@@ -5,6 +5,7 @@ export interface IStorage {
   getMerchant(id: number): Promise<Merchant | undefined>;
   getMerchantByName(name: string): Promise<Merchant | undefined>;
   createMerchant(merchant: InsertMerchant): Promise<Merchant>;
+  updateMerchantRates(id: number, currentProviderRate: string): Promise<Merchant | undefined>;
   
   // Transaction operations
   getTransaction(id: number): Promise<Transaction | undefined>;
@@ -12,6 +13,18 @@ export interface IStorage {
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   updateTransactionStatus(id: number, status: string, windcaveTransactionId?: string): Promise<Transaction | undefined>;
   getTransactionsByMerchant(merchantId: number): Promise<Transaction[]>;
+  
+  // Analytics operations
+  getMerchantAnalytics(merchantId: number): Promise<{
+    totalTransactions: number;
+    completedTransactions: number;
+    totalRevenue: number;
+    currentProviderCost: number;
+    ourCost: number;
+    savings: number;
+    currentProviderRate: number;
+    ourRate: number;
+  }>;
 }
 
 export class MemStorage implements IStorage {
@@ -30,8 +43,13 @@ export class MemStorage implements IStorage {
     this.createMerchant({
       name: "MERCHANT",
       qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=" + encodeURIComponent("http://localhost:5000/pay/1"),
-      paymentUrl: "http://localhost:5000/pay/1"
+      paymentUrl: "http://localhost:5000/pay/1",
+      currentProviderRate: "0.0290",
+      ourRate: "0.0020"
     });
+
+    // Add sample transactions for demo
+    this.createSampleData();
   }
 
   async getMerchant(id: number): Promise<Merchant | undefined> {
@@ -46,7 +64,12 @@ export class MemStorage implements IStorage {
 
   async createMerchant(insertMerchant: InsertMerchant): Promise<Merchant> {
     const id = this.currentMerchantId++;
-    const merchant: Merchant = { ...insertMerchant, id };
+    const merchant: Merchant = { 
+      ...insertMerchant, 
+      id,
+      currentProviderRate: insertMerchant.currentProviderRate || "0.0290",
+      ourRate: insertMerchant.ourRate || "0.0020"
+    };
     this.merchants.set(id, merchant);
     return merchant;
   }
@@ -90,6 +113,82 @@ export class MemStorage implements IStorage {
     return Array.from(this.transactions.values()).filter(
       (transaction) => transaction.merchantId === merchantId
     );
+  }
+
+  async updateMerchantRates(id: number, currentProviderRate: string): Promise<Merchant | undefined> {
+    const merchant = this.merchants.get(id);
+    if (!merchant) return undefined;
+    
+    const updatedMerchant = {
+      ...merchant,
+      currentProviderRate,
+    };
+    this.merchants.set(id, updatedMerchant);
+    return updatedMerchant;
+  }
+
+  async getMerchantAnalytics(merchantId: number): Promise<{
+    totalTransactions: number;
+    completedTransactions: number;
+    totalRevenue: number;
+    currentProviderCost: number;
+    ourCost: number;
+    savings: number;
+    currentProviderRate: number;
+    ourRate: number;
+  }> {
+    const merchant = this.merchants.get(merchantId);
+    const transactions = await this.getTransactionsByMerchant(merchantId);
+    
+    const completedTransactions = transactions.filter(t => t.status === "completed");
+    const totalRevenue = completedTransactions.reduce((sum, t) => sum + parseFloat(t.price), 0);
+    
+    const currentProviderRate = parseFloat(merchant?.currentProviderRate || "0.029");
+    const ourRate = parseFloat(merchant?.ourRate || "0.002");
+    
+    const currentProviderCost = totalRevenue * currentProviderRate;
+    const ourCost = totalRevenue * ourRate;
+    const savings = currentProviderCost - ourCost;
+
+    return {
+      totalTransactions: transactions.length,
+      completedTransactions: completedTransactions.length,
+      totalRevenue,
+      currentProviderCost,
+      ourCost,
+      savings,
+      currentProviderRate: currentProviderRate * 100, // Convert to percentage
+      ourRate: ourRate * 100, // Convert to percentage
+    };
+  }
+
+  private createSampleData() {
+    const sampleTransactions = [
+      { itemName: "Cappuccino", price: "4.50", status: "completed" },
+      { itemName: "Latte", price: "5.00", status: "completed" },
+      { itemName: "Sandwich", price: "8.95", status: "completed" },
+      { itemName: "Muffin", price: "3.75", status: "completed" },
+      { itemName: "Americano", price: "3.50", status: "completed" },
+      { itemName: "Croissant", price: "4.25", status: "completed" },
+      { itemName: "Tea", price: "2.95", status: "completed" },
+      { itemName: "Bagel", price: "6.50", status: "completed" },
+      { itemName: "Smoothie", price: "7.95", status: "completed" },
+      { itemName: "Hot Chocolate", price: "4.75", status: "completed" },
+    ];
+
+    for (const transaction of sampleTransactions) {
+      const id = this.currentTransactionId++;
+      const newTransaction: Transaction = {
+        id,
+        merchantId: 1,
+        itemName: transaction.itemName,
+        price: transaction.price,
+        status: transaction.status,
+        windcaveTransactionId: `WC_${Date.now() + Math.random()}`,
+        createdAt: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000), // Random date within last week
+      };
+      this.transactions.set(id, newTransaction);
+    }
   }
 }
 
