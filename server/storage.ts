@@ -64,6 +64,15 @@ export class MemStorage implements IStorage {
       name: "MERCHANT",
       qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=" + encodeURIComponent("http://localhost:5000/pay/1"),
       paymentUrl: "http://localhost:5000/pay/1",
+      businessName: "The Coffee Corner",
+      contactEmail: "manager@coffeecorner.co.nz",
+      contactPhone: "+64 9 123 4567",
+      businessAddress: "123 Queen Street, Auckland 1010, New Zealand",
+      bankName: "ANZ Bank",
+      bankAccountNumber: "12-3456-1234567-123",
+      bankBranch: "Queen Street Branch",
+      accountHolderName: "The Coffee Corner Ltd",
+      gstNumber: "123-456-789",
       currentProviderRate: "0.0290",
       ourRate: "0.0020"
     });
@@ -298,20 +307,42 @@ export class MemStorage implements IStorage {
 
   private createSampleData() {
     const sampleTransactions = [
-      { itemName: "Cappuccino", price: "4.50", status: "completed" },
-      { itemName: "Latte", price: "5.00", status: "completed" },
-      { itemName: "Sandwich", price: "8.95", status: "completed" },
-      { itemName: "Muffin", price: "3.75", status: "completed" },
-      { itemName: "Americano", price: "3.50", status: "completed" },
-      { itemName: "Croissant", price: "4.25", status: "completed" },
-      { itemName: "Tea", price: "2.95", status: "completed" },
-      { itemName: "Bagel", price: "6.50", status: "completed" },
-      { itemName: "Smoothie", price: "7.95", status: "completed" },
-      { itemName: "Hot Chocolate", price: "4.75", status: "completed" },
+      // Recent transactions (last 3 days)
+      { itemName: "Flat White", price: "5.20", status: "completed", daysAgo: 0 },
+      { itemName: "Chicken Wrap", price: "12.50", status: "completed", daysAgo: 0 },
+      { itemName: "Cappuccino", price: "4.50", status: "completed", daysAgo: 0 },
+      { itemName: "Caesar Salad", price: "14.90", status: "completed", daysAgo: 0 },
+      { itemName: "Iced Coffee", price: "4.80", status: "failed", daysAgo: 1 },
+      { itemName: "Burger & Fries", price: "18.90", status: "completed", daysAgo: 1 },
+      { itemName: "Latte", price: "5.00", status: "completed", daysAgo: 1 },
+      { itemName: "Fish & Chips", price: "22.50", status: "completed", daysAgo: 1 },
+      { itemName: "Green Smoothie", price: "8.50", status: "completed", daysAgo: 2 },
+      { itemName: "Eggs Benedict", price: "16.90", status: "completed", daysAgo: 2 },
+      
+      // Last week transactions
+      { itemName: "Pizza Margherita", price: "24.90", status: "completed", daysAgo: 5 },
+      { itemName: "Americano", price: "3.50", status: "completed", daysAgo: 5 },
+      { itemName: "Pasta Carbonara", price: "19.50", status: "completed", daysAgo: 6 },
+      { itemName: "Orange Juice", price: "4.20", status: "completed", daysAgo: 6 },
+      { itemName: "Steak Sandwich", price: "21.90", status: "completed", daysAgo: 7 },
+      { itemName: "Hot Chocolate", price: "4.75", status: "processing", daysAgo: 7 },
+      
+      // Older transactions (2-4 weeks ago)
+      { itemName: "Thai Curry", price: "17.90", status: "completed", daysAgo: 14 },
+      { itemName: "Croissant", price: "4.25", status: "completed", daysAgo: 15 },
+      { itemName: "Club Sandwich", price: "15.50", status: "completed", daysAgo: 16 },
+      { itemName: "Tea", price: "2.95", status: "completed", daysAgo: 18 },
+      { itemName: "Seafood Pasta", price: "26.90", status: "completed", daysAgo: 20 },
+      { itemName: "Bagel & Cream Cheese", price: "6.50", status: "completed", daysAgo: 21 },
+      { itemName: "Mediterranean Bowl", price: "16.50", status: "completed", daysAgo: 22 },
+      { itemName: "Banana Smoothie", price: "7.95", status: "completed", daysAgo: 25 },
+      { itemName: "Grilled Chicken", price: "19.90", status: "completed", daysAgo: 28 },
+      { itemName: "Muffin", price: "3.75", status: "completed", daysAgo: 30 },
     ];
 
     for (const transaction of sampleTransactions) {
       const id = this.currentTransactionId++;
+      const createdDate = new Date(Date.now() - transaction.daysAgo * 24 * 60 * 60 * 1000 - Math.random() * 12 * 60 * 60 * 1000); // Add some time variation within the day
       const newTransaction: Transaction = {
         id,
         merchantId: 1,
@@ -319,7 +350,7 @@ export class MemStorage implements IStorage {
         price: transaction.price,
         status: transaction.status,
         windcaveTransactionId: `WC_${Date.now() + Math.random()}`,
-        createdAt: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000), // Random date within last week
+        createdAt: createdDate,
       };
       this.transactions.set(id, newTransaction);
     }
