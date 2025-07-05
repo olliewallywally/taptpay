@@ -23,6 +23,39 @@ const loginSchema = z.object({
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
+  // Admin authentication middleware
+  const authenticateAdmin = (req: AuthenticatedRequest, res: any, next: any) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+      return res.status(401).json({ message: 'Access token required' });
+    }
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-change-in-production') as any;
+      
+      // For admin users, we verify directly from the token
+      if (decoded.role === 'admin' && decoded.email === 'admin@tapt.co.nz') {
+        req.user = {
+          id: decoded.userId,
+          email: decoded.email,
+          merchantId: decoded.merchantId,
+          role: decoded.role,
+          password: '',
+          resetToken: undefined,
+          resetTokenExpiry: undefined,
+          createdAt: new Date(),
+        };
+        next();
+      } else {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+    } catch (error) {
+      return res.status(403).json({ message: "Invalid or expired token" });
+    }
+  };
+  
   // Authentication routes
   app.post("/api/auth/login", async (req, res) => {
     try {
@@ -731,8 +764,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create new merchant endpoint
-  app.post("/api/admin/merchants", async (req, res) => {
+  // Legacy create merchant endpoint - deprecated, use /api/admin/merchants/signup instead  
+  app.post("/api/admin/merchants", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    res.status(410).json({ 
+      message: "This endpoint is deprecated. Please use /api/admin/merchants/signup for new merchant creation." 
+    });
+  });
+
+  // Old create merchant endpoint
+  app.post("/api/admin/merchants-old", async (req, res) => {
     try {
       const authHeader = req.headers['authorization'];
       const token = authHeader && authHeader.split(' ')[1];
@@ -752,6 +792,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create merchant
       const newMerchant = await storage.createMerchant({
         name: merchantData.name,
+        email: merchantData.contactEmail, // Add the missing email field
         businessName: merchantData.businessName,
         contactEmail: merchantData.contactEmail,
         contactPhone: merchantData.contactPhone,
@@ -874,13 +915,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all merchants for admin
-  app.get("/api/admin/merchants", authenticateToken, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/admin/merchants", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {
-      const user = req.user;
-      if (!user || user.role !== 'admin') {
-        return res.status(403).json({ message: "Admin access required" });
-      }
-      
       const merchants = await storage.getAllMerchants();
       res.json(merchants);
     } catch (error) {
@@ -890,12 +926,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create merchant signup
-  app.post("/api/admin/merchants/signup", authenticateToken, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/admin/merchants/signup", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {
-      const user = req.user;
-      if (!user || user.role !== 'admin') {
-        return res.status(403).json({ message: "Admin access required" });
-      }
 
       const validation = createMerchantSchema.safeParse(req.body);
       if (!validation.success) {
