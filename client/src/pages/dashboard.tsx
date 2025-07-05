@@ -304,9 +304,9 @@ export default function Dashboard() {
       {/* Rate Comparison */}
       <Card className="mb-8">
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
+          <CardTitle className="flex items-center justify-between text-lg">
             <div className="flex items-center space-x-2">
-              <Calculator className="h-5 w-5" />
+              <Calculator className="h-4 w-4" />
               <span>Rate Comparison</span>
             </div>
             {!isEditingRate && (
@@ -326,24 +326,25 @@ export default function Dashboard() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
-              <div className="flex-1">
-                <p className="text-sm font-medium text-red-900">Your Current Provider</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Current Provider */}
+            <div className="p-4 bg-red-50 rounded-lg border border-red-200">
+              <div className="text-center">
+                <p className="text-sm font-medium text-red-900 mb-2">Your Current Provider</p>
                 {isEditingRate ? (
                   <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="flex items-center space-x-2 mt-2">
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2">
                       <FormField
                         control={form.control}
                         name="currentProviderRate"
                         render={({ field }) => (
-                          <FormItem className="flex-1">
+                          <FormItem>
                             <FormControl>
                               <div className="relative">
                                 <Input
                                   type="text"
                                   placeholder="2.9"
-                                  className="pr-8 text-xl font-bold"
+                                  className="pr-8 text-xl font-bold text-center"
                                   autoFocus
                                   {...field}
                                 />
@@ -354,71 +355,76 @@ export default function Dashboard() {
                           </FormItem>
                         )}
                       />
-                      <Button
-                        type="submit"
-                        size="sm"
-                        disabled={updateRatesMutation.isPending}
-                        className="bg-green-600 hover:bg-green-700 text-white"
-                      >
-                        {updateRatesMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Check className="h-4 w-4" />
-                        )}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleCancelEdit}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+                      <div className="flex justify-center space-x-1">
+                        <Button
+                          type="submit"
+                          size="sm"
+                          disabled={updateRatesMutation.isPending}
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                        >
+                          {updateRatesMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Check className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleCancelEdit}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </form>
                   </Form>
                 ) : (
-                  <p className="text-2xl font-bold text-red-700">
+                  <p className="text-2xl font-bold text-red-700 mb-2">
                     {analytics?.currentProviderRate?.toFixed(2) || "2.90"}%
                   </p>
                 )}
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-red-600">Total Cost</p>
-                <p className="text-lg font-semibold text-red-700">
-                  ${analytics?.currentProviderCost?.toFixed(2) || "0.00"}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-              <div>
-                <p className="text-sm font-medium text-green-900">Our Rate</p>
-                <p className="text-2xl font-bold text-green-700">
-                  $0.20 flat fee
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-green-600">Total Cost</p>
-                <p className="text-lg font-semibold text-green-700">
-                  ${analytics?.ourCost?.toFixed(2) || "0.00"}
-                </p>
+                <div className="border-t border-red-200 pt-2">
+                  <p className="text-xs text-red-600">Total Cost</p>
+                  <p className="text-lg font-semibold text-red-700">
+                    ${analytics?.currentProviderCost?.toFixed(2) || "0.00"}
+                  </p>
+                </div>
               </div>
             </div>
 
-            <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg border-2 border-blue-200">
-              <div>
-                <p className="text-sm font-medium text-blue-900">Your Savings</p>
-                <p className="text-2xl font-bold text-blue-700">
+            {/* Our Rate */}
+            <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+              <div className="text-center">
+                <p className="text-sm font-medium text-green-900 mb-2">Our Rate</p>
+                <p className="text-2xl font-bold text-green-700 mb-2">
+                  $0.20
+                </p>
+                <p className="text-xs text-green-600 mb-2">flat fee</p>
+                <div className="border-t border-green-200 pt-2">
+                  <p className="text-xs text-green-600">Total Cost</p>
+                  <p className="text-lg font-semibold text-green-700">
+                    ${analytics?.ourCost?.toFixed(2) || "0.00"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Savings */}
+            <div className="p-4 bg-blue-50 rounded-lg border-2 border-blue-300">
+              <div className="text-center">
+                <p className="text-sm font-medium text-blue-900 mb-2">Your Savings</p>
+                <p className="text-2xl font-bold text-blue-700 mb-2">
                   ${analytics?.savings?.toFixed(2) || "0.00"}
                 </p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-blue-600">Percentage Saved</p>
-                <p className="text-lg font-semibold text-blue-700">
-                  {analytics?.currentProviderRate && analytics?.ourRate 
-                    ? ((analytics.currentProviderRate - analytics.ourRate) / analytics.currentProviderRate * 100).toFixed(1)
-                    : "0"}%
-                </p>
+                <div className="border-t border-blue-200 pt-2">
+                  <p className="text-xs text-blue-600">Percentage Saved</p>
+                  <p className="text-lg font-semibold text-blue-700">
+                    {analytics?.currentProviderRate && analytics?.ourRate 
+                      ? ((analytics.currentProviderRate - analytics.ourRate) / analytics.currentProviderRate * 100).toFixed(1)
+                      : "0"}%
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -428,8 +434,8 @@ export default function Dashboard() {
       {/* Export Data */}
       <Card className="mb-8">
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Download className="h-5 w-5" />
+          <CardTitle className="flex items-center space-x-2 text-lg">
+            <Download className="h-4 w-4" />
             <span>Export Data</span>
           </CardTitle>
           <CardDescription>
@@ -486,7 +492,7 @@ export default function Dashboard() {
       {/* Transaction History */}
       <Card>
         <CardHeader>
-          <CardTitle>Transaction History</CardTitle>
+          <CardTitle className="text-lg">Transaction History</CardTitle>
           <CardDescription>
             View all your recent payment transactions
           </CardDescription>
