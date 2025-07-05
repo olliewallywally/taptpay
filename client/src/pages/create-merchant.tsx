@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createMerchantSchema, type CreateMerchant } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -15,6 +15,7 @@ import { Link } from "wouter";
 
 export default function CreateMerchant() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [isSuccess, setIsSuccess] = useState(false);
   const [createdMerchant, setCreatedMerchant] = useState<any>(null);
 
@@ -38,6 +39,11 @@ export default function CreateMerchant() {
     onSuccess: (data) => {
       setCreatedMerchant(data.merchant);
       setIsSuccess(true);
+      
+      // Invalidate queries to refresh the admin dashboard
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/merchants'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/analytics'] });
+      
       toast({
         title: "Merchant Created",
         description: "Verification email sent successfully",
