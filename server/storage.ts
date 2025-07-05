@@ -29,6 +29,22 @@ export interface IStorage {
     currentProviderRate: number;
     ourRate: number;
   }>;
+  
+  // Export operations
+  getTransactionsByMerchantWithDateRange(merchantId: number, startDate?: Date, endDate?: Date): Promise<Transaction[]>;
+  getMerchantAnalyticsWithDateRange(merchantId: number, startDate?: Date, endDate?: Date): Promise<{
+    totalTransactions: number;
+    completedTransactions: number;
+    totalRevenue: number;
+    currentProviderCost: number;
+    ourCost: number;
+    savings: number;
+    currentProviderRate: number;
+    ourRate: number;
+    dateRange: { start: Date | null; end: Date | null };
+    averageTransactionValue: number;
+    transactionsByStatus: { [key: string]: number };
+  }>;
 }
 
 export class MemStorage implements IStorage {
@@ -207,6 +223,79 @@ export class MemStorage implements IStorage {
     };
   }
 
+  async getTransactionsByMerchantWithDateRange(merchantId: number, startDate?: Date, endDate?: Date): Promise<Transaction[]> {
+    const allTransactions = await this.getTransactionsByMerchant(merchantId);
+    
+    if (!startDate && !endDate) {
+      return allTransactions;
+    }
+    
+    return allTransactions.filter(transaction => {
+      if (!transaction.createdAt) return false;
+      const transactionDate = new Date(transaction.createdAt);
+      
+      if (startDate && transactionDate < startDate) {
+        return false;
+      }
+      
+      if (endDate && transactionDate > endDate) {
+        return false;
+      }
+      
+      return true;
+    });
+  }
+
+  async getMerchantAnalyticsWithDateRange(merchantId: number, startDate?: Date, endDate?: Date): Promise<{
+    totalTransactions: number;
+    completedTransactions: number;
+    totalRevenue: number;
+    currentProviderCost: number;
+    ourCost: number;
+    savings: number;
+    currentProviderRate: number;
+    ourRate: number;
+    dateRange: { start: Date | null; end: Date | null };
+    averageTransactionValue: number;
+    transactionsByStatus: { [key: string]: number };
+  }> {
+    const merchant = this.merchants.get(merchantId);
+    const transactions = await this.getTransactionsByMerchantWithDateRange(merchantId, startDate, endDate);
+    
+    const completedTransactions = transactions.filter(t => t.status === "completed");
+    const totalRevenue = completedTransactions.reduce((sum, t) => sum + parseFloat(t.price), 0);
+    
+    const currentProviderRate = parseFloat(merchant?.currentProviderRate || "0.029");
+    const ourRate = parseFloat(merchant?.ourRate || "0.002");
+    
+    const currentProviderCost = totalRevenue * currentProviderRate;
+    const ourCost = totalRevenue * ourRate;
+    const savings = currentProviderCost - ourCost;
+
+    // Calculate transaction breakdown by status
+    const transactionsByStatus: { [key: string]: number } = {};
+    transactions.forEach(t => {
+      transactionsByStatus[t.status] = (transactionsByStatus[t.status] || 0) + 1;
+    });
+
+    return {
+      totalTransactions: transactions.length,
+      completedTransactions: completedTransactions.length,
+      totalRevenue,
+      currentProviderCost,
+      ourCost,
+      savings,
+      currentProviderRate: currentProviderRate * 100,
+      ourRate: ourRate * 100,
+      dateRange: { 
+        start: startDate || null, 
+        end: endDate || null 
+      },
+      averageTransactionValue: completedTransactions.length > 0 ? totalRevenue / completedTransactions.length : 0,
+      transactionsByStatus,
+    };
+  }
+
   private createSampleData() {
     const sampleTransactions = [
       { itemName: "Cappuccino", price: "4.50", status: "completed" },
@@ -375,6 +464,93 @@ export class DatabaseStorage implements IStorage {
       savings,
       currentProviderRate,
       ourRate,
+    };
+  }
+
+  async getTransactionsByMerchantWithDateRange(merchantId: number, startDate?: Date, endDate?: Date): Promise<Transaction[]> {
+    if (!this.db) throw new Error('Database not available');
+    
+    let query = this.db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.merchantId, merchantId))
+      .orderBy(desc(transactions.createdAt));
+
+    if (startDate || endDate) {
+      // For database implementation, we would add date filtering here
+      // For now, fall back to memory filtering
+      const allTransactions = await query;
+      return allTransactions.filter(transaction => {
+        if (!transaction.createdAt) return false;
+        const transactionDate = new Date(transaction.createdAt as Date);
+        
+        if (startDate && transactionDate < startDate) {
+          return false;
+        }
+        
+        if (endDate && transactionDate > endDate) {
+          return false;
+        }
+        
+        return true;
+      });
+    }
+
+    return query;
+  }
+
+  async getMerchantAnalyticsWithDateRange(merchantId: number, startDate?: Date, endDate?: Date): Promise<{
+    totalTransactions: number;
+    completedTransactions: number;
+    totalRevenue: number;
+    currentProviderCost: number;
+    ourCost: number;
+    savings: number;
+    currentProviderRate: number;
+    ourRate: number;
+    dateRange: { start: Date | null; end: Date | null };
+    averageTransactionValue: number;
+    transactionsByStatus: { [key: string]: number };
+  }> {
+    if (!this.db) throw new Error('Database not available');
+    
+    const merchantTransactions = await this.getTransactionsByMerchantWithDateRange(merchantId, startDate, endDate);
+    const merchant = await this.getMerchant(merchantId);
+    
+    const totalTransactions = merchantTransactions.length;
+    const completedTransactions = merchantTransactions.filter(t => t.status === 'completed');
+    const totalRevenue = completedTransactions.reduce((sum, t) => sum + parseFloat(t.price), 0);
+    
+    const currentProviderRate = merchant && merchant.currentProviderRate 
+      ? parseFloat(merchant.currentProviderRate) 
+      : 2.9;
+    const ourRate = 0.2;
+    
+    const currentProviderCost = totalRevenue * (currentProviderRate / 100);
+    const ourCost = totalRevenue * (ourRate / 100);
+    const savings = currentProviderCost - ourCost;
+
+    // Calculate transaction breakdown by status
+    const transactionsByStatus: { [key: string]: number } = {};
+    merchantTransactions.forEach(t => {
+      transactionsByStatus[t.status] = (transactionsByStatus[t.status] || 0) + 1;
+    });
+    
+    return {
+      totalTransactions,
+      completedTransactions: completedTransactions.length,
+      totalRevenue,
+      currentProviderCost,
+      ourCost,
+      savings,
+      currentProviderRate,
+      ourRate,
+      dateRange: { 
+        start: startDate || null, 
+        end: endDate || null 
+      },
+      averageTransactionValue: completedTransactions.length > 0 ? totalRevenue / completedTransactions.length : 0,
+      transactionsByStatus,
     };
   }
 }

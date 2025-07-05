@@ -5,6 +5,7 @@ import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetai
 import { windcaveService } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, type AuthenticatedRequest } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
+import { generateBusinessReportPdf } from "./report-generator";
 import { getBaseUrl, generatePaymentUrl, generateQrCodeUrl } from "./url-utils";
 import QRCode from "qrcode";
 import { z } from "zod";
@@ -293,6 +294,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(analytics);
     } catch (error) {
       res.status(500).json({ message: "Failed to get analytics" });
+    }
+  });
+
+  // Get merchant analytics with date range
+  app.get("/api/merchants/:id/analytics/export", async (req, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      const { startDate, endDate } = req.query;
+      
+      const start = startDate ? new Date(startDate as string) : undefined;
+      const end = endDate ? new Date(endDate as string) : undefined;
+      
+      const analytics = await storage.getMerchantAnalyticsWithDateRange(merchantId, start, end);
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching analytics with date range:", error);
+      res.status(500).json({ message: "Failed to get analytics" });
+    }
+  });
+
+  // Export transactions as CSV
+  app.get("/api/merchants/:id/export/csv", async (req, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      const { startDate, endDate } = req.query;
+      
+      const start = startDate ? new Date(startDate as string) : undefined;
+      const end = endDate ? new Date(endDate as string) : undefined;
+      
+      const transactions = await storage.getTransactionsByMerchantWithDateRange(merchantId, start, end);
+      
+      // Generate CSV headers
+      const headers = [
+        "Transaction ID",
+        "Date & Time", 
+        "Item Name",
+        "Amount (NZD)",
+        "Status",
+        "Payment Reference"
+      ];
+      
+      // Generate CSV content
+      const csvRows = [headers.join(",")];
+      
+      transactions.forEach(transaction => {
+        const row = [
+          transaction.id,
+          transaction.createdAt ? new Date(transaction.createdAt).toLocaleString('en-NZ') : 'N/A',
+          `"${transaction.itemName}"`, // Quote item names to handle commas
+          `$${parseFloat(transaction.price).toFixed(2)}`,
+          transaction.status,
+          transaction.windcaveTransactionId || 'N/A'
+        ];
+        csvRows.push(row.join(","));
+      });
+      
+      const csvContent = csvRows.join("\n");
+      
+      // Set response headers for CSV download
+      const dateRange = start || end ? 
+        `_${start?.toISOString().split('T')[0] || 'beginning'}_to_${end?.toISOString().split('T')[0] || 'today'}` : 
+        '_all_time';
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=tapt_transactions${dateRange}.csv`);
+      res.send(csvContent);
+    } catch (error) {
+      console.error("Error generating CSV export:", error);
+      res.status(500).json({ message: "Failed to generate CSV export" });
+    }
+  });
+
+  // Export business report as PDF
+  app.get("/api/merchants/:id/export/pdf", async (req, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      const { startDate, endDate } = req.query;
+      
+      const start = startDate ? new Date(startDate as string) : undefined;
+      const end = endDate ? new Date(endDate as string) : undefined;
+      
+      // Get analytics and transactions for the report
+      const analytics = await storage.getMerchantAnalyticsWithDateRange(merchantId, start, end);
+      const transactions = await storage.getTransactionsByMerchantWithDateRange(merchantId, start, end);
+      const merchant = await storage.getMerchant(merchantId);
+      
+      if (!merchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+      
+      // Generate PDF report
+      const pdf = await generateBusinessReportPdf(analytics, transactions, merchant);
+      
+      // Set response headers for PDF download
+      const dateRange = start || end ? 
+        `_${start?.toISOString().split('T')[0] || 'beginning'}_to_${end?.toISOString().split('T')[0] || 'today'}` : 
+        '_all_time';
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=tapt_business_report${dateRange}.pdf`);
+      res.send(pdf);
+    } catch (error) {
+      console.error("Error generating PDF report:", error);
+      res.status(500).json({ message: "Failed to generate PDF report" });
     }
   });
 
