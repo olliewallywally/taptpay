@@ -13,6 +13,7 @@ import Settings from "@/pages/settings";
 
 import Login from "@/pages/login";
 import AdminDashboard from "@/pages/admin-dashboard";
+import AdminMerchantDetail from "@/pages/admin-merchant";
 import { Layout } from "@/components/layout";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -120,6 +121,12 @@ function Router() {
       <Route path="/admin/dashboard">
         <AdminProtectedRoute>
           <AdminDashboard />
+        </AdminProtectedRoute>
+      </Route>
+      
+      <Route path="/admin/merchants/:merchantId">
+        <AdminProtectedRoute>
+          <AdminMerchantDetail />
         </AdminProtectedRoute>
       </Route>
       
