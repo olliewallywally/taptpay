@@ -663,7 +663,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const activeMerchants = recentMerchants.filter(m => m.status === 'active').length;
-      const averageTransactionValue = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
+      const transactionFeeRevenue = totalCompletedTransactions * 0.20; // $0.20 per completed transaction
 
       res.json({
         totalMerchants: merchants.length,
@@ -671,7 +671,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalRevenue,
         totalTransactions,
         completedTransactions: totalCompletedTransactions,
-        averageTransactionValue,
+        transactionFeeRevenue,
         recentMerchants: recentMerchants.sort((a, b) => b.totalRevenue - a.totalRevenue), // Sort by revenue
       });
     } catch (error) {
