@@ -1013,6 +1013,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Clear problematic merchants endpoint
+  app.post("/api/admin/clear-merchants", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const problemEmails = [
+        'oliverleonard.professional@gmail.com',
+        'dmizedzn@gmail.com', 
+        'oliverharryleonard@gmail.com'
+      ];
+      
+      let clearedCount = 0;
+      for (const email of problemEmails) {
+        const merchant = await storage.getMerchantByEmail(email);
+        if (merchant) {
+          // For MemStorage, we need to manually remove from the map
+          if ('merchants' in storage) {
+            (storage as any).merchants.delete(merchant.id);
+            clearedCount++;
+          }
+        }
+      }
+      
+      res.json({ 
+        message: `Cleared ${clearedCount} problematic merchants`,
+        clearedEmails: problemEmails
+      });
+    } catch (error) {
+      console.error("Clear merchants error:", error);
+      res.status(500).json({ message: "Failed to clear merchants" });
+    }
+  });
+
   // Test email endpoint
   app.post("/api/admin/test-email", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {

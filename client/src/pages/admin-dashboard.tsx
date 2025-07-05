@@ -809,28 +809,56 @@ export default function AdminDashboard() {
                   <div className="space-y-4">
                     <h4 className="font-medium text-gray-900">Email Configuration</h4>
                     <div className="space-y-3">
-                      <Button
-                        onClick={async () => {
-                          try {
-                            const response = await apiRequest("POST", "/api/admin/test-email", {});
-                            const result = await response.json();
-                            toast({
-                              title: result.success ? "Test Email Sent" : "Email Test Failed",
-                              description: result.message,
-                              variant: result.success ? "default" : "destructive",
-                            });
-                          } catch (error: any) {
-                            toast({
-                              title: "Email Test Failed",
-                              description: error.message || "Failed to send test email",
-                              variant: "destructive",
-                            });
-                          }
-                        }}
-                        className="w-full"
-                      >
-                        Test SendGrid Email
-                      </Button>
+                      <div className="space-y-2">
+                        <Button
+                          onClick={async () => {
+                            try {
+                              const response = await apiRequest("POST", "/api/admin/test-email", {});
+                              const result = await response.json();
+                              toast({
+                                title: result.success ? "Test Email Sent" : "Email Test Failed",
+                                description: result.message,
+                                variant: result.success ? "default" : "destructive",
+                              });
+                            } catch (error: any) {
+                              toast({
+                                title: "Email Test Failed",
+                                description: error.message || "Failed to send test email",
+                                variant: "destructive",
+                              });
+                            }
+                          }}
+                          className="w-full"
+                        >
+                          Test SendGrid Email
+                        </Button>
+                        
+                        <Button
+                          variant="destructive"
+                          onClick={async () => {
+                            try {
+                              const response = await apiRequest("POST", "/api/admin/clear-merchants", {});
+                              const result = await response.json();
+                              toast({
+                                title: "Merchants Cleared",
+                                description: result.message,
+                              });
+                              // Refresh merchant list
+                              queryClient.invalidateQueries({ queryKey: ['/api/admin/merchants'] });
+                              queryClient.invalidateQueries({ queryKey: ['/api/admin/analytics'] });
+                            } catch (error: any) {
+                              toast({
+                                title: "Clear Failed",
+                                description: error.message || "Failed to clear merchants",
+                                variant: "destructive",
+                              });
+                            }
+                          }}
+                          className="w-full"
+                        >
+                          Clear Ghost Merchants
+                        </Button>
+                      </div>
                     </div>
                   </div>
                   
