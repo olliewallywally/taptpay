@@ -134,10 +134,38 @@ npm start      # Runs production server
 - Express serves static files in production
 - Development uses Vite middleware for hot reloading
 
+## Security & Production Features
+
+### Authentication System
+- JWT-based authentication with bcrypt password hashing
+- Protected routes requiring login for merchant terminal and dashboard
+- User session management with localStorage token storage
+- Demo account: demo@tapt.co.nz / demo123
+
+### Database Configuration
+- Hybrid storage system: PostgreSQL for production, in-memory for development
+- Automatic fallback to memory storage when DATABASE_URL not configured
+- Drizzle ORM with type-safe database operations
+- Database migration support via Drizzle Kit
+
+### API Security
+- Bearer token authentication for API endpoints
+- Request validation using Zod schemas
+- Error handling with appropriate HTTP status codes
+- CORS and credential handling
+
+### Production Considerations
+- Environment-based configuration
+- Secure session management
+- Database connection pooling
+- Error logging and monitoring
+
 ## Changelog
 - July 05, 2025. Initial setup
 - July 05, 2025. Added comprehensive payment dashboard with analytics, savings calculator, and transaction history
 - July 05, 2025. Implemented inline editing for rate comparison to improve user experience
+- July 05, 2025. Added complete authentication system with JWT tokens and protected routes
+- July 05, 2025. Implemented hybrid database storage with PostgreSQL support and memory fallback
 
 ## User Preferences
 

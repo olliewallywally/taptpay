@@ -3,13 +3,95 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertTransactionSchema, updateMerchantRatesSchema } from "@shared/schema";
 import { windcaveService } from "./windcave";
+import { authenticateUser, generateToken, authenticateToken, type AuthenticatedRequest } from "./auth";
+import QRCode from "qrcode";
 import { z } from "zod";
 
 // Store SSE connections for real-time updates
 const sseConnections = new Map<number, Set<any>>();
 
+const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
+
 export async function registerRoutes(app: Express): Promise<Server> {
   
+  // Authentication routes
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const validation = loginSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid email or password", errors: validation.error.errors });
+      }
+
+      const { email, password } = validation.data;
+      const user = await authenticateUser(email, password);
+      
+      if (!user) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+
+      const token = generateToken(user);
+      
+      res.json({
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          merchantId: user.merchantId,
+          role: user.role,
+        },
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  app.get("/api/auth/me", authenticateToken, (req: AuthenticatedRequest, res) => {
+    res.json({
+      user: {
+        id: req.user!.id,
+        email: req.user!.email,
+        merchantId: req.user!.merchantId,
+        role: req.user!.role,
+      },
+    });
+  });
+
+  // Generate QR code for merchant
+  app.get("/api/merchants/:id/qr", async (req, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      const merchant = await storage.getMerchant(merchantId);
+      
+      if (!merchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+
+      // Set response headers for PNG image
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+      
+      // Generate QR code as PNG buffer
+      const qrBuffer = await QRCode.toBuffer(merchant.paymentUrl, {
+        type: 'png',
+        width: 400,
+        margin: 2,
+        color: {
+          dark: '#16423C', // Forest green
+          light: '#FFFFFF'
+        }
+      });
+      
+      res.send(qrBuffer);
+    } catch (error) {
+      console.error("QR code generation error:", error);
+      res.status(500).json({ message: "Failed to generate QR code" });
+    }
+  });
+
   // Get merchant info
   app.get("/api/merchants/:id", async (req, res) => {
     try {
