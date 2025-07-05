@@ -958,7 +958,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const verificationUrl = `${getBaseUrl(req)}/verify-merchant?token=${verificationToken}`;
       const emailSent = await sendEmail({
         to: data.email,
-        from: 'noreply@tapt.co.nz',
+        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@tapt.co.nz',
         subject: 'Complete Your Tapt Merchant Registration',
         html: `
           <h2>Complete Your Tapt Merchant Registration</h2>
