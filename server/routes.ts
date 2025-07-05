@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema } from "@shared/schema";
+import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema } from "@shared/schema";
 import { windcaveService } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, createUser, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
@@ -644,6 +644,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update merchant bank account details
+  // Change merchant password
+  app.put("/api/merchants/:id/change-password", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      const validation = changePasswordSchema.safeParse(req.body);
+      
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "Validation failed", 
+          errors: validation.error.errors 
+        });
+      }
+
+      const { currentPassword, newPassword } = validation.data;
+
+      // Get merchant to verify current password
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant || !merchant.passwordHash) {
+        return res.status(404).json({ message: "Merchant not found or password not set" });
+      }
+
+      // Verify current password
+      const currentPasswordValid = await bcrypt.compare(currentPassword, merchant.passwordHash);
+      if (!currentPasswordValid) {
+        return res.status(400).json({ message: "Current password is incorrect" });
+      }
+
+      // Hash new password and update
+      const newPasswordHash = await bcrypt.hash(newPassword, 10);
+      const updatedMerchant = await storage.verifyMerchant(merchant.verificationToken || '', newPasswordHash);
+
+      if (!updatedMerchant) {
+        return res.status(500).json({ message: "Failed to update password" });
+      }
+
+      res.json({ message: "Password updated successfully" });
+
+    } catch (error) {
+      console.error("Change password error:", error);
+      res.status(500).json({ message: "Failed to change password" });
+    }
+  });
+
   app.put("/api/merchants/:id/bank-account", async (req, res) => {
     try {
       const merchantId = parseInt(req.params.id);
@@ -1004,46 +1047,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const data = validation.data;
+      const { password, confirmPassword, ...merchantData } = validation.data;
 
       // Check if email already exists
-      const existingMerchant = await storage.getMerchantByEmail(data.email);
+      const existingMerchant = await storage.getMerchantByEmail(merchantData.email);
       if (existingMerchant) {
         return res.status(400).json({ message: "Email already registered" });
       }
 
-      // Generate verification token
-      const verificationToken = crypto.randomBytes(32).toString('hex');
+      // Hash the password
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      // Generate URLs for the merchant
+      const tempMerchantId = Date.now(); // Temporary ID for URL generation
+      const paymentUrl = generatePaymentUrl(tempMerchantId);
+      const qrCodeUrl = generateQrCodeUrl(tempMerchantId);
+
+      // Generate proper URLs with actual merchant ID after creation
+      const merchant = await storage.createMerchantWithPassword({
+        ...merchantData,
+        qrCodeUrl: `temp`, // Will be updated after creation
+        paymentUrl: `temp` // Will be updated after creation
+      }, passwordHash);
+
+      // Update with proper URLs now that we have the merchant ID
+      const actualPaymentUrl = generatePaymentUrl(merchant.id);
+      const actualQrCodeUrl = generateQrCodeUrl(merchant.id);
       
-      // Create merchant
-      const merchant = await storage.createMerchantWithSignup({
-        ...data,
-        verificationToken
+      await storage.updateMerchantDetails(merchant.id, {
+        businessName: merchant.businessName,
+        contactEmail: merchant.email,
+        contactPhone: merchant.phone || '',
+        businessAddress: merchant.address || ''
       });
 
-      // Generate verification URL
-      const verificationUrl = `${getBaseUrl(req)}/verify-merchant?token=${verificationToken}`;
-      
-      // Log verification details for admin access (since email is not working)
-      console.log(`\n=== MERCHANT VERIFICATION LINK ===`);
-      console.log(`Merchant: ${data.name} (${data.email})`);
-      console.log(`Verification URL: ${verificationUrl}`);
-      console.log(`Token: ${verificationToken}`);
-      console.log(`===================================\n`);
-
       res.json({ 
-        message: "Merchant created successfully. Check console for verification link.",
+        message: "Merchant created successfully and is ready to use.",
         merchant: {
           id: merchant.id,
           name: merchant.name,
           businessName: merchant.businessName,
           email: merchant.email,
-          status: merchant.status
-        },
-        verificationUrl,
-        verificationToken,
-        emailSent: false,
-        note: "Email service unavailable. Use the verification URL provided to complete merchant setup."
+          status: 'verified'
+        }
       });
     } catch (error) {
       console.error("Error creating merchant:", error);

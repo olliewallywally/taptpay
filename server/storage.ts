@@ -9,6 +9,7 @@ export interface IStorage {
   getMerchantByEmail(email: string): Promise<Merchant | undefined>;
   getMerchantByToken(token: string): Promise<Merchant | undefined>;
   createMerchant(merchant: InsertMerchant): Promise<Merchant>;
+  createMerchantWithPassword(merchantData: any, passwordHash: string): Promise<Merchant>;
   createMerchantWithSignup(data: CreateMerchant & { verificationToken: string }): Promise<Merchant>;
   verifyMerchant(token: string, passwordHash: string): Promise<Merchant | undefined>;
   updateMerchantStatus(id: number, status: string): Promise<Merchant | undefined>;
@@ -149,6 +150,38 @@ export class MemStorage implements IStorage {
       bankBranch: insertMerchant.bankBranch || null,
       accountHolderName: insertMerchant.accountHolderName || null,
       gstNumber: insertMerchant.gstNumber || null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.merchants.set(id, merchant);
+    return merchant;
+  }
+
+  async createMerchantWithPassword(merchantData: any, passwordHash: string): Promise<Merchant> {
+    const id = this.currentMerchantId++;
+    const merchant: Merchant = { 
+      id,
+      name: merchantData.name,
+      businessName: merchantData.businessName,
+      businessType: merchantData.businessType || null,
+      email: merchantData.email,
+      phone: merchantData.phone || null,
+      address: merchantData.address || null,
+      status: "verified",
+      verificationToken: null,
+      passwordHash: passwordHash,
+      qrCodeUrl: merchantData.qrCodeUrl || null,
+      paymentUrl: merchantData.paymentUrl || null,
+      currentProviderRate: merchantData.currentProviderRate || "0.0290",
+      ourRate: merchantData.ourRate || "0.0020",
+      contactEmail: merchantData.contactEmail || null,
+      contactPhone: merchantData.contactPhone || null,
+      businessAddress: merchantData.businessAddress || null,
+      bankName: merchantData.bankName || null,
+      bankAccountNumber: merchantData.bankAccountNumber || null,
+      bankBranch: merchantData.bankBranch || null,
+      accountHolderName: merchantData.accountHolderName || null,
+      gstNumber: merchantData.gstNumber || null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -473,6 +506,18 @@ export class DatabaseStorage implements IStorage {
   async createMerchant(insertMerchant: InsertMerchant): Promise<Merchant> {
     if (!this.db) throw new Error('Database not available');
     const result = await this.db.insert(merchants).values(insertMerchant).returning();
+    return result[0];
+  }
+
+  async createMerchantWithPassword(merchantData: any, passwordHash: string): Promise<Merchant> {
+    if (!this.db) throw new Error('Database not available');
+    const insertData = {
+      ...merchantData,
+      passwordHash,
+      status: 'verified',
+      verificationToken: null
+    };
+    const result = await this.db.insert(merchants).values(insertData).returning();
     return result[0];
   }
 

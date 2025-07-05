@@ -73,6 +73,11 @@ export const createMerchantSchema = z.object({
   email: z.string().email("Valid email is required"),
   phone: z.string().min(1, "Phone number is required").max(20),
   address: z.string().min(1, "Address is required").max(200),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
 });
 
 export const verifyMerchantSchema = z.object({
@@ -100,6 +105,15 @@ export const updateBankAccountSchema = z.object({
   bankAccountNumber: z.string().regex(/^\d{2}-\d{4}-\d{7}-\d{2,3}$/, "Must be valid NZ account format (12-3456-1234567-12)"),
   bankBranch: z.string().min(1, "Bank branch is required").max(50),
   accountHolderName: z.string().min(1, "Account holder name is required").max(100),
+});
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: z.string().min(6, "New password must be at least 6 characters"),
+  confirmPassword: z.string(),
+}).refine((data) => data.newPassword === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
 });
 
 export const insertTransactionSchema = createInsertSchema(transactions).omit({
