@@ -16,13 +16,20 @@ export const users = pgTable("users", {
 export const merchants = pgTable("merchants", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
-  qrCodeUrl: text("qr_code_url").notNull(),
-  paymentUrl: text("payment_url").notNull(),
+  businessName: text("business_name").notNull(),
+  businessType: text("business_type"),
+  email: text("email").notNull().unique(),
+  phone: text("phone"),
+  address: text("address"),
+  status: text("status").notNull().default("pending"), // pending, verified, active, inactive
+  verificationToken: text("verification_token"),
+  passwordHash: text("password_hash"),
+  qrCodeUrl: text("qr_code_url"),
+  paymentUrl: text("payment_url"),
   currentProviderRate: decimal("current_provider_rate", { precision: 5, scale: 4 }).default("0.0290"), // Default 2.9%
   ourRate: decimal("our_rate", { precision: 5, scale: 4 }).default("0.0020"), // Our 0.20%
   
-  // Merchant business details
-  businessName: text("business_name"),
+  // Additional business details
   contactEmail: text("contact_email"),
   contactPhone: text("contact_phone"),
   businessAddress: text("business_address"),
@@ -35,6 +42,9 @@ export const merchants = pgTable("merchants", {
   
   // Tax information
   gstNumber: text("gst_number"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const transactions = pgTable("transactions", {
@@ -49,6 +59,29 @@ export const transactions = pgTable("transactions", {
 
 export const insertMerchantSchema = createInsertSchema(merchants).omit({
   id: true,
+  status: true,
+  verificationToken: true,
+  passwordHash: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const createMerchantSchema = z.object({
+  name: z.string().min(1, "Merchant name is required").max(50),
+  businessName: z.string().min(1, "Business name is required").max(100),
+  businessType: z.string().min(1, "Business type is required").max(50),
+  email: z.string().email("Valid email is required"),
+  phone: z.string().min(1, "Phone number is required").max(20),
+  address: z.string().min(1, "Address is required").max(200),
+});
+
+export const verifyMerchantSchema = z.object({
+  token: z.string().min(1, "Verification token is required"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  confirmPassword: z.string().min(6, "Password confirmation is required"),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
 });
 
 export const updateMerchantRatesSchema = z.object({
@@ -101,6 +134,8 @@ export const insertUserSchema = createInsertSchema(users).omit({
 });
 
 export type InsertMerchant = z.infer<typeof insertMerchantSchema>;
+export type CreateMerchant = z.infer<typeof createMerchantSchema>;
+export type VerifyMerchant = z.infer<typeof verifyMerchantSchema>;
 export type Merchant = typeof merchants.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type Transaction = typeof transactions.$inferSelect;

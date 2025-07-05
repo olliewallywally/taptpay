@@ -1,4 +1,4 @@
-import { merchants, transactions, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction } from "@shared/schema";
+import { merchants, transactions, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant } from "@shared/schema";
 import { getDb, isDatabaseConnected } from "./database";
 import { eq, desc, and } from "drizzle-orm";
 
@@ -6,10 +6,16 @@ export interface IStorage {
   // Merchant operations
   getMerchant(id: number): Promise<Merchant | undefined>;
   getMerchantByName(name: string): Promise<Merchant | undefined>;
+  getMerchantByEmail(email: string): Promise<Merchant | undefined>;
+  getMerchantByToken(token: string): Promise<Merchant | undefined>;
   createMerchant(merchant: InsertMerchant): Promise<Merchant>;
+  createMerchantWithSignup(data: CreateMerchant & { verificationToken: string }): Promise<Merchant>;
+  verifyMerchant(token: string, passwordHash: string): Promise<Merchant | undefined>;
+  updateMerchantStatus(id: number, status: string): Promise<Merchant | undefined>;
   updateMerchantRates(id: number, currentProviderRate: string): Promise<Merchant | undefined>;
   updateMerchantDetails(id: number, details: { businessName: string; contactEmail: string; contactPhone: string; businessAddress: string }): Promise<Merchant | undefined>;
   updateMerchantBankAccount(id: number, bankDetails: { bankName: string; bankAccountNumber: string; bankBranch: string; accountHolderName: string }): Promise<Merchant | undefined>;
+  getAllMerchants(): Promise<Merchant[]>;
   
   // Transaction operations
   getTransaction(id: number): Promise<Transaction | undefined>;
@@ -59,12 +65,22 @@ export class MemStorage implements IStorage {
     this.currentMerchantId = 1;
     this.currentTransactionId = 1;
     
-    // Create default merchant for demo
-    this.createMerchant({
+    // Create default merchant for demo with new schema
+    const merchant: Merchant = {
+      id: this.currentMerchantId++,
       name: "MERCHANT",
+      businessName: "The Coffee Corner",
+      businessType: "Cafe",
+      email: "manager@coffeecorner.co.nz",
+      phone: "+64 9 123 4567",
+      address: "123 Queen Street, Auckland 1010, New Zealand",
+      status: "verified",
+      verificationToken: null,
+      passwordHash: null,
       qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=" + encodeURIComponent("http://localhost:5000/pay/1"),
       paymentUrl: "http://localhost:5000/pay/1",
-      businessName: "The Coffee Corner",
+      currentProviderRate: "0.0290",
+      ourRate: "0.0020",
       contactEmail: "manager@coffeecorner.co.nz",
       contactPhone: "+64 9 123 4567",
       businessAddress: "123 Queen Street, Auckland 1010, New Zealand",
@@ -73,9 +89,10 @@ export class MemStorage implements IStorage {
       bankBranch: "Queen Street Branch",
       accountHolderName: "The Coffee Corner Ltd",
       gstNumber: "123-456-789",
-      currentProviderRate: "0.0290",
-      ourRate: "0.0020"
-    });
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.merchants.set(merchant.id, merchant);
 
     // Add sample transactions for demo
     this.createSampleData();
@@ -91,25 +108,105 @@ export class MemStorage implements IStorage {
     );
   }
 
+  async getMerchantByEmail(email: string): Promise<Merchant | undefined> {
+    return Array.from(this.merchants.values()).find(
+      (merchant) => merchant.email === email,
+    );
+  }
+
+  async getMerchantByToken(token: string): Promise<Merchant | undefined> {
+    return Array.from(this.merchants.values()).find(
+      (merchant) => merchant.verificationToken === token,
+    );
+  }
+
+  async getAllMerchants(): Promise<Merchant[]> {
+    return Array.from(this.merchants.values());
+  }
+
   async createMerchant(insertMerchant: InsertMerchant): Promise<Merchant> {
     const id = this.currentMerchantId++;
     const merchant: Merchant = { 
       id,
       name: insertMerchant.name,
-      qrCodeUrl: insertMerchant.qrCodeUrl,
-      paymentUrl: insertMerchant.paymentUrl,
+      businessName: insertMerchant.businessName,
+      businessType: insertMerchant.businessType || null,
+      email: insertMerchant.email,
+      phone: insertMerchant.phone || null,
+      address: insertMerchant.address || null,
+      status: "pending",
+      verificationToken: null,
+      passwordHash: null,
+      qrCodeUrl: insertMerchant.qrCodeUrl || null,
+      paymentUrl: insertMerchant.paymentUrl || null,
       currentProviderRate: insertMerchant.currentProviderRate || "0.0290",
       ourRate: insertMerchant.ourRate || "0.0020",
-      businessName: null,
-      contactEmail: null,
-      contactPhone: null,
-      businessAddress: null,
+      contactEmail: insertMerchant.contactEmail || null,
+      contactPhone: insertMerchant.contactPhone || null,
+      businessAddress: insertMerchant.businessAddress || null,
+      bankName: insertMerchant.bankName || null,
+      bankAccountNumber: insertMerchant.bankAccountNumber || null,
+      bankBranch: insertMerchant.bankBranch || null,
+      accountHolderName: insertMerchant.accountHolderName || null,
+      gstNumber: insertMerchant.gstNumber || null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.merchants.set(id, merchant);
+    return merchant;
+  }
+
+  async createMerchantWithSignup(data: CreateMerchant & { verificationToken: string }): Promise<Merchant> {
+    const id = this.currentMerchantId++;
+    const merchant: Merchant = { 
+      id,
+      name: data.name,
+      businessName: data.businessName,
+      businessType: data.businessType,
+      email: data.email,
+      phone: data.phone,
+      address: data.address,
+      status: "pending",
+      verificationToken: data.verificationToken,
+      passwordHash: null,
+      qrCodeUrl: null,
+      paymentUrl: null,
+      currentProviderRate: "0.0290",
+      ourRate: "0.0020",
+      contactEmail: data.email,
+      contactPhone: data.phone,
+      businessAddress: data.address,
       bankName: null,
       bankAccountNumber: null,
       bankBranch: null,
       accountHolderName: null,
       gstNumber: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
+    this.merchants.set(id, merchant);
+    return merchant;
+  }
+
+  async verifyMerchant(token: string, passwordHash: string): Promise<Merchant | undefined> {
+    const merchant = await this.getMerchantByToken(token);
+    if (!merchant) return undefined;
+    
+    merchant.passwordHash = passwordHash;
+    merchant.status = "verified";
+    merchant.verificationToken = null;
+    merchant.updatedAt = new Date();
+    
+    this.merchants.set(merchant.id, merchant);
+    return merchant;
+  }
+
+  async updateMerchantStatus(id: number, status: string): Promise<Merchant | undefined> {
+    const merchant = this.merchants.get(id);
+    if (!merchant) return undefined;
+    
+    merchant.status = status;
+    merchant.updatedAt = new Date();
     this.merchants.set(id, merchant);
     return merchant;
   }
@@ -404,6 +501,65 @@ export class DatabaseStorage implements IStorage {
     const result = await this.db
       .update(merchants)
       .set(bankDetails)
+      .where(eq(merchants.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getMerchantByEmail(email: string): Promise<Merchant | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db.select().from(merchants).where(eq(merchants.email, email)).limit(1);
+    return result[0];
+  }
+
+  async getMerchantByToken(token: string): Promise<Merchant | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db.select().from(merchants).where(eq(merchants.verificationToken, token)).limit(1);
+    return result[0];
+  }
+
+  async getAllMerchants(): Promise<Merchant[]> {
+    if (!this.db) throw new Error('Database not available');
+    return await this.db.select().from(merchants);
+  }
+
+  async createMerchantWithSignup(data: CreateMerchant & { verificationToken: string }): Promise<Merchant> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db.insert(merchants).values({
+      name: data.name,
+      businessName: data.businessName,
+      businessType: data.businessType,
+      email: data.email,
+      phone: data.phone,
+      address: data.address,
+      status: "pending",
+      verificationToken: data.verificationToken,
+      currentProviderRate: "0.0290",
+      ourRate: "0.0020",
+    }).returning();
+    return result[0];
+  }
+
+  async verifyMerchant(token: string, passwordHash: string): Promise<Merchant | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .update(merchants)
+      .set({ 
+        passwordHash, 
+        status: "verified", 
+        verificationToken: null,
+        updatedAt: new Date()
+      })
+      .where(eq(merchants.verificationToken, token))
+      .returning();
+    return result[0];
+  }
+
+  async updateMerchantStatus(id: number, status: string): Promise<Merchant | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .update(merchants)
+      .set({ status, updatedAt: new Date() })
       .where(eq(merchants.id, id))
       .returning();
     return result[0];
