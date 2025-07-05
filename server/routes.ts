@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertTransactionSchema, updateMerchantRatesSchema } from "@shared/schema";
+import { windcaveService } from "./windcave";
 import { z } from "zod";
 
 // Store SSE connections for real-time updates
@@ -80,26 +81,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Simulate Windcave payment processing
-      // In production, integrate with actual Windcave API
-      setTimeout(async () => {
-        const success = Math.random() > 0.1; // 90% success rate for demo
-        const status = success ? "completed" : "failed";
-        const windcaveTransactionId = success ? `WC_${Date.now()}` : undefined;
-        
-        const finalTransaction = await storage.updateTransactionStatus(transactionId, status, windcaveTransactionId);
-        
-        // Notify clients of final result
-        const connections = sseConnections.get(transaction.merchantId);
-        if (connections) {
-          connections.forEach(conn => {
-            conn.write(`data: ${JSON.stringify({ type: 'transaction_updated', transaction: finalTransaction })}\n\n`);
-          });
-        }
-      }, 2000);
+      // Create Windcave payment session
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const merchantReference = `TXN_${transactionId}_${Date.now()}`;
+      
+      const session = await windcaveService.createPaymentSession(
+        transaction.price,
+        merchantReference,
+        baseUrl
+      );
 
-      res.json({ message: "Payment processing started" });
+      if (session) {
+        // For hosted payment page, you would redirect to session.links[0].href
+        // For this demo, we'll simulate the payment process
+        if (windcaveService.isConfigured()) {
+          // Real Windcave integration - would redirect to payment page
+          res.json({ 
+            message: "Payment session created", 
+            sessionId: session.id,
+            paymentUrl: session.links.find(link => link.rel === "self")?.href
+          });
+        } else {
+          // Simulation mode
+          setTimeout(async () => {
+            const result = await windcaveService.getSessionResult(session.id);
+            const status = result?.status === "approved" ? "completed" : "failed";
+            const windcaveTransactionId = result?.dpsTxnRef;
+            
+            const finalTransaction = await storage.updateTransactionStatus(transactionId, status, windcaveTransactionId);
+            
+            // Notify clients of final result
+            const connections = sseConnections.get(transaction.merchantId);
+            if (connections) {
+              connections.forEach(conn => {
+                conn.write(`data: ${JSON.stringify({ type: 'transaction_updated', transaction: finalTransaction })}\n\n`);
+              });
+            }
+          }, 2000);
+
+          res.json({ message: "Payment processing started (simulation mode)" });
+        }
+      } else {
+        throw new Error("Failed to create payment session");
+      }
     } catch (error) {
+      console.error("Payment processing error:", error);
       res.status(500).json({ message: "Failed to process payment" });
     }
   });
@@ -145,6 +171,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       res.status(500).json({ message: "Failed to get transactions" });
     }
+  });
+
+  // Windcave webhook notification handler
+  app.post("/api/windcave/notification", async (req, res) => {
+    try {
+      // This would receive notifications from Windcave about payment status changes
+      const { sessionId, status, merchantReference } = req.body;
+      
+      console.log("Windcave notification received:", { sessionId, status, merchantReference });
+      
+      // Extract transaction ID from merchant reference
+      const transactionId = parseInt(merchantReference.split('_')[1]);
+      
+      if (transactionId) {
+        const finalStatus = status === "approved" ? "completed" : "failed";
+        const windcaveTransactionId = sessionId;
+        
+        const transaction = await storage.updateTransactionStatus(transactionId, finalStatus, windcaveTransactionId);
+        
+        if (transaction) {
+          // Notify connected clients
+          const connections = sseConnections.get(transaction.merchantId);
+          if (connections) {
+            connections.forEach(conn => {
+              conn.write(`data: ${JSON.stringify({ type: 'transaction_updated', transaction })}\n\n`);
+            });
+          }
+        }
+      }
+      
+      res.status(200).send("OK");
+    } catch (error) {
+      console.error("Error processing Windcave notification:", error);
+      res.status(500).json({ message: "Failed to process notification" });
+    }
+  });
+
+  // Check API configuration status
+  app.get("/api/windcave/status", (req, res) => {
+    res.json({
+      configured: windcaveService.isConfigured(),
+      mode: windcaveService.isConfigured() ? "live" : "simulation",
+      message: windcaveService.isConfigured() 
+        ? "Windcave API is configured and ready"
+        : "Running in simulation mode. Configure WINDCAVE_USERNAME and WINDCAVE_API_KEY to enable live payments."
+    });
   });
 
   // Server-Sent Events for real-time updates

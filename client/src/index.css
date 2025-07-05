@@ -28,6 +28,12 @@
   --merchant-teal: hsl(155, 40%, 25%);
   --slider-orange: hsl(25, 60%, 75%);
   --bg-light: hsl(210, 20%, 98%);
+  
+  /* Tapt brand colors */
+  --forest-green: hsl(155, 60%, 20%);
+  --forest-green-light: hsl(155, 40%, 25%);
+  --bronze: hsl(30, 50%, 60%);
+  --bronze-light: hsl(30, 40%, 70%);
 }
 
 .dark {
