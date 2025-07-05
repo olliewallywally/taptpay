@@ -46,6 +46,7 @@ export default function Dashboard() {
   const { toast } = useToast();
   const merchantId = 1; // Using default merchant
   const [isEditingRate, setIsEditingRate] = useState(false);
+  const [showAllTransactions, setShowAllTransactions] = useState(false);
 
   const form = useForm<RateUpdateFormData>({
     resolver: zodResolver(rateUpdateSchema),
@@ -515,8 +516,81 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* Export Data */}
+      {/* Transaction History */}
       <Card className="mb-8">
+        <CardHeader>
+          <CardTitle className="text-lg">Transaction History</CardTitle>
+          <CardDescription>
+            View all your recent payment transactions
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {transactionsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+            </div>
+          ) : transactions && transactions.length > 0 ? (
+            <div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Item</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="hidden sm:table-cell">Transaction ID</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(showAllTransactions ? transactions : transactions.slice(0, 3)).map((transaction: any) => (
+                    <TableRow key={transaction.id}>
+                      <TableCell className="text-sm">
+                        {transaction.createdAt 
+                          ? format(new Date(transaction.createdAt), "MMM dd, HH:mm")
+                          : "N/A"
+                        }
+                      </TableCell>
+                      <TableCell className="font-medium text-sm">{transaction.itemName}</TableCell>
+                      <TableCell className="text-sm">${parseFloat(transaction.price).toFixed(2)}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          {getStatusIcon(transaction.status)}
+                          <Badge variant={getStatusBadgeVariant(transaction.status)} className="text-xs">
+                            {transaction.status}
+                          </Badge>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs text-gray-500 hidden sm:table-cell">
+                        {transaction.windcaveTransactionId || `TXN-${transaction.id}`}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {transactions.length > 3 && (
+                <div className="flex justify-center mt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowAllTransactions(!showAllTransactions)}
+                    className="text-sm"
+                  >
+                    {showAllTransactions ? "Show Less" : `Show More (${transactions.length - 3} more)`}
+                  </Button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <CreditCard className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No transactions yet</h3>
+              <p className="text-gray-500">Start processing payments to see your transaction history</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Export Data */}
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2 text-lg">
             <Download className="h-4 w-4" />
@@ -570,66 +644,6 @@ export default function Dashboard() {
               </Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Transaction History */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Transaction History</CardTitle>
-          <CardDescription>
-            View all your recent payment transactions
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {transactionsLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-            </div>
-          ) : transactions && transactions.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Item</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Transaction ID</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {transactions.map((transaction: any) => (
-                  <TableRow key={transaction.id}>
-                    <TableCell>
-                      {transaction.createdAt 
-                        ? format(new Date(transaction.createdAt), "MMM dd, yyyy HH:mm")
-                        : "N/A"
-                      }
-                    </TableCell>
-                    <TableCell className="font-medium">{transaction.itemName}</TableCell>
-                    <TableCell>${parseFloat(transaction.price).toFixed(2)}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        {getStatusIcon(transaction.status)}
-                        <Badge variant={getStatusBadgeVariant(transaction.status)}>
-                          {transaction.status}
-                        </Badge>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-xs text-gray-500">
-                      {transaction.windcaveTransactionId || `TXN-${transaction.id}`}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="text-center py-8">
-              <CreditCard className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No transactions yet</h3>
-              <p className="text-gray-500">Start processing payments to see your transaction history</p>
-            </div>
-          )}
         </CardContent>
       </Card>
     </div>
