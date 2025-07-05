@@ -14,6 +14,7 @@ import Settings from "@/pages/settings";
 import Login from "@/pages/login";
 import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
+import AdminLogin from "@/pages/admin-login";
 import AdminDashboard from "@/pages/admin-dashboard";
 import AdminMerchantDetail from "@/pages/admin-merchant";
 import { Layout } from "@/components/layout";
@@ -122,6 +123,7 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
+      <Route path="/admin/login" component={AdminLogin} />
       <Route path="/admin/dashboard">
         <AdminProtectedRoute>
           <AdminDashboard />
