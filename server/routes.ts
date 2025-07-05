@@ -925,6 +925,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Test email endpoint
+  app.post("/api/admin/test-email", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const testEmail = await sendEmail({
+        to: req.user?.email || 'test@example.com',
+        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@tapt.co.nz',
+        subject: 'Tapt SendGrid Test Email',
+        text: 'This is a test email to verify SendGrid configuration.',
+        html: '<h2>SendGrid Test</h2><p>This is a test email to verify SendGrid configuration.</p>'
+      });
+
+      if (testEmail) {
+        res.json({ success: true, message: 'Test email sent successfully' });
+      } else {
+        res.status(500).json({ success: false, message: 'Failed to send test email' });
+      }
+    } catch (error) {
+      console.error('Test email error:', error);
+      res.status(500).json({ success: false, message: 'Failed to send test email', error: error });
+    }
+  });
+
   // Create merchant signup
   app.post("/api/admin/merchants/signup", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {
