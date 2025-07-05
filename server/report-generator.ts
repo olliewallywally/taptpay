@@ -1,4 +1,4 @@
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
 import type { Transaction, Merchant } from '@shared/schema';
 
 export interface ReportData {
