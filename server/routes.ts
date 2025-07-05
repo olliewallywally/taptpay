@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema } from "@shared/schema";
 import { windcaveService } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, type AuthenticatedRequest } from "./auth";
+import { generateReceiptPdf } from "./pdf-generator";
 import QRCode from "qrcode";
 import { z } from "zod";
 
@@ -218,6 +219,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Payment processing error:", error);
       res.status(500).json({ message: "Failed to process payment" });
+    }
+  });
+
+  // Get single transaction details
+  app.get("/api/transactions/:id", async (req, res) => {
+    try {
+      const transactionId = parseInt(req.params.id);
+      const transaction = await storage.getTransaction(transactionId);
+      
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+      
+      res.json(transaction);
+    } catch (error) {
+      console.error("Error fetching transaction:", error);
+      res.status(500).json({ message: "Failed to fetch transaction" });
+    }
+  });
+
+  // Generate PDF receipt
+  app.post("/api/transactions/:id/receipt-pdf", async (req, res) => {
+    try {
+      const transactionId = parseInt(req.params.id);
+      const transaction = await storage.getTransaction(transactionId);
+      
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+
+      if (transaction.status !== "completed") {
+        return res.status(400).json({ message: "Cannot generate receipt for incomplete transaction" });
+      }
+
+      // Get merchant details for receipt
+      const merchant = await storage.getMerchant(transaction.merchantId);
+      if (!merchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+
+      // Generate PDF receipt
+      const pdf = await generateReceiptPdf(transaction, merchant);
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=receipt-${transaction.id}-${new Date().toISOString().split('T')[0]}.pdf`);
+      res.send(pdf);
+    } catch (error) {
+      console.error("Error generating PDF receipt:", error);
+      res.status(500).json({ message: "Failed to generate PDF receipt" });
     }
   });
 

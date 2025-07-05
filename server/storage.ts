@@ -69,8 +69,10 @@ export class MemStorage implements IStorage {
   async createMerchant(insertMerchant: InsertMerchant): Promise<Merchant> {
     const id = this.currentMerchantId++;
     const merchant: Merchant = { 
-      ...insertMerchant, 
       id,
+      name: insertMerchant.name,
+      qrCodeUrl: insertMerchant.qrCodeUrl,
+      paymentUrl: insertMerchant.paymentUrl,
       currentProviderRate: insertMerchant.currentProviderRate || "0.0290",
       ourRate: insertMerchant.ourRate || "0.0020",
       businessName: null,
@@ -81,6 +83,7 @@ export class MemStorage implements IStorage {
       bankAccountNumber: null,
       bankBranch: null,
       accountHolderName: null,
+      gstNumber: null,
     };
     this.merchants.set(id, merchant);
     return merchant;

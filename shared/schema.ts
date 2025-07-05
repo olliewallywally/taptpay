@@ -21,6 +21,9 @@ export const merchants = pgTable("merchants", {
   bankAccountNumber: text("bank_account_number"),
   bankBranch: text("bank_branch"),
   accountHolderName: text("account_holder_name"),
+  
+  // Tax information
+  gstNumber: text("gst_number"),
 });
 
 export const transactions = pgTable("transactions", {

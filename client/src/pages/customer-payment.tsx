@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams } from "wouter";
+import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { SlideToPayComponent } from "@/components/slide-to-pay";
 import { sseClient } from "@/lib/sse-client";
@@ -8,6 +8,7 @@ import { Shield, Lock, CheckCircle, XCircle } from "lucide-react";
 
 export default function CustomerPayment() {
   const { merchantId } = useParams<{ merchantId: string }>();
+  const [, setLocation] = useLocation();
   const [currentTransaction, setCurrentTransaction] = useState<any>(null);
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
 
@@ -50,6 +51,10 @@ export default function CustomerPayment() {
         setPaymentStatus("processing");
       } else if (message.transaction.status === "completed") {
         setPaymentStatus("success");
+        // Redirect to receipt page after a short delay to show success message
+        setTimeout(() => {
+          setLocation(`/receipt/${message.transaction.id}`);
+        }, 2000);
       } else if (message.transaction.status === "failed") {
         setPaymentStatus("error");
       }
