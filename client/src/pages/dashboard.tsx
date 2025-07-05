@@ -420,11 +420,9 @@ export default function Dashboard() {
                   ${analytics?.savings?.toFixed(2) || "0.00"}
                 </p>
                 <div className="border-t border-blue-200 pt-2">
-                  <p className="text-xs text-blue-600">Percentage Saved</p>
+                  <p className="text-xs text-blue-600">Total Amount Saved</p>
                   <p className="text-lg font-semibold text-blue-700">
-                    {analytics?.currentProviderRate && analytics?.ourRate 
-                      ? ((analytics.currentProviderRate - analytics.ourRate) / analytics.currentProviderRate * 100).toFixed(1)
-                      : "0"}%
+                    ${analytics?.savings?.toFixed(2) || "0.00"}
                   </p>
                 </div>
               </div>
@@ -506,9 +504,7 @@ export default function Dashboard() {
               <div className="text-center">
                 <p className="text-xs font-medium text-blue-900 mb-1">Savings</p>
                 <p className="text-lg font-bold text-blue-700">
-                  {analytics?.currentProviderRate && analytics?.ourRate 
-                    ? ((analytics.currentProviderRate - analytics.ourRate) / analytics.currentProviderRate * 100).toFixed(1)
-                    : "0"}%
+                  ${analytics?.savings?.toFixed(2) || "0.00"}
                 </p>
               </div>
             </div>
