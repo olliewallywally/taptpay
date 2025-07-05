@@ -37,7 +37,12 @@ export default function CreateMerchant() {
       return response.json();
     },
     onSuccess: (data) => {
-      setCreatedMerchant(data.merchant);
+      setCreatedMerchant({
+        ...data.merchant,
+        verificationUrl: data.verificationUrl,
+        verificationToken: data.verificationToken,
+        emailSent: data.emailSent
+      });
       setIsSuccess(true);
       
       // Invalidate queries to refresh the admin dashboard
@@ -46,7 +51,9 @@ export default function CreateMerchant() {
       
       toast({
         title: "Merchant Created",
-        description: "Verification email sent successfully",
+        description: data.emailSent 
+          ? "Verification email sent successfully" 
+          : "Merchant created. Email service unavailable - use the verification link below.",
       });
     },
     onError: (error: any) => {
@@ -87,13 +94,38 @@ export default function CreateMerchant() {
               </div>
             </div>
             
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <h3 className="font-semibold mb-2 text-blue-900">Next Steps</h3>
-              <p className="text-sm text-blue-700">
-                A verification email has been sent to <strong>{createdMerchant.email}</strong>. 
-                The merchant will need to click the link in the email to create their password and complete the registration.
-              </p>
-            </div>
+            {createdMerchant.emailSent ? (
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h3 className="font-semibold mb-2 text-blue-900">Next Steps</h3>
+                <p className="text-sm text-blue-700">
+                  A verification email has been sent to <strong>{createdMerchant.email}</strong>. 
+                  The merchant will need to click the link in the email to create their password and complete the registration.
+                </p>
+              </div>
+            ) : (
+              <div className="bg-orange-50 p-4 rounded-lg">
+                <h3 className="font-semibold mb-2 text-orange-900">Email Service Unavailable</h3>
+                <p className="text-sm text-orange-700 mb-3">
+                  Email service is currently unavailable. Please share the verification link below with the merchant:
+                </p>
+                <div className="bg-white p-3 rounded border text-xs font-mono break-all">
+                  {createdMerchant.verificationUrl}
+                </div>
+                <Button 
+                  size="sm" 
+                  className="mt-2 w-full"
+                  onClick={() => {
+                    navigator.clipboard.writeText(createdMerchant.verificationUrl);
+                    toast({
+                      title: "Copied!",
+                      description: "Verification URL copied to clipboard",
+                    });
+                  }}
+                >
+                  Copy Verification Link
+                </Button>
+              </div>
+            )}
 
             <div className="flex gap-3">
               <Link href="/admin/dashboard">

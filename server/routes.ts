@@ -556,6 +556,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin manual merchant activation (bypass email verification)
+  app.post("/api/admin/merchants/:id/activate", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      const { password } = req.body;
+
+      if (!password) {
+        return res.status(400).json({ message: "Password is required for activation" });
+      }
+
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+
+      if (merchant.status === 'verified') {
+        return res.status(400).json({ message: "Merchant already verified" });
+      }
+
+      // Hash the password and activate merchant
+      const passwordHash = await bcrypt.hash(password, 10);
+      const updatedMerchant = await storage.verifyMerchant(merchant.verificationToken || '', passwordHash);
+
+      if (!updatedMerchant) {
+        return res.status(500).json({ message: "Failed to activate merchant" });
+      }
+
+      res.json({
+        message: "Merchant activated successfully",
+        merchant: {
+          id: updatedMerchant.id,
+          name: updatedMerchant.name,
+          businessName: updatedMerchant.businessName,
+          email: updatedMerchant.email,
+          status: updatedMerchant.status
+        }
+      });
+
+    } catch (error) {
+      console.error("Admin activation error:", error);
+      res.status(500).json({ message: "Failed to activate merchant" });
+    }
+  });
+
   // Update merchant rates
   app.put("/api/merchants/:id/rates", async (req, res) => {
     try {
@@ -976,52 +1020,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         verificationToken
       });
 
-      // Send verification email
+      // Generate verification URL
       const verificationUrl = `${getBaseUrl(req)}/verify-merchant?token=${verificationToken}`;
-      const emailSent = await sendEmail({
-        to: data.email,
-        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@tapt.co.nz',
-        subject: 'Complete Your Tapt Merchant Registration',
-        html: `
-          <h2>Complete Your Tapt Merchant Registration</h2>
-          <p>Hello ${data.name},</p>
-          <p>Thank you for signing up for Tapt payment processing. To complete your registration, please click the link below to create your password:</p>
-          <p><a href="${verificationUrl}" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Complete Registration</a></p>
-          <p>If the button doesn't work, copy and paste this link into your browser:</p>
-          <p>${verificationUrl}</p>
-          <p>This link will expire in 24 hours.</p>
-          <p>Best regards,<br>The Tapt Team</p>
-        `,
-        text: `
-Complete Your Tapt Merchant Registration
-
-Hello ${data.name},
-
-Thank you for signing up for Tapt payment processing. To complete your registration, please visit this link to create your password:
-
-${verificationUrl}
-
-This link will expire in 24 hours.
-
-Best regards,
-The Tapt Team
-        `
-      });
-
-      if (!emailSent) {
-        console.error("Failed to send verification email");
-        // Don't fail the request, just log the error
-      }
+      
+      // Log verification details for admin access (since email is not working)
+      console.log(`\n=== MERCHANT VERIFICATION LINK ===`);
+      console.log(`Merchant: ${data.name} (${data.email})`);
+      console.log(`Verification URL: ${verificationUrl}`);
+      console.log(`Token: ${verificationToken}`);
+      console.log(`===================================\n`);
 
       res.json({ 
-        message: "Merchant created successfully. Verification email sent.",
+        message: "Merchant created successfully. Check console for verification link.",
         merchant: {
           id: merchant.id,
           name: merchant.name,
           businessName: merchant.businessName,
           email: merchant.email,
           status: merchant.status
-        }
+        },
+        verificationUrl,
+        verificationToken,
+        emailSent: false,
+        note: "Email service unavailable. Use the verification URL provided to complete merchant setup."
       });
     } catch (error) {
       console.error("Error creating merchant:", error);
