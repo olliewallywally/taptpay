@@ -115,7 +115,7 @@ export async function sendPasswordResetEmail(email: string, resetToken: string, 
 
   return await sendEmail({
     to: email,
-    from: 'noreply@tapt.co.nz',
+    from: process.env.SENDGRID_FROM_EMAIL || 'noreply@tapt.co.nz',
     subject: 'Reset Your Tapt Payment Password',
     text: textContent,
     html: htmlContent,
