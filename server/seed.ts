@@ -23,7 +23,7 @@ export async function seedDatabase() {
     const demoMerchant = await db.insert(merchants).values({
       name: "Demo Store",
       qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=https://tapt.co.nz/pay/1",
-      paymentUrl: `${process.env.REPLIT_DOMAINS?.split(',')[0] || 'localhost:5000'}/pay/1`,
+      paymentUrl: `https://${process.env.REPLIT_DOMAINS?.split(',')[0] || 'localhost:5000'}/pay/1`,
       currentProviderRate: "2.9000", // 2.9%
       ourRate: "0.2000", // 0.2%
     }).returning();
