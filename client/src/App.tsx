@@ -7,14 +7,18 @@ import NotFound from "@/pages/not-found";
 import MerchantTerminal from "@/pages/merchant-terminal";
 import CustomerPayment from "@/pages/customer-payment";
 import Dashboard from "@/pages/dashboard";
+import Settings from "@/pages/settings";
+import Login from "@/pages/login";
 import { QrCode } from "lucide-react";
 
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Home} />
+      <Route path="/" component={Login} />
+      <Route path="/home" component={Home} />
       <Route path="/merchant" component={MerchantTerminal} />
       <Route path="/dashboard" component={Dashboard} />
+      <Route path="/settings" component={Settings} />
       <Route path="/pay/:merchantId" component={CustomerPayment} />
       <Route component={NotFound} />
     </Switch>
@@ -46,6 +50,12 @@ function Home() {
                 className="px-4 py-2 text-sm font-medium rounded-md text-gray-600 hover:text-gray-900 transition-all"
               >
                 Dashboard
+              </a>
+              <a 
+                href="/settings"
+                className="px-4 py-2 text-sm font-medium rounded-md text-gray-600 hover:text-gray-900 transition-all"
+              >
+                Settings
               </a>
               <a 
                 href="/pay/1"
