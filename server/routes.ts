@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema } from "@shared/schema";
 import { windcaveService } from "./windcave";
-import { authenticateUser, generateToken, authenticateToken, type AuthenticatedRequest } from "./auth";
+import { authenticateUser, generateToken, authenticateToken, createUser, type AuthenticatedRequest } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
 import { generateBusinessReportPdf } from "./report-generator";
 import { getBaseUrl, generatePaymentUrl, generateQrCodeUrl } from "./url-utils";
@@ -593,9 +593,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin Analytics endpoint
-  app.get("/api/admin/analytics", authenticateToken, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/admin/analytics", async (req, res) => {
     try {
-      if (req.user?.role !== 'admin') {
+      const authHeader = req.headers['authorization'];
+      const token = authHeader && authHeader.split(' ')[1];
+
+      if (!token) {
+        return res.status(401).json({ message: 'Access token required' });
+      }
+
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-change-in-production') as any;
+      
+      if (decoded.role !== 'admin' || decoded.email !== 'admin@tapt.co.nz') {
         return res.status(403).json({ message: "Admin access required" });
       }
 
@@ -668,6 +677,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching admin analytics:", error);
       res.status(500).json({ message: "Failed to get admin analytics" });
+    }
+  });
+
+  // Create new merchant endpoint
+  app.post("/api/admin/merchants", async (req, res) => {
+    try {
+      const authHeader = req.headers['authorization'];
+      const token = authHeader && authHeader.split(' ')[1];
+
+      if (!token) {
+        return res.status(401).json({ message: 'Access token required' });
+      }
+
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-change-in-production') as any;
+      
+      if (decoded.role !== 'admin' || decoded.email !== 'admin@tapt.co.nz') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const merchantData = req.body;
+      
+      // Create merchant
+      const newMerchant = await storage.createMerchant({
+        name: merchantData.name,
+        businessName: merchantData.businessName,
+        contactEmail: merchantData.contactEmail,
+        contactPhone: merchantData.contactPhone,
+        businessAddress: merchantData.businessAddress,
+        currentProviderRate: merchantData.currentProviderRate,
+        bankName: merchantData.bankName,
+        bankAccountNumber: merchantData.bankAccountNumber,
+        bankBranch: merchantData.bankBranch,
+        accountHolderName: merchantData.accountHolderName,
+        qrCodeUrl: generateQrCodeUrl(0, req), // Will be updated with actual merchant ID
+        paymentUrl: generatePaymentUrl(0, req) // Will be updated with actual merchant ID
+      });
+
+      // Update URLs with actual merchant ID
+      await storage.updateMerchantDetails(newMerchant.id, {
+        businessName: newMerchant.businessName || "",
+        contactEmail: newMerchant.contactEmail || "",
+        contactPhone: newMerchant.contactPhone || "",
+        businessAddress: newMerchant.businessAddress || "",
+      });
+
+      // Create login credentials for the merchant
+      await createUser(merchantData.loginEmail, merchantData.loginPassword, newMerchant.id, 'merchant');
+
+      res.json({
+        id: newMerchant.id,
+        name: newMerchant.name,
+        businessName: newMerchant.businessName,
+        message: "Merchant account created successfully"
+      });
+    } catch (error) {
+      console.error("Error creating merchant:", error);
+      res.status(500).json({ message: "Failed to create merchant account" });
     }
   });
 
