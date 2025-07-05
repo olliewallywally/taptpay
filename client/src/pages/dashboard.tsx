@@ -161,14 +161,14 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Payment Dashboard</h1>
-        <p className="text-gray-600">Monitor your transactions and savings with our low-cost payment processing</p>
+    <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Payment Dashboard</h1>
+        <p className="text-sm sm:text-base text-gray-600">Monitor your transactions and savings with our low-cost payment processing</p>
       </div>
 
       {/* Analytics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
@@ -219,10 +219,10 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-[hsl(155,40%,25%)]">
-              {analytics?.ourRate?.toFixed(2) || "0.20"}%
+              $0.20
             </div>
             <p className="text-xs text-muted-foreground">
-              Fixed low rate
+              Flat fee per transaction
             </p>
           </CardContent>
         </Card>
@@ -321,7 +321,7 @@ export default function Dashboard() {
               <div>
                 <p className="text-sm font-medium text-green-900">Our Rate</p>
                 <p className="text-2xl font-bold text-green-700">
-                  {analytics?.ourRate?.toFixed(2) || "0.20"}%
+                  $0.20 flat fee
                 </p>
               </div>
               <div className="text-right">
