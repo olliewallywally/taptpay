@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import MerchantTerminal from "@/pages/merchant-terminal";
 import CustomerPayment from "@/pages/customer-payment";
+import Dashboard from "@/pages/dashboard";
 import { QrCode } from "lucide-react";
 
 function Router() {
@@ -13,6 +14,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/merchant" component={MerchantTerminal} />
+      <Route path="/dashboard" component={Dashboard} />
       <Route path="/pay/:merchantId" component={CustomerPayment} />
       <Route component={NotFound} />
     </Switch>
@@ -37,7 +39,13 @@ function Home() {
                 href="/merchant"
                 className="px-4 py-2 text-sm font-medium rounded-md bg-white text-[hsl(155,40%,25%)] shadow-sm transition-all"
               >
-                Merchant
+                Terminal
+              </a>
+              <a 
+                href="/dashboard"
+                className="px-4 py-2 text-sm font-medium rounded-md text-gray-600 hover:text-gray-900 transition-all"
+              >
+                Dashboard
               </a>
               <a 
                 href="/pay/1"

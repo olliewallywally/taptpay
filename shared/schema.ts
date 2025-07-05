@@ -7,6 +7,8 @@ export const merchants = pgTable("merchants", {
   name: text("name").notNull(),
   qrCodeUrl: text("qr_code_url").notNull(),
   paymentUrl: text("payment_url").notNull(),
+  currentProviderRate: decimal("current_provider_rate", { precision: 5, scale: 4 }).default("0.0290"), // Default 2.9%
+  ourRate: decimal("our_rate", { precision: 5, scale: 4 }).default("0.0020"), // Our 0.20%
 });
 
 export const transactions = pgTable("transactions", {
@@ -21,6 +23,10 @@ export const transactions = pgTable("transactions", {
 
 export const insertMerchantSchema = createInsertSchema(merchants).omit({
   id: true,
+});
+
+export const updateMerchantRatesSchema = z.object({
+  currentProviderRate: z.string().regex(/^\d+(\.\d{1,4})?$/, "Rate must be a valid percentage"),
 });
 
 export const insertTransactionSchema = createInsertSchema(transactions).omit({

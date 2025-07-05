@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTransactionSchema } from "@shared/schema";
+import { insertTransactionSchema, updateMerchantRatesSchema } from "@shared/schema";
 import { z } from "zod";
 
 // Store SSE connections for real-time updates
@@ -101,6 +101,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Payment processing started" });
     } catch (error) {
       res.status(500).json({ message: "Failed to process payment" });
+    }
+  });
+
+  // Get merchant analytics
+  app.get("/api/merchants/:id/analytics", async (req, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      const analytics = await storage.getMerchantAnalytics(merchantId);
+      res.json(analytics);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get analytics" });
+    }
+  });
+
+  // Update merchant rates
+  app.put("/api/merchants/:id/rates", async (req, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      const validation = updateMerchantRatesSchema.safeParse(req.body);
+      
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid rate data", errors: validation.error.errors });
+      }
+
+      const updatedMerchant = await storage.updateMerchantRates(merchantId, validation.data.currentProviderRate);
+      if (!updatedMerchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+
+      res.json(updatedMerchant);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update rates" });
+    }
+  });
+
+  // Get all transactions for merchant (for dashboard)
+  app.get("/api/merchants/:id/transactions", async (req, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      const transactions = await storage.getTransactionsByMerchant(merchantId);
+      res.json(transactions);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get transactions" });
     }
   });
 
