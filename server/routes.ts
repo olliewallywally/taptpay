@@ -70,19 +70,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Merchant not found" });
       }
 
+      // Get size parameter (default to 400, allow up to 1000 for downloads)
+      const size = Math.min(parseInt(req.query.size as string) || 400, 1000);
+      const isDownload = req.query.download === 'true';
+
       // Set response headers for PNG image
       res.setHeader('Content-Type', 'image/png');
       res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
       
-      // Generate QR code as PNG buffer
+      if (isDownload) {
+        res.setHeader('Content-Disposition', `attachment; filename="tapt-payment-qr-merchant-${merchantId}.png"`);
+      }
+      
+      // Generate QR code as PNG buffer with enhanced quality
       const qrBuffer = await QRCode.toBuffer(merchant.paymentUrl, {
         type: 'png',
-        width: 400,
-        margin: 2,
+        width: size,
+        margin: 4, // Larger margin for better visibility
         color: {
           dark: '#16423C', // Forest green
           light: '#FFFFFF'
-        }
+        },
+        errorCorrectionLevel: 'H', // High error correction for better scanning
       });
       
       res.send(qrBuffer);
