@@ -12,6 +12,7 @@ import QRCode from "qrcode";
 import { z } from "zod";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
+import bcrypt from "bcrypt";
 
 // Store SSE connections for real-time updates
 const sseConnections = new Map<number, Set<any>>();
@@ -1070,7 +1071,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Hash password and verify merchant
-      const bcrypt = require('bcrypt');
       const passwordHash = await bcrypt.hash(password, 10);
       
       const verifiedMerchant = await storage.verifyMerchant(token, passwordHash);
