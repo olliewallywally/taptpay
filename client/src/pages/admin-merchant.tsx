@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface MerchantDetails {
   id: number;
@@ -66,6 +67,7 @@ export default function AdminMerchantDetail() {
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
   const [editedMerchant, setEditedMerchant] = useState<Partial<MerchantDetails>>({});
+  const isMobile = useIsMobile();
 
   // Fetch merchant details
   const { data: merchant, isLoading: merchantLoading } = useQuery<MerchantDetails>({
@@ -109,65 +111,6 @@ export default function AdminMerchantDetail() {
     },
   });
 
-  // Update merchant mutation
-  const updateMerchantMutation = useMutation({
-    mutationFn: async (updates: Partial<MerchantDetails>) => {
-      const response = await apiRequest("PUT", `/api/admin/merchants/${merchantId}`, updates);
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/merchants', merchantId] });
-      setIsEditing(false);
-      setEditedMerchant({});
-      toast({
-        title: "Merchant Updated",
-        description: "Merchant details have been successfully updated.",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Update Failed",
-        description: error.message || "Failed to update merchant details.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Test payment link mutation
-  const testPaymentLinkMutation = useMutation({
-    mutationFn: async () => {
-      const response = await fetch(`/api/merchants/${merchantId}/test-payment-link`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('adminAuthToken')}`
-        }
-      });
-      if (!response.ok) throw new Error('Payment link test failed');
-      return response.json();
-    },
-    onSuccess: (result) => {
-      toast({
-        title: "Payment Link Test",
-        description: result.status === 'active' ? "Payment link is working correctly" : "Payment link has issues",
-        variant: result.status === 'active' ? "default" : "destructive",
-      });
-    },
-  });
-
-  const handleEdit = () => {
-    setIsEditing(true);
-    setEditedMerchant(merchant || {});
-  };
-
-  const handleSave = () => {
-    updateMerchantMutation.mutate(editedMerchant);
-  };
-
-  const handleCancel = () => {
-    setIsEditing(false);
-    setEditedMerchant({});
-  };
-
   const handleLogout = () => {
     localStorage.removeItem("adminAuthToken");
     localStorage.removeItem("adminUser");
@@ -178,15 +121,11 @@ export default function AdminMerchantDetail() {
     setLocation("/");
   };
 
-  const handleInputChange = (field: keyof MerchantDetails, value: string) => {
-    setEditedMerchant(prev => ({ ...prev, [field]: value }));
-  };
-
-  if (merchantLoading || analyticsLoading || transactionsLoading) {
+  if (merchantLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="flex items-center space-x-2">
-          <Loader2 className="h-8 w-8 animate-spin text-slate-600" />
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
           <span className="text-slate-600">Loading merchant details...</span>
         </div>
       </div>
@@ -195,7 +134,7 @@ export default function AdminMerchantDetail() {
 
   if (!merchant) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Merchant Not Found</h2>
           <p className="text-gray-600 mb-4">The requested merchant could not be found.</p>
@@ -209,387 +148,295 @@ export default function AdminMerchantDetail() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Button 
-            variant="outline" 
-            onClick={() => setLocation('/admin/dashboard')}
-            className="flex items-center space-x-2"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back to Dashboard</span>
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">{merchant.businessName || merchant.name}</h1>
-            <p className="text-gray-600">Merchant ID: {merchant.id}</p>
-          </div>
-        </div>
-        <div className="flex items-center space-x-2">
-          <Button
-            variant="outline"
-            onClick={handleLogout}
-            className="flex items-center space-x-2"
-          >
-            <LogOut className="w-4 h-4" />
-            <span>Logout</span>
-          </Button>
-          <Badge variant={merchant.status === 'active' ? 'default' : 'secondary'}>
-            {merchant.status === 'active' ? (
-              <CheckCircle className="w-3 h-3 mr-1" />
-            ) : (
-              <AlertCircle className="w-3 h-3 mr-1" />
-            )}
-            {merchant.status}
-          </Badge>
-          {!isEditing ? (
-            <Button onClick={handleEdit}>
-              <Edit className="w-4 h-4 mr-2" />
-              Edit Merchant
+    <div className="min-h-screen bg-gray-50">
+      <div className={`${isMobile ? 'px-4 py-4' : 'px-6 py-6'} max-w-7xl mx-auto space-y-6`}>
+        
+        {/* Mobile-optimized Header */}
+        <div className={`${isMobile ? 'space-y-4' : 'flex items-center justify-between'}`}>
+          <div className={`${isMobile ? 'space-y-3' : 'flex items-center space-x-4'}`}>
+            <Button 
+              variant="outline" 
+              onClick={() => setLocation('/admin/dashboard')}
+              size={isMobile ? "sm" : "default"}
+              className="flex items-center space-x-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>{isMobile ? "Back" : "Back to Dashboard"}</span>
             </Button>
-          ) : (
-            <div className="flex space-x-2">
-              <Button onClick={handleSave} disabled={updateMerchantMutation.isPending}>
-                <Save className="w-4 h-4 mr-2" />
-                Save Changes
-              </Button>
-              <Button variant="outline" onClick={handleCancel}>
-                <X className="w-4 h-4 mr-2" />
-                Cancel
-              </Button>
+            <div>
+              <h1 className={`${isMobile ? 'text-xl' : 'text-3xl'} font-bold text-gray-900`}>
+                {merchant.businessName || merchant.name}
+              </h1>
+              <p className={`text-gray-600 ${isMobile ? 'text-sm' : ''}`}>
+                Merchant ID: {merchant.id}
+              </p>
             </div>
-          )}
-        </div>
-      </div>
-
-      {/* Analytics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              ${analytics?.totalRevenue?.toFixed(2) || "0.00"}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Transactions</CardTitle>
-            <CreditCard className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
-              {analytics?.totalTransactions || 0}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {analytics?.completedTransactions || 0} completed
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Payment Links</CardTitle>
-            <LinkIcon className="h-4 w-4 text-purple-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => testPaymentLinkMutation.mutate()}
-                disabled={testPaymentLinkMutation.isPending}
-                className="w-full"
-              >
-                {testPaymentLinkMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                ) : (
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                )}
-                Test Payment Link
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Detailed Information Tabs */}
-      <Tabs defaultValue="details" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="details">Merchant Details</TabsTrigger>
-          <TabsTrigger value="transactions">Transaction History</TabsTrigger>
-          <TabsTrigger value="links">Payment Links</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="details">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Business Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Business Information</CardTitle>
-                <CardDescription>Basic business details and contact information</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="businessName">Business Name</Label>
-                    {isEditing ? (
-                      <Input
-                        id="businessName"
-                        value={editedMerchant.businessName || ''}
-                        onChange={(e) => handleInputChange('businessName', e.target.value)}
-                      />
-                    ) : (
-                      <p className="text-sm text-gray-900 mt-1">{merchant.businessName}</p>
-                    )}
-                  </div>
-                  <div>
-                    <Label htmlFor="merchantName">Merchant ID Name</Label>
-                    {isEditing ? (
-                      <Input
-                        id="merchantName"
-                        value={editedMerchant.name || ''}
-                        onChange={(e) => handleInputChange('name', e.target.value)}
-                      />
-                    ) : (
-                      <p className="text-sm text-gray-900 mt-1">{merchant.name}</p>
-                    )}
-                  </div>
-                </div>
-                
-                <div>
-                  <Label htmlFor="contactEmail">Contact Email</Label>
-                  {isEditing ? (
-                    <Input
-                      id="contactEmail"
-                      type="email"
-                      value={editedMerchant.contactEmail || ''}
-                      onChange={(e) => handleInputChange('contactEmail', e.target.value)}
-                    />
-                  ) : (
-                    <p className="text-sm text-gray-900 mt-1">{merchant.contactEmail}</p>
-                  )}
-                </div>
-                
-                <div>
-                  <Label htmlFor="contactPhone">Contact Phone</Label>
-                  {isEditing ? (
-                    <Input
-                      id="contactPhone"
-                      value={editedMerchant.contactPhone || ''}
-                      onChange={(e) => handleInputChange('contactPhone', e.target.value)}
-                    />
-                  ) : (
-                    <p className="text-sm text-gray-900 mt-1">{merchant.contactPhone}</p>
-                  )}
-                </div>
-                
-                <div>
-                  <Label htmlFor="businessAddress">Business Address</Label>
-                  {isEditing ? (
-                    <Input
-                      id="businessAddress"
-                      value={editedMerchant.businessAddress || ''}
-                      onChange={(e) => handleInputChange('businessAddress', e.target.value)}
-                    />
-                  ) : (
-                    <p className="text-sm text-gray-900 mt-1">{merchant.businessAddress}</p>
-                  )}
-                </div>
-
-                <div>
-                  <Label htmlFor="currentProviderRate">Current Provider Rate (%)</Label>
-                  {isEditing ? (
-                    <Input
-                      id="currentProviderRate"
-                      value={editedMerchant.currentProviderRate || ''}
-                      onChange={(e) => handleInputChange('currentProviderRate', e.target.value)}
-                    />
-                  ) : (
-                    <p className="text-sm text-gray-900 mt-1">{merchant.currentProviderRate}%</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Bank Account Details */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Bank Account Details</CardTitle>
-                <CardDescription>Banking information for settlements</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="bankName">Bank Name</Label>
-                  {isEditing ? (
-                    <Input
-                      id="bankName"
-                      value={editedMerchant.bankName || ''}
-                      onChange={(e) => handleInputChange('bankName', e.target.value)}
-                    />
-                  ) : (
-                    <p className="text-sm text-gray-900 mt-1">{merchant.bankName}</p>
-                  )}
-                </div>
-                
-                <div>
-                  <Label htmlFor="accountHolderName">Account Holder Name</Label>
-                  {isEditing ? (
-                    <Input
-                      id="accountHolderName"
-                      value={editedMerchant.accountHolderName || ''}
-                      onChange={(e) => handleInputChange('accountHolderName', e.target.value)}
-                    />
-                  ) : (
-                    <p className="text-sm text-gray-900 mt-1">{merchant.accountHolderName}</p>
-                  )}
-                </div>
-                
-                <div>
-                  <Label htmlFor="bankAccountNumber">Account Number</Label>
-                  {isEditing ? (
-                    <Input
-                      id="bankAccountNumber"
-                      value={editedMerchant.bankAccountNumber || ''}
-                      onChange={(e) => handleInputChange('bankAccountNumber', e.target.value)}
-                    />
-                  ) : (
-                    <p className="text-sm text-gray-900 mt-1">{merchant.bankAccountNumber}</p>
-                  )}
-                </div>
-                
-                <div>
-                  <Label htmlFor="bankBranch">Bank Branch</Label>
-                  {isEditing ? (
-                    <Input
-                      id="bankBranch"
-                      value={editedMerchant.bankBranch || ''}
-                      onChange={(e) => handleInputChange('bankBranch', e.target.value)}
-                    />
-                  ) : (
-                    <p className="text-sm text-gray-900 mt-1">{merchant.bankBranch}</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
           </div>
-        </TabsContent>
+          
+          <div className={`flex items-center ${isMobile ? 'justify-between' : 'space-x-2'}`}>
+            <div className="flex items-center space-x-2">
+              <Badge variant={merchant.status === 'active' ? 'default' : 'secondary'}>
+                {merchant.status === 'active' ? (
+                  <CheckCircle className="w-3 h-3 mr-1" />
+                ) : (
+                  <AlertCircle className="w-3 h-3 mr-1" />
+                )}
+                {merchant.status}
+              </Badge>
+            </div>
+            <Button
+              variant="outline"
+              onClick={handleLogout}
+              size={isMobile ? "sm" : "default"}
+              className="bg-red-50 text-red-600 border-red-200 hover:bg-red-100"
+            >
+              <LogOut className="w-4 h-4" />
+              {!isMobile && <span className="ml-2">Logout</span>}
+            </Button>
+          </div>
+        </div>
 
-        <TabsContent value="transactions">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Transactions</CardTitle>
-              <CardDescription>Latest transaction activity for this merchant</CardDescription>
+        {/* Mobile-optimized Analytics Cards */}
+        <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-3'}`}>
+          <Card className="border-blue-200 bg-blue-50">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Transactions</CardTitle>
+              <CreditCard className="h-4 w-4 text-blue-600" />
             </CardHeader>
             <CardContent>
-              {transactions && transactions.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>ID</TableHead>
-                      <TableHead>Item</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Reference</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {transactions.map((transaction) => (
-                      <TableRow key={transaction.id}>
-                        <TableCell>{transaction.id}</TableCell>
-                        <TableCell>{transaction.itemName}</TableCell>
-                        <TableCell>${transaction.price}</TableCell>
-                        <TableCell>
-                          <Badge variant={
-                            transaction.status === 'completed' ? 'default' :
-                            transaction.status === 'failed' ? 'destructive' : 
-                            'secondary'
-                          }>
-                            {transaction.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {new Date(transaction.createdAt).toLocaleDateString('en-NZ')}
-                        </TableCell>
-                        <TableCell className="text-xs text-gray-500">
-                          {transaction.windcaveTransactionId || 'N/A'}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <div className="text-center py-8">
-                  <CreditCard className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No transactions found</h3>
-                  <p className="text-gray-500">This merchant hasn't processed any transactions yet</p>
-                </div>
-              )}
+              <div className="text-2xl font-bold text-blue-700">
+                {analytics?.totalTransactions || 0}
+              </div>
+              <p className="text-xs text-blue-600 mt-1">
+                {analytics?.completedTransactions || 0} completed
+              </p>
             </CardContent>
           </Card>
-        </TabsContent>
 
-        <TabsContent value="links">
-          <Card>
-            <CardHeader>
-              <CardTitle>Payment Links</CardTitle>
-              <CardDescription>Manage and monitor payment links for this merchant</CardDescription>
+          <Card className="border-green-200 bg-green-50">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+              <DollarSign className="h-4 w-4 text-green-600" />
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
+            <CardContent>
+              <div className="text-2xl font-bold text-green-700">
+                ${analytics?.totalRevenue?.toFixed(2) || "0.00"}
+              </div>
+              <p className="text-xs text-green-600 mt-1">
+                All transactions
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-purple-200 bg-purple-50">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Status</CardTitle>
+              <Building2 className="h-4 w-4 text-purple-600" />
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${merchant.status === 'active' ? 'text-green-700' : 'text-gray-700'}`}>
+                {merchant.status === 'active' ? 'Active' : 'Inactive'}
+              </div>
+              <p className="text-xs text-purple-600 mt-1">
+                Account status
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Mobile-optimized Tabs */}
+        <Tabs defaultValue="overview" className="space-y-4">
+          <TabsList className={`grid w-full h-auto p-1 ${isMobile ? 'grid-cols-2 gap-1' : 'grid-cols-4'}`}>
+            <TabsTrigger 
+              value="overview" 
+              className={`flex items-center space-x-2 p-3 ${isMobile ? 'flex-col space-y-1 space-x-0 text-xs' : 'text-sm'}`}
+            >
+              <Building2 className="w-4 h-4" />
+              <span>Overview</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="transactions" 
+              className={`flex items-center space-x-2 p-3 ${isMobile ? 'flex-col space-y-1 space-x-0 text-xs' : 'text-sm'}`}
+            >
+              <CreditCard className="w-4 h-4" />
+              <span>{isMobile ? 'Payments' : 'Transactions'}</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="links" 
+              className={`flex items-center space-x-2 p-3 ${isMobile ? 'flex-col space-y-1 space-x-0 text-xs' : 'text-sm'}`}
+            >
+              <LinkIcon className="w-4 h-4" />
+              <span>Links</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="settings" 
+              className={`flex items-center space-x-2 p-3 ${isMobile ? 'flex-col space-y-1 space-x-0 text-xs' : 'text-sm'}`}
+            >
+              <Edit className="w-4 h-4" />
+              <span>Settings</span>
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Merchant Details</CardTitle>
+                <CardDescription>Business information and contact details</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                  <div>
+                    <Label className="text-sm font-medium">Business Name</Label>
+                    <p className="text-gray-900 mt-1">{merchant.businessName}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Contact Email</Label>
+                    <p className="text-gray-900 mt-1">{merchant.contactEmail}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Contact Phone</Label>
+                    <p className="text-gray-900 mt-1">{merchant.contactPhone}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Current Provider Rate</Label>
+                    <p className="text-gray-900 mt-1">{merchant.currentProviderRate}%</p>
+                  </div>
+                </div>
                 <div>
-                  <Label>QR Code URL</Label>
-                  <div className="flex items-center space-x-2 mt-1">
+                  <Label className="text-sm font-medium">Business Address</Label>
+                  <p className="text-gray-900 mt-1">{merchant.businessAddress}</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Transactions Tab */}
+          <TabsContent value="transactions" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Transactions</CardTitle>
+                <CardDescription>Latest payment activity for this merchant</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isMobile ? (
+                  // Mobile: Card-based layout
+                  <div className="space-y-3">
+                    {transactions?.slice(0, 10).map((transaction) => (
+                      <div key={transaction.id} className="p-4 border rounded-lg bg-gray-50">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-medium text-gray-900">{transaction.itemName}</h4>
+                          <Badge variant={transaction.status === 'completed' ? 'default' : 'secondary'}>
+                            {transaction.status}
+                          </Badge>
+                        </div>
+                        <div className="text-sm text-gray-600 space-y-1">
+                          <p>Amount: ${transaction.price.toFixed(2)}</p>
+                          <p>Date: {new Date(transaction.createdAt).toLocaleDateString()}</p>
+                          {transaction.windcaveTransactionId && (
+                            <p className="font-mono text-xs">ID: {transaction.windcaveTransactionId}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  // Desktop: Table layout
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Item</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Transaction ID</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {transactions?.map((transaction) => (
+                          <TableRow key={transaction.id}>
+                            <TableCell className="font-medium">{transaction.itemName}</TableCell>
+                            <TableCell>${transaction.price.toFixed(2)}</TableCell>
+                            <TableCell>
+                              <Badge variant={transaction.status === 'completed' ? 'default' : 'secondary'}>
+                                {transaction.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{new Date(transaction.createdAt).toLocaleDateString()}</TableCell>
+                            <TableCell className="font-mono text-sm">
+                              {transaction.windcaveTransactionId || 'N/A'}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Links Tab */}
+          <TabsContent value="links" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Payment Links</CardTitle>
+                <CardDescription>QR codes and payment URLs for this merchant</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label className="text-sm font-medium">QR Code URL</Label>
+                  <div className={`flex ${isMobile ? 'flex-col space-y-2' : 'items-center space-x-2'} mt-1`}>
                     <Input value={merchant.qrCodeUrl} readOnly className="font-mono text-xs" />
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => window.open(merchant.qrCodeUrl, '_blank')}
+                      className={isMobile ? 'w-full' : ''}
                     >
-                      View
+                      View QR
                     </Button>
                   </div>
                 </div>
                 
                 <div>
-                  <Label>Payment URL</Label>
-                  <div className="flex items-center space-x-2 mt-1">
+                  <Label className="text-sm font-medium">Payment URL</Label>
+                  <div className={`flex ${isMobile ? 'flex-col space-y-2' : 'items-center space-x-2'} mt-1`}>
                     <Input value={merchant.paymentUrl} readOnly className="font-mono text-xs" />
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => window.open(merchant.paymentUrl, '_blank')}
+                      className={isMobile ? 'w-full' : ''}
                     >
-                      Visit
+                      Visit Page
                     </Button>
                   </div>
                 </div>
-              </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-              <div className="pt-4 border-t">
-                <Button
-                  onClick={() => testPaymentLinkMutation.mutate()}
-                  disabled={testPaymentLinkMutation.isPending}
-                  className="w-full"
-                >
-                  {testPaymentLinkMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  ) : (
-                    <CheckCircle className="w-4 h-4 mr-2" />
-                  )}
-                  Test All Payment Links
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+          {/* Settings Tab */}
+          <TabsContent value="settings" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Merchant Settings</CardTitle>
+                <CardDescription>Configuration and management options</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8">
+                  <Edit className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Settings Coming Soon</h3>
+                  <p className="text-gray-500 text-sm">Merchant configuration options will be available here</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+        </Tabs>
+      </div>
     </div>
   );
 }

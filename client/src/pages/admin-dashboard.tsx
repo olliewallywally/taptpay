@@ -25,9 +25,11 @@ import {
   Plus,
   Settings,
   UserPlus,
-  LogOut
+  LogOut,
+  Menu
 } from "lucide-react";
 import { useLocation } from "wouter";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface AdminAnalytics {
   totalMerchants: number;
@@ -51,13 +53,8 @@ const createMerchantSchema = z.object({
   name: z.string().min(1, "Merchant name is required"),
   businessName: z.string().min(1, "Business name is required"),
   contactEmail: z.string().email("Valid email is required"),
-  contactPhone: z.string().min(1, "Contact phone is required"),
+  contactPhone: z.string().min(1, "Phone number is required"),
   businessAddress: z.string().min(1, "Business address is required"),
-  currentProviderRate: z.string().regex(/^\d+(\.\d{1,4})?$/, "Rate must be a valid percentage"),
-  bankName: z.string().min(1, "Bank name is required"),
-  bankAccountNumber: z.string().min(1, "Bank account number is required"),
-  bankBranch: z.string().min(1, "Bank branch is required"),
-  accountHolderName: z.string().min(1, "Account holder name is required"),
   loginEmail: z.string().email("Valid login email is required"),
   loginPassword: z.string().min(6, "Password must be at least 6 characters"),
 });
@@ -65,22 +62,15 @@ const createMerchantSchema = z.object({
 type CreateMerchantFormData = z.infer<typeof createMerchantSchema>;
 
 export default function AdminDashboard() {
-  const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
 
-  // Fetch overall admin analytics
+  // Get admin analytics
   const { data: analytics, isLoading } = useQuery<AdminAnalytics>({
     queryKey: ['/api/admin/analytics'],
-    queryFn: async () => {
-      const response = await fetch('/api/admin/analytics', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('adminAuthToken')}`
-        }
-      });
-      if (!response.ok) throw new Error('Failed to fetch admin analytics');
-      return response.json();
-    },
+    staleTime: 30000,
   });
 
   // Create merchant form
@@ -92,11 +82,6 @@ export default function AdminDashboard() {
       contactEmail: "",
       contactPhone: "",
       businessAddress: "",
-      currentProviderRate: "2.5",
-      bankName: "",
-      bankAccountNumber: "",
-      bankBranch: "",
-      accountHolderName: "",
       loginEmail: "",
       loginPassword: "",
     },
@@ -141,9 +126,9 @@ export default function AdminDashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="flex items-center space-x-2">
-          <Loader2 className="h-8 w-8 animate-spin text-slate-600" />
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
           <span className="text-slate-600">Loading admin dashboard...</span>
         </div>
       </div>
@@ -155,366 +140,313 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-          <p className="text-gray-600">System-wide performance and merchant management</p>
-        </div>
-        <Button
-          variant="outline"
-          onClick={handleLogout}
-          className="flex items-center space-x-2"
-        >
-          <LogOut className="w-4 h-4" />
-          <span>Logout</span>
-        </Button>
-      </div>
-
-      <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview" className="flex items-center space-x-2">
-            <Activity className="w-4 h-4" />
-            <span>Overview</span>
-          </TabsTrigger>
-          <TabsTrigger value="merchants" className="flex items-center space-x-2">
-            <Users className="w-4 h-4" />
-            <span>Merchants</span>
-          </TabsTrigger>
-          <TabsTrigger value="create" className="flex items-center space-x-2">
-            <UserPlus className="w-4 h-4" />
-            <span>Create Merchant</span>
-          </TabsTrigger>
-          <TabsTrigger value="settings" className="flex items-center space-x-2">
-            <Settings className="w-4 h-4" />
-            <span>Settings</span>
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-6">
-          {/* Overview Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Merchants</CardTitle>
-                <Building2 className="h-4 w-4 text-blue-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-blue-600">
-                  {analytics?.totalMerchants || 0}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {analytics?.activeMerchants || 0} active
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Merchant Revenue</CardTitle>
-                <DollarSign className="h-4 w-4 text-green-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">
-                  ${analytics?.totalRevenue?.toFixed(2) || "0.00"}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Across all merchants
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Transactions</CardTitle>
-                <CreditCard className="h-4 w-4 text-purple-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-purple-600">
-                  {analytics?.totalTransactions || 0}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {analytics?.completedTransactions || 0} completed
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Revenue from Fees</CardTitle>
-                <TrendingUp className="h-4 w-4 text-orange-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-orange-600">
-                  ${analytics?.transactionFeeRevenue?.toFixed(2) || "0.00"}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  From $0.20 per transaction
-                </p>
-              </CardContent>
-            </Card>
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 py-4 md:py-6">
+        
+        {/* Mobile-optimized Header */}
+        <div className="flex flex-col space-y-4 mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl md:text-2xl font-bold text-gray-900">Admin Portal</h1>
+              <p className="text-sm text-gray-600 hidden sm:block">Manage merchants and monitor system performance</p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={handleLogout}
+              size={isMobile ? "sm" : "default"}
+              className="bg-red-50 text-red-600 border-red-200 hover:bg-red-100"
+            >
+              <LogOut className="w-4 h-4" />
+              {!isMobile && <span className="ml-2">Logout</span>}
+            </Button>
           </div>
+        </div>
 
-          {/* System Status */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card className="lg:col-span-2">
+        <Tabs defaultValue="overview" className="space-y-4">
+          
+          {/* Mobile-first tabs */}
+          <TabsList className={`grid w-full h-auto p-1 ${isMobile ? 'grid-cols-2 gap-1' : 'grid-cols-4'}`}>
+            <TabsTrigger 
+              value="overview" 
+              className={`flex items-center space-x-2 p-3 ${isMobile ? 'flex-col space-y-1 space-x-0 text-xs' : 'text-sm'}`}
+            >
+              <Activity className="w-4 h-4" />
+              <span>Overview</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="merchants" 
+              className={`flex items-center space-x-2 p-3 ${isMobile ? 'flex-col space-y-1 space-x-0 text-xs' : 'text-sm'}`}
+            >
+              <Users className="w-4 h-4" />
+              <span>Merchants</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="create" 
+              className={`flex items-center space-x-2 p-3 ${isMobile ? 'flex-col space-y-1 space-x-0 text-xs' : 'text-sm'}`}
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>{isMobile ? 'Add' : 'Add New'}</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="settings" 
+              className={`flex items-center space-x-2 p-3 ${isMobile ? 'flex-col space-y-1 space-x-0 text-xs' : 'text-sm'}`}
+            >
+              <Settings className="w-4 h-4" />
+              <span>Settings</span>
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="space-y-4">
+            
+            {/* Mobile-optimized Analytics Cards */}
+            <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-4'}`}>
+              <Card className="border-blue-200 bg-blue-50">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Merchants</CardTitle>
+                  <Building2 className="h-4 w-4 text-blue-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-blue-700">
+                    {analytics?.totalMerchants || 0}
+                  </div>
+                  <p className="text-xs text-blue-600 mt-1">
+                    {analytics?.activeMerchants || 0} active
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-green-200 bg-green-50">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+                  <DollarSign className="h-4 w-4 text-green-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-green-700">
+                    ${analytics?.totalRevenue?.toFixed(2) || "0.00"}
+                  </div>
+                  <p className="text-xs text-green-600 mt-1">
+                    Across all merchants
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-purple-200 bg-purple-50">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Transactions</CardTitle>
+                  <CreditCard className="h-4 w-4 text-purple-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-purple-700">
+                    {analytics?.totalTransactions || 0}
+                  </div>
+                  <p className="text-xs text-purple-600 mt-1">
+                    {analytics?.completedTransactions || 0} completed
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-orange-200 bg-orange-50">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Platform Revenue</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-orange-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-orange-700">
+                    ${analytics?.transactionFeeRevenue?.toFixed(2) || "0.00"}
+                  </div>
+                  <p className="text-xs text-orange-600 mt-1">
+                    From transaction fees
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Recent Merchants - Mobile optimized */}
+            <Card>
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Users className="h-5 w-5" />
-                  <span>Merchant Performance</span>
-                </CardTitle>
-                <CardDescription>
-                  Overview of all merchants and their activity
-                </CardDescription>
+                <CardTitle className="text-lg">Recent Merchants</CardTitle>
+                <CardDescription>Latest merchant account activity</CardDescription>
               </CardHeader>
               <CardContent>
-                {analytics?.recentMerchants && analytics.recentMerchants.length > 0 ? (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Business</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Transactions</TableHead>
-                        <TableHead>Revenue</TableHead>
-                        <TableHead>Last Activity</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {analytics.recentMerchants.map((merchant) => (
-                        <TableRow key={merchant.id}>
-                          <TableCell>
-                            <div>
-                              <p className="font-medium">{merchant.businessName || merchant.name}</p>
-                              <p className="text-sm text-gray-500">ID: {merchant.id}</p>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge 
-                              variant={merchant.status === 'active' ? 'default' : 'secondary'}
-                              className={merchant.status === 'active' ? 'bg-green-100 text-green-800' : ''}
-                            >
-                              <div className="flex items-center space-x-1">
-                                {merchant.status === 'active' ? (
-                                  <CheckCircle className="w-3 h-3" />
-                                ) : (
-                                  <AlertCircle className="w-3 h-3" />
-                                )}
-                                <span>{merchant.status}</span>
-                              </div>
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <span className="font-medium">{merchant.totalTransactions}</span>
-                          </TableCell>
-                          <TableCell>
-                            <span className="font-medium">${merchant.totalRevenue.toFixed(2)}</span>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-sm text-gray-600">
-                              {merchant.lastTransactionDate 
-                                ? new Date(merchant.lastTransactionDate).toLocaleDateString('en-NZ')
-                                : 'No transactions'
-                              }
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleViewMerchant(merchant.id)}
-                              className="flex items-center space-x-1"
-                            >
-                              <Eye className="w-4 h-4" />
-                              <span>Manage</span>
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                {isMobile ? (
+                  // Mobile: Card-based layout
+                  <div className="space-y-3">
+                    {analytics?.recentMerchants?.slice(0, 5).map((merchant) => (
+                      <div key={merchant.id} className="p-4 border rounded-lg bg-gray-50">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-medium text-gray-900">{merchant.businessName}</h4>
+                          <Badge variant={merchant.status === 'active' ? 'default' : 'secondary'}>
+                            {merchant.status}
+                          </Badge>
+                        </div>
+                        <div className="text-sm text-gray-600 space-y-1">
+                          <p>ID: {merchant.name}</p>
+                          <p>Transactions: {merchant.totalTransactions}</p>
+                          <p>Revenue: ${merchant.totalRevenue.toFixed(2)}</p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewMerchant(merchant.id)}
+                          className="w-full mt-3"
+                        >
+                          <Eye className="w-4 h-4 mr-2" />
+                          View Details
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                 ) : (
-                  <div className="text-center py-8">
-                    <Building2 className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No merchants found</h3>
-                    <p className="text-gray-500">No merchant accounts have been created yet</p>
+                  // Desktop: Table layout
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Business Name</TableHead>
+                          <TableHead>Merchant ID</TableHead>
+                          <TableHead>Transactions</TableHead>
+                          <TableHead>Revenue</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {analytics?.recentMerchants?.map((merchant) => (
+                          <TableRow key={merchant.id}>
+                            <TableCell className="font-medium">{merchant.businessName}</TableCell>
+                            <TableCell className="font-mono text-sm">{merchant.name}</TableCell>
+                            <TableCell>{merchant.totalTransactions}</TableCell>
+                            <TableCell>${merchant.totalRevenue.toFixed(2)}</TableCell>
+                            <TableCell>
+                              <Badge variant={merchant.status === 'active' ? 'default' : 'secondary'}>
+                                {merchant.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleViewMerchant(merchant.id)}
+                              >
+                                <Eye className="w-4 h-4 mr-2" />
+                                View
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </div>
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
 
+          {/* Merchants Tab */}
+          <TabsContent value="merchants" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Activity className="h-5 w-5" />
-                  <span>System Health</span>
-                </CardTitle>
-                <CardDescription>
-                  Real-time system status
-                </CardDescription>
+                <CardTitle>All Merchants</CardTitle>
+                <CardDescription>Complete list of merchant accounts</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Payment Processing</span>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                    <span className="text-sm text-green-600">Online</span>
+              <CardContent>
+                {isMobile ? (
+                  // Mobile: Simplified card view
+                  <div className="space-y-3">
+                    {analytics?.recentMerchants?.map((merchant) => (
+                      <div key={merchant.id} className="p-4 border rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-medium">{merchant.businessName}</h4>
+                          <Badge variant={merchant.status === 'active' ? 'default' : 'secondary'}>
+                            {merchant.status}
+                          </Badge>
+                        </div>
+                        <div className="text-sm text-gray-600 mb-3">
+                          <p>ID: {merchant.name}</p>
+                          <p>{merchant.totalTransactions} transactions</p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewMerchant(merchant.id)}
+                          className="w-full"
+                        >
+                          Manage
+                        </Button>
+                      </div>
+                    ))}
                   </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Database</span>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                    <span className="text-sm text-green-600">Connected</span>
+                ) : (
+                  // Desktop: Full table
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Business Name</TableHead>
+                          <TableHead>Merchant ID</TableHead>
+                          <TableHead>Transactions</TableHead>
+                          <TableHead>Revenue</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Last Transaction</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {analytics?.recentMerchants?.map((merchant) => (
+                          <TableRow key={merchant.id}>
+                            <TableCell className="font-medium">{merchant.businessName}</TableCell>
+                            <TableCell className="font-mono text-sm">{merchant.name}</TableCell>
+                            <TableCell>{merchant.totalTransactions}</TableCell>
+                            <TableCell>${merchant.totalRevenue.toFixed(2)}</TableCell>
+                            <TableCell>
+                              <Badge variant={merchant.status === 'active' ? 'default' : 'secondary'}>
+                                {merchant.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-sm text-gray-500">
+                              {merchant.lastTransactionDate || 'Never'}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleViewMerchant(merchant.id)}
+                              >
+                                Manage
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">QR Code Generation</span>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                    <span className="text-sm text-green-600">Active</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Payment Links</span>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                    <span className="text-sm text-green-600">Monitoring</span>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t">
-                  <Button 
-                    variant="outline" 
-                    className="w-full"
-                    onClick={() => setLocation('/admin/system')}
-                  >
-                    View System Details
-                  </Button>
-                </div>
+                )}
               </CardContent>
             </Card>
-          </div>
-        </TabsContent>
+          </TabsContent>
 
-        <TabsContent value="merchants" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Users className="h-5 w-5" />
-                <span>All Merchants</span>
-              </CardTitle>
-              <CardDescription>
-                Manage and monitor all merchant accounts
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {analytics?.recentMerchants && analytics.recentMerchants.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Business</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Transactions</TableHead>
-                      <TableHead>Revenue</TableHead>
-                      <TableHead>Last Activity</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {analytics.recentMerchants.map((merchant) => (
-                      <TableRow key={merchant.id}>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{merchant.businessName || merchant.name}</p>
-                            <p className="text-sm text-gray-500">ID: {merchant.id}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge 
-                            variant={merchant.status === 'active' ? 'default' : 'secondary'}
-                            className={merchant.status === 'active' ? 'bg-green-100 text-green-800' : ''}
-                          >
-                            <div className="flex items-center space-x-1">
-                              {merchant.status === 'active' ? (
-                                <CheckCircle className="w-3 h-3" />
-                              ) : (
-                                <AlertCircle className="w-3 h-3" />
-                              )}
-                              <span>{merchant.status}</span>
-                            </div>
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <span className="font-medium">{merchant.totalTransactions}</span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="font-medium">${merchant.totalRevenue.toFixed(2)}</span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm text-gray-600">
-                            {merchant.lastTransactionDate 
-                              ? new Date(merchant.lastTransactionDate).toLocaleDateString('en-NZ')
-                              : 'No transactions'
-                            }
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleViewMerchant(merchant.id)}
-                            className="flex items-center space-x-1"
-                          >
-                            <Eye className="w-4 h-4" />
-                            <span>Manage</span>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <div className="text-center py-8">
-                  <Building2 className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No merchants found</h3>
-                  <p className="text-gray-500">No merchant accounts have been created yet</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="create" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <UserPlus className="h-5 w-5" />
-                <span>Create New Merchant</span>
-              </CardTitle>
-              <CardDescription>
-                Set up a new merchant account with login credentials
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Form {...createMerchantForm}>
-                <form onSubmit={createMerchantForm.handleSubmit(onCreateMerchant)} className="space-y-6">
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Business Information */}
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-medium">Business Information</h3>
-                      
+          {/* Create Merchant Tab */}
+          <TabsContent value="create" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Create New Merchant</CardTitle>
+                <CardDescription>Add a new merchant account to the platform</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Form {...createMerchantForm}>
+                  <form onSubmit={createMerchantForm.handleSubmit(onCreateMerchant)} className="space-y-4">
+                    
+                    {/* Mobile-optimized form layout */}
+                    <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
                       <FormField
                         control={createMerchantForm.control}
                         name="name"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Merchant ID Name</FormLabel>
+                            <FormLabel>Merchant ID</FormLabel>
                             <FormControl>
-                              <Input placeholder="merchant-name" {...field} />
+                              <Input placeholder="unique-merchant-id" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -528,7 +460,7 @@ export default function AdminDashboard() {
                           <FormItem>
                             <FormLabel>Business Name</FormLabel>
                             <FormControl>
-                              <Input placeholder="Coffee Corner Ltd" {...field} />
+                              <Input placeholder="Business Display Name" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -542,7 +474,7 @@ export default function AdminDashboard() {
                           <FormItem>
                             <FormLabel>Contact Email</FormLabel>
                             <FormControl>
-                              <Input type="email" placeholder="info@business.com" {...field} />
+                              <Input type="email" placeholder="contact@business.com" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -554,9 +486,9 @@ export default function AdminDashboard() {
                         name="contactPhone"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Contact Phone</FormLabel>
+                            <FormLabel>Phone Number</FormLabel>
                             <FormControl>
-                              <Input placeholder="+64 9 123 4567" {...field} />
+                              <Input placeholder="+64 21 123 4567" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -565,12 +497,12 @@ export default function AdminDashboard() {
 
                       <FormField
                         control={createMerchantForm.control}
-                        name="businessAddress"
+                        name="loginEmail"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Business Address</FormLabel>
+                            <FormLabel>Login Email</FormLabel>
                             <FormControl>
-                              <Input placeholder="123 Queen St, Auckland" {...field} />
+                              <Input type="email" placeholder="login@business.com" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -579,12 +511,12 @@ export default function AdminDashboard() {
 
                       <FormField
                         control={createMerchantForm.control}
-                        name="currentProviderRate"
+                        name="loginPassword"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Current Provider Rate (%)</FormLabel>
+                            <FormLabel>Login Password</FormLabel>
                             <FormControl>
-                              <Input placeholder="2.5" {...field} />
+                              <Input type="password" placeholder="••••••••" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -592,141 +524,62 @@ export default function AdminDashboard() {
                       />
                     </div>
 
-                    {/* Banking & Login Information */}
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-medium">Banking Information</h3>
-                      
-                      <FormField
-                        control={createMerchantForm.control}
-                        name="bankName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Bank Name</FormLabel>
-                            <FormControl>
-                              <Input placeholder="ASB Bank" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                    <FormField
+                      control={createMerchantForm.control}
+                      name="businessAddress"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Business Address</FormLabel>
+                          <FormControl>
+                            <Input placeholder="123 Business Street, City, Country" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                      <FormField
-                        control={createMerchantForm.control}
-                        name="accountHolderName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Account Holder Name</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Coffee Corner Ltd" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={createMerchantForm.control}
-                        name="bankAccountNumber"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Account Number</FormLabel>
-                            <FormControl>
-                              <Input placeholder="12-3456-7890123-00" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={createMerchantForm.control}
-                        name="bankBranch"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Bank Branch</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Queen Street" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <div className="pt-4 border-t">
-                        <h3 className="text-lg font-medium mb-4">Login Credentials</h3>
-                        
-                        <FormField
-                          control={createMerchantForm.control}
-                          name="loginEmail"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Login Email</FormLabel>
-                              <FormControl>
-                                <Input type="email" placeholder="merchant@business.com" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={createMerchantForm.control}
-                          name="loginPassword"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Login Password</FormLabel>
-                              <FormControl>
-                                <Input type="password" placeholder="Secure password" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end pt-6 border-t">
                     <Button
                       type="submit"
                       disabled={createMerchantMutation.isPending}
-                      className="flex items-center space-x-2"
+                      className={`${isMobile ? 'w-full' : 'w-auto'} bg-blue-600 hover:bg-blue-700`}
                     >
                       {createMerchantMutation.isPending ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Creating...
+                        </>
                       ) : (
-                        <Plus className="w-4 h-4" />
+                        <>
+                          <Plus className="w-4 h-4 mr-2" />
+                          Create Merchant
+                        </>
                       )}
-                      <span>Create Merchant Account</span>
                     </Button>
-                  </div>
-                </form>
-              </Form>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                  </form>
+                </Form>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        <TabsContent value="settings" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Settings className="h-5 w-5" />
-                <span>System Settings</span>
-              </CardTitle>
-              <CardDescription>
-                Configure platform settings and preferences
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8">
-                <Settings className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Settings Coming Soon</h3>
-                <p className="text-gray-500">System configuration options will be available here</p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+          {/* Settings Tab */}
+          <TabsContent value="settings" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Platform Settings</CardTitle>
+                <CardDescription>Configure platform settings and preferences</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8">
+                  <Settings className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Settings Coming Soon</h3>
+                  <p className="text-gray-500 text-sm">System configuration options will be available here</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+        </Tabs>
+      </div>
     </div>
   );
 }
