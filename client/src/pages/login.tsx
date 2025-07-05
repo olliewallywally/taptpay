@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { LogIn, Shield } from "lucide-react";
@@ -203,6 +203,17 @@ export default function Login() {
                 `Sign in as ${loginType === 'merchant' ? 'Merchant' : 'Admin'}`
               )}
             </Button>
+            
+            {/* Forgot Password Link - Only show for merchant login */}
+            {loginType === 'merchant' && (
+              <div className="text-center mt-4">
+                <Link href="/forgot-password">
+                  <Button variant="ghost" className="text-sm text-gray-600 hover:text-black">
+                    Forgot your password?
+                  </Button>
+                </Link>
+              </div>
+            )}
           </form>
         </Form>
 

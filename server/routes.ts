@@ -1,9 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema } from "@shared/schema";
+import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, forgotPasswordSchema, resetPasswordSchema } from "@shared/schema";
 import { windcaveService } from "./windcave";
-import { authenticateUser, generateToken, authenticateToken, createUser, type AuthenticatedRequest } from "./auth";
+import { authenticateUser, generateToken, authenticateToken, createUser, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
 import { generateBusinessReportPdf } from "./report-generator";
 import { getBaseUrl, generatePaymentUrl, generateQrCodeUrl } from "./url-utils";
@@ -62,6 +62,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: req.user!.role,
       },
     });
+  });
+
+  // Password reset routes
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const validation = forgotPasswordSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid email", errors: validation.error.errors });
+      }
+
+      const { email } = validation.data;
+      const baseUrl = getBaseUrl(req);
+      
+      await requestPasswordReset(email, baseUrl);
+      
+      // Always return success to prevent email enumeration
+      res.json({ message: "If an account with that email exists, a password reset link has been sent." });
+    } catch (error) {
+      console.error("Password reset request error:", error);
+      res.status(500).json({ message: "Failed to process password reset request" });
+    }
+  });
+
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const validation = resetPasswordSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid reset data", errors: validation.error.errors });
+      }
+
+      const { token, password } = validation.data;
+      const success = await resetPassword(token, password);
+      
+      if (!success) {
+        return res.status(400).json({ message: "Invalid or expired reset token" });
+      }
+      
+      res.json({ message: "Password has been successfully reset" });
+    } catch (error) {
+      console.error("Password reset error:", error);
+      res.status(500).json({ message: "Failed to reset password" });
+    }
+  });
+
+  app.get("/api/auth/validate-reset-token/:token", (req, res) => {
+    const { token } = req.params;
+    const isValid = validateResetToken(token);
+    
+    res.json({ valid: isValid });
   });
 
   // Admin Authentication routes

@@ -12,6 +12,8 @@ import Dashboard from "@/pages/dashboard";
 import Settings from "@/pages/settings";
 
 import Login from "@/pages/login";
+import ForgotPassword from "@/pages/forgot-password";
+import ResetPassword from "@/pages/reset-password";
 import AdminDashboard from "@/pages/admin-dashboard";
 import AdminMerchantDetail from "@/pages/admin-merchant";
 import { Layout } from "@/components/layout";
@@ -96,6 +98,8 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Login} />
+      <Route path="/forgot-password" component={ForgotPassword} />
+      <Route path="/reset-password" component={ResetPassword} />
       <Route path="/merchant">
         <ProtectedRoute>
           <Layout>
