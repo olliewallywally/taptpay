@@ -807,6 +807,34 @@ export default function AdminDashboard() {
                   </div>
                   
                   <div className="space-y-4">
+                    <h4 className="font-medium text-gray-900">Email Configuration</h4>
+                    <div className="space-y-3">
+                      <Button
+                        onClick={async () => {
+                          try {
+                            const response = await apiRequest("POST", "/api/admin/test-email", {});
+                            const result = await response.json();
+                            toast({
+                              title: result.success ? "Test Email Sent" : "Email Test Failed",
+                              description: result.message,
+                              variant: result.success ? "default" : "destructive",
+                            });
+                          } catch (error: any) {
+                            toast({
+                              title: "Email Test Failed",
+                              description: error.message || "Failed to send test email",
+                              variant: "destructive",
+                            });
+                          }
+                        }}
+                        className="w-full"
+                      >
+                        Test SendGrid Email
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
                     <h4 className="font-medium text-gray-900">System Limits</h4>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
