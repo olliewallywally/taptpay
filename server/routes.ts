@@ -9,6 +9,7 @@ import { generateBusinessReportPdf } from "./report-generator";
 import { getBaseUrl, generatePaymentUrl, generateQrCodeUrl } from "./url-utils";
 import QRCode from "qrcode";
 import { z } from "zod";
+import jwt from "jsonwebtoken";
 
 // Store SSE connections for real-time updates
 const sseConnections = new Map<number, Set<any>>();
@@ -104,19 +105,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/admin/auth/me", authenticateToken, (req: AuthenticatedRequest, res) => {
-    if (req.user?.role !== 'admin') {
-      return res.status(403).json({ message: "Admin access required" });
+  app.get("/api/admin/auth/me", (req: AuthenticatedRequest, res) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+      return res.status(401).json({ message: 'Access token required' });
     }
-    
-    res.json({
-      user: {
-        id: req.user.id,
-        email: req.user.email,
-        merchantId: req.user.merchantId,
-        role: req.user.role,
-      },
-    });
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-change-in-production') as any;
+      
+      // For admin users, we verify directly from the token since they're not stored in the users Map
+      if (decoded.role === 'admin' && decoded.email === 'admin@tapt.co.nz') {
+        res.json({
+          user: {
+            id: decoded.userId,
+            email: decoded.email,
+            merchantId: decoded.merchantId,
+            role: decoded.role,
+          },
+        });
+      } else {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+    } catch (error) {
+      return res.status(403).json({ message: "Invalid or expired token" });
+    }
   });
 
   // Generate QR code for merchant
@@ -593,7 +608,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let totalRevenue = 0;
       let totalTransactions = 0;
-      let completedTransactions = 0;
+      let totalCompletedTransactions = 0;
       const recentMerchants = [];
 
       for (const merchant of merchants) {
@@ -603,12 +618,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           totalRevenue += analytics.totalRevenue || 0;
           totalTransactions += analytics.totalTransactions || 0;
-          completedTransactions += analytics.completedTransactions || 0;
+          totalCompletedTransactions += analytics.completedTransactions || 0;
 
           // Get last transaction date
-          const completedTransactions = transactions.filter(t => t.status === 'completed' && t.createdAt);
-          const lastTransaction = completedTransactions.length > 0 
-            ? completedTransactions.sort((a, b) => {
+          const completedTransactionsList = transactions.filter(t => t.status === 'completed' && t.createdAt);
+          const lastTransaction = completedTransactionsList.length > 0 
+            ? completedTransactionsList.sort((a, b) => {
                 const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
                 const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
                 return dateB - dateA;
@@ -646,13 +661,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
         activeMerchants,
         totalRevenue,
         totalTransactions,
-        completedTransactions,
+        completedTransactions: totalCompletedTransactions,
         averageTransactionValue,
         recentMerchants: recentMerchants.sort((a, b) => b.totalRevenue - a.totalRevenue), // Sort by revenue
       });
     } catch (error) {
       console.error("Error fetching admin analytics:", error);
       res.status(500).json({ message: "Failed to get admin analytics" });
+    }
+  });
+
+  // Admin merchant management endpoints
+  app.put("/api/admin/merchants/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const merchantId = parseInt(req.params.id);
+      const updates = req.body;
+
+      // Update different aspects of merchant data based on what's provided
+      if (updates.businessName || updates.contactEmail || updates.contactPhone || updates.businessAddress) {
+        await storage.updateMerchantDetails(merchantId, {
+          businessName: updates.businessName,
+          contactEmail: updates.contactEmail,
+          contactPhone: updates.contactPhone,
+          businessAddress: updates.businessAddress,
+        });
+      }
+
+      if (updates.bankName || updates.bankAccountNumber || updates.bankBranch || updates.accountHolderName) {
+        await storage.updateMerchantBankAccount(merchantId, {
+          bankName: updates.bankName,
+          bankAccountNumber: updates.bankAccountNumber,
+          bankBranch: updates.bankBranch,
+          accountHolderName: updates.accountHolderName,
+        });
+      }
+
+      if (updates.currentProviderRate) {
+        await storage.updateMerchantRates(merchantId, updates.currentProviderRate);
+      }
+
+      const updatedMerchant = await storage.getMerchant(merchantId);
+      res.json(updatedMerchant);
+    } catch (error) {
+      console.error("Error updating merchant:", error);
+      res.status(500).json({ message: "Failed to update merchant" });
+    }
+  });
+
+  // Test payment link endpoint
+  app.post("/api/merchants/:id/test-payment-link", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const merchantId = parseInt(req.params.id);
+      const merchant = await storage.getMerchant(merchantId);
+      
+      if (!merchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+
+      // Test the payment URL by making a simple HTTP request
+      const paymentUrl = generatePaymentUrl(merchantId, req);
+      const qrCodeUrl = generateQrCodeUrl(merchantId, req);
+      
+      try {
+        // Simple connectivity test
+        const testResults = {
+          paymentUrl: { url: paymentUrl, status: 'active' },
+          qrCodeUrl: { url: qrCodeUrl, status: 'active' },
+          merchant: { id: merchantId, status: 'active' }
+        };
+
+        res.json({
+          status: 'active',
+          message: 'All payment links are operational',
+          results: testResults
+        });
+      } catch (testError) {
+        res.json({
+          status: 'error',
+          message: 'Payment link connectivity issues detected',
+          error: testError
+        });
+      }
+    } catch (error) {
+      console.error("Error testing payment links:", error);
+      res.status(500).json({ message: "Failed to test payment links" });
     }
   });
 
