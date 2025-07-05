@@ -41,7 +41,13 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
     console.log(`✅ Email sent successfully to ${params.to}`);
     return true;
   } catch (error: any) {
-    console.error('SendGrid email error:', error.message || error);
+    console.error('SendGrid email error details:', {
+      message: error.message,
+      code: error.code,
+      response: error.response?.body || error.response,
+      status: error.response?.status,
+      headers: error.response?.headers
+    });
     
     // If SendGrid fails, fall back to simulation mode for development
     console.log('\n=== FALLBACK SIMULATED EMAIL ===');
