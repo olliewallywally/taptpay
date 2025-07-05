@@ -125,56 +125,6 @@ export async function generateBusinessReportPdf(
 
   yPos += 35;
 
-  // Transaction Volume Bar Chart
-  pdf.setFontSize(14);
-  pdf.setTextColor(22, 101, 52);
-  pdf.text('Transaction Analysis', 20, yPos);
-  yPos += 12;
-
-  // Create transaction status bar chart
-  const chartX = 20;
-  const chartY = yPos;
-  const chartWidth = 170;
-  const chartHeight = 35;
-  
-  // Chart background
-  pdf.setFillColor(249, 250, 251);
-  pdf.rect(chartX, chartY, chartWidth, chartHeight, 'F');
-  pdf.setDrawColor(229, 231, 235);
-  pdf.rect(chartX, chartY, chartWidth, chartHeight, 'S');
-
-  // Chart data
-  const statusData = [
-    { label: 'Completed', count: analytics.transactionsByStatus.completed || 0, color: [34, 197, 94] },
-    { label: 'Failed', count: analytics.transactionsByStatus.failed || 0, color: [239, 68, 68] },
-    { label: 'Processing', count: analytics.transactionsByStatus.processing || 0, color: [59, 130, 246] },
-    { label: 'Pending', count: analytics.transactionsByStatus.pending || 0, color: [168, 85, 247] }
-  ].filter(item => item.count > 0);
-
-  const maxCount = Math.max(...statusData.map(item => item.count));
-  const barWidth = 20;
-  const barSpacing = 30;
-  
-  statusData.forEach((item, index) => {
-    const barHeight = maxCount > 0 ? (item.count / maxCount) * 20 : 0;
-    const barX = chartX + 20 + (index * barSpacing);
-    const barY = chartY + chartHeight - 15 - barHeight;
-    
-    // Draw bar
-    pdf.setFillColor(item.color[0], item.color[1], item.color[2]);
-    pdf.rect(barX, barY, barWidth, barHeight, 'F');
-    
-    // Value on top of bar
-    pdf.setFontSize(8);
-    pdf.setTextColor(0, 0, 0);
-    pdf.text(item.count.toString(), barX + 8, barY - 2);
-    
-    // Label below bar
-    pdf.setFontSize(7);
-    pdf.setTextColor(107, 114, 128);
-    pdf.text(item.label, barX + 2, chartY + chartHeight - 5);
-  });
-
   // Cost Comparison Section
   pdf.setFontSize(14);
   pdf.setTextColor(22, 101, 52);
