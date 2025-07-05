@@ -147,14 +147,14 @@ export default function Settings() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Settings & Configuration</h1>
-        <p className="text-gray-600">Manage your payment processing configuration and API connections</p>
+    <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Settings & Configuration</h1>
+        <p className="text-sm sm:text-base text-gray-600">Manage your payment processing configuration and API connections</p>
       </div>
 
       {/* Merchant Business Details Card */}
-      <Card className="mb-8">
+      <Card className="mb-6 sm:mb-8">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
@@ -305,7 +305,7 @@ export default function Settings() {
       </Card>
 
       {/* Bank Account Details Card */}
-      <Card className="mb-8">
+      <Card className="mb-6 sm:mb-8">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
@@ -461,7 +461,7 @@ export default function Settings() {
       </Card>
 
       {/* API Status Card */}
-      <Card className="mb-8">
+      <Card className="mb-6 sm:mb-8">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Shield className="h-5 w-5" />
@@ -626,7 +626,7 @@ export default function Settings() {
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-700">Processing Rate</label>
-                <p className="text-gray-900 font-semibold text-green-600">0.20% per transaction</p>
+                <p className="text-gray-900 font-semibold text-green-600">$0.20 flat fee per transaction</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-700">Currency</label>

@@ -24,16 +24,16 @@ export function Navigation() {
 
   return (
     <div className="bg-white shadow-sm border-b border-gray-200">
-      <div className="max-w-6xl mx-auto px-4 py-4">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-green-800 rounded flex items-center justify-center">
+          <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
+            <div className="w-8 h-8 bg-green-800 rounded flex items-center justify-center flex-shrink-0">
               <QrCode className="text-white text-sm" />
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">Tapt Payment Terminal</h1>
+            <div className="min-w-0">
+              <h1 className="text-lg sm:text-xl font-bold text-gray-900 truncate">Tapt Payment Terminal</h1>
               {user && (
-                <p className="text-sm text-gray-600">Welcome back, {user.email}</p>
+                <p className="text-xs sm:text-sm text-gray-600 truncate">Welcome back, {user.email}</p>
               )}
             </div>
           </div>
@@ -41,7 +41,7 @@ export function Navigation() {
             <div className="flex bg-gray-100 rounded-lg p-1">
               <a 
                 href="/merchant"
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                className={`px-2 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-md transition-all ${
                   isActive("/merchant") 
                     ? "bg-white text-green-800 shadow-sm" 
                     : "text-gray-600 hover:text-gray-900"
@@ -51,7 +51,7 @@ export function Navigation() {
               </a>
               <a 
                 href="/dashboard"
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                className={`px-2 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-md transition-all ${
                   isActive("/dashboard") 
                     ? "bg-white text-green-800 shadow-sm" 
                     : "text-gray-600 hover:text-gray-900"
@@ -61,7 +61,7 @@ export function Navigation() {
               </a>
               <a 
                 href="/settings"
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                className={`px-2 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-md transition-all ${
                   isActive("/settings") 
                     ? "bg-white text-green-800 shadow-sm" 
                     : "text-gray-600 hover:text-gray-900"

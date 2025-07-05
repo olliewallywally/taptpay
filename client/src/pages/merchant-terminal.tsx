@@ -143,19 +143,19 @@ export default function MerchantTerminal() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <div className="grid lg:grid-cols-2 gap-8">
+    <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
+      <div className="grid lg:grid-cols-2 gap-4 sm:gap-8">
         
         {/* Transaction Entry Card */}
         <Card className="rounded-2xl shadow-lg">
-          <CardContent className="p-8">
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">New Transaction</h2>
-              <p className="text-gray-600">Enter item details to generate customer payment link</p>
+          <CardContent className="p-4 sm:p-8">
+            <div className="mb-4 sm:mb-6">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">New Transaction</h2>
+              <p className="text-sm sm:text-base text-gray-600">Enter item details to generate customer payment link</p>
             </div>
 
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6">
                 <FormField
                   control={form.control}
                   name="itemName"
