@@ -17,6 +17,8 @@ import ResetPassword from "@/pages/reset-password";
 import AdminLogin from "@/pages/admin-login";
 import AdminDashboard from "@/pages/admin-dashboard";
 import AdminMerchantDetail from "@/pages/admin-merchant";
+import CreateMerchant from "@/pages/create-merchant";
+import VerifyMerchant from "@/pages/verify-merchant";
 import { Layout } from "@/components/layout";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -136,6 +138,13 @@ function Router() {
         </AdminProtectedRoute>
       </Route>
       
+      <Route path="/admin/create-merchant">
+        <AdminProtectedRoute>
+          <CreateMerchant />
+        </AdminProtectedRoute>
+      </Route>
+      
+      <Route path="/verify-merchant" component={VerifyMerchant} />
       <Route path="/pay/:merchantId" component={CustomerPayment} />
       <Route path="/receipt/:transactionId" component={Receipt} />
       <Route component={NotFound} />

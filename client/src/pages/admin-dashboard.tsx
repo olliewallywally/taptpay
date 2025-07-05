@@ -26,9 +26,11 @@ import {
   Settings,
   UserPlus,
   LogOut,
-  Menu
+  Menu,
+  Clock,
+  Mail
 } from "lucide-react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface AdminAnalytics {
@@ -77,6 +79,21 @@ export default function AdminDashboard() {
         }
       });
       if (!response.ok) throw new Error('Failed to fetch admin analytics');
+      return response.json();
+    },
+    staleTime: 30000,
+  });
+
+  // Get all merchants
+  const { data: merchants, isLoading: merchantsLoading } = useQuery({
+    queryKey: ['/api/admin/merchants'],
+    queryFn: async () => {
+      const response = await fetch('/api/admin/merchants', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('adminAuthToken')}`
+        }
+      });
+      if (!response.ok) throw new Error('Failed to fetch merchants');
       return response.json();
     },
     staleTime: 30000,
@@ -189,13 +206,12 @@ export default function AdminDashboard() {
               <Users className="w-4 h-4" />
               <span>Merchants</span>
             </TabsTrigger>
-            <TabsTrigger 
-              value="create" 
-              className={`flex items-center space-x-2 p-3 ${isMobile ? 'flex-col space-y-1 space-x-0 text-xs' : 'text-sm'}`}
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>{isMobile ? 'Add' : 'Add New'}</span>
-            </TabsTrigger>
+            <Link href="/admin/create-merchant">
+              <Button variant="default" size={isMobile ? "sm" : "default"} className="flex items-center space-x-2">
+                <UserPlus className="w-4 h-4" />
+                <span>{isMobile ? 'Add' : 'Add Merchant'}</span>
+              </Button>
+            </Link>
             <TabsTrigger 
               value="settings" 
               className={`flex items-center space-x-2 p-3 ${isMobile ? 'flex-col space-y-1 space-x-0 text-xs' : 'text-sm'}`}

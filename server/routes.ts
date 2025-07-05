@@ -1,15 +1,17 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, forgotPasswordSchema, resetPasswordSchema } from "@shared/schema";
+import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema } from "@shared/schema";
 import { windcaveService } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, createUser, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
 import { generateBusinessReportPdf } from "./report-generator";
 import { getBaseUrl, generatePaymentUrl, generateQrCodeUrl } from "./url-utils";
+import { sendEmail } from "./email-service";
 import QRCode from "qrcode";
 import { z } from "zod";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 
 // Store SSE connections for real-time updates
 const sseConnections = new Map<number, Set<any>>();
@@ -868,6 +870,152 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error testing payment links:", error);
       res.status(500).json({ message: "Failed to test payment links" });
+    }
+  });
+
+  // Get all merchants for admin
+  app.get("/api/admin/merchants", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user;
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const merchants = await storage.getAllMerchants();
+      res.json(merchants);
+    } catch (error) {
+      console.error("Error fetching merchants:", error);
+      res.status(500).json({ message: "Failed to fetch merchants" });
+    }
+  });
+
+  // Create merchant signup
+  app.post("/api/admin/merchants/signup", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user;
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const validation = createMerchantSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "Invalid input", 
+          errors: validation.error.issues 
+        });
+      }
+
+      const data = validation.data;
+
+      // Check if email already exists
+      const existingMerchant = await storage.getMerchantByEmail(data.email);
+      if (existingMerchant) {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+
+      // Generate verification token
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+      
+      // Create merchant
+      const merchant = await storage.createMerchantWithSignup({
+        ...data,
+        verificationToken
+      });
+
+      // Send verification email
+      const verificationUrl = `${getBaseUrl(req)}/verify-merchant?token=${verificationToken}`;
+      const emailSent = await sendEmail({
+        to: data.email,
+        from: 'noreply@tapt.co.nz',
+        subject: 'Complete Your Tapt Merchant Registration',
+        html: `
+          <h2>Complete Your Tapt Merchant Registration</h2>
+          <p>Hello ${data.name},</p>
+          <p>Thank you for signing up for Tapt payment processing. To complete your registration, please click the link below to create your password:</p>
+          <p><a href="${verificationUrl}" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Complete Registration</a></p>
+          <p>If the button doesn't work, copy and paste this link into your browser:</p>
+          <p>${verificationUrl}</p>
+          <p>This link will expire in 24 hours.</p>
+          <p>Best regards,<br>The Tapt Team</p>
+        `,
+        text: `
+Complete Your Tapt Merchant Registration
+
+Hello ${data.name},
+
+Thank you for signing up for Tapt payment processing. To complete your registration, please visit this link to create your password:
+
+${verificationUrl}
+
+This link will expire in 24 hours.
+
+Best regards,
+The Tapt Team
+        `
+      });
+
+      if (!emailSent) {
+        console.error("Failed to send verification email");
+        // Don't fail the request, just log the error
+      }
+
+      res.json({ 
+        message: "Merchant created successfully. Verification email sent.",
+        merchant: {
+          id: merchant.id,
+          name: merchant.name,
+          businessName: merchant.businessName,
+          email: merchant.email,
+          status: merchant.status
+        }
+      });
+    } catch (error) {
+      console.error("Error creating merchant:", error);
+      res.status(500).json({ message: "Failed to create merchant" });
+    }
+  });
+
+  // Verify merchant and create password
+  app.post("/api/verify-merchant", async (req, res) => {
+    try {
+      const validation = verifyMerchantSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "Invalid input", 
+          errors: validation.error.issues 
+        });
+      }
+
+      const { token, password } = validation.data;
+
+      // Find merchant by token
+      const merchant = await storage.getMerchantByToken(token);
+      if (!merchant) {
+        return res.status(400).json({ message: "Invalid or expired verification token" });
+      }
+
+      // Hash password and verify merchant
+      const bcrypt = require('bcrypt');
+      const passwordHash = await bcrypt.hash(password, 10);
+      
+      const verifiedMerchant = await storage.verifyMerchant(token, passwordHash);
+      if (!verifiedMerchant) {
+        return res.status(500).json({ message: "Failed to verify merchant" });
+      }
+
+      res.json({ 
+        message: "Merchant verified successfully. You can now log in.",
+        merchant: {
+          id: verifiedMerchant.id,
+          name: verifiedMerchant.name,
+          businessName: verifiedMerchant.businessName,
+          email: verifiedMerchant.email,
+          status: verifiedMerchant.status
+        }
+      });
+    } catch (error) {
+      console.error("Error verifying merchant:", error);
+      res.status(500).json({ message: "Failed to verify merchant" });
     }
   });
 
