@@ -28,12 +28,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
+    console.log('Admin auth - headers:', req.headers['authorization']);
+    console.log('Admin auth - token:', token);
+
     if (!token) {
+      console.log('Admin auth - no token provided');
       return res.status(401).json({ message: 'Access token required' });
     }
 
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-change-in-production') as any;
+      console.log('Admin auth - decoded token:', decoded);
       
       // For admin users, we verify directly from the token
       if (decoded.role === 'admin' && decoded.email === 'admin@tapt.co.nz') {
@@ -47,11 +52,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           resetTokenExpiry: undefined,
           createdAt: new Date(),
         };
+        console.log('Admin auth - success, user set:', req.user);
         next();
       } else {
+        console.log('Admin auth - invalid role or email:', decoded.role, decoded.email);
         return res.status(403).json({ message: "Admin access required" });
       }
     } catch (error) {
+      console.log('Admin auth - token verification error:', error);
       return res.status(403).json({ message: "Invalid or expired token" });
     }
   };
