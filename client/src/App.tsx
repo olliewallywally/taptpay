@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import MerchantTerminal from "@/pages/merchant-terminal";
 import CustomerPayment from "@/pages/customer-payment";
+import Receipt from "@/pages/receipt";
 import Dashboard from "@/pages/dashboard";
 import Settings from "@/pages/settings";
 import Login from "@/pages/login";
@@ -66,6 +67,7 @@ function Router() {
         </ProtectedRoute>
       </Route>
       <Route path="/pay/:merchantId" component={CustomerPayment} />
+      <Route path="/receipt/:transactionId" component={Receipt} />
       <Route component={NotFound} />
     </Switch>
   );
