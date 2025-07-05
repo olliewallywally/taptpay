@@ -63,6 +63,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Admin Authentication routes
+  app.post("/api/admin/auth/login", async (req, res) => {
+    try {
+      const validation = loginSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid email or password", errors: validation.error.errors });
+      }
+
+      const { email, password } = validation.data;
+      
+      // Check for admin credentials
+      if (email === "admin@tapt.co.nz" && password === "admin123") {
+        const adminUser = {
+          id: 1,
+          email: "admin@tapt.co.nz",
+          password: "admin123",
+          merchantId: 0,
+          role: "admin" as const,
+          createdAt: new Date(),
+        };
+
+        const token = generateToken(adminUser);
+        
+        res.json({
+          token,
+          user: {
+            id: adminUser.id,
+            email: adminUser.email,
+            merchantId: adminUser.merchantId,
+            role: adminUser.role,
+          },
+        });
+      } else {
+        return res.status(401).json({ message: "Invalid admin credentials" });
+      }
+    } catch (error) {
+      console.error("Admin login error:", error);
+      res.status(500).json({ message: "Admin login failed" });
+    }
+  });
+
+  app.get("/api/admin/auth/me", authenticateToken, (req: AuthenticatedRequest, res) => {
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    
+    res.json({
+      user: {
+        id: req.user.id,
+        email: req.user.email,
+        merchantId: req.user.merchantId,
+        role: req.user.role,
+      },
+    });
+  });
+
   // Generate QR code for merchant
   app.get("/api/merchants/:id/qr", async (req, res) => {
     try {
@@ -519,6 +575,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? "Windcave API is configured and ready"
         : "Running in simulation mode. Configure WINDCAVE_USERNAME and WINDCAVE_API_KEY to enable live payments."
     });
+  });
+
+  // Admin Analytics endpoint
+  app.get("/api/admin/analytics", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      // Get all merchants and calculate overall statistics
+      const merchants = [
+        { id: 1, name: "merchant1", businessName: "Coffee Corner", status: "active" },
+        { id: 2, name: "merchant2", businessName: "Tech Store", status: "active" },
+        { id: 3, name: "merchant3", businessName: "Bakery Express", status: "inactive" }
+      ];
+
+      let totalRevenue = 0;
+      let totalTransactions = 0;
+      let completedTransactions = 0;
+      const recentMerchants = [];
+
+      for (const merchant of merchants) {
+        try {
+          const analytics = await storage.getMerchantAnalytics(merchant.id);
+          const transactions = await storage.getTransactionsByMerchant(merchant.id);
+          
+          totalRevenue += analytics.totalRevenue || 0;
+          totalTransactions += analytics.totalTransactions || 0;
+          completedTransactions += analytics.completedTransactions || 0;
+
+          // Get last transaction date
+          const completedTransactions = transactions.filter(t => t.status === 'completed' && t.createdAt);
+          const lastTransaction = completedTransactions.length > 0 
+            ? completedTransactions.sort((a, b) => {
+                const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                return dateB - dateA;
+              })[0]
+            : null;
+
+          recentMerchants.push({
+            id: merchant.id,
+            name: merchant.name,
+            businessName: merchant.businessName,
+            totalTransactions: analytics.totalTransactions || 0,
+            totalRevenue: analytics.totalRevenue || 0,
+            status: merchant.status,
+            lastTransactionDate: lastTransaction?.createdAt || null,
+          });
+        } catch (error) {
+          // If merchant doesn't exist, add with zero values
+          recentMerchants.push({
+            id: merchant.id,
+            name: merchant.name,
+            businessName: merchant.businessName,
+            totalTransactions: 0,
+            totalRevenue: 0,
+            status: merchant.status,
+            lastTransactionDate: null,
+          });
+        }
+      }
+
+      const activeMerchants = recentMerchants.filter(m => m.status === 'active').length;
+      const averageTransactionValue = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
+
+      res.json({
+        totalMerchants: merchants.length,
+        activeMerchants,
+        totalRevenue,
+        totalTransactions,
+        completedTransactions,
+        averageTransactionValue,
+        recentMerchants: recentMerchants.sort((a, b) => b.totalRevenue - a.totalRevenue), // Sort by revenue
+      });
+    } catch (error) {
+      console.error("Error fetching admin analytics:", error);
+      res.status(500).json({ message: "Failed to get admin analytics" });
+    }
   });
 
   // Server-Sent Events for real-time updates

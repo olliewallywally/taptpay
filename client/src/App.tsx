@@ -12,6 +12,7 @@ import Dashboard from "@/pages/dashboard";
 import Settings from "@/pages/settings";
 
 import Login from "@/pages/login";
+import AdminDashboard from "@/pages/admin-dashboard";
 import { Layout } from "@/components/layout";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -37,6 +38,54 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
         <div className="w-8 h-8 border-2 border-green-800 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
+  }
+
+  return isAuthenticated ? <>{children}</> : null;
+}
+
+function AdminProtectedRoute({ children }: { children: React.ReactNode }) {
+  const [, setLocation] = useLocation();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isChecking, setIsChecking] = useState(true);
+
+  useEffect(() => {
+    const checkAdminAuth = async () => {
+      const token = localStorage.getItem("adminAuthToken");
+      if (!token) {
+        setIsAuthenticated(false);
+        setIsChecking(false);
+        setLocation("/");
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/admin/auth/me", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        
+        if (response.ok) {
+          setIsAuthenticated(true);
+        } else {
+          localStorage.removeItem("adminAuthToken");
+          localStorage.removeItem("adminUser");
+          setIsAuthenticated(false);
+          setLocation("/");
+        }
+      } catch (error) {
+        localStorage.removeItem("adminAuthToken");
+        localStorage.removeItem("adminUser");
+        setIsAuthenticated(false);
+        setLocation("/");
+      }
+      
+      setIsChecking(false);
+    };
+
+    checkAdminAuth();
+  }, [setLocation]);
+
+  if (isChecking) {
+    return <div>Loading...</div>;
   }
 
   return isAuthenticated ? <>{children}</> : null;
@@ -68,6 +117,12 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
+      <Route path="/admin/dashboard">
+        <AdminProtectedRoute>
+          <AdminDashboard />
+        </AdminProtectedRoute>
+      </Route>
+      
       <Route path="/pay/:merchantId" component={CustomerPayment} />
       <Route path="/receipt/:transactionId" component={Receipt} />
       <Route component={NotFound} />

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
@@ -11,7 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { LogIn } from "lucide-react";
+import { LogIn, Shield } from "lucide-react";
 import taptLogoPath from "@assets/tapt logo v2_1751682549877.png";
 
 const loginSchema = z.object({
@@ -24,36 +24,55 @@ type LoginFormData = z.infer<typeof loginSchema>;
 export default function Login() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const [loginType, setLoginType] = useState<'merchant' | 'admin'>('merchant');
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "demo@tapt.co.nz",
-      password: "demo123",
+      email: loginType === 'merchant' ? "demo@tapt.co.nz" : "admin@tapt.co.nz",
+      password: loginType === 'merchant' ? "demo123" : "admin123",
     },
   });
 
+  // Update form defaults when login type changes
+  useEffect(() => {
+    form.setValue("email", loginType === 'merchant' ? "demo@tapt.co.nz" : "admin@tapt.co.nz");
+    form.setValue("password", loginType === 'merchant' ? "demo123" : "admin123");
+  }, [loginType, form]);
+
   const loginMutation = useMutation({
     mutationFn: async (data: LoginFormData) => {
-      const response = await apiRequest("POST", "/api/auth/login", data);
+      const endpoint = loginType === 'merchant' ? "/api/auth/login" : "/api/admin/auth/login";
+      const response = await apiRequest("POST", endpoint, data);
       return response.json();
     },
     onSuccess: (result) => {
-      // Store auth token
-      localStorage.setItem("authToken", result.token);
-      localStorage.setItem("user", JSON.stringify(result.user));
-      
-      toast({
-        title: "Welcome back!",
-        description: "You have been successfully logged in.",
-      });
-      
-      setLocation("/merchant");
+      if (loginType === 'merchant') {
+        localStorage.setItem("authToken", result.token);
+        localStorage.setItem("user", JSON.stringify(result.user));
+        
+        toast({
+          title: "Welcome back!",
+          description: "You have been successfully logged in.",
+        });
+        
+        setLocation("/dashboard");
+      } else {
+        localStorage.setItem("adminAuthToken", result.token);
+        localStorage.setItem("adminUser", JSON.stringify(result.user));
+        
+        toast({
+          title: "Admin Access Granted",
+          description: "Welcome to the Tapt Admin Dashboard",
+        });
+        
+        setLocation("/admin/dashboard");
+      }
     },
     onError: (error: any) => {
       toast({
-        title: "Login Failed",
-        description: error.message || "Invalid email or password. Please try again.",
+        title: loginType === 'merchant' ? "Login Failed" : "Access Denied",
+        description: error.message || `Invalid ${loginType} credentials. Please try again.`,
         variant: "destructive",
       });
     },
@@ -82,6 +101,36 @@ export default function Login() {
           <p className="text-gray-500 text-sm">
             Sign in to continue
           </p>
+        </div>
+
+        {/* Login Type Toggle */}
+        <div className="mb-6">
+          <div className="flex bg-gray-100 rounded-lg p-1">
+            <button
+              type="button"
+              onClick={() => setLoginType('merchant')}
+              className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-md text-sm font-medium transition-all ${
+                loginType === 'merchant'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <LogIn className="w-4 h-4" />
+              <span>Merchant Login</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setLoginType('admin')}
+              className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-md text-sm font-medium transition-all ${
+                loginType === 'admin'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Shield className="w-4 h-4" />
+              <span>Admin Login</span>
+            </button>
+          </div>
         </div>
 
         {/* Login Form */}
@@ -134,7 +183,8 @@ export default function Login() {
             {/* Demo Credentials Info */}
             <div className="bg-gray-50 border border-gray-100 rounded-lg p-4">
               <p className="text-sm text-gray-600 text-center">
-                <span className="font-medium">Demo:</span> demo@tapt.co.nz / demo123
+                <span className="font-medium">Demo {loginType}:</span>{' '}
+                {loginType === 'merchant' ? 'demo@tapt.co.nz / demo123' : 'admin@tapt.co.nz / admin123'}
               </p>
             </div>
 
@@ -150,7 +200,7 @@ export default function Login() {
                   <span>Signing in...</span>
                 </div>
               ) : (
-                "Sign in"
+                `Sign in as ${loginType === 'merchant' ? 'Merchant' : 'Admin'}`
               )}
             </Button>
           </form>
