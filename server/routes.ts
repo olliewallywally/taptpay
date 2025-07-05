@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTransactionSchema, updateMerchantRatesSchema } from "@shared/schema";
+import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema } from "@shared/schema";
 import { windcaveService } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, type AuthenticatedRequest } from "./auth";
 import QRCode from "qrcode";
@@ -250,6 +250,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedMerchant);
     } catch (error) {
       res.status(500).json({ message: "Failed to update rates" });
+    }
+  });
+
+  // Update merchant business details
+  app.put("/api/merchants/:id/details", async (req, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      const validation = updateMerchantDetailsSchema.safeParse(req.body);
+      
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid merchant details", errors: validation.error.errors });
+      }
+
+      const updatedMerchant = await storage.updateMerchantDetails(merchantId, validation.data);
+      if (!updatedMerchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+
+      res.json(updatedMerchant);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update merchant details" });
+    }
+  });
+
+  // Update merchant bank account details
+  app.put("/api/merchants/:id/bank-account", async (req, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      const validation = updateBankAccountSchema.safeParse(req.body);
+      
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid bank account details", errors: validation.error.errors });
+      }
+
+      const updatedMerchant = await storage.updateMerchantBankAccount(merchantId, validation.data);
+      if (!updatedMerchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+
+      res.json(updatedMerchant);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update bank account details" });
     }
   });
 

@@ -9,6 +9,18 @@ export const merchants = pgTable("merchants", {
   paymentUrl: text("payment_url").notNull(),
   currentProviderRate: decimal("current_provider_rate", { precision: 5, scale: 4 }).default("0.0290"), // Default 2.9%
   ourRate: decimal("our_rate", { precision: 5, scale: 4 }).default("0.0020"), // Our 0.20%
+  
+  // Merchant business details
+  businessName: text("business_name"),
+  contactEmail: text("contact_email"),
+  contactPhone: text("contact_phone"),
+  businessAddress: text("business_address"),
+  
+  // Bank account details
+  bankName: text("bank_name"),
+  bankAccountNumber: text("bank_account_number"),
+  bankBranch: text("bank_branch"),
+  accountHolderName: text("account_holder_name"),
 });
 
 export const transactions = pgTable("transactions", {
@@ -27,6 +39,20 @@ export const insertMerchantSchema = createInsertSchema(merchants).omit({
 
 export const updateMerchantRatesSchema = z.object({
   currentProviderRate: z.string().regex(/^\d+(\.\d{1,4})?$/, "Rate must be a valid percentage"),
+});
+
+export const updateMerchantDetailsSchema = z.object({
+  businessName: z.string().min(1, "Business name is required").max(100),
+  contactEmail: z.string().email("Valid email is required"),
+  contactPhone: z.string().min(1, "Phone number is required").max(20),
+  businessAddress: z.string().min(1, "Business address is required").max(200),
+});
+
+export const updateBankAccountSchema = z.object({
+  bankName: z.string().min(1, "Bank name is required").max(50),
+  bankAccountNumber: z.string().regex(/^\d{2}-\d{4}-\d{7}-\d{2,3}$/, "Must be valid NZ account format (12-3456-1234567-12)"),
+  bankBranch: z.string().min(1, "Bank branch is required").max(50),
+  accountHolderName: z.string().min(1, "Account holder name is required").max(100),
 });
 
 export const insertTransactionSchema = createInsertSchema(transactions).omit({
