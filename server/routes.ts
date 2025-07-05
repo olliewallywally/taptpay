@@ -1013,6 +1013,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete merchant (admin only)
+  app.delete("/api/admin/merchants/:id", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      
+      // Check if merchant exists
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+
+      const deleted = await storage.deleteMerchant(merchantId);
+      if (!deleted) {
+        return res.status(500).json({ message: "Failed to delete merchant" });
+      }
+
+      res.json({ message: "Merchant deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting merchant:", error);
+      res.status(500).json({ message: "Failed to delete merchant" });
+    }
+  });
+
   // Clear problematic merchants endpoint
   app.post("/api/admin/clear-merchants", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {
