@@ -525,6 +525,8 @@ export class DatabaseStorage implements IStorage {
 
   async createMerchantWithSignup(data: CreateMerchant & { verificationToken: string }): Promise<Merchant> {
     if (!this.db) throw new Error('Database not available');
+    
+    // First insert without URLs to get the ID
     const result = await this.db.insert(merchants).values({
       name: data.name,
       businessName: data.businessName,
@@ -536,8 +538,23 @@ export class DatabaseStorage implements IStorage {
       verificationToken: data.verificationToken,
       currentProviderRate: "0.0290",
       ourRate: "0.0020",
+      qrCodeUrl: "", // Temporary empty string
+      paymentUrl: "", // Temporary empty string
     }).returning();
-    return result[0];
+    
+    const merchant = result[0];
+    
+    // Now update with proper URLs using the merchant ID
+    const updatedResult = await this.db
+      .update(merchants)
+      .set({
+        qrCodeUrl: `/api/merchants/${merchant.id}/qr`,
+        paymentUrl: `/pay/${merchant.id}`,
+      })
+      .where(eq(merchants.id, merchant.id))
+      .returning();
+    
+    return updatedResult[0];
   }
 
   async verifyMerchant(token: string, passwordHash: string): Promise<Merchant | undefined> {
