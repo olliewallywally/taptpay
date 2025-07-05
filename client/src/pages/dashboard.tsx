@@ -326,7 +326,8 @@ export default function Dashboard() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Desktop Layout */}
+          <div className="hidden md:grid md:grid-cols-3 gap-4">
             {/* Current Provider */}
             <div className="p-4 bg-red-50 rounded-lg border border-red-200">
               <div className="text-center">
@@ -425,6 +426,89 @@ export default function Dashboard() {
                       : "0"}%
                   </p>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Mobile Layout */}
+          <div className="grid grid-cols-3 gap-2 md:hidden">
+            {/* Previous */}
+            <div className="p-2 bg-red-50 rounded border border-red-200">
+              <div className="text-center">
+                <p className="text-xs font-medium text-red-900 mb-1">Previous</p>
+                {isEditingRate ? (
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-1">
+                      <FormField
+                        control={form.control}
+                        name="currentProviderRate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <Input
+                                type="text"
+                                placeholder="2.9"
+                                className="text-sm font-bold text-center h-6 px-1"
+                                autoFocus
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <div className="flex justify-center space-x-1">
+                        <Button
+                          type="submit"
+                          size="sm"
+                          disabled={updateRatesMutation.isPending}
+                          className="bg-green-600 hover:bg-green-700 text-white h-6 w-6 p-0"
+                        >
+                          {updateRatesMutation.isPending ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Check className="h-3 w-3" />
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleCancelEdit}
+                          className="h-6 w-6 p-0"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </form>
+                  </Form>
+                ) : (
+                  <p className="text-lg font-bold text-red-700">
+                    {analytics?.currentProviderRate?.toFixed(1) || "2.9"}%
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Current */}
+            <div className="p-2 bg-green-50 rounded border border-green-200">
+              <div className="text-center">
+                <p className="text-xs font-medium text-green-900 mb-1">Current</p>
+                <p className="text-lg font-bold text-green-700">
+                  0.2%
+                </p>
+              </div>
+            </div>
+
+            {/* Savings */}
+            <div className="p-2 bg-blue-50 rounded border-2 border-blue-300">
+              <div className="text-center">
+                <p className="text-xs font-medium text-blue-900 mb-1">Savings</p>
+                <p className="text-lg font-bold text-blue-700">
+                  {analytics?.currentProviderRate && analytics?.ourRate 
+                    ? ((analytics.currentProviderRate - analytics.ourRate) / analytics.currentProviderRate * 100).toFixed(1)
+                    : "0"}%
+                </p>
               </div>
             </div>
           </div>
