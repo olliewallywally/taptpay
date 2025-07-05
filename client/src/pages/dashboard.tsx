@@ -23,7 +23,10 @@ import {
   Loader2,
   Edit2,
   Check,
-  X
+  X,
+  Download,
+  FileText,
+  FileSpreadsheet
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -105,6 +108,76 @@ export default function Dashboard() {
 
   const onSubmit = (data: RateUpdateFormData) => {
     updateRatesMutation.mutate(data);
+  };
+
+  // CSV Export mutation
+  const csvExportMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/merchants/${merchantId}/export/csv`);
+      if (!response.ok) throw new Error('Failed to export CSV');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = response.headers.get('Content-Disposition')?.split('filename=')[1] || 'transactions.csv';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Export Complete",
+        description: "Your transaction data has been downloaded.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Export Failed",
+        description: "There was an error downloading your data.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // PDF Export mutation
+  const pdfExportMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/merchants/${merchantId}/export/pdf`);
+      if (!response.ok) throw new Error('Failed to export PDF');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = response.headers.get('Content-Disposition')?.split('filename=')[1] || 'business_report.pdf';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Report Generated",
+        description: "Your business report has been downloaded.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Export Failed",
+        description: "There was an error generating your report.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const downloadCSV = () => {
+    csvExportMutation.mutate();
+  };
+
+  const downloadPDF = () => {
+    pdfExportMutation.mutate();
   };
 
   const handleEditRate = () => {
@@ -347,6 +420,64 @@ export default function Dashboard() {
                     : "0"}%
                 </p>
               </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Export Data */}
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Download className="h-5 w-5" />
+            <span>Export Data</span>
+          </CardTitle>
+          <CardDescription>
+            Download your transaction data and business reports
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+              <div className="flex items-center space-x-3">
+                <FileSpreadsheet className="h-8 w-8 text-green-600" />
+                <div>
+                  <p className="font-medium text-sm">Transaction Data</p>
+                  <p className="text-xs text-gray-500">CSV format for Excel</p>
+                </div>
+              </div>
+              <Button 
+                size="sm" 
+                onClick={() => downloadCSV()}
+                disabled={csvExportMutation.isPending}
+              >
+                {csvExportMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Download"
+                )}
+              </Button>
+            </div>
+
+            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+              <div className="flex items-center space-x-3">
+                <FileText className="h-8 w-8 text-blue-600" />
+                <div>
+                  <p className="font-medium text-sm">Business Report</p>
+                  <p className="text-xs text-gray-500">PDF with analytics</p>
+                </div>
+              </div>
+              <Button 
+                size="sm" 
+                onClick={() => downloadPDF()}
+                disabled={pdfExportMutation.isPending}
+              >
+                {pdfExportMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Download"
+                )}
+              </Button>
             </div>
           </div>
         </CardContent>

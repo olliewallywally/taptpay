@@ -10,7 +10,7 @@ import CustomerPayment from "@/pages/customer-payment";
 import Receipt from "@/pages/receipt";
 import Dashboard from "@/pages/dashboard";
 import Settings from "@/pages/settings";
-import Exports from "@/pages/exports";
+
 import Login from "@/pages/login";
 import { Layout } from "@/components/layout";
 
@@ -67,13 +67,7 @@ function Router() {
           </Layout>
         </ProtectedRoute>
       </Route>
-      <Route path="/exports">
-        <ProtectedRoute>
-          <Layout>
-            <Exports />
-          </Layout>
-        </ProtectedRoute>
-      </Route>
+
       <Route path="/pay/:merchantId" component={CustomerPayment} />
       <Route path="/receipt/:transactionId" component={Receipt} />
       <Route component={NotFound} />
