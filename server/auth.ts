@@ -1,6 +1,8 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
+import { sendPasswordResetEmail } from './email-service';
 
 export interface User {
   id: number;
@@ -8,6 +10,8 @@ export interface User {
   password: string;
   merchantId: number;
   role: 'merchant' | 'admin';
+  resetToken?: string;
+  resetTokenExpiry?: Date;
   createdAt: Date;
 }
 
@@ -108,4 +112,58 @@ export function getUserByEmail(email: string): User | undefined {
 
 export function getUserById(id: number): User | undefined {
   return users.get(id);
+}
+
+// Password reset functionality
+export function generateResetToken(): string {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+export async function requestPasswordReset(email: string, baseUrl?: string): Promise<boolean> {
+  const user = getUserByEmail(email);
+  if (!user) {
+    // Don't reveal if email exists or not for security
+    return true;
+  }
+
+  const resetToken = generateResetToken();
+  const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
+
+  // Update user with reset token
+  user.resetToken = resetToken;
+  user.resetTokenExpiry = resetTokenExpiry;
+  users.set(user.id, user);
+
+  // Send reset email
+  try {
+    await sendPasswordResetEmail(email, resetToken, baseUrl);
+    return true;
+  } catch (error) {
+    console.error('Failed to send password reset email:', error);
+    return false;
+  }
+}
+
+export async function resetPassword(token: string, newPassword: string): Promise<boolean> {
+  const user = Array.from(users.values()).find(u => u.resetToken === token);
+  
+  if (!user || !user.resetTokenExpiry || user.resetTokenExpiry < new Date()) {
+    return false; // Invalid or expired token
+  }
+
+  // Hash new password
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
+  
+  // Update user
+  user.password = hashedPassword;
+  user.resetToken = undefined;
+  user.resetTokenExpiry = undefined;
+  users.set(user.id, user);
+
+  return true;
+}
+
+export function validateResetToken(token: string): boolean {
+  const user = Array.from(users.values()).find(u => u.resetToken === token);
+  return user ? (user.resetTokenExpiry ? user.resetTokenExpiry > new Date() : false) : false;
 }

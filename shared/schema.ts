@@ -1,6 +1,17 @@
-import { pgTable, text, serial, decimal, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, decimal, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  email: text("email").notNull().unique(),
+  password: text("password").notNull(),
+  merchantId: serial("merchant_id").references(() => merchants.id),
+  role: text("role").notNull().default("merchant"), // merchant, admin
+  resetToken: text("reset_token"),
+  resetTokenExpiry: timestamp("reset_token_expiry"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
 
 export const merchants = pgTable("merchants", {
   id: serial("id").primaryKey(),
@@ -68,7 +79,30 @@ export const insertTransactionSchema = createInsertSchema(transactions).omit({
   status: z.enum(["pending", "processing", "completed", "failed"]).default("pending"),
 });
 
+// Password reset schemas
+export const forgotPasswordSchema = z.object({
+  email: z.string().email("Valid email is required"),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1, "Reset token is required"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  confirmPassword: z.string().min(6, "Password confirmation is required"),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
+});
+
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+  resetToken: true,
+  resetTokenExpiry: true,
+});
+
 export type InsertMerchant = z.infer<typeof insertMerchantSchema>;
 export type Merchant = typeof merchants.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type Transaction = typeof transactions.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type User = typeof users.$inferSelect;
