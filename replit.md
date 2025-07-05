@@ -166,6 +166,8 @@ npm start      # Runs production server
 - July 05, 2025. Implemented inline editing for rate comparison to improve user experience
 - July 05, 2025. Added complete authentication system with JWT tokens and protected routes
 - July 05, 2025. Implemented hybrid database storage with PostgreSQL support and memory fallback
+- July 05, 2025. Added complete password reset functionality with SendGrid email integration
+- July 05, 2025. Redesigned mobile navigation with hamburger menu and improved mobile UX
 
 ## User Preferences
 
