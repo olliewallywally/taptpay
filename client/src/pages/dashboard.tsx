@@ -20,7 +20,10 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  Loader2
+  Loader2,
+  Edit2,
+  Check,
+  X
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -39,6 +42,7 @@ export default function Dashboard() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const merchantId = 1; // Using default merchant
+  const [isEditingRate, setIsEditingRate] = useState(false);
 
   const form = useForm<RateUpdateFormData>({
     resolver: zodResolver(rateUpdateSchema),
@@ -77,11 +81,11 @@ export default function Dashboard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "analytics"] });
+      setIsEditingRate(false);
       toast({
         title: "Rates Updated",
         description: "Your provider rate has been updated successfully",
       });
-      form.reset();
     },
     onError: () => {
       toast({
@@ -101,6 +105,18 @@ export default function Dashboard() {
 
   const onSubmit = (data: RateUpdateFormData) => {
     updateRatesMutation.mutate(data);
+  };
+
+  const handleEditRate = () => {
+    if (analytics) {
+      form.setValue("currentProviderRate", analytics.currentProviderRate.toString());
+      setIsEditingRate(true);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditingRate(false);
+    form.reset();
   };
 
   const getStatusIcon = (status: string) => {
@@ -212,121 +228,129 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Rate Comparison & Update */}
-      <div className="grid lg:grid-cols-2 gap-8 mb-8">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
+      {/* Rate Comparison */}
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
               <Calculator className="h-5 w-5" />
               <span>Rate Comparison</span>
-            </CardTitle>
-            <CardDescription>
-              See how much you save with our low-cost payment processing
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
-                <div>
-                  <p className="text-sm font-medium text-red-900">Your Current Provider</p>
+            </div>
+            {!isEditingRate && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleEditRate}
+                className="flex items-center space-x-2"
+              >
+                <Edit2 className="h-4 w-4" />
+                <span>Edit Rate</span>
+              </Button>
+            )}
+          </CardTitle>
+          <CardDescription>
+            See how much you save with our low-cost payment processing
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-red-900">Your Current Provider</p>
+                {isEditingRate ? (
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="flex items-center space-x-2 mt-2">
+                      <FormField
+                        control={form.control}
+                        name="currentProviderRate"
+                        render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <FormControl>
+                              <div className="relative">
+                                <Input
+                                  type="text"
+                                  placeholder="2.9"
+                                  className="pr-8 text-xl font-bold"
+                                  autoFocus
+                                  {...field}
+                                />
+                                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">%</span>
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <Button
+                        type="submit"
+                        size="sm"
+                        disabled={updateRatesMutation.isPending}
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        {updateRatesMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Check className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCancelEdit}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </form>
+                  </Form>
+                ) : (
                   <p className="text-2xl font-bold text-red-700">
                     {analytics?.currentProviderRate?.toFixed(2) || "2.90"}%
                   </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-red-600">Total Cost</p>
-                  <p className="text-lg font-semibold text-red-700">
-                    ${analytics?.currentProviderCost?.toFixed(2) || "0.00"}
-                  </p>
-                </div>
+                )}
               </div>
-
-              <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-                <div>
-                  <p className="text-sm font-medium text-green-900">Our Rate</p>
-                  <p className="text-2xl font-bold text-green-700">
-                    {analytics?.ourRate?.toFixed(2) || "0.20"}%
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-green-600">Total Cost</p>
-                  <p className="text-lg font-semibold text-green-700">
-                    ${analytics?.ourCost?.toFixed(2) || "0.00"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg border-2 border-blue-200">
-                <div>
-                  <p className="text-sm font-medium text-blue-900">Your Savings</p>
-                  <p className="text-2xl font-bold text-blue-700">
-                    ${analytics?.savings?.toFixed(2) || "0.00"}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-blue-600">Percentage Saved</p>
-                  <p className="text-lg font-semibold text-blue-700">
-                    {analytics?.currentProviderRate && analytics?.ourRate 
-                      ? ((analytics.currentProviderRate - analytics.ourRate) / analytics.currentProviderRate * 100).toFixed(1)
-                      : "0"}%
-                  </p>
-                </div>
+              <div className="text-right">
+                <p className="text-sm text-red-600">Total Cost</p>
+                <p className="text-lg font-semibold text-red-700">
+                  ${analytics?.currentProviderCost?.toFixed(2) || "0.00"}
+                </p>
               </div>
             </div>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Update Your Current Rate</CardTitle>
-            <CardDescription>
-              Enter your current payment provider's rate to see accurate savings
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="currentProviderRate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Current Provider Rate (%)</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <Input
-                            type="text"
-                            placeholder="2.9"
-                            className="pr-8"
-                            {...field}
-                          />
-                          <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">%</span>
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <Button 
-                  type="submit"
-                  disabled={updateRatesMutation.isPending}
-                  className="w-full bg-[hsl(155,40%,25%)] text-white hover:bg-[hsl(155,40%,20%)]"
-                >
-                  {updateRatesMutation.isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Updating...
-                    </>
-                  ) : (
-                    "Update Rate"
-                  )}
-                </Button>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
-      </div>
+            <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+              <div>
+                <p className="text-sm font-medium text-green-900">Our Rate</p>
+                <p className="text-2xl font-bold text-green-700">
+                  {analytics?.ourRate?.toFixed(2) || "0.20"}%
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-green-600">Total Cost</p>
+                <p className="text-lg font-semibold text-green-700">
+                  ${analytics?.ourCost?.toFixed(2) || "0.00"}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg border-2 border-blue-200">
+              <div>
+                <p className="text-sm font-medium text-blue-900">Your Savings</p>
+                <p className="text-2xl font-bold text-blue-700">
+                  ${analytics?.savings?.toFixed(2) || "0.00"}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-blue-600">Percentage Saved</p>
+                <p className="text-lg font-semibold text-blue-700">
+                  {analytics?.currentProviderRate && analytics?.ourRate 
+                    ? ((analytics.currentProviderRate - analytics.ourRate) / analytics.currentProviderRate * 100).toFixed(1)
+                    : "0"}%
+                </p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Transaction History */}
       <Card>

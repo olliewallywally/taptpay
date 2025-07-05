@@ -136,6 +136,8 @@ npm start      # Runs production server
 
 ## Changelog
 - July 05, 2025. Initial setup
+- July 05, 2025. Added comprehensive payment dashboard with analytics, savings calculator, and transaction history
+- July 05, 2025. Implemented inline editing for rate comparison to improve user experience
 
 ## User Preferences
 
