@@ -1,4 +1,6 @@
 import { merchants, transactions, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction } from "@shared/schema";
+import { getDb, isDatabaseConnected } from "./database";
+import { eq, desc, and } from "drizzle-orm";
 
 export interface IStorage {
   // Merchant operations
@@ -192,4 +194,129 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// Database Storage Implementation
+export class DatabaseStorage implements IStorage {
+  private db = getDb();
+
+  async getMerchant(id: number): Promise<Merchant | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db.select().from(merchants).where(eq(merchants.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getMerchantByName(name: string): Promise<Merchant | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db.select().from(merchants).where(eq(merchants.name, name)).limit(1);
+    return result[0];
+  }
+
+  async createMerchant(insertMerchant: InsertMerchant): Promise<Merchant> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db.insert(merchants).values(insertMerchant).returning();
+    return result[0];
+  }
+
+  async updateMerchantRates(id: number, currentProviderRate: string): Promise<Merchant | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .update(merchants)
+      .set({ currentProviderRate })
+      .where(eq(merchants.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getTransaction(id: number): Promise<Transaction | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db.select().from(transactions).where(eq(transactions.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getActiveTransactionByMerchant(merchantId: number): Promise<Transaction | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .select()
+      .from(transactions)
+      .where(and(eq(transactions.merchantId, merchantId), eq(transactions.status, 'pending')))
+      .orderBy(desc(transactions.createdAt))
+      .limit(1);
+    return result[0];
+  }
+
+  async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db.insert(transactions).values(insertTransaction).returning();
+    return result[0];
+  }
+
+  async updateTransactionStatus(id: number, status: string, windcaveTransactionId?: string): Promise<Transaction | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const updateData: any = { status };
+    if (windcaveTransactionId) {
+      updateData.windcaveTransactionId = windcaveTransactionId;
+    }
+    
+    const result = await this.db
+      .update(transactions)
+      .set(updateData)
+      .where(eq(transactions.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getTransactionsByMerchant(merchantId: number): Promise<Transaction[]> {
+    if (!this.db) throw new Error('Database not available');
+    return await this.db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.merchantId, merchantId))
+      .orderBy(desc(transactions.createdAt));
+  }
+
+  async getMerchantAnalytics(merchantId: number): Promise<{
+    totalTransactions: number;
+    completedTransactions: number;
+    totalRevenue: number;
+    currentProviderCost: number;
+    ourCost: number;
+    savings: number;
+    currentProviderRate: number;
+    ourRate: number;
+  }> {
+    if (!this.db) throw new Error('Database not available');
+    
+    const merchantTransactions = await this.getTransactionsByMerchant(merchantId);
+    const merchant = await this.getMerchant(merchantId);
+    
+    const totalTransactions = merchantTransactions.length;
+    const completedTransactions = merchantTransactions.filter(t => t.status === 'completed').length;
+    const totalRevenue = merchantTransactions
+      .filter(t => t.status === 'completed')
+      .reduce((sum, t) => sum + parseFloat(t.price), 0);
+    
+    const currentProviderRate = merchant && merchant.currentProviderRate 
+      ? parseFloat(merchant.currentProviderRate) 
+      : 2.9;
+    const ourRate = 0.2;
+    
+    const currentProviderCost = totalRevenue * (currentProviderRate / 100);
+    const ourCost = totalRevenue * (ourRate / 100);
+    const savings = currentProviderCost - ourCost;
+    
+    return {
+      totalTransactions,
+      completedTransactions,
+      totalRevenue,
+      currentProviderCost,
+      ourCost,
+      savings,
+      currentProviderRate,
+      ourRate,
+    };
+  }
+}
+
+// Use database storage if available, fall back to memory storage
+export const storage: IStorage = isDatabaseConnected() 
+  ? new DatabaseStorage() 
+  : new MemStorage();

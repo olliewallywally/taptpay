@@ -215,6 +215,7 @@ export default function MerchantTerminal() {
             <QRCodeDisplay 
               paymentUrl={merchant?.paymentUrl}
               qrCodeUrl={merchant?.qrCodeUrl}
+              merchantId={merchantId}
             />
 
             {currentTransaction && getStatusDisplay(currentTransaction.status)}

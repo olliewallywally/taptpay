@@ -4,18 +4,20 @@ import { QrCode } from "lucide-react";
 interface QRCodeDisplayProps {
   paymentUrl?: string;
   qrCodeUrl?: string;
+  merchantId?: number;
 }
 
-export function QRCodeDisplay({ paymentUrl, qrCodeUrl }: QRCodeDisplayProps) {
+export function QRCodeDisplay({ paymentUrl, qrCodeUrl, merchantId }: QRCodeDisplayProps) {
+  const actualQrCodeUrl = qrCodeUrl || (merchantId ? `/api/merchants/${merchantId}/qr` : undefined);
   return (
     <div className="text-center">
       <h3 className="text-xl font-bold text-gray-900 mb-4">Customer Payment QR</h3>
       
       <div className="bg-gray-50 rounded-2xl p-8 mb-6">
-        {qrCodeUrl ? (
+        {actualQrCodeUrl ? (
           <div className="w-48 h-48 mx-auto bg-white rounded-xl shadow-inner flex items-center justify-center">
             <img 
-              src={qrCodeUrl} 
+              src={actualQrCodeUrl} 
               alt="Payment QR Code" 
               className="w-44 h-44 object-contain"
             />
