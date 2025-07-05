@@ -17,6 +17,7 @@ export interface IStorage {
   updateMerchantDetails(id: number, details: { businessName: string; contactEmail: string; contactPhone: string; businessAddress: string }): Promise<Merchant | undefined>;
   updateMerchantBankAccount(id: number, bankDetails: { bankName: string; bankAccountNumber: string; bankBranch: string; accountHolderName: string }): Promise<Merchant | undefined>;
   getAllMerchants(): Promise<Merchant[]>;
+  deleteMerchant(id: number): Promise<boolean>;
   
   // Transaction operations
   getTransaction(id: number): Promise<Transaction | undefined>;
@@ -435,6 +436,31 @@ export class MemStorage implements IStorage {
     };
   }
 
+  async deleteMerchant(id: number): Promise<boolean> {
+    // Check if merchant exists
+    if (!this.merchants.has(id)) {
+      return false;
+    }
+
+    // Delete all transactions associated with this merchant
+    const transactionsToDelete: number[] = [];
+    for (const transactionId of Array.from(this.transactions.keys())) {
+      const transaction = this.transactions.get(transactionId);
+      if (transaction && transaction.merchantId === id) {
+        transactionsToDelete.push(transactionId);
+      }
+    }
+    
+    // Remove transactions
+    transactionsToDelete.forEach(transactionId => {
+      this.transactions.delete(transactionId);
+    });
+
+    // Remove merchant
+    this.merchants.delete(id);
+    return true;
+  }
+
   private createSampleData() {
     const sampleTransactions = [
       // Recent transactions (last 3 days)
@@ -801,6 +827,23 @@ export class DatabaseStorage implements IStorage {
       averageTransactionValue: completedTransactions.length > 0 ? totalRevenue / completedTransactions.length : 0,
       transactionsByStatus,
     };
+  }
+
+  async deleteMerchant(id: number): Promise<boolean> {
+    if (!this.db) throw new Error('Database not available');
+    
+    try {
+      // First delete all transactions associated with the merchant
+      await this.db.delete(transactions).where(eq(transactions.merchantId, id));
+      
+      // Then delete the merchant
+      const result = await this.db.delete(merchants).where(eq(merchants.id, id));
+      
+      return true;
+    } catch (error) {
+      console.error('Error deleting merchant:', error);
+      return false;
+    }
   }
 }
 

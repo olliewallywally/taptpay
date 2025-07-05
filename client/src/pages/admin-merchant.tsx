@@ -1,14 +1,22 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useParams } from "wouter";
+import { useParams, useLocation } from "wouter";
+import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { updateMerchantDetailsSchema, updateBankAccountSchema } from "@shared/schema";
 import { 
   ArrowLeft, 
   Building2, 
@@ -22,10 +30,9 @@ import {
   CheckCircle,
   AlertCircle,
   Loader2,
-  LogOut
+  LogOut,
+  Trash2
 } from "lucide-react";
-import { useState } from "react";
-import { useLocation } from "wouter";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface MerchantDetails {
@@ -48,7 +55,7 @@ interface MerchantDetails {
 interface Transaction {
   id: number;
   itemName: string;
-  price: number;
+  price: string | number;
   status: string;
   createdAt: string;
   windcaveTransactionId?: string;
@@ -60,14 +67,131 @@ interface MerchantAnalytics {
   totalRevenue: number;
 }
 
+// Helper function to safely format price
+const formatPrice = (price: string | number): string => {
+  return parseFloat(price.toString()).toFixed(2);
+};
+
 export default function AdminMerchantDetail() {
   const { merchantId } = useParams<{ merchantId: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedMerchant, setEditedMerchant] = useState<Partial<MerchantDetails>>({});
+  const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [isEditingBank, setIsEditingBank] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const isMobile = useIsMobile();
+
+  // Forms for editing
+  const detailsForm = useForm({
+    resolver: zodResolver(updateMerchantDetailsSchema),
+    defaultValues: {
+      businessName: "",
+      contactEmail: "",
+      contactPhone: "",
+      businessAddress: "",
+    },
+  });
+
+  const bankForm = useForm({
+    resolver: zodResolver(updateBankAccountSchema),
+    defaultValues: {
+      bankName: "",
+      bankAccountNumber: "",
+      bankBranch: "",
+      accountHolderName: "",
+    },
+  });
+
+  // Update merchant details mutation
+  const updateDetailsMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await fetch(`/api/merchants/${merchantId}/details`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('adminAuthToken')}`
+        },
+      });
+      if (!response.ok) throw new Error('Failed to update merchant details');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/merchants', merchantId] });
+      setIsEditingDetails(false);
+      toast({
+        title: "Success",
+        description: "Merchant details updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update merchant details",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update bank account mutation
+  const updateBankMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await fetch(`/api/merchants/${merchantId}/bank-account`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('adminAuthToken')}`
+        },
+      });
+      if (!response.ok) throw new Error('Failed to update bank account');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/merchants', merchantId] });
+      setIsEditingBank(false);
+      toast({
+        title: "Success",
+        description: "Bank account updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update bank account",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete merchant mutation
+  const deleteMerchantMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/admin/merchants/${merchantId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('adminAuthToken')}`
+        },
+      });
+      if (!response.ok) throw new Error('Failed to delete merchant');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Merchant deleted successfully",
+      });
+      setLocation('/admin/dashboard');
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete merchant",
+        variant: "destructive",
+      });
+    },
+  });
 
   // Fetch merchant details
   const { data: merchant, isLoading: merchantLoading } = useQuery<MerchantDetails>({
@@ -119,6 +243,39 @@ export default function AdminMerchantDetail() {
       description: "You have been successfully logged out.",
     });
     setLocation("/");
+  };
+
+  // Populate forms with merchant data when loaded
+  useEffect(() => {
+    if (merchant) {
+      detailsForm.reset({
+        businessName: merchant.businessName || "",
+        contactEmail: merchant.contactEmail || "",
+        contactPhone: merchant.contactPhone || "",
+        businessAddress: merchant.businessAddress || "",
+      });
+      
+      bankForm.reset({
+        bankName: merchant.bankName || "",
+        bankAccountNumber: merchant.bankAccountNumber || "",
+        bankBranch: merchant.bankBranch || "",
+        accountHolderName: merchant.accountHolderName || "",
+      });
+    }
+  }, [merchant, detailsForm, bankForm]);
+
+  // Form submission handlers
+  const onDetailsSubmit = (data: any) => {
+    updateDetailsMutation.mutate(data);
+  };
+
+  const onBankSubmit = (data: any) => {
+    updateBankMutation.mutate(data);
+  };
+
+  const handleDelete = () => {
+    deleteMerchantMutation.mutate();
+    setShowDeleteDialog(false);
   };
 
   if (merchantLoading) {
@@ -173,7 +330,7 @@ export default function AdminMerchantDetail() {
             </div>
           </div>
           
-          <div className={`flex items-center ${isMobile ? 'justify-between' : 'space-x-2'}`}>
+          <div className={`flex items-center ${isMobile ? 'flex-wrap gap-2' : 'space-x-2'}`}>
             <div className="flex items-center space-x-2">
               <Badge variant={merchant.status === 'active' ? 'default' : 'secondary'}>
                 {merchant.status === 'active' ? (
@@ -184,15 +341,29 @@ export default function AdminMerchantDetail() {
                 {merchant.status}
               </Badge>
             </div>
-            <Button
-              variant="outline"
-              onClick={handleLogout}
-              size={isMobile ? "sm" : "default"}
-              className="bg-red-50 text-red-600 border-red-200 hover:bg-red-100"
-            >
-              <LogOut className="w-4 h-4" />
-              {!isMobile && <span className="ml-2">Logout</span>}
-            </Button>
+            
+            {/* Management Actions */}
+            <div className="flex items-center space-x-1">
+              <Button
+                variant="outline"
+                size={isMobile ? "sm" : "default"}
+                className="text-red-600 border-red-200 hover:bg-red-50"
+                onClick={() => setShowDeleteDialog(true)}
+              >
+                <Trash2 className="w-4 h-4" />
+                {!isMobile && <span className="ml-2">Delete</span>}
+              </Button>
+              
+              <Button
+                variant="outline"
+                onClick={handleLogout}
+                size={isMobile ? "sm" : "default"}
+                className="bg-red-50 text-red-600 border-red-200 hover:bg-red-100"
+              >
+                <LogOut className="w-4 h-4" />
+                {!isMobile && <span className="ml-2">Logout</span>}
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -331,7 +502,7 @@ export default function AdminMerchantDetail() {
                           </Badge>
                         </div>
                         <div className="text-sm text-gray-600 space-y-1">
-                          <p>Amount: ${transaction.price.toFixed(2)}</p>
+                          <p>Amount: ${formatPrice(transaction.price)}</p>
                           <p>Date: {new Date(transaction.createdAt).toLocaleDateString()}</p>
                           {transaction.windcaveTransactionId && (
                             <p className="font-mono text-xs">ID: {transaction.windcaveTransactionId}</p>
@@ -357,7 +528,7 @@ export default function AdminMerchantDetail() {
                         {transactions?.map((transaction) => (
                           <TableRow key={transaction.id}>
                             <TableCell className="font-medium">{transaction.itemName}</TableCell>
-                            <TableCell>${transaction.price.toFixed(2)}</TableCell>
+                            <TableCell>${formatPrice(transaction.price)}</TableCell>
                             <TableCell>
                               <Badge variant={transaction.status === 'completed' ? 'default' : 'secondary'}>
                                 {transaction.status}
@@ -436,6 +607,38 @@ export default function AdminMerchantDetail() {
           </TabsContent>
 
         </Tabs>
+
+        {/* Delete Confirmation Dialog */}
+        {showDeleteDialog && (
+          <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Merchant</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete "{merchant.businessName || merchant.name}"? 
+                  This action cannot be undone and will permanently remove all merchant data and transactions.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDelete}
+                  className="bg-red-600 hover:bg-red-700"
+                  disabled={deleteMerchantMutation.isPending}
+                >
+                  {deleteMerchantMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    "Delete Merchant"
+                  )}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
       </div>
     </div>
   );
