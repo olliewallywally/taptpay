@@ -169,7 +169,7 @@ export default function CustomerPayment() {
             disabled={paymentStatus !== "idle"}
             amount={parseFloat(currentTransaction.price)}
             currency="NZD"
-            merchantName={merchant?.businessName || "Tapt Payment"}
+            merchantName="Tapt Payment"
           />
 
           {/* Security Badges */}
