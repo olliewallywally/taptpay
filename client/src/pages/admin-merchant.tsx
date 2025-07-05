@@ -21,7 +21,8 @@ import {
   X,
   CheckCircle,
   AlertCircle,
-  Loader2
+  Loader2,
+  LogOut
 } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
@@ -167,6 +168,16 @@ export default function AdminMerchantDetail() {
     setEditedMerchant({});
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem("adminAuthToken");
+    localStorage.removeItem("adminUser");
+    toast({
+      title: "Logged Out",
+      description: "You have been successfully logged out.",
+    });
+    setLocation("/");
+  };
+
   const handleInputChange = (field: keyof MerchantDetails, value: string) => {
     setEditedMerchant(prev => ({ ...prev, [field]: value }));
   };
@@ -216,6 +227,14 @@ export default function AdminMerchantDetail() {
           </div>
         </div>
         <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            onClick={handleLogout}
+            className="flex items-center space-x-2"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>Logout</span>
+          </Button>
           <Badge variant={merchant.status === 'active' ? 'default' : 'secondary'}>
             {merchant.status === 'active' ? (
               <CheckCircle className="w-3 h-3 mr-1" />

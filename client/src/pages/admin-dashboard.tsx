@@ -24,7 +24,8 @@ import {
   Loader2,
   Plus,
   Settings,
-  UserPlus
+  UserPlus,
+  LogOut
 } from "lucide-react";
 import { useLocation } from "wouter";
 
@@ -128,6 +129,16 @@ export default function AdminDashboard() {
     createMerchantMutation.mutate(data);
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem("adminAuthToken");
+    localStorage.removeItem("adminUser");
+    toast({
+      title: "Logged Out",
+      description: "You have been successfully logged out.",
+    });
+    setLocation("/");
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -145,9 +156,19 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-        <p className="text-gray-600">System-wide performance and merchant management</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
+          <p className="text-gray-600">System-wide performance and merchant management</p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={handleLogout}
+          className="flex items-center space-x-2"
+        >
+          <LogOut className="w-4 h-4" />
+          <span>Logout</span>
+        </Button>
       </div>
 
       <Tabs defaultValue="overview" className="space-y-4">
