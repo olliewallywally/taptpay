@@ -5,6 +5,7 @@ import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetai
 import { windcaveService } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, type AuthenticatedRequest } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
+import { getBaseUrl, generatePaymentUrl, generateQrCodeUrl } from "./url-utils";
 import QRCode from "qrcode";
 import { z } from "zod";
 
@@ -83,8 +84,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.setHeader('Content-Disposition', `attachment; filename="tapt-payment-qr-merchant-${merchantId}.png"`);
       }
       
-      // Generate QR code as PNG buffer with enhanced quality
-      const qrBuffer = await QRCode.toBuffer(merchant.paymentUrl, {
+      // Generate QR code with current payment URL
+      const currentPaymentUrl = generatePaymentUrl(merchantId, req);
+      const qrBuffer = await QRCode.toBuffer(currentPaymentUrl, {
         type: 'png',
         width: size,
         margin: 4, // Larger margin for better visibility
@@ -110,7 +112,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!merchant) {
         return res.status(404).json({ message: "Merchant not found" });
       }
-      res.json(merchant);
+      
+      // Ensure URLs are always current for this environment
+      const currentPaymentUrl = generatePaymentUrl(id, req);
+      const currentQrCodeUrl = generateQrCodeUrl(id, req);
+      
+      // Return merchant with current URLs
+      const merchantWithCurrentUrls = {
+        ...merchant,
+        paymentUrl: currentPaymentUrl,
+        qrCodeUrl: currentQrCodeUrl
+      };
+      
+      res.json(merchantWithCurrentUrls);
     } catch (error) {
       res.status(500).json({ message: "Failed to get merchant" });
     }
