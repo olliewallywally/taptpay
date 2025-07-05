@@ -70,6 +70,16 @@ export function Navigation() {
                 Settings
               </a>
               <a 
+                href="/exports"
+                className={`px-2 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-md transition-all ${
+                  isActive("/exports") 
+                    ? "bg-white text-green-800 shadow-sm" 
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                Exports
+              </a>
+              <a 
                 href="/pay/1"
                 className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
                   isActive("/pay/1") 
