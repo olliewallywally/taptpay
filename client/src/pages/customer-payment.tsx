@@ -167,6 +167,9 @@ export default function CustomerPayment() {
           <SlideToPayComponent 
             onPayment={handlePayment}
             disabled={paymentStatus !== "idle"}
+            amount={parseFloat(currentTransaction.price)}
+            currency="NZD"
+            merchantName={merchant?.businessName || "Tapt Payment"}
           />
 
           {/* Security Badges */}
