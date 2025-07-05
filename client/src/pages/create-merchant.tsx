@@ -28,6 +28,8 @@ export default function CreateMerchant() {
       email: "",
       phone: "",
       address: "",
+      password: "",
+      confirmPassword: "",
     },
   });
 
@@ -37,12 +39,7 @@ export default function CreateMerchant() {
       return response.json();
     },
     onSuccess: (data) => {
-      setCreatedMerchant({
-        ...data.merchant,
-        verificationUrl: data.verificationUrl,
-        verificationToken: data.verificationToken,
-        emailSent: data.emailSent
-      });
+      setCreatedMerchant(data.merchant);
       setIsSuccess(true);
       
       // Invalidate queries to refresh the admin dashboard
@@ -51,9 +48,7 @@ export default function CreateMerchant() {
       
       toast({
         title: "Merchant Created",
-        description: data.emailSent 
-          ? "Verification email sent successfully" 
-          : "Merchant created. Email service unavailable - use the verification link below.",
+        description: "Merchant account created successfully and is ready to use.",
       });
     },
     onError: (error: any) => {
@@ -94,38 +89,16 @@ export default function CreateMerchant() {
               </div>
             </div>
             
-            {createdMerchant.emailSent ? (
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <h3 className="font-semibold mb-2 text-blue-900">Next Steps</h3>
-                <p className="text-sm text-blue-700">
-                  A verification email has been sent to <strong>{createdMerchant.email}</strong>. 
-                  The merchant will need to click the link in the email to create their password and complete the registration.
-                </p>
+            <div className="bg-green-50 p-4 rounded-lg">
+              <h3 className="font-semibold mb-2 text-green-900">Account Ready</h3>
+              <p className="text-sm text-green-700">
+                The merchant account is fully set up and ready to use. The merchant can now log in with:
+              </p>
+              <div className="mt-2 p-2 bg-white rounded border text-sm">
+                <p><strong>Email:</strong> {createdMerchant.email}</p>
+                <p><strong>Password:</strong> (Set during creation)</p>
               </div>
-            ) : (
-              <div className="bg-orange-50 p-4 rounded-lg">
-                <h3 className="font-semibold mb-2 text-orange-900">Email Service Unavailable</h3>
-                <p className="text-sm text-orange-700 mb-3">
-                  Email service is currently unavailable. Please share the verification link below with the merchant:
-                </p>
-                <div className="bg-white p-3 rounded border text-xs font-mono break-all">
-                  {createdMerchant.verificationUrl}
-                </div>
-                <Button 
-                  size="sm" 
-                  className="mt-2 w-full"
-                  onClick={() => {
-                    navigator.clipboard.writeText(createdMerchant.verificationUrl);
-                    toast({
-                      title: "Copied!",
-                      description: "Verification URL copied to clipboard",
-                    });
-                  }}
-                >
-                  Copy Verification Link
-                </Button>
-              </div>
-            )}
+            </div>
 
             <div className="flex gap-3">
               <Link href="/admin/dashboard">
@@ -265,6 +238,36 @@ export default function CreateMerchant() {
                   </FormItem>
                 )}
               />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="Minimum 6 characters" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Confirm Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="Repeat password" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <Button 
                 type="submit" 
