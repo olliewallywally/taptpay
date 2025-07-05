@@ -18,8 +18,12 @@ export async function apiRequest(
     headers["Content-Type"] = "application/json";
   }
   
-  // Add auth token if available
-  const token = localStorage.getItem("authToken");
+  // Add auth token if available - use admin token for admin routes
+  const isAdminRoute = url.startsWith("/api/admin");
+  const token = isAdminRoute 
+    ? localStorage.getItem("adminAuthToken")
+    : localStorage.getItem("authToken");
+    
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
@@ -43,8 +47,13 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const headers: Record<string, string> = {};
     
-    // Add auth token if available
-    const token = localStorage.getItem("authToken");
+    // Add auth token if available - use admin token for admin routes
+    const url = queryKey[0] as string;
+    const isAdminRoute = url.startsWith("/api/admin");
+    const token = isAdminRoute 
+      ? localStorage.getItem("adminAuthToken")
+      : localStorage.getItem("authToken");
+      
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
     }
