@@ -14,15 +14,13 @@ export default function CustomerPayment() {
 
   const id = merchantId ? parseInt(merchantId) : 1;
 
-  // Get active transaction
-  const { data: activeTransaction } = useQuery({
+  // Get active transaction with optimized caching
+  const { data: activeTransaction, isLoading } = useQuery({
     queryKey: ["/api/merchants", id, "active-transaction"],
-    queryFn: async () => {
-      const response = await fetch(`/api/merchants/${id}/active-transaction`);
-      if (!response.ok) throw new Error("Failed to fetch active transaction");
-      return response.json();
-    },
-    refetchInterval: 5000, // Poll every 5 seconds as backup
+    staleTime: 30000, // Consider data fresh for 30 seconds
+    gcTime: 300000, // Keep in cache for 5 minutes
+    refetchInterval: 15000, // Reduced polling to 15 seconds
+    refetchOnWindowFocus: false, // Prevent unnecessary refetches
   });
 
   // Process payment mutation
@@ -39,11 +37,18 @@ export default function CustomerPayment() {
     },
   });
 
-  // Set up SSE connection
+  // Optimized SSE connection with memoization
   useEffect(() => {
+    let isSubscribed = true;
+    
+    // Only connect if we have a valid merchant ID
+    if (!id) return;
+    
     sseClient.connect(id);
     
-    sseClient.subscribe("transaction_updated", (message) => {
+    const handleTransactionUpdate = (message: any) => {
+      if (!isSubscribed) return;
+      
       setCurrentTransaction(message.transaction);
       
       // Update payment status based on transaction status
@@ -51,19 +56,24 @@ export default function CustomerPayment() {
         setPaymentStatus("processing");
       } else if (message.transaction.status === "completed") {
         setPaymentStatus("success");
-        // Redirect to receipt page after a short delay to show success message
+        // Redirect to receipt page after a short delay
         setTimeout(() => {
-          setLocation(`/receipt/${message.transaction.id}`);
+          if (isSubscribed) {
+            setLocation(`/receipt/${message.transaction.id}`);
+          }
         }, 2000);
       } else if (message.transaction.status === "failed") {
         setPaymentStatus("error");
       }
-    });
+    };
+    
+    sseClient.subscribe("transaction_updated", handleTransactionUpdate);
 
     return () => {
+      isSubscribed = false;
       sseClient.disconnect();
     };
-  }, [id]);
+  }, [id, setLocation]);
 
   // Update current transaction from query
   useEffect(() => {
@@ -109,17 +119,34 @@ export default function CustomerPayment() {
     }
   };
 
-  if (!currentTransaction) {
+  // Show loading skeleton while fetching
+  if (isLoading || !currentTransaction) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
         <div className="bg-white rounded-3xl shadow-2xl p-8 text-center max-w-sm w-full">
-          <div className="text-gray-400 mb-4">
-            <div className="w-16 h-16 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
-              <span className="text-2xl">💳</span>
+          {isLoading ? (
+            // Fast loading skeleton
+            <div className="animate-pulse">
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 bg-gray-200 rounded-lg"></div>
+                  <div className="h-6 bg-gray-200 rounded w-24"></div>
+                </div>
+              </div>
+              <div className="h-8 bg-gray-200 rounded w-32 mx-auto mb-2"></div>
+              <div className="h-16 bg-gray-200 rounded w-40 mx-auto mb-12"></div>
+              <div className="h-12 bg-gray-200 rounded-full w-full"></div>
             </div>
-          </div>
-          <h2 className="text-xl font-bold text-gray-700 mb-2">Waiting for Transaction</h2>
-          <p className="text-gray-500">The merchant will send payment details shortly</p>
+          ) : (
+            // No transaction state
+            <div>
+              <div className="w-16 h-16 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                <span className="text-2xl">💳</span>
+              </div>
+              <h2 className="text-xl font-bold text-gray-700 mb-2">Waiting for Transaction</h2>
+              <p className="text-gray-500">The merchant will send payment details shortly</p>
+            </div>
+          )}
         </div>
       </div>
     );

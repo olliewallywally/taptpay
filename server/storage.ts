@@ -60,12 +60,14 @@ export class MemStorage implements IStorage {
   private transactions: Map<number, Transaction>;
   private currentMerchantId: number;
   private currentTransactionId: number;
+  private activeTransactionCache: Map<number, Transaction | null>; // Cache for active transactions by merchant
 
   constructor() {
     this.merchants = new Map();
     this.transactions = new Map();
     this.currentMerchantId = 1;
     this.currentTransactionId = 1;
+    this.activeTransactionCache = new Map();
     
     // Create default merchant for demo with new schema
     const merchant: Merchant = {
@@ -250,9 +252,21 @@ export class MemStorage implements IStorage {
   }
 
   async getActiveTransactionByMerchant(merchantId: number): Promise<Transaction | undefined> {
-    return Array.from(this.transactions.values()).find(
+    // Check cache first for ultra-fast lookups
+    if (this.activeTransactionCache.has(merchantId)) {
+      const cached = this.activeTransactionCache.get(merchantId);
+      return cached || undefined;
+    }
+    
+    // Find active transaction and update cache
+    const activeTransaction = Array.from(this.transactions.values()).find(
       (transaction) => transaction.merchantId === merchantId && transaction.status === "pending"
     );
+    
+    // Cache the result (null if no active transaction)
+    this.activeTransactionCache.set(merchantId, activeTransaction || null);
+    
+    return activeTransaction;
   }
 
   async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
@@ -264,6 +278,12 @@ export class MemStorage implements IStorage {
       windcaveTransactionId: null,
     };
     this.transactions.set(id, transaction);
+    
+    // Update cache if this is a pending transaction
+    if (transaction.status === "pending") {
+      this.activeTransactionCache.set(transaction.merchantId, transaction);
+    }
+    
     return transaction;
   }
 
@@ -277,6 +297,15 @@ export class MemStorage implements IStorage {
       windcaveTransactionId: windcaveTransactionId || transaction.windcaveTransactionId,
     };
     this.transactions.set(id, updatedTransaction);
+    
+    // Update cache based on new status
+    if (status === "pending") {
+      this.activeTransactionCache.set(transaction.merchantId, updatedTransaction);
+    } else {
+      // Transaction is no longer pending, remove from cache
+      this.activeTransactionCache.delete(transaction.merchantId);
+    }
+    
     return updatedTransaction;
   }
 
