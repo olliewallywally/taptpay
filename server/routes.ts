@@ -1097,7 +1097,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create merchant signup
+  // Public merchant signup (no admin required)
+  app.post("/api/merchants/signup", async (req, res) => {
+    try {
+      const validation = createMerchantSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "Invalid input", 
+          errors: validation.error.issues 
+        });
+      }
+
+      const { password, confirmPassword, ...merchantData } = validation.data;
+
+      // Check if email already exists
+      const existingMerchant = await storage.getMerchantByEmail(merchantData.email);
+      if (existingMerchant) {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+
+      // Hash password for storage
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      // Generate verification token
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+
+      // Create merchant with pending status and password
+      const merchant = await storage.createMerchantWithSignup({
+        ...merchantData,
+        password,
+        confirmPassword,
+        verificationToken,
+      });
+
+      // Send verification email using the new email service
+      const { sendMerchantVerificationEmail } = await import('./email-service-multi');
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      
+      const emailSent = await sendMerchantVerificationEmail(
+        merchantData.email,
+        verificationToken,
+        merchantData.businessName || merchantData.name,
+        baseUrl
+      );
+
+      if (!emailSent) {
+        console.warn('Failed to send verification email, but merchant account was created');
+      }
+
+      res.json({
+        message: "Merchant account created successfully. Please check your email to verify your account.",
+        merchant: {
+          id: merchant.id,
+          name: merchant.name,
+          businessName: merchant.businessName,
+          email: merchant.email,
+          status: merchant.status
+        }
+      });
+
+    } catch (error) {
+      console.error("Public merchant signup error:", error);
+      res.status(500).json({ message: "Failed to create merchant account" });
+    }
+  });
+
+  // Create merchant signup (admin version)
   app.post("/api/admin/merchants/signup", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {
 
