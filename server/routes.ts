@@ -287,13 +287,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get active transaction for merchant
+  // Get active transaction for merchant with optimized caching
   app.get("/api/merchants/:id/active-transaction", async (req, res) => {
     try {
       const merchantId = parseInt(req.params.id);
+      
+      // Set aggressive caching headers for better performance
+      res.set({
+        'Cache-Control': 'max-age=10, s-maxage=10', // Cache for 10 seconds
+        'ETag': `"merchant-${merchantId}-${Date.now()}"`,
+      });
+      
       const transaction = await storage.getActiveTransactionByMerchant(merchantId);
       res.json(transaction || null);
     } catch (error) {
+      console.error(`Error fetching active transaction for merchant ${req.params.id}:`, error);
       res.status(500).json({ message: "Failed to get active transaction" });
     }
   });
