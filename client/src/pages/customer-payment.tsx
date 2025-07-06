@@ -14,13 +14,31 @@ export default function CustomerPayment() {
 
   const id = merchantId ? parseInt(merchantId) : 1;
 
-  // Get active transaction with optimized caching
-  const { data: activeTransaction, isLoading } = useQuery({
+  // Get active transaction - override global query settings for public endpoint
+  const { data: activeTransaction, isLoading, error } = useQuery({
     queryKey: ["/api/merchants", id, "active-transaction"],
-    staleTime: 30000, // Consider data fresh for 30 seconds
-    gcTime: 300000, // Keep in cache for 5 minutes
-    refetchInterval: 15000, // Reduced polling to 15 seconds
-    refetchOnWindowFocus: false, // Prevent unnecessary refetches
+    queryFn: async () => {
+      const response = await fetch(`/api/merchants/${id}/active-transaction`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return response.json();
+    },
+    staleTime: 5000,
+    gcTime: 60000,
+    refetchInterval: 5000,
+    refetchOnWindowFocus: true,
+    retry: 3,
+  });
+
+  console.log("Customer payment debug:", { 
+    merchantId, 
+    id, 
+    activeTransaction, 
+    isLoading, 
+    error,
+    currentTransaction,
+    paymentStatus 
   });
 
   // Process payment mutation
@@ -90,14 +108,16 @@ export default function CustomerPayment() {
     };
   }, [id, setLocation]);
 
-  // Update current transaction from query only if SSE hasn't already set it
+  // Update current transaction from query - always use latest data
   useEffect(() => {
-    if (activeTransaction && !currentTransaction) {
+    if (activeTransaction) {
       console.log("Setting transaction from query:", activeTransaction);
       setCurrentTransaction(activeTransaction);
-      setPaymentStatus("idle");
+      if (activeTransaction.status === "pending") {
+        setPaymentStatus("idle");
+      }
     }
-  }, [activeTransaction, currentTransaction]);
+  }, [activeTransaction]);
 
   const handlePayment = () => {
     console.log("Payment triggered, current transaction:", currentTransaction);
