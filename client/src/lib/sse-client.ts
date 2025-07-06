@@ -12,11 +12,17 @@ export class SSEClient {
       this.eventSource.close();
     }
 
+    console.log(`Connecting to SSE for merchant ${merchantId}`);
     this.eventSource = new EventSource(`/api/merchants/${merchantId}/events`);
+    
+    this.eventSource.onopen = () => {
+      console.log(`SSE connection opened for merchant ${merchantId}`);
+    };
     
     this.eventSource.onmessage = (event) => {
       try {
         const message: SSEMessage = JSON.parse(event.data);
+        console.log('SSE message received:', message);
         const callbacks = this.listeners.get(message.type) || [];
         callbacks.forEach(callback => callback(message));
       } catch (error) {
@@ -26,6 +32,7 @@ export class SSEClient {
 
     this.eventSource.onerror = (error) => {
       console.error('SSE connection error:', error);
+      console.log('SSE readyState:', this.eventSource?.readyState);
     };
   }
 

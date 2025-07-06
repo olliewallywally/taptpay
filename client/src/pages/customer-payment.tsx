@@ -3,7 +3,7 @@ import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { SlideToPayComponent } from "@/components/slide-to-pay";
 import { sseClient } from "@/lib/sse-client";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Shield, Lock, CheckCircle, XCircle } from "lucide-react";
 
 export default function CustomerPayment() {
@@ -49,7 +49,15 @@ export default function CustomerPayment() {
     const handleTransactionUpdate = (message: any) => {
       if (!isSubscribed) return;
       
+      console.log("SSE transaction update received:", message);
+      
+      // Immediately update local state with SSE data
       setCurrentTransaction(message.transaction);
+      
+      // Invalidate cache to ensure fresh data on next query
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/merchants", id, "active-transaction"] 
+      });
       
       // Update payment status based on transaction status
       if (message.transaction.status === "processing") {
@@ -75,13 +83,14 @@ export default function CustomerPayment() {
     };
   }, [id, setLocation]);
 
-  // Update current transaction from query
+  // Update current transaction from query only if SSE hasn't already set it
   useEffect(() => {
-    if (activeTransaction) {
+    if (activeTransaction && !currentTransaction) {
+      console.log("Setting transaction from query:", activeTransaction);
       setCurrentTransaction(activeTransaction);
       setPaymentStatus("idle");
     }
-  }, [activeTransaction]);
+  }, [activeTransaction, currentTransaction]);
 
   const handlePayment = () => {
     if (currentTransaction) {
