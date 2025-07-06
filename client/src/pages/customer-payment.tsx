@@ -26,13 +26,18 @@ export default function CustomerPayment() {
   // Process payment mutation
   const processPaymentMutation = useMutation({
     mutationFn: async (transactionId: number) => {
+      console.log("Making payment API request for transaction:", transactionId);
       const response = await apiRequest("POST", `/api/transactions/${transactionId}/pay`, {});
-      return response.json();
+      const result = await response.json();
+      console.log("Payment API response:", result);
+      return result;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("Payment mutation success:", data);
       setPaymentStatus("processing");
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Payment mutation error:", error);
       setPaymentStatus("error");
     },
   });
@@ -60,7 +65,9 @@ export default function CustomerPayment() {
       });
       
       // Update payment status based on transaction status
-      if (message.transaction.status === "processing") {
+      if (message.transaction.status === "pending") {
+        setPaymentStatus("idle"); // Reset to idle for new pending transactions
+      } else if (message.transaction.status === "processing") {
         setPaymentStatus("processing");
       } else if (message.transaction.status === "completed") {
         setPaymentStatus("success");
@@ -93,8 +100,12 @@ export default function CustomerPayment() {
   }, [activeTransaction, currentTransaction]);
 
   const handlePayment = () => {
+    console.log("Payment triggered, current transaction:", currentTransaction);
     if (currentTransaction) {
+      console.log("Initiating payment for transaction ID:", currentTransaction.id);
       processPaymentMutation.mutate(currentTransaction.id);
+    } else {
+      console.log("No current transaction available for payment");
     }
   };
 
@@ -200,13 +211,18 @@ export default function CustomerPayment() {
           </div>
 
           {/* Slide to Pay Widget */}
-          <SlideToPayComponent 
-            onPayment={handlePayment}
-            disabled={paymentStatus !== "idle"}
-            amount={parseFloat(currentTransaction.price)}
-            currency="NZD"
-            merchantName="Tapt Payment"
-          />
+          <div>
+            <div className="text-xs text-gray-500 mb-2">
+              Status: {paymentStatus} | Transaction ID: {currentTransaction.id}
+            </div>
+            <SlideToPayComponent 
+              onPayment={handlePayment}
+              disabled={paymentStatus !== "idle"}
+              amount={parseFloat(currentTransaction.price)}
+              currency="NZD"
+              merchantName="Tapt Payment"
+            />
+          </div>
 
           {/* Security Badges */}
           <div className="flex items-center justify-center space-x-6 pt-4 border-t border-gray-100">
