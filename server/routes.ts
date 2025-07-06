@@ -1097,6 +1097,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Public merchant verification endpoint
+  app.post("/api/merchants/verify", async (req, res) => {
+    try {
+      // Simple validation without confirmPassword requirement
+      const { token, password } = req.body;
+      
+      if (!token || !password) {
+        return res.status(400).json({ 
+          message: "Token and password are required"
+        });
+      }
+
+      // Hash the password
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      // Verify the merchant
+      const merchant = await storage.verifyMerchant(token, passwordHash);
+      if (!merchant) {
+        return res.status(400).json({ message: "Invalid or expired verification token" });
+      }
+
+      // Create user account for the verified merchant
+      try {
+        await createUser(merchant.email, password, merchant.id, 'merchant');
+        console.log("User account created successfully for merchant:", merchant.email);
+      } catch (error) {
+        console.error("Error creating user account:", error);
+        // Don't fail verification if user creation fails, but log it
+      }
+
+      res.json({
+        message: "Merchant account verified successfully. You can now log in.",
+        merchant: {
+          id: merchant.id,
+          name: merchant.name,
+          businessName: merchant.businessName,
+          email: merchant.email,
+          status: merchant.status,
+        }
+      });
+    } catch (error) {
+      console.error("Error verifying merchant:", error);
+      res.status(500).json({ message: "Failed to verify merchant account" });
+    }
+  });
+
   // Public merchant signup (no admin required)
   app.post("/api/merchants/signup", async (req, res) => {
     try {

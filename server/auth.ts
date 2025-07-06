@@ -90,6 +90,12 @@ export function authenticateToken(req: AuthenticatedRequest, res: Response, next
 }
 
 export async function createUser(email: string, password: string, merchantId: number, role: 'merchant' | 'admin' = 'merchant'): Promise<User> {
+  // Check if user already exists
+  const existingUser = getUserByEmail(email);
+  if (existingUser) {
+    throw new Error(`User with email ${email} already exists`);
+  }
+
   const hashedPassword = await bcrypt.hash(password, 10);
   const id = currentUserId++;
   
@@ -103,6 +109,7 @@ export async function createUser(email: string, password: string, merchantId: nu
   };
   
   users.set(id, user);
+  console.log(`User created successfully: ${email} with ID ${id} for merchant ${merchantId}`);
   return user;
 }
 
