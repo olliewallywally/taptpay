@@ -51,21 +51,7 @@ export default function Login() {
     },
   });
 
-  // Reset signup form when switching to signup view
-  useEffect(() => {
-    if (showSignup) {
-      signupForm.reset({
-        name: "",
-        businessName: "",
-        businessType: "",
-        email: "",
-        phone: "",
-        address: "",
-        password: "",
-        confirmPassword: "",
-      });
-    }
-  }, [showSignup, signupForm]);
+
 
   // Update form defaults when login type changes
   useEffect(() => {
@@ -122,16 +108,7 @@ export default function Login() {
         description: "Please check your email to verify your account before logging in.",
       });
       setShowSignup(false);
-      signupForm.reset({
-        name: "",
-        businessName: "",
-        businessType: "",
-        email: "",
-        phone: "",
-        address: "",
-        password: "",
-        confirmPassword: "",
-      });
+      signupForm.reset();
     },
     onError: (error: any) => {
       toast({
