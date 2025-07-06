@@ -168,6 +168,9 @@ npm start      # Runs production server
 - July 05, 2025. Implemented hybrid database storage with PostgreSQL support and memory fallback
 - July 05, 2025. Added complete password reset functionality with SendGrid email integration
 - July 05, 2025. Redesigned mobile navigation with hamburger menu and improved mobile UX
+- July 06, 2025. Fixed payment terminal SSE connection issues and slide-to-pay functionality
+- July 06, 2025. Implemented public merchant signup with email verification system
+- July 06, 2025. Added multi-provider email service (SendGrid, Gmail, SMTP fallback) for production reliability
 
 ## User Preferences
 
