@@ -19,6 +19,7 @@ import ResetPassword from "@/pages/reset-password";
 import AdminLogin from "@/pages/admin-login";
 import AdminDashboard from "@/pages/admin-dashboard";
 import AdminMerchantDetail from "@/pages/admin-merchant";
+import AdminRevenue from "@/pages/admin-revenue";
 import CreateMerchant from "@/pages/create-merchant";
 import VerifyMerchant from "@/pages/verify-merchant";
 import { Layout } from "@/components/layout";
@@ -140,6 +141,12 @@ function Router() {
       <Route path="/admin/dashboard">
         <AdminProtectedRoute>
           <AdminDashboard />
+        </AdminProtectedRoute>
+      </Route>
+      
+      <Route path="/admin/revenue">
+        <AdminProtectedRoute>
+          <AdminRevenue />
         </AdminProtectedRoute>
       </Route>
       

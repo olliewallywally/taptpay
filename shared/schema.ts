@@ -57,6 +57,24 @@ export const transactions = pgTable("transactions", {
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   status: text("status").notNull().default("pending"), // pending, processing, completed, failed
   windcaveTransactionId: text("windcave_transaction_id"),
+  
+  // Fee tracking
+  windcaveFee: decimal("windcave_fee", { precision: 10, scale: 2 }).default("0.20"), // Fixed $0.20 fee
+  platformFee: decimal("platform_fee", { precision: 10, scale: 2 }).default("0.05"), // Fixed $0.05 fee
+  merchantNet: decimal("merchant_net", { precision: 10, scale: 2 }), // Amount merchant receives (price - windcave_fee - platform_fee)
+  
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Platform fees collection table - tracks all fees collected
+export const platformFees = pgTable("platform_fees", {
+  id: serial("id").primaryKey(),
+  transactionId: serial("transaction_id").references(() => transactions.id),
+  merchantId: serial("merchant_id").references(() => merchants.id),
+  feeAmount: decimal("fee_amount", { precision: 10, scale: 2 }).notNull(), // $0.05 per transaction
+  transactionAmount: decimal("transaction_amount", { precision: 10, scale: 2 }).notNull(), // Original transaction amount
+  status: text("status").notNull().default("pending"), // pending, collected, failed
+  collectedAt: timestamp("collected_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -160,5 +178,7 @@ export type VerifyMerchant = z.infer<typeof verifyMerchantSchema>;
 export type Merchant = typeof merchants.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type Transaction = typeof transactions.$inferSelect;
+export type InsertPlatformFee = typeof platformFees.$inferInsert;
+export type PlatformFee = typeof platformFees.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
