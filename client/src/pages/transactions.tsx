@@ -33,7 +33,8 @@ export default function TransactionsPage() {
         
         if (response.ok) {
           const userData = await response.json();
-          setMerchantId(userData.merchantId);
+          console.log("Auth response:", userData);
+          setMerchantId(userData.user.merchantId);
         }
       } catch (error) {
         console.error("Failed to get merchant ID:", error);
@@ -93,7 +94,7 @@ export default function TransactionsPage() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || !merchantId) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
         <div className="max-w-6xl mx-auto">
@@ -109,6 +110,9 @@ export default function TransactionsPage() {
       </div>
     );
   }
+
+  console.log("Transactions data:", transactions);
+  console.log("Merchant ID:", merchantId);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
