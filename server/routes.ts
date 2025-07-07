@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema } from "@shared/schema";
+import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema } from "@shared/schema";
 import { windcaveService } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, createUser, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
@@ -712,6 +712,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedMerchant);
     } catch (error) {
       res.status(500).json({ message: "Failed to update bank account details" });
+    }
+  });
+
+  app.put("/api/merchants/:id/theme", async (req, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      const validation = updateThemeSchema.safeParse(req.body);
+      
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid theme selection", errors: validation.error.errors });
+      }
+
+      const updatedMerchant = await storage.updateMerchantTheme(merchantId, validation.data.themeId);
+      if (!updatedMerchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+
+      res.json(updatedMerchant);
+    } catch (error) {
+      console.error("Error updating theme:", error);
+      res.status(500).json({ message: "Failed to update theme" });
     }
   });
 

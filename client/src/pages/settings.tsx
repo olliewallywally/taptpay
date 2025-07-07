@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { updateMerchantDetailsSchema, updateBankAccountSchema } from "@shared/schema";
+import { updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema } from "@shared/schema";
 import { 
   Settings as SettingsIcon, 
   CheckCircle, 
@@ -24,26 +24,38 @@ import {
   CreditCard,
   Edit,
   Save,
-  X
+  X,
+  Palette
 } from "lucide-react";
 import { z } from "zod";
+import { colorThemes, getThemeById } from "@/lib/themes";
 
 type MerchantDetailsFormData = z.infer<typeof updateMerchantDetailsSchema>;
 type BankAccountFormData = z.infer<typeof updateBankAccountSchema>;
+type ThemeFormData = z.infer<typeof updateThemeSchema>;
 
 export default function Settings() {
   const { toast } = useToast();
   const [editingDetails, setEditingDetails] = useState(false);
   const [editingBankAccount, setEditingBankAccount] = useState(false);
+  const [editingTheme, setEditingTheme] = useState(false);
 
-  // Get current merchant data
+  // Get current user first to get their merchant ID
+  const { data: user, isLoading: userLoading } = useQuery({
+    queryKey: ["/api/auth/me"],
+    retry: false,
+  });
+
+  // Get current merchant data using the authenticated user's merchant ID
   const { data: merchant, isLoading: merchantLoading } = useQuery({
-    queryKey: ["/api/merchants/1"],
+    queryKey: ["/api/merchants", user?.merchantId],
     queryFn: async () => {
-      const response = await fetch("/api/merchants/1");
+      if (!user?.merchantId) throw new Error("No merchant ID available");
+      const response = await fetch(`/api/merchants/${user.merchantId}`);
       if (!response.ok) throw new Error("Failed to fetch merchant");
       return response.json();
     },
+    enabled: !!user?.merchantId,
   });
 
   // Get Windcave API status
@@ -77,6 +89,13 @@ export default function Settings() {
     },
   });
 
+  const themeForm = useForm<ThemeFormData>({
+    resolver: zodResolver(updateThemeSchema),
+    defaultValues: {
+      themeId: merchant?.themeId || "classic",
+    },
+  });
+
   // Update form defaults when merchant data loads
   useEffect(() => {
     if (merchant) {
@@ -92,16 +111,20 @@ export default function Settings() {
         bankBranch: merchant.bankBranch || "",
         accountHolderName: merchant.accountHolderName || "",
       });
+      themeForm.reset({
+        themeId: merchant.themeId || "classic",
+      });
     }
-  }, [merchant, merchantDetailsForm, bankAccountForm]);
+  }, [merchant, merchantDetailsForm, bankAccountForm, themeForm]);
 
   // Mutations for updating merchant data
   const updateDetailsMutation = useMutation({
     mutationFn: async (data: MerchantDetailsFormData) => {
-      return apiRequest("PUT", "/api/merchants/1/details", data);
+      if (!user?.merchantId) throw new Error("No merchant ID available");
+      return apiRequest("PUT", `/api/merchants/${user.merchantId}/details`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants/1"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", user?.merchantId] });
       setEditingDetails(false);
       toast({
         title: "Business Details Updated",
@@ -119,10 +142,11 @@ export default function Settings() {
 
   const updateBankAccountMutation = useMutation({
     mutationFn: async (data: BankAccountFormData) => {
-      return apiRequest("PUT", "/api/merchants/1/bank-account", data);
+      if (!user?.merchantId) throw new Error("No merchant ID available");
+      return apiRequest("PUT", `/api/merchants/${user.merchantId}/bank-account`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants/1"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", user?.merchantId] });
       setEditingBankAccount(false);
       toast({
         title: "Bank Account Updated",
@@ -138,12 +162,38 @@ export default function Settings() {
     },
   });
 
+  const updateThemeMutation = useMutation({
+    mutationFn: async (data: ThemeFormData) => {
+      if (!user?.merchantId) throw new Error("No merchant ID available");
+      return apiRequest("PUT", `/api/merchants/${user.merchantId}/theme`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", user?.merchantId] });
+      setEditingTheme(false);
+      toast({
+        title: "Theme Updated",
+        description: "Your color theme has been changed successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Update Failed",
+        description: "Failed to update theme. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmitDetails = (data: MerchantDetailsFormData) => {
     updateDetailsMutation.mutate(data);
   };
 
   const onSubmitBankAccount = (data: BankAccountFormData) => {
     updateBankAccountMutation.mutate(data);
+  };
+
+  const onSubmitTheme = (data: ThemeFormData) => {
+    updateThemeMutation.mutate(data);
   };
 
   return (
@@ -298,6 +348,180 @@ export default function Settings() {
               <div>
                 <label className="text-sm font-medium text-gray-700">Business Address</label>
                 <p className="text-gray-900 whitespace-pre-line">{merchant?.businessAddress || "Not set"}</p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Color Theme Card */}
+      <Card className="mb-6 sm:mb-8">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Palette className="h-5 w-5" />
+              <div>
+                <CardTitle>Color Theme</CardTitle>
+                <CardDescription>
+                  Customize the color scheme for your payment interface
+                </CardDescription>
+              </div>
+            </div>
+            {!editingTheme && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEditingTheme(true)}
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                Change Theme
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {merchantLoading ? (
+            <div className="animate-pulse space-y-4">
+              <div className="h-4 bg-gray-200 rounded w-32"></div>
+              <div className="h-24 bg-gray-200 rounded"></div>
+            </div>
+          ) : editingTheme ? (
+            <Form {...themeForm}>
+              <form onSubmit={themeForm.handleSubmit(onSubmitTheme)} className="space-y-6">
+                <FormField
+                  control={themeForm.control}
+                  name="themeId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Select Color Theme</FormLabel>
+                      <FormControl>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {colorThemes.map((theme) => (
+                            <div
+                              key={theme.id}
+                              className={`relative border-2 rounded-xl p-4 cursor-pointer transition-all ${
+                                field.value === theme.id
+                                  ? "border-blue-500 bg-blue-50"
+                                  : "border-gray-200 hover:border-gray-300"
+                              }`}
+                              onClick={() => field.onChange(theme.id)}
+                            >
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <h4 className="font-medium text-gray-900">{theme.name}</h4>
+                                  {field.value === theme.id && (
+                                    <CheckCircle className="w-5 h-5 text-blue-600" />
+                                  )}
+                                </div>
+                                <p className="text-sm text-gray-600">{theme.description}</p>
+                                <div className="flex space-x-2">
+                                  <div
+                                    className="w-8 h-8 rounded-full border-2 border-white shadow-sm"
+                                    style={{ backgroundColor: theme.colors.primary }}
+                                    title="Primary Color"
+                                  />
+                                  <div
+                                    className="w-8 h-8 rounded-full border-2 border-white shadow-sm"
+                                    style={{ backgroundColor: theme.colors.secondary }}
+                                    title="Secondary Color"
+                                  />
+                                  <div
+                                    className="w-8 h-8 rounded-full border-2 border-white shadow-sm"
+                                    style={{ backgroundColor: theme.colors.accent }}
+                                    title="Accent Color"
+                                  />
+                                </div>
+                                <div className={`p-3 rounded-lg ${theme.preview.background} ${theme.preview.border} border`}>
+                                  <div className={`text-sm font-medium ${theme.preview.text}`}>
+                                    Payment Interface Preview
+                                  </div>
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    How your customers will see your payment page
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="flex space-x-2">
+                  <Button 
+                    type="submit" 
+                    disabled={updateThemeMutation.isPending}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {updateThemeMutation.isPending ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4 mr-2" />
+                        Save Theme
+                      </>
+                    )}
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => {
+                      setEditingTheme(false);
+                      themeForm.reset();
+                    }}
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700">Current Theme</label>
+                {(() => {
+                  const currentTheme = getThemeById(merchant?.themeId || "classic");
+                  return (
+                    <div className="mt-2 p-4 border rounded-lg">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <h4 className="font-medium text-gray-900">{currentTheme?.name}</h4>
+                          <p className="text-sm text-gray-600">{currentTheme?.description}</p>
+                        </div>
+                        <div className="flex space-x-2">
+                          <div
+                            className="w-6 h-6 rounded-full border-2 border-white shadow-sm"
+                            style={{ backgroundColor: currentTheme?.colors.primary }}
+                            title="Primary Color"
+                          />
+                          <div
+                            className="w-6 h-6 rounded-full border-2 border-white shadow-sm"
+                            style={{ backgroundColor: currentTheme?.colors.secondary }}
+                            title="Secondary Color"
+                          />
+                          <div
+                            className="w-6 h-6 rounded-full border-2 border-white shadow-sm"
+                            style={{ backgroundColor: currentTheme?.colors.accent }}
+                            title="Accent Color"
+                          />
+                        </div>
+                      </div>
+                      <div className={`p-3 rounded-lg ${currentTheme?.preview.background} ${currentTheme?.preview.border} border`}>
+                        <div className={`text-sm font-medium ${currentTheme?.preview.text}`}>
+                          Payment Interface Preview
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          This is how customers see your payment page
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}

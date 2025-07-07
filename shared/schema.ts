@@ -43,6 +43,9 @@ export const merchants = pgTable("merchants", {
   // Tax information
   gstNumber: text("gst_number"),
   
+  // Theme customization
+  themeId: text("theme_id").default("classic"),
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -105,6 +108,10 @@ export const updateBankAccountSchema = z.object({
   bankAccountNumber: z.string().regex(/^\d{2}-\d{4}-\d{7}-\d{2,3}$/, "Must be valid NZ account format (12-3456-1234567-12)"),
   bankBranch: z.string().min(1, "Bank branch is required").max(50),
   accountHolderName: z.string().min(1, "Account holder name is required").max(100),
+});
+
+export const updateThemeSchema = z.object({
+  themeId: z.string().min(1, "Theme selection is required"),
 });
 
 export const changePasswordSchema = z.object({
