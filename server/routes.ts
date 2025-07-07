@@ -747,6 +747,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Platform fee analytics (admin only)
+  app.get("/api/admin/platform-fees", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const totalFees = await storage.getTotalPlatformFees();
+      res.json(totalFees);
+    } catch (error) {
+      console.error("Error fetching platform fees:", error);
+      res.status(500).json({ message: "Failed to fetch platform fees" });
+    }
+  });
+
   // Windcave webhook notification handler
   app.post("/api/windcave/notification", async (req, res) => {
     try {

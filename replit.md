@@ -14,6 +14,7 @@ The application follows a monorepo structure with clear separation between clien
 - **Real-time Communication**: Server-Sent Events (SSE)
 - **UI Framework**: shadcn/ui with Tailwind CSS
 - **State Management**: TanStack Query for server state
+- **Revenue Model**: Automatic $0.05 fee collection per transaction
 
 ## Key Components
 
@@ -37,6 +38,9 @@ The application follows a monorepo structure with clear separation between clien
 // Merchants table
 - id: serial primary key
 - name: text (merchant identifier)
+- businessName: text (merchant business name)
+- email: text (merchant contact email)
+- themeId: text (customization theme)
 - qrCodeUrl: text (generated QR code URL)
 - paymentUrl: text (customer payment link)
 
@@ -47,7 +51,20 @@ The application follows a monorepo structure with clear separation between clien
 - price: decimal(10,2) (transaction amount)
 - status: text (pending|processing|completed|failed)
 - windcaveTransactionId: text (external payment processor ID)
+- windcaveFee: decimal(10,2) (fixed $0.20 processing fee)
+- platformFee: decimal(10,2) (fixed $0.05 platform fee)
+- merchantNet: decimal(10,2) (amount merchant receives after fees)
 - createdAt: timestamp (transaction creation time)
+
+// Platform Fees table (NEW)
+- id: serial primary key
+- transactionId: foreign key to transactions
+- merchantId: foreign key to merchants
+- feeAmount: decimal(10,2) (platform fee collected)
+- transactionAmount: decimal(10,2) (original transaction amount)
+- status: text (pending|collected|failed)
+- collectedAt: timestamp (when fee was collected)
+- createdAt: timestamp (fee record creation time)
 ```
 
 ## Data Flow
@@ -187,6 +204,10 @@ npm start      # Runs production server
 - July 07, 2025. Fixed import issues and authentication for transactions page to display all historical transaction data
 - July 07, 2025. Restored payment status indicator above QR code section with full status flow (Awaiting Payment → Processing → Payment Accepted)
 - July 07, 2025. Implemented clearTransactions functionality and removed all test transactions for clean customer payment experience
+- July 07, 2025. **MAJOR**: Implemented comprehensive platform revenue collection system with $0.05 fee per transaction
+- July 07, 2025. Added platform fees database table with automatic fee tracking and collection on completed payments
+- July 07, 2025. Created admin revenue dashboard showing total earnings, transaction counts, and revenue analytics
+- July 07, 2025. Enhanced transaction schema with fee breakdown (Windcave: $0.20, Platform: $0.05, Merchant: remainder)
 
 ## User Preferences
 
