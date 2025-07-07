@@ -208,6 +208,9 @@ npm start      # Runs production server
 - July 07, 2025. Added platform fees database table with automatic fee tracking and collection on completed payments
 - July 07, 2025. Created admin revenue dashboard showing total earnings, transaction counts, and revenue analytics
 - July 07, 2025. Enhanced transaction schema with fee breakdown (Windcave: $0.20, Platform: $0.05, Merchant: remainder)
+- July 07, 2025. **CRITICAL FIX**: Redesigned revenue system to Marketplace Model after discovering Windcave uses percentage-based fees (2.9%), not fixed $0.20
+- July 07, 2025. Implemented proper Merchant of Record architecture where platform collects all payments and settles net amounts to merchants
+- July 07, 2025. Updated fee structure: Windcave 2.9% + Platform 0.5% = 3.4% total, merchants receive 96.6% of transaction amount
 
 ## User Preferences
 

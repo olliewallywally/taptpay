@@ -66,13 +66,13 @@ export default function AdminRevenue() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Fee per Transaction</CardTitle>
+            <CardTitle className="text-sm font-medium">Platform Fee Rate</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">$0.05</div>
+            <div className="text-2xl font-bold">0.5%</div>
             <p className="text-xs text-muted-foreground">
-              Fixed platform fee
+              Of transaction amount
             </p>
           </CardContent>
         </Card>
@@ -102,19 +102,19 @@ export default function AdminRevenue() {
             <div className="space-y-2">
               <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                 <span className="font-medium">Windcave Fee</span>
-                <Badge variant="secondary">$0.20 per transaction</Badge>
+                <Badge variant="secondary">2.9% of transaction</Badge>
               </div>
               <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
                 <span className="font-medium">Platform Fee</span>
-                <Badge variant="default">$0.05 per transaction</Badge>
+                <Badge variant="default">0.5% of transaction</Badge>
               </div>
               <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                 <span className="font-medium">Merchant Receives</span>
-                <Badge variant="outline">Transaction Amount - $0.25</Badge>
+                <Badge variant="outline">96.6% of transaction</Badge>
               </div>
             </div>
             <div className="text-sm text-gray-600 dark:text-gray-400">
-              Merchants pay a total of $0.25 per transaction: $0.20 to Windcave for processing and $0.05 to our platform.
+              Marketplace Model: Platform collects all payments, deducts processing fees (2.9%) and platform fees (0.5%), then settles net amount to merchants.
             </div>
           </CardContent>
         </Card>
@@ -140,8 +140,8 @@ export default function AdminRevenue() {
                 <Badge variant="outline">Real-time</Badge>
               </div>
               <div className="text-sm text-gray-600 dark:text-gray-400 mt-4">
-                Platform fees are automatically deducted from each transaction and tracked in real-time. 
-                Merchants see their net amount after all fees are applied.
+                Platform acts as Merchant of Record, collecting all customer payments. 
+                Fees are automatically calculated and merchants receive settled amounts.
               </div>
             </div>
           </CardContent>
