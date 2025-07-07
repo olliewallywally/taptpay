@@ -116,54 +116,7 @@ export default function MerchantTerminal() {
     createTransactionMutation.mutate(data);
   };
 
-  const getPaymentStatusIndicator = (status: string) => {
-    switch (status) {
-      case "pending":
-        return (
-          <div className="flex flex-col items-center space-y-3 p-6 bg-gray-50 rounded-xl border-2 border-gray-200">
-            <div className="flex items-center space-x-3">
-              <Clock className="w-6 h-6 text-gray-500" />
-              <span className="text-lg font-medium text-gray-700">Awaiting Payment</span>
-            </div>
-            <p className="text-sm text-gray-500 text-center">Customer can now scan QR code to pay</p>
-          </div>
-        );
-      case "processing":
-        return (
-          <div className="flex flex-col items-center space-y-3 p-6 bg-orange-50 rounded-xl border-2 border-orange-200">
-            <div className="flex items-center space-x-3">
-              <Loader2 className="w-7 h-7 text-orange-500 animate-spin" />
-              <span className="text-lg font-medium text-orange-700">Processing Payment</span>
-            </div>
-            <p className="text-sm text-orange-600 text-center">Payment is being processed...</p>
-          </div>
-        );
-      case "completed":
-        return (
-          <div className="flex flex-col items-center space-y-3 p-6 bg-green-50 rounded-xl border-2 border-green-200">
-            <div className="flex items-center space-x-3">
-              <CheckCircle className="w-7 h-7 text-green-600" />
-              <span className="text-lg font-medium text-green-700">Payment Accepted</span>
-            </div>
-            <p className="text-sm text-green-600 text-center">Transaction completed successfully!</p>
-          </div>
-        );
-      case "failed":
-        return (
-          <div className="flex flex-col items-center space-y-3 p-6 bg-red-50 rounded-xl border-2 border-red-200">
-            <div className="flex items-center space-x-3">
-              <div className="w-7 h-7 rounded-full bg-red-500 flex items-center justify-center">
-                <span className="text-white font-bold text-sm">✕</span>
-              </div>
-              <span className="text-lg font-medium text-red-700">Payment Failed</span>
-            </div>
-            <p className="text-sm text-red-600 text-center">Please try again or contact support</p>
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
+
 
   return (
     <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
@@ -232,22 +185,8 @@ export default function MerchantTerminal() {
           </CardContent>
         </Card>
 
-        {/* Payment Status Indicator - Prominent Position */}
+        {/* QR Code Section */}
         {currentTransaction ? (
-          <Card className="rounded-2xl shadow-lg">
-            <CardContent className="p-6">
-              <div className="text-center mb-4">
-                <h3 className="text-xl font-bold text-gray-900 mb-1">
-                  Transaction #{currentTransaction.id}
-                </h3>
-                <p className="text-sm text-gray-600">
-                  {currentTransaction.itemName} - ${currentTransaction.price}
-                </p>
-              </div>
-              {getPaymentStatusIndicator(currentTransaction.status)}
-            </CardContent>
-          </Card>
-        ) : (
           /* QR Code Card - When no transaction */
           <Card className="rounded-2xl shadow-lg">
             <CardContent className="p-8">
