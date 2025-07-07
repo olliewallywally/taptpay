@@ -231,21 +231,8 @@ export default function MerchantTerminal() {
           </CardContent>
         </Card>
 
-        {/* QR Code Card */}
-        <Card className="rounded-2xl shadow-lg">
-          <CardContent className="p-8">
-            <QRCodeDisplay 
-              paymentUrl={merchant?.paymentUrl}
-              qrCodeUrl={merchant?.qrCodeUrl}
-              merchantId={merchantId}
-            />
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Payment Status Indicator - Full Width */}
-      {currentTransaction && (
-        <div className="max-w-4xl mx-auto px-3 sm:px-4 mt-6">
+        {/* Payment Status Indicator - Prominent Position */}
+        {currentTransaction ? (
           <Card className="rounded-2xl shadow-lg">
             <CardContent className="p-6">
               <div className="text-center mb-4">
@@ -259,8 +246,19 @@ export default function MerchantTerminal() {
               {getPaymentStatusIndicator(currentTransaction.status)}
             </CardContent>
           </Card>
-        </div>
-      )}
+        ) : (
+          /* QR Code Card - When no transaction */
+          <Card className="rounded-2xl shadow-lg">
+            <CardContent className="p-8">
+              <QRCodeDisplay 
+                paymentUrl={merchant?.paymentUrl}
+                qrCodeUrl={merchant?.qrCodeUrl}
+                merchantId={merchantId}
+              />
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
       {/* Merchant URL Display - Always show for reference */}
       {merchant && (
