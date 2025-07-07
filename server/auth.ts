@@ -23,16 +23,18 @@ export interface AuthenticatedRequest extends Request {
 const users: Map<number, User> = new Map();
 let currentUserId = 1;
 
-// Create default demo user
-const hashedPassword = bcrypt.hashSync('demo123', 10);
+// Create admin user
+const adminHashedPassword = bcrypt.hashSync('TAPTpay', 10);
 users.set(1, {
   id: 1,
-  email: 'demo@tapt.co.nz',
-  password: hashedPassword,
-  merchantId: 1,
-  role: 'merchant',
+  email: 'oliverleonard.professional@gmail.com',
+  password: adminHashedPassword,
+  merchantId: 0,
+  role: 'admin',
   createdAt: new Date(),
 });
+
+currentUserId = 2;
 
 export const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 

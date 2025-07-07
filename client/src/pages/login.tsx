@@ -32,8 +32,8 @@ export default function Login() {
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: loginType === 'merchant' ? "demo@tapt.co.nz" : "admin@tapt.co.nz",
-      password: loginType === 'merchant' ? "demo123" : "admin123",
+      email: loginType === 'merchant' ? "" : "oliverleonard.professional@gmail.com",
+      password: loginType === 'merchant' ? "" : "TAPTpay",
     },
   });
 
@@ -56,8 +56,8 @@ export default function Login() {
 
   // Update form defaults when login type changes
   useEffect(() => {
-    form.setValue("email", loginType === 'merchant' ? "demo@tapt.co.nz" : "admin@tapt.co.nz");
-    form.setValue("password", loginType === 'merchant' ? "demo123" : "admin123");
+    form.setValue("email", loginType === 'merchant' ? "" : "oliverleonard.professional@gmail.com");
+    form.setValue("password", loginType === 'merchant' ? "" : "TAPTpay");
   }, [loginType, form]);
 
   const loginMutation = useMutation({
@@ -494,13 +494,14 @@ export default function Login() {
               />
             </div>
 
-            {/* Demo Credentials Info */}
-            <div className="bg-gray-50 border border-gray-100 rounded-lg p-4">
-              <p className="text-sm text-gray-600 text-center">
-                <span className="font-medium">Demo {loginType}:</span>{' '}
-                {loginType === 'merchant' ? 'demo@tapt.co.nz / demo123' : 'admin@tapt.co.nz / admin123'}
-              </p>
-            </div>
+            {/* Admin Credentials Info */}
+            {loginType === 'admin' && (
+              <div className="bg-gray-50 border border-gray-100 rounded-lg p-4">
+                <p className="text-sm text-gray-600 text-center">
+                  <span className="font-medium">Admin credentials pre-filled</span>
+                </p>
+              </div>
+            )}
 
             {/* Login Button */}
             <Button

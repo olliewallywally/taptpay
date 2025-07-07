@@ -68,38 +68,6 @@ export class MemStorage implements IStorage {
     this.currentMerchantId = 1;
     this.currentTransactionId = 1;
     this.activeTransactionCache = new Map();
-    
-    // Create default merchant for demo with new schema
-    const merchant: Merchant = {
-      id: this.currentMerchantId++,
-      name: "MERCHANT",
-      businessName: "The Coffee Corner",
-      businessType: "Cafe",
-      email: "manager@coffeecorner.co.nz",
-      phone: "+64 9 123 4567",
-      address: "123 Queen Street, Auckland 1010, New Zealand",
-      status: "verified",
-      verificationToken: null,
-      passwordHash: null,
-      qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=" + encodeURIComponent("http://localhost:5000/pay/1"),
-      paymentUrl: "http://localhost:5000/pay/1",
-      currentProviderRate: "0.0290",
-      ourRate: "0.0020",
-      contactEmail: "manager@coffeecorner.co.nz",
-      contactPhone: "+64 9 123 4567",
-      businessAddress: "123 Queen Street, Auckland 1010, New Zealand",
-      bankName: "ANZ Bank",
-      bankAccountNumber: "12-3456-1234567-123",
-      bankBranch: "Queen Street Branch",
-      accountHolderName: "The Coffee Corner Ltd",
-      gstNumber: "123-456-789",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    this.merchants.set(merchant.id, merchant);
-
-    // Add sample transactions for demo
-    this.createSampleData();
   }
 
   async getMerchant(id: number): Promise<Merchant | undefined> {
