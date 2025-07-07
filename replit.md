@@ -174,6 +174,10 @@ npm start      # Runs production server
 - July 07, 2025. Successfully switched from SendGrid to Gmail email delivery after resolving API key issues
 - July 07, 2025. Fixed signup form validation by replacing React Hook Form with plain HTML inputs to prevent input blocking
 - July 07, 2025. Changed "Store Name" field to "Full Name" in merchant signup form per user request
+- July 07, 2025. Fixed critical verification email URL issue - emails now use proper Replit domain instead of localhost
+- July 07, 2025. Resolved admin authentication system - fixed email validation and analytics endpoint access
+- July 07, 2025. Completed merchant authentication debugging - login system working with correct merchantId assignment
+- July 07, 2025. Successfully cleared problematic merchant data and established clean testing environment
 
 ## User Preferences
 
