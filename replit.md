@@ -179,6 +179,9 @@ npm start      # Runs production server
 - July 07, 2025. Completed merchant authentication debugging - login system working with correct merchantId assignment
 - July 07, 2025. Successfully cleared problematic merchant data and established clean testing environment
 - July 07, 2025. Implemented automatic auth user sync for verified merchants to survive server restarts
+- July 07, 2025. Fixed merchant terminal routing to use authenticated user's merchantId (22) instead of hardcoded 1
+- July 07, 2025. Eliminated all hardcoded merchant IDs throughout system for complete scalability
+- July 07, 2025. Added merchant validation middleware and URL display components for seamless multi-merchant support
 
 ## User Preferences
 

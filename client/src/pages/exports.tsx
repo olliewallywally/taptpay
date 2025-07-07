@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { getCurrentMerchantId } from "@/lib/auth";
 import { Download, FileText, FileSpreadsheet, Calendar, TrendingUp } from "lucide-react";
 import { format } from "date-fns";
 
@@ -18,8 +19,14 @@ export default function Exports() {
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
 
-  // Get current user's merchant ID (for demo, using merchant ID 1)
-  const merchantId = 1;
+  // Get current user's merchant ID from authentication
+  const merchantId = getCurrentMerchantId();
+  
+  // Redirect to login if no merchantId
+  if (!merchantId) {
+    window.location.href = '/login';
+    return <div>Redirecting to login...</div>;
+  }
 
   // Calculate date range based on selection
   const getDateRange = () => {

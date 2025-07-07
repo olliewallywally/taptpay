@@ -12,7 +12,27 @@ export default function CustomerPayment() {
   const [currentTransaction, setCurrentTransaction] = useState<any>(null);
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
 
-  const id = merchantId ? parseInt(merchantId) : 1;
+  // Debug URL parsing
+  console.log("Raw URL:", window.location.pathname);
+  console.log("Parsed merchantId from URL:", merchantId);
+  
+  const id = merchantId ? parseInt(merchantId) : null;
+  
+  // Redirect if no valid merchantId
+  if (!id) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <h2 className="text-2xl font-bold text-red-600">Invalid Payment Link</h2>
+          <p className="text-gray-600">Please use a valid payment link from your merchant.</p>
+          <div className="text-sm text-gray-500">
+            <p>Payment URLs should be in format: /pay/[merchant-id]</p>
+            <p>Example: /pay/22 for merchant #22</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Get active transaction - override global query settings for public endpoint
   const { data: activeTransaction, isLoading, error } = useQuery({
