@@ -47,6 +47,9 @@ export function clearAllUsers() {
   console.log("All user accounts cleared except admin");
 }
 
+// Force clear all users now
+clearAllUsers();
+
 export const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
 export async function authenticateUser(email: string, password: string): Promise<User | null> {
