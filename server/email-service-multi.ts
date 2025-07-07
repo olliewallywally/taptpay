@@ -11,7 +11,7 @@ interface EmailParams {
 
 // Email service configuration with multiple provider support
 const EMAIL_CONFIG = {
-  provider: process.env.EMAIL_PROVIDER || 'sendgrid', // 'sendgrid', 'gmail', 'outlook', 'smtp'
+  provider: process.env.EMAIL_PROVIDER || 'gmail', // 'sendgrid', 'gmail', 'outlook', 'smtp'
   sendgrid: {
     apiKey: process.env.SENDGRID_API_KEY,
     fromEmail: process.env.SENDGRID_FROM_EMAIL || 'noreply@tapt.co.nz',
@@ -251,9 +251,11 @@ If you didn't create this account, please ignore this email.
 Need help? Contact us at support@tapt.co.nz
   `;
   
+  const fromEmail = EMAIL_CONFIG.provider === 'gmail' ? EMAIL_CONFIG.gmail.user : EMAIL_CONFIG.sendgrid.fromEmail;
+  
   return sendEmailMulti({
     to: email,
-    from: EMAIL_CONFIG.sendgrid.fromEmail,
+    from: fromEmail || 'noreply@tapt.co.nz',
     subject: 'Welcome to Tapt - Verify Your Merchant Account',
     html,
     text: textContent
