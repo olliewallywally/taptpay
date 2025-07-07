@@ -125,22 +125,14 @@ export default function TransactionsPage() {
             <h1 className="text-3xl font-bold text-gray-900">All Transactions</h1>
           </div>
           
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              onClick={handleExportTransactions}
-              className="flex items-center gap-2"
-            >
-              <Download className="h-4 w-4" />
-              Export CSV
-            </Button>
-            <Link href="/terminal">
-              <Button className="flex items-center gap-2">
-                <Eye className="h-4 w-4" />
-                Terminal
-              </Button>
-            </Link>
-          </div>
+          <Button 
+            variant="outline" 
+            onClick={handleExportTransactions}
+            className="flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </Button>
         </div>
 
         {/* Transactions List */}
@@ -175,48 +167,56 @@ export default function TransactionsPage() {
                 {transactions.slice().reverse().map((transaction: Transaction) => (
                   <div 
                     key={transaction.id}
-                    className="grid grid-cols-1 md:grid-cols-6 gap-4 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                    className="border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                   >
                     {/* Mobile Layout */}
-                    <div className="md:hidden space-y-2">
-                      <div className="flex justify-between items-start">
+                    <div className="md:hidden p-4 space-y-3">
+                      <div className="flex justify-between items-center">
                         <div>
-                          <p className="font-medium">#{transaction.id}</p>
-                          <p className="text-sm text-gray-600">{transaction.itemName}</p>
+                          <p className="font-bold text-lg">#{transaction.id}</p>
+                          <p className="text-gray-600">{transaction.itemName}</p>
                         </div>
                         <div className="text-right">
-                          <p className="font-bold text-lg">${transaction.price}</p>
+                          <p className="font-bold text-xl">${transaction.price}</p>
                           {getStatusBadge(transaction.status)}
                         </div>
                       </div>
-                      <div className="flex justify-between text-sm text-gray-500">
-                        <span>{transaction.windcaveTransactionId || 'N/A'}</span>
-                        <span>{format(new Date(transaction.createdAt), 'MMM d, yyyy h:mm a')}</span>
+                      <div className="pt-2 border-t border-gray-100">
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-gray-500">Payment ID:</span>
+                          <span className="font-mono text-xs">{transaction.windcaveTransactionId || 'Pending'}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm mt-1">
+                          <span className="text-gray-500">Date:</span>
+                          <span>{format(new Date(transaction.createdAt), 'MMM d, h:mm a')}</span>
+                        </div>
                       </div>
                     </div>
 
                     {/* Desktop Layout */}
-                    <div className="hidden md:block">
-                      <span className="font-medium">#{transaction.id}</span>
-                    </div>
-                    <div className="hidden md:block">
-                      <span className="text-gray-900">{transaction.itemName}</span>
-                    </div>
-                    <div className="hidden md:block">
-                      <span className="font-bold">${transaction.price}</span>
-                    </div>
-                    <div className="hidden md:block">
-                      {getStatusBadge(transaction.status)}
-                    </div>
-                    <div className="hidden md:block">
-                      <span className="text-sm text-gray-600 font-mono">
-                        {transaction.windcaveTransactionId || 'N/A'}
-                      </span>
-                    </div>
-                    <div className="hidden md:block">
-                      <span className="text-sm text-gray-600">
-                        {format(new Date(transaction.createdAt), 'MMM d, yyyy h:mm a')}
-                      </span>
+                    <div className="hidden md:grid md:grid-cols-6 gap-4 p-4">
+                      <div>
+                        <span className="font-medium">#{transaction.id}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-900">{transaction.itemName}</span>
+                      </div>
+                      <div>
+                        <span className="font-bold">${transaction.price}</span>
+                      </div>
+                      <div>
+                        {getStatusBadge(transaction.status)}
+                      </div>
+                      <div>
+                        <span className="text-sm text-gray-600 font-mono">
+                          {transaction.windcaveTransactionId || 'N/A'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-sm text-gray-600">
+                          {format(new Date(transaction.createdAt), 'MMM d, yyyy h:mm a')}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ))}
