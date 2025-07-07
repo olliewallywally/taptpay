@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { QrCode, LogOut, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { getCurrentMerchantId } from "@/lib/auth";
 
 export function Navigation() {
   const [location, setLocation] = useLocation();
@@ -24,12 +25,16 @@ export function Navigation() {
   };
 
   const isActive = (path: string) => location === path;
+  
+  // Get current merchant ID for dynamic customer view link
+  const merchantId = getCurrentMerchantId();
+  const customerViewPath = merchantId ? `/pay/${merchantId}` : "/pay/1";
 
   const navigationLinks = [
     { path: "/merchant", label: "Terminal" },
     { path: "/dashboard", label: "Dashboard" },
     { path: "/settings", label: "Settings" },
-    { path: "/pay/1", label: "Customer View" },
+    { path: customerViewPath, label: "Customer View" },
   ];
 
   return (

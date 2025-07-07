@@ -25,9 +25,16 @@ export default function CustomerPayment() {
         <div className="text-center space-y-4">
           <h2 className="text-2xl font-bold text-red-600">Invalid Payment Link</h2>
           <p className="text-gray-600">Please use a valid payment link from your merchant.</p>
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-gray-500 space-y-2">
             <p>Payment URLs should be in format: /pay/[merchant-id]</p>
             <p>Example: /pay/22 for merchant #22</p>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-4">
+              <p className="text-yellow-800 font-medium">Note:</p>
+              <p className="text-yellow-700 text-xs">
+                If you're trying to access /pay/1, this merchant doesn't exist. 
+                Please use the correct payment link provided by your merchant.
+              </p>
+            </div>
           </div>
         </div>
       </div>

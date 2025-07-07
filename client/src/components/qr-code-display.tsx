@@ -102,13 +102,28 @@ export function QRCodeDisplay({ paymentUrl, qrCodeUrl, merchantId }: QRCodeDispl
       )}
 
       {paymentUrl && (
-        <div className="bg-gray-50 rounded-xl p-4 mb-6">
-          <p className="text-xs text-gray-500 mb-1">Payment Link:</p>
-          <code className="text-sm text-green-800 font-mono break-all">
-            {paymentUrl}
-          </code>
+        <div className="space-y-3">
+          <div className="bg-gray-50 rounded-xl p-4">
+            <p className="text-xs text-gray-500 mb-1">Payment Link:</p>
+            <code className="text-sm text-green-800 font-mono break-all">
+              {paymentUrl}
+            </code>
+          </div>
+          
+          <Button
+            onClick={() => window.open(paymentUrl, '_blank')}
+            variant="outline"
+            size="sm"
+            className="w-full border-blue-200 text-blue-800 hover:bg-blue-50 hover:border-blue-300"
+          >
+            View Customer Payment Page
+          </Button>
         </div>
       )}
+
+      <p className="text-xs text-gray-500 mt-4">
+        Customers scan this QR code to pay
+      </p>
     </div>
   );
 }
