@@ -160,11 +160,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { email, password } = validation.data;
       
       // Check for admin credentials
-      if (email === "admin@tapt.co.nz" && password === "admin123") {
+      if (email === "oliverleonard.professional@gmail.com" && password === "TAPTpay") {
         const adminUser = {
           id: 1,
-          email: "admin@tapt.co.nz",
-          password: "admin123",
+          email: "oliverleonard.professional@gmail.com",
+          password: "TAPTpay",
           merchantId: 0,
           role: "admin" as const,
           createdAt: new Date(),
@@ -202,7 +202,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-change-in-production') as any;
       
       // For admin users, we verify directly from the token since they're not stored in the users Map
-      if (decoded.role === 'admin' && decoded.email === 'admin@tapt.co.nz') {
+      if (decoded.role === 'admin' && decoded.email === 'oliverleonard.professional@gmail.com') {
         res.json({
           user: {
             id: decoded.userId,
