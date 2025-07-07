@@ -185,6 +185,8 @@ npm start      # Runs production server
 - July 07, 2025. Created dedicated transactions page with navigation buttons from dashboard and terminal page
 - July 07, 2025. Added real-time payment status indicator above QR code section with visual status updates
 - July 07, 2025. Fixed import issues and authentication for transactions page to display all historical transaction data
+- July 07, 2025. Restored payment status indicator above QR code section with full status flow (Awaiting Payment → Processing → Payment Accepted)
+- July 07, 2025. Implemented clearTransactions functionality and removed all test transactions for clean customer payment experience
 
 ## User Preferences
 
