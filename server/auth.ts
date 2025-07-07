@@ -47,6 +47,37 @@ export function clearAllUsers() {
   console.log("All user accounts cleared except admin");
 }
 
+// Function to recreate auth users for verified merchants
+export async function syncVerifiedMerchants() {
+  try {
+    const { storage } = await import('./storage');
+    const allMerchants = await storage.getAllMerchants();
+    
+    for (const merchant of allMerchants) {
+      if (merchant.status === 'verified' && merchant.passwordHash) {
+        // Check if auth user already exists
+        const existingUser = getUserByEmail(merchant.email);
+        if (!existingUser) {
+          // Create auth user with the password hash from merchant record
+          const id = currentUserId++;
+          const user: User = {
+            id,
+            email: merchant.email,
+            password: merchant.passwordHash,
+            merchantId: merchant.id,
+            role: 'merchant',
+            createdAt: new Date(),
+          };
+          users.set(id, user);
+          console.log(`Recreated auth user for verified merchant: ${merchant.email} (ID: ${merchant.id})`);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error syncing verified merchants:', error);
+  }
+}
+
 // Force clear all users now
 clearAllUsers();
 
