@@ -458,6 +458,15 @@ export class MemStorage implements IStorage {
     return true;
   }
 
+  clearAllMerchants() {
+    this.merchants.clear();
+    this.transactions.clear();
+    this.currentMerchantId = 1;
+    this.currentTransactionId = 1;
+    this.activeTransactionCache.clear();
+    console.log("All merchants and transactions cleared from memory");
+  }
+
   private createSampleData() {
     const sampleTransactions = [
       // Recent transactions (last 3 days)
@@ -845,6 +854,6 @@ export class DatabaseStorage implements IStorage {
 }
 
 // Use database storage if available, fall back to memory storage
-export const storage: IStorage = isDatabaseConnected() 
+export const storage: IStorage & { clearAllMerchants?: () => void } = isDatabaseConnected() 
   ? new DatabaseStorage() 
   : new MemStorage();
