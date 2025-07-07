@@ -186,7 +186,11 @@ export async function sendMerchantVerificationEmail(
   merchantName: string,
   baseUrl?: string
 ): Promise<boolean> {
-  const verificationUrl = `${baseUrl || 'http://localhost:5000'}/verify-merchant?token=${token}`;
+  // Use proper domain for verification URL
+  const properBaseUrl = baseUrl || (process.env.REPLIT_DOMAINS ? 
+    `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` : 
+    'http://localhost:5000');
+  const verificationUrl = `${properBaseUrl}/verify-merchant?token=${token}`;
   
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f9fafb; padding: 20px;">

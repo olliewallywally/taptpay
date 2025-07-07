@@ -1198,7 +1198,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Send verification email using the new email service
       const { sendMerchantVerificationEmail } = await import('./email-service-multi');
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const { getBaseUrl } = await import('./url-utils');
+      const baseUrl = getBaseUrl(req);
       
       const emailSent = await sendMerchantVerificationEmail(
         merchantData.email,
