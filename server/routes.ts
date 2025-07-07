@@ -1491,6 +1491,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Clear transactions for a merchant
+  app.post("/api/merchants/:id/clear-transactions", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      const success = await storage.clearTransactions(merchantId);
+      
+      if (success) {
+        res.json({ message: "Transactions cleared successfully" });
+      } else {
+        res.status(500).json({ message: "Failed to clear transactions" });
+      }
+    } catch (error) {
+      console.error("Error clearing transactions:", error);
+      res.status(500).json({ message: "Failed to clear transactions" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
