@@ -171,6 +171,9 @@ npm start      # Runs production server
 - July 06, 2025. Fixed payment terminal SSE connection issues and slide-to-pay functionality
 - July 06, 2025. Implemented public merchant signup with email verification system
 - July 06, 2025. Added multi-provider email service (SendGrid, Gmail, SMTP fallback) for production reliability
+- July 07, 2025. Successfully switched from SendGrid to Gmail email delivery after resolving API key issues
+- July 07, 2025. Fixed signup form validation by replacing React Hook Form with plain HTML inputs to prevent input blocking
+- July 07, 2025. Changed "Store Name" field to "Full Name" in merchant signup form per user request
 
 ## User Preferences
 
