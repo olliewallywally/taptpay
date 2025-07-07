@@ -53,6 +53,9 @@ export interface IStorage {
     averageTransactionValue: number;
     transactionsByStatus: { [key: string]: number };
   }>;
+  
+  // Clear operations
+  clearTransactions(merchantId: number): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -458,6 +461,23 @@ export class MemStorage implements IStorage {
     return true;
   }
 
+  async clearTransactions(merchantId: number): Promise<boolean> {
+    // Clear all transactions for a specific merchant
+    const transactionsToDelete = Array.from(this.transactions.values()).filter(
+      t => t.merchantId === merchantId
+    );
+    
+    transactionsToDelete.forEach(transaction => {
+      this.transactions.delete(transaction.id);
+    });
+    
+    // Clear the active transaction cache for this merchant
+    this.activeTransactionCache.delete(merchantId);
+    
+    console.log(`Cleared ${transactionsToDelete.length} transactions for merchant ${merchantId}`);
+    return true;
+  }
+
   clearAllMerchants() {
     this.merchants.clear();
     this.transactions.clear();
@@ -833,6 +853,20 @@ export class DatabaseStorage implements IStorage {
       averageTransactionValue: completedTransactions.length > 0 ? totalRevenue / completedTransactions.length : 0,
       transactionsByStatus,
     };
+  }
+
+  async clearTransactions(merchantId: number): Promise<boolean> {
+    if (!this.db) throw new Error('Database not available');
+    
+    try {
+      // Delete all transactions for the merchant
+      await this.db.delete(transactions).where(eq(transactions.merchantId, merchantId));
+      console.log(`Cleared transactions for merchant ${merchantId} from database`);
+      return true;
+    } catch (error) {
+      console.error('Error clearing transactions:', error);
+      return false;
+    }
   }
 
   async deleteMerchant(id: number): Promise<boolean> {
