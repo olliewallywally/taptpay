@@ -507,7 +507,7 @@ export class MemStorage implements IStorage {
       const createdDate = new Date(Date.now() - transaction.daysAgo * 24 * 60 * 60 * 1000 - Math.random() * 12 * 60 * 60 * 1000); // Add some time variation within the day
       const newTransaction: Transaction = {
         id,
-        merchantId: 1,
+        merchantId: this.currentMerchantId,
         itemName: transaction.itemName,
         price: transaction.price,
         status: transaction.status,

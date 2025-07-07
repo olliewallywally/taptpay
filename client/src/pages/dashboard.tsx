@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { getCurrentMerchantId } from "@/lib/auth";
 import { 
   DollarSign, 
   TrendingUp, 
@@ -44,7 +45,13 @@ type RateUpdateFormData = z.infer<typeof rateUpdateSchema>;
 export default function Dashboard() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const merchantId = 1; // Using default merchant
+  const merchantId = getCurrentMerchantId();
+  
+  // Redirect to login if no merchantId
+  if (!merchantId) {
+    window.location.href = '/login';
+    return <div>Redirecting to login...</div>;
+  }
   const [isEditingRate, setIsEditingRate] = useState(false);
   const [showAllTransactions, setShowAllTransactions] = useState(false);
 

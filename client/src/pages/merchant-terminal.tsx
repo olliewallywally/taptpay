@@ -8,6 +8,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { QRCodeDisplay } from "@/components/qr-code-display";
+import { MerchantUrlDisplay } from "@/components/merchant-url-display";
 import { apiRequest } from "@/lib/queryClient";
 import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
@@ -229,6 +230,18 @@ export default function MerchantTerminal() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Merchant URL Display - Always show for reference */}
+      {merchant && (
+        <div className="max-w-4xl mx-auto px-3 sm:px-4 mt-8">
+          <MerchantUrlDisplay
+            merchantId={merchantId}
+            paymentUrl={merchant.paymentUrl}
+            qrCodeUrl={merchant.qrCodeUrl}
+            businessName={merchant.businessName || merchant.name}
+          />
+        </div>
+      )}
     </div>
   );
 }
