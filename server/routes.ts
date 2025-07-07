@@ -1075,6 +1075,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Resend verification email endpoint
+  app.post("/api/admin/resend-verification", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      // Find merchant by email
+      const merchant = await storage.getMerchantByEmail(email);
+      if (!merchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+
+      if (merchant.status !== "pending") {
+        return res.status(400).json({ message: "Merchant is already verified" });
+      }
+
+      if (!merchant.verificationToken) {
+        return res.status(400).json({ message: "No verification token found for this merchant" });
+      }
+
+      // Send verification email using the new email service
+      const { sendMerchantVerificationEmail } = await import('./email-service-multi');
+      const { getBaseUrl } = await import('./url-utils');
+      const baseUrl = getBaseUrl(req);
+      
+      const emailSent = await sendMerchantVerificationEmail(
+        merchant.email,
+        merchant.verificationToken,
+        merchant.businessName || merchant.name,
+        baseUrl
+      );
+
+      if (!emailSent) {
+        return res.status(500).json({ message: "Failed to send verification email" });
+      }
+
+      res.json({
+        message: "Verification email sent successfully",
+        merchant: {
+          id: merchant.id,
+          name: merchant.name,
+          businessName: merchant.businessName,
+          email: merchant.email,
+          status: merchant.status
+        }
+      });
+
+    } catch (error) {
+      console.error("Error resending verification email:", error);
+      res.status(500).json({ message: "Failed to resend verification email" });
+    }
+  });
+
   // Test email endpoint
   // Clear all merchants  
   app.post("/api/admin/clear-merchants", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
