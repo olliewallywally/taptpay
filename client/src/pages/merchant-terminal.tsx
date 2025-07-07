@@ -13,7 +13,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentMerchantId } from "@/lib/auth";
-import { Send } from "lucide-react";
+import { Send, Loader2, CheckCircle, Clock } from "lucide-react";
 
 const transactionFormSchema = z.object({
   itemName: z.string().min(1, "Item name is required"),
@@ -115,34 +115,48 @@ export default function MerchantTerminal() {
     createTransactionMutation.mutate(data);
   };
 
-  const getStatusDisplay = (status: string) => {
+  const getPaymentStatusIndicator = (status: string) => {
     switch (status) {
       case "pending":
         return (
-          <div className="flex items-center justify-center space-x-2 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-            <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
-            <span className="text-sm font-medium text-yellow-700">Waiting for customer</span>
+          <div className="flex flex-col items-center space-y-3 p-6 bg-gray-50 rounded-xl border-2 border-gray-200">
+            <div className="flex items-center space-x-3">
+              <Clock className="w-6 h-6 text-gray-500" />
+              <span className="text-lg font-medium text-gray-700">Awaiting Payment</span>
+            </div>
+            <p className="text-sm text-gray-500 text-center">Customer can now scan QR code to pay</p>
           </div>
         );
       case "processing":
         return (
-          <div className="flex items-center justify-center space-x-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
-            <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-            <span className="text-sm font-medium text-blue-700">Processing payment</span>
+          <div className="flex flex-col items-center space-y-3 p-6 bg-orange-50 rounded-xl border-2 border-orange-200">
+            <div className="flex items-center space-x-3">
+              <Loader2 className="w-7 h-7 text-orange-500 animate-spin" />
+              <span className="text-lg font-medium text-orange-700">Processing Payment</span>
+            </div>
+            <p className="text-sm text-orange-600 text-center">Payment is being processed...</p>
           </div>
         );
       case "completed":
         return (
-          <div className="flex items-center justify-center space-x-2 p-3 bg-green-50 rounded-lg border border-green-200">
-            <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-            <span className="text-sm font-medium text-green-700">Payment successful</span>
+          <div className="flex flex-col items-center space-y-3 p-6 bg-green-50 rounded-xl border-2 border-green-200">
+            <div className="flex items-center space-x-3">
+              <CheckCircle className="w-7 h-7 text-green-600" />
+              <span className="text-lg font-medium text-green-700">Payment Accepted</span>
+            </div>
+            <p className="text-sm text-green-600 text-center">Transaction completed successfully!</p>
           </div>
         );
       case "failed":
         return (
-          <div className="flex items-center justify-center space-x-2 p-3 bg-red-50 rounded-lg border border-red-200">
-            <div className="w-2 h-2 bg-red-400 rounded-full"></div>
-            <span className="text-sm font-medium text-red-700">Payment failed</span>
+          <div className="flex flex-col items-center space-y-3 p-6 bg-red-50 rounded-xl border-2 border-red-200">
+            <div className="flex items-center space-x-3">
+              <div className="w-7 h-7 rounded-full bg-red-500 flex items-center justify-center">
+                <span className="text-white font-bold text-sm">✕</span>
+              </div>
+              <span className="text-lg font-medium text-red-700">Payment Failed</span>
+            </div>
+            <p className="text-sm text-red-600 text-center">Please try again or contact support</p>
           </div>
         );
       default:
@@ -217,7 +231,7 @@ export default function MerchantTerminal() {
           </CardContent>
         </Card>
 
-        {/* QR Code & Status Card */}
+        {/* QR Code Card */}
         <Card className="rounded-2xl shadow-lg">
           <CardContent className="p-8">
             <QRCodeDisplay 
@@ -225,11 +239,28 @@ export default function MerchantTerminal() {
               qrCodeUrl={merchant?.qrCodeUrl}
               merchantId={merchantId}
             />
-
-            {currentTransaction && getStatusDisplay(currentTransaction.status)}
           </CardContent>
         </Card>
       </div>
+
+      {/* Payment Status Indicator - Full Width */}
+      {currentTransaction && (
+        <div className="max-w-4xl mx-auto px-3 sm:px-4 mt-6">
+          <Card className="rounded-2xl shadow-lg">
+            <CardContent className="p-6">
+              <div className="text-center mb-4">
+                <h3 className="text-xl font-bold text-gray-900 mb-1">
+                  Transaction #{currentTransaction.id}
+                </h3>
+                <p className="text-sm text-gray-600">
+                  {currentTransaction.itemName} - ${currentTransaction.price}
+                </p>
+              </div>
+              {getPaymentStatusIndicator(currentTransaction.status)}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Merchant URL Display - Always show for reference */}
       {merchant && (
