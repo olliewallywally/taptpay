@@ -11,6 +11,7 @@ import { QRCodeDisplay } from "@/components/qr-code-display";
 import { apiRequest } from "@/lib/queryClient";
 import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
+import { getCurrentMerchantId } from "@/lib/auth";
 import { Send } from "lucide-react";
 
 const transactionFormSchema = z.object({
@@ -24,7 +25,13 @@ export default function MerchantTerminal() {
   const [currentTransaction, setCurrentTransaction] = useState<any>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const merchantId = 1; // Using default merchant
+  const merchantId = getCurrentMerchantId();
+
+  // Redirect to login if no merchantId
+  if (!merchantId) {
+    window.location.href = '/login';
+    return <div>Redirecting to login...</div>;
+  }
 
   const form = useForm<TransactionFormData>({
     resolver: zodResolver(transactionFormSchema),
