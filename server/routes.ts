@@ -1076,6 +1076,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Test email endpoint
+  // Fix missing user accounts for verified merchants (temporary utility)
+  app.post("/api/admin/fix-merchant-accounts", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchants = await storage.getAllMerchants();
+      const verifiedMerchants = merchants.filter(m => m.status === 'verified' && m.passwordHash);
+      const fixedAccounts = [];
+
+      for (const merchant of verifiedMerchants) {
+        try {
+          // Try to create user account - this will fail if user already exists
+          const tempPassword = 'temp123'; // They'll need to reset password
+          await createUser(merchant.email, tempPassword, merchant.id, 'merchant');
+          fixedAccounts.push(merchant.email);
+          console.log(`Created user account for verified merchant: ${merchant.email}`);
+        } catch (error) {
+          // User probably already exists, skip
+          console.log(`User account already exists for: ${merchant.email}`);
+        }
+      }
+
+      res.json({ 
+        message: `Fixed ${fixedAccounts.length} merchant accounts`,
+        fixedAccounts,
+        totalVerified: verifiedMerchants.length
+      });
+    } catch (error) {
+      console.error("Error fixing merchant accounts:", error);
+      res.status(500).json({ message: "Failed to fix merchant accounts" });
+    }
+  });
+
   app.post("/api/admin/test-email", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       const testEmail = await sendEmail({
@@ -1295,6 +1326,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const verifiedMerchant = await storage.verifyMerchant(token, passwordHash);
       if (!verifiedMerchant) {
         return res.status(500).json({ message: "Failed to verify merchant" });
+      }
+
+      // Create user account for the verified merchant
+      try {
+        await createUser(verifiedMerchant.email, password, verifiedMerchant.id, 'merchant');
+        console.log("User account created successfully for merchant:", verifiedMerchant.email);
+      } catch (error) {
+        console.error("Error creating user account:", error);
+        // Don't fail verification if user creation fails, but log it
       }
 
       res.json({ 
