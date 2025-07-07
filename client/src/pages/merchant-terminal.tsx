@@ -13,7 +13,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentMerchantId } from "@/lib/auth";
-import { Send, Loader2, CheckCircle, Clock } from "lucide-react";
+import { Send, Loader2, CheckCircle, Clock, XCircle, Eye } from "lucide-react";
+import { Link } from "wouter";
 
 const transactionFormSchema = z.object({
   itemName: z.string().min(1, "Item name is required"),
