@@ -37,7 +37,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-change-in-production') as any;
       
       // For admin users, we verify directly from the token
-      if (decoded.role === 'admin' && decoded.email === 'admin@tapt.co.nz') {
+      if (decoded.role === 'admin' && decoded.email === 'oliverleonard.professional@gmail.com') {
         req.user = {
           id: decoded.userId,
           email: decoded.email,
@@ -1076,34 +1076,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Test email endpoint
-  // Fix missing user accounts for verified merchants (temporary utility)
-  app.post("/api/admin/fix-merchant-accounts", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+  // Clear all merchants  
+  app.post("/api/admin/clear-merchants", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {
-      const merchants = await storage.getAllMerchants();
-      const verifiedMerchants = merchants.filter(m => m.status === 'verified' && m.passwordHash);
-      const fixedAccounts = [];
-
-      for (const merchant of verifiedMerchants) {
-        try {
-          // Try to create user account - this will fail if user already exists
-          const tempPassword = 'temp123'; // They'll need to reset password
-          await createUser(merchant.email, tempPassword, merchant.id, 'merchant');
-          fixedAccounts.push(merchant.email);
-          console.log(`Created user account for verified merchant: ${merchant.email}`);
-        } catch (error) {
-          // User probably already exists, skip
-          console.log(`User account already exists for: ${merchant.email}`);
-        }
+      const merchantsBefore = await storage.getAllMerchants();
+      
+      // Clear all merchants  
+      for (const merchant of merchantsBefore) {
+        await storage.deleteMerchant(merchant.id);
       }
 
       res.json({ 
-        message: `Fixed ${fixedAccounts.length} merchant accounts`,
-        fixedAccounts,
-        totalVerified: verifiedMerchants.length
+        message: `Cleared ${merchantsBefore.length} merchants successfully`,
+        deletedMerchants: merchantsBefore.length
       });
     } catch (error) {
-      console.error("Error fixing merchant accounts:", error);
-      res.status(500).json({ message: "Failed to fix merchant accounts" });
+      console.error("Error clearing merchants:", error);
+      res.status(500).json({ message: "Failed to clear merchants" });
     }
   });
 

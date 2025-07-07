@@ -36,6 +36,17 @@ users.set(1, {
 
 currentUserId = 2;
 
+export function clearAllUsers() {
+  // Clear all users except admin
+  const adminUser = users.get(1);
+  users.clear();
+  if (adminUser) {
+    users.set(1, adminUser);
+  }
+  currentUserId = 2;
+  console.log("All user accounts cleared except admin");
+}
+
 export const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
 export async function authenticateUser(email: string, password: string): Promise<User | null> {
