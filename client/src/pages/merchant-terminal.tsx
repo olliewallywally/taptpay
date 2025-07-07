@@ -271,6 +271,18 @@ export default function MerchantTerminal() {
           />
         </div>
       )}
+
+      {/* Transactions Button - Bottom of page */}
+      <div className="max-w-4xl mx-auto px-3 sm:px-4 mt-8 mb-8">
+        <div className="flex justify-center">
+          <Link href="/transactions">
+            <Button variant="outline" className="flex items-center gap-2 px-6 py-3">
+              <Eye className="h-5 w-5" />
+              View All Transactions
+            </Button>
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }

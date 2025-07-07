@@ -30,6 +30,7 @@ import {
   FileSpreadsheet
 } from "lucide-react";
 import { format } from "date-fns";
+import { Link } from "wouter";
 
 const rateUpdateSchema = z.object({
   currentProviderRate: z.string()
@@ -521,11 +522,19 @@ export default function Dashboard() {
 
       {/* Transaction History */}
       <Card className="mb-8">
-        <CardHeader>
-          <CardTitle className="text-lg">Transaction History</CardTitle>
-          <CardDescription>
-            View all your recent payment transactions
-          </CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-lg">Transaction History</CardTitle>
+            <CardDescription>
+              View all your recent payment transactions
+            </CardDescription>
+          </div>
+          <Link href="/transactions">
+            <Button variant="outline" className="flex items-center gap-2">
+              <Eye className="h-4 w-4" />
+              View All
+            </Button>
+          </Link>
         </CardHeader>
         <CardContent>
           {transactionsLoading ? (
