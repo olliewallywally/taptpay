@@ -1,4 +1,4 @@
-import { merchants, transactions, platformFees, type Merchant, type Transaction, type PlatformFee, type InsertMerchant, type InsertTransaction, type InsertPlatformFee, type CreateMerchant } from "@shared/schema";
+import { merchants, transactions, merchantSettlements, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant } from "@shared/schema";
 import { getDb, isDatabaseConnected } from "./database";
 import { eq, desc, and } from "drizzle-orm";
 
@@ -27,11 +27,8 @@ export interface IStorage {
   updateTransactionStatus(id: number, status: string, windcaveTransactionId?: string): Promise<Transaction | undefined>;
   getTransactionsByMerchant(merchantId: number): Promise<Transaction[]>;
   
-  // Platform fee operations
-  createPlatformFee(platformFee: InsertPlatformFee): Promise<PlatformFee>;
-  getPlatformFeesByMerchant(merchantId: number): Promise<PlatformFee[]>;
-  updatePlatformFeeStatus(id: number, status: string): Promise<PlatformFee | undefined>;
-  getTotalPlatformFees(): Promise<{ totalFees: number; totalTransactions: number }>;
+  // Platform revenue operations (Marketplace Model)
+  getTotalPlatformRevenue(): Promise<{ totalFees: number; totalTransactions: number }>;
   
   // Analytics operations
   getMerchantAnalytics(merchantId: number): Promise<{
@@ -68,19 +65,15 @@ export interface IStorage {
 export class MemStorage implements IStorage {
   private merchants: Map<number, Merchant>;
   private transactions: Map<number, Transaction>;
-  private platformFees: Map<number, PlatformFee>;
   private currentMerchantId: number;
   private currentTransactionId: number;
-  private currentPlatformFeeId: number;
   private activeTransactionCache: Map<number, Transaction | null>; // Cache for active transactions by merchant
 
   constructor() {
     this.merchants = new Map();
     this.transactions = new Map();
-    this.platformFees = new Map();
     this.currentMerchantId = 1;
     this.currentTransactionId = 1;
-    this.currentPlatformFeeId = 1;
     this.activeTransactionCache = new Map();
   }
 
@@ -254,17 +247,23 @@ export class MemStorage implements IStorage {
   async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
     const id = this.currentTransactionId++;
     const transactionAmount = parseFloat(insertTransaction.price);
-    const windcaveFee = 0.20; // Fixed $0.20 fee
-    const platformFee = 0.05; // Fixed $0.05 fee
-    const merchantNet = transactionAmount - windcaveFee - platformFee;
+    
+    // Marketplace Model: Calculate percentage-based fees
+    const windcaveFeeRate = 0.029; // 2.9% typical Windcave rate
+    const platformFeeRate = 0.005; // 0.5% platform fee
+    const windcaveFeeAmount = Math.round(transactionAmount * windcaveFeeRate * 100) / 100;
+    const platformFeeAmount = Math.round(transactionAmount * platformFeeRate * 100) / 100;
+    const merchantNet = Math.round((transactionAmount - windcaveFeeAmount - platformFeeAmount) * 100) / 100;
 
     const transaction: Transaction = {
       ...insertTransaction,
       id,
       createdAt: new Date(),
       windcaveTransactionId: null,
-      windcaveFee: windcaveFee.toString(),
-      platformFee: platformFee.toString(),
+      windcaveFeeRate: windcaveFeeRate.toString(),
+      windcaveFeeAmount: windcaveFeeAmount.toString(),
+      platformFeeRate: platformFeeRate.toString(),
+      platformFeeAmount: platformFeeAmount.toString(),
       merchantNet: merchantNet.toString(),
     };
     this.transactions.set(id, transaction);
@@ -308,10 +307,15 @@ export class MemStorage implements IStorage {
     return updatedFee;
   }
 
-  async getTotalPlatformFees(): Promise<{ totalFees: number; totalTransactions: number }> {
-    const fees = Array.from(this.platformFees.values());
-    const totalFees = fees.reduce((sum, fee) => sum + parseFloat(fee.feeAmount), 0);
-    const totalTransactions = fees.length;
+  async getTotalPlatformRevenue(): Promise<{ totalFees: number; totalTransactions: number }> {
+    const completedTransactions = Array.from(this.transactions.values())
+      .filter(transaction => transaction.status === "completed");
+    
+    const totalFees = completedTransactions
+      .reduce((sum, transaction) => sum + parseFloat(transaction.platformFeeAmount || "0"), 0);
+    
+    const totalTransactions = completedTransactions.length;
+    
     return { totalFees, totalTransactions };
   }
 
@@ -778,14 +782,20 @@ export class DatabaseStorage implements IStorage {
   async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
     if (!this.db) throw new Error('Database not available');
     const transactionAmount = parseFloat(insertTransaction.price);
-    const windcaveFee = 0.20; // Fixed $0.20 fee
-    const platformFee = 0.05; // Fixed $0.05 fee
-    const merchantNet = transactionAmount - windcaveFee - platformFee;
+    
+    // Marketplace Model: Calculate percentage-based fees
+    const windcaveFeeRate = 0.029; // 2.9% typical Windcave rate
+    const platformFeeRate = 0.005; // 0.5% platform fee
+    const windcaveFeeAmount = Math.round(transactionAmount * windcaveFeeRate * 100) / 100;
+    const platformFeeAmount = Math.round(transactionAmount * platformFeeRate * 100) / 100;
+    const merchantNet = Math.round((transactionAmount - windcaveFeeAmount - platformFeeAmount) * 100) / 100;
 
     const transactionWithFees = {
       ...insertTransaction,
-      windcaveFee: windcaveFee.toString(),
-      platformFee: platformFee.toString(),
+      windcaveFeeRate: windcaveFeeRate.toString(),
+      windcaveFeeAmount: windcaveFeeAmount.toString(),
+      platformFeeRate: platformFeeRate.toString(),
+      platformFeeAmount: platformFeeAmount.toString(),
       merchantNet: merchantNet.toString(),
     };
 
@@ -1003,11 +1013,16 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async getTotalPlatformFees(): Promise<{ totalFees: number; totalTransactions: number }> {
+  async getTotalPlatformRevenue(): Promise<{ totalFees: number; totalTransactions: number }> {
     if (!this.db) throw new Error('Database not available');
-    const result = await this.db.select().from(platformFees);
-    const totalFees = result.reduce((sum, fee) => sum + parseFloat(fee.feeAmount), 0);
-    const totalTransactions = result.length;
+    const result = await this.db.select().from(transactions);
+    const completedTransactions = result.filter(t => t.status === "completed");
+    
+    const totalFees = completedTransactions
+      .reduce((sum, transaction) => sum + parseFloat(transaction.platformFeeAmount || "0"), 0);
+    
+    const totalTransactions = completedTransactions.length;
+    
     return { totalFees, totalTransactions };
   }
 }

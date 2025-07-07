@@ -58,23 +58,27 @@ export const transactions = pgTable("transactions", {
   status: text("status").notNull().default("pending"), // pending, processing, completed, failed
   windcaveTransactionId: text("windcave_transaction_id"),
   
-  // Fee tracking
-  windcaveFee: decimal("windcave_fee", { precision: 10, scale: 2 }).default("0.20"), // Fixed $0.20 fee
-  platformFee: decimal("platform_fee", { precision: 10, scale: 2 }).default("0.05"), // Fixed $0.05 fee
-  merchantNet: decimal("merchant_net", { precision: 10, scale: 2 }), // Amount merchant receives (price - windcave_fee - platform_fee)
+  // Fee tracking (Marketplace Model)
+  windcaveFeeRate: decimal("windcave_fee_rate", { precision: 5, scale: 4 }).default("0.0290"), // 2.9% typical Windcave rate
+  windcaveFeeAmount: decimal("windcave_fee_amount", { precision: 10, scale: 2 }), // Calculated Windcave fee
+  platformFeeRate: decimal("platform_fee_rate", { precision: 5, scale: 4 }).default("0.0050"), // 0.5% platform fee
+  platformFeeAmount: decimal("platform_fee_amount", { precision: 10, scale: 2 }), // Calculated platform fee
+  merchantNet: decimal("merchant_net", { precision: 10, scale: 2 }), // Amount to settle to merchant
   
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Platform fees collection table - tracks all fees collected
-export const platformFees = pgTable("platform_fees", {
+// Platform settlements - tracks money owed to merchants (Marketplace Model)
+export const merchantSettlements = pgTable("merchant_settlements", {
   id: serial("id").primaryKey(),
-  transactionId: serial("transaction_id").references(() => transactions.id),
   merchantId: serial("merchant_id").references(() => merchants.id),
-  feeAmount: decimal("fee_amount", { precision: 10, scale: 2 }).notNull(), // $0.05 per transaction
-  transactionAmount: decimal("transaction_amount", { precision: 10, scale: 2 }).notNull(), // Original transaction amount
-  status: text("status").notNull().default("pending"), // pending, collected, failed
-  collectedAt: timestamp("collected_at"),
+  settlementPeriod: text("settlement_period").notNull(), // e.g., "2025-01-01"
+  totalTransactionAmount: decimal("total_transaction_amount", { precision: 10, scale: 2 }).notNull(),
+  totalWindcaveFees: decimal("total_windcave_fees", { precision: 10, scale: 2 }).notNull(),
+  totalPlatformFees: decimal("total_platform_fees", { precision: 10, scale: 2 }).notNull(),
+  netSettlementAmount: decimal("net_settlement_amount", { precision: 10, scale: 2 }).notNull(),
+  status: text("status").notNull().default("pending"), // pending, processing, completed, failed
+  settlementDate: timestamp("settlement_date"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
