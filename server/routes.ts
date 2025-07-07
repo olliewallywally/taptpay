@@ -773,27 +773,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin Analytics endpoint
-  app.get("/api/admin/analytics", async (req, res) => {
+  app.get("/api/admin/analytics", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {
-      const authHeader = req.headers['authorization'];
-      const token = authHeader && authHeader.split(' ')[1];
-
-      if (!token) {
-        return res.status(401).json({ message: 'Access token required' });
-      }
-
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-change-in-production') as any;
-      
-      if (decoded.role !== 'admin' || decoded.email !== 'admin@tapt.co.nz') {
-        return res.status(403).json({ message: "Admin access required" });
-      }
-
-      // Get all merchants and calculate overall statistics
-      const merchants = [
-        { id: 1, name: "merchant1", businessName: "Coffee Corner", status: "active" },
-        { id: 2, name: "merchant2", businessName: "Tech Store", status: "active" },
-        { id: 3, name: "merchant3", businessName: "Bakery Express", status: "inactive" }
-      ];
+      // Get all merchants from storage
+      const merchants = await storage.getAllMerchants();
 
       let totalRevenue = 0;
       let totalTransactions = 0;
