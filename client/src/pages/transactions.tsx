@@ -21,12 +21,26 @@ export default function TransactionsPage() {
   const [merchantId, setMerchantId] = useState<number | null>(null);
 
   useEffect(() => {
-    // Get user info from localStorage
-    const userData = localStorage.getItem("userData");
-    if (userData) {
-      const user = JSON.parse(userData);
-      setMerchantId(user.merchantId);
-    }
+    // Get merchantId using the same method as other pages
+    const getMerchantId = async () => {
+      try {
+        const token = localStorage.getItem("authToken");
+        if (!token) return;
+
+        const response = await fetch("/api/auth/me", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        
+        if (response.ok) {
+          const userData = await response.json();
+          setMerchantId(userData.merchantId);
+        }
+      } catch (error) {
+        console.error("Failed to get merchant ID:", error);
+      }
+    };
+
+    getMerchantId();
   }, []);
 
   const { data: transactions = [], isLoading } = useQuery({
@@ -158,7 +172,7 @@ export default function TransactionsPage() {
                 </div>
 
                 {/* Transactions */}
-                {transactions.map((transaction: Transaction) => (
+                {transactions.slice().reverse().map((transaction: Transaction) => (
                   <div 
                     key={transaction.id}
                     className="grid grid-cols-1 md:grid-cols-6 gap-4 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
