@@ -37,6 +37,18 @@ export default function Login() {
     },
   });
 
+  // Simple signup form state
+  const [signupData, setSignupData] = useState({
+    name: "",
+    businessName: "",
+    businessType: "",
+    email: "",
+    phone: "",
+    address: "",
+    password: "",
+    confirmPassword: "",
+  });
+
   const signupForm = useForm<CreateMerchant>({
     resolver: zodResolver(createMerchantSchema),
     mode: "onSubmit",
@@ -152,183 +164,109 @@ export default function Login() {
             </Button>
           </div>
 
-          {/* Signup Form */}
-          <Form {...signupForm}>
-            <form onSubmit={signupForm.handleSubmit(onSignupSubmit)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={signupForm.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm font-medium text-gray-700">
-                        Store Name
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="My Store"
-                          className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={signupForm.control}
-                  name="businessName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm font-medium text-gray-700">
-                        Business Name
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="My Business Ltd"
-                          className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={signupForm.control}
-                name="businessType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-medium text-gray-700">
-                      Business Type
-                    </FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent">
-                          <SelectValue placeholder="Select business type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="retail">Retail</SelectItem>
-                        <SelectItem value="restaurant">Restaurant</SelectItem>
-                        <SelectItem value="cafe">Cafe</SelectItem>
-                        <SelectItem value="service">Service</SelectItem>
-                        <SelectItem value="online">Online</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
+          {/* Simple Signup Form */}
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            onSignupSubmit(signupData);
+          }} className="space-y-4">
+            
+            {/* Store Name */}
+            <div>
+              <Label className="text-sm font-medium text-gray-700">Store Name</Label>
+              <Input
+                placeholder="My Store"
+                value={signupData.name}
+                onChange={(e) => setSignupData(prev => ({...prev, name: e.target.value}))}
+                className="mt-1 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
               />
+            </div>
 
-              <FormField
-                control={signupForm.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-medium text-gray-700">
-                      Email Address
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        type="email"
-                        placeholder="you@business.com"
-                        className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+            {/* Business Name */}
+            <div>
+              <Label className="text-sm font-medium text-gray-700">Business Name</Label>
+              <Input
+                placeholder="My Business Ltd"
+                value={signupData.businessName}
+                onChange={(e) => setSignupData(prev => ({...prev, businessName: e.target.value}))}
+                className="mt-1 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
               />
+            </div>
 
-              <FormField
-                control={signupForm.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-medium text-gray-700">
-                      Phone Number
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="+64 21 123 456"
-                        className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+            {/* Business Type */}
+            <div>
+              <Label className="text-sm font-medium text-gray-700">Business Type</Label>
+              <select
+                value={signupData.businessType}
+                onChange={(e) => setSignupData(prev => ({...prev, businessType: e.target.value}))}
+                className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
+              >
+                <option value="">Select business type</option>
+                <option value="retail">Retail</option>
+                <option value="restaurant">Restaurant</option>
+                <option value="cafe">Cafe</option>
+                <option value="service">Service</option>
+                <option value="online">Online</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            {/* Email */}
+            <div>
+              <Label className="text-sm font-medium text-gray-700">Email Address</Label>
+              <Input
+                type="email"
+                placeholder="you@business.com"
+                value={signupData.email}
+                onChange={(e) => setSignupData(prev => ({...prev, email: e.target.value}))}
+                className="mt-1 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
               />
+            </div>
 
-              <FormField
-                control={signupForm.control}
-                name="address"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-medium text-gray-700">
-                      Business Address
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="123 Queen St, Auckland"
-                        className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+            {/* Phone */}
+            <div>
+              <Label className="text-sm font-medium text-gray-700">Phone Number</Label>
+              <Input
+                placeholder="+64 21 123 456"
+                value={signupData.phone}
+                onChange={(e) => setSignupData(prev => ({...prev, phone: e.target.value}))}
+                className="mt-1 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
               />
+            </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={signupForm.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm font-medium text-gray-700">
-                        Password
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          type="password"
-                          placeholder="••••••••"
-                          className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={signupForm.control}
-                  name="confirmPassword"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm font-medium text-gray-700">
-                        Confirm Password
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          type="password"
-                          placeholder="••••••••"
-                          className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+            {/* Address */}
+            <div>
+              <Label className="text-sm font-medium text-gray-700">Business Address</Label>
+              <Input
+                placeholder="123 Queen St, Auckland"
+                value={signupData.address}
+                onChange={(e) => setSignupData(prev => ({...prev, address: e.target.value}))}
+                className="mt-1 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
+              />
+            </div>
+
+            {/* Password Fields */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium text-gray-700">Password</Label>
+                <Input
+                  type="password"
+                  placeholder="••••••••"
+                  value={signupData.password}
+                  onChange={(e) => setSignupData(prev => ({...prev, password: e.target.value}))}
+                  className="mt-1 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
                 />
               </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-700">Confirm Password</Label>
+                <Input
+                  type="password"
+                  placeholder="••••••••"
+                  value={signupData.confirmPassword}
+                  onChange={(e) => setSignupData(prev => ({...prev, confirmPassword: e.target.value}))}
+                  className="mt-1 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
+                />
+              </div>
+            </div>
 
               <Button
                 type="submit"
@@ -345,7 +283,6 @@ export default function Login() {
                 )}
               </Button>
             </form>
-          </Form>
 
           {/* Footer */}
           <div className="mt-6 text-center">
