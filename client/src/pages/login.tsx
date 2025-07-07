@@ -170,11 +170,11 @@ export default function Login() {
             onSignupSubmit(signupData);
           }} className="space-y-4">
             
-            {/* Store Name */}
+            {/* Full Name */}
             <div>
-              <Label className="text-sm font-medium text-gray-700">Store Name</Label>
+              <Label className="text-sm font-medium text-gray-700">Full Name</Label>
               <Input
-                placeholder="My Store"
+                placeholder="John Smith"
                 value={signupData.name}
                 onChange={(e) => setSignupData(prev => ({...prev, name: e.target.value}))}
                 className="mt-1 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
