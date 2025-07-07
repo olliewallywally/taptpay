@@ -1156,6 +1156,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Debug route to sync verified merchants
+  app.post("/api/debug/sync-merchants", async (req, res) => {
+    try {
+      const { syncVerifiedMerchants } = await import('./auth');
+      await syncVerifiedMerchants();
+      res.json({ success: true, message: "Verified merchants synced successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Debug route to check auth users
+  app.get("/api/debug/auth-users", async (req, res) => {
+    try {
+      const { getUserByEmail } = await import('./auth');
+      const user = getUserByEmail('oliverharryleonard@gmail.com');
+      if (user) {
+        res.json({ 
+          found: true, 
+          user: { 
+            id: user.id, 
+            email: user.email, 
+            merchantId: user.merchantId, 
+            role: user.role,
+            hasPassword: !!user.password 
+          } 
+        });
+      } else {
+        res.json({ found: false });
+      }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Debug route to test password
+  app.post("/api/debug/test-password", async (req, res) => {
+    try {
+      const bcrypt = await import('bcrypt');
+      const { hash, password } = req.body;
+      const isValid = await bcrypt.compare(password, hash);
+      res.json({ isValid, hash: hash.substring(0, 20) + "...", password });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Debug route to fix missing auth user
+  app.post("/api/debug/fix-auth-user", async (req, res) => {
+    try {
+      // Get the verified merchant
+      const merchant = await storage.getMerchant(22);
+      if (!merchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+
+      // Create auth user with default password
+      try {
+        const user = await createUser(merchant.email, "123456", merchant.id, 'merchant');
+        res.json({ 
+          success: true, 
+          message: `Auth user created for ${merchant.email}`,
+          user: { id: user.id, email: user.email, merchantId: user.merchantId }
+        });
+      } catch (error: any) {
+        if (error.message.includes("already exists")) {
+          res.json({ success: true, message: "Auth user already exists" });
+        } else {
+          throw error;
+        }
+      }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Public merchant verification endpoint
   app.post("/api/merchants/verify", async (req, res) => {
     try {
