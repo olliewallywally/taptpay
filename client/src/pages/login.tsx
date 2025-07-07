@@ -39,17 +39,7 @@ export default function Login() {
 
   const signupForm = useForm<CreateMerchant>({
     resolver: zodResolver(createMerchantSchema),
-    mode: "onChange",
-    defaultValues: {
-      name: "",
-      businessName: "",
-      businessType: "",
-      email: "",
-      phone: "",
-      address: "",
-      password: "",
-      confirmPassword: "",
-    },
+    mode: "onSubmit",
   });
 
 
@@ -178,11 +168,7 @@ export default function Login() {
                         <Input
                           placeholder="My Store"
                           className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
-                          value={field.value || ""}
-                          onChange={field.onChange}
-                          onBlur={field.onBlur}
-                          name={field.name}
-                          ref={field.ref}
+                          {...field}
                         />
                       </FormControl>
                       <FormMessage />
@@ -202,11 +188,7 @@ export default function Login() {
                         <Input
                           placeholder="My Business Ltd"
                           className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
-                          value={field.value || ""}
-                          onChange={field.onChange}
-                          onBlur={field.onBlur}
-                          name={field.name}
-                          ref={field.ref}
+                          {...field}
                         />
                       </FormControl>
                       <FormMessage />
@@ -256,11 +238,7 @@ export default function Login() {
                         type="email"
                         placeholder="you@business.com"
                         className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
-                        value={field.value || ""}
-                        onChange={field.onChange}
-                        onBlur={field.onBlur}
-                        name={field.name}
-                        ref={field.ref}
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
@@ -280,11 +258,7 @@ export default function Login() {
                       <Input
                         placeholder="+64 21 123 456"
                         className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
-                        value={field.value || ""}
-                        onChange={field.onChange}
-                        onBlur={field.onBlur}
-                        name={field.name}
-                        ref={field.ref}
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
@@ -304,11 +278,7 @@ export default function Login() {
                       <Input
                         placeholder="123 Queen St, Auckland"
                         className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
-                        value={field.value || ""}
-                        onChange={field.onChange}
-                        onBlur={field.onBlur}
-                        name={field.name}
-                        ref={field.ref}
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
@@ -330,11 +300,7 @@ export default function Login() {
                           type="password"
                           placeholder="••••••••"
                           className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
-                          value={field.value || ""}
-                          onChange={field.onChange}
-                          onBlur={field.onBlur}
-                          name={field.name}
-                          ref={field.ref}
+                          {...field}
                         />
                       </FormControl>
                       <FormMessage />
@@ -355,11 +321,7 @@ export default function Login() {
                           type="password"
                           placeholder="••••••••"
                           className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
-                          value={field.value || ""}
-                          onChange={field.onChange}
-                          onBlur={field.onBlur}
-                          name={field.name}
-                          ref={field.ref}
+                          {...field}
                         />
                       </FormControl>
                       <FormMessage />
