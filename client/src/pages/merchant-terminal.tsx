@@ -248,32 +248,26 @@ export default function MerchantTerminal() {
           </Card>
         ) : null}
 
-        {/* QR Code Section */}
-        {currentTransaction ? (
-          <Card className="rounded-2xl shadow-lg">
-            <CardContent className="p-8">
-              <QRCodeDisplay 
-                paymentUrl={merchant?.paymentUrl}
-                qrCodeUrl={merchant?.qrCodeUrl}
-                merchantId={merchantId}
-              />
-            </CardContent>
-          </Card>
-        ) : (
-          /* QR Code Card - When no transaction */
-          <Card className="rounded-2xl shadow-lg">
-            <CardContent className="p-8">
-              <div className="text-center py-12">
-                <h3 className="text-xl font-semibold text-gray-700 mb-4">
-                  Ready for Transactions
-                </h3>
-                <p className="text-gray-500">
-                  Create a transaction to generate a QR code for customer payment
+        {/* QR Code Section - ALWAYS VISIBLE (static per merchant) */}
+        <Card className="rounded-2xl shadow-lg">
+          <CardContent className="p-8">
+            <QRCodeDisplay 
+              paymentUrl={merchant?.paymentUrl}
+              qrCodeUrl={merchant?.qrCodeUrl}
+              merchantId={merchantId}
+            />
+            {!currentTransaction && (
+              <div className="mt-6 text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <p className="text-sm text-blue-700 dark:text-blue-300 font-medium">
+                  🏪 Static QR Code - Ready for Print
+                </p>
+                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                  This QR code never changes. Print it and display in your shop!
                 </p>
               </div>
-            </CardContent>
-          </Card>
-        )}
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Merchant URL Display - Always show for reference */}
