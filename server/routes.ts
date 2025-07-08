@@ -233,9 +233,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const size = Math.min(parseInt(req.query.size as string) || 400, 1000);
       const isDownload = req.query.download === 'true';
 
-      // Set response headers for PNG image
+      // Set response headers for PNG image - STATIC QR per merchant
       res.setHeader('Content-Type', 'image/png');
-      res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+      res.setHeader('Cache-Control', 'public, max-age=2592000'); // Cache for 30 days - QR never changes per merchant
+      res.setHeader('ETag', `"merchant-qr-${merchantId}"`); // Static ETag per merchant
       
       if (isDownload) {
         res.setHeader('Content-Disposition', `attachment; filename="tapt-payment-qr-merchant-${merchantId}.png"`);
@@ -292,10 +293,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const merchantId = parseInt(req.params.id);
       
-      // Set aggressive caching headers for better performance
+      // Faster response - no caching headers that slow down queries
       res.set({
-        'Cache-Control': 'max-age=10, s-maxage=10', // Cache for 10 seconds
-        'ETag': `"merchant-${merchantId}-${Date.now()}"`,
+        'Cache-Control': 'no-cache', // Always get fresh data for real-time updates
       });
       
       const transaction = await storage.getActiveTransactionByMerchant(merchantId);

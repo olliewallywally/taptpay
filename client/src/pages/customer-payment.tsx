@@ -41,7 +41,7 @@ export default function CustomerPayment() {
     );
   }
 
-  // Get active transaction - override global query settings for public endpoint
+  // Get active transaction - optimized for speed
   const { data: activeTransaction, isLoading, error } = useQuery({
     queryKey: ["/api/merchants", id, "active-transaction"],
     queryFn: async () => {
@@ -51,11 +51,11 @@ export default function CustomerPayment() {
       }
       return response.json();
     },
-    staleTime: 5000,
-    gcTime: 60000,
-    refetchInterval: 5000,
+    staleTime: 1000, // Cache for 1 second only - real-time updates are important
+    gcTime: 30000,   // Reduce garbage collection time 
+    refetchInterval: 3000, // Check every 3 seconds instead of 5
     refetchOnWindowFocus: true,
-    retry: 3,
+    retry: 2, // Reduce retries for faster failure
   });
 
   console.log("Customer payment debug:", { 

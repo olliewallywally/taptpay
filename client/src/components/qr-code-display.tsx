@@ -56,7 +56,7 @@ export function QRCodeDisplay({ paymentUrl, qrCodeUrl, merchantId }: QRCodeDispl
   };
   return (
     <div className="text-center">
-      <h3 className="text-xl font-bold text-gray-900 mb-4">Customer Payment QR</h3>
+      <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Customer Payment QR</h3>
       
       <div className="bg-gray-50 rounded-2xl p-8 mb-6">
         {actualQrCodeUrl ? (
