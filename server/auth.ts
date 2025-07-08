@@ -78,8 +78,8 @@ export async function syncVerifiedMerchants() {
   }
 }
 
-// Force clear all users now
-clearAllUsers();
+// Initialize auth system by syncing verified merchants
+syncVerifiedMerchants();
 
 export const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
@@ -102,7 +102,7 @@ export function generateToken(user: User): string {
       role: user.role 
     },
     JWT_SECRET,
-    { expiresIn: '24h' }
+    { expiresIn: '1h' } // 1 hour as requested
   );
 }
 
@@ -114,7 +114,7 @@ export function verifyToken(token: string): any {
   }
 }
 
-export function authenticateToken(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+export async function authenticateToken(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
@@ -127,7 +127,27 @@ export function authenticateToken(req: AuthenticatedRequest, res: Response, next
     return res.status(403).json({ message: 'Invalid or expired token' });
   }
 
-  const user = users.get(decoded.userId);
+  // Handle admin users (not stored in users Map)
+  if (decoded.role === 'admin') {
+    req.user = {
+      id: decoded.userId,
+      email: decoded.email,
+      password: '', // Admin doesn't need password stored
+      merchantId: decoded.merchantId,
+      role: decoded.role,
+      createdAt: new Date(),
+    };
+    return next();
+  }
+
+  // For regular users, check if user exists, if not try to recreate from merchant data
+  let user = users.get(decoded.userId);
+  if (!user && decoded.merchantId) {
+    // Try to recreate user from merchant data
+    console.log(`Recreating user session for merchant ${decoded.merchantId}`);
+    await syncVerifiedMerchants();
+    user = users.get(decoded.userId);
+  }
   if (!user) {
     return res.status(404).json({ message: 'User not found' });
   }

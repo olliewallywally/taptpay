@@ -30,15 +30,39 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("authToken");
-    if (!token) {
+    const checkAuthStatus = async () => {
+      const token = localStorage.getItem("authToken");
+      if (!token) {
+        setIsChecking(false);
+        setLocation("/");
+        return;
+      }
+      
+      try {
+        // Verify token with server to check if it's still valid
+        const response = await fetch('/api/auth/me', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        
+        if (response.ok) {
+          setIsAuthenticated(true);
+        } else {
+          // Token is invalid, remove it and redirect to login
+          localStorage.removeItem("authToken");
+          setLocation("/");
+        }
+      } catch (error) {
+        // Network error or server down, keep token for now
+        console.log('Auth check failed, keeping existing token');
+        setIsAuthenticated(true);
+      }
+      
       setIsChecking(false);
-      setLocation("/");
-      return;
-    }
-    
-    setIsAuthenticated(true);
-    setIsChecking(false);
+    };
+
+    checkAuthStatus();
   }, [setLocation]);
 
   if (isChecking) {

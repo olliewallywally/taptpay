@@ -190,6 +190,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Regular user authentication check
+  app.get("/api/auth/me", authenticateToken, (req: AuthenticatedRequest, res) => {
+    res.json({
+      user: {
+        id: req.user!.id,
+        email: req.user!.email,
+        merchantId: req.user!.merchantId,
+        role: req.user!.role,
+      },
+    });
+  });
+
   app.get("/api/admin/auth/me", (req: AuthenticatedRequest, res) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
