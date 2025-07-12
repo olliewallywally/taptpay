@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { QrCode, LogOut, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,19 +9,50 @@ export function Navigation() {
   const [location, setLocation] = useLocation();
   const [user, setUser] = useState<any>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isMenuAnimating, setIsMenuAnimating] = useState(false);
   const isMobile = useIsMobile();
+  const timeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
     const userData = localStorage.getItem("user");
     if (userData) {
       setUser(JSON.parse(userData));
     }
+
+    // Cleanup timeout on unmount
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
   }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("authToken");
     localStorage.removeItem("user");
     setLocation("/");
+  };
+
+  const handleMenuToggle = () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    if (mobileMenuOpen) {
+      // Start closing animation
+      setIsMenuAnimating(true);
+      timeoutRef.current = setTimeout(() => {
+        setMobileMenuOpen(false);
+        setIsMenuAnimating(false);
+      }, 250); // Match the exit animation duration
+    } else {
+      // Open menu immediately and start enter animation
+      setMobileMenuOpen(true);
+      setIsMenuAnimating(true);
+      timeoutRef.current = setTimeout(() => {
+        setIsMenuAnimating(false);
+      }, 300); // Match the enter animation duration
+    }
   };
 
   const isActive = (path: string) => location === path;
@@ -109,7 +140,7 @@ export function Navigation() {
                   <span className="ml-1 text-xs">Exit</span>
                 </Button>
                 <Button
-                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                  onClick={handleMenuToggle}
                   variant="outline"
                   size="sm"
                   className="text-black border-white/20 hover:bg-white/15 hover:text-black backdrop-blur-sm bg-white/10 p-2"
@@ -124,7 +155,15 @@ export function Navigation() {
 
       {/* Mobile Navigation Menu */}
       {isMobile && mobileMenuOpen && (
-        <div className="mt-4">
+        <div 
+          className={`mt-4 mobile-menu-container ${
+            isMenuAnimating 
+              ? mobileMenuOpen && !isMenuAnimating 
+                ? 'mobile-menu-enter' 
+                : 'mobile-menu-exit'
+              : 'mobile-menu-enter'
+          }`}
+        >
           <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl shadow-2xl">
             <div className="max-w-6xl mx-auto px-6 py-4">
               <div className="flex flex-col space-y-1">
@@ -133,16 +172,22 @@ export function Navigation() {
                     {user.email}
                   </div>
                 )}
-                {navigationLinks.map((link) => (
+                {navigationLinks.map((link, index) => (
                   <a
                     key={link.path}
                     href={link.path}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`px-3 py-3 text-base font-medium rounded-lg transition-all mx-2 ${
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      setIsMenuAnimating(false);
+                    }}
+                    className={`px-3 py-3 text-base font-medium rounded-lg transition-all mx-2 transform ${
                       isActive(link.path)
                         ? "bg-white/20 text-white border-l-4 border-white/50 backdrop-blur-sm"
                         : "text-white/80 hover:bg-white/10 hover:text-white"
                     }`}
+                    style={{
+                      animationDelay: `${index * 50}ms`
+                    }}
                   >
                     {link.label}
                   </a>
