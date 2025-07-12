@@ -211,6 +211,10 @@ npm start      # Runs production server
 - July 07, 2025. **CRITICAL FIX**: Redesigned revenue system to Marketplace Model after discovering Windcave uses percentage-based fees (2.9%), not fixed $0.20
 - July 07, 2025. Implemented proper Merchant of Record architecture where platform collects all payments and settles net amounts to merchants
 - July 07, 2025. Updated fee structure: Windcave 2.9% + Platform 0.5% = 3.4% total, merchants receive 96.6% of transaction amount
+- July 12, 2025. **MAJOR NFC FEATURE**: Added comprehensive "tap to phone" NFC payment API with support for Apple Pay, Google Pay, Samsung Pay, and contactless cards
+- July 12, 2025. Created dedicated /nfc page with device capability detection, real-time payment status updates, and intuitive mobile-first interface
+- July 12, 2025. Enhanced database schema with payment method tracking (QR code, NFC tap, card reader, manual) and NFC session management
+- July 12, 2025. Added NFC Pay navigation link to merchant interface for easy access to contactless payment features
 
 ## User Preferences
 
