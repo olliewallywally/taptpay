@@ -339,10 +339,10 @@ export default function Login() {
               <button
                 type="button"
                 onClick={() => setLoginType('merchant')}
-                className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-sm font-medium transition-all duration-300 ${
+                className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-sm font-bold transition-all duration-300 ${
                   loginType === 'merchant'
-                    ? 'backdrop-blur-xl bg-white/15 text-white shadow-md border border-white/30'
-                    : 'text-white/70 hover:text-white hover:bg-white/5 hover:backdrop-blur-lg'
+                    ? 'backdrop-blur-xl bg-white/15 text-black shadow-md border border-white/30'
+                    : 'text-black/70 hover:text-black hover:bg-white/5 hover:backdrop-blur-lg'
                 }`}
               >
                 <LogIn className="w-4 h-4" />
@@ -351,10 +351,10 @@ export default function Login() {
               <button
                 type="button"
                 onClick={() => setLoginType('admin')}
-                className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-sm font-medium transition-all duration-300 ${
+                className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-sm font-bold transition-all duration-300 ${
                   loginType === 'admin'
-                    ? 'backdrop-blur-xl bg-white/15 text-white shadow-md border border-white/30'
-                    : 'text-white/70 hover:text-white hover:bg-white/5 hover:backdrop-blur-lg'
+                    ? 'backdrop-blur-xl bg-white/15 text-black shadow-md border border-white/30'
+                    : 'text-black/70 hover:text-black hover:bg-white/5 hover:backdrop-blur-lg'
                 }`}
               >
                 <Shield className="w-4 h-4" />
