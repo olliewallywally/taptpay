@@ -58,6 +58,11 @@ export const transactions = pgTable("transactions", {
   status: text("status").notNull().default("pending"), // pending, processing, completed, failed
   windcaveTransactionId: text("windcave_transaction_id"),
   
+  // Payment method tracking
+  paymentMethod: text("payment_method").default("qr_code"), // qr_code, nfc_tap, card_reader, manual
+  nfcSessionId: text("nfc_session_id"), // For NFC/tap payments
+  deviceId: text("device_id"), // Device that initiated the transaction
+  
   // Fee tracking (Marketplace Model)
   windcaveFeeRate: decimal("windcave_fee_rate", { precision: 5, scale: 4 }).default("0.0290"), // 2.9% typical Windcave rate
   windcaveFeeAmount: decimal("windcave_fee_amount", { precision: 10, scale: 2 }), // Calculated Windcave fee

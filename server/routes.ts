@@ -342,6 +342,182 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // NFC Tap to Phone Payment API
+  app.post("/api/merchants/:merchantId/nfc-pay", async (req, res) => {
+    try {
+      const merchantId = parseInt(req.params.merchantId);
+      const { amount, itemName, deviceId, nfcCapabilities } = req.body;
+      
+      // Validate required fields
+      if (!amount || !itemName) {
+        return res.status(400).json({ message: "Amount and item name are required" });
+      }
+      
+      // Check if merchant exists
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+      
+      // Create transaction with NFC payment method
+      const transaction = await storage.createTransaction({
+        merchantId,
+        itemName,
+        price: amount.toString(),
+        paymentMethod: "nfc_tap",
+        deviceId: deviceId || "unknown",
+        status: "pending"
+      });
+      
+      // Generate NFC session for contactless payment
+      const nfcSessionId = `NFC_${transaction.id}_${Date.now()}`;
+      
+      // Update transaction with NFC session ID
+      await storage.updateTransactionNfcSession(transaction.id, nfcSessionId);
+      
+      // Create Windcave payment session for NFC/contactless
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const merchantReference = `NFC_${transaction.id}_${Date.now()}`;
+      
+      const session = await windcaveService.createPaymentSession(
+        amount.toString(),
+        merchantReference,
+        baseUrl
+      );
+      
+      // Notify connected clients about new NFC transaction
+      const connections = sseConnections.get(merchantId);
+      if (connections) {
+        connections.forEach(conn => {
+          conn.write(`data: ${JSON.stringify({ 
+            type: 'nfc_transaction_created', 
+            transaction: { ...transaction, nfcSessionId },
+            nfcSession: {
+              sessionId: nfcSessionId,
+              amount: amount,
+              merchantName: merchant.businessName || merchant.name,
+              paymentMethods: ['apple_pay', 'google_pay', 'contactless_card']
+            }
+          })}\n\n`);
+        });
+      }
+      
+      res.json({
+        success: true,
+        transaction: { ...transaction, nfcSessionId },
+        nfcSession: {
+          sessionId: nfcSessionId,
+          amount: amount,
+          merchantName: merchant.businessName || merchant.name,
+          windcaveSessionId: session?.id,
+          paymentUrl: session?.links?.find(link => link.rel === "self")?.href,
+          supportedMethods: [
+            'apple_pay',
+            'google_pay', 
+            'samsung_pay',
+            'contactless_card',
+            'nfc_enabled_cards'
+          ]
+        }
+      });
+    } catch (error) {
+      console.error("NFC payment creation error:", error);
+      res.status(500).json({ message: "Failed to create NFC payment session" });
+    }
+  });
+
+  // Process NFC payment completion
+  app.post("/api/nfc-sessions/:sessionId/complete", async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const { paymentMethod, paymentData, deviceFingerprint } = req.body;
+      
+      // Find transaction by NFC session ID
+      const transaction = await storage.getTransactionByNfcSession(sessionId);
+      if (!transaction) {
+        return res.status(404).json({ message: "NFC session not found" });
+      }
+      
+      // Update transaction status to processing
+      await storage.updateTransactionStatus(transaction.id, "processing");
+      
+      // Simulate contactless payment processing
+      // In production, this would integrate with actual NFC payment processors
+      const isSimulation = !windcaveService.isConfigured();
+      
+      if (isSimulation) {
+        // Simulate NFC payment with realistic timing
+        setTimeout(async () => {
+          const success = Math.random() > 0.1; // 90% success rate
+          const finalStatus = success ? "completed" : "failed";
+          const windcaveTransactionId = success ? `NFC_${Date.now()}` : null;
+          
+          const updatedTransaction = await storage.updateTransactionStatus(
+            transaction.id, 
+            finalStatus, 
+            windcaveTransactionId
+          );
+          
+          // Notify clients of completion
+          const connections = sseConnections.get(transaction.merchantId);
+          if (connections) {
+            connections.forEach(conn => {
+              conn.write(`data: ${JSON.stringify({ 
+                type: 'nfc_payment_completed', 
+                transaction: updatedTransaction,
+                paymentMethod: paymentMethod || 'contactless_card'
+              })}\n\n`);
+            });
+          }
+        }, 2000); // 2-second processing delay
+        
+        res.json({ 
+          message: "NFC payment processing", 
+          status: "processing",
+          estimatedCompletion: "2-3 seconds" 
+        });
+      } else {
+        // Real Windcave NFC processing would go here
+        res.json({ 
+          message: "NFC payment session created", 
+          status: "processing",
+          windcaveSession: "Real NFC processing not implemented yet" 
+        });
+      }
+    } catch (error) {
+      console.error("NFC payment completion error:", error);
+      res.status(500).json({ message: "Failed to complete NFC payment" });
+    }
+  });
+
+  // Get NFC payment capabilities for a device
+  app.get("/api/nfc/capabilities", (req, res) => {
+    const userAgent = req.headers['user-agent'] || '';
+    const isIOS = /iPhone|iPad|iPod/.test(userAgent);
+    const isAndroid = /Android/.test(userAgent);
+    const isDesktop = !isIOS && !isAndroid;
+    
+    const capabilities = {
+      nfcSupported: !isDesktop,
+      applePay: isIOS,
+      googlePay: isAndroid,
+      samsungPay: isAndroid && /Samsung/.test(userAgent),
+      contactlessCard: true,
+      webNFC: 'NDEFReader' in global, // Web NFC API support
+      recommendations: []
+    };
+    
+    if (isIOS) {
+      capabilities.recommendations.push("Use Apple Pay for fastest checkout");
+    } else if (isAndroid) {
+      capabilities.recommendations.push("Use Google Pay or tap your card");
+    } else {
+      capabilities.recommendations.push("Use QR code for payment on desktop");
+    }
+    
+    res.json(capabilities);
+  });
+
   // Process payment with Windcave
   app.post("/api/transactions/:id/pay", async (req, res) => {
     try {
