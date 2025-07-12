@@ -159,18 +159,35 @@ export default function NFCPayment() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
-      <div className="max-w-2xl mx-auto">
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Gradient Background with Floating Orbs */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+        <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse shadow-2xl" style={{
+          animation: 'glow-pulse 4s ease-in-out infinite',
+          filter: 'blur(40px)',
+        }}></div>
+        <div className="absolute top-40 right-20 w-96 h-96 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse delay-75 shadow-2xl" style={{
+          animation: 'glow-pulse 5s ease-in-out infinite 1.5s',
+          filter: 'blur(45px)',
+        }}></div>
+        <div className="absolute -bottom-8 left-40 w-96 h-96 bg-gradient-to-r from-indigo-400 to-blue-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse delay-150 shadow-2xl" style={{
+          animation: 'glow-pulse 6s ease-in-out infinite 3s',
+          filter: 'blur(50px)',
+        }}></div>
+      </div>
+
+      {/* Main Content */}
+      <div className="relative z-10 max-w-2xl mx-auto px-4 py-8 pt-28">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-4">
-            <Smartphone className="h-8 w-8 text-blue-600" />
-            <Waves className="h-6 w-6 text-blue-500" />
-            <CreditCard className="h-8 w-8 text-blue-600" />
+            <Smartphone className="h-8 w-8 text-blue-300" />
+            <Waves className="h-6 w-6 text-purple-300" />
+            <CreditCard className="h-8 w-8 text-pink-300" />
           </div>
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
+          <h1 className="text-4xl font-bold text-white mb-2">
             Tap to Pay
           </h1>
-          <p className="text-lg text-gray-600 dark:text-gray-300">
+          <p className="text-lg text-white/70">
             Contactless NFC payments with Apple Pay, Google Pay & more
           </p>
         </div>
