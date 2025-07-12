@@ -24,6 +24,7 @@ import CreateMerchant from "@/pages/create-merchant";
 import VerifyMerchant from "@/pages/verify-merchant";
 import NFCPayment from "@/pages/nfc-payment";
 import { Layout } from "@/components/layout";
+import { PageTransition } from "@/components/page-transition";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [, setLocation] = useLocation();
@@ -127,72 +128,80 @@ function AdminProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function Router() {
   return (
-    <Switch>
-      <Route path="/" component={Login} />
-      <Route path="/login" component={Login} />
-      <Route path="/signup" component={MerchantSignup} />
-      <Route path="/forgot-password" component={ForgotPassword} />
-      <Route path="/reset-password" component={ResetPassword} />
-      <Route path="/merchant">
-        <ProtectedRoute>
-          <Layout>
-            <MerchantTerminal />
-          </Layout>
-        </ProtectedRoute>
-      </Route>
-      <Route path="/dashboard">
-        <ProtectedRoute>
-          <Layout>
-            <Dashboard />
-          </Layout>
-        </ProtectedRoute>
-      </Route>
-      <Route path="/settings">
-        <ProtectedRoute>
-          <Layout>
-            <Settings />
-          </Layout>
-        </ProtectedRoute>
-      </Route>
-      <Route path="/transactions">
-        <ProtectedRoute>
-          <Layout>
-            <Transactions />
-          </Layout>
-        </ProtectedRoute>
-      </Route>
+    <PageTransition>
+      <Switch>
+        <Route path="/" component={Login} />
+        <Route path="/login" component={Login} />
+        <Route path="/signup" component={MerchantSignup} />
+        <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/reset-password" component={ResetPassword} />
+        <Route path="/merchant">
+          <ProtectedRoute>
+            <Layout>
+              <MerchantTerminal />
+            </Layout>
+          </ProtectedRoute>
+        </Route>
+        <Route path="/dashboard">
+          <ProtectedRoute>
+            <Layout>
+              <Dashboard />
+            </Layout>
+          </ProtectedRoute>
+        </Route>
+        <Route path="/settings">
+          <ProtectedRoute>
+            <Layout>
+              <Settings />
+            </Layout>
+          </ProtectedRoute>
+        </Route>
+        <Route path="/transactions">
+          <ProtectedRoute>
+            <Layout>
+              <Transactions />
+            </Layout>
+          </ProtectedRoute>
+        </Route>
+        <Route path="/nfc">
+          <ProtectedRoute>
+            <Layout>
+              <NFCPayment />
+            </Layout>
+          </ProtectedRoute>
+        </Route>
 
-      <Route path="/admin/login" component={AdminLogin} />
-      <Route path="/admin/dashboard">
-        <AdminProtectedRoute>
-          <AdminDashboard />
-        </AdminProtectedRoute>
-      </Route>
-      
-      <Route path="/admin/revenue">
-        <AdminProtectedRoute>
-          <AdminRevenue />
-        </AdminProtectedRoute>
-      </Route>
-      
-      <Route path="/admin/merchants/:merchantId">
-        <AdminProtectedRoute>
-          <AdminMerchantDetail />
-        </AdminProtectedRoute>
-      </Route>
-      
-      <Route path="/admin/create-merchant">
-        <AdminProtectedRoute>
-          <CreateMerchant />
-        </AdminProtectedRoute>
-      </Route>
-      
-      <Route path="/verify-merchant" component={VerifyMerchant} />
-      <Route path="/pay/:merchantId" component={CustomerPayment} />
-      <Route path="/receipt/:transactionId" component={Receipt} />
-      <Route path="/nfc" component={NFCPayment} />
-      <Route component={NotFound} />
-    </Switch>
+        <Route path="/admin/login" component={AdminLogin} />
+        <Route path="/admin/dashboard">
+          <AdminProtectedRoute>
+            <AdminDashboard />
+          </AdminProtectedRoute>
+        </Route>
+        
+        <Route path="/admin/revenue">
+          <AdminProtectedRoute>
+            <AdminRevenue />
+          </AdminProtectedRoute>
+        </Route>
+        
+        <Route path="/admin/merchants/:merchantId">
+          <AdminProtectedRoute>
+            <AdminMerchantDetail />
+          </AdminProtectedRoute>
+        </Route>
+        
+        <Route path="/admin/create-merchant">
+          <AdminProtectedRoute>
+            <CreateMerchant />
+          </AdminProtectedRoute>
+        </Route>
+        
+        <Route path="/verify-merchant" component={VerifyMerchant} />
+        <Route path="/pay/:merchantId" component={CustomerPayment} />
+        <Route path="/receipt/:transactionId" component={Receipt} />
+        <Route component={NotFound} />
+      </Switch>
+    </PageTransition>
   );
 }
 
