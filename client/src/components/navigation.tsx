@@ -51,13 +51,13 @@ export function Navigation() {
                 <QrCode className="text-white w-4 h-4" />
               </div>
               <div className="hidden sm:block">
-                <h1 className="text-xl font-bold text-white">Tapt Payment Terminal</h1>
+                <h1 className="text-xl text-white brand-text">Tapt Payment Terminal</h1>
                 {user && (
-                  <p className="text-sm text-white/70">Welcome back, {user.email}</p>
+                  <p className="text-sm text-white/70 minimal-text">Welcome back, {user.email}</p>
                 )}
               </div>
               <div className="sm:hidden">
-                <h1 className="text-lg font-bold text-white">Tapt</h1>
+                <h1 className="text-lg text-white brand-text">Tapt</h1>
               </div>
             </div>
 

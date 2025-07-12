@@ -273,32 +273,32 @@ export default function Dashboard() {
       {/* Main Content */}
       <div className="relative z-10 max-w-7xl mx-auto px-3 sm:px-4 pt-24 pb-4 sm:pt-28 sm:pb-8">
         <div className="mb-6 sm:mb-8 text-center">
-          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Payment Dashboard</h1>
-          <p className="text-sm sm:text-base text-white/70">Monitor your transactions and savings with our low-cost payment processing</p>
+          <h1 className="text-2xl sm:text-3xl text-white mb-2">Payment Dashboard</h1>
+          <p className="text-sm sm:text-base text-white/70 minimal-text">Monitor your transactions and savings with our low-cost payment processing</p>
         </div>
 
         {/* Analytics Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
           <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 shadow-2xl">
             <div className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <h3 className="text-sm font-medium text-white/90">Total Revenue</h3>
+              <h3 className="text-sm text-white/90 minimal-text">Total Revenue</h3>
               <DollarSign className="h-4 w-4 text-white/70" />
             </div>
-            <div className="text-2xl font-bold text-white">
+            <div className="text-2xl text-white">
               ${analytics?.totalRevenue?.toFixed(2) || "0.00"}
             </div>
-            <p className="text-xs text-white/60">
+            <p className="text-xs text-white/60 minimal-text">
               From {analytics?.completedTransactions || 0} completed transactions
             </p>
           </div>
 
           <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 shadow-2xl">
             <div className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <h3 className="text-sm font-medium text-white/90">Total Transactions</h3>
+              <h3 className="text-sm text-white/90 minimal-text">Total Transactions</h3>
               <CreditCard className="h-4 w-4 text-white/70" />
             </div>
-            <div className="text-2xl font-bold text-white">{analytics?.totalTransactions || 0}</div>
-            <p className="text-xs text-white/60">
+            <div className="text-2xl text-white">{analytics?.totalTransactions || 0}</div>
+            <p className="text-xs text-white/60 minimal-text">
               {analytics?.completedTransactions || 0} successful payments
             </p>
           </div>
