@@ -361,33 +361,38 @@ export default function NFCPayment() {
         {/* NFC Overlay */}
         {showNfcOverlay && (
           <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex flex-col animate-in fade-in duration-300">
-            {/* Tap Here Indicator at Top - Slides down smoothly */}
-            <div className="bg-gradient-to-r from-green-600 to-green-700 text-white text-center py-6 relative shadow-lg animate-in slide-in-from-top duration-500 ease-out">
+            {/* Close Button */}
+            <div className="absolute top-4 right-4 z-10">
               <Button
                 onClick={closeNfcOverlay}
                 variant="ghost"
                 size="sm"
-                className="absolute right-4 top-4 text-white hover:bg-green-800 rounded-full w-8 h-8 p-0"
+                className="text-white hover:bg-white/10 rounded-full w-10 h-10 p-0 backdrop-blur-sm border border-white/20"
               >
-                <X className="h-4 w-4" />
+                <X className="h-5 w-5" />
               </Button>
-              
-              {/* Tapt Logo and Payment Info */}
-              <div className="flex items-center justify-center gap-3 mb-2">
-                <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
-                  <span className="text-green-700 font-bold text-sm">T</span>
+            </div>
+
+            {/* Glass Morphism Banner - Separate Box */}
+            <div className="flex justify-center pt-6 px-4 animate-in slide-in-from-top duration-500 ease-out">
+              <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl px-8 py-6 shadow-2xl max-w-sm w-full text-center">
+                {/* Tapt Logo and Payment Info */}
+                <div className="flex items-center justify-center gap-3 mb-3">
+                  <div className="w-8 h-8 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center border border-white/30">
+                    <span className="text-white font-bold text-sm">T</span>
+                  </div>
+                  <span className="text-2xl font-light tracking-wide text-white">TAPT</span>
                 </div>
-                <span className="text-2xl font-light tracking-wide">TAPT</span>
-              </div>
-              
-              <div className="flex items-center justify-center gap-2 mb-1">
-                <Waves className="h-4 w-4 animate-pulse" />
-                <span className="text-sm font-medium uppercase tracking-wider">TAP HERE TO PAY</span>
-                <Waves className="h-4 w-4 animate-pulse" />
-              </div>
-              
-              <div className="text-xs opacity-90 font-light">
-                ${nfcSession?.amount} • {nfcSession?.merchantName}
+                
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <Waves className="h-4 w-4 animate-pulse text-white" />
+                  <span className="text-sm font-medium uppercase tracking-wider text-white">TAP HERE TO PAY</span>
+                  <Waves className="h-4 w-4 animate-pulse text-white" />
+                </div>
+                
+                <div className="text-xs text-white/90 font-light">
+                  ${nfcSession?.amount} • {nfcSession?.merchantName}
+                </div>
               </div>
             </div>
             
