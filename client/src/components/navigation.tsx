@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { QrCode, LogOut, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,22 +9,13 @@ export function Navigation() {
   const [location, setLocation] = useLocation();
   const [user, setUser] = useState<any>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isMenuAnimating, setIsMenuAnimating] = useState(false);
   const isMobile = useIsMobile();
-  const timeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
     const userData = localStorage.getItem("user");
     if (userData) {
       setUser(JSON.parse(userData));
     }
-
-    // Cleanup timeout on unmount
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
   }, []);
 
   const handleLogout = () => {
@@ -34,25 +25,7 @@ export function Navigation() {
   };
 
   const handleMenuToggle = () => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-
-    if (mobileMenuOpen) {
-      // Start closing animation
-      setIsMenuAnimating(true);
-      timeoutRef.current = setTimeout(() => {
-        setMobileMenuOpen(false);
-        setIsMenuAnimating(false);
-      }, 250); // Match the exit animation duration
-    } else {
-      // Open menu immediately and start enter animation
-      setMobileMenuOpen(true);
-      setIsMenuAnimating(true);
-      timeoutRef.current = setTimeout(() => {
-        setIsMenuAnimating(false);
-      }, 300); // Match the enter animation duration
-    }
+    setMobileMenuOpen(!mobileMenuOpen);
   };
 
   const isActive = (path: string) => location === path;
@@ -155,15 +128,7 @@ export function Navigation() {
 
       {/* Mobile Navigation Menu */}
       {isMobile && mobileMenuOpen && (
-        <div 
-          className={`mt-4 mobile-menu-container ${
-            isMenuAnimating 
-              ? mobileMenuOpen && !isMenuAnimating 
-                ? 'mobile-menu-enter' 
-                : 'mobile-menu-exit'
-              : 'mobile-menu-enter'
-          }`}
-        >
+        <div className="mt-4 mobile-menu-enter">
           <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl shadow-2xl">
             <div className="max-w-6xl mx-auto px-6 py-4">
               <div className="flex flex-col space-y-1">
@@ -176,11 +141,8 @@ export function Navigation() {
                   <a
                     key={link.path}
                     href={link.path}
-                    onClick={() => {
-                      setMobileMenuOpen(false);
-                      setIsMenuAnimating(false);
-                    }}
-                    className={`px-3 py-3 text-base font-medium rounded-lg transition-all mx-2 transform ${
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`px-3 py-3 text-base font-medium rounded-lg transition-all mx-2 ${
                       isActive(link.path)
                         ? "bg-white/20 text-white border-l-4 border-white/50 backdrop-blur-sm"
                         : "text-white/80 hover:bg-white/10 hover:text-white"
