@@ -148,8 +148,8 @@ export default function Login() {
             {/* Logo Section */}
             <div className="text-center mb-8">
               <div className="flex justify-center mb-6">
-                <div className="w-16 h-16 bg-white/20 backdrop-blur-lg rounded-2xl flex items-center justify-center border border-white/30">
-                  <span className="text-white font-bold text-xl">T</span>
+                <div className="w-16 h-16 bg-white backdrop-blur-lg rounded-2xl flex items-center justify-center border border-white/30 shadow-lg">
+                  <span className="text-black font-bold text-xl">T</span>
                 </div>
               </div>
               <h1 className="text-2xl font-light text-white mb-2">
@@ -321,8 +321,8 @@ export default function Login() {
           {/* Logo Section */}
           <div className="text-center mb-8">
             <div className="flex justify-center mb-6">
-              <div className="w-16 h-16 bg-white/20 backdrop-blur-lg rounded-2xl flex items-center justify-center border border-white/30">
-                <span className="text-white font-bold text-xl">T</span>
+              <div className="w-16 h-16 bg-white backdrop-blur-lg rounded-2xl flex items-center justify-center border border-white/30 shadow-lg">
+                <span className="text-black font-bold text-xl">T</span>
               </div>
             </div>
             <h1 className="text-2xl font-light text-white mb-2">
@@ -335,14 +335,14 @@ export default function Login() {
 
           {/* Login Type Toggle */}
           <div className="mb-6">
-            <div className="flex bg-white/10 backdrop-blur-sm rounded-2xl p-1 border border-white/20">
+            <div className="flex bg-black/30 backdrop-blur-sm rounded-2xl p-1 border border-purple-500/30">
               <button
                 type="button"
                 onClick={() => setLoginType('merchant')}
                 className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-sm font-medium transition-all duration-300 ${
                   loginType === 'merchant'
-                    ? 'bg-white/20 text-white shadow-lg backdrop-blur-sm border border-white/30'
-                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                    ? 'bg-black/40 text-purple-300 shadow-lg backdrop-blur-sm border border-purple-400/50'
+                    : 'text-purple-400/70 hover:text-purple-300 hover:bg-black/20'
                 }`}
               >
                 <LogIn className="w-4 h-4" />
@@ -353,8 +353,8 @@ export default function Login() {
                 onClick={() => setLoginType('admin')}
                 className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-sm font-medium transition-all duration-300 ${
                   loginType === 'admin'
-                    ? 'bg-white/20 text-white shadow-lg backdrop-blur-sm border border-white/30'
-                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                    ? 'bg-black/40 text-purple-300 shadow-lg backdrop-blur-sm border border-purple-400/50'
+                    : 'text-purple-400/70 hover:text-purple-300 hover:bg-black/20'
                 }`}
               >
                 <Shield className="w-4 h-4" />
