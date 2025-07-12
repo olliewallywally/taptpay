@@ -346,7 +346,7 @@ export default function Dashboard() {
               </p>
             </div>
             <Link href="/transactions">
-              <button className="backdrop-blur-xl bg-white/15 border border-white/30 text-white px-4 py-2 rounded-xl hover:bg-white/20 transition-all duration-300 flex items-center gap-2">
+              <button className="backdrop-blur-xl bg-white/15 border border-white/30 text-black px-4 py-2 rounded-xl hover:bg-white/20 transition-all duration-300 flex items-center gap-2">
                 <Eye className="h-4 w-4" />
                 View All
               </button>
@@ -382,7 +382,7 @@ export default function Dashboard() {
                       <TableCell>
                         <div className="flex items-center space-x-2">
                           {getStatusIcon(transaction.status)}
-                          <span className="text-xs text-white/80 bg-white/10 px-2 py-1 rounded-lg border border-white/20">
+                          <span className="text-xs text-black bg-white/10 px-2 py-1 rounded-lg border border-white/20">
                             {transaction.status}
                           </span>
                         </div>
@@ -398,7 +398,7 @@ export default function Dashboard() {
                 <div className="flex justify-center mt-4 p-4">
                   <button
                     onClick={() => setShowAllTransactions(!showAllTransactions)}
-                    className="backdrop-blur-xl bg-white/15 border border-white/30 text-white px-4 py-2 rounded-xl hover:bg-white/20 transition-all duration-300 text-sm"
+                    className="backdrop-blur-xl bg-white/15 border border-white/30 text-black px-4 py-2 rounded-xl hover:bg-white/20 transition-all duration-300 text-sm"
                   >
                     {showAllTransactions ? "Show Less" : `Show More (${transactions.length - 3} more)`}
                   </button>

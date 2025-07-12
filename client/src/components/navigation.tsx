@@ -76,8 +76,8 @@ export function Navigation() {
                       href={link.path}
                       className={`px-4 py-2 text-sm font-medium rounded-lg transition-all backdrop-blur-sm border ${
                         isActive(link.path) 
-                          ? "bg-white/20 text-white shadow-sm border-white/30" 
-                          : "bg-white/10 text-white hover:text-white hover:bg-white/15 border-white/20"
+                          ? "bg-white/20 text-black shadow-sm border-white/30" 
+                          : "bg-white/10 text-black hover:text-black hover:bg-white/15 border-white/20"
                       }`}
                     >
                       {link.label}
@@ -88,7 +88,7 @@ export function Navigation() {
                   onClick={handleLogout}
                   variant="outline"
                   size="sm"
-                  className="text-white border-white/20 hover:bg-white/15 hover:text-white backdrop-blur-sm bg-white/10"
+                  className="text-black border-white/20 hover:bg-white/15 hover:text-black backdrop-blur-sm bg-white/10"
                 >
                   <LogOut className="w-4 h-4 mr-2" />
                   Logout
@@ -103,7 +103,7 @@ export function Navigation() {
                   onClick={handleLogout}
                   variant="outline"
                   size="sm"
-                  className="text-white border-white/20 hover:bg-white/15 hover:text-white backdrop-blur-sm bg-white/10 px-3"
+                  className="text-black border-white/20 hover:bg-white/15 hover:text-black backdrop-blur-sm bg-white/10 px-3"
                 >
                   <LogOut className="w-4 h-4" />
                   <span className="ml-1 text-xs">Exit</span>
@@ -112,7 +112,7 @@ export function Navigation() {
                   onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                   variant="outline"
                   size="sm"
-                  className="text-white border-white/20 hover:bg-white/15 hover:text-white backdrop-blur-sm bg-white/10 p-2"
+                  className="text-black border-white/20 hover:bg-white/15 hover:text-black backdrop-blur-sm bg-white/10 p-2"
                 >
                   {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
                 </Button>

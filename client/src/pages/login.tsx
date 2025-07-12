@@ -396,7 +396,7 @@ export default function Login() {
                         <Input
                           type="email"
                           placeholder="demo@tapt.co.nz"
-                          className="mt-2 w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all duration-300"
+                          className="mt-2 w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-black placeholder-gray-600 focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all duration-300"
                           {...field}
                         />
                       </FormControl>
@@ -417,7 +417,7 @@ export default function Login() {
                         <Input
                           type="password"
                           placeholder="demo123"
-                          className="mt-2 w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all duration-300"
+                          className="mt-2 w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-black placeholder-gray-600 focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all duration-300"
                           {...field}
                         />
                       </FormControl>
