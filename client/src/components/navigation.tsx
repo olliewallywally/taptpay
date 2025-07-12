@@ -33,6 +33,7 @@ export function Navigation() {
   const navigationLinks = [
     { path: "/merchant", label: "Terminal" },
     { path: "/dashboard", label: "Dashboard" },
+    { path: "/transactions", label: "Transactions" },
     { path: "/nfc", label: "NFC Pay" },
     { path: "/settings", label: "Settings" },
     { path: customerViewPath, label: "Customer View" },
@@ -62,11 +63,11 @@ export function Navigation() {
           {!isMobile && (
             <div className="flex items-center space-x-4">
               <div className="flex bg-gray-100 rounded-lg p-1">
-                {navigationLinks.map((link) => (
+                {navigationLinks.slice(0, 5).map((link) => (
                   <a 
                     key={link.path}
                     href={link.path}
-                    className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                    className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${
                       isActive(link.path) 
                         ? "bg-white text-green-800 shadow-sm" 
                         : "text-gray-600 hover:text-gray-900"
@@ -114,7 +115,7 @@ export function Navigation() {
 
         {/* Mobile Navigation Menu */}
         {isMobile && mobileMenuOpen && (
-          <div className="mt-3 pb-3 border-t border-gray-200">
+          <div className="mt-3 pb-3 border-t border-gray-200 bg-white">
             <div className="flex flex-col space-y-1 pt-3">
               {user && (
                 <div className="px-3 py-2 text-sm text-gray-600 border-b border-gray-100 mb-2">
@@ -126,10 +127,31 @@ export function Navigation() {
                   key={link.path}
                   href={link.path}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`px-3 py-3 text-base font-medium rounded-lg transition-all ${
+                  className={`px-3 py-3 text-base font-medium rounded-lg transition-all mx-2 ${
                     isActive(link.path)
                       ? "bg-green-50 text-green-800 border-l-4 border-green-800"
                       : "text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  {link.label}
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Full-width navigation banner for desktop */}
+        {!isMobile && (
+          <div className="mt-4 border-t border-gray-200">
+            <div className="flex justify-center space-x-8 pt-3 pb-2">
+              {navigationLinks.map((link) => (
+                <a
+                  key={link.path}
+                  href={link.path}
+                  className={`text-sm font-medium transition-colors ${
+                    isActive(link.path)
+                      ? "text-green-800 border-b-2 border-green-800 pb-1"
+                      : "text-gray-600 hover:text-gray-900"
                   }`}
                 >
                   {link.label}
