@@ -335,14 +335,14 @@ export default function Login() {
 
           {/* Login Type Toggle */}
           <div className="mb-6">
-            <div className="flex bg-black/30 backdrop-blur-sm rounded-2xl p-1 border border-purple-500/30">
+            <div className="flex bg-black/20 backdrop-blur-lg rounded-2xl p-1 border border-purple-500/30 shadow-lg">
               <button
                 type="button"
                 onClick={() => setLoginType('merchant')}
                 className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-sm font-medium transition-all duration-300 ${
                   loginType === 'merchant'
-                    ? 'bg-black/40 text-purple-300 shadow-lg backdrop-blur-sm border border-purple-400/50'
-                    : 'text-purple-400/70 hover:text-purple-300 hover:bg-black/20'
+                    ? 'bg-black/30 backdrop-blur-xl text-purple-200 shadow-lg border border-purple-400/50'
+                    : 'text-purple-300/70 hover:text-purple-200 hover:bg-black/15 hover:backdrop-blur-lg'
                 }`}
               >
                 <LogIn className="w-4 h-4" />
@@ -353,8 +353,8 @@ export default function Login() {
                 onClick={() => setLoginType('admin')}
                 className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-sm font-medium transition-all duration-300 ${
                   loginType === 'admin'
-                    ? 'bg-black/40 text-purple-300 shadow-lg backdrop-blur-sm border border-purple-400/50'
-                    : 'text-purple-400/70 hover:text-purple-300 hover:bg-black/20'
+                    ? 'bg-black/30 backdrop-blur-xl text-purple-200 shadow-lg border border-purple-400/50'
+                    : 'text-purple-300/70 hover:text-purple-200 hover:bg-black/15 hover:backdrop-blur-lg'
                 }`}
               >
                 <Shield className="w-4 h-4" />
