@@ -321,12 +321,10 @@ export default function Login() {
           {/* Logo Section */}
           <div className="text-center mb-8">
             <div className="flex justify-center mb-6">
-              <div className="w-20 h-20 bg-white backdrop-blur-lg rounded-2xl flex items-center justify-center border border-white/30 shadow-lg p-3">
-                <img 
-                  src="/attached_assets/tapt logo v2_1751682549877.png" 
-                  alt="TAPT Logo" 
-                  className="w-full h-full object-contain"
-                />
+              <div className="bg-white backdrop-blur-lg rounded-2xl flex items-center justify-center border border-white/30 shadow-lg px-6 py-4">
+                <span className="text-black font-black text-2xl tracking-wider lowercase" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+                  tapt
+                </span>
               </div>
             </div>
             <h1 className="text-2xl font-light text-white mb-2">
