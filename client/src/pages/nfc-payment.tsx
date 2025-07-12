@@ -360,49 +360,59 @@ export default function NFCPayment() {
         
         {/* NFC Overlay */}
         {showNfcOverlay && (
-          <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex flex-col">
-            {/* Tap Here Indicator at Top */}
-            <div className="bg-blue-600 text-white text-center py-4 relative">
+          <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex flex-col animate-in fade-in duration-300">
+            {/* Tap Here Indicator at Top - Slides down smoothly */}
+            <div className="bg-gradient-to-r from-green-600 to-green-700 text-white text-center py-6 relative shadow-lg animate-in slide-in-from-top duration-500 ease-out">
               <Button
                 onClick={closeNfcOverlay}
                 variant="ghost"
                 size="sm"
-                className="absolute right-4 top-3 text-white hover:bg-blue-700"
+                className="absolute right-4 top-4 text-white hover:bg-green-800 rounded-full w-8 h-8 p-0"
               >
                 <X className="h-4 w-4" />
               </Button>
-              <div className="flex items-center justify-center gap-2">
-                <Waves className="h-5 w-5 animate-pulse" />
-                <span className="text-lg font-semibold">TAP HERE TO PAY</span>
-                <Waves className="h-5 w-5 animate-pulse" />
+              
+              {/* Tapt Logo and Payment Info */}
+              <div className="flex items-center justify-center gap-3 mb-2">
+                <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
+                  <span className="text-green-700 font-bold text-sm">T</span>
+                </div>
+                <span className="text-2xl font-light tracking-wide">TAPT</span>
               </div>
-              <div className="text-sm opacity-90 mt-1">
+              
+              <div className="flex items-center justify-center gap-2 mb-1">
+                <Waves className="h-4 w-4 animate-pulse" />
+                <span className="text-sm font-medium uppercase tracking-wider">TAP HERE TO PAY</span>
+                <Waves className="h-4 w-4 animate-pulse" />
+              </div>
+              
+              <div className="text-xs opacity-90 font-light">
                 ${nfcSession?.amount} • {nfcSession?.merchantName}
               </div>
             </div>
             
             {/* Main Overlay Content */}
             <div className="flex-1 flex items-center justify-center p-6">
-              <Card className="w-full max-w-md">
-                <CardContent className="p-8 text-center">
+              <Card className="w-full max-w-md border-0 shadow-2xl animate-in slide-in-from-bottom duration-700 ease-out delay-200">
+                <CardContent className="p-8 text-center bg-white/95 backdrop-blur-sm rounded-lg">
                   <div className="space-y-6">
                     {paymentStatus === "ready" && (
                       <>
-                        <div className="text-6xl animate-pulse">📱</div>
+                        <div className="text-5xl mb-6 animate-pulse">📱</div>
                         <div>
-                          <h3 className="text-2xl font-bold mb-2">Hold Near Device</h3>
-                          <p className="text-gray-600 mb-4">
+                          <h3 className="text-xl font-semibold mb-3 text-gray-800">Hold Near Device</h3>
+                          <p className="text-gray-500 mb-6 text-sm">
                             Position your phone near the payment terminal
                           </p>
-                          <div className="flex justify-center space-x-2 mb-6">
-                            {nfcCapabilities?.applePay && <Badge>Apple Pay</Badge>}
-                            {nfcCapabilities?.googlePay && <Badge>Google Pay</Badge>}
-                            {nfcCapabilities?.samsungPay && <Badge>Samsung Pay</Badge>}
-                            <Badge variant="outline">Contactless</Badge>
+                          <div className="flex justify-center space-x-2 mb-8">
+                            {nfcCapabilities?.applePay && <Badge variant="secondary" className="text-xs">Apple Pay</Badge>}
+                            {nfcCapabilities?.googlePay && <Badge variant="secondary" className="text-xs">Google Pay</Badge>}
+                            {nfcCapabilities?.samsungPay && <Badge variant="secondary" className="text-xs">Samsung Pay</Badge>}
+                            <Badge variant="outline" className="text-xs">Contactless</Badge>
                           </div>
                           <Button 
                             onClick={simulateNFCTap}
-                            className="w-full"
+                            className="w-full bg-green-600 hover:bg-green-700 text-white border-0"
                             size="lg"
                           >
                             <Waves className="mr-2 h-4 w-4" />
@@ -414,14 +424,14 @@ export default function NFCPayment() {
                     
                     {paymentStatus === "processing" && (
                       <>
-                        <div className="text-6xl animate-bounce">⚡</div>
+                        <div className="text-5xl animate-bounce mb-6">⚡</div>
                         <div>
-                          <h3 className="text-2xl font-bold mb-2">Processing...</h3>
-                          <p className="text-gray-600">
+                          <h3 className="text-xl font-semibold mb-3 text-gray-800">Processing...</h3>
+                          <p className="text-gray-500 text-sm mb-6">
                             Securely processing your payment
                           </p>
-                          <div className="mt-4">
-                            <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+                          <div className="flex justify-center">
+                            <Loader2 className="h-6 w-6 animate-spin text-green-600" />
                           </div>
                         </div>
                       </>
@@ -429,16 +439,16 @@ export default function NFCPayment() {
                     
                     {paymentStatus === "completed" && (
                       <>
-                        <div className="text-6xl">✅</div>
+                        <div className="text-5xl mb-6">✅</div>
                         <div>
-                          <h3 className="text-2xl font-bold text-green-600 mb-2">Payment Successful!</h3>
-                          <p className="text-gray-600 mb-4">
+                          <h3 className="text-xl font-semibold text-green-600 mb-3">Payment Successful!</h3>
+                          <p className="text-gray-500 text-sm mb-6">
                             ${nfcSession?.amount} charged successfully
                           </p>
                           <Button 
                             onClick={resetPayment}
                             variant="outline"
-                            className="w-full"
+                            className="w-full border-gray-200"
                           >
                             Make Another Payment
                           </Button>
@@ -448,23 +458,23 @@ export default function NFCPayment() {
                     
                     {paymentStatus === "failed" && (
                       <>
-                        <div className="text-6xl">❌</div>
+                        <div className="text-5xl mb-6">❌</div>
                         <div>
-                          <h3 className="text-2xl font-bold text-red-600 mb-2">Payment Failed</h3>
-                          <p className="text-gray-600 mb-4">
+                          <h3 className="text-xl font-semibold text-red-600 mb-3">Payment Failed</h3>
+                          <p className="text-gray-500 text-sm mb-6">
                             Please try again or use another payment method
                           </p>
-                          <div className="space-y-2">
+                          <div className="space-y-3">
                             <Button 
                               onClick={simulateNFCTap}
-                              className="w-full"
+                              className="w-full bg-green-600 hover:bg-green-700"
                             >
                               Try Again
                             </Button>
                             <Button 
                               onClick={closeNfcOverlay}
                               variant="outline"
-                              className="w-full"
+                              className="w-full border-gray-200"
                             >
                               Cancel
                             </Button>
