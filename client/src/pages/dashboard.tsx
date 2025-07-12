@@ -230,16 +230,13 @@ export default function Dashboard() {
 
   if (analyticsLoading) {
     return (
-      <div className="min-h-screen relative overflow-hidden">
-        {/* Gradient Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900"></div>
-        
-        <div className="relative z-10 max-w-7xl mx-auto px-4 py-8 pt-28">
+      <div className="min-h-screen bg-gray-50">
+        <div className="container mx-auto px-4 py-8">
           <div className="animate-pulse">
-            <div className="h-8 backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl w-64 mb-6"></div>
+            <div className="h-8 bg-gray-200 rounded-2xl w-64 mb-6"></div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-32 backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl shadow-2xl"></div>
+                <div key={i} className="h-32 bg-gray-200 rounded-3xl"></div>
               ))}
             </div>
           </div>
@@ -249,87 +246,65 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
-      {/* Gradient Background with Floating Orbs */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900">
-        {/* Animated Gradient Orbs with Enhanced Glow */}
-        <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse shadow-2xl" style={{
-          animation: 'glow-pulse 4s ease-in-out infinite',
-          filter: 'blur(40px)',
-        }}></div>
-        <div className="absolute top-40 right-20 w-96 h-96 bg-gradient-to-r from-green-400 to-emerald-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse delay-75 shadow-2xl" style={{
-          animation: 'glow-pulse 5s ease-in-out infinite 1.5s',
-          filter: 'blur(45px)',
-        }}></div>
-        <div className="absolute -bottom-8 left-40 w-96 h-96 bg-gradient-to-r from-lime-400 to-green-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse delay-150 shadow-2xl" style={{
-          animation: 'glow-pulse 6s ease-in-out infinite 3s',
-          filter: 'blur(50px)',
-        }}></div>
-        
-        {/* Additional Moving Glow Effects */}
-        <div className="absolute top-0 left-1/2 w-72 h-72 bg-gradient-to-r from-teal-300 to-emerald-300 rounded-full mix-blend-screen filter blur-3xl opacity-30" style={{
-          animation: 'float-slow 8s ease-in-out infinite, glow-pulse 3s ease-in-out infinite',
-        }}></div>
-        <div className="absolute bottom-0 right-1/3 w-80 h-80 bg-gradient-to-r from-green-300 to-lime-300 rounded-full mix-blend-screen filter blur-3xl opacity-25" style={{
-          animation: 'float-reverse 10s ease-in-out infinite, glow-pulse 4s ease-in-out infinite 2s',
-        }}></div>
-      </div>
-
-      {/* Main Content */}
-      <div className="relative z-10 max-w-7xl mx-auto px-3 sm:px-4 pt-24 pb-4 sm:pt-28 sm:pb-8">
-        <div className="mb-8 sm:mb-12 mt-8 sm:mt-12 text-center">
-          <h1 className="text-3xl sm:text-4xl font-bold text-white">Payment Dashboard</h1>
+    <div className="min-h-screen bg-gray-50">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">Payment Dashboard</h1>
+            <p className="text-gray-600">Monitor your transactions and savings</p>
+          </div>
         </div>
 
         {/* Analytics Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
-          <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 shadow-2xl">
+          <div className="dashboard-card-glow bg-white rounded-3xl p-6">
             <div className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <h3 className="text-sm font-medium text-white/90">Total Revenue</h3>
-              <DollarSign className="h-4 w-4 text-white/70" />
+              <h3 className="text-sm font-medium text-gray-700">Total Revenue</h3>
+              <DollarSign className="h-4 w-4 text-green-600" />
             </div>
-            <div className="text-2xl font-bold text-white">
+            <div className="text-2xl font-bold text-gray-900">
               ${analytics?.totalRevenue?.toFixed(2) || "0.00"}
             </div>
-            <p className="text-xs text-white/60">
+            <p className="text-xs text-gray-500">
               From {analytics?.completedTransactions || 0} completed transactions
             </p>
           </div>
 
-          <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 shadow-2xl">
+          <div className="dashboard-card-glow bg-white rounded-3xl p-6">
             <div className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <h3 className="text-sm font-medium text-white/90">Total Transactions</h3>
-              <CreditCard className="h-4 w-4 text-white/70" />
+              <h3 className="text-sm font-medium text-gray-700">Total Transactions</h3>
+              <CreditCard className="h-4 w-4 text-green-600" />
             </div>
-            <div className="text-2xl font-bold text-white">{analytics?.totalTransactions || 0}</div>
-            <p className="text-xs text-white/60">
+            <div className="text-2xl font-bold text-gray-900">{analytics?.totalTransactions || 0}</div>
+            <p className="text-xs text-gray-500">
               {analytics?.completedTransactions || 0} successful payments
             </p>
           </div>
 
-          <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 shadow-2xl">
+          <div className="dashboard-card-glow bg-white rounded-3xl p-6">
             <div className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <h3 className="text-sm font-medium text-white/90">Money Saved</h3>
-              <PiggyBank className="h-4 w-4 text-emerald-400" />
+              <h3 className="text-sm font-medium text-gray-700">Money Saved</h3>
+              <PiggyBank className="h-4 w-4 text-green-600" />
             </div>
-            <div className="text-2xl font-bold text-emerald-400">
+            <div className="text-2xl font-bold text-green-600">
               ${analytics?.savings?.toFixed(2) || "0.00"}
             </div>
-            <p className="text-xs text-white/60">
+            <p className="text-xs text-gray-500">
               vs your current provider
             </p>
           </div>
 
-          <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 shadow-2xl">
+          <div className="dashboard-card-glow bg-white rounded-3xl p-6">
             <div className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <h3 className="text-sm font-medium text-white/90">Our Rate</h3>
-              <TrendingUp className="h-4 w-4 text-teal-400" />
+              <h3 className="text-sm font-medium text-gray-700">Our Rate</h3>
+              <TrendingUp className="h-4 w-4 text-green-600" />
             </div>
-            <div className="text-2xl font-bold text-teal-400">
-              $0.20
+            <div className="text-2xl font-bold text-green-600">
+              3.4%
             </div>
-            <p className="text-xs text-white/60">
-              Flat fee per transaction
+            <p className="text-xs text-gray-500">
+              Total processing fee
             </p>
           </div>
         </div>
@@ -337,16 +312,16 @@ export default function Dashboard() {
 
 
         {/* Transaction History */}
-        <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-8 shadow-2xl mb-8">
+        <div className="dashboard-card-glow bg-white rounded-3xl p-8 mb-8">
           <div className="flex flex-row items-center justify-between mb-6">
             <div>
-              <h2 className="text-lg font-semibold text-white">Transaction History</h2>
-              <p className="text-white/70 text-sm">
+              <h2 className="text-lg font-semibold text-gray-800">Transaction History</h2>
+              <p className="text-gray-600 text-sm">
                 View all your recent payment transactions
               </p>
             </div>
             <Link href="/transactions">
-              <button className="backdrop-blur-xl bg-white/15 border border-white/30 text-black px-4 py-2 rounded-xl hover:bg-white/20 transition-all duration-300 flex items-center gap-2">
+              <button className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl transition-all duration-300 flex items-center gap-2">
                 <Eye className="h-4 w-4" />
                 View All
               </button>
@@ -354,40 +329,40 @@ export default function Dashboard() {
           </div>
           {transactionsLoading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-white/70" />
+              <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
             </div>
           ) : transactions && transactions.length > 0 ? (
-            <div className="backdrop-blur-lg bg-white/5 rounded-2xl border border-white/10 overflow-hidden">
+            <div className="bg-gray-50 rounded-2xl border border-gray-200 overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-white/20">
-                    <TableHead className="text-white/80">Date</TableHead>
-                    <TableHead className="text-white/80">Item</TableHead>
-                    <TableHead className="text-white/80">Amount</TableHead>
-                    <TableHead className="text-white/80">Status</TableHead>
-                    <TableHead className="text-white/80 hidden sm:table-cell">Transaction ID</TableHead>
+                  <TableRow className="border-gray-200">
+                    <TableHead className="text-gray-700">Date</TableHead>
+                    <TableHead className="text-gray-700">Item</TableHead>
+                    <TableHead className="text-gray-700">Amount</TableHead>
+                    <TableHead className="text-gray-700">Status</TableHead>
+                    <TableHead className="text-gray-700 hidden sm:table-cell">Transaction ID</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {(showAllTransactions ? transactions : transactions.slice(0, 3)).map((transaction: any) => (
-                    <TableRow key={transaction.id} className="border-white/10 hover:bg-white/5">
-                      <TableCell className="text-sm text-white/90">
+                    <TableRow key={transaction.id} className="border-gray-100 hover:bg-gray-100">
+                      <TableCell className="text-sm text-gray-800">
                         {transaction.createdAt 
                           ? format(new Date(transaction.createdAt), "MMM dd, HH:mm")
                           : "N/A"
                         }
                       </TableCell>
-                      <TableCell className="font-medium text-sm text-white">{transaction.itemName}</TableCell>
-                      <TableCell className="text-sm text-white">${parseFloat(transaction.price).toFixed(2)}</TableCell>
+                      <TableCell className="font-medium text-sm text-gray-900">{transaction.itemName}</TableCell>
+                      <TableCell className="text-sm text-gray-800">${parseFloat(transaction.price).toFixed(2)}</TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
                           {getStatusIcon(transaction.status)}
-                          <span className="text-xs text-black bg-white/10 px-2 py-1 rounded-lg border border-white/20">
+                          <span className="text-xs text-gray-700 bg-gray-200 px-2 py-1 rounded-lg border border-gray-300">
                             {transaction.status}
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-xs text-white/60 hidden sm:table-cell">
+                      <TableCell className="text-xs text-gray-600 hidden sm:table-cell">
                         {transaction.windcaveTransactionId || `TXN-${transaction.id}`}
                       </TableCell>
                     </TableRow>
@@ -398,7 +373,7 @@ export default function Dashboard() {
                 <div className="flex justify-center mt-4 p-4">
                   <button
                     onClick={() => setShowAllTransactions(!showAllTransactions)}
-                    className="backdrop-blur-xl bg-white/15 border border-white/30 text-black px-4 py-2 rounded-xl hover:bg-white/20 transition-all duration-300 text-sm"
+                    className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl transition-all duration-300 text-sm"
                   >
                     {showAllTransactions ? "Show Less" : `Show More (${transactions.length - 3} more)`}
                   </button>
@@ -407,37 +382,37 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="text-center py-8">
-              <CreditCard className="mx-auto h-12 w-12 text-white/40 mb-4" />
-              <h3 className="text-lg font-medium text-white mb-2">No transactions yet</h3>
-              <p className="text-white/60">Start processing payments to see your transaction history</p>
+              <CreditCard className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-800 mb-2">No transactions yet</h3>
+              <p className="text-gray-600">Start processing payments to see your transaction history</p>
             </div>
           )}
         </div>
 
         {/* Export Data */}
-        <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-8 shadow-2xl">
+        <div className="dashboard-card-glow bg-white rounded-3xl p-8">
           <div className="mb-6">
-            <h2 className="flex items-center space-x-2 text-lg font-semibold text-white">
+            <h2 className="flex items-center space-x-2 text-lg font-semibold text-gray-800">
               <Download className="h-4 w-4" />
               <span>Export Data</span>
             </h2>
-            <p className="text-white/70 text-sm">
+            <p className="text-gray-600 text-sm">
               Download your transaction data and business reports
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="flex items-center justify-between p-4 backdrop-blur-lg bg-white/10 border border-white/20 rounded-2xl">
+            <div className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 rounded-2xl">
               <div className="flex items-center space-x-3">
-                <FileSpreadsheet className="h-8 w-8 text-emerald-400" />
+                <FileSpreadsheet className="h-8 w-8 text-green-600" />
                 <div>
-                  <p className="font-medium text-sm text-white">Transaction Data</p>
-                  <p className="text-xs text-white/60">CSV format for Excel</p>
+                  <p className="font-medium text-sm text-gray-800">Transaction Data</p>
+                  <p className="text-xs text-gray-600">CSV format for Excel</p>
                 </div>
               </div>
               <button 
                 onClick={() => downloadCSV()}
                 disabled={csvExportMutation.isPending}
-                className="backdrop-blur-xl bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl transition-all duration-300 disabled:opacity-50"
+                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl transition-all duration-300 disabled:opacity-50"
               >
                 {csvExportMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -447,18 +422,18 @@ export default function Dashboard() {
               </button>
             </div>
 
-            <div className="flex items-center justify-between p-4 backdrop-blur-lg bg-white/10 border border-white/20 rounded-2xl">
+            <div className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 rounded-2xl">
               <div className="flex items-center space-x-3">
-                <FileText className="h-8 w-8 text-teal-400" />
+                <FileText className="h-8 w-8 text-green-600" />
                 <div>
-                  <p className="font-medium text-sm text-white">Business Report</p>
-                  <p className="text-xs text-white/60">PDF with analytics</p>
+                  <p className="font-medium text-sm text-gray-800">Business Report</p>
+                  <p className="text-xs text-gray-600">PDF with analytics</p>
                 </div>
               </div>
               <button 
                 onClick={() => downloadPDF()}
                 disabled={pdfExportMutation.isPending}
-                className="backdrop-blur-xl bg-teal-500 hover:bg-teal-600 text-white px-4 py-2 rounded-xl transition-all duration-300 disabled:opacity-50"
+                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl transition-all duration-300 disabled:opacity-50"
               >
                 {pdfExportMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
