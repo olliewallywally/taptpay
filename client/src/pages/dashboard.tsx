@@ -244,336 +244,146 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
-      <div className="mb-6 sm:mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Payment Dashboard</h1>
-        <p className="text-sm sm:text-base text-gray-600">Monitor your transactions and savings with our low-cost payment processing</p>
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Gradient Background with Floating Orbs */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900">
+        {/* Animated Gradient Orbs with Enhanced Glow */}
+        <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse shadow-2xl" style={{
+          animation: 'glow-pulse 4s ease-in-out infinite',
+          filter: 'blur(40px)',
+        }}></div>
+        <div className="absolute top-40 right-20 w-96 h-96 bg-gradient-to-r from-green-400 to-emerald-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse delay-75 shadow-2xl" style={{
+          animation: 'glow-pulse 5s ease-in-out infinite 1.5s',
+          filter: 'blur(45px)',
+        }}></div>
+        <div className="absolute -bottom-8 left-40 w-96 h-96 bg-gradient-to-r from-lime-400 to-green-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse delay-150 shadow-2xl" style={{
+          animation: 'glow-pulse 6s ease-in-out infinite 3s',
+          filter: 'blur(50px)',
+        }}></div>
+        
+        {/* Additional Moving Glow Effects */}
+        <div className="absolute top-0 left-1/2 w-72 h-72 bg-gradient-to-r from-teal-300 to-emerald-300 rounded-full mix-blend-screen filter blur-3xl opacity-30" style={{
+          animation: 'float-slow 8s ease-in-out infinite, glow-pulse 3s ease-in-out infinite',
+        }}></div>
+        <div className="absolute bottom-0 right-1/3 w-80 h-80 bg-gradient-to-r from-green-300 to-lime-300 rounded-full mix-blend-screen filter blur-3xl opacity-25" style={{
+          animation: 'float-reverse 10s ease-in-out infinite, glow-pulse 4s ease-in-out infinite 2s',
+        }}></div>
       </div>
 
-      {/* Analytics Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
+      {/* Main Content */}
+      <div className="relative z-10 max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
+        <div className="mb-6 sm:mb-8 text-center">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Payment Dashboard</h1>
+          <p className="text-sm sm:text-base text-white/70">Monitor your transactions and savings with our low-cost payment processing</p>
+        </div>
+
+        {/* Analytics Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
+          <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 shadow-2xl">
+            <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <h3 className="text-sm font-medium text-white/90">Total Revenue</h3>
+              <DollarSign className="h-4 w-4 text-white/70" />
+            </div>
+            <div className="text-2xl font-bold text-white">
               ${analytics?.totalRevenue?.toFixed(2) || "0.00"}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-white/60">
               From {analytics?.completedTransactions || 0} completed transactions
             </p>
-          </CardContent>
-        </Card>
+          </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Transactions</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{analytics?.totalTransactions || 0}</div>
-            <p className="text-xs text-muted-foreground">
+          <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 shadow-2xl">
+            <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <h3 className="text-sm font-medium text-white/90">Total Transactions</h3>
+              <CreditCard className="h-4 w-4 text-white/70" />
+            </div>
+            <div className="text-2xl font-bold text-white">{analytics?.totalTransactions || 0}</div>
+            <p className="text-xs text-white/60">
               {analytics?.completedTransactions || 0} successful payments
             </p>
-          </CardContent>
-        </Card>
+          </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Money Saved</CardTitle>
-            <PiggyBank className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+          <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 shadow-2xl">
+            <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <h3 className="text-sm font-medium text-white/90">Money Saved</h3>
+              <PiggyBank className="h-4 w-4 text-emerald-400" />
+            </div>
+            <div className="text-2xl font-bold text-emerald-400">
               ${analytics?.savings?.toFixed(2) || "0.00"}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-white/60">
               vs your current provider
             </p>
-          </CardContent>
-        </Card>
+          </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Our Rate</CardTitle>
-            <TrendingUp className="h-4 w-4 text-[hsl(155,40%,25%)]" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-[hsl(155,40%,25%)]">
+          <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 shadow-2xl">
+            <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <h3 className="text-sm font-medium text-white/90">Our Rate</h3>
+              <TrendingUp className="h-4 w-4 text-teal-400" />
+            </div>
+            <div className="text-2xl font-bold text-teal-400">
               $0.20
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-white/60">
               Flat fee per transaction
             </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Rate Comparison */}
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between text-lg">
-            <div className="flex items-center space-x-2">
-              <Calculator className="h-4 w-4" />
-              <span>Rate Comparison</span>
-            </div>
-            {!isEditingRate && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleEditRate}
-                className="flex items-center space-x-2"
-              >
-                <Edit2 className="h-4 w-4" />
-                <span>Edit Rate</span>
-              </Button>
-            )}
-          </CardTitle>
-          <CardDescription>
-            See how much you save with our low-cost payment processing
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {/* Desktop Layout */}
-          <div className="hidden md:grid md:grid-cols-3 gap-4">
-            {/* Current Provider */}
-            <div className="p-4 bg-red-50 rounded-lg border border-red-200">
-              <div className="text-center">
-                <p className="text-sm font-medium text-red-900 mb-2">Your Current Provider</p>
-                {isEditingRate ? (
-                  <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2">
-                      <FormField
-                        control={form.control}
-                        name="currentProviderRate"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormControl>
-                              <div className="relative">
-                                <Input
-                                  type="text"
-                                  placeholder="2.9"
-                                  className="pr-8 text-xl font-bold text-center"
-                                  autoFocus
-                                  {...field}
-                                />
-                                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">%</span>
-                              </div>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <div className="flex justify-center space-x-1">
-                        <Button
-                          type="submit"
-                          size="sm"
-                          disabled={updateRatesMutation.isPending}
-                          className="bg-green-600 hover:bg-green-700 text-white"
-                        >
-                          {updateRatesMutation.isPending ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Check className="h-4 w-4" />
-                          )}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={handleCancelEdit}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </form>
-                  </Form>
-                ) : (
-                  <p className="text-2xl font-bold text-red-700 mb-2">
-                    {analytics?.currentProviderRate?.toFixed(2) || "2.90"}%
-                  </p>
-                )}
-                <div className="border-t border-red-200 pt-2">
-                  <p className="text-xs text-red-600">Total Cost</p>
-                  <p className="text-lg font-semibold text-red-700">
-                    ${analytics?.currentProviderCost?.toFixed(2) || "0.00"}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Our Rate */}
-            <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-              <div className="text-center">
-                <p className="text-sm font-medium text-green-900 mb-2">Our Rate</p>
-                <p className="text-2xl font-bold text-green-700 mb-2">
-                  $0.20
-                </p>
-                <p className="text-xs text-green-600 mb-2">flat fee</p>
-                <div className="border-t border-green-200 pt-2">
-                  <p className="text-xs text-green-600">Total Cost</p>
-                  <p className="text-lg font-semibold text-green-700">
-                    ${analytics?.ourCost?.toFixed(2) || "0.00"}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Savings */}
-            <div className="p-4 bg-blue-50 rounded-lg border-2 border-blue-300">
-              <div className="text-center">
-                <p className="text-sm font-medium text-blue-900 mb-2">Your Savings</p>
-                <p className="text-2xl font-bold text-blue-700 mb-2">
-                  ${analytics?.savings?.toFixed(2) || "0.00"}
-                </p>
-                <div className="border-t border-blue-200 pt-2">
-                  <p className="text-xs text-blue-600">Total Amount Saved</p>
-                  <p className="text-lg font-semibold text-blue-700">
-                    ${analytics?.savings?.toFixed(2) || "0.00"}
-                  </p>
-                </div>
-              </div>
-            </div>
           </div>
+        </div>
 
-          {/* Mobile Layout */}
-          <div className="grid grid-cols-3 gap-2 md:hidden">
-            {/* Previous */}
-            <div className="p-2 bg-red-50 rounded border border-red-200">
-              <div className="text-center">
-                <p className="text-xs font-medium text-red-900 mb-1">Previous</p>
-                {isEditingRate ? (
-                  <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-1">
-                      <FormField
-                        control={form.control}
-                        name="currentProviderRate"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormControl>
-                              <Input
-                                type="text"
-                                placeholder="2.9"
-                                className="text-sm font-bold text-center h-6 px-1"
-                                autoFocus
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <div className="flex justify-center space-x-1">
-                        <Button
-                          type="submit"
-                          size="sm"
-                          disabled={updateRatesMutation.isPending}
-                          className="bg-green-600 hover:bg-green-700 text-white h-6 w-6 p-0"
-                        >
-                          {updateRatesMutation.isPending ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <Check className="h-3 w-3" />
-                          )}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={handleCancelEdit}
-                          className="h-6 w-6 p-0"
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </form>
-                  </Form>
-                ) : (
-                  <p className="text-lg font-bold text-red-700">
-                    {analytics?.currentProviderRate?.toFixed(1) || "2.9"}%
-                  </p>
-                )}
-              </div>
-            </div>
 
-            {/* Current */}
-            <div className="p-2 bg-green-50 rounded border border-green-200">
-              <div className="text-center">
-                <p className="text-xs font-medium text-green-900 mb-1">Current</p>
-                <p className="text-lg font-bold text-green-700">
-                  0.2%
-                </p>
-              </div>
-            </div>
 
-            {/* Savings */}
-            <div className="p-2 bg-blue-50 rounded border-2 border-blue-300">
-              <div className="text-center">
-                <p className="text-xs font-medium text-blue-900 mb-1">Savings</p>
-                <p className="text-lg font-bold text-blue-700">
-                  ${analytics?.savings?.toFixed(2) || "0.00"}
-                </p>
-              </div>
+        {/* Transaction History */}
+        <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-8 shadow-2xl mb-8">
+          <div className="flex flex-row items-center justify-between mb-6">
+            <div>
+              <h2 className="text-lg font-semibold text-white">Transaction History</h2>
+              <p className="text-white/70 text-sm">
+                View all your recent payment transactions
+              </p>
             </div>
+            <Link href="/transactions">
+              <button className="backdrop-blur-xl bg-white/15 border border-white/30 text-white px-4 py-2 rounded-xl hover:bg-white/20 transition-all duration-300 flex items-center gap-2">
+                <Eye className="h-4 w-4" />
+                View All
+              </button>
+            </Link>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Transaction History */}
-      <Card className="mb-8">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="text-lg">Transaction History</CardTitle>
-            <CardDescription>
-              View all your recent payment transactions
-            </CardDescription>
-          </div>
-          <Link href="/transactions">
-            <Button variant="outline" className="flex items-center gap-2">
-              <Eye className="h-4 w-4" />
-              View All
-            </Button>
-          </Link>
-        </CardHeader>
-        <CardContent>
           {transactionsLoading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+              <Loader2 className="h-8 w-8 animate-spin text-white/70" />
             </div>
           ) : transactions && transactions.length > 0 ? (
-            <div>
+            <div className="backdrop-blur-lg bg-white/5 rounded-2xl border border-white/10 overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Item</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="hidden sm:table-cell">Transaction ID</TableHead>
+                  <TableRow className="border-white/20">
+                    <TableHead className="text-white/80">Date</TableHead>
+                    <TableHead className="text-white/80">Item</TableHead>
+                    <TableHead className="text-white/80">Amount</TableHead>
+                    <TableHead className="text-white/80">Status</TableHead>
+                    <TableHead className="text-white/80 hidden sm:table-cell">Transaction ID</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {(showAllTransactions ? transactions : transactions.slice(0, 3)).map((transaction: any) => (
-                    <TableRow key={transaction.id}>
-                      <TableCell className="text-sm">
+                    <TableRow key={transaction.id} className="border-white/10 hover:bg-white/5">
+                      <TableCell className="text-sm text-white/90">
                         {transaction.createdAt 
                           ? format(new Date(transaction.createdAt), "MMM dd, HH:mm")
                           : "N/A"
                         }
                       </TableCell>
-                      <TableCell className="font-medium text-sm">{transaction.itemName}</TableCell>
-                      <TableCell className="text-sm">${parseFloat(transaction.price).toFixed(2)}</TableCell>
+                      <TableCell className="font-medium text-sm text-white">{transaction.itemName}</TableCell>
+                      <TableCell className="text-sm text-white">${parseFloat(transaction.price).toFixed(2)}</TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
                           {getStatusIcon(transaction.status)}
-                          <Badge variant={getStatusBadgeVariant(transaction.status)} className="text-xs">
+                          <span className="text-xs text-white/80 bg-white/10 px-2 py-1 rounded-lg border border-white/20">
                             {transaction.status}
-                          </Badge>
+                          </span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-xs text-gray-500 hidden sm:table-cell">
+                      <TableCell className="text-xs text-white/60 hidden sm:table-cell">
                         {transaction.windcaveTransactionId || `TXN-${transaction.id}`}
                       </TableCell>
                     </TableRow>
@@ -581,84 +391,81 @@ export default function Dashboard() {
                 </TableBody>
               </Table>
               {transactions.length > 3 && (
-                <div className="flex justify-center mt-4">
-                  <Button
-                    variant="outline"
+                <div className="flex justify-center mt-4 p-4">
+                  <button
                     onClick={() => setShowAllTransactions(!showAllTransactions)}
-                    className="text-sm"
+                    className="backdrop-blur-xl bg-white/15 border border-white/30 text-white px-4 py-2 rounded-xl hover:bg-white/20 transition-all duration-300 text-sm"
                   >
                     {showAllTransactions ? "Show Less" : `Show More (${transactions.length - 3} more)`}
-                  </Button>
+                  </button>
                 </div>
               )}
             </div>
           ) : (
             <div className="text-center py-8">
-              <CreditCard className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No transactions yet</h3>
-              <p className="text-gray-500">Start processing payments to see your transaction history</p>
+              <CreditCard className="mx-auto h-12 w-12 text-white/40 mb-4" />
+              <h3 className="text-lg font-medium text-white mb-2">No transactions yet</h3>
+              <p className="text-white/60">Start processing payments to see your transaction history</p>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Export Data */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2 text-lg">
-            <Download className="h-4 w-4" />
-            <span>Export Data</span>
-          </CardTitle>
-          <CardDescription>
-            Download your transaction data and business reports
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+        {/* Export Data */}
+        <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-8 shadow-2xl">
+          <div className="mb-6">
+            <h2 className="flex items-center space-x-2 text-lg font-semibold text-white">
+              <Download className="h-4 w-4" />
+              <span>Export Data</span>
+            </h2>
+            <p className="text-white/70 text-sm">
+              Download your transaction data and business reports
+            </p>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+            <div className="flex items-center justify-between p-4 backdrop-blur-lg bg-white/10 border border-white/20 rounded-2xl">
               <div className="flex items-center space-x-3">
-                <FileSpreadsheet className="h-8 w-8 text-green-600" />
+                <FileSpreadsheet className="h-8 w-8 text-emerald-400" />
                 <div>
-                  <p className="font-medium text-sm">Transaction Data</p>
-                  <p className="text-xs text-gray-500">CSV format for Excel</p>
+                  <p className="font-medium text-sm text-white">Transaction Data</p>
+                  <p className="text-xs text-white/60">CSV format for Excel</p>
                 </div>
               </div>
-              <Button 
-                size="sm" 
+              <button 
                 onClick={() => downloadCSV()}
                 disabled={csvExportMutation.isPending}
+                className="backdrop-blur-xl bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl transition-all duration-300 disabled:opacity-50"
               >
                 {csvExportMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   "Download"
                 )}
-              </Button>
+              </button>
             </div>
 
-            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+            <div className="flex items-center justify-between p-4 backdrop-blur-lg bg-white/10 border border-white/20 rounded-2xl">
               <div className="flex items-center space-x-3">
-                <FileText className="h-8 w-8 text-blue-600" />
+                <FileText className="h-8 w-8 text-teal-400" />
                 <div>
-                  <p className="font-medium text-sm">Business Report</p>
-                  <p className="text-xs text-gray-500">PDF with analytics</p>
+                  <p className="font-medium text-sm text-white">Business Report</p>
+                  <p className="text-xs text-white/60">PDF with analytics</p>
                 </div>
               </div>
-              <Button 
-                size="sm" 
+              <button 
                 onClick={() => downloadPDF()}
                 disabled={pdfExportMutation.isPending}
+                className="backdrop-blur-xl bg-teal-500 hover:bg-teal-600 text-white px-4 py-2 rounded-xl transition-all duration-300 disabled:opacity-50"
               >
                 {pdfExportMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   "Download"
                 )}
-              </Button>
+              </button>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }
