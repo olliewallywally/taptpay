@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { QrCode, LogOut, Menu, X } from "lucide-react";
+import { LogOut, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { getCurrentMerchantId } from "@/lib/auth";
+import taptLogoUrl from "@assets/tapt logo_1751676012286.png";
 
 export function Navigation() {
   const [location, setLocation] = useLocation();
@@ -51,22 +52,15 @@ export function Navigation() {
           <div className="flex items-center justify-between">
             {/* Logo and Title */}
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-white/10 backdrop-blur-sm rounded-lg flex items-center justify-center flex-shrink-0 border border-white/20">
-                <QrCode className="text-black w-6 h-6" />
-              </div>
-              <div className="hidden sm:block">
-                <span className="text-white font-black text-xl tracking-wider lowercase" style={{ fontFamily: 'Nunito, system-ui, sans-serif' }}>
-                  tapt
-                </span>
-                <span className="text-white text-sm ml-2 font-light">Payment Terminal</span>
+              <div className="flex items-center">
+                <img 
+                  src={taptLogoUrl} 
+                  alt="Tapt Logo" 
+                  className="h-8 w-auto filter brightness-0 invert"
+                />
                 {user && (
-                  <p className="text-sm text-white/70 minimal-text mt-1">Welcome back, {user.email}</p>
+                  <p className="text-xs text-white/60 ml-4">Welcome back, {user.email}</p>
                 )}
-              </div>
-              <div className="sm:hidden">
-                <span className="text-white font-black text-lg tracking-wider lowercase" style={{ fontFamily: 'Nunito, system-ui, sans-serif' }}>
-                  tapt
-                </span>
               </div>
             </div>
 
