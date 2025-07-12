@@ -308,10 +308,27 @@ export default function Login() {
     <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
       {/* Gradient Background with Floating Orbs */}
       <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900">
-        {/* Animated Gradient Orbs */}
-        <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse"></div>
-        <div className="absolute top-40 right-20 w-96 h-96 bg-gradient-to-r from-green-400 to-emerald-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse delay-75"></div>
-        <div className="absolute -bottom-8 left-40 w-96 h-96 bg-gradient-to-r from-lime-400 to-green-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse delay-150"></div>
+        {/* Animated Gradient Orbs with Enhanced Glow */}
+        <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse shadow-2xl" style={{
+          animation: 'glow-pulse 4s ease-in-out infinite',
+          filter: 'blur(40px)',
+        }}></div>
+        <div className="absolute top-40 right-20 w-96 h-96 bg-gradient-to-r from-green-400 to-emerald-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse delay-75 shadow-2xl" style={{
+          animation: 'glow-pulse 5s ease-in-out infinite 1.5s',
+          filter: 'blur(45px)',
+        }}></div>
+        <div className="absolute -bottom-8 left-40 w-96 h-96 bg-gradient-to-r from-lime-400 to-green-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse delay-150 shadow-2xl" style={{
+          animation: 'glow-pulse 6s ease-in-out infinite 3s',
+          filter: 'blur(50px)',
+        }}></div>
+        
+        {/* Additional Moving Glow Effects */}
+        <div className="absolute top-0 left-1/2 w-72 h-72 bg-gradient-to-r from-teal-300 to-emerald-300 rounded-full mix-blend-screen filter blur-3xl opacity-30" style={{
+          animation: 'float-slow 8s ease-in-out infinite, glow-pulse 3s ease-in-out infinite',
+        }}></div>
+        <div className="absolute bottom-0 right-1/3 w-80 h-80 bg-gradient-to-r from-green-300 to-lime-300 rounded-full mix-blend-screen filter blur-3xl opacity-25" style={{
+          animation: 'float-reverse 10s ease-in-out infinite, glow-pulse 4s ease-in-out infinite 2s',
+        }}></div>
       </div>
 
       {/* Glass Morphism Container */}
