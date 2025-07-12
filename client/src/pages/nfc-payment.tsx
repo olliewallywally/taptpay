@@ -194,90 +194,87 @@ export default function NFCPayment() {
 
         {/* NFC Capabilities Card */}
         {nfcCapabilities && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Smartphone className="h-5 w-5" />
-                Device Capabilities
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2 mb-4">
-                {nfcCapabilities.nfcSupported && (
-                  <Badge variant="default">NFC Supported</Badge>
-                )}
-                {nfcCapabilities.applePay && (
-                  <Badge variant="secondary">Apple Pay</Badge>
-                )}
-                {nfcCapabilities.googlePay && (
-                  <Badge variant="secondary">Google Pay</Badge>
-                )}
-                {nfcCapabilities.samsungPay && (
-                  <Badge variant="secondary">Samsung Pay</Badge>
-                )}
-                {nfcCapabilities.contactlessCard && (
-                  <Badge variant="outline">Contactless Cards</Badge>
-                )}
-              </div>
-              {nfcCapabilities.recommendations?.length > 0 && (
-                <div className="text-sm text-gray-600 dark:text-gray-400">
-                  💡 {nfcCapabilities.recommendations[0]}
-                </div>
+          <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 shadow-2xl mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Smartphone className="h-5 w-5 text-blue-300" />
+              <h3 className="text-xl font-bold text-white">Device Capabilities</h3>
+            </div>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {nfcCapabilities.nfcSupported && (
+                <Badge variant="default" className="bg-green-100 text-green-800">NFC Supported</Badge>
               )}
-            </CardContent>
-          </Card>
+              {nfcCapabilities.applePay && (
+                <Badge variant="secondary" className="bg-gray-100 text-gray-800">Apple Pay</Badge>
+              )}
+              {nfcCapabilities.googlePay && (
+                <Badge variant="secondary" className="bg-gray-100 text-gray-800">Google Pay</Badge>
+              )}
+              {nfcCapabilities.samsungPay && (
+                <Badge variant="secondary" className="bg-gray-100 text-gray-800">Samsung Pay</Badge>
+              )}
+              {nfcCapabilities.contactlessCard && (
+                <Badge variant="outline" className="bg-white text-gray-800 border-gray-300">Contactless Cards</Badge>
+              )}
+            </div>
+            {nfcCapabilities.recommendations?.length > 0 && (
+              <div className="text-sm text-white/70">
+                💡 {nfcCapabilities.recommendations[0]}
+              </div>
+            )}
+          </div>
         )}
 
         {/* Payment Setup Card */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Create NFC Payment</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 shadow-2xl mb-6">
+          <h3 className="text-xl font-bold text-white mb-6">Create NFC Payment</h3>
+          <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <Label htmlFor="merchantId">Merchant ID</Label>
-                <Input
+                <label htmlFor="merchantId" className="text-sm font-medium text-white">Merchant ID</label>
+                <input
                   id="merchantId"
                   value={merchantId}
                   onChange={(e) => setMerchantId(e.target.value)}
                   placeholder="Enter merchant ID"
+                  className="mt-2 w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-white/50 focus:ring-2 focus:ring-white/30 focus:border-white/30 transition-all backdrop-blur-sm"
                 />
               </div>
               <div>
-                <Label htmlFor="amount">Amount ($)</Label>
-                <Input
+                <label htmlFor="amount" className="text-sm font-medium text-white">Amount ($)</label>
+                <input
                   id="amount"
                   type="number"
                   step="0.01"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="0.00"
+                  className="mt-2 w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-white/50 focus:ring-2 focus:ring-white/30 focus:border-white/30 transition-all backdrop-blur-sm"
                 />
               </div>
               <div>
-                <Label htmlFor="itemName">Item</Label>
-                <Input
+                <label htmlFor="itemName" className="text-sm font-medium text-white">Item</label>
+                <input
                   id="itemName"
                   value={itemName}
                   onChange={(e) => setItemName(e.target.value)}
                   placeholder="Item name"
+                  className="mt-2 w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-white/50 focus:ring-2 focus:ring-white/30 focus:border-white/30 transition-all backdrop-blur-sm"
                 />
               </div>
             </div>
             
             {paymentStatus === "idle" && (
-              <Button 
+              <button 
                 onClick={createNFCPayment}
-                className="w-full"
                 disabled={!nfcCapabilities?.nfcSupported}
+                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-white/20 text-white rounded-xl hover:bg-white/25 transition-all duration-300 backdrop-blur-sm border border-white/30 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Waves className="mr-2 h-4 w-4" />
+                <Waves className="h-4 w-4" />
                 Create NFC Payment
-              </Button>
+              </button>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* NFC Payment Status Card */}
         {nfcSession && (

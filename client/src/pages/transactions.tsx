@@ -51,10 +51,10 @@ export default function TransactionsPage() {
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      pending: { variant: "secondary" as const, label: "Pending" },
-      processing: { variant: "default" as const, label: "Processing" },
+      pending: { variant: "secondary" as const, label: "Pending", className: "bg-gray-100 text-gray-800" },
+      processing: { variant: "default" as const, label: "Processing", className: "bg-blue-100 text-blue-800" },
       completed: { variant: "default" as const, label: "Completed", className: "bg-green-100 text-green-800" },
-      failed: { variant: "destructive" as const, label: "Failed" },
+      failed: { variant: "destructive" as const, label: "Failed", className: "bg-red-100 text-red-800" },
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
