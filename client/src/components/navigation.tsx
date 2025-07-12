@@ -76,8 +76,8 @@ export function Navigation() {
                       href={link.path}
                       className={`px-4 py-2 text-sm font-medium rounded-lg transition-all backdrop-blur-sm border ${
                         isActive(link.path) 
-                          ? "bg-white/20 text-black shadow-sm border-white/30" 
-                          : "bg-white/10 text-black hover:text-black hover:bg-white/15 border-white/20"
+                          ? "bg-white/20 text-white shadow-sm border-white/30" 
+                          : "bg-white/10 text-white hover:text-white hover:bg-white/15 border-white/20"
                       }`}
                     >
                       {link.label}
