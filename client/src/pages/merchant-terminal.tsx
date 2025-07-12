@@ -122,10 +122,10 @@ export default function MerchantTerminal() {
         return (
           <div className="flex flex-col items-center space-y-3 p-6 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20">
             <div className="flex items-center space-x-3">
-              <Clock className="w-6 h-6 text-white/70" />
-              <span className="text-lg font-medium text-white">Awaiting Payment</span>
+              <Clock className="w-6 h-6 text-gray-600" />
+              <span className="text-lg font-medium text-black">Awaiting Payment</span>
             </div>
-            <p className="text-sm text-white/60 text-center">Customer can now scan QR code to pay</p>
+            <p className="text-sm text-gray-700 text-center">Customer can now scan QR code to pay</p>
           </div>
         );
       case "processing":

@@ -138,7 +138,7 @@ export default function TransactionsPage() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <Link href="/dashboard">
-              <button className="flex items-center gap-2 px-4 py-2 bg-white/10 border border-white/20 text-white rounded-xl hover:bg-white/15 transition-all duration-300 backdrop-blur-sm">
+              <button className="flex items-center gap-2 px-4 py-2 bg-white/10 border border-white/20 text-black rounded-xl hover:bg-white/15 transition-all duration-300 backdrop-blur-sm">
                 <ArrowLeft className="h-4 w-4" />
                 Back to Dashboard
               </button>
@@ -148,7 +148,7 @@ export default function TransactionsPage() {
           
           <button 
             onClick={handleExportTransactions}
-            className="flex items-center gap-2 px-4 py-2 bg-white/10 border border-white/20 text-white rounded-xl hover:bg-white/15 transition-all duration-300 backdrop-blur-sm"
+            className="flex items-center gap-2 px-4 py-2 bg-white/10 border border-white/20 text-black rounded-xl hover:bg-white/15 transition-all duration-300 backdrop-blur-sm"
           >
             <Download className="h-4 w-4" />
             Export CSV

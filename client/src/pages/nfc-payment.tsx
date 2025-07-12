@@ -236,7 +236,7 @@ export default function NFCPayment() {
                   value={merchantId}
                   onChange={(e) => setMerchantId(e.target.value)}
                   placeholder="Enter merchant ID"
-                  className="mt-2 w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-white/50 focus:ring-2 focus:ring-white/30 focus:border-white/30 transition-all backdrop-blur-sm"
+                  className="mt-2 w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-black placeholder:text-gray-600 focus:ring-2 focus:ring-white/30 focus:border-white/30 transition-all backdrop-blur-sm"
                 />
               </div>
               <div>
@@ -248,7 +248,7 @@ export default function NFCPayment() {
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="0.00"
-                  className="mt-2 w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-white/50 focus:ring-2 focus:ring-white/30 focus:border-white/30 transition-all backdrop-blur-sm"
+                  className="mt-2 w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-black placeholder:text-gray-600 focus:ring-2 focus:ring-white/30 focus:border-white/30 transition-all backdrop-blur-sm"
                 />
               </div>
               <div>
@@ -258,7 +258,7 @@ export default function NFCPayment() {
                   value={itemName}
                   onChange={(e) => setItemName(e.target.value)}
                   placeholder="Item name"
-                  className="mt-2 w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-white/50 focus:ring-2 focus:ring-white/30 focus:border-white/30 transition-all backdrop-blur-sm"
+                  className="mt-2 w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-black placeholder:text-gray-600 focus:ring-2 focus:ring-white/30 focus:border-white/30 transition-all backdrop-blur-sm"
                 />
               </div>
             </div>
@@ -267,7 +267,7 @@ export default function NFCPayment() {
               <button 
                 onClick={createNFCPayment}
                 disabled={!nfcCapabilities?.nfcSupported}
-                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-white/20 text-white rounded-xl hover:bg-white/25 transition-all duration-300 backdrop-blur-sm border border-white/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-white/20 text-black rounded-xl hover:bg-white/25 transition-all duration-300 backdrop-blur-sm border border-white/30 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Waves className="h-4 w-4" />
                 Create NFC Payment
