@@ -48,16 +48,21 @@ export function Navigation() {
             {/* Logo and Title */}
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-white/10 backdrop-blur-sm rounded-lg flex items-center justify-center flex-shrink-0 border border-white/20">
-                <QrCode className="text-black w-4 h-4" />
+                <QrCode className="text-black w-6 h-6" />
               </div>
               <div className="hidden sm:block">
-                <h1 className="text-xl text-white brand-text">Tapt Payment Terminal</h1>
+                <span className="text-white font-black text-xl tracking-wider lowercase" style={{ fontFamily: 'Nunito, system-ui, sans-serif' }}>
+                  tapt
+                </span>
+                <span className="text-white text-sm ml-2 font-light">Payment Terminal</span>
                 {user && (
-                  <p className="text-sm text-white/70 minimal-text">Welcome back, {user.email}</p>
+                  <p className="text-sm text-white/70 minimal-text mt-1">Welcome back, {user.email}</p>
                 )}
               </div>
               <div className="sm:hidden">
-                <h1 className="text-lg text-white brand-text">Tapt</h1>
+                <span className="text-white font-black text-lg tracking-wider lowercase" style={{ fontFamily: 'Nunito, system-ui, sans-serif' }}>
+                  tapt
+                </span>
               </div>
             </div>
 
@@ -71,8 +76,8 @@ export function Navigation() {
                       href={link.path}
                       className={`px-4 py-2 text-sm font-medium rounded-lg transition-all backdrop-blur-sm border ${
                         isActive(link.path) 
-                          ? "bg-white/20 text-white shadow-sm border-white/30" 
-                          : "bg-white/10 text-white/90 hover:text-white hover:bg-white/15 border-white/20"
+                          ? "bg-white/20 text-black shadow-sm border-white/30" 
+                          : "bg-white/10 text-black hover:text-black hover:bg-white/15 border-white/20"
                       }`}
                     >
                       {link.label}
