@@ -47,8 +47,8 @@ export function Navigation() {
           <div className="flex items-center justify-between">
             {/* Logo and Title */}
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center flex-shrink-0 border border-white/30">
-                <QrCode className="text-white w-4 h-4" />
+              <div className="w-8 h-8 bg-white/10 backdrop-blur-sm rounded-lg flex items-center justify-center flex-shrink-0 border border-white/20">
+                <QrCode className="text-black w-4 h-4" />
               </div>
               <div className="hidden sm:block">
                 <h1 className="text-xl text-white brand-text">Tapt Payment Terminal</h1>
@@ -64,15 +64,15 @@ export function Navigation() {
             {/* Desktop Navigation */}
             {!isMobile && (
               <div className="flex items-center space-x-4">
-                <div className="flex bg-white/10 backdrop-blur-sm rounded-lg p-1 border border-white/20">
-                  {navigationLinks.slice(0, 5).map((link) => (
+                <div className="flex space-x-2">
+                  {navigationLinks.slice(0, 3).map((link) => (
                     <a 
                       key={link.path}
                       href={link.path}
-                      className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${
+                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-all backdrop-blur-sm border ${
                         isActive(link.path) 
-                          ? "bg-white/20 text-white shadow-sm border border-white/30" 
-                          : "text-white/80 hover:text-white hover:bg-white/10"
+                          ? "bg-white/20 text-white shadow-sm border-white/30" 
+                          : "bg-white/10 text-white/90 hover:text-white hover:bg-white/15 border-white/20"
                       }`}
                     >
                       {link.label}
@@ -83,7 +83,7 @@ export function Navigation() {
                   onClick={handleLogout}
                   variant="outline"
                   size="sm"
-                  className="text-white border-white/20 hover:bg-white/10 hover:text-white backdrop-blur-sm"
+                  className="text-white border-white/20 hover:bg-white/15 hover:text-white backdrop-blur-sm bg-white/10"
                 >
                   <LogOut className="w-4 h-4 mr-2" />
                   Logout
@@ -98,7 +98,7 @@ export function Navigation() {
                   onClick={handleLogout}
                   variant="outline"
                   size="sm"
-                  className="text-white border-white/20 hover:bg-white/10 hover:text-white backdrop-blur-sm px-3"
+                  className="text-white border-white/20 hover:bg-white/15 hover:text-white backdrop-blur-sm bg-white/10 px-3"
                 >
                   <LogOut className="w-4 h-4" />
                   <span className="ml-1 text-xs">Exit</span>
@@ -107,7 +107,7 @@ export function Navigation() {
                   onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                   variant="outline"
                   size="sm"
-                  className="text-white border-white/20 hover:bg-white/10 hover:text-white backdrop-blur-sm p-2"
+                  className="text-white border-white/20 hover:bg-white/15 hover:text-white backdrop-blur-sm bg-white/10 p-2"
                 >
                   {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
                 </Button>
