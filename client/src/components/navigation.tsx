@@ -45,11 +45,12 @@ export function Navigation() {
   ];
 
   return (
-    <div className="absolute top-0 left-0 right-0 z-20 p-4">
-      {/* Glass Morphism Navigation Bubble */}
-      <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl shadow-2xl max-w-7xl mx-auto">
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
+    <div className="absolute top-0 left-0 right-0 z-20">
+      <div className="container mx-auto px-4 pt-4">
+        {/* Glass Morphism Navigation Bubble */}
+        <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl shadow-2xl">
+          <div className="px-6 py-4">
+            <div className="flex items-center justify-between">
             {/* Logo and Title */}
             <div className="flex items-center space-x-3">
               <div className="flex items-center">
@@ -116,43 +117,44 @@ export function Navigation() {
                 </Button>
               </div>
             )}
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile Navigation Menu */}
-      {isMobile && mobileMenuOpen && (
-        <div className="mt-4 mobile-menu-enter">
-          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl shadow-2xl">
-            <div className="max-w-6xl mx-auto px-6 py-4">
-              <div className="flex flex-col space-y-1">
-                {user && (
-                  <div className="px-3 py-2 text-sm text-white/70 border-b border-white/20 mb-2">
-                    {user.email}
-                  </div>
-                )}
-                {navigationLinks.map((link, index) => (
-                  <a
-                    key={link.path}
-                    href={link.path}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`px-3 py-3 text-base font-medium rounded-lg transition-all mx-2 ${
-                      isActive(link.path)
-                        ? "bg-white/20 text-white border-l-4 border-white/50 backdrop-blur-sm"
-                        : "text-white/80 hover:bg-white/10 hover:text-white"
-                    }`}
-                    style={{
-                      animationDelay: `${index * 50}ms`
-                    }}
-                  >
-                    {link.label}
-                  </a>
-                ))}
-              </div>
             </div>
           </div>
         </div>
-      )}
+
+        {/* Mobile Navigation Menu */}
+        {isMobile && mobileMenuOpen && (
+          <div className="mt-4 mobile-menu-enter">
+            <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl shadow-2xl">
+              <div className="px-6 py-4">
+                <div className="flex flex-col space-y-1">
+                  {user && (
+                    <div className="px-3 py-2 text-sm text-white/70 border-b border-white/20 mb-2">
+                      {user.email}
+                    </div>
+                  )}
+                  {navigationLinks.map((link, index) => (
+                    <a
+                      key={link.path}
+                      href={link.path}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`px-3 py-3 text-base font-medium rounded-lg transition-all mx-2 ${
+                        isActive(link.path)
+                          ? "bg-white/20 text-white border-l-4 border-white/50 backdrop-blur-sm"
+                          : "text-white/80 hover:bg-white/10 hover:text-white"
+                      }`}
+                      style={{
+                        animationDelay: `${index * 50}ms`
+                      }}
+                    >
+                      {link.label}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
