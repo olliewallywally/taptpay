@@ -47,8 +47,8 @@ export function Navigation() {
   return (
     <div className="absolute top-0 left-0 right-0 z-20 p-4">
       {/* Glass Morphism Navigation Bubble */}
-      <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl shadow-2xl">
-        <div className="max-w-6xl mx-auto px-6 py-4">
+      <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl shadow-2xl max-w-7xl mx-auto">
+        <div className="px-6 py-4">
           <div className="flex items-center justify-between">
             {/* Logo and Title */}
             <div className="flex items-center space-x-3">
