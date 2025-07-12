@@ -33,6 +33,7 @@ export function Navigation() {
   const navigationLinks = [
     { path: "/merchant", label: "Terminal" },
     { path: "/dashboard", label: "Dashboard" },
+    { path: "/nfc", label: "NFC Pay" },
     { path: "/settings", label: "Settings" },
     { path: customerViewPath, label: "Customer View" },
   ];
