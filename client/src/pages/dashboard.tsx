@@ -230,13 +230,18 @@ export default function Dashboard() {
 
   if (analyticsLoading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-64 mb-6"></div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-32 bg-gray-200 rounded-lg"></div>
-            ))}
+      <div className="min-h-screen relative overflow-hidden">
+        {/* Gradient Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900"></div>
+        
+        <div className="relative z-10 max-w-7xl mx-auto px-4 py-8 pt-28">
+          <div className="animate-pulse">
+            <div className="h-8 backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl w-64 mb-6"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="h-32 backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl shadow-2xl"></div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
