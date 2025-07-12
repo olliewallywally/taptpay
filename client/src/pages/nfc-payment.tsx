@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Smartphone, Waves, CreditCard, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { Smartphone, Waves, CreditCard, CheckCircle, XCircle, Loader2, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function NFCPayment() {
@@ -14,6 +14,7 @@ export default function NFCPayment() {
   const [itemName, setItemName] = useState<string>("Coffee");
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "creating" | "ready" | "processing" | "completed" | "failed">("idle");
   const [nfcSession, setNfcSession] = useState<any>(null);
+  const [showNfcOverlay, setShowNfcOverlay] = useState(false);
   const { toast } = useToast();
 
   // Check NFC capabilities on load
@@ -72,6 +73,7 @@ export default function NFCPayment() {
       const result = await response.json();
       setNfcSession(result.nfcSession);
       setPaymentStatus("ready");
+      setShowNfcOverlay(true);
       
       toast({
         title: "NFC Payment Ready",
@@ -118,6 +120,10 @@ export default function NFCPayment() {
         const success = Math.random() > 0.1; // 90% success rate
         setPaymentStatus(success ? "completed" : "failed");
         
+        if (success) {
+          setShowNfcOverlay(false);
+        }
+        
         toast({
           title: success ? "Payment Successful!" : "Payment Failed",
           description: success ? 
@@ -141,8 +147,15 @@ export default function NFCPayment() {
   const resetPayment = () => {
     setPaymentStatus("idle");
     setNfcSession(null);
+    setShowNfcOverlay(false);
     setAmount("10.00");
     setItemName("Coffee");
+  };
+
+  const closeNfcOverlay = () => {
+    setShowNfcOverlay(false);
+    setPaymentStatus("idle");
+    setNfcSession(null);
   };
 
   return (
@@ -344,6 +357,127 @@ export default function NFCPayment() {
             </div>
           </CardContent>
         </Card>
+        
+        {/* NFC Overlay */}
+        {showNfcOverlay && (
+          <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex flex-col">
+            {/* Tap Here Indicator at Top */}
+            <div className="bg-blue-600 text-white text-center py-4 relative">
+              <Button
+                onClick={closeNfcOverlay}
+                variant="ghost"
+                size="sm"
+                className="absolute right-4 top-3 text-white hover:bg-blue-700"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+              <div className="flex items-center justify-center gap-2">
+                <Waves className="h-5 w-5 animate-pulse" />
+                <span className="text-lg font-semibold">TAP HERE TO PAY</span>
+                <Waves className="h-5 w-5 animate-pulse" />
+              </div>
+              <div className="text-sm opacity-90 mt-1">
+                ${nfcSession?.amount} • {nfcSession?.merchantName}
+              </div>
+            </div>
+            
+            {/* Main Overlay Content */}
+            <div className="flex-1 flex items-center justify-center p-6">
+              <Card className="w-full max-w-md">
+                <CardContent className="p-8 text-center">
+                  <div className="space-y-6">
+                    {paymentStatus === "ready" && (
+                      <>
+                        <div className="text-6xl animate-pulse">📱</div>
+                        <div>
+                          <h3 className="text-2xl font-bold mb-2">Hold Near Device</h3>
+                          <p className="text-gray-600 mb-4">
+                            Position your phone near the payment terminal
+                          </p>
+                          <div className="flex justify-center space-x-2 mb-6">
+                            {nfcCapabilities?.applePay && <Badge>Apple Pay</Badge>}
+                            {nfcCapabilities?.googlePay && <Badge>Google Pay</Badge>}
+                            {nfcCapabilities?.samsungPay && <Badge>Samsung Pay</Badge>}
+                            <Badge variant="outline">Contactless</Badge>
+                          </div>
+                          <Button 
+                            onClick={simulateNFCTap}
+                            className="w-full"
+                            size="lg"
+                          >
+                            <Waves className="mr-2 h-4 w-4" />
+                            Simulate Tap
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                    
+                    {paymentStatus === "processing" && (
+                      <>
+                        <div className="text-6xl animate-bounce">⚡</div>
+                        <div>
+                          <h3 className="text-2xl font-bold mb-2">Processing...</h3>
+                          <p className="text-gray-600">
+                            Securely processing your payment
+                          </p>
+                          <div className="mt-4">
+                            <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    
+                    {paymentStatus === "completed" && (
+                      <>
+                        <div className="text-6xl">✅</div>
+                        <div>
+                          <h3 className="text-2xl font-bold text-green-600 mb-2">Payment Successful!</h3>
+                          <p className="text-gray-600 mb-4">
+                            ${nfcSession?.amount} charged successfully
+                          </p>
+                          <Button 
+                            onClick={resetPayment}
+                            variant="outline"
+                            className="w-full"
+                          >
+                            Make Another Payment
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                    
+                    {paymentStatus === "failed" && (
+                      <>
+                        <div className="text-6xl">❌</div>
+                        <div>
+                          <h3 className="text-2xl font-bold text-red-600 mb-2">Payment Failed</h3>
+                          <p className="text-gray-600 mb-4">
+                            Please try again or use another payment method
+                          </p>
+                          <div className="space-y-2">
+                            <Button 
+                              onClick={simulateNFCTap}
+                              className="w-full"
+                            >
+                              Try Again
+                            </Button>
+                            <Button 
+                              onClick={closeNfcOverlay}
+                              variant="outline"
+                              className="w-full"
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
