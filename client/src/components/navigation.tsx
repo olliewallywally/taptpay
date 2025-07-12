@@ -40,9 +40,9 @@ export function Navigation() {
   ];
 
   return (
-    <div className="p-4">
+    <div className="absolute top-0 left-0 right-0 z-20 p-4">
       {/* Glass Morphism Navigation Bubble */}
-      <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl shadow-2xl">
+      <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl shadow-2xl">
         <div className="max-w-6xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             {/* Logo and Title */}
@@ -120,7 +120,7 @@ export function Navigation() {
       {/* Mobile Navigation Menu */}
       {isMobile && mobileMenuOpen && (
         <div className="mt-4">
-          <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl shadow-2xl">
+          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl shadow-2xl">
             <div className="max-w-6xl mx-auto px-6 py-4">
               <div className="flex flex-col space-y-1">
                 {user && (

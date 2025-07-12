@@ -271,7 +271,7 @@ export default function Dashboard() {
       </div>
 
       {/* Main Content */}
-      <div className="relative z-10 max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
+      <div className="relative z-10 max-w-7xl mx-auto px-3 sm:px-4 pt-24 pb-4 sm:pt-28 sm:pb-8">
         <div className="mb-6 sm:mb-8 text-center">
           <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Payment Dashboard</h1>
           <p className="text-sm sm:text-base text-white/70">Monitor your transactions and savings with our low-cost payment processing</p>
