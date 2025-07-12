@@ -213,7 +213,7 @@ export default function NFCPayment() {
                 <Badge variant="secondary" className="bg-gray-100 text-gray-800">Samsung Pay</Badge>
               )}
               {nfcCapabilities.contactlessCard && (
-                <Badge variant="outline" className="bg-white text-gray-800 border-gray-300">Contactless Cards</Badge>
+                <Badge variant="outline" className="bg-gray-100 text-gray-800 border-gray-300">Contactless Cards</Badge>
               )}
             </div>
             {nfcCapabilities.recommendations?.length > 0 && (
@@ -412,15 +412,15 @@ export default function NFCPayment() {
             
             {/* Main Overlay Content */}
             <div className="flex-1 flex items-center justify-center p-6">
-              <Card className="w-full max-w-md border-0 shadow-2xl animate-in slide-in-from-bottom duration-700 ease-out delay-200">
-                <CardContent className="p-8 text-center bg-white/95 backdrop-blur-sm rounded-lg">
+              <div className="w-full max-w-md border-0 shadow-2xl animate-in slide-in-from-bottom duration-700 ease-out delay-200">
+                <div className="p-8 text-center backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl shadow-2xl">
                   <div className="space-y-6">
                     {paymentStatus === "ready" && (
                       <>
                         <div className="text-5xl mb-6 animate-pulse">📱</div>
                         <div>
-                          <h3 className="text-xl font-semibold mb-3 text-gray-800">Hold Near Device</h3>
-                          <p className="text-gray-500 mb-6 text-sm">
+                          <h3 className="text-xl font-semibold mb-3 text-white">Hold Near Device</h3>
+                          <p className="text-white/70 mb-6 text-sm">
                             Position your phone near the payment terminal
                           </p>
                           <div className="flex justify-center space-x-2 mb-8">
@@ -445,8 +445,8 @@ export default function NFCPayment() {
                       <>
                         <div className="text-5xl animate-bounce mb-6">⚡</div>
                         <div>
-                          <h3 className="text-xl font-semibold mb-3 text-gray-800">Processing...</h3>
-                          <p className="text-gray-500 text-sm mb-6">
+                          <h3 className="text-xl font-semibold mb-3 text-white">Processing...</h3>
+                          <p className="text-white/70 text-sm mb-6">
                             Securely processing your payment
                           </p>
                           <div className="flex justify-center">
@@ -502,8 +502,8 @@ export default function NFCPayment() {
                       </>
                     )}
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </div>
           </div>
         )}
