@@ -132,146 +132,154 @@ export default function Login() {
 
   if (showSignup) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center p-4">
-        <div className="w-full max-w-md">
-          
-          {/* Logo Section */}
-          <div className="text-center mb-8">
-            <div className="flex justify-center mb-6">
-              <img 
-                src={taptLogoPath} 
-                alt="Tapt" 
-                className="h-12 w-auto"
-              />
-            </div>
-            <h1 className="text-2xl font-light text-gray-900 mb-2">
-              Create Your Account
-            </h1>
-            <p className="text-gray-500 text-sm">
-              Join Tapt and start accepting payments
-            </p>
-          </div>
+      <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
+        {/* Gradient Background with Floating Orbs */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+          {/* Animated Gradient Orbs */}
+          <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse"></div>
+          <div className="absolute top-40 right-20 w-96 h-96 bg-gradient-to-r from-cyan-400 to-blue-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse delay-75"></div>
+          <div className="absolute -bottom-8 left-40 w-96 h-96 bg-gradient-to-r from-yellow-400 to-orange-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse delay-150"></div>
+        </div>
 
-          {/* Back to Login Button */}
-          <div className="mb-6">
-            <Button
-              variant="ghost"
-              onClick={() => setShowSignup(false)}
-              className="flex items-center space-x-2 text-gray-600 hover:text-black"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Back to Login</span>
-            </Button>
-          </div>
-
-          {/* Simple Signup Form */}
-          <form onSubmit={(e) => {
-            e.preventDefault();
-            onSignupSubmit(signupData);
-          }} className="space-y-4">
+        {/* Glass Morphism Container */}
+        <div className="relative z-10 w-full max-w-md">
+          <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-8 shadow-2xl">
             
-            {/* Full Name */}
-            <div>
-              <Label className="text-sm font-medium text-gray-700">Full Name</Label>
-              <Input
-                placeholder="John Smith"
-                value={signupData.name}
-                onChange={(e) => setSignupData(prev => ({...prev, name: e.target.value}))}
-                className="mt-1 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
-              />
+            {/* Logo Section */}
+            <div className="text-center mb-8">
+              <div className="flex justify-center mb-6">
+                <div className="w-16 h-16 bg-white/20 backdrop-blur-lg rounded-2xl flex items-center justify-center border border-white/30">
+                  <span className="text-white font-bold text-xl">T</span>
+                </div>
+              </div>
+              <h1 className="text-2xl font-light text-white mb-2">
+                Create Your Account
+              </h1>
+              <p className="text-white/70 text-sm">
+                Join Tapt and start accepting payments
+              </p>
             </div>
 
-            {/* Business Name */}
-            <div>
-              <Label className="text-sm font-medium text-gray-700">Business Name</Label>
-              <Input
-                placeholder="My Business Ltd"
-                value={signupData.businessName}
-                onChange={(e) => setSignupData(prev => ({...prev, businessName: e.target.value}))}
-                className="mt-1 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
-              />
-            </div>
-
-            {/* Business Type */}
-            <div>
-              <Label className="text-sm font-medium text-gray-700">Business Type</Label>
-              <select
-                value={signupData.businessType}
-                onChange={(e) => setSignupData(prev => ({...prev, businessType: e.target.value}))}
-                className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
+            {/* Back to Login Button */}
+            <div className="mb-6">
+              <Button
+                variant="ghost"
+                onClick={() => setShowSignup(false)}
+                className="flex items-center space-x-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl"
               >
-                <option value="">Select business type</option>
-                <option value="retail">Retail</option>
-                <option value="restaurant">Restaurant</option>
-                <option value="cafe">Cafe</option>
-                <option value="service">Service</option>
-                <option value="online">Online</option>
-                <option value="other">Other</option>
-              </select>
+                <ArrowLeft className="w-4 h-4" />
+                <span>Back to Login</span>
+              </Button>
             </div>
 
-            {/* Email */}
-            <div>
-              <Label className="text-sm font-medium text-gray-700">Email Address</Label>
-              <Input
-                type="email"
-                placeholder="you@business.com"
-                value={signupData.email}
-                onChange={(e) => setSignupData(prev => ({...prev, email: e.target.value}))}
-                className="mt-1 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
-              />
-            </div>
-
-            {/* Phone */}
-            <div>
-              <Label className="text-sm font-medium text-gray-700">Phone Number</Label>
-              <Input
-                placeholder="+64 21 123 456"
-                value={signupData.phone}
-                onChange={(e) => setSignupData(prev => ({...prev, phone: e.target.value}))}
-                className="mt-1 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
-              />
-            </div>
-
-            {/* Address */}
-            <div>
-              <Label className="text-sm font-medium text-gray-700">Business Address</Label>
-              <Input
-                placeholder="123 Queen St, Auckland"
-                value={signupData.address}
-                onChange={(e) => setSignupData(prev => ({...prev, address: e.target.value}))}
-                className="mt-1 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
-              />
-            </div>
-
-            {/* Password Fields */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* Simple Signup Form */}
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              onSignupSubmit(signupData);
+            }} className="space-y-4">
+              
+              {/* Full Name */}
               <div>
-                <Label className="text-sm font-medium text-gray-700">Password</Label>
+                <Label className="text-sm font-medium text-white/90">Full Name</Label>
                 <Input
-                  type="password"
-                  placeholder="••••••••"
-                  value={signupData.password}
-                  onChange={(e) => setSignupData(prev => ({...prev, password: e.target.value}))}
-                  className="mt-1 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
+                  placeholder="John Smith"
+                  value={signupData.name}
+                  onChange={(e) => setSignupData(prev => ({...prev, name: e.target.value}))}
+                  className="mt-2 px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all duration-300"
                 />
               </div>
+
+              {/* Business Name */}
               <div>
-                <Label className="text-sm font-medium text-gray-700">Confirm Password</Label>
+                <Label className="text-sm font-medium text-white/90">Business Name</Label>
                 <Input
-                  type="password"
-                  placeholder="••••••••"
-                  value={signupData.confirmPassword}
-                  onChange={(e) => setSignupData(prev => ({...prev, confirmPassword: e.target.value}))}
-                  className="mt-1 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
+                  placeholder="My Business Ltd"
+                  value={signupData.businessName}
+                  onChange={(e) => setSignupData(prev => ({...prev, businessName: e.target.value}))}
+                  className="mt-2 px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all duration-300"
                 />
               </div>
-            </div>
+
+              {/* Business Type */}
+              <div>
+                <Label className="text-sm font-medium text-white/90">Business Type</Label>
+                <select
+                  value={signupData.businessType}
+                  onChange={(e) => setSignupData(prev => ({...prev, businessType: e.target.value}))}
+                  className="mt-2 w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all duration-300"
+                >
+                  <option value="" className="bg-slate-800 text-white">Select business type</option>
+                  <option value="retail" className="bg-slate-800 text-white">Retail</option>
+                  <option value="restaurant" className="bg-slate-800 text-white">Restaurant</option>
+                  <option value="cafe" className="bg-slate-800 text-white">Cafe</option>
+                  <option value="service" className="bg-slate-800 text-white">Service</option>
+                  <option value="online" className="bg-slate-800 text-white">Online</option>
+                  <option value="other" className="bg-slate-800 text-white">Other</option>
+                </select>
+              </div>
+
+              {/* Email */}
+              <div>
+                <Label className="text-sm font-medium text-white/90">Email Address</Label>
+                <Input
+                  type="email"
+                  placeholder="you@business.com"
+                  value={signupData.email}
+                  onChange={(e) => setSignupData(prev => ({...prev, email: e.target.value}))}
+                  className="mt-2 px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all duration-300"
+                />
+              </div>
+
+              {/* Phone */}
+              <div>
+                <Label className="text-sm font-medium text-white/90">Phone Number</Label>
+                <Input
+                  placeholder="+64 21 123 456"
+                  value={signupData.phone}
+                  onChange={(e) => setSignupData(prev => ({...prev, phone: e.target.value}))}
+                  className="mt-2 px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all duration-300"
+                />
+              </div>
+
+              {/* Address */}
+              <div>
+                <Label className="text-sm font-medium text-white/90">Business Address</Label>
+                <Input
+                  placeholder="123 Queen St, Auckland"
+                  value={signupData.address}
+                  onChange={(e) => setSignupData(prev => ({...prev, address: e.target.value}))}
+                  className="mt-2 px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all duration-300"
+                />
+              </div>
+
+              {/* Password Fields */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-white/90">Password</Label>
+                  <Input
+                    type="password"
+                    placeholder="••••••••"
+                    value={signupData.password}
+                    onChange={(e) => setSignupData(prev => ({...prev, password: e.target.value}))}
+                    className="mt-2 px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all duration-300"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-white/90">Confirm Password</Label>
+                  <Input
+                    type="password"
+                    placeholder="••••••••"
+                    value={signupData.confirmPassword}
+                    onChange={(e) => setSignupData(prev => ({...prev, confirmPassword: e.target.value}))}
+                    className="mt-2 px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all duration-300"
+                  />
+                </div>
+              </div>
 
               <Button
                 type="submit"
                 disabled={signupMutation.isPending}
-                className="w-full bg-black hover:bg-gray-800 text-white py-3 px-6 rounded-lg font-medium transition-all disabled:opacity-50"
+                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white py-4 px-6 rounded-xl font-medium transition-all duration-300 disabled:opacity-50 shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
               >
                 {signupMutation.isPending ? (
                   <div className="flex items-center justify-center space-x-2">
@@ -284,11 +292,12 @@ export default function Login() {
               </Button>
             </form>
 
-          {/* Footer */}
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-400">
-              By creating an account, you agree to our terms of service
-            </p>
+            {/* Footer */}
+            <div className="mt-6 text-center">
+              <p className="text-sm text-white/50">
+                By creating an account, you agree to our terms of service
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -296,168 +305,177 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
-        
-        {/* Logo Section */}
-        <div className="text-center mb-12">
-          <div className="flex justify-center mb-8">
-            <img 
-              src={taptLogoPath} 
-              alt="Tapt" 
-              className="h-12 w-auto"
-            />
-          </div>
-          <h1 className="text-2xl font-light text-gray-900 mb-2">
-            Welcome back
-          </h1>
-          <p className="text-gray-500 text-sm">
-            Sign in to continue
-          </p>
-        </div>
+    <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
+      {/* Gradient Background with Floating Orbs */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+        {/* Animated Gradient Orbs */}
+        <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse"></div>
+        <div className="absolute top-40 right-20 w-96 h-96 bg-gradient-to-r from-cyan-400 to-blue-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse delay-75"></div>
+        <div className="absolute -bottom-8 left-40 w-96 h-96 bg-gradient-to-r from-yellow-400 to-orange-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse delay-150"></div>
+      </div>
 
-        {/* Login Type Toggle */}
-        <div className="mb-6">
-          <div className="flex bg-gray-100 rounded-lg p-1">
-            <button
-              type="button"
-              onClick={() => setLoginType('merchant')}
-              className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-md text-sm font-medium transition-all ${
-                loginType === 'merchant'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <LogIn className="w-4 h-4" />
-              <span>Merchant Login</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setLoginType('admin')}
-              className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-md text-sm font-medium transition-all ${
-                loginType === 'admin'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <Shield className="w-4 h-4" />
-              <span>Admin Login</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Login Form */}
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="space-y-5">
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-medium text-gray-700">
-                      Email
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        type="email"
-                        placeholder="demo@tapt.co.nz"
-                        className="mt-1 w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent transition-all"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-medium text-gray-700">
-                      Password
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="demo123"
-                        className="mt-1 w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent transition-all"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            {/* Admin Credentials Info */}
-            {loginType === 'admin' && (
-              <div className="bg-gray-50 border border-gray-100 rounded-lg p-4">
-                <p className="text-sm text-gray-600 text-center">
-                  <span className="font-medium">Admin credentials pre-filled</span>
-                </p>
+      {/* Glass Morphism Container */}
+      <div className="relative z-10 w-full max-w-md">
+        <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-8 shadow-2xl">
+          
+          {/* Logo Section */}
+          <div className="text-center mb-8">
+            <div className="flex justify-center mb-6">
+              <div className="w-16 h-16 bg-white/20 backdrop-blur-lg rounded-2xl flex items-center justify-center border border-white/30">
+                <span className="text-white font-bold text-xl">T</span>
               </div>
-            )}
+            </div>
+            <h1 className="text-2xl font-light text-white mb-2">
+              Welcome back
+            </h1>
+            <p className="text-white/70 text-sm">
+              Sign in to continue
+            </p>
+          </div>
 
-            {/* Login Button */}
-            <Button
-              type="submit"
-              disabled={loginMutation.isPending}
-              className="w-full bg-black hover:bg-gray-800 text-white py-3 px-6 rounded-lg font-medium transition-all disabled:opacity-50"
-            >
-              {loginMutation.isPending ? (
-                <div className="flex items-center justify-center space-x-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span>Signing in...</span>
+          {/* Login Type Toggle */}
+          <div className="mb-6">
+            <div className="flex bg-white/10 backdrop-blur-sm rounded-2xl p-1 border border-white/20">
+              <button
+                type="button"
+                onClick={() => setLoginType('merchant')}
+                className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-sm font-medium transition-all duration-300 ${
+                  loginType === 'merchant'
+                    ? 'bg-white/20 text-white shadow-lg backdrop-blur-sm border border-white/30'
+                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <LogIn className="w-4 h-4" />
+                <span>Merchant</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setLoginType('admin')}
+                className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-sm font-medium transition-all duration-300 ${
+                  loginType === 'admin'
+                    ? 'bg-white/20 text-white shadow-lg backdrop-blur-sm border border-white/30'
+                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <Shield className="w-4 h-4" />
+                <span>Admin</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Login Form */}
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <div className="space-y-5">
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium text-white/90">
+                        Email
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          type="email"
+                          placeholder="demo@tapt.co.nz"
+                          className="mt-2 w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all duration-300"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage className="text-red-300" />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium text-white/90">
+                        Password
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          type="password"
+                          placeholder="demo123"
+                          className="mt-2 w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all duration-300"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage className="text-red-300" />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Admin Credentials Info */}
+              {loginType === 'admin' && (
+                <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4">
+                  <p className="text-sm text-white/80 text-center">
+                    <span className="font-medium">Admin credentials pre-filled</span>
+                  </p>
                 </div>
-              ) : (
-                `Sign in as ${loginType === 'merchant' ? 'Merchant' : 'Admin'}`
               )}
-            </Button>
+
+              {/* Login Button */}
+              <Button
+                type="submit"
+                disabled={loginMutation.isPending}
+                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white py-4 px-6 rounded-xl font-medium transition-all duration-300 disabled:opacity-50 shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
+              >
+                {loginMutation.isPending ? (
+                  <div className="flex items-center justify-center space-x-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Signing in...</span>
+                  </div>
+                ) : (
+                  'Sign In'
+                )}
+              </Button>
             
             {/* Forgot Password Link - Only show for merchant login */}
             {loginType === 'merchant' && (
               <div className="text-center mt-4">
                 <Link href="/forgot-password">
-                  <Button variant="ghost" className="text-sm text-gray-600 hover:text-black">
+                  <Button variant="ghost" className="text-sm text-white/70 hover:text-white">
                     Forgot your password?
                   </Button>
                 </Link>
               </div>
             )}
-          </form>
-        </Form>
+            </form>
+          </Form>
 
-        {/* Signup Section - Only show for merchant login */}
-        {loginType === 'merchant' && (
-          <div className="mt-8 border-t border-gray-100 pt-8">
-            <div className="text-center space-y-4">
-              <p className="text-sm text-gray-600">
-                Don't have an account yet?
-              </p>
-              <Button
-                variant="outline"
-                onClick={() => setShowSignup(true)}
-                className="w-full flex items-center justify-center space-x-2 border-gray-200 hover:border-black hover:bg-gray-50"
-              >
-                <UserPlus className="w-4 h-4" />
-                <span>Create New Account</span>
-              </Button>
+          {/* Signup Section - Only show for merchant login */}
+          {loginType === 'merchant' && (
+            <div className="mt-8 border-t border-white/20 pt-8">
+              <div className="text-center space-y-4">
+                <p className="text-sm text-white/70">
+                  Don't have an account yet?
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowSignup(true)}
+                  className="w-full flex items-center justify-center space-x-2 bg-white/10 border-white/20 text-white hover:bg-white/20 hover:border-white/40 backdrop-blur-sm rounded-xl transition-all duration-300"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>Create New Account</span>
+                </Button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Footer */}
-        <div className="mt-8 text-center">
-          <p className="text-sm text-gray-400">
-            Need help?{" "}
-            <a href="#" className="text-gray-600 hover:text-black font-medium transition-colors">
-              Contact support
-            </a>
-          </p>
+          {/* Footer */}
+          <div className="mt-8 text-center">
+            <p className="text-sm text-white/50">
+              Need help?{" "}
+              <a href="#" className="text-white/70 hover:text-white font-medium transition-colors">
+                Contact support
+              </a>
+            </p>
+          </div>
         </div>
       </div>
     </div>
