@@ -335,14 +335,14 @@ export default function Login() {
 
           {/* Login Type Toggle */}
           <div className="mb-6">
-            <div className="flex backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl p-1 shadow-2xl">
+            <div className="flex backdrop-blur-xl bg-white/5 border border-white/20 rounded-2xl p-1 shadow-lg">
               <button
                 type="button"
                 onClick={() => setLoginType('merchant')}
                 className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-sm font-medium transition-all duration-300 ${
                   loginType === 'merchant'
-                    ? 'backdrop-blur-xl bg-white/20 text-white shadow-lg border border-white/30'
-                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                    ? 'backdrop-blur-xl bg-white/15 text-white shadow-md border border-white/30'
+                    : 'text-white/70 hover:text-white hover:bg-white/5 hover:backdrop-blur-lg'
                 }`}
               >
                 <LogIn className="w-4 h-4" />
@@ -353,8 +353,8 @@ export default function Login() {
                 onClick={() => setLoginType('admin')}
                 className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-sm font-medium transition-all duration-300 ${
                   loginType === 'admin'
-                    ? 'backdrop-blur-xl bg-white/20 text-white shadow-lg border border-white/30'
-                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                    ? 'backdrop-blur-xl bg-white/15 text-white shadow-md border border-white/30'
+                    : 'text-white/70 hover:text-white hover:bg-white/5 hover:backdrop-blur-lg'
                 }`}
               >
                 <Shield className="w-4 h-4" />
