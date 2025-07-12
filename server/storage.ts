@@ -23,8 +23,10 @@ export interface IStorage {
   // Transaction operations
   getTransaction(id: number): Promise<Transaction | undefined>;
   getActiveTransactionByMerchant(merchantId: number): Promise<Transaction | undefined>;
+  getTransactionByNfcSession(nfcSessionId: string): Promise<Transaction | undefined>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   updateTransactionStatus(id: number, status: string, windcaveTransactionId?: string): Promise<Transaction | undefined>;
+  updateTransactionNfcSession(id: number, nfcSessionId: string): Promise<Transaction | undefined>;
   getTransactionsByMerchant(merchantId: number): Promise<Transaction[]>;
   
   // Platform revenue operations (Marketplace Model)
@@ -244,6 +246,11 @@ export class MemStorage implements IStorage {
     return activeTransaction;
   }
 
+  async getTransactionByNfcSession(nfcSessionId: string): Promise<Transaction | undefined> {
+    return Array.from(this.transactions.values())
+      .find(t => t.nfcSessionId === nfcSessionId);
+  }
+
   async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
     const id = this.currentTransactionId++;
     const transactionAmount = parseFloat(insertTransaction.price);
@@ -338,6 +345,18 @@ export class MemStorage implements IStorage {
       this.activeTransactionCache.delete(transaction.merchantId);
     }
     
+    return updatedTransaction;
+  }
+
+  async updateTransactionNfcSession(id: number, nfcSessionId: string): Promise<Transaction | undefined> {
+    const transaction = this.transactions.get(id);
+    if (!transaction) return undefined;
+    
+    const updatedTransaction = {
+      ...transaction,
+      nfcSessionId,
+    };
+    this.transactions.set(id, updatedTransaction);
     return updatedTransaction;
   }
 
@@ -813,6 +832,26 @@ export class DatabaseStorage implements IStorage {
     const result = await this.db
       .update(transactions)
       .set(updateData)
+      .where(eq(transactions.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getTransactionByNfcSession(nfcSessionId: string): Promise<Transaction | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.nfcSessionId, nfcSessionId))
+      .limit(1);
+    return result[0];
+  }
+
+  async updateTransactionNfcSession(id: number, nfcSessionId: string): Promise<Transaction | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .update(transactions)
+      .set({ nfcSessionId })
       .where(eq(transactions.id, id))
       .returning();
     return result[0];

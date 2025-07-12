@@ -22,6 +22,7 @@ import AdminMerchantDetail from "@/pages/admin-merchant";
 import AdminRevenue from "@/pages/admin-revenue";
 import CreateMerchant from "@/pages/create-merchant";
 import VerifyMerchant from "@/pages/verify-merchant";
+import NFCPayment from "@/pages/nfc-payment";
 import { Layout } from "@/components/layout";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -189,6 +190,7 @@ function Router() {
       <Route path="/verify-merchant" component={VerifyMerchant} />
       <Route path="/pay/:merchantId" component={CustomerPayment} />
       <Route path="/receipt/:transactionId" component={Receipt} />
+      <Route path="/nfc" component={NFCPayment} />
       <Route component={NotFound} />
     </Switch>
   );
