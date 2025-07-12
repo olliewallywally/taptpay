@@ -15,11 +15,19 @@ export function SlideToPayComponent({
 }: SlideToPayProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragProgress, setDragProgress] = useState(0);
+  const [isCompleted, setIsCompleted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleDragEnd = () => {
     if (dragProgress > 0.8 && !disabled) {
+      console.log("Slide to pay completed - triggering payment");
+      setIsCompleted(true);
       onPayment();
+      // Keep the slider at the end position briefly to show completion
+      setTimeout(() => {
+        setDragProgress(0);
+        setIsCompleted(false);
+      }, 800);
     } else {
       setDragProgress(0);
     }
@@ -42,10 +50,14 @@ export function SlideToPayComponent({
       >
         {/* Background gradient based on progress */}
         <div 
-          className="absolute inset-0 bg-gradient-to-r from-[hsl(155,40%,25%)] to-green-600 transition-all duration-300"
+          className={`absolute inset-0 transition-all duration-300 ${
+            isCompleted 
+              ? 'bg-gradient-to-r from-green-500 to-green-600 animate-pulse' 
+              : 'bg-gradient-to-r from-[hsl(155,40%,25%)] to-green-600'
+          }`}
           style={{ 
-            width: `${dragProgress * 100}%`,
-            opacity: dragProgress > 0 ? 0.8 : 0 
+            width: isCompleted ? '100%' : `${dragProgress * 100}%`,
+            opacity: dragProgress > 0 || isCompleted ? 0.8 : 0 
           }}
         />
         
@@ -53,10 +65,11 @@ export function SlideToPayComponent({
         <div className="absolute inset-0 flex items-center justify-center">
           <span 
             className={`font-medium transition-all duration-300 ${
-              dragProgress > 0.5 ? 'text-white' : 'text-gray-600'
+              dragProgress > 0.5 || isCompleted ? 'text-white' : 'text-gray-600'
             }`}
           >
-            {dragProgress > 0.8 ? 'Release to Pay' : 'Slide to Pay'}
+            {isCompleted ? 'Payment Started!' : 
+             dragProgress > 0.8 ? 'Release to Pay' : 'Slide to Pay'}
           </span>
         </div>
         
