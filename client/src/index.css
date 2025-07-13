@@ -353,15 +353,15 @@
   
   /* Terminal page mobile optimizations */
   .backdrop-blur-xl {
-    /* Improve text contrast on mobile */
-    background: rgba(255, 255, 255, 0.12) !important;
-    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    /* Glass morphism - transparent background */
+    background: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
   }
   
   /* Better mobile button visibility */
   .backdrop-blur-sm {
-    background: rgba(255, 255, 255, 0.18) !important;
-    border: 1px solid rgba(255, 255, 255, 0.35) !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.20) !important;
   }
   
   /* Ensure form labels are visible */
@@ -370,20 +370,20 @@
     font-weight: 500;
   }
   
-  /* Better input contrast */
+  /* Glass input styling */
   input {
-    background: rgba(255, 255, 255, 0.15) !important;
-    border: 1px solid rgba(255, 255, 255, 0.3) !important;
-    color: white !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.20) !important;
+    color: black !important;
   }
   
   input::placeholder {
-    color: rgba(255, 255, 255, 0.7) !important;
+    color: rgba(0, 0, 0, 0.6) !important;
   }
   
   input:focus {
-    background: rgba(255, 255, 255, 0.2) !important;
-    border: 1px solid rgba(255, 255, 255, 0.4) !important;
+    background: rgba(255, 255, 255, 0.12) !important;
+    border: 1px solid rgba(255, 255, 255, 0.30) !important;
   }
 }
 

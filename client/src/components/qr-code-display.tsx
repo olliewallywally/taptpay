@@ -78,7 +78,7 @@ export function QRCodeDisplay({ paymentUrl, qrCodeUrl, merchantId }: QRCodeDispl
           <Button
             onClick={handleDownloadQR}
             disabled={isDownloading}
-            className="w-full sm:w-auto backdrop-blur-sm bg-white/15 border border-white/30 text-white hover:bg-white/25 hover:border-white/40 px-4 py-2 h-10 sm:h-9 rounded-lg text-xs sm:text-sm font-medium transition-all duration-300"
+            className="w-full sm:w-auto backdrop-blur-sm bg-white/5 border border-white/15 text-white hover:bg-white/8 hover:border-white/20 px-4 py-2 h-10 sm:h-9 rounded-lg text-xs sm:text-sm font-medium transition-all duration-300"
           >
             {isDownloading ? (
               <>
