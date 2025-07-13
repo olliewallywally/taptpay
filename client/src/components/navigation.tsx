@@ -104,7 +104,7 @@ export function Navigation() {
                   onClick={handleLogout}
                   variant="outline"
                   size="sm"
-                  className="text-black border-white/20 hover:bg-white/15 hover:text-black backdrop-blur-sm bg-white/10 px-3"
+                  className="text-white border-white/20 hover:bg-white/15 hover:text-white backdrop-blur-sm bg-white/10 px-3"
                 >
                   <LogOut className="w-4 h-4" />
                   <span className="ml-1 text-xs">Exit</span>
@@ -113,7 +113,7 @@ export function Navigation() {
                   onClick={handleMenuToggle}
                   variant="outline"
                   size="sm"
-                  className="text-black border-white/20 hover:bg-white/15 hover:text-black backdrop-blur-sm bg-white/10 p-2"
+                  className="text-white border-white/20 hover:bg-white/15 hover:text-white backdrop-blur-sm bg-white/10 p-2"
                 >
                   {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
                 </Button>
