@@ -180,7 +180,7 @@ export default function MerchantTerminal() {
         <div className="grid lg:grid-cols-2 gap-4 sm:gap-6 mb-6">
           
           {/* Transaction Entry Card */}
-          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl">
+          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl transition-all duration-300 hover:bg-white/15 hover:border-white/30 hover:transform hover:translate-y-[-2px] hover:shadow-[0_12px_40px_rgba(0,0,0,0.15)]">
             <div className="mb-4">
               <h2 className="text-lg font-bold text-white mb-2">New Transaction</h2>
               <p className="text-sm text-white/70">Enter item details</p>
@@ -235,7 +235,7 @@ export default function MerchantTerminal() {
           </div>
 
           {/* QR Code Section */}
-          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl">
+          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl transition-all duration-300 hover:bg-white/15 hover:border-white/30 hover:transform hover:translate-y-[-2px] hover:shadow-[0_12px_40px_rgba(0,0,0,0.15)]">
             <div className="mb-4">
               <h2 className="text-lg font-bold text-white mb-2">QR Code</h2>
               <p className="text-sm text-white/70">Static payment code</p>
@@ -254,7 +254,7 @@ export default function MerchantTerminal() {
         {/* Payment Status Row */}
         {currentTransaction && (
           <div className="mb-6">
-            <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl">
+            <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl transition-all duration-300 hover:bg-white/15 hover:border-white/30 hover:transform hover:translate-y-[-2px] hover:shadow-[0_12px_40px_rgba(0,0,0,0.15)]">
               <div className="text-center mb-4">
                 <h3 className="text-lg font-bold text-white mb-1">
                   Transaction #{currentTransaction.id}
@@ -271,7 +271,7 @@ export default function MerchantTerminal() {
         {/* Bottom Row: Payment Link + Customer Page */}
         <div className="grid lg:grid-cols-2 gap-4 sm:gap-6 mb-6">
           {/* Payment Link Section */}
-          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl">
+          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl transition-all duration-300 hover:bg-white/15 hover:border-white/30 hover:transform hover:translate-y-[-2px] hover:shadow-[0_12px_40px_rgba(0,0,0,0.15)]">
             <div className="mb-4">
               <h2 className="text-lg font-bold text-white mb-2">Payment Link</h2>
               <p className="text-sm text-white/70">Share this link with customers</p>
@@ -316,7 +316,7 @@ export default function MerchantTerminal() {
           </div>
 
           {/* Customer Payment Page Button */}
-          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl">
+          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl transition-all duration-300 hover:bg-white/15 hover:border-white/30 hover:transform hover:translate-y-[-2px] hover:shadow-[0_12px_40px_rgba(0,0,0,0.15)]">
             <div className="flex items-center justify-center h-full">
               {merchant?.paymentUrl && (
                 <Link href={`/pay/${merchantId}`}>
