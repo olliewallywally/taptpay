@@ -13,7 +13,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentMerchantId } from "@/lib/auth";
-import { Send, Loader2, CheckCircle, Clock, XCircle, Eye } from "lucide-react";
+import { Send, Loader2, CheckCircle, Clock, XCircle, Eye, Copy, Check } from "lucide-react";
 import { Link } from "wouter";
 
 const transactionFormSchema = z.object({
@@ -25,6 +25,7 @@ type TransactionFormData = z.infer<typeof transactionFormSchema>;
 
 export default function MerchantTerminal() {
   const [currentTransaction, setCurrentTransaction] = useState<any>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const merchantId = getCurrentMerchantId();
@@ -282,6 +283,51 @@ export default function MerchantTerminal() {
               qrCodeUrl={merchant?.qrCodeUrl}
               merchantId={merchantId}
             />
+            
+            {/* Payment Link Section */}
+            {merchant?.paymentUrl && (
+              <div className="mt-6 space-y-3">
+                <div className="text-center">
+                  <p className="text-sm text-white/70 mb-2">Payment Link</p>
+                  <div className="flex items-center gap-2 p-3 bg-white/5 border border-white/20 rounded-xl">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-white/90 truncate font-mono">
+                        {merchant.paymentUrl}
+                      </p>
+                    </div>
+                    <Button
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(merchant.paymentUrl);
+                          setCopiedLink(true);
+                          toast({
+                            title: "Copied!",
+                            description: "Payment link copied to clipboard",
+                          });
+                          setTimeout(() => setCopiedLink(false), 2000);
+                        } catch (err) {
+                          toast({
+                            title: "Failed to copy",
+                            description: "Please copy the link manually",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      size="sm"
+                      variant="outline"
+                      className="text-white border-white/20 hover:bg-white/15 hover:text-white backdrop-blur-sm bg-white/10 shrink-0"
+                    >
+                      {copiedLink ? (
+                        <Check className="h-4 w-4" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {!currentTransaction && (
               <div className="mt-6 text-center p-4 bg-emerald-500/20 backdrop-blur-sm rounded-2xl border border-emerald-400/30">
                 <p className="text-sm text-emerald-200 font-medium">
