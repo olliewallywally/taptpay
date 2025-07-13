@@ -10,6 +10,7 @@ import CustomerPayment from "@/pages/customer-payment";
 import Receipt from "@/pages/receipt";
 import Dashboard from "@/pages/dashboard";
 import Settings from "@/pages/settings";
+import Transactions from "@/pages/transactions";
 
 
 import Login from "@/pages/login";
@@ -153,6 +154,13 @@ function Router() {
           <ProtectedRoute>
             <Layout>
               <Settings />
+            </Layout>
+          </ProtectedRoute>
+        </Route>
+        <Route path="/transactions">
+          <ProtectedRoute>
+            <Layout>
+              <Transactions />
             </Layout>
           </ProtectedRoute>
         </Route>
