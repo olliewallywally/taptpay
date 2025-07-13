@@ -203,7 +203,7 @@ export default function MerchantTerminal() {
                         <Input
                           placeholder="Coffee, Lunch, etc."
                           {...field}
-                          className="backdrop-blur-sm bg-white/10 border-white/20 text-white placeholder:text-white/60 focus:bg-white/15 focus:border-white/30 h-11 sm:h-10 text-base font-medium"
+                          className="backdrop-blur-sm bg-white/10 border-white/20 text-black sm:text-white placeholder:text-gray-600 sm:placeholder:text-white/60 focus:bg-white/15 focus:border-white/30 h-11 sm:h-10 text-base font-medium"
                         />
                       </FormControl>
                       <FormMessage className="text-red-300 text-xs" />
@@ -220,7 +220,7 @@ export default function MerchantTerminal() {
                         <Input
                           placeholder="4.50"
                           {...field}
-                          className="backdrop-blur-sm bg-white/10 border-white/20 text-white placeholder:text-white/60 focus:bg-white/15 focus:border-white/30 h-11 sm:h-10 text-base font-medium"
+                          className="backdrop-blur-sm bg-white/10 border-white/20 text-black sm:text-white placeholder:text-gray-600 sm:placeholder:text-white/60 focus:bg-white/15 focus:border-white/30 h-11 sm:h-10 text-base font-medium"
                         />
                       </FormControl>
                       <FormMessage className="text-red-300 text-xs" />
