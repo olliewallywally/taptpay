@@ -268,7 +268,67 @@ export default function MerchantTerminal() {
           </div>
         )}
 
+        {/* Bottom Row: Payment Link + Customer Page */}
+        <div className="grid lg:grid-cols-2 gap-4 sm:gap-6 mb-6">
+          {/* Payment Link Section */}
+          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl">
+            <div className="mb-4">
+              <h2 className="text-lg font-bold text-white mb-2">Payment Link</h2>
+              <p className="text-sm text-white/70">Share this link with customers</p>
+            </div>
+            
+            {merchant?.paymentUrl && (
+              <div className="flex items-center gap-3 p-3 bg-white/5 border border-white/10 rounded-xl">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-white/90 truncate font-mono">
+                    {merchant.paymentUrl}
+                  </p>
+                </div>
+                <Button
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(merchant.paymentUrl);
+                      setCopiedLink(true);
+                      toast({
+                        title: "Copied!",
+                        description: "Payment link copied to clipboard",
+                      });
+                      setTimeout(() => setCopiedLink(false), 2000);
+                    } catch (err) {
+                      toast({
+                        title: "Failed to copy",
+                        description: "Please copy the link manually",
+                        variant: "destructive",
+                      });
+                    }
+                  }}
+                  size="sm"
+                  className="backdrop-blur-sm bg-white/10 border border-white/20 text-white hover:bg-white/20 hover:border-white/30 shrink-0 px-3 py-2"
+                >
+                  {copiedLink ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            )}
+          </div>
 
+          {/* Customer Payment Page Button */}
+          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl">
+            <div className="flex items-center justify-center h-full">
+              {merchant?.paymentUrl && (
+                <Link href={`/pay/${merchantId}`}>
+                  <Button className="backdrop-blur-sm bg-white/10 border border-white/20 text-white hover:bg-white/20 hover:border-white/30 px-6 py-3 rounded-xl font-medium transition-all duration-300">
+                    <Eye className="mr-2 h-4 w-4" />
+                    View Customer Payment Page
+                  </Button>
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
 
         {/* Transactions Button - Bottom of page */}
         <div className="mt-8 mb-8">
