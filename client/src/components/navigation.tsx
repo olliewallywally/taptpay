@@ -49,7 +49,7 @@ export function Navigation() {
       <div className="container mx-auto px-4 pt-4">
         {/* Glass Morphism Navigation Bubble */}
         <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl shadow-2xl">
-          <div className="px-6 py-4">
+          <div className="px-3 py-2 sm:px-6 sm:py-4">
             <div className="flex items-center justify-between">
             {/* Logo and Title */}
             <div className="flex items-center space-x-3">
@@ -57,10 +57,12 @@ export function Navigation() {
                 <img 
                   src={taptLogoUrl} 
                   alt="Tapt Logo" 
-                  className="h-8 w-auto filter brightness-0 invert"
+                  className="h-6 sm:h-8 w-auto filter brightness-0 invert"
                 />
                 {user && (
-                  <p className="text-xs text-white/60 ml-4">Welcome back, {user.email}</p>
+                  <div className="ml-2 sm:ml-4 hidden sm:block">
+                    <p className="text-xs text-white/60">Welcome back, {user.email}</p>
+                  </div>
                 )}
               </div>
             </div>
