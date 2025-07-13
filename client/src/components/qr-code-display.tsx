@@ -56,7 +56,7 @@ export function QRCodeDisplay({ paymentUrl, qrCodeUrl, merchantId }: QRCodeDispl
   };
   return (
     <div className="text-center">
-      <div className="mb-6">
+      <div className="mb-4">
         {actualQrCodeUrl ? (
           <img 
             src={actualQrCodeUrl} 
@@ -72,6 +72,28 @@ export function QRCodeDisplay({ paymentUrl, qrCodeUrl, merchantId }: QRCodeDispl
           </div>
         )}
       </div>
+
+      {actualQrCodeUrl && (
+        <div className="mb-4">
+          <Button
+            onClick={handleDownloadQR}
+            disabled={isDownloading}
+            className="backdrop-blur-sm bg-white/10 border border-white/20 text-white hover:bg-white/20 hover:border-white/30 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300"
+          >
+            {isDownloading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Downloading...
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4 mr-2" />
+                Download QR Code
+              </>
+            )}
+          </Button>
+        </div>
+      )}
 
       <p className="text-xs text-white/60 mt-4">
         Customers scan this QR code to pay
