@@ -343,10 +343,47 @@
   /* Ensure readable text sizes */
   .text-xs {
     font-size: 0.75rem;
+    line-height: 1.4;
   }
   
   .text-sm {
     font-size: 0.875rem;
+    line-height: 1.4;
+  }
+  
+  /* Terminal page mobile optimizations */
+  .backdrop-blur-xl {
+    /* Improve text contrast on mobile */
+    background: rgba(255, 255, 255, 0.12) !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  }
+  
+  /* Better mobile button visibility */
+  .backdrop-blur-sm {
+    background: rgba(255, 255, 255, 0.18) !important;
+    border: 1px solid rgba(255, 255, 255, 0.35) !important;
+  }
+  
+  /* Ensure form labels are visible */
+  label {
+    color: rgba(255, 255, 255, 0.95) !important;
+    font-weight: 500;
+  }
+  
+  /* Better input contrast */
+  input {
+    background: rgba(255, 255, 255, 0.15) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    color: white !important;
+  }
+  
+  input::placeholder {
+    color: rgba(255, 255, 255, 0.7) !important;
+  }
+  
+  input:focus {
+    background: rgba(255, 255, 255, 0.2) !important;
+    border: 1px solid rgba(255, 255, 255, 0.4) !important;
   }
 }
 
