@@ -385,6 +385,32 @@
     background: rgba(255, 255, 255, 0.12) !important;
     border: 1px solid rgba(255, 255, 255, 0.30) !important;
   }
+
+  /* COMPLETE TABLE TRANSPARENCY OVERRIDE - MOBILE ONLY */
+  table,
+  tbody,
+  thead,
+  tr,
+  td,
+  th,
+  .dashboard-card-glass table,
+  .dashboard-card-glass tbody,
+  .dashboard-card-glass thead,
+  .dashboard-card-glass tr,
+  .dashboard-card-glass td,
+  .dashboard-card-glass th,
+  .backdrop-blur-lg,
+  .bg-white\/5 {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+
+  /* Force all transaction container transparency */
+  .dashboard-card-glass .backdrop-blur-lg,
+  .dashboard-card-glass .bg-white\/5 {
+    background: rgba(255, 255, 255, 0.02) !important;
+    background-color: rgba(255, 255, 255, 0.02) !important;
+  }
 }
 
 /* Tablet optimizations */
@@ -513,90 +539,5 @@
     background: linear-gradient(90deg, rgba(74, 222, 128, 0.9), rgba(16, 185, 129, 0.9), rgba(34, 197, 94, 0.9)) !important;
     border: 1px solid rgba(74, 222, 128, 0.6) !important;
     box-shadow: 0 0 20px rgba(34, 197, 94, 0.5) !important;
-  }
-
-  /* Fix mobile transaction text visibility */
-  .dashboard-card-glass {
-    background: rgba(255, 255, 255, 0.08) !important;
-    border: 1px solid rgba(255, 255, 255, 0.25) !important;
-  }
-
-  /* Ensure transaction buttons are visible on mobile */
-  .backdrop-blur-xl.bg-white\/10 {
-    background: rgba(255, 255, 255, 0.08) !important;
-    border: 1px solid rgba(255, 255, 255, 0.25) !important;
-  }
-
-  /* Fix transaction card backgrounds */
-  .bg-white\/5 {
-    background: rgba(255, 255, 255, 0.08) !important;
-    border: 1px solid rgba(255, 255, 255, 0.25) !important;
-  }
-
-  .bg-white\/10 {
-    background: rgba(255, 255, 255, 0.12) !important;
-    border: 1px solid rgba(255, 255, 255, 0.3) !important;
-  }
-
-  /* Specific fixes for transaction page buttons only */
-  .backdrop-blur-xl .text-black,
-  .bg-white\/10 .text-black {
-    color: white !important;
-  }
-
-  /* Fix specific transaction page button text */
-  button.bg-white\/10 {
-    color: white !important;
-  }
-  
-  button.bg-white\/10 * {
-    color: white !important;
-  }
-
-  /* Ensure badge text is readable */
-  .bg-gray-100,
-  .bg-blue-100,
-  .bg-green-100,
-  .bg-red-100 {
-    background: rgba(255, 255, 255, 0.15) !important;
-    color: white !important;
-    border: 1px solid rgba(255, 255, 255, 0.3) !important;
-  }
-
-  /* Fix dashboard table transparency on mobile */
-  .dashboard-card-glass table,
-  .dashboard-card-glass .backdrop-blur-lg {
-    background: rgba(255, 255, 255, 0.03) !important;
-    border: 1px solid rgba(255, 255, 255, 0.15) !important;
-  }
-
-  /* Ensure table cells are transparent */
-  .dashboard-card-glass td,
-  .dashboard-card-glass th {
-    background: transparent !important;
-    border-color: rgba(255, 255, 255, 0.1) !important;
-  }
-
-  /* Fix table row backgrounds */
-  .dashboard-card-glass tr {
-    background: transparent !important;
-  }
-
-  .dashboard-card-glass tr:hover {
-    background: rgba(255, 255, 255, 0.05) !important;
-  }
-
-  /* Force override all shadcn table components */
-  table {
-    background: transparent !important;
-  }
-
-  tbody, thead, tr, td, th {
-    background: transparent !important;
-  }
-
-  /* More specific table container fixes */
-  .bg-white\/5.backdrop-blur-lg {
-    background: rgba(255, 255, 255, 0.03) !important;
   }
 }
