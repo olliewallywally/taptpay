@@ -74,21 +74,23 @@ export function QRCodeDisplay({ paymentUrl, qrCodeUrl, merchantId }: QRCodeDispl
       </div>
 
       {actualQrCodeUrl && (
-        <div className="mb-4">
+        <div className="mb-3 sm:mb-4">
           <Button
             onClick={handleDownloadQR}
             disabled={isDownloading}
-            className="backdrop-blur-sm bg-white/10 border border-white/20 text-white hover:bg-white/20 hover:border-white/30 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300"
+            className="w-full sm:w-auto backdrop-blur-sm bg-white/15 border border-white/30 text-white hover:bg-white/25 hover:border-white/40 px-4 py-2 h-10 sm:h-9 rounded-lg text-xs sm:text-sm font-medium transition-all duration-300"
           >
             {isDownloading ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Downloading...
+                <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 animate-spin" />
+                <span className="hidden sm:inline">Downloading...</span>
+                <span className="sm:hidden">Downloading</span>
               </>
             ) : (
               <>
-                <Download className="w-4 h-4 mr-2" />
-                Download QR Code
+                <Download className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Download QR Code</span>
+                <span className="sm:hidden">Download</span>
               </>
             )}
           </Button>
