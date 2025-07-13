@@ -8,7 +8,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentMerchantId } from "@/lib/auth";
@@ -28,10 +28,10 @@ import {
   Download,
   FileText,
   FileSpreadsheet,
-  Eye
+
 } from "lucide-react";
 import { format } from "date-fns";
-import { Link } from "wouter";
+
 
 const rateUpdateSchema = z.object({
   currentProviderRate: z.string()
@@ -55,7 +55,7 @@ export default function Dashboard() {
     return <div>Redirecting to login...</div>;
   }
   const [isEditingRate, setIsEditingRate] = useState(false);
-  const [showAllTransactions, setShowAllTransactions] = useState(false);
+
 
   const form = useForm<RateUpdateFormData>({
     resolver: zodResolver(rateUpdateSchema),
@@ -303,83 +303,7 @@ export default function Dashboard() {
 
 
 
-        {/* Transaction History */}
-        <div className="dashboard-card-glass rounded-3xl p-8 mb-8">
-          <div className="flex flex-row items-center justify-between mb-6">
-            <div>
-              <h2 className="text-lg font-semibold text-white">Transaction History</h2>
-              <p className="text-white/70 text-sm">
-                View all your recent payment transactions
-              </p>
-            </div>
-            <Link href="/transactions">
-              <button className="backdrop-blur-xl bg-white/15 border border-white/30 text-white px-4 py-2 rounded-xl hover:bg-white/25 transition-all duration-300 flex items-center gap-2">
-                <Eye className="h-4 w-4" />
-                View All
-              </button>
-            </Link>
-          </div>
-          {transactionsLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-white/70" />
-            </div>
-          ) : transactions && transactions.length > 0 ? (
-            <div className="backdrop-blur-lg bg-white/5 rounded-2xl border border-white/20 overflow-hidden" style={{background: 'rgba(255, 255, 255, 0.02)', backgroundColor: 'rgba(255, 255, 255, 0.02)'}}>
-              <Table style={{background: 'transparent', backgroundColor: 'transparent'}}>
-                <TableHeader style={{background: 'transparent', backgroundColor: 'transparent'}}>
-                  <TableRow className="border-white/20" style={{background: 'transparent', backgroundColor: 'transparent'}}>
-                    <TableHead className="text-white/80" style={{background: 'transparent', backgroundColor: 'transparent'}}>Date</TableHead>
-                    <TableHead className="text-white/80" style={{background: 'transparent', backgroundColor: 'transparent'}}>Item</TableHead>
-                    <TableHead className="text-white/80" style={{background: 'transparent', backgroundColor: 'transparent'}}>Amount</TableHead>
-                    <TableHead className="text-white/80" style={{background: 'transparent', backgroundColor: 'transparent'}}>Status</TableHead>
-                    <TableHead className="text-white/80 hidden sm:table-cell" style={{background: 'transparent', backgroundColor: 'transparent'}}>Transaction ID</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody style={{background: 'transparent', backgroundColor: 'transparent'}}>
-                  {(showAllTransactions ? transactions : transactions.slice(0, 3)).map((transaction: any) => (
-                    <TableRow key={transaction.id} className="border-white/10 hover:bg-white/5" style={{background: 'transparent', backgroundColor: 'transparent'}}>
-                      <TableCell className="text-sm text-white/90" style={{background: 'transparent', backgroundColor: 'transparent'}}>
-                        {transaction.createdAt 
-                          ? format(new Date(transaction.createdAt), "MMM dd, HH:mm")
-                          : "N/A"
-                        }
-                      </TableCell>
-                      <TableCell className="font-medium text-sm text-white" style={{background: 'transparent', backgroundColor: 'transparent'}}>{transaction.itemName}</TableCell>
-                      <TableCell className="text-sm text-white" style={{background: 'transparent', backgroundColor: 'transparent'}}>${parseFloat(transaction.price).toFixed(2)}</TableCell>
-                      <TableCell style={{background: 'transparent', backgroundColor: 'transparent'}}>
-                        <div className="flex items-center space-x-2">
-                          {getStatusIcon(transaction.status)}
-                          <span className="text-xs text-white bg-white/10 px-2 py-1 rounded-lg border border-white/20">
-                            {transaction.status}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-xs text-white/60 hidden sm:table-cell" style={{background: 'transparent', backgroundColor: 'transparent'}}>
-                        {transaction.windcaveTransactionId || `TXN-${transaction.id}`}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              {transactions.length > 3 && (
-                <div className="flex justify-center mt-4 p-4">
-                  <button
-                    onClick={() => setShowAllTransactions(!showAllTransactions)}
-                    className="backdrop-blur-xl bg-white/15 border border-white/30 text-white px-4 py-2 rounded-xl hover:bg-white/25 transition-all duration-300 text-sm"
-                  >
-                    {showAllTransactions ? "Show Less" : `Show More (${transactions.length - 3} more)`}
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <CreditCard className="mx-auto h-12 w-12 text-white/40 mb-4" />
-              <h3 className="text-lg font-medium text-white mb-2">No transactions yet</h3>
-              <p className="text-white/60">Start processing payments to see your transaction history</p>
-            </div>
-          )}
-        </div>
+
 
         {/* Export Data */}
         <div className="dashboard-card-glass rounded-3xl p-8">
