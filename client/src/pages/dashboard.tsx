@@ -324,29 +324,29 @@ export default function Dashboard() {
               <Loader2 className="h-8 w-8 animate-spin text-white/70" />
             </div>
           ) : transactions && transactions.length > 0 ? (
-            <div className="backdrop-blur-lg bg-white/5 rounded-2xl border border-white/20 overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-white/20">
-                    <TableHead className="text-white/80">Date</TableHead>
-                    <TableHead className="text-white/80">Item</TableHead>
-                    <TableHead className="text-white/80">Amount</TableHead>
-                    <TableHead className="text-white/80">Status</TableHead>
-                    <TableHead className="text-white/80 hidden sm:table-cell">Transaction ID</TableHead>
+            <div className="backdrop-blur-lg bg-white/5 rounded-2xl border border-white/20 overflow-hidden" style={{background: 'rgba(255, 255, 255, 0.02)', backgroundColor: 'rgba(255, 255, 255, 0.02)'}}>
+              <Table style={{background: 'transparent', backgroundColor: 'transparent'}}>
+                <TableHeader style={{background: 'transparent', backgroundColor: 'transparent'}}>
+                  <TableRow className="border-white/20" style={{background: 'transparent', backgroundColor: 'transparent'}}>
+                    <TableHead className="text-white/80" style={{background: 'transparent', backgroundColor: 'transparent'}}>Date</TableHead>
+                    <TableHead className="text-white/80" style={{background: 'transparent', backgroundColor: 'transparent'}}>Item</TableHead>
+                    <TableHead className="text-white/80" style={{background: 'transparent', backgroundColor: 'transparent'}}>Amount</TableHead>
+                    <TableHead className="text-white/80" style={{background: 'transparent', backgroundColor: 'transparent'}}>Status</TableHead>
+                    <TableHead className="text-white/80 hidden sm:table-cell" style={{background: 'transparent', backgroundColor: 'transparent'}}>Transaction ID</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
+                <TableBody style={{background: 'transparent', backgroundColor: 'transparent'}}>
                   {(showAllTransactions ? transactions : transactions.slice(0, 3)).map((transaction: any) => (
-                    <TableRow key={transaction.id} className="border-white/10 hover:bg-white/5">
-                      <TableCell className="text-sm text-white/90">
+                    <TableRow key={transaction.id} className="border-white/10 hover:bg-white/5" style={{background: 'transparent', backgroundColor: 'transparent'}}>
+                      <TableCell className="text-sm text-white/90" style={{background: 'transparent', backgroundColor: 'transparent'}}>
                         {transaction.createdAt 
                           ? format(new Date(transaction.createdAt), "MMM dd, HH:mm")
                           : "N/A"
                         }
                       </TableCell>
-                      <TableCell className="font-medium text-sm text-white">{transaction.itemName}</TableCell>
-                      <TableCell className="text-sm text-white">${parseFloat(transaction.price).toFixed(2)}</TableCell>
-                      <TableCell>
+                      <TableCell className="font-medium text-sm text-white" style={{background: 'transparent', backgroundColor: 'transparent'}}>{transaction.itemName}</TableCell>
+                      <TableCell className="text-sm text-white" style={{background: 'transparent', backgroundColor: 'transparent'}}>${parseFloat(transaction.price).toFixed(2)}</TableCell>
+                      <TableCell style={{background: 'transparent', backgroundColor: 'transparent'}}>
                         <div className="flex items-center space-x-2">
                           {getStatusIcon(transaction.status)}
                           <span className="text-xs text-white bg-white/10 px-2 py-1 rounded-lg border border-white/20">
@@ -354,7 +354,7 @@ export default function Dashboard() {
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-xs text-white/60 hidden sm:table-cell">
+                      <TableCell className="text-xs text-white/60 hidden sm:table-cell" style={{background: 'transparent', backgroundColor: 'transparent'}}>
                         {transaction.windcaveTransactionId || `TXN-${transaction.id}`}
                       </TableCell>
                     </TableRow>
