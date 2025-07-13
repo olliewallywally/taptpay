@@ -168,7 +168,7 @@ export default function MerchantTerminal() {
   return (
     <div className="min-h-screen relative overflow-hidden">
       {/* Gradient Background with Floating Orbs */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900">
+      <div className="absolute inset-0 bg-gradient-to-br from-gray-800 via-gray-700 to-gray-900">
         {/* Animated Gradient Orbs with Enhanced Glow */}
         <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse shadow-2xl" style={{
           animation: 'glow-pulse 4s ease-in-out infinite',
@@ -193,7 +193,7 @@ export default function MerchantTerminal() {
       </div>
 
       {/* Main Content */}
-      <div className="relative z-10 max-w-4xl mx-auto px-3 sm:px-4 pt-24 pb-4 sm:pt-28 sm:pb-8">
+      <div className="relative z-10 max-w-4xl mx-auto px-3 sm:px-4 pt-28 pb-4 sm:pb-8">
         <div className="mb-8 sm:mb-12 text-center">
           <h1 className="text-3xl sm:text-4xl font-bold text-white mb-4">Payment Terminal</h1>
         </div>
@@ -201,7 +201,7 @@ export default function MerchantTerminal() {
         <div className="grid lg:grid-cols-2 gap-4 sm:gap-8">
           
           {/* Transaction Entry Card */}
-          <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 shadow-2xl">
+          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-3xl p-6 shadow-2xl">
             <div className="mb-4 sm:mb-6">
               <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">New Transaction</h2>
               <p className="text-sm sm:text-base text-white/70">Enter item details to generate customer payment link</p>
@@ -263,7 +263,7 @@ export default function MerchantTerminal() {
 
           {/* Payment Status Indicator - Prominent Position */}
           {currentTransaction ? (
-            <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 shadow-2xl">
+            <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-3xl p-6 shadow-2xl">
               <div className="text-center mb-4">
                 <h3 className="text-xl font-bold text-white mb-1">
                   Transaction #{currentTransaction.id}
@@ -277,7 +277,7 @@ export default function MerchantTerminal() {
           ) : null}
 
           {/* QR Code Section - ALWAYS VISIBLE (static per merchant) */}
-          <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-8 shadow-2xl">
+          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-3xl p-8 shadow-2xl">
             <QRCodeDisplay 
               paymentUrl={merchant?.paymentUrl}
               qrCodeUrl={merchant?.qrCodeUrl}
@@ -289,7 +289,7 @@ export default function MerchantTerminal() {
               <div className="mt-6 space-y-3">
                 <div className="text-center">
                   <p className="text-sm text-white/70 mb-2">Payment Link</p>
-                  <div className="flex items-center gap-2 p-3 bg-white/5 border border-white/20 rounded-xl">
+                  <div className="flex items-center gap-2 p-3 bg-white/5 border border-white/10 rounded-xl">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-white/90 truncate font-mono">
                         {merchant.paymentUrl}
@@ -315,7 +315,7 @@ export default function MerchantTerminal() {
                       }}
                       size="sm"
                       variant="outline"
-                      className="text-white border-white/20 hover:bg-white/15 hover:text-white backdrop-blur-sm bg-white/10 shrink-0"
+                      className="text-white border-white/10 hover:bg-white/15 hover:text-white backdrop-blur-sm bg-white/5 shrink-0"
                     >
                       {copiedLink ? (
                         <Check className="h-4 w-4" />
@@ -329,7 +329,7 @@ export default function MerchantTerminal() {
             )}
 
             {!currentTransaction && (
-              <div className="mt-6 text-center p-4 bg-emerald-500/20 backdrop-blur-sm rounded-2xl border border-emerald-400/30">
+              <div className="mt-6 text-center p-4 bg-emerald-500/10 backdrop-blur-sm rounded-2xl border border-emerald-400/20">
                 <p className="text-sm text-emerald-200 font-medium">
                   🏪 Static QR Code - Ready for Print
                 </p>
