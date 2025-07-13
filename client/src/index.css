@@ -411,6 +411,22 @@
     background: rgba(255, 255, 255, 0.02) !important;
     background-color: rgba(255, 255, 255, 0.02) !important;
   }
+
+  /* CRITICAL: Override shadcn muted backgrounds that cause white backgrounds */
+  .bg-muted,
+  .bg-muted\/50,
+  [data-state=selected],
+  tr:hover,
+  tr[data-state=selected] {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+
+  /* Override the wrapper div around table that might have background */
+  .relative.w-full.overflow-auto {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
 }
 
 /* Tablet optimizations */
