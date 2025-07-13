@@ -514,4 +514,47 @@
     border: 1px solid rgba(74, 222, 128, 0.6) !important;
     box-shadow: 0 0 20px rgba(34, 197, 94, 0.5) !important;
   }
+
+  /* Fix mobile transaction text visibility */
+  .dashboard-card-glass {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  }
+
+  /* Ensure transaction buttons are visible on mobile */
+  .backdrop-blur-xl.bg-white\/10 {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  }
+
+  /* Fix transaction card backgrounds */
+  .bg-white\/5 {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  }
+
+  .bg-white\/10 {
+    background: rgba(255, 255, 255, 0.12) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  }
+
+  /* Ensure all transaction text is white on mobile */
+  .text-black {
+    color: white !important;
+  }
+
+  /* Mobile button text should be white */
+  button .text-black {
+    color: white !important;
+  }
+
+  /* Ensure badge text is readable */
+  .bg-gray-100,
+  .bg-blue-100,
+  .bg-green-100,
+  .bg-red-100 {
+    background: rgba(255, 255, 255, 0.15) !important;
+    color: white !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  }
 }
