@@ -562,4 +562,41 @@
     color: white !important;
     border: 1px solid rgba(255, 255, 255, 0.3) !important;
   }
+
+  /* Fix dashboard table transparency on mobile */
+  .dashboard-card-glass table,
+  .dashboard-card-glass .backdrop-blur-lg {
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  }
+
+  /* Ensure table cells are transparent */
+  .dashboard-card-glass td,
+  .dashboard-card-glass th {
+    background: transparent !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+  }
+
+  /* Fix table row backgrounds */
+  .dashboard-card-glass tr {
+    background: transparent !important;
+  }
+
+  .dashboard-card-glass tr:hover {
+    background: rgba(255, 255, 255, 0.05) !important;
+  }
+
+  /* Force override all shadcn table components */
+  table {
+    background: transparent !important;
+  }
+
+  tbody, thead, tr, td, th {
+    background: transparent !important;
+  }
+
+  /* More specific table container fixes */
+  .bg-white\/5.backdrop-blur-lg {
+    background: rgba(255, 255, 255, 0.03) !important;
+  }
 }
