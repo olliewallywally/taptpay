@@ -167,48 +167,27 @@ export default function MerchantTerminal() {
 
   return (
     <div className="min-h-screen relative overflow-hidden">
-      {/* Gradient Background with Floating Orbs */}
-      <div className="absolute inset-0 bg-gradient-to-br from-gray-800 via-gray-700 to-gray-900">
-        {/* Animated Gradient Orbs with Enhanced Glow */}
-        <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse shadow-2xl" style={{
-          animation: 'glow-pulse 4s ease-in-out infinite',
-          filter: 'blur(40px)',
-        }}></div>
-        <div className="absolute top-40 right-20 w-96 h-96 bg-gradient-to-r from-green-400 to-emerald-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse delay-75 shadow-2xl" style={{
-          animation: 'glow-pulse 5s ease-in-out infinite 1.5s',
-          filter: 'blur(45px)',
-        }}></div>
-        <div className="absolute -bottom-8 left-40 w-96 h-96 bg-gradient-to-r from-lime-400 to-green-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse delay-150 shadow-2xl" style={{
-          animation: 'glow-pulse 6s ease-in-out infinite 3s',
-          filter: 'blur(50px)',
-        }}></div>
-        
-        {/* Additional Moving Glow Effects */}
-        <div className="absolute top-0 left-1/2 w-72 h-72 bg-gradient-to-r from-teal-300 to-emerald-300 rounded-full mix-blend-screen filter blur-3xl opacity-30" style={{
-          animation: 'float-slow 8s ease-in-out infinite, glow-pulse 3s ease-in-out infinite',
-        }}></div>
-        <div className="absolute bottom-0 right-1/3 w-80 h-80 bg-gradient-to-r from-green-300 to-lime-300 rounded-full mix-blend-screen filter blur-3xl opacity-25" style={{
-          animation: 'float-reverse 10s ease-in-out infinite, glow-pulse 4s ease-in-out infinite 2s',
-        }}></div>
-      </div>
+      {/* Simple Dark Background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-800"></div>
 
       {/* Main Content */}
       <div className="relative z-10 max-w-4xl mx-auto px-3 sm:px-4 pt-28 pb-4 sm:pb-8">
-        <div className="mb-8 sm:mb-12 text-center">
-          <h1 className="text-3xl sm:text-4xl font-bold text-white mb-4">Payment Terminal</h1>
+        <div className="mb-6 text-center">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-4">Payment Terminal</h1>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-4 sm:gap-8">
+        {/* Top Row: Transaction Entry + QR Code */}
+        <div className="grid lg:grid-cols-2 gap-4 sm:gap-6 mb-6">
           
           {/* Transaction Entry Card */}
-          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-3xl p-6 shadow-2xl">
-            <div className="mb-4 sm:mb-6">
-              <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">New Transaction</h2>
-              <p className="text-sm sm:text-base text-white/70">Enter item details to generate customer payment link</p>
+          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl">
+            <div className="mb-4">
+              <h2 className="text-lg font-bold text-white mb-2">New Transaction</h2>
+              <p className="text-sm text-white/70">Enter item details</p>
             </div>
 
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
                   control={form.control}
                   name="itemName"
@@ -217,42 +196,36 @@ export default function MerchantTerminal() {
                       <FormLabel className="text-sm font-medium text-white">Item Name</FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="e.g., Cappuccino"
-                          className="px-4 py-3 bg-white/10 border border-white/20 rounded-xl focus:ring-2 focus:ring-white/30 focus:border-white/30 transition-all text-lg text-white placeholder:text-white/50 backdrop-blur-sm"
+                          placeholder="Coffee, Lunch, etc."
                           {...field}
+                          className="backdrop-blur-sm bg-white/5 border-white/10 text-white placeholder:text-white/50 focus:bg-white/10 focus:border-white/20"
                         />
                       </FormControl>
-                      <FormMessage />
+                      <FormMessage className="text-red-300" />
                     </FormItem>
                   )}
                 />
-                
                 <FormField
                   control={form.control}
                   name="price"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm font-medium text-white">Price</FormLabel>
+                      <FormLabel className="text-sm font-medium text-white">Price ($)</FormLabel>
                       <FormControl>
-                        <div className="relative">
-                          <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/70 text-lg font-medium">$</span>
-                          <Input
-                            type="text"
-                            placeholder="0.00"
-                            className="pl-8 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl focus:ring-2 focus:ring-white/30 focus:border-white/30 transition-all text-lg text-white placeholder:text-white/50 backdrop-blur-sm"
-                            {...field}
-                          />
-                        </div>
+                        <Input
+                          placeholder="4.50"
+                          {...field}
+                          className="backdrop-blur-sm bg-white/5 border-white/10 text-white placeholder:text-white/50 focus:bg-white/10 focus:border-white/20"
+                        />
                       </FormControl>
-                      <FormMessage />
+                      <FormMessage className="text-red-300" />
                     </FormItem>
                   )}
                 />
-
-                <Button 
+                <Button
                   type="submit"
                   disabled={createTransactionMutation.isPending}
-                  className="w-full bg-white/20 text-white py-4 px-6 rounded-xl font-semibold text-lg hover:bg-white/25 transition-all transform hover:scale-[1.02] active:scale-[0.98] backdrop-blur-sm border border-white/30"
+                  className="w-full backdrop-blur-sm bg-white/10 border border-white/20 text-white hover:bg-white/20 hover:border-white/30 py-3 rounded-xl font-medium transition-all duration-300"
                 >
                   <Send className="mr-2 h-4 w-4" />
                   {createTransactionMutation.isPending ? "Creating..." : "Send to Customer"}
@@ -261,11 +234,43 @@ export default function MerchantTerminal() {
             </Form>
           </div>
 
-          {/* Payment Status Indicator - Prominent Position */}
-          {currentTransaction ? (
-            <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-3xl p-6 shadow-2xl">
+          {/* QR Code Section with Download Button */}
+          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl">
+            <div className="mb-4">
+              <h2 className="text-lg font-bold text-white mb-2">QR Code</h2>
+              <p className="text-sm text-white/70">Static payment code</p>
+            </div>
+            
+            <div className="text-center">
+              <QRCodeDisplay 
+                paymentUrl={merchant?.paymentUrl}
+                qrCodeUrl={merchant?.qrCodeUrl}
+                merchantId={merchantId}
+              />
+              
+              <Button
+                onClick={() => {
+                  if (merchant?.qrCodeUrl) {
+                    const link = document.createElement('a');
+                    link.href = merchant.qrCodeUrl;
+                    link.download = `qr-code-${merchant.name || 'merchant'}.png`;
+                    link.click();
+                  }
+                }}
+                className="mt-4 backdrop-blur-sm bg-white/10 border border-white/20 text-white hover:bg-white/20 hover:border-white/30 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300"
+              >
+                Download QR Code
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Payment Status Row */}
+        {currentTransaction && (
+          <div className="mb-6">
+            <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl">
               <div className="text-center mb-4">
-                <h3 className="text-xl font-bold text-white mb-1">
+                <h3 className="text-lg font-bold text-white mb-1">
                   Transaction #{currentTransaction.id}
                 </h3>
                 <p className="text-sm text-white/70">
@@ -274,95 +279,66 @@ export default function MerchantTerminal() {
               </div>
               {getPaymentStatusIndicator(currentTransaction.status)}
             </div>
-          ) : null}
+          </div>
+        )}
 
-          {/* QR Code Section - ALWAYS VISIBLE (static per merchant) */}
-          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-3xl p-8 shadow-2xl">
-            <QRCodeDisplay 
-              paymentUrl={merchant?.paymentUrl}
-              qrCodeUrl={merchant?.qrCodeUrl}
-              merchantId={merchantId}
-            />
+        {/* Bottom Row: Payment Link Section */}
+        <div className="mb-6">
+          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl">
+            <div className="mb-4">
+              <h2 className="text-lg font-bold text-white mb-2">Payment Link</h2>
+              <p className="text-sm text-white/70">Share this link with customers</p>
+            </div>
             
-            {/* Payment Link Section */}
             {merchant?.paymentUrl && (
-              <div className="mt-6 space-y-3">
-                <div className="text-center">
-                  <p className="text-sm text-white/70 mb-2">Payment Link</p>
-                  <div className="flex items-center gap-2 p-3 bg-white/5 border border-white/10 rounded-xl">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-white/90 truncate font-mono">
-                        {merchant.paymentUrl}
-                      </p>
-                    </div>
-                    <Button
-                      onClick={async () => {
-                        try {
-                          await navigator.clipboard.writeText(merchant.paymentUrl);
-                          setCopiedLink(true);
-                          toast({
-                            title: "Copied!",
-                            description: "Payment link copied to clipboard",
-                          });
-                          setTimeout(() => setCopiedLink(false), 2000);
-                        } catch (err) {
-                          toast({
-                            title: "Failed to copy",
-                            description: "Please copy the link manually",
-                            variant: "destructive",
-                          });
-                        }
-                      }}
-                      size="sm"
-                      variant="outline"
-                      className="text-white border-white/10 hover:bg-white/15 hover:text-white backdrop-blur-sm bg-white/5 shrink-0"
-                    >
-                      {copiedLink ? (
-                        <Check className="h-4 w-4" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
+              <div className="flex items-center gap-3 p-3 bg-white/5 border border-white/10 rounded-xl">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-white/90 truncate font-mono">
+                    {merchant.paymentUrl}
+                  </p>
                 </div>
-              </div>
-            )}
-
-            {!currentTransaction && (
-              <div className="mt-6 text-center p-4 bg-emerald-500/10 backdrop-blur-sm rounded-2xl border border-emerald-400/20">
-                <p className="text-sm text-emerald-200 font-medium">
-                  🏪 Static QR Code - Ready for Print
-                </p>
-                <p className="text-xs text-emerald-300 mt-1">
-                  This QR code never changes. Print it and display in your shop!
-                </p>
+                <Button
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(merchant.paymentUrl);
+                      setCopiedLink(true);
+                      toast({
+                        title: "Copied!",
+                        description: "Payment link copied to clipboard",
+                      });
+                      setTimeout(() => setCopiedLink(false), 2000);
+                    } catch (err) {
+                      toast({
+                        title: "Failed to copy",
+                        description: "Please copy the link manually",
+                        variant: "destructive",
+                      });
+                    }
+                  }}
+                  size="sm"
+                  className="backdrop-blur-sm bg-white/10 border border-white/20 text-white hover:bg-white/20 hover:border-white/30 shrink-0 px-3 py-2"
+                >
+                  {copiedLink ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                </Button>
               </div>
             )}
           </div>
         </div>
-      </div>
 
-      {/* Merchant URL Display - Always show for reference */}
-      {merchant && (
-        <div className="max-w-4xl mx-auto px-3 sm:px-4 mt-8">
-          <MerchantUrlDisplay
-            merchantId={merchantId}
-            paymentUrl={merchant.paymentUrl}
-            qrCodeUrl={merchant.qrCodeUrl}
-            businessName={merchant.businessName || merchant.name}
-          />
-        </div>
-      )}
-
-      {/* Transactions Button - Bottom of page */}
-      <div className="relative z-10 max-w-4xl mx-auto px-3 sm:px-4 mt-8 mb-8">
-        <div className="flex justify-center">
-          <Link href="/transactions">
-            <button className="flex items-center gap-2 px-6 py-3 bg-white/10 border border-white/20 text-white rounded-2xl hover:bg-white/15 transition-all duration-300 backdrop-blur-sm">
-              <Eye className="h-5 w-5" />
-              View All Transactions
-            </button>
-          </Link>
+        {/* Transactions Button - Bottom of page */}
+        <div className="mt-8 mb-8">
+          <div className="flex justify-center">
+            <Link href="/transactions">
+              <button className="flex items-center gap-2 px-6 py-3 backdrop-blur-sm bg-white/10 border border-white/20 text-white rounded-2xl hover:bg-white/15 transition-all duration-300">
+                <Eye className="h-5 w-5" />
+                View All Transactions
+              </button>
+            </Link>
+          </div>
         </div>
       </div>
     </div>
