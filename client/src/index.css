@@ -538,13 +538,18 @@
     border: 1px solid rgba(255, 255, 255, 0.3) !important;
   }
 
-  /* Ensure all transaction text is white on mobile */
-  .text-black {
+  /* Specific fixes for transaction page buttons only */
+  .backdrop-blur-xl .text-black,
+  .bg-white\/10 .text-black {
     color: white !important;
   }
 
-  /* Mobile button text should be white */
-  button .text-black {
+  /* Fix specific transaction page button text */
+  button.bg-white\/10 {
+    color: white !important;
+  }
+  
+  button.bg-white\/10 * {
     color: white !important;
   }
 
