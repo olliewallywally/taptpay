@@ -57,7 +57,7 @@ export function Navigation() {
                 <img 
                   src={taptLogoUrl} 
                   alt="Tapt Logo" 
-                  className="h-6 sm:h-8 w-auto filter brightness-0 invert"
+                  className="h-8 sm:h-10 w-auto filter brightness-0 invert"
                 />
                 {user && (
                   <div className="ml-2 sm:ml-4 hidden sm:block">
