@@ -167,8 +167,13 @@ export default function MerchantTerminal() {
 
   return (
     <div className="min-h-screen relative overflow-hidden">
-      {/* Simple Dark Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-800"></div>
+      {/* Dynamic Moving Gradient Background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-800">
+        <div className="absolute inset-0 opacity-30">
+          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-purple-900/20 via-transparent to-blue-900/20 animate-gradient-x"></div>
+          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-l from-gray-800/30 via-transparent to-gray-700/30 animate-gradient-y"></div>
+        </div>
+      </div>
 
       {/* Main Content */}
       <div className="relative z-10 max-w-4xl mx-auto px-3 sm:px-4 pt-28 pb-4 sm:pb-8">
