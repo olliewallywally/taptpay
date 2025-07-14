@@ -74,6 +74,64 @@ export default function Transactions() {
     return matchesSearch && matchesStatus;
   }) || [];
 
+  // CSV Export Function
+  const exportToCSV = () => {
+    if (!filteredTransactions || filteredTransactions.length === 0) {
+      alert("No transactions to export");
+      return;
+    }
+
+    // Define CSV headers
+    const headers = [
+      "Date",
+      "Time", 
+      "Transaction ID",
+      "Item Name",
+      "Amount",
+      "Status",
+      "Payment Method",
+      "Windcave Transaction ID",
+      "Windcave Fee",
+      "Platform Fee",
+      "Merchant Net"
+    ];
+
+    // Convert transactions to CSV format
+    const csvContent = [
+      headers.join(","),
+      ...filteredTransactions.map((transaction: any) => {
+        const date = transaction.createdAt ? new Date(transaction.createdAt) : new Date();
+        return [
+          format(date, "yyyy-MM-dd"),
+          format(date, "HH:mm:ss"),
+          transaction.windcaveTransactionId || `TXN-${transaction.id}`,
+          `"${transaction.itemName}"`, // Quote item name in case it contains commas
+          transaction.price,
+          transaction.status,
+          getPaymentMethodDisplay(transaction.paymentMethod).replace(/📱|📋|💳|✋/g, ''), // Remove emojis for CSV
+          transaction.windcaveTransactionId || "",
+          transaction.windcaveFeeAmount || "0.00",
+          transaction.platformFeeAmount || "0.00",
+          transaction.merchantNet || "0.00"
+        ].join(",");
+      })
+    ].join("\n");
+
+    // Create and download the CSV file
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", `transactions_${format(new Date(), "yyyy-MM-dd_HH-mm-ss")}.csv`);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
   const totalTransactions = transactions?.length || 0;
   const completedTransactions = transactions?.filter((t: any) => t.status === 'completed').length || 0;
   const totalRevenue = transactions?.filter((t: any) => t.status === 'completed')
@@ -267,7 +325,10 @@ export default function Transactions() {
                 <h3 className="text-base sm:text-lg font-semibold text-white mb-1">Export Data</h3>
                 <p className="text-white/60 text-xs sm:text-sm">Download your transaction data for external analysis</p>
               </div>
-              <button className="backdrop-blur-xl bg-white/15 border border-white/30 text-white px-4 sm:px-6 py-3 rounded-xl hover:bg-white/25 hover:border-white/40 hover:scale-105 hover:shadow-lg transition-all duration-300 flex items-center justify-center gap-2 text-sm sm:text-base group">
+              <button 
+                onClick={exportToCSV}
+                className="backdrop-blur-xl bg-white/15 border border-white/30 text-white px-4 sm:px-6 py-3 rounded-xl hover:bg-white/25 hover:border-white/40 hover:scale-105 hover:shadow-lg transition-all duration-300 flex items-center justify-center gap-2 text-sm sm:text-base group"
+              >
                 <Download className="h-4 w-4 group-hover:translate-y-[-1px] transition-transform duration-300" />
                 <span className="group-hover:text-green-200 transition-colors duration-300">Export CSV</span>
               </button>
