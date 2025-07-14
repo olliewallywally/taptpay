@@ -193,7 +193,26 @@ export default function NFCPayment() {
                   <div className="space-y-4">
                     <button
                       onClick={simulateNFCTap}
-                      className="w-full py-4 backdrop-blur-sm bg-gradient-to-r from-green-500/80 via-emerald-500/80 to-green-400/80 border border-green-400/50 text-white hover:from-green-400/90 hover:via-emerald-400/90 hover:to-green-300/90 hover:border-green-300/60 hover:shadow-[0_0_20px_rgba(34,197,94,0.4)] rounded-2xl transition-all duration-300 font-light"
+                      style={{
+                        width: '100%',
+                        padding: '16px',
+                        background: 'linear-gradient(to right, rgba(34, 197, 94, 0.8), rgba(16, 185, 129, 0.8), rgba(34, 197, 94, 0.8))',
+                        border: '1px solid rgba(34, 197, 94, 0.5)',
+                        borderRadius: '16px',
+                        color: 'white',
+                        fontSize: '16px',
+                        fontWeight: '300',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'linear-gradient(to right, rgba(34, 197, 94, 0.9), rgba(16, 185, 129, 0.9), rgba(34, 197, 94, 0.9))';
+                        e.currentTarget.style.boxShadow = '0 0 20px rgba(34, 197, 94, 0.4)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'linear-gradient(to right, rgba(34, 197, 94, 0.8), rgba(16, 185, 129, 0.8), rgba(34, 197, 94, 0.8))';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
                     >
                       Tap to Pay
                     </button>
@@ -234,7 +253,18 @@ export default function NFCPayment() {
                   
                   <button
                     onClick={resetPayment}
-                    className="w-full py-4 backdrop-blur-sm bg-gradient-to-r from-green-500/80 via-emerald-500/80 to-green-400/80 border border-green-400/50 text-white hover:from-green-400/90 hover:via-emerald-400/90 hover:to-green-300/90 hover:border-green-300/60 hover:shadow-[0_0_20px_rgba(34,197,94,0.4)] rounded-2xl transition-all duration-300 font-light"
+                    style={{
+                      width: '100%',
+                      padding: '16px',
+                      background: 'linear-gradient(to right, rgba(34, 197, 94, 0.8), rgba(16, 185, 129, 0.8), rgba(34, 197, 94, 0.8))',
+                      border: '1px solid rgba(34, 197, 94, 0.5)',
+                      borderRadius: '16px',
+                      color: 'white',
+                      fontSize: '16px',
+                      fontWeight: '300',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease'
+                    }}
                   >
                     New Payment
                   </button>
@@ -254,7 +284,18 @@ export default function NFCPayment() {
                   
                   <button
                     onClick={resetPayment}
-                    className="w-full py-4 backdrop-blur-sm bg-gradient-to-r from-green-500/80 via-emerald-500/80 to-green-400/80 border border-green-400/50 text-white hover:from-green-400/90 hover:via-emerald-400/90 hover:to-green-300/90 hover:border-green-300/60 hover:shadow-[0_0_20px_rgba(34,197,94,0.4)] rounded-2xl transition-all duration-300 font-light"
+                    style={{
+                      width: '100%',
+                      padding: '16px',
+                      background: 'linear-gradient(to right, rgba(34, 197, 94, 0.8), rgba(16, 185, 129, 0.8), rgba(34, 197, 94, 0.8))',
+                      border: '1px solid rgba(34, 197, 94, 0.5)',
+                      borderRadius: '16px',
+                      color: 'white',
+                      fontSize: '16px',
+                      fontWeight: '300',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease'
+                    }}
                   >
                     Try Again
                   </button>
@@ -317,7 +358,21 @@ export default function NFCPayment() {
             <button 
               onClick={createNFCPayment}
               disabled={!nfcCapabilities?.nfcSupported || !amount || !itemName}
-              className="w-full py-6 backdrop-blur-sm bg-gradient-to-r from-green-500/80 via-emerald-500/80 to-green-400/80 border border-green-400/50 text-white hover:from-green-400/90 hover:via-emerald-400/90 hover:to-green-300/90 hover:border-green-300/60 hover:shadow-[0_0_20px_rgba(34,197,94,0.4)] rounded-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 font-light text-lg"
+              style={{
+                width: '100%',
+                padding: '24px',
+                background: (!nfcCapabilities?.nfcSupported || !amount || !itemName) 
+                  ? 'rgba(107, 114, 128, 0.5)' 
+                  : 'linear-gradient(to right, rgba(34, 197, 94, 0.8), rgba(16, 185, 129, 0.8), rgba(34, 197, 94, 0.8))',
+                border: '1px solid rgba(34, 197, 94, 0.5)',
+                borderRadius: '16px',
+                color: 'white',
+                fontSize: '18px',
+                fontWeight: '300',
+                cursor: (!nfcCapabilities?.nfcSupported || !amount || !itemName) ? 'not-allowed' : 'pointer',
+                opacity: (!nfcCapabilities?.nfcSupported || !amount || !itemName) ? 0.5 : 1,
+                transition: 'all 0.3s ease'
+              }}
             >
               Create Payment
             </button>
