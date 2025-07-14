@@ -92,8 +92,8 @@ export default function Transactions() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6 sm:mb-8">
           <Link href="/dashboard">
-            <button className="backdrop-blur-xl bg-white/10 border border-white/20 text-white p-3 rounded-xl hover:bg-white/20 transition-all duration-300 self-start">
-              <ArrowLeft className="h-5 w-5" />
+            <button className="backdrop-blur-xl bg-white/10 border border-white/20 text-white p-3 rounded-xl hover:bg-white/20 hover:scale-110 hover:shadow-lg transition-all duration-300 self-start group">
+              <ArrowLeft className="h-5 w-5 group-hover:translate-x-[-2px] transition-transform duration-300" />
             </button>
           </Link>
           <div className="flex-1">
@@ -104,31 +104,31 @@ export default function Transactions() {
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
-          <div className="backdrop-blur-xl bg-white/5 border border-white/20 rounded-2xl p-4 sm:p-6">
+          <div className="backdrop-blur-xl bg-white/5 border border-white/20 rounded-2xl p-4 sm:p-6 hover:bg-white/10 hover:border-white/30 hover:scale-105 transition-all duration-300 cursor-pointer group">
             <div className="flex items-center gap-3 mb-2">
-              <CreditCard className="h-6 w-6 sm:h-8 sm:w-8 text-blue-400" />
-              <h3 className="text-base sm:text-lg font-semibold text-white">Total Transactions</h3>
+              <CreditCard className="h-6 w-6 sm:h-8 sm:w-8 text-blue-400 group-hover:text-blue-300 transition-colors duration-300" />
+              <h3 className="text-base sm:text-lg font-semibold text-white group-hover:text-white/90 transition-colors duration-300">Total Transactions</h3>
             </div>
-            <p className="text-2xl sm:text-3xl font-bold text-white">{totalTransactions}</p>
-            <p className="text-white/60 text-xs sm:text-sm">All time</p>
+            <p className="text-2xl sm:text-3xl font-bold text-white group-hover:text-blue-200 transition-colors duration-300">{totalTransactions}</p>
+            <p className="text-white/60 text-xs sm:text-sm group-hover:text-white/70 transition-colors duration-300">All time</p>
           </div>
 
-          <div className="backdrop-blur-xl bg-white/5 border border-white/20 rounded-2xl p-4 sm:p-6">
+          <div className="backdrop-blur-xl bg-white/5 border border-white/20 rounded-2xl p-4 sm:p-6 hover:bg-white/10 hover:border-white/30 hover:scale-105 transition-all duration-300 cursor-pointer group">
             <div className="flex items-center gap-3 mb-2">
-              <CheckCircle className="h-6 w-6 sm:h-8 sm:w-8 text-green-400" />
-              <h3 className="text-base sm:text-lg font-semibold text-white">Completed</h3>
+              <CheckCircle className="h-6 w-6 sm:h-8 sm:w-8 text-green-400 group-hover:text-green-300 transition-colors duration-300" />
+              <h3 className="text-base sm:text-lg font-semibold text-white group-hover:text-white/90 transition-colors duration-300">Completed</h3>
             </div>
-            <p className="text-2xl sm:text-3xl font-bold text-white">{completedTransactions}</p>
-            <p className="text-white/60 text-xs sm:text-sm">{totalTransactions > 0 ? ((completedTransactions / totalTransactions) * 100).toFixed(1) : 0}% success rate</p>
+            <p className="text-2xl sm:text-3xl font-bold text-white group-hover:text-green-200 transition-colors duration-300">{completedTransactions}</p>
+            <p className="text-white/60 text-xs sm:text-sm group-hover:text-white/70 transition-colors duration-300">{totalTransactions > 0 ? ((completedTransactions / totalTransactions) * 100).toFixed(1) : 0}% success rate</p>
           </div>
 
-          <div className="backdrop-blur-xl bg-white/5 border border-white/20 rounded-2xl p-4 sm:p-6">
+          <div className="backdrop-blur-xl bg-white/5 border border-white/20 rounded-2xl p-4 sm:p-6 hover:bg-white/10 hover:border-white/30 hover:scale-105 transition-all duration-300 cursor-pointer group">
             <div className="flex items-center gap-3 mb-2">
-              <div className="text-xl sm:text-2xl">💰</div>
-              <h3 className="text-base sm:text-lg font-semibold text-white">Total Revenue</h3>
+              <div className="text-xl sm:text-2xl group-hover:scale-110 transition-transform duration-300">💰</div>
+              <h3 className="text-base sm:text-lg font-semibold text-white group-hover:text-white/90 transition-colors duration-300">Total Revenue</h3>
             </div>
-            <p className="text-2xl sm:text-3xl font-bold text-white">${totalRevenue.toFixed(2)}</p>
-            <p className="text-white/60 text-xs sm:text-sm">From completed transactions</p>
+            <p className="text-2xl sm:text-3xl font-bold text-white group-hover:text-yellow-200 transition-colors duration-300">${totalRevenue.toFixed(2)}</p>
+            <p className="text-white/60 text-xs sm:text-sm group-hover:text-white/70 transition-colors duration-300">From completed transactions</p>
           </div>
         </div>
 
@@ -173,17 +173,17 @@ export default function Transactions() {
               {/* Mobile Card View */}
               <div className="block sm:hidden space-y-3">
                 {filteredTransactions.map((transaction: any) => (
-                  <div key={transaction.id} className="bg-white/5 border border-white/10 rounded-xl p-4 hover:bg-white/10 transition-colors duration-200">
+                  <div key={transaction.id} className="bg-white/5 border border-white/10 rounded-xl p-4 hover:bg-white/10 hover:border-white/20 hover:scale-[1.02] transition-all duration-300 cursor-pointer group">
                     <div className="flex justify-between items-start mb-2">
-                      <div className="font-medium text-white text-lg">{transaction.itemName}</div>
-                      <div className="text-white font-mono font-bold">${parseFloat(transaction.price).toFixed(2)}</div>
+                      <div className="font-medium text-white text-lg group-hover:text-blue-200 transition-colors duration-300">{transaction.itemName}</div>
+                      <div className="text-white font-mono font-bold group-hover:text-green-200 transition-colors duration-300">${parseFloat(transaction.price).toFixed(2)}</div>
                     </div>
                     <div className="flex items-center gap-2 mb-2">
                       {getStatusIcon(transaction.status)}
                       <span className="text-xs text-white bg-white/10 px-2 py-1 rounded-lg border border-white/20">
                         {transaction.status}
                       </span>
-                      <span className="text-white/60 text-sm ml-auto">{getPaymentMethodDisplay(transaction.paymentMethod)}</span>
+                      <span className="text-white/60 text-sm ml-auto group-hover:text-white/80 transition-colors duration-300">{getPaymentMethodDisplay(transaction.paymentMethod)}</span>
                     </div>
                     <div className="text-white/60 text-xs">
                       {transaction.createdAt 
@@ -216,7 +216,7 @@ export default function Transactions() {
                   {/* Table Body */}
                   <div className="divide-y divide-white/5">
                     {filteredTransactions.map((transaction: any) => (
-                      <div key={transaction.id} className="px-6 py-4 hover:bg-white/5 transition-colors duration-200">
+                      <div key={transaction.id} className="px-6 py-4 hover:bg-white/10 hover:border-l-4 hover:border-l-blue-400 transition-all duration-300 cursor-pointer group">
                         <div className="grid grid-cols-6 gap-4 items-center">
                           <div className="text-white/90 text-sm">
                             {transaction.createdAt 
@@ -224,9 +224,9 @@ export default function Transactions() {
                               : "N/A"
                             }
                           </div>
-                          <div className="font-medium text-white">{transaction.itemName}</div>
-                          <div className="text-white font-mono">${parseFloat(transaction.price).toFixed(2)}</div>
-                          <div className="text-white/80 text-sm">{getPaymentMethodDisplay(transaction.paymentMethod)}</div>
+                          <div className="font-medium text-white group-hover:text-blue-200 transition-colors duration-300">{transaction.itemName}</div>
+                          <div className="text-white font-mono group-hover:text-green-200 transition-colors duration-300">${parseFloat(transaction.price).toFixed(2)}</div>
+                          <div className="text-white/80 text-sm group-hover:text-white transition-colors duration-300">{getPaymentMethodDisplay(transaction.paymentMethod)}</div>
                           <div className="flex items-center gap-2">
                             {getStatusIcon(transaction.status)}
                             <span className="text-xs text-white bg-white/10 px-2 py-1 rounded-lg border border-white/20">
@@ -267,9 +267,9 @@ export default function Transactions() {
                 <h3 className="text-base sm:text-lg font-semibold text-white mb-1">Export Data</h3>
                 <p className="text-white/60 text-xs sm:text-sm">Download your transaction data for external analysis</p>
               </div>
-              <button className="backdrop-blur-xl bg-white/15 border border-white/30 text-white px-4 sm:px-6 py-3 rounded-xl hover:bg-white/25 transition-all duration-300 flex items-center justify-center gap-2 text-sm sm:text-base">
-                <Download className="h-4 w-4" />
-                Export CSV
+              <button className="backdrop-blur-xl bg-white/15 border border-white/30 text-white px-4 sm:px-6 py-3 rounded-xl hover:bg-white/25 hover:border-white/40 hover:scale-105 hover:shadow-lg transition-all duration-300 flex items-center justify-center gap-2 text-sm sm:text-base group">
+                <Download className="h-4 w-4 group-hover:translate-y-[-1px] transition-transform duration-300" />
+                <span className="group-hover:text-green-200 transition-colors duration-300">Export CSV</span>
               </button>
             </div>
           </div>
