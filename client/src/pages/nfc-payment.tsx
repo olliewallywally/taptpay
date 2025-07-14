@@ -76,8 +76,8 @@ export default function NFCPayment() {
       setShowNfcOverlay(true);
       
       toast({
-        title: "NFC Payment Ready",
-        description: "Hold your phone near the merchant's device to pay.",
+        title: "Payment Terminal Ready",
+        description: "Ask customer to tap their card or digital wallet.",
       });
     } catch (error) {
       console.error('NFC payment creation failed:', error);
@@ -96,49 +96,46 @@ export default function NFCPayment() {
     setPaymentStatus("processing");
     
     try {
+      // Simulate waiting for customer to tap their card/phone
+      // In real implementation, this would wait for actual NFC hardware response
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
       const response = await fetch(`/api/nfc-sessions/${nfcSession.sessionId}/complete`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          paymentMethod: nfcCapabilities?.applePay ? 'apple_pay' : 
-                        nfcCapabilities?.googlePay ? 'google_pay' : 'contactless_card',
-          paymentData: { 
-            deviceFingerprint: navigator.userAgent,
-            timestamp: new Date().toISOString()
-          }
+          paymentMethod: 'contactless_card', // Simulate contactless card tap
+          cardLast4: '4532',
+          deviceId: navigator.userAgent
         }),
       });
 
       if (!response.ok) {
-        throw new Error('NFC payment failed');
+        throw new Error('Failed to complete NFC payment');
       }
 
-      // Wait for completion (simulated timing)
-      setTimeout(() => {
-        const success = Math.random() > 0.1; // 90% success rate
-        setPaymentStatus(success ? "completed" : "failed");
-        
-        if (success) {
-          setShowNfcOverlay(false);
-        }
-        
-        toast({
-          title: success ? "Payment Successful!" : "Payment Failed",
-          description: success ? 
-            `$${amount} paid via ${nfcCapabilities?.applePay ? 'Apple Pay' : 'NFC'}` :
-            "Payment was declined. Please try again.",
-          variant: success ? "default" : "destructive",
-        });
-      }, 2500);
+      const result = await response.json();
+      setPaymentStatus("completed");
       
+      toast({
+        title: "Payment Received!",
+        description: `Customer paid $${nfcSession.amount} successfully`,
+      });
+
+      // Auto-reset after showing success
+      setTimeout(() => {
+        resetPayment();
+      }, 4000);
+
     } catch (error) {
       console.error('NFC payment failed:', error);
       setPaymentStatus("failed");
+      
       toast({
         title: "Payment Failed",
-        description: "NFC payment could not be completed.",
+        description: "Ask customer to try tapping again or use different payment method.",
         variant: "destructive",
       });
     }
@@ -185,9 +182,10 @@ export default function NFCPayment() {
                   </div>
                   
                   <div>
-                    <h2 className="text-2xl font-light text-white mb-2">Ready to Pay</h2>
+                    <h2 className="text-2xl font-light text-white mb-2">Ready for Payment</h2>
                     <div className="text-4xl font-thin text-white mb-1">${nfcSession?.amount}</div>
                     <p className="text-white/60 text-sm">{nfcSession?.itemName}</p>
+                    <p className="text-white/40 text-xs mt-2">Ask customer to tap their card or phone</p>
                   </div>
                   
                   <div className="space-y-4">
@@ -214,7 +212,7 @@ export default function NFCPayment() {
                         e.currentTarget.style.boxShadow = 'none';
                       }}
                     >
-                      Tap to Pay
+                      Simulate Customer Tap
                     </button>
                     
                     <button
@@ -229,13 +227,14 @@ export default function NFCPayment() {
               
               {paymentStatus === "processing" && (
                 <div className="space-y-8">
-                  <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-white/20 flex items-center justify-center">
-                    <Loader2 className="h-12 w-12 text-white/80 animate-spin" />
+                  <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-400/30 flex items-center justify-center">
+                    <Loader2 className="h-12 w-12 text-yellow-400 animate-spin" />
                   </div>
                   
                   <div>
-                    <h2 className="text-xl font-light text-white mb-2">Processing</h2>
-                    <p className="text-white/60 text-sm">Please wait...</p>
+                    <h2 className="text-xl font-light text-white mb-2">Processing Payment</h2>
+                    <p className="text-white/60 text-sm">Waiting for customer's tap...</p>
+                    <p className="text-white/40 text-xs mt-2">Customer should tap card or digital wallet now</p>
                   </div>
                 </div>
               )}
@@ -247,8 +246,9 @@ export default function NFCPayment() {
                   </div>
                   
                   <div>
-                    <h2 className="text-xl font-light text-white mb-2">Payment Complete</h2>
-                    <p className="text-white/60 text-sm">Thank you</p>
+                    <h2 className="text-xl font-light text-white mb-2">Payment Successful</h2>
+                    <p className="text-white/60 text-sm">Customer payment received</p>
+                    <p className="text-white/40 text-xs mt-2">${nfcSession?.amount} charged successfully</p>
                   </div>
                   
                   <button
@@ -279,7 +279,8 @@ export default function NFCPayment() {
                   
                   <div>
                     <h2 className="text-xl font-light text-white mb-2">Payment Failed</h2>
-                    <p className="text-white/60 text-sm">Please try again</p>
+                    <p className="text-white/60 text-sm">Ask customer to try again</p>
+                    <p className="text-white/40 text-xs mt-2">Check card placement or try different payment method</p>
                   </div>
                   
                   <button
@@ -309,8 +310,8 @@ export default function NFCPayment() {
       <div className="relative z-10 p-6 max-w-sm mx-auto min-h-screen flex flex-col justify-center">
         {/* Simple Header */}
         <div className="text-center mb-12">
-          <h1 className="text-3xl font-thin text-white mb-3">NFC Payment</h1>
-          <p className="text-white/60 font-light">Tap your phone to pay</p>
+          <h1 className="text-3xl font-thin text-white mb-3">NFC Terminal</h1>
+          <p className="text-white/60 font-light">Accept contactless payments</p>
         </div>
 
         {/* Clean Payment Form */}
@@ -389,10 +390,10 @@ export default function NFCPayment() {
               {paymentStatus === "failed" && <XCircle className="h-5 w-5 text-red-400" />}
               
               <span className="text-white font-light">
-                {paymentStatus === "ready" && "Payment Ready"}
-                {paymentStatus === "processing" && "Processing..."}
-                {paymentStatus === "completed" && "Success"}
-                {paymentStatus === "failed" && "Failed"}
+                {paymentStatus === "ready" && "Waiting for Customer"}
+                {paymentStatus === "processing" && "Processing Payment..."}
+                {paymentStatus === "completed" && "Payment Received"}
+                {paymentStatus === "failed" && "Payment Failed"}
               </span>
             </div>
             
@@ -401,7 +402,7 @@ export default function NFCPayment() {
                 onClick={() => setShowNfcOverlay(true)}
                 className="text-blue-400 hover:text-blue-300 transition-colors font-light"
               >
-                Open Payment
+                Show Payment Screen
               </button>
             )}
           </div>
