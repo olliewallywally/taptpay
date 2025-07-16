@@ -59,17 +59,9 @@ export const transactions = pgTable("transactions", {
   windcaveTransactionId: text("windcave_transaction_id"),
   
   // Payment method tracking
-  paymentMethod: text("payment_method").default("qr_code"), // qr_code, nfc_tap, card_reader, manual, crypto
+  paymentMethod: text("payment_method").default("qr_code"), // qr_code, nfc_tap, card_reader, manual
   nfcSessionId: text("nfc_session_id"), // For NFC/tap payments
   deviceId: text("device_id"), // Device that initiated the transaction
-  
-  // Crypto payment specific fields
-  cryptoCurrency: text("crypto_currency"), // BTC, ETH, USDC, etc.
-  cryptoWalletAddress: text("crypto_wallet_address"), // Recipient wallet address
-  cryptoTransactionHash: text("crypto_transaction_hash"), // Blockchain transaction hash
-  cryptoNetworkFee: decimal("crypto_network_fee", { precision: 10, scale: 8 }), // Network fee paid
-  cryptoExchangeRate: decimal("crypto_exchange_rate", { precision: 15, scale: 8 }), // Exchange rate at time of payment
-  cryptoAmountSent: decimal("crypto_amount_sent", { precision: 15, scale: 8 }), // Amount sent in crypto
   
   // Fee tracking (Marketplace Model)
   windcaveFeeRate: decimal("windcave_fee_rate", { precision: 5, scale: 4 }).default("0.0290"), // 2.9% typical Windcave rate
@@ -77,10 +69,6 @@ export const transactions = pgTable("transactions", {
   platformFeeRate: decimal("platform_fee_rate", { precision: 5, scale: 4 }).default("0.0050"), // 0.5% platform fee
   platformFeeAmount: decimal("platform_fee_amount", { precision: 10, scale: 2 }), // Calculated platform fee
   merchantNet: decimal("merchant_net", { precision: 10, scale: 2 }), // Amount to settle to merchant
-  
-  // Crypto-specific fees
-  cryptoProcessingFeeRate: decimal("crypto_processing_fee_rate", { precision: 5, scale: 4 }).default("0.0150"), // 1.5% crypto processing fee
-  cryptoProcessingFeeAmount: decimal("crypto_processing_fee_amount", { precision: 10, scale: 2 }), // Calculated crypto processing fee
   
   createdAt: timestamp("created_at").defaultNow(),
 });
