@@ -255,11 +255,9 @@ export class MemStorage implements IStorage {
     const id = this.currentTransactionId++;
     const transactionAmount = parseFloat(insertTransaction.price);
     
-    // Marketplace Model: Calculate percentage-based fees
-    const windcaveFeeRate = 0.029; // 2.9% typical Windcave rate
-    const platformFeeRate = 0.005; // 0.5% platform fee
-    const windcaveFeeAmount = Math.round(transactionAmount * windcaveFeeRate * 100) / 100;
-    const platformFeeAmount = Math.round(transactionAmount * platformFeeRate * 100) / 100;
+    // Fixed fee structure: $0.05 platform + $0.20 Windcave = $0.25 total per transaction
+    const windcaveFeeAmount = 0.20; // Fixed $0.20 Windcave fee
+    const platformFeeAmount = 0.05; // Fixed $0.05 platform fee
     const merchantNet = Math.round((transactionAmount - windcaveFeeAmount - platformFeeAmount) * 100) / 100;
 
     const transaction: Transaction = {
@@ -267,9 +265,9 @@ export class MemStorage implements IStorage {
       id,
       createdAt: new Date(),
       windcaveTransactionId: null,
-      windcaveFeeRate: windcaveFeeRate.toString(),
+      windcaveFeeRate: "0.0000", // Not percentage-based
       windcaveFeeAmount: windcaveFeeAmount.toString(),
-      platformFeeRate: platformFeeRate.toString(),
+      platformFeeRate: "0.0000", // Not percentage-based
       platformFeeAmount: platformFeeAmount.toString(),
       merchantNet: merchantNet.toString(),
     };
@@ -802,18 +800,16 @@ export class DatabaseStorage implements IStorage {
     if (!this.db) throw new Error('Database not available');
     const transactionAmount = parseFloat(insertTransaction.price);
     
-    // Marketplace Model: Calculate percentage-based fees
-    const windcaveFeeRate = 0.029; // 2.9% typical Windcave rate
-    const platformFeeRate = 0.005; // 0.5% platform fee
-    const windcaveFeeAmount = Math.round(transactionAmount * windcaveFeeRate * 100) / 100;
-    const platformFeeAmount = Math.round(transactionAmount * platformFeeRate * 100) / 100;
+    // Fixed fee structure: $0.05 platform + $0.20 Windcave = $0.25 total per transaction
+    const windcaveFeeAmount = 0.20; // Fixed $0.20 Windcave fee
+    const platformFeeAmount = 0.05; // Fixed $0.05 platform fee
     const merchantNet = Math.round((transactionAmount - windcaveFeeAmount - platformFeeAmount) * 100) / 100;
 
     const transactionWithFees = {
       ...insertTransaction,
-      windcaveFeeRate: windcaveFeeRate.toString(),
+      windcaveFeeRate: "0.0000", // Not percentage-based
       windcaveFeeAmount: windcaveFeeAmount.toString(),
-      platformFeeRate: platformFeeRate.toString(),
+      platformFeeRate: "0.0000", // Not percentage-based
       platformFeeAmount: platformFeeAmount.toString(),
       merchantNet: merchantNet.toString(),
     };

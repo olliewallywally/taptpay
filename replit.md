@@ -14,7 +14,7 @@ The application follows a monorepo structure with clear separation between clien
 - **Real-time Communication**: Server-Sent Events (SSE)
 - **UI Framework**: shadcn/ui with Tailwind CSS
 - **State Management**: TanStack Query for server state
-- **Revenue Model**: Automatic $0.05 fee collection per transaction
+- **Revenue Model**: Fixed fee structure - $0.05 platform fee + $0.20 Windcave fee = $0.25 total per transaction
 
 ## Key Components
 
@@ -51,16 +51,16 @@ The application follows a monorepo structure with clear separation between clien
 - price: decimal(10,2) (transaction amount)
 - status: text (pending|processing|completed|failed)
 - windcaveTransactionId: text (external payment processor ID)
-- windcaveFee: decimal(10,2) (fixed $0.20 processing fee)
-- platformFee: decimal(10,2) (fixed $0.05 platform fee)
-- merchantNet: decimal(10,2) (amount merchant receives after fees)
+- windcaveFeeAmount: decimal(10,2) (fixed $0.20 Windcave fee per transaction)
+- platformFeeAmount: decimal(10,2) (fixed $0.05 platform fee per transaction)
+- merchantNet: decimal(10,2) (amount merchant receives after $0.25 total fees)
 - createdAt: timestamp (transaction creation time)
 
-// Platform Fees table (NEW)
+// Platform Fees table
 - id: serial primary key
 - transactionId: foreign key to transactions
 - merchantId: foreign key to merchants
-- feeAmount: decimal(10,2) (platform fee collected)
+- feeAmount: decimal(10,2) (fixed $0.05 platform fee per transaction)
 - transactionAmount: decimal(10,2) (original transaction amount)
 - status: text (pending|collected|failed)
 - collectedAt: timestamp (when fee was collected)
@@ -224,6 +224,7 @@ npm start      # Runs production server
 - July 14, 2025. Updated NFC payment page messaging to properly reflect merchant-customer payment flow with merchant terminal interface
 - July 14, 2025. Fixed CSV export functionality on transactions page - added complete export function with proper data formatting and auto-download
 - July 17, 2025. **SYSTEM VERIFICATION**: Completed comprehensive system check - all payment functions (QR, NFC, authentication, analytics) working correctly
+- July 17, 2025. **FEE STRUCTURE CORRECTION**: Updated system to use fixed fees per user specification - $0.05 platform fee + $0.20 Windcave fee = $0.25 total per transaction
 
 ## User Preferences
 
