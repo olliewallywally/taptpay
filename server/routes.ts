@@ -649,6 +649,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get revenue over time data
+  app.get("/api/merchants/:id/revenue-over-time", async (req, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      const days = parseInt(req.query.days as string) || 30;
+      const revenueData = await storage.getRevenueOverTime(merchantId, days);
+      res.json(revenueData);
+    } catch (error) {
+      console.error("Error fetching revenue over time:", error);
+      res.status(500).json({ message: "Failed to get revenue data" });
+    }
+  });
+
   // Get merchant analytics with date range
   app.get("/api/merchants/:id/analytics/export", async (req, res) => {
     try {
