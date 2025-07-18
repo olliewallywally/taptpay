@@ -35,14 +35,21 @@ export function Navigation() {
   const merchantId = getCurrentMerchantId();
   const customerViewPath = merchantId ? `/pay/${merchantId}` : "/pay/1";
 
-  const navigationLinks = [
+  // Primary navigation for main functionality
+  const primaryLinks = [
     { path: "/merchant", label: "Terminal" },
     { path: "/dashboard", label: "Dashboard" },
-    { path: "/transactions", label: "Transactions" },
     { path: "/nfc", label: "NFC Pay" },
+  ];
+
+  // Secondary navigation for management
+  const secondaryLinks = [
+    { path: "/transactions", label: "Transactions" },
     { path: "/settings", label: "Settings" },
     { path: customerViewPath, label: "Customer View" },
   ];
+
+  const allNavigationLinks = [...primaryLinks, ...secondaryLinks];
 
   return (
     <div className="absolute top-0 left-0 right-0 z-20">
@@ -69,30 +76,61 @@ export function Navigation() {
 
             {/* Desktop Navigation */}
             {!isMobile && (
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-6">
+                {/* Primary Navigation */}
                 <div className="flex space-x-2">
-                  {navigationLinks.slice(0, 5).map((link) => (
+                  {primaryLinks.map((link) => (
                     <a 
                       key={link.path}
                       href={link.path}
-                      className={`px-3 py-2 text-sm font-medium rounded-lg transition-all backdrop-blur-sm border ${
+                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-all backdrop-blur-sm border ${
                         isActive(link.path) 
-                          ? "bg-white/20 text-black shadow-sm border-white/30" 
-                          : "bg-white/10 text-black hover:text-black hover:bg-white/15 border-white/20"
+                          ? "bg-white/25 text-black shadow-lg border-white/40" 
+                          : "bg-white/10 text-black hover:text-black hover:bg-white/20 border-white/20"
                       }`}
                     >
                       {link.label}
                     </a>
                   ))}
                 </div>
+
+                {/* Secondary Navigation Dropdown */}
+                <div className="relative group">
+                  <button className="px-3 py-2 text-sm font-medium rounded-lg transition-all backdrop-blur-sm border bg-white/10 text-black hover:bg-white/20 border-white/20 flex items-center">
+                    More
+                    <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  
+                  {/* Dropdown Menu */}
+                  <div className="absolute right-0 mt-2 w-48 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                    <div className="backdrop-blur-xl bg-white/15 border border-white/20 rounded-lg shadow-2xl overflow-hidden">
+                      {secondaryLinks.map((link) => (
+                        <a
+                          key={link.path}
+                          href={link.path}
+                          className={`block px-4 py-3 text-sm transition-all ${
+                            isActive(link.path)
+                              ? "bg-white/30 text-black font-medium border-l-4 border-white/60"
+                              : "text-black hover:bg-white/20 hover:text-black"
+                          }`}
+                        >
+                          {link.label}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Logout Button */}
                 <Button
                   onClick={handleLogout}
                   variant="outline"
                   size="sm"
-                  className="text-black border-white/20 hover:bg-white/15 hover:text-black backdrop-blur-sm bg-white/10"
+                  className="text-black border-white/30 hover:bg-white/20 hover:text-black backdrop-blur-sm bg-white/15"
                 >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Logout
+                  <LogOut className="w-4 h-4" />
                 </Button>
               </div>
             )}
@@ -134,7 +172,7 @@ export function Navigation() {
                       {user.email}
                     </div>
                   )}
-                  {navigationLinks.map((link, index) => (
+                  {allNavigationLinks.map((link, index) => (
                     <a
                       key={link.path}
                       href={link.path}
