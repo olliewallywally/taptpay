@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema } from "@shared/schema";
+import { updateMerchantDetailsSchema, updateBankAccountSchema } from "@shared/schema";
 import { 
   Settings as SettingsIcon, 
   CheckCircle, 
@@ -24,21 +24,20 @@ import {
   CreditCard,
   Edit,
   Save,
-  X,
-  Palette
+  X
 } from "lucide-react";
 import { z } from "zod";
-import { colorThemes, getThemeById } from "@/lib/themes";
+
 
 type MerchantDetailsFormData = z.infer<typeof updateMerchantDetailsSchema>;
 type BankAccountFormData = z.infer<typeof updateBankAccountSchema>;
-type ThemeFormData = z.infer<typeof updateThemeSchema>;
+
 
 export default function Settings() {
   const { toast } = useToast();
   const [editingDetails, setEditingDetails] = useState(false);
   const [editingBankAccount, setEditingBankAccount] = useState(false);
-  const [editingTheme, setEditingTheme] = useState(false);
+
 
   // Get current user first to get their merchant ID
   const { data: user, isLoading: userLoading } = useQuery({
@@ -89,12 +88,7 @@ export default function Settings() {
     },
   });
 
-  const themeForm = useForm<ThemeFormData>({
-    resolver: zodResolver(updateThemeSchema),
-    defaultValues: {
-      themeId: merchant?.themeId || "classic",
-    },
-  });
+
 
   // Update form defaults when merchant data loads
   useEffect(() => {
@@ -111,11 +105,9 @@ export default function Settings() {
         bankBranch: merchant.bankBranch || "",
         accountHolderName: merchant.accountHolderName || "",
       });
-      themeForm.reset({
-        themeId: merchant.themeId || "classic",
-      });
+
     }
-  }, [merchant, merchantDetailsForm, bankAccountForm, themeForm]);
+  }, [merchant, merchantDetailsForm, bankAccountForm]);
 
   // Mutations for updating merchant data
   const updateDetailsMutation = useMutation({
@@ -162,38 +154,12 @@ export default function Settings() {
     },
   });
 
-  const updateThemeMutation = useMutation({
-    mutationFn: async (data: ThemeFormData) => {
-      if (!user?.merchantId) throw new Error("No merchant ID available");
-      return apiRequest("PUT", `/api/merchants/${user.merchantId}/theme`, data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", user?.merchantId] });
-      setEditingTheme(false);
-      toast({
-        title: "Theme Updated",
-        description: "Your color theme has been changed successfully.",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Update Failed",
-        description: "Failed to update theme. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
   const onSubmitDetails = (data: MerchantDetailsFormData) => {
     updateDetailsMutation.mutate(data);
   };
 
   const onSubmitBankAccount = (data: BankAccountFormData) => {
     updateBankAccountMutation.mutate(data);
-  };
-
-  const onSubmitTheme = (data: ThemeFormData) => {
-    updateThemeMutation.mutate(data);
   };
 
   return (
@@ -212,31 +178,30 @@ export default function Settings() {
       </div>
 
       {/* Merchant Business Details Card */}
-      <Card className="mb-6 sm:mb-8">
-        <CardHeader>
+      <div className="backdrop-blur-xl bg-white/5 border border-white/20 rounded-3xl p-6 shadow-2xl mb-6 sm:mb-8 hover:bg-white/10 hover:border-white/30 transition-all duration-300">
+        <div className="mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <Building className="h-5 w-5" />
+              <Building className="h-5 w-5 text-white" />
               <div>
-                <CardTitle>Business Details</CardTitle>
-                <CardDescription>
+                <h3 className="text-lg font-semibold text-white">Business Details</h3>
+                <p className="text-white/70 text-sm">
                   Manage your business information and contact details
-                </CardDescription>
+                </p>
               </div>
             </div>
             {!editingDetails && (
-              <Button
-                variant="outline"
-                size="sm"
+              <button
                 onClick={() => setEditingDetails(true)}
+                className="backdrop-blur-sm bg-white/10 border border-white/20 text-white px-4 py-2 rounded-xl hover:bg-white/20 hover:border-white/30 transition-all duration-300 text-sm font-medium"
               >
-                <Edit className="w-4 h-4 mr-2" />
+                <Edit className="w-4 h-4 mr-2 inline" />
                 Edit
-              </Button>
+              </button>
             )}
           </div>
-        </CardHeader>
-        <CardContent>
+        </div>
+        <div>
           {merchantLoading ? (
             <div className="animate-pulse space-y-4">
               {Array.from({ length: 4 }).map((_, i) => (
@@ -341,227 +306,54 @@ export default function Settings() {
             <div className="space-y-4">
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Business Name</label>
-                  <p className="text-gray-900">{merchant?.businessName || "Not set"}</p>
+                  <label className="text-sm font-medium text-white/70">Business Name</label>
+                  <p className="text-white">{merchant?.businessName || "Not set"}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Contact Email</label>
-                  <p className="text-gray-900">{merchant?.contactEmail || "Not set"}</p>
+                  <label className="text-sm font-medium text-white/70">Contact Email</label>
+                  <p className="text-white">{merchant?.contactEmail || "Not set"}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Contact Phone</label>
-                  <p className="text-gray-900">{merchant?.contactPhone || "Not set"}</p>
+                  <label className="text-sm font-medium text-white/70">Contact Phone</label>
+                  <p className="text-white">{merchant?.contactPhone || "Not set"}</p>
                 </div>
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-700">Business Address</label>
-                <p className="text-gray-900 whitespace-pre-line">{merchant?.businessAddress || "Not set"}</p>
+                <label className="text-sm font-medium text-white/70">Business Address</label>
+                <p className="text-white whitespace-pre-line">{merchant?.businessAddress || "Not set"}</p>
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      {/* Color Theme Card */}
-      <Card className="mb-6 sm:mb-8">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Palette className="h-5 w-5" />
-              <div>
-                <CardTitle>Color Theme</CardTitle>
-                <CardDescription>
-                  Customize the color scheme for your payment interface
-                </CardDescription>
-              </div>
-            </div>
-            {!editingTheme && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setEditingTheme(true)}
-              >
-                <Edit className="w-4 h-4 mr-2" />
-                Change Theme
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {merchantLoading ? (
-            <div className="animate-pulse space-y-4">
-              <div className="h-4 bg-gray-200 rounded w-32"></div>
-              <div className="h-24 bg-gray-200 rounded"></div>
-            </div>
-          ) : editingTheme ? (
-            <Form {...themeForm}>
-              <form onSubmit={themeForm.handleSubmit(onSubmitTheme)} className="space-y-6">
-                <FormField
-                  control={themeForm.control}
-                  name="themeId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Select Color Theme</FormLabel>
-                      <FormControl>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {colorThemes.map((theme) => (
-                            <div
-                              key={theme.id}
-                              className={`relative border-2 rounded-xl p-4 cursor-pointer transition-all ${
-                                field.value === theme.id
-                                  ? "border-blue-500 bg-blue-50"
-                                  : "border-gray-200 hover:border-gray-300"
-                              }`}
-                              onClick={() => field.onChange(theme.id)}
-                            >
-                              <div className="space-y-3">
-                                <div className="flex items-center justify-between">
-                                  <h4 className="font-medium text-gray-900">{theme.name}</h4>
-                                  {field.value === theme.id && (
-                                    <CheckCircle className="w-5 h-5 text-blue-600" />
-                                  )}
-                                </div>
-                                <p className="text-sm text-gray-600">{theme.description}</p>
-                                <div className="flex space-x-2">
-                                  <div
-                                    className="w-8 h-8 rounded-full border-2 border-white shadow-sm"
-                                    style={{ backgroundColor: theme.colors.primary }}
-                                    title="Primary Color"
-                                  />
-                                  <div
-                                    className="w-8 h-8 rounded-full border-2 border-white shadow-sm"
-                                    style={{ backgroundColor: theme.colors.secondary }}
-                                    title="Secondary Color"
-                                  />
-                                  <div
-                                    className="w-8 h-8 rounded-full border-2 border-white shadow-sm"
-                                    style={{ backgroundColor: theme.colors.accent }}
-                                    title="Accent Color"
-                                  />
-                                </div>
-                                <div className={`p-3 rounded-lg ${theme.preview.background} ${theme.preview.border} border`}>
-                                  <div className={`text-sm font-medium ${theme.preview.text}`}>
-                                    Payment Interface Preview
-                                  </div>
-                                  <div className="text-xs text-gray-500 mt-1">
-                                    How your customers will see your payment page
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="flex space-x-2">
-                  <Button 
-                    type="submit" 
-                    disabled={updateThemeMutation.isPending}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    {updateThemeMutation.isPending ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4 mr-2" />
-                        Save Theme
-                      </>
-                    )}
-                  </Button>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => {
-                      setEditingTheme(false);
-                      themeForm.reset();
-                    }}
-                  >
-                    <X className="w-4 h-4 mr-2" />
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          ) : (
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-gray-700">Current Theme</label>
-                {(() => {
-                  const currentTheme = getThemeById(merchant?.themeId || "classic");
-                  return (
-                    <div className="mt-2 p-4 border rounded-lg">
-                      <div className="flex items-center justify-between mb-3">
-                        <div>
-                          <h4 className="font-medium text-gray-900">{currentTheme?.name}</h4>
-                          <p className="text-sm text-gray-600">{currentTheme?.description}</p>
-                        </div>
-                        <div className="flex space-x-2">
-                          <div
-                            className="w-6 h-6 rounded-full border-2 border-white shadow-sm"
-                            style={{ backgroundColor: currentTheme?.colors.primary }}
-                            title="Primary Color"
-                          />
-                          <div
-                            className="w-6 h-6 rounded-full border-2 border-white shadow-sm"
-                            style={{ backgroundColor: currentTheme?.colors.secondary }}
-                            title="Secondary Color"
-                          />
-                          <div
-                            className="w-6 h-6 rounded-full border-2 border-white shadow-sm"
-                            style={{ backgroundColor: currentTheme?.colors.accent }}
-                            title="Accent Color"
-                          />
-                        </div>
-                      </div>
-                      <div className={`p-3 rounded-lg ${currentTheme?.preview.background} ${currentTheme?.preview.border} border`}>
-                        <div className={`text-sm font-medium ${currentTheme?.preview.text}`}>
-                          Payment Interface Preview
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          This is how customers see your payment page
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+
 
       {/* Bank Account Details Card */}
-      <Card className="mb-6 sm:mb-8">
-        <CardHeader>
+      <div className="backdrop-blur-xl bg-white/5 border border-white/20 rounded-3xl p-6 shadow-2xl mb-6 sm:mb-8 hover:bg-white/10 hover:border-white/30 transition-all duration-300">
+        <div className="mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <CreditCard className="h-5 w-5" />
+              <CreditCard className="h-5 w-5 text-white" />
               <div>
-                <CardTitle>Bank Account Details</CardTitle>
-                <CardDescription>
+                <h3 className="text-lg font-semibold text-white">Bank Account Details</h3>
+                <p className="text-white/70 text-sm">
                   Manage your bank account information for payment settlements
-                </CardDescription>
+                </p>
               </div>
             </div>
             {!editingBankAccount && (
-              <Button
-                variant="outline"
-                size="sm"
+              <button
                 onClick={() => setEditingBankAccount(true)}
+                className="backdrop-blur-sm bg-white/10 border border-white/20 text-white px-4 py-2 rounded-xl hover:bg-white/20 hover:border-white/30 transition-all duration-300 text-sm font-medium"
               >
-                <Edit className="w-4 h-4 mr-2" />
+                <Edit className="w-4 h-4 mr-2 inline" />
                 Edit
-              </Button>
+              </button>
             )}
           </div>
-        </CardHeader>
-        <CardContent>
+        </div>
+        <div>
           {merchantLoading ? (
             <div className="animate-pulse space-y-4">
               {Array.from({ length: 4 }).map((_, i) => (
@@ -662,20 +454,20 @@ export default function Settings() {
             <div className="space-y-4">
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Bank Name</label>
-                  <p className="text-gray-900">{merchant?.bankName || "Not set"}</p>
+                  <label className="text-sm font-medium text-white/70">Bank Name</label>
+                  <p className="text-white">{merchant?.bankName || "Not set"}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Account Number</label>
-                  <p className="text-gray-900 font-mono">{merchant?.bankAccountNumber || "Not set"}</p>
+                  <label className="text-sm font-medium text-white/70">Account Number</label>
+                  <p className="text-white font-mono">{merchant?.bankAccountNumber || "Not set"}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Bank Branch</label>
-                  <p className="text-gray-900">{merchant?.bankBranch || "Not set"}</p>
+                  <label className="text-sm font-medium text-white/70">Bank Branch</label>
+                  <p className="text-white">{merchant?.bankBranch || "Not set"}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Account Holder</label>
-                  <p className="text-gray-900">{merchant?.accountHolderName || "Not set"}</p>
+                  <label className="text-sm font-medium text-white/70">Account Holder</label>
+                  <p className="text-white">{merchant?.accountHolderName || "Not set"}</p>
                 </div>
               </div>
               {(!merchant?.bankName || !merchant?.bankAccountNumber) && (
@@ -689,21 +481,21 @@ export default function Settings() {
               )}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* API Status Card */}
-      <Card className="mb-6 sm:mb-8">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Shield className="h-5 w-5" />
+      <div className="backdrop-blur-xl bg-white/5 border border-white/20 rounded-3xl p-6 shadow-2xl mb-6 sm:mb-8 hover:bg-white/10 hover:border-white/30 transition-all duration-300">
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold text-white flex items-center space-x-2">
+            <Shield className="h-5 w-5 text-white" />
             <span>Payment Gateway Status</span>
-          </CardTitle>
-          <CardDescription>
+          </h3>
+          <p className="text-white/70 text-sm">
             Current status of your Windcave payment gateway integration
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </p>
+        </div>
+        <div>
           {isLoading ? (
             <div className="animate-pulse">
               <div className="h-6 bg-gray-200 rounded w-32 mb-2"></div>
@@ -719,10 +511,10 @@ export default function Settings() {
                     <AlertCircle className="h-6 w-6 text-yellow-600" />
                   )}
                   <div>
-                    <p className="font-medium text-gray-900">
+                    <p className="font-medium text-white">
                       {apiStatus?.configured ? "API Configured" : "API Not Configured"}
                     </p>
-                    <p className="text-sm text-gray-500">{apiStatus?.message}</p>
+                    <p className="text-sm text-white/70">{apiStatus?.message}</p>
                   </div>
                 </div>
                 <Badge variant={apiStatus?.configured ? "default" : "secondary"}>
@@ -741,25 +533,25 @@ export default function Settings() {
               )}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Setup Instructions */}
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Key className="h-5 w-5" />
+      <div className="backdrop-blur-xl bg-white/5 border border-white/20 rounded-3xl p-6 shadow-2xl mb-8 hover:bg-white/10 hover:border-white/30 transition-all duration-300">
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold text-white flex items-center space-x-2">
+            <Key className="h-5 w-5 text-white" />
             <span>Windcave API Setup</span>
-          </CardTitle>
-          <CardDescription>
+          </h3>
+          <p className="text-white/70 text-sm">
             Follow these steps to connect your Windcave payment gateway
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </p>
+        </div>
+        <div>
           <div className="space-y-6">
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900">1. Get Windcave Account</h3>
-              <p className="text-gray-600">
+              <h3 className="text-lg font-semibold text-white">1. Get Windcave Account</h3>
+              <p className="text-white/70">
                 Contact Windcave to set up your merchant account and get API credentials.
               </p>
               <div className="flex items-center space-x-2">
@@ -777,8 +569,8 @@ export default function Settings() {
             </div>
 
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900">2. Configure Environment Variables</h3>
-              <p className="text-gray-600">
+              <h3 className="text-lg font-semibold text-white">2. Configure Environment Variables</h3>
+              <p className="text-white/70">
                 Add your Windcave credentials to your environment variables:
               </p>
               <div className="bg-gray-50 rounded-lg p-4 font-mono text-sm">
@@ -791,7 +583,7 @@ export default function Settings() {
             </div>
 
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900">3. Integration Options</h3>
+              <h3 className="text-lg font-semibold text-white">3. Integration Options</h3>
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="border rounded-lg p-4">
                   <h4 className="font-medium text-gray-900 mb-2">Hosted Payment Page (Recommended)</h4>
@@ -811,11 +603,11 @@ export default function Settings() {
             </div>
 
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900">4. Testing</h3>
-              <p className="text-gray-600">
+              <h3 className="text-lg font-semibold text-white">4. Testing</h3>
+              <p className="text-white/70">
                 Use Windcave's UAT (User Acceptance Testing) environment for development and testing:
               </p>
-              <ul className="list-disc list-inside text-sm text-gray-600 space-y-1 ml-4">
+              <ul className="list-disc list-inside text-sm text-white/70 space-y-1 ml-4">
                 <li>Test card numbers available in Windcave documentation</li>
                 <li>Sandbox environment for safe testing</li>
                 <li>Real-time transaction monitoring</li>
@@ -823,11 +615,11 @@ export default function Settings() {
             </div>
 
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900">5. Go Live</h3>
-              <p className="text-gray-600">
+              <h3 className="text-lg font-semibold text-white">5. Go Live</h3>
+              <p className="text-white/70">
                 When ready for production:
               </p>
-              <ul className="list-disc list-inside text-sm text-gray-600 space-y-1 ml-4">
+              <ul className="list-disc list-inside text-sm text-white/70 space-y-1 ml-4">
                 <li>Update WINDCAVE_ENDPOINT to production URL</li>
                 <li>Use production API credentials</li>
                 <li>Complete Windcave's go-live process</li>
@@ -835,43 +627,43 @@ export default function Settings() {
               </ul>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Current Configuration */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <SettingsIcon className="h-5 w-5" />
+      <div className="backdrop-blur-xl bg-white/5 border border-white/20 rounded-3xl p-6 shadow-2xl hover:bg-white/10 hover:border-white/30 transition-all duration-300">
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold text-white flex items-center space-x-2">
+            <SettingsIcon className="h-5 w-5 text-white" />
             <span>Current Configuration</span>
-          </CardTitle>
-          <CardDescription>
+          </h3>
+          <p className="text-white/70 text-sm">
             Review your current payment processing setup
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </p>
+        </div>
+        <div>
           <div className="space-y-4">
             <div className="grid md:grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium text-gray-700">Payment Provider</label>
-                <p className="text-gray-900">Windcave (formerly Payment Express)</p>
+                <label className="text-sm font-medium text-white/70">Payment Provider</label>
+                <p className="text-white">Windcave (formerly Payment Express)</p>
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-700">Processing Rate</label>
-                <p className="text-gray-900 font-semibold text-green-600">$0.20 flat fee per transaction</p>
+                <label className="text-sm font-medium text-white/70">Processing Rate</label>
+                <p className="text-white font-semibold text-green-400">$0.20 flat fee per transaction</p>
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-700">Currency</label>
-                <p className="text-gray-900">NZD (New Zealand Dollar)</p>
+                <label className="text-sm font-medium text-white/70">Currency</label>
+                <p className="text-white">NZD (New Zealand Dollar)</p>
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-700">Integration Method</label>
-                <p className="text-gray-900">REST API with Hosted Payment Page</p>
+                <label className="text-sm font-medium text-white/70">Integration Method</label>
+                <p className="text-white">REST API with Hosted Payment Page</p>
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
       </div>
     </div>
   );
