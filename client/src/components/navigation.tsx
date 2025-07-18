@@ -71,11 +71,11 @@ export function Navigation() {
             {!isMobile && (
               <div className="flex items-center space-x-4">
                 <div className="flex space-x-2">
-                  {navigationLinks.slice(0, 3).map((link) => (
+                  {navigationLinks.slice(0, 5).map((link) => (
                     <a 
                       key={link.path}
                       href={link.path}
-                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-all backdrop-blur-sm border ${
+                      className={`px-3 py-2 text-sm font-medium rounded-lg transition-all backdrop-blur-sm border ${
                         isActive(link.path) 
                           ? "bg-white/20 text-black shadow-sm border-white/30" 
                           : "bg-white/10 text-black hover:text-black hover:bg-white/15 border-white/20"
