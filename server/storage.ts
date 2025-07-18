@@ -62,6 +62,13 @@ export interface IStorage {
   
   // Clear operations
   clearTransactions(merchantId: number): Promise<boolean>;
+  
+  // Revenue analytics
+  getRevenueOverTime(merchantId: number, days?: number): Promise<Array<{
+    date: string;
+    revenue: number;
+    transactions: number;
+  }>>;
 }
 
 export class MemStorage implements IStorage {
@@ -568,6 +575,52 @@ export class MemStorage implements IStorage {
     return true;
   }
 
+  async getRevenueOverTime(merchantId: number, days: number = 30): Promise<Array<{
+    date: string;
+    revenue: number;
+    transactions: number;
+  }>> {
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(endDate.getDate() - days);
+
+    const transactions = await this.getTransactionsByMerchantWithDateRange(merchantId, startDate, endDate);
+    const completedTransactions = transactions.filter(t => t.status === "completed");
+
+    // Group transactions by date
+    const revenueByDate = new Map<string, { revenue: number; transactions: number }>();
+    
+    // Initialize all dates with 0 values
+    for (let i = 0; i <= days; i++) {
+      const date = new Date(startDate);
+      date.setDate(startDate.getDate() + i);
+      const dateKey = date.toISOString().split('T')[0];
+      revenueByDate.set(dateKey, { revenue: 0, transactions: 0 });
+    }
+
+    // Aggregate completed transactions by date
+    completedTransactions.forEach(transaction => {
+      if (transaction.createdAt) {
+        const date = new Date(transaction.createdAt);
+        const dateKey = date.toISOString().split('T')[0];
+        const existing = revenueByDate.get(dateKey) || { revenue: 0, transactions: 0 };
+        revenueByDate.set(dateKey, {
+          revenue: existing.revenue + parseFloat(transaction.price),
+          transactions: existing.transactions + 1
+        });
+      }
+    });
+
+    // Convert to array and sort by date
+    return Array.from(revenueByDate.entries())
+      .map(([date, data]) => ({
+        date,
+        revenue: Number(data.revenue.toFixed(2)),
+        transactions: data.transactions
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }
+
   clearAllMerchants() {
     this.merchants.clear();
     this.transactions.clear();
@@ -1003,6 +1056,54 @@ export class DatabaseStorage implements IStorage {
       console.error('Error clearing transactions:', error);
       return false;
     }
+  }
+
+  async getRevenueOverTime(merchantId: number, days: number = 30): Promise<Array<{
+    date: string;
+    revenue: number;
+    transactions: number;
+  }>> {
+    if (!this.db) throw new Error('Database not available');
+    
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(endDate.getDate() - days);
+
+    const allTransactions = await this.getTransactionsByMerchantWithDateRange(merchantId, startDate, endDate);
+    const completedTransactions = allTransactions.filter(t => t.status === "completed");
+
+    // Group transactions by date
+    const revenueByDate = new Map<string, { revenue: number; transactions: number }>();
+    
+    // Initialize all dates with 0 values
+    for (let i = 0; i <= days; i++) {
+      const date = new Date(startDate);
+      date.setDate(startDate.getDate() + i);
+      const dateKey = date.toISOString().split('T')[0];
+      revenueByDate.set(dateKey, { revenue: 0, transactions: 0 });
+    }
+
+    // Aggregate completed transactions by date
+    completedTransactions.forEach(transaction => {
+      if (transaction.createdAt) {
+        const date = new Date(transaction.createdAt);
+        const dateKey = date.toISOString().split('T')[0];
+        const existing = revenueByDate.get(dateKey) || { revenue: 0, transactions: 0 };
+        revenueByDate.set(dateKey, {
+          revenue: existing.revenue + parseFloat(transaction.price),
+          transactions: existing.transactions + 1
+        });
+      }
+    });
+
+    // Convert to array and sort by date
+    return Array.from(revenueByDate.entries())
+      .map(([date, data]) => ({
+        date,
+        revenue: Number(data.revenue.toFixed(2)),
+        transactions: data.transactions
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
   }
 
   async deleteMerchant(id: number): Promise<boolean> {

@@ -8,6 +8,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -80,6 +81,16 @@ export default function Dashboard() {
     queryFn: async () => {
       const response = await fetch(`/api/merchants/${merchantId}/transactions`);
       if (!response.ok) throw new Error("Failed to fetch transactions");
+      return response.json();
+    },
+  });
+
+  // Get revenue over time data (30 days)
+  const { data: revenueData, isLoading: revenueLoading } = useQuery({
+    queryKey: ["/api/merchants", merchantId, "revenue-over-time"],
+    queryFn: async () => {
+      const response = await fetch(`/api/merchants/${merchantId}/revenue-over-time?days=30`);
+      if (!response.ok) throw new Error("Failed to fetch revenue data");
       return response.json();
     },
   });
@@ -304,6 +315,85 @@ export default function Dashboard() {
 
 
 
+
+        {/* Revenue Performance Graph */}
+        <div className="dashboard-card-glass rounded-3xl p-8 mb-8">
+          <div className="mb-6">
+            <h2 className="flex items-center space-x-2 text-lg font-semibold text-white">
+              <TrendingUp className="h-5 w-5" />
+              <span>Revenue Performance</span>
+            </h2>
+            <p className="text-white/70 text-sm">
+              Daily revenue over the last 30 days
+            </p>
+          </div>
+          
+          {revenueLoading ? (
+            <div className="h-64 flex items-center justify-center">
+              <div className="animate-pulse space-y-4 w-full">
+                <div className="h-4 backdrop-blur-xl bg-white/10 border border-white/20 rounded w-64 mx-auto"></div>
+                <div className="h-48 backdrop-blur-xl bg-white/10 border border-white/20 rounded"></div>
+              </div>
+            </div>
+          ) : revenueData && revenueData.length > 0 ? (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={revenueData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                  <XAxis 
+                    dataKey="date" 
+                    stroke="rgba(255,255,255,0.7)"
+                    fontSize={12}
+                    tick={{ fill: 'rgba(255,255,255,0.7)' }}
+                    tickFormatter={(value) => {
+                      const date = new Date(value);
+                      return `${date.getMonth() + 1}/${date.getDate()}`;
+                    }}
+                  />
+                  <YAxis 
+                    stroke="rgba(255,255,255,0.7)"
+                    fontSize={12}
+                    tick={{ fill: 'rgba(255,255,255,0.7)' }}
+                    tickFormatter={(value) => `$${value}`}
+                  />
+                  <Tooltip 
+                    contentStyle={{
+                      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      borderRadius: '12px',
+                      backdropFilter: 'blur(12px)',
+                      color: 'white'
+                    }}
+                    labelFormatter={(value) => {
+                      const date = new Date(value);
+                      return date.toLocaleDateString();
+                    }}
+                    formatter={(value: number, name: string) => [
+                      name === 'revenue' ? `$${value.toFixed(2)}` : value,
+                      name === 'revenue' ? 'Revenue' : 'Transactions'
+                    ]}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="revenue" 
+                    stroke="#4ade80" 
+                    strokeWidth={3}
+                    dot={{ fill: '#4ade80', strokeWidth: 2, r: 4 }}
+                    activeDot={{ r: 6, fill: '#22c55e' }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-64 flex items-center justify-center">
+              <div className="text-center">
+                <TrendingUp className="h-12 w-12 text-white/40 mx-auto mb-4" />
+                <p className="text-white/70">No revenue data available yet</p>
+                <p className="text-white/50 text-sm">Complete some transactions to see your revenue performance</p>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Export Data */}
         <div className="dashboard-card-glass rounded-3xl p-8">
