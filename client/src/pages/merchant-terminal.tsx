@@ -176,7 +176,7 @@ export default function MerchantTerminal() {
       </div>
 
       {/* Main Content */}
-      <div className="relative z-10 max-w-4xl mx-auto px-3 sm:px-4 pt-20 sm:pt-22 pb-4 sm:pb-8">
+      <div className="relative z-10 max-w-4xl mx-auto px-3 sm:px-4 pt-28 sm:pt-30 pb-4 sm:pb-8">
         <div className="mb-4 sm:mb-6 text-center">
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white mb-2 sm:mb-4">Payment Terminal</h1>
         </div>
