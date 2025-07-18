@@ -197,7 +197,7 @@ export default function Settings() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
+    <div className="max-w-4xl mx-auto px-3 sm:px-4 pt-32 pb-4 sm:pb-8">
       <div className="mb-6 sm:mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Settings & Configuration</h1>
         <p className="text-sm sm:text-base text-gray-600">Manage your payment processing configuration and API connections</p>
