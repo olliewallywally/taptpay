@@ -293,10 +293,10 @@ export default function Dashboard() {
               <TrendingUp className="h-4 w-4 text-green-400" />
             </div>
             <div className="text-2xl font-bold text-green-400">
-              3.4%
+              $0.25
             </div>
             <p className="text-xs text-white/70">
-              Total processing fee
+              Fixed fee per transaction
             </p>
           </div>
         </div>
