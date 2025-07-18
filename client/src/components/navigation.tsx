@@ -76,14 +76,14 @@ export function Navigation() {
 
             {/* Desktop Navigation */}
             {!isMobile && (
-              <div className="flex items-center space-x-6">
+              <div className="flex items-center space-x-3">
                 {/* Primary Navigation */}
-                <div className="flex space-x-2">
+                <div className="flex space-x-3">
                   {primaryLinks.map((link) => (
                     <a 
                       key={link.path}
                       href={link.path}
-                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-all backdrop-blur-sm border ${
+                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-all backdrop-blur-sm border min-w-[90px] text-center ${
                         isActive(link.path) 
                           ? "bg-white/25 text-black shadow-lg border-white/40" 
                           : "bg-white/10 text-black hover:text-black hover:bg-white/20 border-white/20"
@@ -96,7 +96,7 @@ export function Navigation() {
 
                 {/* Secondary Navigation Dropdown */}
                 <div className="relative group">
-                  <button className="px-3 py-2 text-sm font-medium rounded-lg transition-all backdrop-blur-sm border bg-white/10 text-black hover:bg-white/20 border-white/20 flex items-center">
+                  <button className="px-4 py-2 text-sm font-medium rounded-lg transition-all backdrop-blur-sm border bg-white/10 text-black hover:bg-white/20 border-white/20 flex items-center justify-center min-w-[90px]">
                     More
                     <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -105,15 +105,15 @@ export function Navigation() {
                   
                   {/* Dropdown Menu */}
                   <div className="absolute right-0 mt-2 w-48 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                    <div className="backdrop-blur-xl bg-white/15 border border-white/20 rounded-lg shadow-2xl overflow-hidden">
+                    <div className="backdrop-blur-2xl bg-black/40 border border-white/30 rounded-lg shadow-2xl overflow-hidden">
                       {secondaryLinks.map((link) => (
                         <a
                           key={link.path}
                           href={link.path}
                           className={`block px-4 py-3 text-sm transition-all ${
                             isActive(link.path)
-                              ? "bg-white/30 text-black font-medium border-l-4 border-white/60"
-                              : "text-black hover:bg-white/20 hover:text-black"
+                              ? "bg-white/40 text-white font-medium border-l-4 border-white/80"
+                              : "text-white hover:bg-white/20 hover:text-white"
                           }`}
                         >
                           {link.label}
@@ -124,14 +124,12 @@ export function Navigation() {
                 </div>
 
                 {/* Logout Button */}
-                <Button
+                <button
                   onClick={handleLogout}
-                  variant="outline"
-                  size="sm"
-                  className="text-black border-white/30 hover:bg-white/20 hover:text-black backdrop-blur-sm bg-white/15"
+                  className="px-4 py-2 text-sm font-medium rounded-lg transition-all backdrop-blur-sm border bg-white/10 text-black hover:bg-white/20 hover:text-black border-white/20 min-w-[90px] flex items-center justify-center"
                 >
                   <LogOut className="w-4 h-4" />
-                </Button>
+                </button>
               </div>
             )}
 
