@@ -39,11 +39,11 @@ export function Navigation() {
   const primaryLinks = [
     { path: "/merchant", label: "Terminal" },
     { path: "/dashboard", label: "Dashboard" },
-    { path: "/nfc", label: "NFC Pay" },
   ];
 
-  // Secondary navigation for management
+  // Secondary navigation for management (moved to "More" dropdown)
   const secondaryLinks = [
+    { path: "/nfc", label: "NFC Pay" },
     { path: "/transactions", label: "Transactions" },
     { path: "/settings", label: "Settings" },
     { path: customerViewPath, label: "Customer View" },
