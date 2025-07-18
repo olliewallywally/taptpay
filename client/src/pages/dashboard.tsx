@@ -47,6 +47,20 @@ type RateUpdateFormData = z.infer<typeof rateUpdateSchema>;
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
+  
+  // Track screen size for responsive chart settings
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
   const { toast } = useToast();
   const merchantId = getCurrentMerchantId();
   
@@ -317,52 +331,66 @@ export default function Dashboard() {
 
 
         {/* Revenue Performance Graph */}
-        <div className="dashboard-card-glass rounded-3xl p-8 mb-8">
-          <div className="mb-6">
-            <h2 className="flex items-center space-x-2 text-lg font-semibold text-white">
-              <TrendingUp className="h-5 w-5" />
+        <div className="dashboard-card-glass rounded-3xl p-4 md:p-8 mb-8">
+          <div className="mb-4 md:mb-6">
+            <h2 className="flex items-center space-x-2 text-base md:text-lg font-semibold text-white">
+              <TrendingUp className="h-4 w-4 md:h-5 md:w-5" />
               <span>Revenue Performance</span>
             </h2>
-            <p className="text-white/70 text-sm">
+            <p className="text-white/70 text-xs md:text-sm">
               Daily revenue over the last 30 days
             </p>
           </div>
           
           {revenueLoading ? (
-            <div className="h-64 flex items-center justify-center">
+            <div className="h-48 md:h-64 flex items-center justify-center">
               <div className="animate-pulse space-y-4 w-full">
-                <div className="h-4 backdrop-blur-xl bg-white/10 border border-white/20 rounded w-64 mx-auto"></div>
-                <div className="h-48 backdrop-blur-xl bg-white/10 border border-white/20 rounded"></div>
+                <div className="h-4 backdrop-blur-xl bg-white/10 border border-white/20 rounded w-48 md:w-64 mx-auto"></div>
+                <div className="h-32 md:h-48 backdrop-blur-xl bg-white/10 border border-white/20 rounded"></div>
               </div>
             </div>
           ) : revenueData && revenueData.length > 0 ? (
-            <div className="h-64">
+            <div className="h-48 md:h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={revenueData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <LineChart 
+                  data={revenueData} 
+                  margin={{ 
+                    top: 5, 
+                    right: isMobile ? 10 : 30, 
+                    left: isMobile ? 5 : 20, 
+                    bottom: 5 
+                  }}
+                >
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                   <XAxis 
                     dataKey="date" 
                     stroke="rgba(255,255,255,0.7)"
-                    fontSize={12}
+                    fontSize={isMobile ? 10 : 12}
                     tick={{ fill: 'rgba(255,255,255,0.7)' }}
+                    interval={isMobile ? 'preserveStartEnd' : 0}
                     tickFormatter={(value) => {
                       const date = new Date(value);
-                      return `${date.getMonth() + 1}/${date.getDate()}`;
+                      return isMobile 
+                        ? `${date.getMonth() + 1}/${date.getDate()}` 
+                        : `${date.getMonth() + 1}/${date.getDate()}`;
                     }}
                   />
                   <YAxis 
                     stroke="rgba(255,255,255,0.7)"
-                    fontSize={12}
+                    fontSize={isMobile ? 10 : 12}
                     tick={{ fill: 'rgba(255,255,255,0.7)' }}
+                    width={isMobile ? 40 : 60}
                     tickFormatter={(value) => `$${value}`}
                   />
                   <Tooltip 
                     contentStyle={{
-                      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                      backgroundColor: 'rgba(0, 0, 0, 0.9)',
                       border: '1px solid rgba(255, 255, 255, 0.2)',
                       borderRadius: '12px',
                       backdropFilter: 'blur(12px)',
-                      color: 'white'
+                      color: 'white',
+                      fontSize: isMobile ? '12px' : '14px',
+                      padding: isMobile ? '8px' : '12px'
                     }}
                     labelFormatter={(value) => {
                       const date = new Date(value);
@@ -377,19 +405,26 @@ export default function Dashboard() {
                     type="monotone" 
                     dataKey="revenue" 
                     stroke="#4ade80" 
-                    strokeWidth={3}
-                    dot={{ fill: '#4ade80', strokeWidth: 2, r: 4 }}
-                    activeDot={{ r: 6, fill: '#22c55e' }}
+                    strokeWidth={isMobile ? 2 : 3}
+                    dot={{ 
+                      fill: '#4ade80', 
+                      strokeWidth: 2, 
+                      r: isMobile ? 3 : 4 
+                    }}
+                    activeDot={{ 
+                      r: isMobile ? 5 : 6, 
+                      fill: '#22c55e' 
+                    }}
                   />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="h-64 flex items-center justify-center">
-              <div className="text-center">
-                <TrendingUp className="h-12 w-12 text-white/40 mx-auto mb-4" />
-                <p className="text-white/70">No revenue data available yet</p>
-                <p className="text-white/50 text-sm">Complete some transactions to see your revenue performance</p>
+            <div className="h-48 md:h-64 flex items-center justify-center">
+              <div className="text-center px-4">
+                <TrendingUp className="h-8 w-8 md:h-12 md:w-12 text-white/40 mx-auto mb-4" />
+                <p className="text-white/70 text-sm md:text-base">No revenue data available yet</p>
+                <p className="text-white/50 text-xs md:text-sm">Complete some transactions to see your revenue performance</p>
               </div>
             </div>
           )}
