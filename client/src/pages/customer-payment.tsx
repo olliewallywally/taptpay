@@ -202,12 +202,13 @@ export default function CustomerPayment() {
         <div className="relative z-10 backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-8 shadow-2xl text-center max-w-sm w-full">
           {/* Tapt Logo */}
           <div className="text-center mb-8">
-            <div className="flex justify-center mb-6">
-              <div className="w-16 h-16 bg-white backdrop-blur-lg rounded-2xl flex items-center justify-center border border-white/30 shadow-lg">
-                <span className="text-black font-bold text-xl">T</span>
-              </div>
+            <div className="flex justify-center">
+              <img 
+                src="@assets/tapt logo_1751676012286.png" 
+                alt="tapt" 
+                className="h-12 w-auto"
+              />
             </div>
-            <h1 className="text-2xl font-light text-white mb-2">tapt</h1>
           </div>
 
           {isLoading ? (
@@ -249,12 +250,13 @@ export default function CustomerPayment() {
           
           {/* Tapt Logo */}
           <div className="text-center mb-8">
-            <div className="flex justify-center mb-6">
-              <div className="w-16 h-16 bg-white backdrop-blur-lg rounded-2xl flex items-center justify-center border border-white/30 shadow-lg">
-                <span className="text-black font-bold text-xl">T</span>
-              </div>
+            <div className="flex justify-center">
+              <img 
+                src="@assets/tapt logo_1751676012286.png" 
+                alt="tapt" 
+                className="h-12 w-auto"
+              />
             </div>
-            <h1 className="text-2xl font-light text-white mb-2">tapt</h1>
           </div>
 
           {/* Item Name */}
