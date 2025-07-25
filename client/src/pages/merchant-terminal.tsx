@@ -405,9 +405,9 @@ export default function MerchantTerminal() {
           </div>
         </div>
 
-            {/* Payment Status Row for QR */}
+            {/* Payment Status Row for QR - Positioned between terminal and QR code */}
             {currentTransaction && (
-              <div>
+              <div className="mt-4">
                 <div className="backdrop-blur-xl bg-white/3 border border-white/8 rounded-2xl p-4 sm:p-6 shadow-2xl transition-all duration-300 hover:bg-white/6 hover:border-white/15 hover:transform hover:translate-y-[-2px] hover:shadow-[0_12px_40px_rgba(0,0,0,0.15)]">
                   <div className="text-center mb-3 sm:mb-4">
                     <h3 className="text-base sm:text-lg font-bold text-white mb-1">
