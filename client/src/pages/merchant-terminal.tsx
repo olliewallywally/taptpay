@@ -610,20 +610,41 @@ export default function MerchantTerminal() {
 
       {/* NFC Glass Overlay Effect when NFC Payment is Active */}
       {showNfcOverlay && (
-        <div className="fixed inset-0 z-50 backdrop-blur-2xl bg-black/60">
-          <div className="absolute inset-0 bg-gradient-to-br from-black/40 via-gray-900/30 to-gray-800/20"></div>
-          
-          <div className="relative z-10 min-h-screen flex items-center justify-center p-6">
-            <div className="backdrop-blur-3xl bg-white/[0.02] border border-white/10 rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl">
+        <div className="fixed inset-0 z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.95)' }}>
+          <div className="min-h-screen flex items-center justify-center p-6">
+            <div style={{ 
+              background: 'rgba(255, 255, 255, 0.05)', 
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              borderRadius: '24px',
+              padding: '32px',
+              backdropFilter: 'blur(20px)',
+              boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5)'
+            }} className="max-w-sm w-full text-center relative">
               
               {nfcPaymentStatus === "ready" && (
                 <div className="space-y-12">
                   {/* Close Button */}
                   <button
                     onClick={() => setShowNfcOverlay(false)}
-                    className="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all duration-200"
+                    style={{
+                      position: 'absolute',
+                      top: '16px',
+                      right: '16px',
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      border: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.2)'}
+                    onMouseLeave={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.1)'}
                   >
-                    <X className="h-5 w-5 text-white/70" />
+                    <X style={{ width: '20px', height: '20px', color: 'rgba(255, 255, 255, 0.8)' }} />
                   </button>
                   
                   {/* Minimal NFC Icon */}
@@ -655,9 +676,25 @@ export default function MerchantTerminal() {
                   {/* Close Button */}
                   <button
                     onClick={() => setShowNfcOverlay(false)}
-                    className="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all duration-200"
+                    style={{
+                      position: 'absolute',
+                      top: '16px',
+                      right: '16px',
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      border: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.2)'}
+                    onMouseLeave={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.1)'}
                   >
-                    <X className="h-5 w-5 text-white/70" />
+                    <X style={{ width: '20px', height: '20px', color: 'rgba(255, 255, 255, 0.8)' }} />
                   </button>
                   
                   {/* Minimal Processing Indicator */}
@@ -678,9 +715,25 @@ export default function MerchantTerminal() {
                   {/* Close Button */}
                   <button
                     onClick={() => setShowNfcOverlay(false)}
-                    className="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all duration-200"
+                    style={{
+                      position: 'absolute',
+                      top: '16px',
+                      right: '16px',
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      border: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.2)'}
+                    onMouseLeave={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.1)'}
                   >
-                    <X className="h-5 w-5 text-white/70" />
+                    <X style={{ width: '20px', height: '20px', color: 'rgba(255, 255, 255, 0.8)' }} />
                   </button>
                   
                   {/* Success Icon */}
@@ -706,9 +759,25 @@ export default function MerchantTerminal() {
                       setNfcPaymentStatus("idle");
                       setNfcSession(null);
                     }}
-                    className="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all duration-200"
+                    style={{
+                      position: 'absolute',
+                      top: '16px',
+                      right: '16px',
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      border: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.2)'}
+                    onMouseLeave={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.1)'}
                   >
-                    <X className="h-5 w-5 text-white/70" />
+                    <X style={{ width: '20px', height: '20px', color: 'rgba(255, 255, 255, 0.8)' }} />
                   </button>
                   
                   {/* Error Icon */}
