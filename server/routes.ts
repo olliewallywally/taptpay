@@ -448,35 +448,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isSimulation = !windcaveService.isConfigured();
       
       if (isSimulation) {
-        // Simulate NFC payment with realistic timing
-        setTimeout(async () => {
-          const success = Math.random() > 0.1; // 90% success rate
-          const finalStatus = success ? "completed" : "failed";
-          const windcaveTransactionId = success ? `NFC_${Date.now()}` : null;
-          
-          const updatedTransaction = await storage.updateTransactionStatus(
-            transaction.id, 
-            finalStatus, 
-            windcaveTransactionId
-          );
-          
-          // Notify clients of completion
-          const connections = sseConnections.get(transaction.merchantId);
-          if (connections) {
-            connections.forEach(conn => {
-              conn.write(`data: ${JSON.stringify({ 
-                type: 'nfc_payment_completed', 
-                transaction: updatedTransaction,
-                paymentMethod: paymentMethod || 'contactless_card'
-              })}\n\n`);
-            });
-          }
-        }, 2000); // 2-second processing delay
+        // In a real NFC system, this endpoint would only be called when hardware detects a physical tap
+        // Process payment immediately since this represents a completed NFC tap
+        const finalStatus = "completed";
+        const windcaveTransactionId = `NFC_${Date.now()}`;
+        
+        const updatedTransaction = await storage.updateTransactionStatus(
+          transaction.id, 
+          finalStatus, 
+          windcaveTransactionId
+        );
+        
+        // Collect platform fee for successful payment
+        await storage.createPlatformFee({
+          transactionId: transaction.id,
+          merchantId: transaction.merchantId,
+          feeAmount: transaction.platformFeeAmount,
+          transactionAmount: Number(transaction.price),
+          status: 'collected',
+          collectedAt: new Date(),
+        });
+        
+        // Notify clients of completion
+        const connections = sseConnections.get(transaction.merchantId);
+        if (connections) {
+          connections.forEach(conn => {
+            conn.write(`data: ${JSON.stringify({ 
+              type: 'nfc_payment_completed', 
+              transaction: updatedTransaction,
+              paymentMethod: paymentMethod || 'contactless_card'
+            })}\n\n`);
+          });
+        }
         
         res.json({ 
-          message: "NFC payment processing", 
-          status: "processing",
-          estimatedCompletion: "2-3 seconds" 
+          message: "NFC payment completed successfully", 
+          status: "completed",
+          transaction: updatedTransaction
         });
       } else {
         // Real Windcave NFC processing would go here

@@ -199,50 +199,8 @@ export default function MerchantTerminal() {
     }
   };
 
-  const simulateNFCTap = async () => {
-    if (!nfcSession) return;
-    
-    setNfcPaymentStatus("processing");
-    
-    try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      const response = await fetch(`/api/nfc-sessions/${nfcSession.sessionId}/complete`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          paymentMethod: 'contactless_card',
-          cardLast4: '4532',
-          deviceId: navigator.userAgent
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to complete NFC payment');
-      }
-
-      const result = await response.json();
-      setNfcPaymentStatus("completed");
-      
-      setTimeout(() => {
-        setShowNfcOverlay(false);
-        setNfcPaymentStatus("idle");
-        setNfcSession(null);
-        form.reset();
-      }, 3000);
-      
-    } catch (error) {
-      console.error('NFC payment failed:', error);
-      setNfcPaymentStatus("failed");
-      toast({
-        title: "Payment Failed",
-        description: "NFC payment could not be completed.",
-        variant: "destructive",
-      });
-    }
-  };
+  // Real NFC hardware would trigger payment completion through SSE events
+  // No simulation function needed - payments process only through actual card taps
 
   const getPaymentStatusIndicator = (status: string) => {
     switch (status) {
@@ -684,12 +642,9 @@ export default function MerchantTerminal() {
                     <div className="text-white/80 text-xl font-light">Tap to Pay</div>
                     <div className="text-white/50 text-sm">Present card or device to terminal</div>
                     
-                    {/* Clickable Payment Area for Demo */}
-                    <div 
-                      onClick={simulateNFCTap}
-                      className="cursor-pointer w-full mt-8 py-6 px-8 bg-white/5 hover:bg-white/10 border border-white/20 rounded-2xl text-white/90 text-lg font-light transition-all duration-200 hover:border-white/30 text-center"
-                    >
-                      Tap here to pay
+                    {/* NFC Payment Area - Pure Visual Indicator */}
+                    <div className="w-full mt-8 py-6 px-8 bg-white/5 border border-white/20 rounded-2xl text-white/90 text-lg font-light text-center">
+                      <div className="animate-pulse">Ready for contactless payment</div>
                     </div>
                   </div>
                 </div>
