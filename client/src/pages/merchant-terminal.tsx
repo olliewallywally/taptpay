@@ -310,10 +310,10 @@ export default function MerchantTerminal() {
 
         {/* Tabbed Interface */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6 backdrop-blur-xl bg-white/5 border border-white/10 rounded-xl p-1">
+          <TabsList className="grid w-full grid-cols-2 mb-6 backdrop-blur-xl bg-white/[0.03] border border-white/10 rounded-2xl p-2 shadow-2xl">
             <TabsTrigger 
               value="qr" 
-              className="flex items-center gap-2 text-white/70 data-[state=active]:text-white data-[state=active]:bg-white/10 data-[state=active]:backdrop-blur-sm rounded-lg py-3"
+              className="flex items-center justify-center gap-2 px-6 py-4 text-white/70 font-medium transition-all duration-300 rounded-xl data-[state=active]:text-white data-[state=active]:bg-white/15 data-[state=active]:backdrop-blur-sm data-[state=active]:border data-[state=active]:border-white/20 data-[state=active]:shadow-lg hover:text-white/90 hover:bg-white/8"
             >
               <QrCode className="w-4 h-4" />
               <span className="hidden sm:inline">QR Code</span>
@@ -321,7 +321,7 @@ export default function MerchantTerminal() {
             </TabsTrigger>
             <TabsTrigger 
               value="nfc" 
-              className="flex items-center gap-2 text-white/70 data-[state=active]:text-white data-[state=active]:bg-white/10 data-[state=active]:backdrop-blur-sm rounded-lg py-3"
+              className="flex items-center justify-center gap-2 px-6 py-4 text-white/70 font-medium transition-all duration-300 rounded-xl data-[state=active]:text-white data-[state=active]:bg-white/15 data-[state=active]:backdrop-blur-sm data-[state=active]:border data-[state=active]:border-white/20 data-[state=active]:shadow-lg hover:text-white/90 hover:bg-white/8"
             >
               <Smartphone className="w-4 h-4" />
               <span className="hidden sm:inline">NFC Tap</span>
