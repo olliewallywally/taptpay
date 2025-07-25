@@ -23,7 +23,7 @@ import AdminMerchantDetail from "@/pages/admin-merchant";
 import AdminRevenue from "@/pages/admin-revenue";
 import CreateMerchant from "@/pages/create-merchant";
 import VerifyMerchant from "@/pages/verify-merchant";
-import NFCPayment from "@/pages/nfc-payment";
+
 import { Layout } from "@/components/layout";
 import { PageTransition } from "@/components/page-transition";
 
@@ -165,13 +165,7 @@ function Router() {
           </ProtectedRoute>
         </Route>
 
-        <Route path="/nfc">
-          <ProtectedRoute>
-            <Layout>
-              <NFCPayment />
-            </Layout>
-          </ProtectedRoute>
-        </Route>
+
 
         <Route path="/admin/login" component={AdminLogin} />
         <Route path="/admin/dashboard">
