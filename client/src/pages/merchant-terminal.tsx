@@ -310,22 +310,20 @@ export default function MerchantTerminal() {
 
         {/* Tabbed Interface */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6 backdrop-blur-xl bg-white/[0.03] border border-white/10 rounded-2xl p-2 shadow-2xl">
+          <TabsList className="grid w-full grid-cols-2 mb-6 bg-transparent p-1 gap-2">
             <TabsTrigger 
               value="qr" 
-              className="flex items-center justify-center gap-2 px-6 py-4 text-white/70 font-medium transition-all duration-300 rounded-xl data-[state=active]:text-white data-[state=active]:bg-white/15 data-[state=active]:backdrop-blur-sm data-[state=active]:border data-[state=active]:border-white/20 data-[state=active]:shadow-lg hover:text-white/90 hover:bg-white/8"
+              className="flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 border data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:border-white/40 data-[state=inactive]:bg-transparent data-[state=inactive]:text-white/80 data-[state=inactive]:border-white/20 hover:bg-white/10 hover:text-white"
             >
               <QrCode className="w-4 h-4" />
-              <span className="hidden sm:inline">QR Code</span>
-              <span className="sm:hidden">QR</span>
+              <span>QR Code</span>
             </TabsTrigger>
             <TabsTrigger 
               value="nfc" 
-              className="flex items-center justify-center gap-2 px-6 py-4 text-white/70 font-medium transition-all duration-300 rounded-xl data-[state=active]:text-white data-[state=active]:bg-white/15 data-[state=active]:backdrop-blur-sm data-[state=active]:border data-[state=active]:border-white/20 data-[state=active]:shadow-lg hover:text-white/90 hover:bg-white/8"
+              className="flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 border data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:border-white/40 data-[state=inactive]:bg-transparent data-[state=inactive]:text-white/80 data-[state=inactive]:border-white/20 hover:bg-white/10 hover:text-white"
             >
               <Smartphone className="w-4 h-4" />
-              <span className="hidden sm:inline">NFC Tap</span>
-              <span className="sm:hidden">NFC</span>
+              <span>NFC</span>
             </TabsTrigger>
           </TabsList>
 
