@@ -130,10 +130,10 @@ export function SlideToPayComponent({
             width: '48px',
             height: '48px',
             borderRadius: '24px',
-            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-            backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(255, 255, 255, 0.3)',
-            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
+            backgroundColor: 'rgba(255, 255, 255, 0.15)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255, 255, 255, 0.25)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -157,20 +157,22 @@ export function SlideToPayComponent({
           {/* Inner button indicator */}
           <div 
             style={{
-              width: '20px',
-              height: '20px',
-              borderRadius: '10px',
+              width: '24px',
+              height: '24px',
+              borderRadius: '12px',
               background: dragProgress > 0.8 || isCompleted 
-                ? 'linear-gradient(135deg, rgba(34, 197, 94, 1), rgba(22, 163, 74, 1))'
-                : 'linear-gradient(135deg, rgba(34, 197, 94, 0.8), rgba(22, 163, 74, 0.9))',
+                ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.9), rgba(22, 163, 74, 0.95))'
+                : 'linear-gradient(135deg, rgba(34, 197, 94, 0.6), rgba(22, 163, 74, 0.7))',
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
               transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              boxShadow: 'inset 0 1px 2px rgba(255, 255, 255, 0.3)',
+              boxShadow: 'inset 0 1px 2px rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.2)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
             }}
           >
-            {isCompleted && <span style={{ color: 'white', fontSize: '12px' }}>✓</span>}
+            {isCompleted && <span style={{ color: 'white', fontSize: '12px', fontWeight: 'bold' }}>✓</span>}
           </div>
         </motion.div>
       </div>
