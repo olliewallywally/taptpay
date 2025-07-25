@@ -87,6 +87,18 @@ export const merchantSettlements = pgTable("merchant_settlements", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Platform fees table for tracking revenue collection
+export const platformFees = pgTable("platform_fees", {
+  id: serial("id").primaryKey(),
+  transactionId: serial("transaction_id").references(() => transactions.id),
+  merchantId: serial("merchant_id").references(() => merchants.id),
+  feeAmount: decimal("fee_amount", { precision: 10, scale: 2 }).notNull(),
+  transactionAmount: decimal("transaction_amount", { precision: 10, scale: 2 }).notNull(),
+  status: text("status").notNull().default("pending"), // pending, collected, failed
+  collectedAt: timestamp("collected_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertMerchantSchema = createInsertSchema(merchants).omit({
   id: true,
   status: true,
@@ -173,6 +185,22 @@ export const resetPasswordSchema = z.object({
   message: "Passwords don't match",
   path: ["confirmPassword"],
 });
+
+export const insertPlatformFeeSchema = createInsertSchema(platformFees).omit({
+  id: true,
+  createdAt: true,
+  collectedAt: true,
+});
+
+// Type exports
+export type Merchant = typeof merchants.$inferSelect;
+export type InsertMerchant = typeof merchants.$inferInsert;
+export type CreateMerchant = z.infer<typeof createMerchantSchema>;
+export type Transaction = typeof transactions.$inferSelect;
+export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
+export type PlatformFee = typeof platformFees.$inferSelect;
+export type InsertPlatformFee = z.infer<typeof insertPlatformFeeSchema>;
+export type MerchantSettlement = typeof merchantSettlements.$inferSelect;
 
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,

@@ -1,4 +1,4 @@
-import { merchants, transactions, merchantSettlements, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant } from "@shared/schema";
+import { merchants, transactions, merchantSettlements, platformFees, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee } from "@shared/schema";
 import { getDb, isDatabaseConnected } from "./database";
 import { eq, desc, and } from "drizzle-orm";
 
@@ -30,6 +30,10 @@ export interface IStorage {
   getTransactionsByMerchant(merchantId: number): Promise<Transaction[]>;
   
   // Platform revenue operations (Marketplace Model)
+  createPlatformFee(data: InsertPlatformFee): Promise<PlatformFee>;
+  getPlatformFee(id: number): Promise<PlatformFee | undefined>;
+  getPlatformFeesByMerchant(merchantId: number): Promise<PlatformFee[]>;
+  updatePlatformFeeStatus(id: number, status: string): Promise<PlatformFee | undefined>;
   getTotalPlatformRevenue(): Promise<{ totalFees: number; totalTransactions: number }>;
   
   // Analytics operations
@@ -74,15 +78,19 @@ export interface IStorage {
 export class MemStorage implements IStorage {
   private merchants: Map<number, Merchant>;
   private transactions: Map<number, Transaction>;
+  private platformFees: Map<number, PlatformFee>;
   private currentMerchantId: number;
   private currentTransactionId: number;
+  private currentPlatformFeeId: number;
   private activeTransactionCache: Map<number, Transaction | null>; // Cache for active transactions by merchant
 
   constructor() {
     this.merchants = new Map();
     this.transactions = new Map();
+    this.platformFees = new Map();
     this.currentMerchantId = 1;
     this.currentTransactionId = 1;
+    this.currentPlatformFeeId = 1;
     this.activeTransactionCache = new Map();
   }
 
@@ -127,6 +135,7 @@ export class MemStorage implements IStorage {
       passwordHash: null,
       qrCodeUrl: insertMerchant.qrCodeUrl || null,
       paymentUrl: insertMerchant.paymentUrl || null,
+      themeId: insertMerchant.themeId || "classic",
       currentProviderRate: insertMerchant.currentProviderRate || "0.0290",
       ourRate: insertMerchant.ourRate || "0.0020",
       contactEmail: insertMerchant.contactEmail || null,
@@ -159,6 +168,7 @@ export class MemStorage implements IStorage {
       passwordHash: passwordHash,
       qrCodeUrl: merchantData.qrCodeUrl || null,
       paymentUrl: merchantData.paymentUrl || null,
+      themeId: merchantData.themeId || "classic",
       currentProviderRate: merchantData.currentProviderRate || "0.0290",
       ourRate: merchantData.ourRate || "0.0020",
       contactEmail: merchantData.contactEmail || null,
@@ -191,6 +201,7 @@ export class MemStorage implements IStorage {
       passwordHash: null,
       qrCodeUrl: null,
       paymentUrl: null,
+      themeId: "classic",
       currentProviderRate: "0.0290",
       ourRate: "0.0020",
       contactEmail: data.email,
@@ -241,9 +252,11 @@ export class MemStorage implements IStorage {
       return this.activeTransactionCache.get(merchantId) || undefined;
     }
     
-    // Optimized search - break early when found
+    // Optimized search - convert to array first for faster iteration
     let activeTransaction: Transaction | undefined;
-    for (const transaction of this.transactions.values()) {
+    const transactionArray = Array.from(this.transactions.values());
+    for (let i = 0; i < transactionArray.length; i++) {
+      const transaction = transactionArray[i];
       if (transaction.merchantId === merchantId && transaction.status === "pending") {
         activeTransaction = transaction;
         break; // Exit immediately when found
