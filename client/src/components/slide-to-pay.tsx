@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback, useEffect } from "react";
-import { motion, useMotionValue, useTransform } from "framer-motion";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import { motion, useMotionValue } from "framer-motion";
 
 interface SlideToPayProps {
   onPayment: () => void;
@@ -19,7 +19,7 @@ export function SlideToPayComponent({
   
   const [dragProgress, setDragProgress] = useState(0);
 
-  // Update progress when x changes
+  // Optimized progress tracking
   useEffect(() => {
     const updateProgress = () => {
       if (!containerRef.current) return;
@@ -32,6 +32,32 @@ export function SlideToPayComponent({
     const unsubscribe = x.on("change", updateProgress);
     return unsubscribe;
   }, [x]);
+
+  // Memoized styles for better performance
+  const containerStyles = useMemo(() => ({
+    position: 'relative' as const,
+    height: '56px',
+    borderRadius: '28px',
+    overflow: 'hidden' as const,
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    backdropFilter: 'blur(40px)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
+  }), []);
+
+  const liquidBackgroundStyles = useMemo(() => ({
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    height: '100%',
+    borderRadius: '28px',
+    background: isCompleted 
+      ? 'linear-gradient(90deg, rgba(34, 197, 94, 0.8), rgba(22, 163, 74, 0.9))'
+      : `linear-gradient(90deg, rgba(34, 197, 94, ${0.3 + dragProgress * 0.5}), rgba(22, 163, 74, ${0.4 + dragProgress * 0.5}))`,
+    width: `${Math.max(20, dragProgress * 100)}%`,
+    transition: isCompleted ? 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)' : 'width 0.1s ease-out',
+    zIndex: 1
+  }), [isCompleted, dragProgress]);
 
   const handleDragEnd = useCallback(() => {
     if (dragProgress > 0.8 && !disabled) {

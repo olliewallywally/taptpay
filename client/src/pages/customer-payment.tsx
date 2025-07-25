@@ -14,9 +14,6 @@ export default function CustomerPayment() {
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
 
   // Debug URL parsing
-  console.log("Raw URL:", window.location.pathname);
-  console.log("Parsed merchantId from URL:", merchantId);
-  
   const id = merchantId ? parseInt(merchantId) : null;
   
   // Redirect if no valid merchantId
@@ -42,87 +39,83 @@ export default function CustomerPayment() {
     );
   }
 
-  // Get active transaction - optimized for speed
+  // Get active transaction - heavily optimized for speed
   const { data: activeTransaction, isLoading, error } = useQuery({
     queryKey: ["/api/merchants", id, "active-transaction"],
     queryFn: async () => {
-      const response = await fetch(`/api/merchants/${id}/active-transaction`);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+      
+      try {
+        const response = await fetch(`/api/merchants/${id}/active-transaction`, {
+          signal: controller.signal,
+          headers: { 'Cache-Control': 'no-cache' }
+        });
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+      } catch (error) {
+        clearTimeout(timeoutId);
+        throw error;
       }
-      return response.json();
     },
-    staleTime: 1000, // Cache for 1 second only - real-time updates are important
-    gcTime: 30000,   // Reduce garbage collection time 
-    refetchInterval: 3000, // Check every 3 seconds instead of 5
-    refetchOnWindowFocus: true,
-    retry: 2, // Reduce retries for faster failure
+    staleTime: 500, // Cache for 0.5 seconds only
+    gcTime: 10000, // Shorter garbage collection time 
+    refetchInterval: 2000, // Check every 2 seconds for faster updates
+    refetchOnWindowFocus: false, // Disable to reduce unnecessary requests
+    retry: 1, // Only retry once for faster failure
+    retryDelay: 1000, // 1 second retry delay
   });
 
-  console.log("Customer payment debug:", { 
-    merchantId, 
-    id, 
-    activeTransaction, 
-    isLoading, 
-    error,
-    currentTransaction,
-    paymentStatus 
-  });
+  // Remove debug logging for faster performance
 
-  // Process payment mutation
+  // Process payment mutation - optimized
   const processPaymentMutation = useMutation({
     mutationFn: async (transactionId: number) => {
-      console.log("Making payment API request for transaction:", transactionId);
       const response = await apiRequest("POST", `/api/transactions/${transactionId}/pay`, {});
-      const result = await response.json();
-      console.log("Payment API response:", result);
-      return result;
+      return response.json();
     },
-    onSuccess: (data) => {
-      console.log("Payment mutation success:", data);
+    onSuccess: () => {
       setPaymentStatus("processing");
     },
-    onError: (error) => {
-      console.error("Payment mutation error:", error);
+    onError: () => {
       setPaymentStatus("error");
     },
   });
 
-  // Optimized SSE connection with memoization
+  // Highly optimized SSE connection
   useEffect(() => {
-    let isSubscribed = true;
-    
-    // Only connect if we have a valid merchant ID
     if (!id) return;
     
     sseClient.connect(id);
     
     const handleTransactionUpdate = (message: any) => {
-      if (!isSubscribed) return;
-      
-      console.log("SSE transaction update received:", message);
-      
-      // Immediately update local state with SSE data
+      // Batch state updates for better performance
       setCurrentTransaction(message.transaction);
       
-      // Invalidate cache to ensure fresh data on next query
-      queryClient.invalidateQueries({ 
-        queryKey: ["/api/merchants", id, "active-transaction"] 
-      });
+      // Optimized cache invalidation - only when necessary
+      if (message.transaction) {
+        queryClient.setQueryData(["/api/merchants", id, "active-transaction"], message.transaction);
+      }
       
-      // Update payment status based on transaction status
-      if (message.transaction.status === "pending") {
-        setPaymentStatus("idle"); // Reset to idle for new pending transactions
-      } else if (message.transaction.status === "processing") {
-        setPaymentStatus("processing");
-      } else if (message.transaction.status === "completed") {
-        setPaymentStatus("success");
-        // Redirect to receipt page after a short delay
-        setTimeout(() => {
-          if (isSubscribed) {
-            setLocation(`/receipt/${message.transaction.id}`);
-          }
-        }, 2000);
+      // Fast status updates without excessive branching
+      const statusMap = {
+        "pending": "idle",
+        "processing": "processing", 
+        "completed": "success"
+      } as const;
+      
+      const newStatus = statusMap[message.transaction.status as keyof typeof statusMap];
+      if (newStatus) {
+        setPaymentStatus(newStatus);
+        
+        // Fast redirect for completed payments
+        if (newStatus === "success") {
+          setTimeout(() => setLocation(`/receipt/${message.transaction.id}`), 1500);
+        }
       } else if (message.transaction.status === "failed") {
         setPaymentStatus("error");
       }
@@ -131,15 +124,14 @@ export default function CustomerPayment() {
     sseClient.subscribe("transaction_updated", handleTransactionUpdate);
 
     return () => {
-      isSubscribed = false;
+      sseClient.unsubscribe("transaction_updated", handleTransactionUpdate);
       sseClient.disconnect();
     };
-  }, [id, setLocation]);
+  }, [id]);
 
-  // Update current transaction from query - always use latest data
+  // Update current transaction from query - optimized
   useEffect(() => {
     if (activeTransaction) {
-      console.log("Setting transaction from query:", activeTransaction);
       setCurrentTransaction(activeTransaction);
       if (activeTransaction.status === "pending") {
         setPaymentStatus("idle");
@@ -148,12 +140,8 @@ export default function CustomerPayment() {
   }, [activeTransaction]);
 
   const handlePayment = () => {
-    console.log("Payment triggered, current transaction:", currentTransaction);
     if (currentTransaction) {
-      console.log("Initiating payment for transaction ID:", currentTransaction.id);
       processPaymentMutation.mutate(currentTransaction.id);
-    } else {
-      console.log("No current transaction available for payment");
     }
   };
 

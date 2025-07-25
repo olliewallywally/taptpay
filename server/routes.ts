@@ -300,20 +300,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get active transaction for merchant with optimized caching
+  // Get active transaction for merchant - ultra-fast optimized
   app.get("/api/merchants/:id/active-transaction", async (req, res) => {
+    const merchantId = parseInt(req.params.id);
+    
+    // Ultra-fast headers for immediate response
+    res.set({
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+      'Content-Type': 'application/json'
+    });
+    
     try {
-      const merchantId = parseInt(req.params.id);
-      
-      // Faster response - no caching headers that slow down queries
-      res.set({
-        'Cache-Control': 'no-cache', // Always get fresh data for real-time updates
-      });
-      
       const transaction = await storage.getActiveTransactionByMerchant(merchantId);
       res.json(transaction || null);
     } catch (error) {
-      console.error(`Error fetching active transaction for merchant ${req.params.id}:`, error);
       res.status(500).json({ message: "Failed to get active transaction" });
     }
   });

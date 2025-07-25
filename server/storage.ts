@@ -236,20 +236,22 @@ export class MemStorage implements IStorage {
   }
 
   async getActiveTransactionByMerchant(merchantId: number): Promise<Transaction | undefined> {
-    // Check cache first for ultra-fast lookups
+    // Check cache first for instant response
     if (this.activeTransactionCache.has(merchantId)) {
-      const cached = this.activeTransactionCache.get(merchantId);
-      return cached || undefined;
+      return this.activeTransactionCache.get(merchantId) || undefined;
     }
     
-    // Find active transaction and update cache
-    const activeTransaction = Array.from(this.transactions.values()).find(
-      (transaction) => transaction.merchantId === merchantId && transaction.status === "pending"
-    );
+    // Optimized search - break early when found
+    let activeTransaction: Transaction | undefined;
+    for (const transaction of this.transactions.values()) {
+      if (transaction.merchantId === merchantId && transaction.status === "pending") {
+        activeTransaction = transaction;
+        break; // Exit immediately when found
+      }
+    }
     
-    // Cache the result (null if no active transaction)
+    // Cache for immediate future lookups
     this.activeTransactionCache.set(merchantId, activeTransaction || null);
-    
     return activeTransaction;
   }
 
