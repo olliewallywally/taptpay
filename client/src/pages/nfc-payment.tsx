@@ -164,107 +164,81 @@ export default function NFCPayment() {
         <div className="absolute inset-0 bg-gradient-to-t from-gray-600/20 via-transparent to-gray-900/30 animate-pulse"></div>
       </div>
 
-      {/* Glass Overlay Effect when NFC Payment is Active */}
+      {/* Minimalist NFC Payment Overlay */}
       {showNfcOverlay && (
-        <div className="fixed inset-0 z-50 backdrop-blur-2xl bg-black/60">
-          <div className="absolute inset-0 bg-gradient-to-br from-black/40 via-gray-900/30 to-gray-800/20"></div>
-          
-          <div className="relative z-10 min-h-screen flex items-center justify-center p-6">
-            <div className="backdrop-blur-3xl bg-white/[0.02] border border-white/10 rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl">
+        <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm">
+          <div className="min-h-screen flex items-center justify-center p-8">
+            <div className="bg-white/5 border border-white/10 rounded-3xl p-12 max-w-md w-full text-center backdrop-blur-xl shadow-2xl relative">
               
               {paymentStatus === "ready" && (
-                <div className="space-y-8">
-                  <div className="relative">
-                    <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-white/20 flex items-center justify-center animate-pulse">
-                      <Waves className="h-12 w-12 text-white/80" />
-                    </div>
-                    <div className="absolute inset-0 w-24 h-24 mx-auto rounded-full border-2 border-white/30 animate-ping"></div>
+                <div className="space-y-12">
+                  {/* Close Button */}
+                  <button
+                    onClick={closeNfcOverlay}
+                    className="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                  >
+                    <X className="h-5 w-5 text-white/70" />
+                  </button>
+                  
+                  {/* Minimal NFC Icon */}
+                  <div className="mx-auto w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
+                    <Waves className="h-8 w-8 text-white/80" />
                   </div>
                   
-                  <div>
-                    <h2 className="text-2xl font-light text-white mb-2">Ready for Payment</h2>
-                    <div className="text-4xl font-thin text-white mb-1">${nfcSession?.amount}</div>
-                    <p className="text-white/60 text-sm">{nfcSession?.itemName}</p>
-                    <p className="text-white/40 text-xs mt-2">Ask customer to tap their card or phone</p>
+                  {/* Clean Typography */}
+                  <div className="space-y-2">
+                    <div className="text-5xl font-extralight text-white tracking-tight">${nfcSession?.amount}</div>
+                    <div className="text-white/60 text-lg font-light">{nfcSession?.itemName}</div>
                   </div>
                   
-                  <div className="space-y-4">
+                  {/* Simple Instruction */}
+                  <div className="space-y-6">
+                    <div className="text-white/80 text-xl font-light">Tap to Pay</div>
+                    <div className="text-white/50 text-sm">Present card or device to terminal</div>
+                    
+                    {/* Simulation Button - Clean Design */}
                     <button
                       onClick={simulateNFCTap}
-                      style={{
-                        width: '100%',
-                        padding: '16px',
-                        background: 'linear-gradient(to right, rgba(34, 197, 94, 0.8), rgba(16, 185, 129, 0.8), rgba(34, 197, 94, 0.8))',
-                        border: '1px solid rgba(34, 197, 94, 0.5)',
-                        borderRadius: '16px',
-                        color: 'white',
-                        fontSize: '16px',
-                        fontWeight: '300',
-                        cursor: 'pointer',
-                        transition: 'all 0.3s ease'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'linear-gradient(to right, rgba(34, 197, 94, 0.9), rgba(16, 185, 129, 0.9), rgba(34, 197, 94, 0.9))';
-                        e.currentTarget.style.boxShadow = '0 0 20px rgba(34, 197, 94, 0.4)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'linear-gradient(to right, rgba(34, 197, 94, 0.8), rgba(16, 185, 129, 0.8), rgba(34, 197, 94, 0.8))';
-                        e.currentTarget.style.boxShadow = 'none';
-                      }}
+                      className="w-full mt-8 py-4 px-6 bg-white/10 hover:bg-white/15 border border-white/20 rounded-2xl text-white/90 text-sm font-light transition-all duration-200 hover:border-white/30"
                     >
-                      Simulate Customer Tap
-                    </button>
-                    
-                    <button
-                      onClick={() => setShowNfcOverlay(false)}
-                      className="text-white/50 hover:text-white/80 transition-colors text-sm font-light"
-                    >
-                      Cancel
+                      Simulate Payment
                     </button>
                   </div>
                 </div>
               )}
               
               {paymentStatus === "processing" && (
-                <div className="space-y-8">
-                  <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-400/30 flex items-center justify-center">
-                    <Loader2 className="h-12 w-12 text-yellow-400 animate-spin" />
+                <div className="space-y-12">
+                  {/* Minimal Processing Indicator */}
+                  <div className="mx-auto w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
+                    <Loader2 className="h-8 w-8 text-white/80 animate-spin" />
                   </div>
                   
-                  <div>
-                    <h2 className="text-xl font-light text-white mb-2">Processing Payment</h2>
-                    <p className="text-white/60 text-sm">Waiting for customer's tap...</p>
-                    <p className="text-white/40 text-xs mt-2">Customer should tap card or digital wallet now</p>
+                  {/* Clean Processing Text */}
+                  <div className="space-y-4">
+                    <div className="text-white/90 text-2xl font-light">Processing</div>
+                    <div className="text-white/60 text-sm">Please wait...</div>
                   </div>
                 </div>
               )}
               
               {paymentStatus === "completed" && (
-                <div className="space-y-8">
-                  <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-400/30 flex items-center justify-center">
-                    <CheckCircle className="h-12 w-12 text-green-400" />
+                <div className="space-y-12">
+                  {/* Minimal Success Icon */}
+                  <div className="mx-auto w-20 h-20 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center">
+                    <CheckCircle className="h-8 w-8 text-green-400" />
                   </div>
                   
-                  <div>
-                    <h2 className="text-xl font-light text-white mb-2">Payment Successful</h2>
-                    <p className="text-white/60 text-sm">Customer payment received</p>
-                    <p className="text-white/40 text-xs mt-2">${nfcSession?.amount} charged successfully</p>
+                  {/* Clean Success Message */}
+                  <div className="space-y-4">
+                    <div className="text-white/90 text-2xl font-light">Payment Complete</div>
+                    <div className="text-green-400/80 text-lg font-light">${nfcSession?.amount}</div>
                   </div>
                   
+                  {/* Simple Action Button */}
                   <button
                     onClick={resetPayment}
-                    style={{
-                      width: '100%',
-                      padding: '16px',
-                      background: 'linear-gradient(to right, rgba(34, 197, 94, 0.8), rgba(16, 185, 129, 0.8), rgba(34, 197, 94, 0.8))',
-                      border: '1px solid rgba(34, 197, 94, 0.5)',
-                      borderRadius: '16px',
-                      color: 'white',
-                      fontSize: '16px',
-                      fontWeight: '300',
-                      cursor: 'pointer',
-                      transition: 'all 0.3s ease'
-                    }}
+                    className="w-full py-4 px-6 bg-white/10 hover:bg-white/15 border border-white/20 rounded-2xl text-white/90 text-sm font-light transition-all duration-200 hover:border-white/30"
                   >
                     New Payment
                   </button>
@@ -272,31 +246,22 @@ export default function NFCPayment() {
               )}
               
               {paymentStatus === "failed" && (
-                <div className="space-y-8">
-                  <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-r from-red-500/20 to-rose-500/20 border border-red-400/30 flex items-center justify-center">
-                    <XCircle className="h-12 w-12 text-red-400" />
+                <div className="space-y-12">
+                  {/* Minimal Error Icon */}
+                  <div className="mx-auto w-20 h-20 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+                    <XCircle className="h-8 w-8 text-red-400" />
                   </div>
                   
-                  <div>
-                    <h2 className="text-xl font-light text-white mb-2">Payment Failed</h2>
-                    <p className="text-white/60 text-sm">Ask customer to try again</p>
-                    <p className="text-white/40 text-xs mt-2">Check card placement or try different payment method</p>
+                  {/* Clean Error Message */}
+                  <div className="space-y-4">
+                    <div className="text-white/90 text-2xl font-light">Payment Failed</div>
+                    <div className="text-white/60 text-sm">Please try again</div>
                   </div>
                   
+                  {/* Simple Retry Button */}
                   <button
                     onClick={resetPayment}
-                    style={{
-                      width: '100%',
-                      padding: '16px',
-                      background: 'linear-gradient(to right, rgba(34, 197, 94, 0.8), rgba(16, 185, 129, 0.8), rgba(34, 197, 94, 0.8))',
-                      border: '1px solid rgba(34, 197, 94, 0.5)',
-                      borderRadius: '16px',
-                      color: 'white',
-                      fontSize: '16px',
-                      fontWeight: '300',
-                      cursor: 'pointer',
-                      transition: 'all 0.3s ease'
-                    }}
+                    className="w-full py-4 px-6 bg-white/10 hover:bg-white/15 border border-white/20 rounded-2xl text-white/90 text-sm font-light transition-all duration-200 hover:border-white/30"
                   >
                     Try Again
                   </button>

@@ -11,6 +11,7 @@ import Receipt from "@/pages/receipt";
 import Dashboard from "@/pages/dashboard";
 import Settings from "@/pages/settings";
 import Transactions from "@/pages/transactions";
+import NFCPayment from "@/pages/nfc-payment";
 
 
 import Login from "@/pages/login";
@@ -164,8 +165,11 @@ function Router() {
             </Layout>
           </ProtectedRoute>
         </Route>
-
-
+        <Route path="/nfc">
+          <ProtectedRoute>
+            <NFCPayment />
+          </ProtectedRoute>
+        </Route>
 
         <Route path="/admin/login" component={AdminLogin} />
         <Route path="/admin/dashboard">
