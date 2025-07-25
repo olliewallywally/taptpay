@@ -388,39 +388,39 @@ export default function MerchantTerminal() {
             </Form>
           </div>
 
-          {/* QR Code Section */}
-          <div className="backdrop-blur-xl bg-white/3 border border-white/8 rounded-2xl p-4 sm:p-6 shadow-2xl transition-all duration-300 hover:bg-white/6 hover:border-white/15 hover:transform hover:translate-y-[-2px] hover:shadow-[0_12px_40px_rgba(0,0,0,0.15)]">
-            <div className="mb-3 sm:mb-4">
-              <h2 className="text-base sm:text-lg font-bold text-white mb-1 sm:mb-2">QR Code</h2>
-              <p className="text-xs sm:text-sm text-white/70">Static payment code</p>
-            </div>
-            
-            <div className="text-center">
-              <QRCodeDisplay 
-                paymentUrl={merchant?.paymentUrl}
-                qrCodeUrl={merchant?.qrCodeUrl}
-                merchantId={merchantId}
-              />
-            </div>
-          </div>
+
         </div>
 
-            {/* Payment Status Row for QR - Positioned between terminal and QR code */}
+            {/* Payment Status Row for QR - MOVED above QR Code section */}
             {currentTransaction && (
-              <div className="mt-4">
-                <div className="backdrop-blur-xl bg-white/3 border border-white/8 rounded-2xl p-4 sm:p-6 shadow-2xl transition-all duration-300 hover:bg-white/6 hover:border-white/15 hover:transform hover:translate-y-[-2px] hover:shadow-[0_12px_40px_rgba(0,0,0,0.15)]">
-                  <div className="text-center mb-3 sm:mb-4">
-                    <h3 className="text-base sm:text-lg font-bold text-white mb-1">
-                      Transaction #{currentTransaction.id}
-                    </h3>
-                    <p className="text-xs sm:text-sm text-white/70">
-                      {currentTransaction.itemName} - ${currentTransaction.price}
-                    </p>
-                  </div>
-                  {getPaymentStatusIndicator(currentTransaction.status)}
+              <div className="backdrop-blur-xl bg-white/3 border border-white/8 rounded-2xl p-4 sm:p-6 shadow-2xl transition-all duration-300 hover:bg-white/6 hover:border-white/15 hover:transform hover:translate-y-[-2px] hover:shadow-[0_12px_40px_rgba(0,0,0,0.15)]">
+                <div className="text-center mb-3 sm:mb-4">
+                  <h3 className="text-base sm:text-lg font-bold text-white mb-1">
+                    Transaction #{currentTransaction.id}
+                  </h3>
+                  <p className="text-xs sm:text-sm text-white/70">
+                    {currentTransaction.itemName} - ${currentTransaction.price}
+                  </p>
                 </div>
+                {getPaymentStatusIndicator(currentTransaction.status)}
               </div>
             )}
+
+            {/* QR Code Display Section */}
+            <div className="backdrop-blur-xl bg-white/3 border border-white/8 rounded-2xl p-4 sm:p-6 shadow-2xl transition-all duration-300 hover:bg-white/6 hover:border-white/15 hover:transform hover:translate-y-[-2px] hover:shadow-[0_12px_40px_rgba(0,0,0,0.15)]">
+              <div className="mb-3 sm:mb-4">
+                <h2 className="text-base sm:text-lg font-bold text-white mb-1 sm:mb-2">QR Code</h2>
+                <p className="text-xs sm:text-sm text-white/70">Static payment code</p>
+              </div>
+              
+              <div className="text-center">
+                <QRCodeDisplay 
+                  paymentUrl={merchant?.paymentUrl}
+                  qrCodeUrl={merchant?.qrCodeUrl}
+                  merchantId={merchantId}
+                />
+              </div>
+            </div>
           </TabsContent>
 
           {/* NFC Tab Content */}
