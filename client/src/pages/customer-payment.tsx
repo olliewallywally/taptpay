@@ -5,6 +5,7 @@ import { SlideToPayComponent } from "@/components/slide-to-pay";
 import { sseClient } from "@/lib/sse-client";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Shield, Lock, CheckCircle, XCircle } from "lucide-react";
+import taptLogo from "@assets/tapt logo_1751676012286.png";
 
 export default function CustomerPayment() {
   const { merchantId } = useParams<{ merchantId: string }>();
@@ -204,7 +205,7 @@ export default function CustomerPayment() {
           <div className="text-center mb-8">
             <div className="flex justify-center">
               <img 
-                src="@assets/tapt logo_1751676012286.png" 
+                src={taptLogo} 
                 alt="tapt" 
                 className="h-12 w-auto"
               />
@@ -252,7 +253,7 @@ export default function CustomerPayment() {
           <div className="text-center mb-8">
             <div className="flex justify-center">
               <img 
-                src="@assets/tapt logo_1751676012286.png" 
+                src={taptLogo} 
                 alt="tapt" 
                 className="h-12 w-auto"
               />
