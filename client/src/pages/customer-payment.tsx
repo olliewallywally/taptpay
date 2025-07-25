@@ -160,25 +160,25 @@ export default function CustomerPayment() {
     switch (paymentStatus) {
       case "processing":
         return (
-          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-center">
-            <div className="animate-spin w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto mb-2"></div>
-            <p className="text-blue-700 font-medium">Processing Payment...</p>
+          <div className="backdrop-blur-xl bg-blue-500/20 border border-blue-400/30 rounded-2xl p-4 text-center">
+            <div className="animate-spin w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full mx-auto mb-2"></div>
+            <p className="text-blue-200 font-medium">Processing Payment...</p>
           </div>
         );
       case "success":
         return (
-          <div className="bg-green-50 border border-green-200 rounded-2xl p-4 text-center">
-            <CheckCircle className="w-8 h-8 text-green-600 mx-auto mb-2" />
-            <p className="text-green-700 font-medium">Payment Successful!</p>
-            <p className="text-green-600 text-sm">Thank you for your purchase</p>
+          <div className="backdrop-blur-xl bg-green-500/20 border border-green-400/30 rounded-2xl p-4 text-center">
+            <CheckCircle className="w-8 h-8 text-green-400 mx-auto mb-2" />
+            <p className="text-green-200 font-medium">Payment Successful!</p>
+            <p className="text-green-300/80 text-sm">Thank you for your purchase</p>
           </div>
         );
       case "error":
         return (
-          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-center">
-            <XCircle className="w-8 h-8 text-red-600 mx-auto mb-2" />
-            <p className="text-red-700 font-medium">Payment Failed</p>
-            <p className="text-red-600 text-sm">Please try again or contact staff</p>
+          <div className="backdrop-blur-xl bg-red-500/20 border border-red-400/30 rounded-2xl p-4 text-center">
+            <XCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+            <p className="text-red-200 font-medium">Payment Failed</p>
+            <p className="text-red-300/80 text-sm">Please try again or contact staff</p>
           </div>
         );
       default:
@@ -189,29 +189,42 @@ export default function CustomerPayment() {
   // Show loading skeleton while fetching
   if (isLoading || !currentTransaction) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl shadow-2xl p-8 text-center max-w-sm w-full">
-          {isLoading ? (
-            // Fast loading skeleton
-            <div className="animate-pulse">
-              <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-gray-200 rounded-lg"></div>
-                  <div className="h-6 bg-gray-200 rounded w-24"></div>
-                </div>
+      <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
+        {/* Gradient Background with Floating Orbs */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+          {/* Animated Gradient Orbs */}
+          <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse"></div>
+          <div className="absolute top-40 right-20 w-96 h-96 bg-gradient-to-r from-cyan-400 to-blue-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse delay-75"></div>
+          <div className="absolute -bottom-8 left-40 w-96 h-96 bg-gradient-to-r from-yellow-400 to-orange-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse delay-150"></div>
+        </div>
+
+        {/* Glass Morphism Container */}
+        <div className="relative z-10 backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-8 shadow-2xl text-center max-w-sm w-full">
+          {/* Tapt Logo */}
+          <div className="text-center mb-8">
+            <div className="flex justify-center mb-6">
+              <div className="w-16 h-16 bg-white backdrop-blur-lg rounded-2xl flex items-center justify-center border border-white/30 shadow-lg">
+                <span className="text-black font-bold text-xl">T</span>
               </div>
-              <div className="h-8 bg-gray-200 rounded w-32 mx-auto mb-2"></div>
-              <div className="h-16 bg-gray-200 rounded w-40 mx-auto mb-12"></div>
-              <div className="h-12 bg-gray-200 rounded-full w-full"></div>
+            </div>
+            <h1 className="text-2xl font-light text-white mb-2">tapt</h1>
+          </div>
+
+          {isLoading ? (
+            /* Loading skeleton */
+            <div className="animate-pulse">
+              <div className="h-8 bg-white/20 rounded w-32 mx-auto mb-2"></div>
+              <div className="h-16 bg-white/20 rounded w-40 mx-auto mb-12"></div>
+              <div className="h-12 bg-white/20 rounded-full w-full"></div>
             </div>
           ) : (
-            // No transaction state
+            /* No transaction state */
             <div>
-              <div className="w-16 h-16 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
+              <div className="w-16 h-16 mx-auto bg-white/20 rounded-full flex items-center justify-center mb-4">
                 <span className="text-2xl">💳</span>
               </div>
-              <h2 className="text-xl font-bold text-gray-700 mb-2">Waiting for Transaction</h2>
-              <p className="text-gray-500">The merchant will send payment details shortly</p>
+              <h2 className="text-xl font-bold text-white mb-2">Waiting for Transaction</h2>
+              <p className="text-white/70">The merchant will send payment details shortly</p>
             </div>
           )}
         </div>
@@ -220,48 +233,42 @@ export default function CustomerPayment() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
+    <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
+      {/* Gradient Background with Floating Orbs */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+        {/* Animated Gradient Orbs */}
+        <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse"></div>
+        <div className="absolute top-40 right-20 w-96 h-96 bg-gradient-to-r from-cyan-400 to-blue-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse delay-75"></div>
+        <div className="absolute -bottom-8 left-40 w-96 h-96 bg-gradient-to-r from-yellow-400 to-orange-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse delay-150"></div>
+      </div>
+
+      <div className="relative z-10 w-full max-w-sm">
         
-        {/* Main Payment Card */}
-        <div className="bg-white rounded-3xl shadow-2xl p-8 text-center">
+        {/* Main Payment Card - Liquid Glass */}
+        <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-8 shadow-2xl text-center">
           
-          {/* Merchant Branding */}
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center space-x-3">
-              {/* QR Code Icon */}
-              <div className="w-12 h-12 bg-[hsl(155,40%,25%)] rounded-lg flex items-center justify-center">
-                <div className="grid grid-cols-3 gap-0.5">
-                  <div className="w-1.5 h-1.5 bg-white rounded-sm"></div>
-                  <div className="w-1.5 h-1.5 bg-transparent"></div>
-                  <div className="w-1.5 h-1.5 bg-white rounded-sm"></div>
-                  <div className="w-1.5 h-1.5 bg-transparent"></div>
-                  <div className="w-1.5 h-1.5 bg-white rounded-sm"></div>
-                  <div className="w-1.5 h-1.5 bg-transparent"></div>
-                  <div className="w-1.5 h-1.5 bg-white rounded-sm"></div>
-                  <div className="w-1.5 h-1.5 bg-transparent"></div>
-                  <div className="w-1.5 h-1.5 bg-white rounded-sm"></div>
-                </div>
+          {/* Tapt Logo */}
+          <div className="text-center mb-8">
+            <div className="flex justify-center mb-6">
+              <div className="w-16 h-16 bg-white backdrop-blur-lg rounded-2xl flex items-center justify-center border border-white/30 shadow-lg">
+                <span className="text-black font-bold text-xl">T</span>
               </div>
-              <span className="text-lg font-bold text-gray-700 tracking-wide">MERCHANT</span>
             </div>
+            <h1 className="text-2xl font-light text-white mb-2">tapt</h1>
           </div>
 
           {/* Item Name */}
-          <h2 className="text-4xl font-bold text-gray-900 mb-2">
+          <h2 className="text-3xl font-bold text-white mb-2">
             {currentTransaction.itemName}
           </h2>
 
           {/* Price */}
-          <div className="text-6xl font-bold text-gray-900 mb-12">
+          <div className="text-5xl font-bold text-white mb-12">
             ${parseFloat(currentTransaction.price).toFixed(2)}
           </div>
 
           {/* Slide to Pay Widget */}
           <div>
-            <div className="text-xs text-gray-500 mb-2">
-              Status: {paymentStatus} | Transaction ID: {currentTransaction.id}
-            </div>
             <SlideToPayComponent 
               onPayment={handlePayment}
               disabled={paymentStatus !== "idle"}
@@ -272,14 +279,14 @@ export default function CustomerPayment() {
           </div>
 
           {/* Security Badges */}
-          <div className="flex items-center justify-center space-x-6 pt-4 border-t border-gray-100">
+          <div className="flex items-center justify-center space-x-6 pt-6 mt-6 border-t border-white/20">
             <div className="flex items-center space-x-2">
-              <Shield className="w-4 h-4 text-[hsl(155,40%,25%)]" />
-              <span className="text-xs font-medium text-gray-600">PCI DSS</span>
+              <Shield className="w-4 h-4 text-green-400" />
+              <span className="text-xs font-medium text-white/80">PCI DSS</span>
             </div>
             <div className="flex items-center space-x-2">
-              <Lock className="w-4 h-4 text-[hsl(155,40%,25%)]" />
-              <span className="text-xs font-medium text-gray-600">SECURE PAYMENT</span>
+              <Lock className="w-4 h-4 text-green-400" />
+              <span className="text-xs font-medium text-white/80">SECURE PAYMENT</span>
             </div>
           </div>
         </div>

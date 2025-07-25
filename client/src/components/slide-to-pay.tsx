@@ -46,59 +46,148 @@ export function SlideToPayComponent({
     <div className="w-full">
       <div 
         ref={containerRef}
-        className="relative bg-gray-100 rounded-full h-14 overflow-hidden border-2 border-gray-200"
+        style={{
+          position: 'relative',
+          height: '56px',
+          borderRadius: '28px',
+          overflow: 'hidden',
+          backgroundColor: 'rgba(255, 255, 255, 0.1)',
+          backdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
+        }}
       >
-        {/* Background gradient based on progress */}
+        {/* Liquid background gradient that follows drag */}
         <div 
-          className={`absolute inset-0 transition-all duration-300 ${
-            isCompleted 
-              ? 'bg-gradient-to-r from-green-500 to-green-600 animate-pulse' 
-              : 'bg-gradient-to-r from-[hsl(155,40%,25%)] to-green-600'
-          }`}
-          style={{ 
-            width: isCompleted ? '100%' : `${dragProgress * 100}%`,
-            opacity: dragProgress > 0 || isCompleted ? 0.8 : 0 
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            height: '100%',
+            borderRadius: '28px',
+            background: isCompleted 
+              ? 'linear-gradient(90deg, rgba(34, 197, 94, 0.8), rgba(22, 163, 74, 0.9))'
+              : 'linear-gradient(90deg, rgba(34, 197, 94, 0.6), rgba(22, 163, 74, 0.7))',
+            width: isCompleted ? '100%' : `${Math.max(20, dragProgress * 100)}%`,
+            transition: isCompleted ? 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)' : 'width 0.2s ease-out',
+            opacity: dragProgress > 0 || isCompleted ? 1 : 0,
+            filter: 'blur(0.5px)'
           }}
         />
         
-        {/* Slide text */}
-        <div className="absolute inset-0 flex items-center justify-center">
+        {/* Shimmer effect overlay */}
+        <div 
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: '-100%',
+            width: '100%',
+            height: '100%',
+            background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent)',
+            animation: dragProgress > 0.5 ? 'shimmer 2s infinite' : 'none'
+          }}
+        />
+        
+        {/* Slide text with better typography */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          pointerEvents: 'none'
+        }}>
           <span 
-            className={`font-medium transition-all duration-300 ${
-              dragProgress > 0.5 || isCompleted ? 'text-white' : 'text-gray-600'
-            }`}
+            style={{
+              fontSize: '14px',
+              fontWeight: '500',
+              color: dragProgress > 0.3 || isCompleted ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.7)',
+              transition: 'color 0.3s ease',
+              textShadow: dragProgress > 0.3 ? '0 1px 2px rgba(0, 0, 0, 0.3)' : 'none',
+              letterSpacing: '0.5px'
+            }}
           >
-            {isCompleted ? 'Payment Started!' : 
-             dragProgress > 0.8 ? 'Release to Pay' : 'Slide to Pay'}
+            {isCompleted ? '✓ Payment Started!' : 
+             dragProgress > 0.8 ? 'Release to Pay' : 'Slide to Pay →'}
           </span>
         </div>
         
-        {/* Draggable button */}
+        {/* Enhanced draggable button with liquid glass effect */}
         <motion.div
-          className={`absolute left-1 top-1 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center cursor-pointer ${
-            disabled ? 'opacity-50 cursor-not-allowed' : ''
-          }`}
+          style={{
+            position: 'absolute',
+            left: '4px',
+            top: '4px',
+            width: '48px',
+            height: '48px',
+            borderRadius: '24px',
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: disabled ? 'not-allowed' : 'grab',
+            opacity: disabled ? 0.5 : 1
+          }}
           drag={disabled ? false : "x"}
-          dragConstraints={{ left: 0, right: containerRef.current ? containerRef.current.offsetWidth - 60 : 0 }}
-          dragElastic={0.1}
+          dragConstraints={{ left: 0, right: containerRef.current ? containerRef.current.offsetWidth - 56 : 0 }}
+          dragElastic={0.05}
+          dragMomentum={false}
           onDragStart={() => setIsDragging(true)}
           onDrag={handleDrag}
           onDragEnd={handleDragEnd}
           animate={{ 
-            x: dragProgress * (containerRef.current ? containerRef.current.offsetWidth - 60 : 0),
-            backgroundColor: dragProgress > 0.8 ? "#059669" : "#ffffff"
+            x: dragProgress * (containerRef.current ? containerRef.current.offsetWidth - 56 : 0)
           }}
-          whileTap={{ scale: 0.95 }}
+          transition={{
+            type: "spring",
+            stiffness: 500,
+            damping: 40,
+            mass: 0.8
+          }}
+          whileTap={{ 
+            scale: 0.98,
+            boxShadow: '0 2px 10px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.8)'
+          }}
+          whileDrag={{
+            cursor: 'grabbing',
+            scale: 1.02,
+            boxShadow: '0 6px 25px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.8)'
+          }}
         >
-          <div className={`w-6 h-6 rounded-full border-2 transition-colors ${
-            dragProgress > 0.8 ? 'border-white' : 'border-[hsl(155,40%,25%)]'
-          }`}>
-            <div className={`w-full h-full rounded-full transition-colors ${
-              dragProgress > 0.8 ? 'bg-white' : 'bg-[hsl(155,40%,25%)]'
-            }`} />
+          {/* Inner button indicator */}
+          <div 
+            style={{
+              width: '20px',
+              height: '20px',
+              borderRadius: '10px',
+              background: dragProgress > 0.8 || isCompleted 
+                ? 'linear-gradient(135deg, rgba(34, 197, 94, 1), rgba(22, 163, 74, 1))'
+                : 'linear-gradient(135deg, rgba(34, 197, 94, 0.8), rgba(22, 163, 74, 0.9))',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              boxShadow: 'inset 0 1px 2px rgba(255, 255, 255, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            {isCompleted && <span style={{ color: 'white', fontSize: '12px' }}>✓</span>}
           </div>
         </motion.div>
       </div>
+      
+      {/* Custom CSS for shimmer animation */}
+      <style>{`
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(200%); }
+        }
+      `}</style>
     </div>
   );
 }
