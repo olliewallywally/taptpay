@@ -1,5 +1,5 @@
-import { useState, useRef } from "react";
-import { motion } from "framer-motion";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { motion, useMotionValue, useTransform } from "framer-motion";
 
 interface SlideToPayProps {
   onPayment: () => void;
@@ -13,34 +13,40 @@ export function SlideToPayComponent({
   onPayment, 
   disabled = false 
 }: SlideToPayProps) {
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragProgress, setDragProgress] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const x = useMotionValue(0);
+  
+  const [dragProgress, setDragProgress] = useState(0);
 
-  const handleDragEnd = () => {
+  // Update progress when x changes
+  useEffect(() => {
+    const updateProgress = () => {
+      if (!containerRef.current) return;
+      const maxX = containerRef.current.offsetWidth - 56;
+      const currentX = x.get();
+      const progress = Math.max(0, Math.min(1, currentX / maxX));
+      setDragProgress(progress);
+    };
+
+    const unsubscribe = x.on("change", updateProgress);
+    return unsubscribe;
+  }, [x]);
+
+  const handleDragEnd = useCallback(() => {
     if (dragProgress > 0.8 && !disabled) {
       console.log("Slide to pay completed - triggering payment");
       setIsCompleted(true);
       onPayment();
       // Keep the slider at the end position briefly to show completion
       setTimeout(() => {
-        setDragProgress(0);
+        x.set(0);
         setIsCompleted(false);
       }, 800);
     } else {
-      setDragProgress(0);
+      x.set(0);
     }
-    setIsDragging(false);
-  };
-
-  const handleDrag = (event: any, info: any) => {
-    if (!containerRef.current || disabled) return;
-    
-    const containerWidth = containerRef.current.offsetWidth - 60; // Account for button width
-    const progress = Math.max(0, Math.min(1, info.point.x / containerWidth));
-    setDragProgress(progress);
-  };
+  }, [dragProgress, disabled, onPayment, x]);
 
   return (
     <div className="w-full">
@@ -132,32 +138,20 @@ export function SlideToPayComponent({
             alignItems: 'center',
             justifyContent: 'center',
             cursor: disabled ? 'not-allowed' : 'grab',
-            opacity: disabled ? 0.5 : 1
+            opacity: disabled ? 0.5 : 1,
+            x
           }}
           drag={disabled ? false : "x"}
-          dragConstraints={{ left: 0, right: containerRef.current ? containerRef.current.offsetWidth - 56 : 0 }}
-          dragElastic={0.05}
+          dragConstraints={containerRef}
+          dragElastic={0}
           dragMomentum={false}
-          onDragStart={() => setIsDragging(true)}
-          onDrag={handleDrag}
           onDragEnd={handleDragEnd}
-          animate={{ 
-            x: dragProgress * (containerRef.current ? containerRef.current.offsetWidth - 56 : 0)
-          }}
-          transition={{
-            type: "spring",
-            stiffness: 500,
-            damping: 40,
-            mass: 0.8
-          }}
           whileTap={{ 
-            scale: 0.98,
-            boxShadow: '0 2px 10px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.8)'
+            scale: 0.98
           }}
           whileDrag={{
             cursor: 'grabbing',
-            scale: 1.02,
-            boxShadow: '0 6px 25px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.8)'
+            scale: 1.02
           }}
         >
           {/* Inner button indicator */}
