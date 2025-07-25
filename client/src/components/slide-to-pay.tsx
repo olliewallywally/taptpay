@@ -57,10 +57,10 @@ export function SlideToPayComponent({
           height: '56px',
           borderRadius: '28px',
           overflow: 'hidden',
-          backgroundColor: 'rgba(255, 255, 255, 0.1)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
+          backgroundColor: 'rgba(255, 255, 255, 0.05)',
+          backdropFilter: 'blur(30px)',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
         }}
       >
         {/* Liquid background gradient that follows drag */}
@@ -109,10 +109,10 @@ export function SlideToPayComponent({
           <span 
             style={{
               fontSize: '14px',
-              fontWeight: '500',
-              color: dragProgress > 0.3 || isCompleted ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.7)',
+              fontWeight: '600',
+              color: dragProgress > 0.3 || isCompleted ? 'rgba(255, 255, 255, 1)' : 'rgba(255, 255, 255, 0.9)',
               transition: 'color 0.3s ease',
-              textShadow: dragProgress > 0.3 ? '0 1px 2px rgba(0, 0, 0, 0.3)' : 'none',
+              textShadow: '0 2px 4px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.8)',
               letterSpacing: '0.5px'
             }}
           >
