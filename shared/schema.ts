@@ -55,7 +55,7 @@ export const transactions = pgTable("transactions", {
   merchantId: serial("merchant_id").references(() => merchants.id),
   itemName: text("item_name").notNull(),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-  status: text("status").notNull().default("pending"), // pending, processing, completed, failed
+  status: text("status").notNull().default("pending"), // pending, processing, completed, failed, refunded, partially_refunded
   windcaveTransactionId: text("windcave_transaction_id"),
   
   // Payment method tracking
@@ -70,6 +70,31 @@ export const transactions = pgTable("transactions", {
   platformFeeAmount: decimal("platform_fee_amount", { precision: 10, scale: 2 }), // Calculated platform fee
   merchantNet: decimal("merchant_net", { precision: 10, scale: 2 }), // Amount to settle to merchant
   
+  // Refund tracking
+  totalRefunded: decimal("total_refunded", { precision: 10, scale: 2 }).default("0.00"), // Total amount refunded
+  refundableAmount: decimal("refundable_amount", { precision: 10, scale: 2 }), // Amount still available for refund
+  
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Refunds table to track all refund activities
+export const refunds = pgTable("refunds", {
+  id: serial("id").primaryKey(),
+  transactionId: serial("transaction_id").references(() => transactions.id),
+  merchantId: serial("merchant_id").references(() => merchants.id),
+  refundAmount: decimal("refund_amount", { precision: 10, scale: 2 }).notNull(),
+  refundReason: text("refund_reason"),
+  refundMethod: text("refund_method").default("original_payment_method"), // original_payment_method, bank_transfer, manual
+  status: text("status").notNull().default("pending"), // pending, processing, completed, failed
+  windcaveRefundId: text("windcave_refund_id"), // External refund processor ID
+  
+  // Fee handling for refunds
+  windcaveFeeRefunded: decimal("windcave_fee_refunded", { precision: 10, scale: 2 }).default("0.00"),
+  platformFeeRefunded: decimal("platform_fee_refunded", { precision: 10, scale: 2 }).default("0.00"),
+  
+  initiatedBy: text("initiated_by"), // merchant, customer, admin
+  customerNotified: boolean("customer_notified").default(false),
+  completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -99,6 +124,7 @@ export const platformFees = pgTable("platform_fees", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Create insert schemas for all tables
 export const insertMerchantSchema = createInsertSchema(merchants).omit({
   id: true,
   status: true,
@@ -106,6 +132,21 @@ export const insertMerchantSchema = createInsertSchema(merchants).omit({
   passwordHash: true,
   createdAt: true,
   updatedAt: true,
+});
+
+export const insertRefundSchema = createInsertSchema(refunds).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const createRefundSchema = z.object({
+  transactionId: z.number().min(1, "Transaction ID is required"),
+  refundAmount: z.string().refine((val) => {
+    const num = parseFloat(val);
+    return !isNaN(num) && num > 0;
+  }, "Refund amount must be a positive number"),
+  refundReason: z.string().min(1, "Refund reason is required").max(500, "Reason must be under 500 characters"),
+  refundMethod: z.enum(["original_payment_method", "bank_transfer", "manual"]).default("original_payment_method"),
 });
 
 export const createMerchantSchema = z.object({
