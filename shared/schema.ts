@@ -234,7 +234,7 @@ export const insertUserSchema = createInsertSchema(users).omit({
 
 // Type exports - consolidated to avoid duplicates
 export type Merchant = typeof merchants.$inferSelect;
-export type InsertMerchant = z.infer<typeof insertMerchantSchema>;
+export type InsertMerchant = z.infer<typeof createMerchantSchema>;
 export type CreateMerchant = z.infer<typeof createMerchantSchema>;
 export type VerifyMerchant = z.infer<typeof verifyMerchantSchema>;
 export type Transaction = typeof transactions.$inferSelect;
