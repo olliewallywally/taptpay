@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema } from "@shared/schema";
+import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema } from "@shared/schema";
 import { windcaveService } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, createUser, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
@@ -463,10 +463,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.createPlatformFee({
           transactionId: transaction.id,
           merchantId: transaction.merchantId,
-          feeAmount: transaction.platformFeeAmount,
-          transactionAmount: Number(transaction.price),
+          feeAmount: transaction.platformFeeAmount || "0.05",
+          transactionAmount: transaction.price,
           status: 'collected',
-          collectedAt: new Date(),
         });
         
         // Notify clients of completion
@@ -518,11 +517,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     };
     
     if (isIOS) {
-      capabilities.recommendations.push("Use Apple Pay for fastest checkout");
+      (capabilities.recommendations as string[]).push("Use Apple Pay for fastest checkout");
     } else if (isAndroid) {
-      capabilities.recommendations.push("Use Google Pay or tap your card");
+      (capabilities.recommendations as string[]).push("Use Google Pay or tap your card");
     } else {
-      capabilities.recommendations.push("Use QR code for payment on desktop");
+      (capabilities.recommendations as string[]).push("Use QR code for payment on desktop");
     }
     
     res.json(capabilities);
@@ -1748,6 +1747,188 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error clearing transactions:", error);
       res.status(500).json({ message: "Failed to clear transactions" });
+    }
+  });
+
+  // ===== REFUND MANAGEMENT ROUTES =====
+  
+  // Create a refund for a transaction
+  app.post("/api/transactions/:transactionId/refunds", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const transactionId = parseInt(req.params.transactionId);
+      const merchantId = req.user?.merchantId;
+      
+      if (!merchantId) {
+        return res.status(401).json({ message: "Merchant authentication required" });
+      }
+
+      // Validate refund data
+      const validation = createRefundSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid refund data", errors: validation.error.errors });
+      }
+
+      const { refundAmount, refundReason, refundMethod } = validation.data;
+
+      // Get the original transaction
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+
+      // Verify merchant owns this transaction
+      if (transaction.merchantId !== merchantId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Check if transaction can be refunded
+      if (transaction.status !== "completed") {
+        return res.status(400).json({ message: "Only completed transactions can be refunded" });
+      }
+
+      // Check refund amount is valid
+      const requestedAmount = parseFloat(refundAmount);
+      const transactionAmount = parseFloat(transaction.price);
+      const alreadyRefunded = parseFloat(transaction.totalRefunded || "0");
+      const refundableAmount = parseFloat(transaction.refundableAmount || transaction.price);
+
+      if (requestedAmount > refundableAmount) {
+        return res.status(400).json({ 
+          message: `Refund amount cannot exceed refundable amount of $${refundableAmount.toFixed(2)}` 
+        });
+      }
+
+      if (requestedAmount <= 0) {
+        return res.status(400).json({ message: "Refund amount must be greater than zero" });
+      }
+
+      // Create refund record
+      const refund = await storage.createRefund({
+        transactionId,
+        merchantId,
+        refundAmount,
+        refundReason,
+        refundMethod,
+        status: "pending",
+        windcaveRefundId: null,
+        completedAt: null,
+      });
+
+      // In a real system, this would integrate with Windcave refund API
+      // For now, we'll simulate the refund process
+      const isSimulation = !windcaveService.isConfigured();
+      
+      if (isSimulation) {
+        // Simulate successful refund
+        const windcaveRefundId = `REFUND_${Date.now()}`;
+        await storage.updateRefundStatus(refund.id, "completed", windcaveRefundId);
+        
+        // Notify connected clients about the refund
+        const connections = sseConnections.get(merchantId);
+        if (connections) {
+          connections.forEach(conn => {
+            conn.write(`data: ${JSON.stringify({ 
+              type: 'refund_completed', 
+              refund: { ...refund, status: "completed", windcaveRefundId },
+              transactionId
+            })}\n\n`);
+          });
+        }
+
+        res.json({ 
+          success: true,
+          message: "Refund processed successfully",
+          refund: { ...refund, status: "completed", windcaveRefundId }
+        });
+      } else {
+        // Real Windcave integration would go here
+        res.json({ 
+          success: true,
+          message: "Refund request created and being processed",
+          refund
+        });
+      }
+
+    } catch (error) {
+      console.error("Error creating refund:", error);
+      res.status(500).json({ message: "Failed to create refund" });
+    }
+  });
+
+  // Get refunds for a specific transaction
+  app.get("/api/transactions/:transactionId/refunds", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const transactionId = parseInt(req.params.transactionId);
+      const merchantId = req.user?.merchantId;
+      
+      if (!merchantId) {
+        return res.status(401).json({ message: "Merchant authentication required" });
+      }
+
+      // Get the transaction to verify ownership
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+
+      if (transaction.merchantId !== merchantId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const refunds = await storage.getRefundsByTransaction(transactionId);
+      res.json(refunds);
+
+    } catch (error) {
+      console.error("Error fetching refunds:", error);
+      res.status(500).json({ message: "Failed to fetch refunds" });
+    }
+  });
+
+  // Get all refunds for a merchant
+  app.get("/api/merchants/:merchantId/refunds", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = parseInt(req.params.merchantId);
+      const userMerchantId = req.user?.merchantId;
+      
+      // Verify access
+      if (userMerchantId !== merchantId && req.user?.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const refunds = await storage.getRefundsByMerchant(merchantId);
+      res.json(refunds);
+
+    } catch (error) {
+      console.error("Error fetching merchant refunds:", error);
+      res.status(500).json({ message: "Failed to fetch refunds" });
+    }
+  });
+
+  // Get specific refund details
+  app.get("/api/refunds/:refundId", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const refundId = parseInt(req.params.refundId);
+      const merchantId = req.user?.merchantId;
+      
+      if (!merchantId) {
+        return res.status(401).json({ message: "Merchant authentication required" });
+      }
+
+      const refund = await storage.getRefund(refundId);
+      if (!refund) {
+        return res.status(404).json({ message: "Refund not found" });
+      }
+
+      // Verify access
+      if (refund.merchantId !== merchantId && req.user?.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      res.json(refund);
+
+    } catch (error) {
+      console.error("Error fetching refund:", error);
+      res.status(500).json({ message: "Failed to fetch refund" });
     }
   });
 

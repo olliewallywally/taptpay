@@ -1,4 +1,4 @@
-import { merchants, transactions, merchantSettlements, platformFees, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee } from "@shared/schema";
+import { merchants, transactions, merchantSettlements, platformFees, refunds, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund } from "@shared/schema";
 import { getDb, isDatabaseConnected } from "./database";
 import { eq, desc, and } from "drizzle-orm";
 
@@ -35,6 +35,13 @@ export interface IStorage {
   getPlatformFeesByMerchant(merchantId: number): Promise<PlatformFee[]>;
   updatePlatformFeeStatus(id: number, status: string): Promise<PlatformFee | undefined>;
   getTotalPlatformRevenue(): Promise<{ totalFees: number; totalTransactions: number }>;
+  
+  // Refund operations
+  createRefund(data: InsertRefund): Promise<Refund>;
+  getRefund(id: number): Promise<Refund | undefined>;
+  getRefundsByTransaction(transactionId: number): Promise<Refund[]>;
+  getRefundsByMerchant(merchantId: number): Promise<Refund[]>;
+  updateRefundStatus(id: number, status: string, windcaveRefundId?: string): Promise<Refund | undefined>;
   
   // Analytics operations
   getMerchantAnalytics(merchantId: number): Promise<{
@@ -79,18 +86,22 @@ export class MemStorage implements IStorage {
   private merchants: Map<number, Merchant>;
   private transactions: Map<number, Transaction>;
   private platformFees: Map<number, PlatformFee>;
+  private refunds: Map<number, Refund>;
   private currentMerchantId: number;
   private currentTransactionId: number;
   private currentPlatformFeeId: number;
+  private currentRefundId: number;
   private activeTransactionCache: Map<number, Transaction | null>; // Cache for active transactions by merchant
 
   constructor() {
     this.merchants = new Map();
     this.transactions = new Map();
     this.platformFees = new Map();
+    this.refunds = new Map();
     this.currentMerchantId = 1;
     this.currentTransactionId = 1;
     this.currentPlatformFeeId = 1;
+    this.currentRefundId = 1;
     this.activeTransactionCache = new Map();
   }
 
@@ -292,6 +303,11 @@ export class MemStorage implements IStorage {
       platformFeeRate: "0.0000", // Not percentage-based
       platformFeeAmount: platformFeeAmount.toString(),
       merchantNet: merchantNet.toString(),
+      totalRefunded: "0.00",
+      refundableAmount: transactionAmount.toString(),
+      paymentMethod: insertTransaction.paymentMethod || "qr_code",
+      nfcSessionId: insertTransaction.nfcSessionId || null,
+      deviceId: insertTransaction.deviceId || null,
     };
     this.transactions.set(id, transaction);
     
@@ -334,6 +350,10 @@ export class MemStorage implements IStorage {
     return updatedFee;
   }
 
+  async getPlatformFee(id: number): Promise<PlatformFee | undefined> {
+    return this.platformFees.get(id);
+  }
+
   async getTotalPlatformRevenue(): Promise<{ totalFees: number; totalTransactions: number }> {
     const completedTransactions = Array.from(this.transactions.values())
       .filter(transaction => transaction.status === "completed");
@@ -344,6 +364,49 @@ export class MemStorage implements IStorage {
     const totalTransactions = completedTransactions.length;
     
     return { totalFees, totalTransactions };
+  }
+
+  // Refund methods
+  async createRefund(insertRefund: InsertRefund): Promise<Refund> {
+    const id = this.currentRefundId++;
+    const refund: Refund = {
+      ...insertRefund,
+      id,
+      createdAt: new Date(),
+      completedAt: null,
+    };
+    this.refunds.set(id, refund);
+    return refund;
+  }
+
+  async getRefund(id: number): Promise<Refund | undefined> {
+    return this.refunds.get(id);
+  }
+
+  async getRefundsByTransaction(transactionId: number): Promise<Refund[]> {
+    return Array.from(this.refunds.values()).filter(
+      (refund) => refund.transactionId === transactionId
+    );
+  }
+
+  async getRefundsByMerchant(merchantId: number): Promise<Refund[]> {
+    return Array.from(this.refunds.values()).filter(
+      (refund) => refund.merchantId === merchantId
+    );
+  }
+
+  async updateRefundStatus(id: number, status: string, windcaveRefundId?: string): Promise<Refund | undefined> {
+    const refund = this.refunds.get(id);
+    if (!refund) return undefined;
+    
+    const updatedRefund = {
+      ...refund,
+      status,
+      windcaveRefundId: windcaveRefundId || refund.windcaveRefundId,
+      completedAt: status === "completed" ? new Date() : refund.completedAt,
+    };
+    this.refunds.set(id, updatedRefund);
+    return updatedRefund;
   }
 
   async updateTransactionStatus(id: number, status: string, windcaveTransactionId?: string): Promise<Transaction | undefined> {
@@ -1164,6 +1227,12 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async getPlatformFee(id: number): Promise<PlatformFee | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db.select().from(platformFees).where(eq(platformFees.id, id)).limit(1);
+    return result[0];
+  }
+
   async getTotalPlatformRevenue(): Promise<{ totalFees: number; totalTransactions: number }> {
     if (!this.db) throw new Error('Database not available');
     const result = await this.db.select().from(transactions);
@@ -1175,6 +1244,47 @@ export class DatabaseStorage implements IStorage {
     const totalTransactions = completedTransactions.length;
     
     return { totalFees, totalTransactions };
+  }
+
+  // Refund methods for DatabaseStorage
+  async createRefund(insertRefund: InsertRefund): Promise<Refund> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db.insert(refunds).values(insertRefund).returning();
+    return result[0];
+  }
+
+  async getRefund(id: number): Promise<Refund | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db.select().from(refunds).where(eq(refunds.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getRefundsByTransaction(transactionId: number): Promise<Refund[]> {
+    if (!this.db) throw new Error('Database not available');
+    return await this.db.select().from(refunds).where(eq(refunds.transactionId, transactionId));
+  }
+
+  async getRefundsByMerchant(merchantId: number): Promise<Refund[]> {
+    if (!this.db) throw new Error('Database not available');
+    return await this.db.select().from(refunds).where(eq(refunds.merchantId, merchantId));
+  }
+
+  async updateRefundStatus(id: number, status: string, windcaveRefundId?: string): Promise<Refund | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const updateData: any = { status };
+    if (windcaveRefundId) {
+      updateData.windcaveRefundId = windcaveRefundId;
+    }
+    if (status === "completed") {
+      updateData.completedAt = new Date();
+    }
+    
+    const result = await this.db
+      .update(refunds)
+      .set(updateData)
+      .where(eq(refunds.id, id))
+      .returning();
+    return result[0];
   }
 }
 

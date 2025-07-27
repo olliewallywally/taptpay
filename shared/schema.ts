@@ -124,16 +124,7 @@ export const platformFees = pgTable("platform_fees", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Create insert schemas for all tables
-export const insertMerchantSchema = createInsertSchema(merchants).omit({
-  id: true,
-  status: true,
-  verificationToken: true,
-  passwordHash: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
+// Add refund schemas only - keeping existing schemas intact
 export const insertRefundSchema = createInsertSchema(refunds).omit({
   id: true,
   createdAt: true,
@@ -233,16 +224,7 @@ export const insertPlatformFeeSchema = createInsertSchema(platformFees).omit({
   collectedAt: true,
 });
 
-// Type exports
-export type Merchant = typeof merchants.$inferSelect;
-export type InsertMerchant = typeof merchants.$inferInsert;
-export type CreateMerchant = z.infer<typeof createMerchantSchema>;
-export type Transaction = typeof transactions.$inferSelect;
-export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
-export type PlatformFee = typeof platformFees.$inferSelect;
-export type InsertPlatformFee = z.infer<typeof insertPlatformFeeSchema>;
-export type MerchantSettlement = typeof merchantSettlements.$inferSelect;
-
+// User schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
@@ -250,13 +232,20 @@ export const insertUserSchema = createInsertSchema(users).omit({
   resetTokenExpiry: true,
 });
 
+// Type exports - consolidated to avoid duplicates
+export type Merchant = typeof merchants.$inferSelect;
 export type InsertMerchant = z.infer<typeof insertMerchantSchema>;
 export type CreateMerchant = z.infer<typeof createMerchantSchema>;
 export type VerifyMerchant = z.infer<typeof verifyMerchantSchema>;
-export type Merchant = typeof merchants.$inferSelect;
-export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type Transaction = typeof transactions.$inferSelect;
-export type InsertPlatformFee = typeof platformFees.$inferInsert;
+export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type PlatformFee = typeof platformFees.$inferSelect;
-export type InsertUser = z.infer<typeof insertUserSchema>;
+export type InsertPlatformFee = z.infer<typeof insertPlatformFeeSchema>;
+export type MerchantSettlement = typeof merchantSettlements.$inferSelect;
 export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+
+// Refund types
+export type Refund = typeof refunds.$inferSelect;
+export type InsertRefund = z.infer<typeof insertRefundSchema>;
+export type CreateRefund = z.infer<typeof createRefundSchema>;
