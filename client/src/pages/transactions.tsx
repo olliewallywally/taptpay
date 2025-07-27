@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { 
   CreditCard, 
@@ -11,10 +11,20 @@ import {
   Download,
   Filter,
   Search,
-  Calendar
+  Calendar,
+  RotateCcw,
+  AlertTriangle
 } from "lucide-react";
 import { format } from "date-fns";
 import { Link } from "wouter";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 const getStatusIcon = (status: string) => {
   switch (status) {
@@ -48,6 +58,14 @@ export default function Transactions() {
   const merchantId = getCurrentMerchantId();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
+  const [refundAmount, setRefundAmount] = useState("");
+  const [refundReason, setRefundReason] = useState("");
+  const [refundMethod, setRefundMethod] = useState("original_payment_method");
+  const [isRefundDialogOpen, setIsRefundDialogOpen] = useState(false);
+  
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   // Redirect to login if no merchantId
   if (!merchantId) {
@@ -73,6 +91,84 @@ export default function Transactions() {
     const matchesStatus = statusFilter === "all" || transaction.status === statusFilter;
     return matchesSearch && matchesStatus;
   }) || [];
+
+  // Refund mutation
+  const refundMutation = useMutation({
+    mutationFn: async (refundData: any) => {
+      const response = await apiRequest(`/api/transactions/${selectedTransaction.id}/refunds`, "POST", refundData);
+      return response;
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Refund Processed",
+        description: `Successfully processed $${refundAmount} refund for ${selectedTransaction.itemName}`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "transactions"] });
+      handleCloseRefundDialog();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Refund Failed",
+        description: error.message || "Failed to process refund",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleRefundClick = (transaction: any) => {
+    if (transaction.status !== "completed") {
+      toast({
+        title: "Cannot Refund",
+        description: "Only completed transactions can be refunded",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setSelectedTransaction(transaction);
+    setRefundAmount(transaction.price);
+    setRefundReason("");
+    setRefundMethod("original_payment_method");
+    setIsRefundDialogOpen(true);
+  };
+
+  const handleCloseRefundDialog = () => {
+    setIsRefundDialogOpen(false);
+    setSelectedTransaction(null);
+    setRefundAmount("");
+    setRefundReason("");
+    setRefundMethod("original_payment_method");
+  };
+
+  const handleRefundSubmit = () => {
+    if (!selectedTransaction || !refundAmount || !refundReason) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const refundAmountNum = parseFloat(refundAmount);
+    const transactionAmount = parseFloat(selectedTransaction.price);
+    
+    if (refundAmountNum <= 0 || refundAmountNum > transactionAmount) {
+      toast({
+        title: "Invalid Amount",
+        description: `Refund amount must be between $0.01 and $${transactionAmount.toFixed(2)}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    refundMutation.mutate({
+      transactionId: selectedTransaction.id,
+      refundAmount,
+      refundReason,
+      refundMethod,
+    });
+  };
 
   // CSV Export Function
   const exportToCSV = () => {
@@ -252,6 +348,17 @@ export default function Transactions() {
                     <div className="text-white/40 text-xs mt-1 font-mono">
                       {transaction.windcaveTransactionId || `TXN-${transaction.id}`}
                     </div>
+                    {transaction.status === "completed" && (
+                      <Button
+                        onClick={() => handleRefundClick(transaction)}
+                        variant="outline"
+                        size="sm"
+                        className="mt-3 bg-red-500/20 border-red-400/30 text-red-300 hover:bg-red-500/30 hover:border-red-400/50 hover:text-red-200"
+                      >
+                        <RotateCcw className="h-3 w-3 mr-1" />
+                        Refund
+                      </Button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -261,21 +368,22 @@ export default function Transactions() {
                 <div className="min-w-full">
                   {/* Table Header */}
                   <div className="bg-white/5 border-b border-white/10 px-6 py-4">
-                    <div className="grid grid-cols-6 gap-4 text-white/80 font-medium text-sm">
+                    <div className="grid grid-cols-7 gap-4 text-white/80 font-medium text-sm">
                       <div>Date & Time</div>
                       <div>Item Name</div>
                       <div>Amount</div>
                       <div>Method</div>
                       <div>Status</div>
                       <div>Transaction ID</div>
+                      <div>Actions</div>
                     </div>
                   </div>
 
                   {/* Table Body */}
                   <div className="divide-y divide-white/5">
                     {filteredTransactions.map((transaction: any) => (
-                      <div key={transaction.id} className="px-6 py-4 hover:bg-white/10 hover:border-l-4 hover:border-l-blue-400 transition-all duration-300 cursor-pointer group">
-                        <div className="grid grid-cols-6 gap-4 items-center">
+                      <div key={transaction.id} className="px-6 py-4 hover:bg-white/10 hover:border-l-4 hover:border-l-blue-400 transition-all duration-300 group">
+                        <div className="grid grid-cols-7 gap-4 items-center">
                           <div className="text-white/90 text-sm">
                             {transaction.createdAt 
                               ? format(new Date(transaction.createdAt), "MMM dd, yyyy\nHH:mm:ss")
@@ -293,6 +401,19 @@ export default function Transactions() {
                           </div>
                           <div className="text-xs text-white/60 font-mono">
                             {transaction.windcaveTransactionId || `TXN-${transaction.id}`}
+                          </div>
+                          <div>
+                            {transaction.status === "completed" && (
+                              <Button
+                                onClick={() => handleRefundClick(transaction)}
+                                variant="outline"
+                                size="sm"
+                                className="bg-red-500/20 border-red-400/30 text-red-300 hover:bg-red-500/30 hover:border-red-400/50 hover:text-red-200"
+                              >
+                                <RotateCcw className="h-3 w-3 mr-1" />
+                                Refund
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -335,6 +456,131 @@ export default function Transactions() {
             </div>
           </div>
         )}
+
+        {/* Refund Dialog */}
+        <Dialog open={isRefundDialogOpen} onOpenChange={setIsRefundDialogOpen}>
+          <DialogContent className="sm:max-w-[500px] bg-black/90 backdrop-blur-xl border border-white/20 text-white">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-semibold text-white flex items-center gap-2">
+                <RotateCcw className="h-5 w-5 text-red-400" />
+                Process Refund
+              </DialogTitle>
+              <DialogDescription className="text-white/70">
+                {selectedTransaction && (
+                  <>Process a refund for <span className="font-medium text-white">{selectedTransaction.itemName}</span> (${selectedTransaction.price})</>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            
+            {selectedTransaction && (
+              <div className="space-y-4 py-4">
+                {/* Transaction Details */}
+                <div className="bg-white/5 border border-white/20 rounded-xl p-4">
+                  <h4 className="text-sm font-medium text-white/80 mb-2">Transaction Details</h4>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-white/60">Transaction ID:</span>
+                      <span className="text-white font-mono">{selectedTransaction.windcaveTransactionId || `TXN-${selectedTransaction.id}`}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-white/60">Original Amount:</span>
+                      <span className="text-white font-mono">${selectedTransaction.price}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-white/60">Payment Method:</span>
+                      <span className="text-white">{getPaymentMethodDisplay(selectedTransaction.paymentMethod)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Refund Amount */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-white/80">Refund Amount</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    max={selectedTransaction.price}
+                    value={refundAmount}
+                    onChange={(e) => setRefundAmount(e.target.value)}
+                    className="bg-white/10 border-white/20 text-white placeholder-white/60 focus:border-white/40"
+                    placeholder="Enter refund amount"
+                  />
+                  <p className="text-xs text-white/60">Maximum refund: ${selectedTransaction.price}</p>
+                </div>
+
+                {/* Refund Reason */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-white/80">Refund Reason</Label>
+                  <Textarea
+                    value={refundReason}
+                    onChange={(e) => setRefundReason(e.target.value)}
+                    className="bg-white/10 border-white/20 text-white placeholder-white/60 focus:border-white/40 min-h-[80px]"
+                    placeholder="Enter reason for refund (required)"
+                  />
+                </div>
+
+                {/* Refund Method */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-white/80">Refund Method</Label>
+                  <Select value={refundMethod} onValueChange={setRefundMethod}>
+                    <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-black/90 backdrop-blur-xl border border-white/20">
+                      <SelectItem value="original_payment_method" className="text-white focus:bg-white/10">
+                        Original Payment Method
+                      </SelectItem>
+                      <SelectItem value="bank_transfer" className="text-white focus:bg-white/10">
+                        Bank Transfer
+                      </SelectItem>
+                      <SelectItem value="store_credit" className="text-white focus:bg-white/10">
+                        Store Credit
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Warning */}
+                <div className="bg-red-500/10 border border-red-400/20 rounded-xl p-3 flex items-start gap-3">
+                  <AlertTriangle className="h-4 w-4 text-red-400 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm">
+                    <p className="text-red-300 font-medium">Refund Confirmation</p>
+                    <p className="text-red-400/80 mt-1">This action cannot be undone. The refund will be processed immediately.</p>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    onClick={handleCloseRefundDialog}
+                    variant="outline"
+                    className="flex-1 bg-white/10 border-white/20 text-white hover:bg-white/20"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleRefundSubmit}
+                    disabled={refundMutation.isPending || !refundAmount || !refundReason}
+                    className="flex-1 bg-red-500/80 border-red-400/50 text-white hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {refundMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <RotateCcw className="h-4 w-4 mr-2" />
+                        Process Refund
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
