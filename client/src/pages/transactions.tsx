@@ -459,8 +459,8 @@ export default function Transactions() {
 
         {/* Refund Dialog */}
         <Dialog open={isRefundDialogOpen} onOpenChange={setIsRefundDialogOpen}>
-          <DialogContent className="sm:max-w-[500px] bg-black/90 backdrop-blur-xl border border-white/20 text-white">
-            <DialogHeader>
+          <DialogContent className="sm:max-w-[500px] max-h-[90vh] bg-black/90 backdrop-blur-xl border border-white/20 text-white flex flex-col">
+            <DialogHeader className="flex-shrink-0">
               <DialogTitle className="text-xl font-semibold text-white flex items-center gap-2">
                 <RotateCcw className="h-5 w-5 text-red-400" />
                 Process Refund
@@ -473,85 +473,87 @@ export default function Transactions() {
             </DialogHeader>
             
             {selectedTransaction && (
-              <div className="space-y-4 py-4">
-                {/* Transaction Details */}
-                <div className="bg-white/5 border border-white/20 rounded-xl p-4">
-                  <h4 className="text-sm font-medium text-white/80 mb-2">Transaction Details</h4>
-                  <div className="space-y-1 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-white/60">Transaction ID:</span>
-                      <span className="text-white font-mono">{selectedTransaction.windcaveTransactionId || `TXN-${selectedTransaction.id}`}</span>
+              <>
+                <div className="space-y-4 py-4 overflow-y-auto flex-1 pr-2" style={{ maxHeight: 'calc(90vh - 200px)' }}>
+                  {/* Transaction Details */}
+                  <div className="bg-white/5 border border-white/20 rounded-xl p-4">
+                    <h4 className="text-sm font-medium text-white/80 mb-2">Transaction Details</h4>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-white/60">Transaction ID:</span>
+                        <span className="text-white font-mono">{selectedTransaction.windcaveTransactionId || `TXN-${selectedTransaction.id}`}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-white/60">Original Amount:</span>
+                        <span className="text-white font-mono">${selectedTransaction.price}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-white/60">Payment Method:</span>
+                        <span className="text-white">{getPaymentMethodDisplay(selectedTransaction.paymentMethod)}</span>
+                      </div>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-white/60">Original Amount:</span>
-                      <span className="text-white font-mono">${selectedTransaction.price}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-white/60">Payment Method:</span>
-                      <span className="text-white">{getPaymentMethodDisplay(selectedTransaction.paymentMethod)}</span>
+                  </div>
+
+                  {/* Refund Amount */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-white/80">Refund Amount</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      max={selectedTransaction.price}
+                      value={refundAmount}
+                      onChange={(e) => setRefundAmount(e.target.value)}
+                      className="bg-white/10 border-white/20 text-white placeholder-white/60 focus:border-white/40"
+                      placeholder="Enter refund amount"
+                    />
+                    <p className="text-xs text-white/60">Maximum refund: ${selectedTransaction.price}</p>
+                  </div>
+
+                  {/* Refund Reason */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-white/80">Refund Reason</Label>
+                    <Textarea
+                      value={refundReason}
+                      onChange={(e) => setRefundReason(e.target.value)}
+                      className="bg-white/10 border-white/20 text-white placeholder-white/60 focus:border-white/40 min-h-[80px]"
+                      placeholder="Enter reason for refund (required)"
+                    />
+                  </div>
+
+                  {/* Refund Method */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-white/80">Refund Method</Label>
+                    <Select value={refundMethod} onValueChange={setRefundMethod}>
+                      <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-black/90 backdrop-blur-xl border border-white/20">
+                        <SelectItem value="original_payment_method" className="text-white focus:bg-white/10">
+                          Original Payment Method
+                        </SelectItem>
+                        <SelectItem value="bank_transfer" className="text-white focus:bg-white/10">
+                          Bank Transfer
+                        </SelectItem>
+                        <SelectItem value="store_credit" className="text-white focus:bg-white/10">
+                          Store Credit
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Warning */}
+                  <div className="bg-red-500/10 border border-red-400/20 rounded-xl p-3 flex items-start gap-3">
+                    <AlertTriangle className="h-4 w-4 text-red-400 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm">
+                      <p className="text-red-300 font-medium">Refund Confirmation</p>
+                      <p className="text-red-400/80 mt-1">This action cannot be undone. The refund will be processed immediately.</p>
                     </div>
                   </div>
                 </div>
-
-                {/* Refund Amount */}
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium text-white/80">Refund Amount</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    max={selectedTransaction.price}
-                    value={refundAmount}
-                    onChange={(e) => setRefundAmount(e.target.value)}
-                    className="bg-white/10 border-white/20 text-white placeholder-white/60 focus:border-white/40"
-                    placeholder="Enter refund amount"
-                  />
-                  <p className="text-xs text-white/60">Maximum refund: ${selectedTransaction.price}</p>
-                </div>
-
-                {/* Refund Reason */}
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium text-white/80">Refund Reason</Label>
-                  <Textarea
-                    value={refundReason}
-                    onChange={(e) => setRefundReason(e.target.value)}
-                    className="bg-white/10 border-white/20 text-white placeholder-white/60 focus:border-white/40 min-h-[80px]"
-                    placeholder="Enter reason for refund (required)"
-                  />
-                </div>
-
-                {/* Refund Method */}
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium text-white/80">Refund Method</Label>
-                  <Select value={refundMethod} onValueChange={setRefundMethod}>
-                    <SelectTrigger className="bg-white/10 border-white/20 text-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-black/90 backdrop-blur-xl border border-white/20">
-                      <SelectItem value="original_payment_method" className="text-white focus:bg-white/10">
-                        Original Payment Method
-                      </SelectItem>
-                      <SelectItem value="bank_transfer" className="text-white focus:bg-white/10">
-                        Bank Transfer
-                      </SelectItem>
-                      <SelectItem value="store_credit" className="text-white focus:bg-white/10">
-                        Store Credit
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Warning */}
-                <div className="bg-red-500/10 border border-red-400/20 rounded-xl p-3 flex items-start gap-3">
-                  <AlertTriangle className="h-4 w-4 text-red-400 mt-0.5 flex-shrink-0" />
-                  <div className="text-sm">
-                    <p className="text-red-300 font-medium">Refund Confirmation</p>
-                    <p className="text-red-400/80 mt-1">This action cannot be undone. The refund will be processed immediately.</p>
-                  </div>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex gap-3 pt-4">
+                
+                {/* Action Buttons - Fixed at bottom */}
+                <div className="flex gap-3 pt-4 border-t border-white/20 bg-black/90 backdrop-blur-xl flex-shrink-0">
                   <Button
                     onClick={handleCloseRefundDialog}
                     variant="outline"
@@ -577,7 +579,7 @@ export default function Transactions() {
                     )}
                   </Button>
                 </div>
-              </div>
+              </>
             )}
           </DialogContent>
         </Dialog>
