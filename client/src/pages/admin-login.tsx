@@ -64,8 +64,17 @@ export default function AdminLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      <div className="flex items-center justify-center min-h-screen p-4">
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Dynamic Moving Gradient Background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-800">
+        <div className="absolute inset-0 opacity-30">
+          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-purple-900/20 via-transparent to-blue-900/20 animate-gradient-x"></div>
+          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-l from-gray-800/30 via-transparent to-gray-700/30 animate-gradient-y"></div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="relative z-10 flex items-center justify-center min-h-screen p-3 sm:p-4">
         <div className={`w-full ${isMobile ? 'max-w-sm' : 'max-w-md'}`}>
         
         {/* Mobile-optimized Back Button */}
@@ -73,7 +82,7 @@ export default function AdminLogin() {
           <Button
             variant="ghost"
             onClick={() => setLocation("/")}
-            className="text-slate-300 hover:text-white text-sm p-2"
+            className="text-white/70 hover:text-white text-sm p-2 backdrop-blur-sm bg-white/5 border border-white/10 rounded-xl"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             {!isMobile && "Back to Terminal"}
@@ -83,7 +92,7 @@ export default function AdminLogin() {
         {/* Header */}
         <div className={`text-center ${isMobile ? 'mb-8' : 'mb-12'}`}>
           <div className="flex justify-center mb-4">
-            <div className="bg-white p-3 rounded-lg shadow-lg">
+            <div className="backdrop-blur-sm bg-white/90 p-3 rounded-xl shadow-2xl border border-white/20">
               <img 
                 src={taptLogoPath} 
                 alt="Tapt" 
@@ -91,18 +100,18 @@ export default function AdminLogin() {
               />
             </div>
           </div>
-          <h1 className={`${isMobile ? 'text-xl' : 'text-2xl'} font-light text-white mb-2`}>
+          <h1 className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold text-white mb-2`}>
             Admin Portal
           </h1>
-          <p className={`text-slate-300 ${isMobile ? 'text-xs' : 'text-sm'} flex items-center justify-center gap-2`}>
-            <Shield className="w-4 h-4" />
+          <p className={`text-white/70 ${isMobile ? 'text-xs' : 'text-sm'} flex items-center justify-center gap-2`}>
+            <Shield className="w-4 h-4 text-blue-400" />
             Secure administrative access
           </p>
         </div>
 
         {/* Login Form */}
-        <Card className="bg-white/95 backdrop-blur border-0 shadow-xl">
-          <CardContent className={`${isMobile ? 'p-4' : 'p-6'}`}>
+        <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl shadow-2xl">
+          <div className={`${isMobile ? 'p-4' : 'p-6'}`}>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
@@ -110,18 +119,18 @@ export default function AdminLogin() {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium text-gray-700`}>
+                      <FormLabel className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium text-white`}>
                         Admin Email
                       </FormLabel>
                       <FormControl>
                         <Input
                           type="email"
                           placeholder="admin@tapt.co.nz"
-                          className={`w-full ${isMobile ? 'px-3 py-2 text-sm' : 'px-4 py-3'} border border-gray-200 rounded-lg focus:ring-2 focus:ring-slate-800 focus:border-transparent`}
+                          className={`w-full ${isMobile ? 'px-3 py-2 text-sm' : 'px-4 py-3'} backdrop-blur-sm bg-white/5 border border-white/15 text-white placeholder:text-white/60 focus:bg-white/8 focus:border-white/20 rounded-xl`}
                           {...field}
                         />
                       </FormControl>
-                      <FormMessage />
+                      <FormMessage className="text-red-300" />
                     </FormItem>
                   )}
                 />
@@ -131,18 +140,18 @@ export default function AdminLogin() {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium text-gray-700`}>
+                      <FormLabel className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium text-white`}>
                         Password
                       </FormLabel>
                       <FormControl>
                         <Input
                           type="password"
                           placeholder="••••••••"
-                          className={`w-full ${isMobile ? 'px-3 py-2 text-sm' : 'px-4 py-3'} border border-gray-200 rounded-lg focus:ring-2 focus:ring-slate-800 focus:border-transparent`}
+                          className={`w-full ${isMobile ? 'px-3 py-2 text-sm' : 'px-4 py-3'} backdrop-blur-sm bg-white/5 border border-white/15 text-white placeholder:text-white/60 focus:bg-white/8 focus:border-white/20 rounded-xl`}
                           {...field}
                         />
                       </FormControl>
-                      <FormMessage />
+                      <FormMessage className="text-red-300" />
                     </FormItem>
                   )}
                 />
@@ -150,14 +159,14 @@ export default function AdminLogin() {
                 <Button
                   type="submit"
                   disabled={loginMutation.isPending}
-                  className={`w-full ${isMobile ? 'py-2 px-3 text-sm' : 'py-3 px-4'} bg-slate-800 hover:bg-slate-700 text-white font-medium rounded-lg transition-colors duration-200 disabled:opacity-50`}
+                  className={`w-full ${isMobile ? 'py-2 px-3 text-sm' : 'py-3 px-4'} backdrop-blur-sm bg-gradient-to-r from-blue-500/80 via-blue-600/80 to-blue-500/80 border border-blue-400/50 text-white hover:from-blue-400/90 hover:via-blue-500/90 hover:to-blue-400/90 hover:border-blue-300/60 rounded-xl transition-all duration-300 font-medium disabled:opacity-50`}
                 >
                   {loginMutation.isPending ? "Signing in..." : (isMobile ? "Access Portal" : "Access Admin Portal")}
                 </Button>
               </form>
             </Form>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
         
       </div>
       </div>
