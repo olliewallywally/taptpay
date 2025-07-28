@@ -191,7 +191,7 @@ export default function AdminDashboard() {
         <Tabs defaultValue="overview" className="space-y-4">
           
           {/* Mobile-first tabs */}
-          <TabsList className={`grid w-full h-auto p-1 ${isMobile ? 'grid-cols-2 gap-1' : 'grid-cols-4'}`}>
+          <TabsList className={`grid w-full h-auto p-1 ${isMobile ? 'grid-cols-2 gap-1' : 'grid-cols-5'}`}>
             <TabsTrigger 
               value="overview" 
               className={`flex items-center space-x-2 p-3 ${isMobile ? 'flex-col space-y-1 space-x-0 text-xs' : 'text-sm'}`}
@@ -206,6 +206,12 @@ export default function AdminDashboard() {
               <Users className="w-4 h-4" />
               <span>Merchants</span>
             </TabsTrigger>
+            <Link href="/admin/api">
+              <Button variant="outline" size={isMobile ? "sm" : "default"} className="flex items-center space-x-2 bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100">
+                <Settings className="w-4 h-4" />
+                <span>{isMobile ? 'API' : 'API Management'}</span>
+              </Button>
+            </Link>
             <Link href="/admin/create-merchant">
               <Button variant="default" size={isMobile ? "sm" : "default"} className="flex items-center space-x-2">
                 <UserPlus className="w-4 h-4" />

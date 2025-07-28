@@ -224,6 +224,78 @@ export const insertPlatformFeeSchema = createInsertSchema(platformFees).omit({
   collectedAt: true,
 });
 
+// API Keys table for ecommerce integration
+export const apiKeys = pgTable("api_keys", {
+  id: serial("id").primaryKey(),
+  merchantId: serial("merchant_id").references(() => merchants.id),
+  keyName: text("key_name").notNull(), // User-friendly name for the key
+  apiKey: text("api_key").notNull().unique(), // The actual API key (hashed)
+  keyPrefix: text("key_prefix").notNull(), // First 8 chars for display (e.g., "tapt_live_")
+  environment: text("environment").notNull().default("sandbox"), // sandbox, live
+  status: text("status").notNull().default("active"), // active, inactive, revoked
+  permissions: text("permissions").notNull().default("create_transactions,read_transactions"), // Comma-separated permissions
+  webhookUrl: text("webhook_url"), // Optional webhook endpoint
+  webhookSecret: text("webhook_secret"), // Secret for webhook signing
+  lastUsedAt: timestamp("last_used_at"),
+  rateLimitPerHour: serial("rate_limit_per_hour").default(1000), // API rate limiting
+  createdAt: timestamp("created_at").defaultNow(),
+  expiresAt: timestamp("expires_at"), // Optional expiration
+});
+
+// API Requests tracking table
+export const apiRequests = pgTable("api_requests", {
+  id: serial("id").primaryKey(),
+  apiKeyId: serial("api_key_id").references(() => apiKeys.id),
+  merchantId: serial("merchant_id").references(() => merchants.id),
+  endpoint: text("endpoint").notNull(), // e.g., "/api/v1/transactions"
+  method: text("method").notNull(), // GET, POST, PUT, DELETE
+  statusCode: serial("status_code").notNull(), // HTTP status code
+  responseTime: serial("response_time"), // Response time in milliseconds
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  requestSize: serial("request_size"), // Request body size in bytes
+  responseSize: serial("response_size"), // Response body size in bytes
+  errorMessage: text("error_message"), // Error details if any
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Webhook Deliveries tracking
+export const webhookDeliveries = pgTable("webhook_deliveries", {
+  id: serial("id").primaryKey(),
+  apiKeyId: serial("api_key_id").references(() => apiKeys.id),
+  merchantId: serial("merchant_id").references(() => merchants.id),
+  transactionId: serial("transaction_id").references(() => transactions.id),
+  eventType: text("event_type").notNull(), // transaction.created, transaction.completed, etc.
+  webhookUrl: text("webhook_url").notNull(),
+  payload: text("payload").notNull(), // JSON payload sent
+  httpStatus: serial("http_status"), // Response HTTP status
+  responseBody: text("response_body"), // Response from merchant webhook
+  attemptCount: serial("attempt_count").default(1),
+  maxAttempts: serial("max_attempts").default(3),
+  nextRetryAt: timestamp("next_retry_at"),
+  deliveredAt: timestamp("delivered_at"),
+  failedAt: timestamp("failed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// API Key schemas
+export const createApiKeySchema = z.object({
+  keyName: z.string().min(1, "Key name is required").max(100, "Key name too long"),
+  environment: z.enum(["sandbox", "live"]).default("sandbox"),
+  permissions: z.array(z.string()).min(1, "At least one permission required"),
+  webhookUrl: z.string().url("Valid webhook URL required").optional().or(z.literal("")),
+  rateLimitPerHour: z.number().min(100).max(10000).default(1000),
+  expiresAt: z.string().optional(), // ISO date string
+});
+
+export const updateApiKeySchema = z.object({
+  keyName: z.string().min(1, "Key name is required").max(100, "Key name too long"),
+  status: z.enum(["active", "inactive", "revoked"]),
+  permissions: z.array(z.string()).min(1, "At least one permission required"),
+  webhookUrl: z.string().url("Valid webhook URL required").optional().or(z.literal("")),
+  rateLimitPerHour: z.number().min(100).max(10000),
+});
+
 // User schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,

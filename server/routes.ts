@@ -1932,6 +1932,283 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // =============================================================================
+  // ADMIN API MANAGEMENT ROUTES
+  // =============================================================================
+
+  // Get all API keys for admin
+  app.get("/api/admin/api-keys", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      // For now, return mock data since we don't have API tables yet
+      const mockApiKeys = [
+        {
+          id: 1,
+          keyName: "Shopify Store API",
+          keyPrefix: "tapt_live_12ab",
+          environment: "live",
+          status: "active",
+          permissions: ["create_transactions", "read_transactions", "webhook_events"],
+          webhookUrl: "https://mystore.shopify.com/webhooks/tapt",
+          rateLimitPerHour: 1000,
+          lastUsedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
+          createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days ago
+        },
+        {
+          id: 2,
+          keyName: "WooCommerce Integration",
+          keyPrefix: "tapt_sandbox_34cd",
+          environment: "sandbox",
+          status: "active",
+          permissions: ["create_transactions", "read_transactions"],
+          webhookUrl: "",
+          rateLimitPerHour: 500,
+          lastUsedAt: null,
+          createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 days ago
+        }
+      ];
+      
+      res.json(mockApiKeys);
+    } catch (error) {
+      console.error("Error fetching API keys:", error);
+      res.status(500).json({ message: "Failed to fetch API keys" });
+    }
+  });
+
+  // Create new API key
+  app.post("/api/admin/api-keys", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { keyName, environment, permissions, webhookUrl, rateLimitPerHour } = req.body;
+      
+      // Generate API key
+      const apiKey = await storage.createApiKey({
+        keyName,
+        environment,
+        permissions,
+        webhookUrl,
+        rateLimitPerHour,
+        merchantId: 1 // Admin creates for platform-wide use
+      });
+
+      res.json(apiKey);
+    } catch (error) {
+      console.error("Error creating API key:", error);
+      res.status(500).json({ message: "Failed to create API key" });
+    }
+  });
+
+  // Revoke API key
+  app.post("/api/admin/api-keys/:keyId/revoke", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const keyId = parseInt(req.params.keyId);
+      await storage.revokeApiKey(keyId);
+      res.json({ success: true, message: "API key revoked successfully" });
+    } catch (error) {
+      console.error("Error revoking API key:", error);
+      res.status(500).json({ message: "Failed to revoke API key" });
+    }
+  });
+
+  // Get API metrics for admin dashboard
+  app.get("/api/admin/api-metrics", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const metrics = await storage.getApiMetrics();
+      res.json(metrics);
+    } catch (error) {
+      console.error("Error fetching API metrics:", error);
+      res.status(500).json({ message: "Failed to fetch API metrics" });
+    }
+  });
+
+  // Get API usage data
+  app.get("/api/admin/api-usage", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const usageData = await storage.getApiUsageData();
+      res.json(usageData);
+    } catch (error) {
+      console.error("Error fetching API usage:", error);  
+      res.status(500).json({ message: "Failed to fetch API usage" });
+    }
+  });
+
+  // =============================================================================
+  // PUBLIC API ROUTES FOR ECOMMERCE INTEGRATION
+  // =============================================================================
+
+  // Middleware to authenticate API keys
+  const authenticateApiKey = async (req: any, res: any, next: any) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'API key required' });
+      }
+
+      const apiKey = authHeader.substring(7);
+      const keyData = await storage.getApiKeyByKey(apiKey);
+      
+      if (!keyData || keyData.status !== 'active') {
+        return res.status(401).json({ error: 'Invalid or revoked API key' });
+      }
+
+      // Update last used timestamp
+      await storage.updateApiKeyLastUsed(keyData.id);
+      
+      req.apiKey = keyData;
+      next();
+    } catch (error) {
+      res.status(401).json({ error: 'Authentication failed' });
+    }
+  };
+
+  // Create transaction via API
+  app.post("/api/v1/transactions", authenticateApiKey, async (req: any, res) => {
+    const startTime = Date.now();
+    
+    try {
+      const { amount, currency = 'NZD', item_name, customer_email, return_url, webhook_url } = req.body;
+      
+      // Validate required fields
+      if (!amount || !item_name) {
+        await storage.logApiRequest({
+          apiKeyId: req.apiKey.id,
+          merchantId: req.apiKey.merchantId,
+          endpoint: '/api/v1/transactions',
+          method: 'POST',
+          statusCode: 400,
+          responseTime: Date.now() - startTime,
+          errorMessage: 'Missing required fields'
+        });
+        return res.status(400).json({ error: 'amount and item_name are required' });
+      }
+
+      // Check permissions
+      if (!req.apiKey.permissions.includes('create_transactions')) {
+        return res.status(403).json({ error: 'Insufficient permissions' });
+      }
+
+      // Create transaction
+      const transaction = await storage.createTransaction({
+        merchantId: req.apiKey.merchantId,
+        itemName: item_name,
+        price: amount,
+        status: 'pending',
+        paymentMethod: 'api'
+      });
+
+      // Log successful API request
+      await storage.logApiRequest({
+        apiKeyId: req.apiKey.id,
+        merchantId: req.apiKey.merchantId,
+        endpoint: '/api/v1/transactions',
+        method: 'POST',
+        statusCode: 200,
+        responseTime: Date.now() - startTime
+      });
+
+      // Send webhook if configured
+      if (webhook_url || req.apiKey.webhookUrl) {
+        await storage.createWebhookDelivery({
+          apiKeyId: req.apiKey.id,
+          merchantId: req.apiKey.merchantId,
+          transactionId: transaction.id,
+          eventType: 'transaction.created',
+          webhookUrl: webhook_url || req.apiKey.webhookUrl,
+          payload: JSON.stringify({
+            event: 'transaction.created',
+            data: transaction
+          })
+        });
+      }
+
+      res.json({
+        id: transaction.id,
+        amount: transaction.price,
+        currency,
+        item_name: transaction.itemName,
+        status: transaction.status,
+        payment_url: `${req.protocol}://${req.get('host')}/pay/${req.apiKey.merchantId}?transaction=${transaction.id}`,
+        created_at: transaction.createdAt
+      });
+
+    } catch (error) {
+      console.error("API transaction creation error:", error);
+      await storage.logApiRequest({
+        apiKeyId: req.apiKey?.id,
+        merchantId: req.apiKey?.merchantId,
+        endpoint: '/api/v1/transactions',
+        method: 'POST',
+        statusCode: 500,
+        responseTime: Date.now() - startTime,
+        errorMessage: error.message
+      });
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Get transaction status via API
+  app.get("/api/v1/transactions/:id", authenticateApiKey, async (req: any, res) => {
+    const startTime = Date.now();
+    
+    try {
+      const transactionId = parseInt(req.params.id);
+      
+      // Check permissions
+      if (!req.apiKey.permissions.includes('read_transactions')) {
+        return res.status(403).json({ error: 'Insufficient permissions' });
+      }
+
+      const transaction = await storage.getTransaction(transactionId);
+      
+      if (!transaction) {
+        await storage.logApiRequest({
+          apiKeyId: req.apiKey.id,
+          merchantId: req.apiKey.merchantId,
+          endpoint: `/api/v1/transactions/${transactionId}`,
+          method: 'GET',
+          statusCode: 404,
+          responseTime: Date.now() - startTime
+        });
+        return res.status(404).json({ error: 'Transaction not found' });
+      }
+
+      // Verify access to this merchant's transactions
+      if (transaction.merchantId !== req.apiKey.merchantId) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      await storage.logApiRequest({
+        apiKeyId: req.apiKey.id,
+        merchantId: req.apiKey.merchantId,
+        endpoint: `/api/v1/transactions/${transactionId}`,
+        method: 'GET',
+        statusCode: 200,
+        responseTime: Date.now() - startTime
+      });
+
+      res.json({
+        id: transaction.id,
+        amount: transaction.price,
+        currency: 'NZD',
+        item_name: transaction.itemName,
+        status: transaction.status,
+        created_at: transaction.createdAt,
+        windcave_transaction_id: transaction.windcaveTransactionId
+      });
+
+    } catch (error) {
+      console.error("API transaction fetch error:", error);
+      await storage.logApiRequest({
+        apiKeyId: req.apiKey?.id,
+        merchantId: req.apiKey?.merchantId,
+        endpoint: `/api/v1/transactions/${req.params.id}`,
+        method: 'GET',
+        statusCode: 500,
+        responseTime: Date.now() - startTime,
+        errorMessage: error.message
+      });
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

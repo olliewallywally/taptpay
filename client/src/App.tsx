@@ -22,6 +22,7 @@ import AdminLogin from "@/pages/admin-login";
 import AdminDashboard from "@/pages/admin-dashboard";
 import AdminMerchantDetail from "@/pages/admin-merchant";
 import AdminRevenue from "@/pages/admin-revenue";
+import AdminApi from "@/pages/admin-api";
 import CreateMerchant from "@/pages/create-merchant";
 import VerifyMerchant from "@/pages/verify-merchant";
 
@@ -193,6 +194,12 @@ function Router() {
         <Route path="/admin/create-merchant">
           <AdminProtectedRoute>
             <CreateMerchant />
+          </AdminProtectedRoute>
+        </Route>
+        
+        <Route path="/admin/api">
+          <AdminProtectedRoute>
+            <AdminApi />
           </AdminProtectedRoute>
         </Route>
         
