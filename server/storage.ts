@@ -73,6 +73,25 @@ export interface IStorage {
   
   // Clear operations
   clearTransactions(merchantId: number): Promise<boolean>;
+
+  // API Key operations
+  createApiKey(data: any): Promise<any>;
+  getApiKey(id: number): Promise<any>;
+  getApiKeyByKey(apiKey: string): Promise<any>;
+  getApiKeysByMerchant(merchantId: number): Promise<any[]>;
+  updateApiKeyStatus(id: number, status: string): Promise<any>;
+  revokeApiKey(id: number): Promise<boolean>;
+  updateApiKeyLastUsed(id: number): Promise<any>;
+  
+  // API Request tracking
+  logApiRequest(data: any): Promise<any>;
+  getApiMetrics(merchantId?: number): Promise<any>;
+  getApiUsageData(merchantId?: number): Promise<any[]>;
+  
+  // Webhook delivery tracking
+  createWebhookDelivery(data: any): Promise<any>;
+  updateWebhookDelivery(id: number, data: any): Promise<any>;
+  getWebhookDeliveries(apiKeyId: number): Promise<any[]>;
   
   // Revenue analytics
   getRevenueOverTime(merchantId: number, days?: number): Promise<Array<{
@@ -758,6 +777,76 @@ export class MemStorage implements IStorage {
       this.transactions.set(id, newTransaction);
     }
   }
+
+  // API Key operations - Memory implementations
+  async createApiKey(data: any): Promise<any> {
+    const id = Date.now();
+    const apiKey = {
+      ...data,
+      id,
+      keyPrefix: `tapt_${data.environment}_`,
+      apiKey: `tapt_${data.environment}_${Math.random().toString(36).substring(2, 15)}`,
+      status: 'active',
+      createdAt: new Date().toISOString()
+    };
+    // Store in memory (would normally go to database)
+    return apiKey;
+  }
+
+  async getApiKey(id: number): Promise<any> {
+    return null; // Not implemented in memory storage
+  }
+
+  async getApiKeyByKey(apiKey: string): Promise<any> {
+    return null;
+  }
+
+  async getApiKeysByMerchant(merchantId: number): Promise<any[]> {
+    return [];
+  }
+
+  async updateApiKeyStatus(id: number, status: string): Promise<any> {
+    return null;
+  }
+
+  async revokeApiKey(id: number): Promise<boolean> {
+    return true;
+  }
+
+  async updateApiKeyLastUsed(id: number): Promise<any> {
+    return null;
+  }
+
+  async logApiRequest(data: any): Promise<any> {
+    return { ...data, id: Date.now(), createdAt: new Date() };
+  }
+
+  async getApiMetrics(merchantId?: number): Promise<any> {
+    return {
+      totalRequests: 0,
+      successfulRequests: 0,
+      failedRequests: 0,
+      averageResponseTime: 0,
+      requestsToday: 0,
+      webhookDeliveryRate: 0
+    };
+  }
+
+  async getApiUsageData(merchantId?: number): Promise<any[]> {
+    return [];
+  }
+
+  async createWebhookDelivery(data: any): Promise<any> {
+    return { ...data, id: Date.now(), createdAt: new Date() };
+  }
+
+  async updateWebhookDelivery(id: number, data: any): Promise<any> {
+    return null;
+  }
+
+  async getWebhookDeliveries(apiKeyId: number): Promise<any[]> {
+    return [];
+  }
 }
 
 // Database Storage Implementation
@@ -1285,6 +1374,67 @@ export class DatabaseStorage implements IStorage {
       .where(eq(refunds.id, id))
       .returning();
     return result[0];
+  }
+
+  // API Key operations - placeholder implementations
+  async createApiKey(data: any): Promise<any> {
+    // TODO: Implement when API tables are available
+    return { ...data, id: Date.now(), keyPrefix: 'tapt_sandbox_', status: 'active', createdAt: new Date() };
+  }
+
+  async getApiKey(id: number): Promise<any> {
+    return null;
+  }
+
+  async getApiKeyByKey(apiKey: string): Promise<any> {
+    return null;
+  }
+
+  async getApiKeysByMerchant(merchantId: number): Promise<any[]> {
+    return [];
+  }
+
+  async updateApiKeyStatus(id: number, status: string): Promise<any> {
+    return null;
+  }
+
+  async revokeApiKey(id: number): Promise<boolean> {
+    return true;
+  }
+
+  async updateApiKeyLastUsed(id: number): Promise<any> {
+    return null;
+  }
+
+  async logApiRequest(data: any): Promise<any> {
+    return { ...data, id: Date.now(), createdAt: new Date() };
+  }
+
+  async getApiMetrics(merchantId?: number): Promise<any> {
+    return {
+      totalRequests: 0,
+      successfulRequests: 0,
+      failedRequests: 0,
+      averageResponseTime: 0,
+      requestsToday: 0,
+      webhookDeliveryRate: 0
+    };
+  }
+
+  async getApiUsageData(merchantId?: number): Promise<any[]> {
+    return [];
+  }
+
+  async createWebhookDelivery(data: any): Promise<any> {
+    return { ...data, id: Date.now(), createdAt: new Date() };
+  }
+
+  async updateWebhookDelivery(id: number, data: any): Promise<any> {
+    return null;
+  }
+
+  async getWebhookDeliveries(apiKeyId: number): Promise<any[]> {
+    return [];
   }
 }
 
