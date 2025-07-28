@@ -213,40 +213,44 @@ export default function AdminDashboard() {
         <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6">
           
           {/* Mobile-first tabs with glass morphism */}
-          <div className={`grid w-full gap-2 ${isMobile ? 'grid-cols-2' : 'grid-cols-5'} backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-2`}>
-            <TabsTrigger 
-              value="overview" 
-              className={`flex items-center justify-center gap-2 px-3 py-3 text-sm font-medium rounded-xl transition-all duration-200 border data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:border-white/40 data-[state=inactive]:bg-transparent data-[state=inactive]:text-white/80 data-[state=inactive]:border-white/20 hover:bg-white/10 hover:text-white ${isMobile ? 'flex-col space-y-1 text-xs' : ''}`}
-            >
-              <Activity className="w-4 h-4" />
-              <span>Overview</span>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="merchants" 
-              className={`flex items-center justify-center gap-2 px-3 py-3 text-sm font-medium rounded-xl transition-all duration-200 border data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:border-white/40 data-[state=inactive]:bg-transparent data-[state=inactive]:text-white/80 data-[state=inactive]:border-white/20 hover:bg-white/10 hover:text-white ${isMobile ? 'flex-col space-y-1 text-xs' : ''}`}
-            >
-              <Users className="w-4 h-4" />
-              <span>Merchants</span>
-            </TabsTrigger>
-            <Link href="/admin/api" className="w-full">
-              <Button variant="outline" size={isMobile ? "sm" : "default"} className="w-full flex items-center justify-center gap-2 backdrop-blur-sm bg-blue-500/10 text-blue-300 border-blue-400/30 hover:bg-blue-500/20 hover:border-blue-300/50">
+          <div className={`grid w-full gap-2 ${isMobile ? 'grid-cols-1' : 'grid-cols-5'} backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-2`}>
+            <TabsList className={`grid w-full ${isMobile ? 'grid-cols-2' : 'grid-cols-3'} gap-2 bg-transparent`}>
+              <TabsTrigger 
+                value="overview" 
+                className={`flex items-center justify-center gap-2 px-3 py-3 text-sm font-medium rounded-xl transition-all duration-200 border data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:border-white/40 data-[state=inactive]:bg-transparent data-[state=inactive]:text-white/80 data-[state=inactive]:border-white/20 hover:bg-white/10 hover:text-white ${isMobile ? 'flex-col space-y-1 text-xs' : ''}`}
+              >
+                <Activity className="w-4 h-4" />
+                <span>Overview</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="merchants" 
+                className={`flex items-center justify-center gap-2 px-3 py-3 text-sm font-medium rounded-xl transition-all duration-200 border data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:border-white/40 data-[state=inactive]:bg-transparent data-[state=inactive]:text-white/80 data-[state=inactive]:border-white/20 hover:bg-white/10 hover:text-white ${isMobile ? 'flex-col space-y-1 text-xs' : ''}`}
+              >
+                <Users className="w-4 h-4" />
+                <span>Merchants</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="settings" 
+                className={`flex items-center justify-center gap-2 px-3 py-3 text-sm font-medium rounded-xl transition-all duration-200 border data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:border-white/40 data-[state=inactive]:bg-transparent data-[state=inactive]:text-white/80 data-[state=inactive]:border-white/20 hover:bg-white/10 hover:text-white ${isMobile ? 'flex-col space-y-1 text-xs' : ''}`}
+              >
                 <Settings className="w-4 h-4" />
-                <span>{isMobile ? 'API' : 'API Management'}</span>
-              </Button>
-            </Link>
-            <Link href="/admin/create-merchant" className="w-full">
-              <Button variant="default" size={isMobile ? "sm" : "default"} className="w-full flex items-center justify-center gap-2 backdrop-blur-sm bg-gradient-to-r from-green-500/80 via-emerald-500/80 to-green-400/80 border border-green-400/50 text-white hover:from-green-400/90 hover:via-emerald-400/90 hover:to-green-300/90 hover:border-green-300/60">
-                <UserPlus className="w-4 h-4" />
-                <span>{isMobile ? 'Add' : 'Add Merchant'}</span>
-              </Button>
-            </Link>
-            <TabsTrigger 
-              value="settings" 
-              className={`flex items-center justify-center gap-2 px-3 py-3 text-sm font-medium rounded-xl transition-all duration-200 border data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:border-white/40 data-[state=inactive]:bg-transparent data-[state=inactive]:text-white/80 data-[state=inactive]:border-white/20 hover:bg-white/10 hover:text-white ${isMobile ? 'flex-col space-y-1 text-xs' : ''}`}
-            >
-              <Settings className="w-4 h-4" />
-              <span>Settings</span>
-            </TabsTrigger>
+                <span>Settings</span>
+              </TabsTrigger>
+            </TabsList>
+            <div className={`${isMobile ? 'grid grid-cols-2 gap-2 mt-2' : 'grid grid-cols-2 gap-2'}`}>
+              <Link href="/admin/api" className="w-full">
+                <Button variant="outline" size={isMobile ? "sm" : "default"} className="w-full flex items-center justify-center gap-2 backdrop-blur-sm bg-blue-500/10 text-blue-300 border-blue-400/30 hover:bg-blue-500/20 hover:border-blue-300/50">
+                  <Settings className="w-4 h-4" />
+                  <span>{isMobile ? 'API' : 'API Management'}</span>
+                </Button>
+              </Link>
+              <Link href="/admin/create-merchant" className="w-full">
+                <Button variant="default" size={isMobile ? "sm" : "default"} className="w-full flex items-center justify-center gap-2 backdrop-blur-sm bg-gradient-to-r from-green-500/80 via-emerald-500/80 to-green-400/80 border border-green-400/50 text-white hover:from-green-400/90 hover:via-emerald-400/90 hover:to-green-300/90 hover:border-green-300/60">
+                  <UserPlus className="w-4 h-4" />
+                  <span>{isMobile ? 'Add' : 'Add Merchant'}</span>
+                </Button>
+              </Link>
+            </div>
           </div>
 
           {/* Overview Tab */}
