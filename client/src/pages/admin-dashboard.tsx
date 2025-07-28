@@ -28,7 +28,8 @@ import {
   LogOut,
   Menu,
   Clock,
-  Mail
+  Mail,
+  Shield
 } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -152,10 +153,20 @@ export default function AdminDashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="flex items-center space-x-2">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <span className="text-slate-600">Loading admin dashboard...</span>
+      <div className="min-h-screen relative overflow-hidden">
+        {/* Dynamic Moving Gradient Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-800">
+          <div className="absolute inset-0 opacity-30">
+            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-purple-900/20 via-transparent to-blue-900/20 animate-gradient-x"></div>
+            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-l from-gray-800/30 via-transparent to-gray-700/30 animate-gradient-y"></div>
+          </div>
+        </div>
+        
+        <div className="relative z-10 flex items-center justify-center min-h-screen">
+          <div className="flex items-center space-x-3 backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
+            <span className="text-white">Loading admin dashboard...</span>
+          </div>
         </div>
       </div>
     );
@@ -166,21 +177,32 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 py-4 md:py-6">
-        
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Dynamic Moving Gradient Background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-800">
+        <div className="absolute inset-0 opacity-30">
+          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-purple-900/20 via-transparent to-blue-900/20 animate-gradient-x"></div>
+          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-l from-gray-800/30 via-transparent to-gray-700/30 animate-gradient-y"></div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="relative z-10 max-w-7xl mx-auto px-3 sm:px-4 pt-6 sm:pt-8 pb-4 sm:pb-8">
         {/* Mobile-optimized Header */}
         <div className="flex flex-col space-y-4 mb-6">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl md:text-2xl font-bold text-gray-900">Admin Portal</h1>
-              <p className="text-sm text-gray-600 hidden sm:block">Manage merchants and monitor system performance</p>
+            <div className="flex items-center space-x-3">
+              <Shield className="w-6 h-6 text-blue-400" />
+              <div>
+                <h1 className="text-xl md:text-2xl font-bold text-white">Admin Portal</h1>
+                <p className="text-sm text-white/70 hidden sm:block">Manage merchants and monitor system performance</p>
+              </div>
             </div>
             <Button
               variant="outline"
               onClick={handleLogout}
               size={isMobile ? "sm" : "default"}
-              className="bg-red-50 text-red-600 border-red-200 hover:bg-red-100"
+              className="backdrop-blur-sm bg-red-500/10 text-red-300 border-red-400/30 hover:bg-red-500/20 hover:border-red-300/50"
             >
               <LogOut className="w-4 h-4" />
               {!isMobile && <span className="ml-2">Logout</span>}
@@ -188,130 +210,122 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <Tabs defaultValue="overview" className="space-y-4">
+        <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6">
           
-          {/* Mobile-first tabs */}
-          <TabsList className={`grid w-full h-auto p-1 ${isMobile ? 'grid-cols-2 gap-1' : 'grid-cols-5'}`}>
+          {/* Mobile-first tabs with glass morphism */}
+          <div className={`grid w-full gap-2 ${isMobile ? 'grid-cols-2' : 'grid-cols-5'} backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-2`}>
             <TabsTrigger 
               value="overview" 
-              className={`flex items-center space-x-2 p-3 ${isMobile ? 'flex-col space-y-1 space-x-0 text-xs' : 'text-sm'}`}
+              className={`flex items-center justify-center gap-2 px-3 py-3 text-sm font-medium rounded-xl transition-all duration-200 border data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:border-white/40 data-[state=inactive]:bg-transparent data-[state=inactive]:text-white/80 data-[state=inactive]:border-white/20 hover:bg-white/10 hover:text-white ${isMobile ? 'flex-col space-y-1 text-xs' : ''}`}
             >
               <Activity className="w-4 h-4" />
               <span>Overview</span>
             </TabsTrigger>
             <TabsTrigger 
               value="merchants" 
-              className={`flex items-center space-x-2 p-3 ${isMobile ? 'flex-col space-y-1 space-x-0 text-xs' : 'text-sm'}`}
+              className={`flex items-center justify-center gap-2 px-3 py-3 text-sm font-medium rounded-xl transition-all duration-200 border data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:border-white/40 data-[state=inactive]:bg-transparent data-[state=inactive]:text-white/80 data-[state=inactive]:border-white/20 hover:bg-white/10 hover:text-white ${isMobile ? 'flex-col space-y-1 text-xs' : ''}`}
             >
               <Users className="w-4 h-4" />
               <span>Merchants</span>
             </TabsTrigger>
-            <Link href="/admin/api">
-              <Button variant="outline" size={isMobile ? "sm" : "default"} className="flex items-center space-x-2 bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100">
+            <Link href="/admin/api" className="w-full">
+              <Button variant="outline" size={isMobile ? "sm" : "default"} className="w-full flex items-center justify-center gap-2 backdrop-blur-sm bg-blue-500/10 text-blue-300 border-blue-400/30 hover:bg-blue-500/20 hover:border-blue-300/50">
                 <Settings className="w-4 h-4" />
                 <span>{isMobile ? 'API' : 'API Management'}</span>
               </Button>
             </Link>
-            <Link href="/admin/create-merchant">
-              <Button variant="default" size={isMobile ? "sm" : "default"} className="flex items-center space-x-2">
+            <Link href="/admin/create-merchant" className="w-full">
+              <Button variant="default" size={isMobile ? "sm" : "default"} className="w-full flex items-center justify-center gap-2 backdrop-blur-sm bg-gradient-to-r from-green-500/80 via-emerald-500/80 to-green-400/80 border border-green-400/50 text-white hover:from-green-400/90 hover:via-emerald-400/90 hover:to-green-300/90 hover:border-green-300/60">
                 <UserPlus className="w-4 h-4" />
                 <span>{isMobile ? 'Add' : 'Add Merchant'}</span>
               </Button>
             </Link>
             <TabsTrigger 
               value="settings" 
-              className={`flex items-center space-x-2 p-3 ${isMobile ? 'flex-col space-y-1 space-x-0 text-xs' : 'text-sm'}`}
+              className={`flex items-center justify-center gap-2 px-3 py-3 text-sm font-medium rounded-xl transition-all duration-200 border data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:border-white/40 data-[state=inactive]:bg-transparent data-[state=inactive]:text-white/80 data-[state=inactive]:border-white/20 hover:bg-white/10 hover:text-white ${isMobile ? 'flex-col space-y-1 text-xs' : ''}`}
             >
               <Settings className="w-4 h-4" />
               <span>Settings</span>
             </TabsTrigger>
-          </TabsList>
+          </div>
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-4">
             
-            {/* Mobile-optimized Analytics Cards */}
+            {/* Mobile-optimized Analytics Cards with Glass Morphism */}
             <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-4'}`}>
-              <Card className="border-blue-200 bg-blue-50">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Merchants</CardTitle>
-                  <Building2 className="h-4 w-4 text-blue-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-blue-700">
-                    {analytics?.totalMerchants || 0}
-                  </div>
-                  <p className="text-xs text-blue-600 mt-1">
-                    {analytics?.activeMerchants || 0} active
-                  </p>
-                </CardContent>
-              </Card>
+              <div className="backdrop-blur-xl bg-blue-500/10 border border-blue-400/30 rounded-2xl p-4 sm:p-6 shadow-2xl transition-all duration-300 hover:bg-blue-500/15 hover:border-blue-300/40 hover:transform hover:translate-y-[-2px]">
+                <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <h3 className="text-sm font-medium text-blue-300">Total Merchants</h3>
+                  <Building2 className="h-4 w-4 text-blue-400" />
+                </div>
+                <div className="text-2xl font-bold text-blue-200">
+                  {analytics?.totalMerchants || 0}
+                </div>
+                <p className="text-xs text-blue-300 mt-1">
+                  {analytics?.activeMerchants || 0} active
+                </p>
+              </div>
 
-              <Card className="border-green-200 bg-green-50">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-                  <DollarSign className="h-4 w-4 text-green-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-green-700">
-                    ${analytics?.totalRevenue?.toFixed(2) || "0.00"}
-                  </div>
-                  <p className="text-xs text-green-600 mt-1">
-                    Across all merchants
-                  </p>
-                </CardContent>
-              </Card>
+              <div className="backdrop-blur-xl bg-green-500/10 border border-green-400/30 rounded-2xl p-4 sm:p-6 shadow-2xl transition-all duration-300 hover:bg-green-500/15 hover:border-green-300/40 hover:transform hover:translate-y-[-2px]">
+                <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <h3 className="text-sm font-medium text-green-300">Total Revenue</h3>
+                  <DollarSign className="h-4 w-4 text-green-400" />
+                </div>
+                <div className="text-2xl font-bold text-green-200">
+                  ${analytics?.totalRevenue?.toFixed(2) || "0.00"}
+                </div>
+                <p className="text-xs text-green-300 mt-1">
+                  Across all merchants
+                </p>
+              </div>
 
-              <Card className="border-purple-200 bg-purple-50">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Transactions</CardTitle>
-                  <CreditCard className="h-4 w-4 text-purple-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-purple-700">
-                    {analytics?.totalTransactions || 0}
-                  </div>
-                  <p className="text-xs text-purple-600 mt-1">
-                    {analytics?.completedTransactions || 0} completed
-                  </p>
-                </CardContent>
-              </Card>
+              <div className="backdrop-blur-xl bg-purple-500/10 border border-purple-400/30 rounded-2xl p-4 sm:p-6 shadow-2xl transition-all duration-300 hover:bg-purple-500/15 hover:border-purple-300/40 hover:transform hover:translate-y-[-2px]">
+                <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <h3 className="text-sm font-medium text-purple-300">Transactions</h3>
+                  <CreditCard className="h-4 w-4 text-purple-400" />
+                </div>
+                <div className="text-2xl font-bold text-purple-200">
+                  {analytics?.totalTransactions || 0}
+                </div>
+                <p className="text-xs text-purple-300 mt-1">
+                  {analytics?.completedTransactions || 0} completed
+                </p>
+              </div>
 
-              <Card className="border-orange-200 bg-orange-50">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Platform Revenue</CardTitle>
-                  <TrendingUp className="h-4 w-4 text-orange-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-orange-700">
-                    ${analytics?.transactionFeeRevenue?.toFixed(2) || "0.00"}
-                  </div>
-                  <p className="text-xs text-orange-600 mt-1">
-                    From transaction fees
-                  </p>
-                </CardContent>
-              </Card>
+              <div className="backdrop-blur-xl bg-orange-500/10 border border-orange-400/30 rounded-2xl p-4 sm:p-6 shadow-2xl transition-all duration-300 hover:bg-orange-500/15 hover:border-orange-300/40 hover:transform hover:translate-y-[-2px]">
+                <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <h3 className="text-sm font-medium text-orange-300">Platform Revenue</h3>
+                  <TrendingUp className="h-4 w-4 text-orange-400" />
+                </div>
+                <div className="text-2xl font-bold text-orange-200">
+                  ${analytics?.transactionFeeRevenue?.toFixed(2) || "0.00"}
+                </div>
+                <p className="text-xs text-orange-300 mt-1">
+                  From transaction fees
+                </p>
+              </div>
             </div>
 
-            {/* Recent Merchants - Mobile optimized */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Recent Merchants</CardTitle>
-                <CardDescription>Latest merchant account activity</CardDescription>
-              </CardHeader>
-              <CardContent>
+            {/* Recent Merchants - Mobile optimized with Glass Morphism */}
+            <div className="backdrop-blur-xl bg-white/3 border border-white/8 rounded-2xl p-4 sm:p-6 shadow-2xl transition-all duration-300 hover:bg-white/6 hover:border-white/15">
+              <div className="mb-4 sm:mb-6">
+                <h2 className="text-lg font-bold text-white mb-1 sm:mb-2">Recent Merchants</h2>
+                <p className="text-sm text-white/70">Latest merchant account activity</p>
+              </div>
+              <div>
                 {isMobile ? (
                   // Mobile: Card-based layout
                   <div className="space-y-3">
                     {analytics?.recentMerchants?.slice(0, 5).map((merchant) => (
-                      <div key={merchant.id} className="p-4 border rounded-lg bg-gray-50">
+                      <div key={merchant.id} className="backdrop-blur-sm bg-white/5 border border-white/15 rounded-xl p-4 transition-all duration-300 hover:bg-white/8 hover:border-white/20">
                         <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-medium text-gray-900">{merchant.businessName}</h4>
-                          <Badge variant={merchant.status === 'active' ? 'default' : 'secondary'}>
+                          <h4 className="font-medium text-white">{merchant.businessName}</h4>
+                          <Badge variant={merchant.status === 'active' ? 'default' : 'secondary'} className="backdrop-blur-sm bg-white/10 text-white border-white/20">
                             {merchant.status}
                           </Badge>
                         </div>
-                        <div className="text-sm text-gray-600 space-y-1">
+                        <div className="text-sm text-white/70 space-y-1">
                           <p>ID: {merchant.name}</p>
                           <p>Transactions: {merchant.totalTransactions}</p>
                           <p>Revenue: ${merchant.totalRevenue.toFixed(2)}</p>
@@ -320,7 +334,7 @@ export default function AdminDashboard() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleViewMerchant(merchant.id)}
-                          className="w-full mt-3"
+                          className="w-full mt-3 backdrop-blur-sm bg-white/5 text-white/80 border-white/20 hover:bg-white/10 hover:text-white hover:border-white/30"
                         >
                           <Eye className="w-4 h-4 mr-2" />
                           View Details
@@ -329,94 +343,93 @@ export default function AdminDashboard() {
                     ))}
                   </div>
                 ) : (
-                  // Desktop: Table layout
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Business Name</TableHead>
-                          <TableHead>Merchant ID</TableHead>
-                          <TableHead>Transactions</TableHead>
-                          <TableHead>Revenue</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
+                  // Desktop: Table layout with glass morphism
+                  <div className="overflow-x-auto backdrop-blur-sm bg-white/5 border border-white/10 rounded-xl">
+                    <table className="w-full">
+                      <thead className="border-b border-white/10">
+                        <tr>
+                          <th className="text-left p-3 text-sm font-medium text-white/80">Business Name</th>
+                          <th className="text-left p-3 text-sm font-medium text-white/80">Merchant ID</th>
+                          <th className="text-left p-3 text-sm font-medium text-white/80">Transactions</th>
+                          <th className="text-left p-3 text-sm font-medium text-white/80">Revenue</th>
+                          <th className="text-left p-3 text-sm font-medium text-white/80">Status</th>
+                          <th className="text-left p-3 text-sm font-medium text-white/80">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
                         {analytics?.recentMerchants?.map((merchant) => (
-                          <TableRow key={merchant.id}>
-                            <TableCell className="font-medium">{merchant.businessName}</TableCell>
-                            <TableCell className="font-mono text-sm">{merchant.name}</TableCell>
-                            <TableCell>{merchant.totalTransactions}</TableCell>
-                            <TableCell>${merchant.totalRevenue.toFixed(2)}</TableCell>
-                            <TableCell>
-                              <Badge variant={merchant.status === 'active' ? 'default' : 'secondary'}>
+                          <tr key={merchant.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                            <td className="p-3 font-medium text-white">{merchant.businessName}</td>
+                            <td className="p-3 font-mono text-sm text-white/70">{merchant.name}</td>
+                            <td className="p-3 text-white/70">{merchant.totalTransactions}</td>
+                            <td className="p-3 text-white/70">${merchant.totalRevenue.toFixed(2)}</td>
+                            <td className="p-3">
+                              <Badge variant={merchant.status === 'active' ? 'default' : 'secondary'} className="backdrop-blur-sm bg-white/10 text-white border-white/20">
                                 {merchant.status}
                               </Badge>
-                            </TableCell>
-                            <TableCell>
+                            </td>
+                            <td className="p-3">
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleViewMerchant(merchant.id)}
+                                className="backdrop-blur-sm bg-white/5 text-white/80 border-white/20 hover:bg-white/10 hover:text-white hover:border-white/30"
                               >
                                 <Eye className="w-4 h-4 mr-2" />
                                 View
                               </Button>
-                            </TableCell>
-                          </TableRow>
+                            </td>
+                          </tr>
                         ))}
-                      </TableBody>
-                    </Table>
+                      </tbody>
+                    </table>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
-            {/* System Performance Metrics */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">System Performance</CardTitle>
-                <CardDescription>Real-time system metrics and health indicators</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-3'}`}>
-                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-blue-700">Success Rate</p>
-                        <p className="text-2xl font-bold text-blue-800">
-                          {analytics?.completedTransactions && analytics?.totalTransactions 
-                            ? Math.round((analytics.completedTransactions / analytics.totalTransactions) * 100)
-                            : 0}%
-                        </p>
-                      </div>
-                      <CheckCircle className="h-8 w-8 text-blue-600" />
+            {/* System Performance Metrics with Glass Morphism */}
+            <div className="backdrop-blur-xl bg-white/3 border border-white/8 rounded-2xl p-4 sm:p-6 shadow-2xl transition-all duration-300 hover:bg-white/6 hover:border-white/15">
+              <div className="mb-4 sm:mb-6">
+                <h2 className="text-lg font-bold text-white mb-1 sm:mb-2">System Performance</h2>
+                <p className="text-sm text-white/70">Real-time system metrics and health indicators</p>
+              </div>
+              <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-3'}`}>
+                <div className="backdrop-blur-sm bg-blue-500/10 border border-blue-400/30 rounded-xl p-4 transition-all duration-300 hover:bg-blue-500/15">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-blue-300">Success Rate</p>
+                      <p className="text-2xl font-bold text-blue-200">
+                        {analytics?.completedTransactions && analytics?.totalTransactions 
+                          ? Math.round((analytics.completedTransactions / analytics.totalTransactions) * 100)
+                          : 0}%
+                      </p>
                     </div>
-                  </div>
-                  
-                  <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-green-700">Platform Uptime</p>
-                        <p className="text-2xl font-bold text-green-800">99.9%</p>
-                      </div>
-                      <Activity className="h-8 w-8 text-green-600" />
-                    </div>
-                  </div>
-                  
-                  <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-purple-700">Avg Response</p>
-                        <p className="text-2xl font-bold text-purple-800">1.2s</p>
-                      </div>
-                      <TrendingUp className="h-8 w-8 text-purple-600" />
-                    </div>
+                    <CheckCircle className="h-8 w-8 text-blue-400" />
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+                
+                <div className="backdrop-blur-sm bg-green-500/10 border border-green-400/30 rounded-xl p-4 transition-all duration-300 hover:bg-green-500/15">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-green-300">Platform Uptime</p>
+                      <p className="text-2xl font-bold text-green-200">99.9%</p>
+                    </div>
+                    <Activity className="h-8 w-8 text-green-400" />
+                  </div>
+                </div>
+                
+                <div className="backdrop-blur-sm bg-purple-500/10 border border-purple-400/30 rounded-xl p-4 transition-all duration-300 hover:bg-purple-500/15">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-purple-300">Avg Response</p>
+                      <p className="text-2xl font-bold text-purple-200">1.2s</p>
+                    </div>
+                    <TrendingUp className="h-8 w-8 text-purple-400" />
+                  </div>
+                </div>
+              </div>
+            </div>
 
             {/* Transaction Analytics */}
             <Card>
