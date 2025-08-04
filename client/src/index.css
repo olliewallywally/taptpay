@@ -662,3 +662,56 @@
   background-size: 200px 100%;
   animation: shimmer 2s infinite;
 }
+
+/* iPhone 12 and Mobile Specific Optimizations */
+@media (max-width: 768px) {
+  /* Prevent horizontal scrolling */
+  body {
+    overflow-x: hidden;
+  }
+  
+  /* Ensure all content stays within viewport */
+  * {
+    max-width: 100vw;
+    box-sizing: border-box;
+  }
+  
+  /* Improve text rendering on mobile */
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-size-adjust: 100%;
+  }
+  
+  /* Prevent zoom on input focus (iOS Safari) */
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* iPhone 12 specific optimizations */
+@media (max-width: 390px) {
+  /* Extra tight spacing for small screens */
+  .space-y-4 > * + * {
+    margin-top: 0.75rem !important;
+  }
+  
+  .space-y-6 > * + * {
+    margin-top: 1rem !important;
+  }
+  
+  /* Smaller padding for very small screens */
+  .p-4 {
+    padding: 0.75rem !important;
+  }
+  
+  .px-4 {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+  
+  .py-4 {
+    padding-top: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
+  }
+}
