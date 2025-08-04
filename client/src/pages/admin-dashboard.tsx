@@ -128,8 +128,8 @@ const ProgressRing = ({ percentage, size = 120, strokeWidth = 8 }: {
         />
         <defs>
           <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#3B82F6" />
-            <stop offset="100%" stopColor="#06B6D4" />
+            <stop offset="0%" stopColor="#10B981" />
+            <stop offset="100%" stopColor="#22C55E" />
           </linearGradient>
         </defs>
       </svg>
@@ -179,9 +179,9 @@ const generateChartData = (analytics: AdminAnalytics | undefined) => {
 
   // Payment method distribution
   const paymentMethods = [
-    { name: 'QR Code', value: Math.floor((analytics?.totalTransactions || 0) * 0.6), color: '#3B82F6' },
-    { name: 'NFC Tap', value: Math.floor((analytics?.totalTransactions || 0) * 0.3), color: '#8B5CF6' },
-    { name: 'Manual', value: Math.floor((analytics?.totalTransactions || 0) * 0.1), color: '#06B6D4' },
+    { name: 'QR Code', value: Math.floor((analytics?.totalTransactions || 0) * 0.6), color: '#10B981' },
+    { name: 'NFC Tap', value: Math.floor((analytics?.totalTransactions || 0) * 0.3), color: '#22C55E' },
+    { name: 'Manual', value: Math.floor((analytics?.totalTransactions || 0) * 0.1), color: '#16A34A' },
   ];
 
   return { revenueTrend, statusData, paymentMethods };
@@ -221,18 +221,18 @@ export default function AdminDashboard() {
   if (isLoading) {
     return (
       <div className="min-h-screen relative overflow-hidden">
-        {/* Liquid Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+        {/* Liquid Background - Matching Merchant Site */}
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-800">
           <div className="absolute inset-0">
-            <div className="absolute top-0 left-0 w-96 h-96 bg-blue-500/30 rounded-full blur-3xl animate-pulse"></div>
-            <div className="absolute top-0 right-0 w-96 h-96 bg-purple-500/30 rounded-full blur-3xl animate-pulse animation-delay-700"></div>
-            <div className="absolute bottom-0 left-1/2 w-96 h-96 bg-cyan-500/30 rounded-full blur-3xl animate-pulse animation-delay-1000"></div>
+            <div className="absolute top-0 left-0 w-96 h-96 bg-gray-500/20 rounded-full blur-3xl animate-pulse"></div>
+            <div className="absolute top-0 right-0 w-96 h-96 bg-gray-600/20 rounded-full blur-3xl animate-pulse animation-delay-700"></div>
+            <div className="absolute bottom-0 left-1/2 w-96 h-96 bg-gray-400/20 rounded-full blur-3xl animate-pulse animation-delay-1000"></div>
           </div>
         </div>
         
         <div className="relative z-10 flex items-center justify-center min-h-screen">
           <div className="flex items-center space-x-4 backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-3xl p-8 shadow-2xl">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
+            <Loader2 className="h-8 w-8 animate-spin text-green-400" />
             <span className="text-white text-lg">Loading admin portal...</span>
           </div>
         </div>
@@ -246,176 +246,181 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen relative overflow-hidden">
-      {/* Liquid Glass Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      {/* Liquid Glass Background - Matching Merchant Site */}
+      <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-800">
         <div className="absolute inset-0">
-          <div className="absolute top-0 left-0 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute top-0 right-0 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse animation-delay-700"></div>
-          <div className="absolute bottom-0 left-1/2 w-96 h-96 bg-cyan-500/20 rounded-full blur-3xl animate-pulse animation-delay-1000"></div>
-          <div className="absolute bottom-0 right-0 w-64 h-64 bg-pink-500/20 rounded-full blur-3xl animate-pulse animation-delay-500"></div>
+          <div className="absolute top-0 left-0 w-96 h-96 bg-gray-500/15 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute top-0 right-0 w-96 h-96 bg-gray-600/15 rounded-full blur-3xl animate-pulse animation-delay-700"></div>
+          <div className="absolute bottom-0 left-1/2 w-96 h-96 bg-gray-400/15 rounded-full blur-3xl animate-pulse animation-delay-1000"></div>
+          <div className="absolute bottom-0 right-0 w-64 h-64 bg-gray-500/10 rounded-full blur-3xl animate-pulse animation-delay-500"></div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="relative z-10 max-w-7xl mx-auto px-6 pt-8 pb-12">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8 pb-8 sm:pb-12">
         
-        {/* Header */}
-        <div className="flex items-center justify-between mb-12">
-          <div className="flex items-center space-x-4">
-            <div className="p-3 backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-2xl">
-              <Shield className="w-8 h-8 text-blue-400" />
+        {/* Mobile-Optimized Header */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 sm:mb-12 space-y-4 sm:space-y-0">
+          <div className="flex items-center space-x-3 sm:space-x-4">
+            <div className="p-2 sm:p-3 backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-xl sm:rounded-2xl">
+              <Shield className="w-6 h-6 sm:w-8 sm:h-8 text-green-400" />
             </div>
             <div>
-              <h1 className="text-3xl font-light text-white">Admin Portal</h1>
-              <p className="text-white/60 mt-1">Monitor and manage your platform</p>
+              <h1 className="text-2xl sm:text-3xl font-light text-white">Admin Portal</h1>
+              <p className="text-white/60 mt-1 text-sm sm:text-base">Monitor and manage your platform</p>
             </div>
           </div>
           <Button
             variant="outline"
             onClick={handleLogout}
-            className="backdrop-blur-2xl bg-white/[0.02] text-white/80 border-white/10 hover:bg-white/[0.05] hover:border-white/20 rounded-2xl px-6 py-3 transition-all duration-300"
+            size={isMobile ? "sm" : "default"}
+            className="backdrop-blur-2xl bg-white/[0.02] text-white/80 border-white/10 hover:bg-white/[0.05] hover:border-white/20 rounded-xl sm:rounded-2xl px-4 sm:px-6 py-2 sm:py-3 transition-all duration-300 w-full sm:w-auto"
           >
             <LogOut className="w-4 h-4 mr-2" />
             Logout
           </Button>
         </div>
 
-        <Tabs defaultValue="overview" className="space-y-8">
+        <Tabs defaultValue="overview" className="space-y-6 sm:space-y-8">
           
-          {/* Navigation Tabs */}
-          <div className="flex items-center justify-between">
-            <TabsList className="backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-2xl p-2">
-              <TabsTrigger 
-                value="overview" 
-                className="data-[state=active]:bg-white data-[state=active]:text-black data-[state=inactive]:text-white/70 px-6 py-3 rounded-xl transition-all duration-300 hover:text-white"
-              >
-                <BarChart3 className="w-4 h-4 mr-2" />
-                Overview
-              </TabsTrigger>
-              <TabsTrigger 
-                value="merchants" 
-                className="data-[state=active]:bg-white data-[state=active]:text-black data-[state=inactive]:text-white/70 px-6 py-3 rounded-xl transition-all duration-300 hover:text-white"
-              >
-                <Users className="w-4 h-4 mr-2" />
-                Merchants
-              </TabsTrigger>
-              <TabsTrigger 
-                value="analytics" 
-                className="data-[state=active]:bg-white data-[state=active]:text-black data-[state=inactive]:text-white/70 px-6 py-3 rounded-xl transition-all duration-300 hover:text-white"
-              >
-                <PieChart className="w-4 h-4 mr-2" />
-                Analytics
-              </TabsTrigger>
+          {/* Mobile-First Navigation */}
+          <div className={`flex ${isMobile ? 'flex-col space-y-4' : 'items-center justify-between'}`}>
+            <TabsList className={`backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-2xl p-2 ${isMobile ? 'w-full' : ''}`}>
+              <div className={`grid ${isMobile ? 'grid-cols-1 gap-2' : 'grid-cols-3 gap-1'} w-full`}>
+                <TabsTrigger 
+                  value="overview" 
+                  className={`data-[state=active]:bg-white data-[state=active]:text-black data-[state=inactive]:text-white/70 transition-all duration-300 hover:text-white rounded-xl ${isMobile ? 'px-4 py-3 text-sm' : 'px-6 py-3'}`}
+                >
+                  <BarChart3 className="w-4 h-4 mr-2" />
+                  Overview
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="merchants" 
+                  className={`data-[state=active]:bg-white data-[state=active]:text-black data-[state=inactive]:text-white/70 transition-all duration-300 hover:text-white rounded-xl ${isMobile ? 'px-4 py-3 text-sm' : 'px-6 py-3'}`}
+                >
+                  <Users className="w-4 h-4 mr-2" />
+                  Merchants
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="analytics" 
+                  className={`data-[state=active]:bg-white data-[state=active]:text-black data-[state=inactive]:text-white/70 transition-all duration-300 hover:text-white rounded-xl ${isMobile ? 'px-4 py-3 text-sm' : 'px-6 py-3'}`}
+                >
+                  <PieChartIcon className="w-4 h-4 mr-2" />
+                  Analytics
+                </TabsTrigger>
+              </div>
             </TabsList>
 
-            <div className="flex space-x-3">
-              <Link href="/admin/api">
+            <div className={`flex ${isMobile ? 'flex-col space-y-3' : 'space-x-3'}`}>
+              <Link href="/admin/api" className={isMobile ? 'w-full' : ''}>
                 <Button 
                   variant="outline" 
-                  className="backdrop-blur-2xl bg-blue-500/10 text-blue-300 border-blue-400/30 hover:bg-blue-500/20 hover:border-blue-300/50 rounded-2xl px-6 py-3 transition-all duration-300"
+                  size={isMobile ? "sm" : "default"}
+                  className={`backdrop-blur-2xl bg-green-500/10 text-green-300 border-green-400/30 hover:bg-green-500/20 hover:border-green-300/50 rounded-xl transition-all duration-300 ${isMobile ? 'w-full px-4 py-2 text-sm' : 'px-6 py-3'}`}
                 >
                   <Settings className="w-4 h-4 mr-2" />
-                  API
+                  {isMobile ? 'API Management' : 'API'}
                 </Button>
               </Link>
-              <Link href="/admin/create-merchant">
+              <Link href="/admin/create-merchant" className={isMobile ? 'w-full' : ''}>
                 <Button 
-                  className="backdrop-blur-2xl bg-gradient-to-r from-emerald-500/80 to-cyan-500/80 hover:from-emerald-400/90 hover:to-cyan-400/90 text-white border-0 rounded-2xl px-6 py-3 transition-all duration-300 shadow-lg hover:shadow-xl"
+                  size={isMobile ? "sm" : "default"}
+                  className={`backdrop-blur-2xl bg-gradient-to-r from-green-600/80 to-emerald-600/80 hover:from-green-500/90 hover:to-emerald-500/90 text-white border-0 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl ${isMobile ? 'w-full px-4 py-2 text-sm' : 'px-6 py-3'}`}
                 >
                   <UserPlus className="w-4 h-4 mr-2" />
-                  Add Merchant
+                  {isMobile ? 'Add New Merchant' : 'Add Merchant'}
                 </Button>
               </Link>
             </div>
           </div>
 
           {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-8">
+          <TabsContent value="overview" className="space-y-6 sm:space-y-8">
             
-            {/* Key Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Key Metrics - Mobile Optimized */}
+            <div className={`grid gap-4 sm:gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-4'}`}>
               
               {/* Total Merchants */}
-              <div className="group backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-3xl p-6 hover:bg-white/[0.05] hover:border-white/20 transition-all duration-500 hover:scale-105 hover:shadow-2xl">
-                <div className="flex items-center justify-between mb-4">
-                  <Building2 className="w-8 h-8 text-blue-400 group-hover:scale-110 transition-transform duration-300" />
+              <div className="group backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-2xl sm:rounded-3xl p-4 sm:p-6 hover:bg-white/[0.05] hover:border-white/20 transition-all duration-500 hover:scale-105 hover:shadow-2xl">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <Building2 className="w-6 h-6 sm:w-8 sm:h-8 text-green-400 group-hover:scale-110 transition-transform duration-300" />
                   <div className="text-right">
-                    <p className="text-white/60 text-sm">Total</p>
-                    <p className="text-white/60 text-sm">Merchants</p>
+                    <p className="text-white/60 text-xs sm:text-sm">Total</p>
+                    <p className="text-white/60 text-xs sm:text-sm">Merchants</p>
                   </div>
                 </div>
-                <div className="text-4xl font-light text-white mb-2">
+                <div className="text-2xl sm:text-4xl font-light text-white mb-2">
                   <AnimatedCounter value={analytics?.totalMerchants || 0} />
                 </div>
-                <div className="flex items-center text-green-400 text-sm">
-                  <ArrowUpRight className="w-4 h-4 mr-1" />
+                <div className="flex items-center text-green-400 text-xs sm:text-sm">
+                  <ArrowUpRight className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
                   <span>{analytics?.activeMerchants || 0} active</span>
                 </div>
               </div>
 
               {/* Total Revenue */}
-              <div className="group backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-3xl p-6 hover:bg-white/[0.05] hover:border-white/20 transition-all duration-500 hover:scale-105 hover:shadow-2xl">
-                <div className="flex items-center justify-between mb-4">
-                  <DollarSign className="w-8 h-8 text-emerald-400 group-hover:scale-110 transition-transform duration-300" />
+              <div className="group backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-2xl sm:rounded-3xl p-4 sm:p-6 hover:bg-white/[0.05] hover:border-white/20 transition-all duration-500 hover:scale-105 hover:shadow-2xl">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <DollarSign className="w-6 h-6 sm:w-8 sm:h-8 text-green-400 group-hover:scale-110 transition-transform duration-300" />
                   <div className="text-right">
-                    <p className="text-white/60 text-sm">Total</p>
-                    <p className="text-white/60 text-sm">Revenue</p>
+                    <p className="text-white/60 text-xs sm:text-sm">Total</p>
+                    <p className="text-white/60 text-xs sm:text-sm">Revenue</p>
                   </div>
                 </div>
-                <div className="text-4xl font-light text-white mb-2">
+                <div className="text-2xl sm:text-4xl font-light text-white mb-2">
                   $<AnimatedCounter value={analytics?.totalRevenue || 0} />
                 </div>
-                <div className="flex items-center text-emerald-400 text-sm">
-                  <ArrowUpRight className="w-4 h-4 mr-1" />
+                <div className="flex items-center text-green-400 text-xs sm:text-sm">
+                  <ArrowUpRight className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
                   <span>All merchants</span>
                 </div>
               </div>
 
               {/* Transactions */}
-              <div className="group backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-3xl p-6 hover:bg-white/[0.05] hover:border-white/20 transition-all duration-500 hover:scale-105 hover:shadow-2xl">
-                <div className="flex items-center justify-between mb-4">
-                  <CreditCard className="w-8 h-8 text-purple-400 group-hover:scale-110 transition-transform duration-300" />
+              <div className="group backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-2xl sm:rounded-3xl p-4 sm:p-6 hover:bg-white/[0.05] hover:border-white/20 transition-all duration-500 hover:scale-105 hover:shadow-2xl">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <CreditCard className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400 group-hover:scale-110 transition-transform duration-300" />
                   <div className="text-right">
-                    <p className="text-white/60 text-sm">Total</p>
-                    <p className="text-white/60 text-sm">Transactions</p>
+                    <p className="text-white/60 text-xs sm:text-sm">Total</p>
+                    <p className="text-white/60 text-xs sm:text-sm">Transactions</p>
                   </div>
                 </div>
-                <div className="text-4xl font-light text-white mb-2">
+                <div className="text-2xl sm:text-4xl font-light text-white mb-2">
                   <AnimatedCounter value={analytics?.totalTransactions || 0} />
                 </div>
-                <div className="flex items-center text-purple-400 text-sm">
-                  <CheckCircle className="w-4 h-4 mr-1" />
+                <div className="flex items-center text-gray-400 text-xs sm:text-sm">
+                  <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
                   <span>{analytics?.completedTransactions || 0} completed</span>
                 </div>
               </div>
 
               {/* Platform Revenue */}
-              <div className="group backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-3xl p-6 hover:bg-white/[0.05] hover:border-white/20 transition-all duration-500 hover:scale-105 hover:shadow-2xl">
-                <div className="flex items-center justify-between mb-4">
-                  <TrendingUp className="w-8 h-8 text-cyan-400 group-hover:scale-110 transition-transform duration-300" />
+              <div className="group backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-2xl sm:rounded-3xl p-4 sm:p-6 hover:bg-white/[0.05] hover:border-white/20 transition-all duration-500 hover:scale-105 hover:shadow-2xl">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <TrendingUp className="w-6 h-6 sm:w-8 sm:h-8 text-green-400 group-hover:scale-110 transition-transform duration-300" />
                   <div className="text-right">
-                    <p className="text-white/60 text-sm">Platform</p>
-                    <p className="text-white/60 text-sm">Revenue</p>
+                    <p className="text-white/60 text-xs sm:text-sm">Platform</p>
+                    <p className="text-white/60 text-xs sm:text-sm">Revenue</p>
                   </div>
                 </div>
-                <div className="text-4xl font-light text-white mb-2">
+                <div className="text-2xl sm:text-4xl font-light text-white mb-2">
                   $<AnimatedCounter value={analytics?.transactionFeeRevenue || 0} />
                 </div>
-                <div className="flex items-center text-cyan-400 text-sm">
-                  <ArrowUpRight className="w-4 h-4 mr-1" />
+                <div className="flex items-center text-green-400 text-xs sm:text-sm">
+                  <ArrowUpRight className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
                   <span>Transaction fees</span>
                 </div>
               </div>
             </div>
 
             {/* Performance Dashboard */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className={`grid gap-6 sm:gap-8 ${isMobile ? 'grid-cols-1' : 'lg:grid-cols-2'}`}>
               
               {/* Success Rate Circle */}
-              <div className="backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-3xl p-8 hover:bg-white/[0.05] hover:border-white/20 transition-all duration-500">
-                <h3 className="text-xl font-light text-white mb-6">Transaction Success Rate</h3>
+              <div className="backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-2xl sm:rounded-3xl p-6 sm:p-8 hover:bg-white/[0.05] hover:border-white/20 transition-all duration-500">
+                <h3 className="text-lg sm:text-xl font-light text-white mb-6">Transaction Success Rate</h3>
                 <div className="flex items-center justify-center">
-                  <ProgressRing percentage={successRate} />
+                  <ProgressRing percentage={successRate} size={isMobile ? 100 : 120} />
                 </div>
                 <div className="text-center mt-6">
                   <p className="text-white/60 text-sm">
@@ -425,8 +430,8 @@ export default function AdminDashboard() {
               </div>
 
               {/* System Health */}
-              <div className="backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-3xl p-8 hover:bg-white/[0.05] hover:border-white/20 transition-all duration-500">
-                <h3 className="text-xl font-light text-white mb-6">System Health</h3>
+              <div className="backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-2xl sm:rounded-3xl p-6 sm:p-8 hover:bg-white/[0.05] hover:border-white/20 transition-all duration-500">
+                <h3 className="text-lg sm:text-xl font-light text-white mb-6">System Health</h3>
                 <div className="space-y-6">
                   
                   {/* Uptime */}
@@ -441,7 +446,7 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-2xl font-light text-white">99.9%</p>
+                      <p className="text-xl sm:text-2xl font-light text-white">99.9%</p>
                       <div className="flex items-center text-green-400 text-sm">
                         <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
                         Online
@@ -452,8 +457,8 @@ export default function AdminDashboard() {
                   {/* Response Time */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                      <div className="p-2 bg-blue-500/20 rounded-xl">
-                        <Zap className="w-5 h-5 text-blue-400" />
+                      <div className="p-2 bg-green-500/20 rounded-xl">
+                        <Zap className="w-5 h-5 text-green-400" />
                       </div>
                       <div>
                         <p className="text-white font-medium">Avg Response Time</p>
@@ -461,8 +466,8 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-2xl font-light text-white">1.2s</p>
-                      <div className="flex items-center text-blue-400 text-sm">
+                      <p className="text-xl sm:text-2xl font-light text-white">1.2s</p>
+                      <div className="flex items-center text-green-400 text-sm">
                         <ArrowDownRight className="w-4 h-4 mr-1" />
                         Fast
                       </div>
@@ -472,8 +477,8 @@ export default function AdminDashboard() {
                   {/* Active Sessions */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                      <div className="p-2 bg-purple-500/20 rounded-xl">
-                        <Clock className="w-5 h-5 text-purple-400" />
+                      <div className="p-2 bg-gray-500/20 rounded-xl">
+                        <Clock className="w-5 h-5 text-gray-400" />
                       </div>
                       <div>
                         <p className="text-white font-medium">Active Sessions</p>
@@ -481,9 +486,9 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-2xl font-light text-white">{analytics?.activeMerchants || 0}</p>
-                      <div className="flex items-center text-purple-400 text-sm">
-                        <div className="w-2 h-2 bg-purple-400 rounded-full mr-2 animate-pulse"></div>
+                      <p className="text-xl sm:text-2xl font-light text-white">{analytics?.activeMerchants || 0}</p>
+                      <div className="flex items-center text-gray-400 text-sm">
+                        <div className="w-2 h-2 bg-gray-400 rounded-full mr-2 animate-pulse"></div>
                         Live
                       </div>
                     </div>
@@ -493,10 +498,10 @@ export default function AdminDashboard() {
             </div>
 
             {/* Recent Merchants */}
-            <div className="backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-3xl p-8 hover:bg-white/[0.05] hover:border-white/20 transition-all duration-500">
-              <div className="flex items-center justify-between mb-8">
+            <div className="backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-2xl sm:rounded-3xl p-6 sm:p-8 hover:bg-white/[0.05] hover:border-white/20 transition-all duration-500">
+              <div className="flex items-center justify-between mb-6 sm:mb-8">
                 <div>
-                  <h3 className="text-xl font-light text-white">Recent Merchants</h3>
+                  <h3 className="text-lg sm:text-xl font-light text-white">Recent Merchants</h3>
                   <p className="text-white/60 text-sm mt-1">Latest merchant activity</p>
                 </div>
                 <Button 
@@ -508,11 +513,11 @@ export default function AdminDashboard() {
                 </Button>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {analytics?.recentMerchants?.slice(0, 6).map((merchant) => (
+              <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'md:grid-cols-2 lg:grid-cols-3'}`}>
+                {analytics?.recentMerchants?.slice(0, isMobile ? 3 : 6).map((merchant) => (
                   <div 
                     key={merchant.id} 
-                    className="group backdrop-blur-xl bg-white/[0.02] border border-white/10 rounded-2xl p-6 hover:bg-white/[0.05] hover:border-white/20 transition-all duration-300 hover:scale-105 cursor-pointer"
+                    className="group backdrop-blur-xl bg-white/[0.02] border border-white/10 rounded-xl sm:rounded-2xl p-4 sm:p-6 hover:bg-white/[0.05] hover:border-white/20 transition-all duration-300 hover:scale-105 cursor-pointer"
                     onClick={() => setLocation(`/admin/merchants/${merchant.id}`)}
                   >
                     <div className="flex items-center justify-between mb-4">
@@ -541,8 +546,8 @@ export default function AdminDashboard() {
 
           {/* Merchants Tab */}
           <TabsContent value="merchants" className="space-y-8">
-            <div className="backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-3xl p-8">
-              <h3 className="text-xl font-light text-white mb-6">All Merchants</h3>
+            <div className="backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-2xl sm:rounded-3xl p-6 sm:p-8">
+              <h3 className="text-lg sm:text-xl font-light text-white mb-6">All Merchants</h3>
               <div className="text-center py-12">
                 <Users className="w-16 h-16 text-white/20 mx-auto mb-4" />
                 <p className="text-white/60">Merchant management features coming soon</p>
@@ -551,24 +556,24 @@ export default function AdminDashboard() {
           </TabsContent>
 
           {/* Analytics Tab */}
-          <TabsContent value="analytics" className="space-y-8">
+          <TabsContent value="analytics" className="space-y-6 sm:space-y-8">
             
             {/* Interactive Charts Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className={`grid gap-6 sm:gap-8 ${isMobile ? 'grid-cols-1' : 'lg:grid-cols-2'}`}>
               
               {/* Revenue Trend Chart */}
-              <div className="backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-3xl p-8 hover:bg-white/[0.05] hover:border-white/20 transition-all duration-500">
+              <div className="backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-2xl sm:rounded-3xl p-6 sm:p-8 hover:bg-white/[0.05] hover:border-white/20 transition-all duration-500">
                 <div className="mb-6">
-                  <h3 className="text-xl font-light text-white mb-2">Revenue Trend</h3>
+                  <h3 className="text-lg sm:text-xl font-light text-white mb-2">Revenue Trend</h3>
                   <p className="text-white/60 text-sm">7-day revenue performance</p>
                 </div>
-                <div className="h-80">
+                <div className={`${isMobile ? 'h-64' : 'h-80'}`}>
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={generateChartData(analytics).revenueTrend}>
                       <defs>
                         <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="#3B82F6" stopOpacity={0.05}/>
+                          <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#10B981" stopOpacity={0.05}/>
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
@@ -576,22 +581,22 @@ export default function AdminDashboard() {
                         dataKey="day" 
                         axisLine={false} 
                         tickLine={false} 
-                        tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: 12 }}
+                        tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: isMobile ? 10 : 12 }}
                       />
                       <YAxis 
                         axisLine={false} 
                         tickLine={false} 
-                        tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: 12 }}
+                        tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: isMobile ? 10 : 12 }}
                       />
                       <Tooltip content={<GlassTooltip />} />
                       <Area
                         type="monotone"
                         dataKey="revenue"
-                        stroke="#3B82F6"
+                        stroke="#10B981"
                         strokeWidth={3}
                         fill="url(#revenueGradient)"
-                        dot={{ fill: '#3B82F6', strokeWidth: 2, r: 4 }}
-                        activeDot={{ r: 6, stroke: '#3B82F6', strokeWidth: 2, fill: 'white' }}
+                        dot={{ fill: '#10B981', strokeWidth: 2, r: 4 }}
+                        activeDot={{ r: 6, stroke: '#10B981', strokeWidth: 2, fill: 'white' }}
                       />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -599,20 +604,20 @@ export default function AdminDashboard() {
               </div>
 
               {/* Transaction Status Pie Chart */}
-              <div className="backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-3xl p-8 hover:bg-white/[0.05] hover:border-white/20 transition-all duration-500">
+              <div className="backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-2xl sm:rounded-3xl p-6 sm:p-8 hover:bg-white/[0.05] hover:border-white/20 transition-all duration-500">
                 <div className="mb-6">
-                  <h3 className="text-xl font-light text-white mb-2">Transaction Status</h3>
+                  <h3 className="text-lg sm:text-xl font-light text-white mb-2">Transaction Status</h3>
                   <p className="text-white/60 text-sm">Distribution of transaction outcomes</p>
                 </div>
-                <div className="h-80">
+                <div className={`${isMobile ? 'h-64' : 'h-80'}`}>
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
                         data={generateChartData(analytics).statusData}
                         cx="50%"
                         cy="50%"
-                        innerRadius={60}
-                        outerRadius={120}
+                        innerRadius={isMobile ? 40 : 60}
+                        outerRadius={isMobile ? 80 : 120}
                         paddingAngle={5}
                         dataKey="value"
                       >
@@ -622,7 +627,7 @@ export default function AdminDashboard() {
                       </Pie>
                       <Tooltip content={<GlassTooltip />} />
                       <Legend 
-                        wrapperStyle={{ color: 'white' }}
+                        wrapperStyle={{ color: 'white', fontSize: isMobile ? '12px' : '14px' }}
                         formatter={(value) => <span style={{ color: 'rgba(255,255,255,0.8)' }}>{value}</span>}
                       />
                     </PieChart>
@@ -632,15 +637,15 @@ export default function AdminDashboard() {
             </div>
 
             {/* Payment Methods & Transaction Volume */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className={`grid gap-6 sm:gap-8 ${isMobile ? 'grid-cols-1' : 'lg:grid-cols-2'}`}>
               
               {/* Payment Methods Bar Chart */}
-              <div className="backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-3xl p-8 hover:bg-white/[0.05] hover:border-white/20 transition-all duration-500">
+              <div className="backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-2xl sm:rounded-3xl p-6 sm:p-8 hover:bg-white/[0.05] hover:border-white/20 transition-all duration-500">
                 <div className="mb-6">
-                  <h3 className="text-xl font-light text-white mb-2">Payment Methods</h3>
+                  <h3 className="text-lg sm:text-xl font-light text-white mb-2">Payment Methods</h3>
                   <p className="text-white/60 text-sm">Popular payment methods by volume</p>
                 </div>
-                <div className="h-80">
+                <div className={`${isMobile ? 'h-64' : 'h-80'}`}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={generateChartData(analytics).paymentMethods}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
@@ -648,47 +653,40 @@ export default function AdminDashboard() {
                         dataKey="name" 
                         axisLine={false} 
                         tickLine={false} 
-                        tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: 12 }}
+                        tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: isMobile ? 10 : 12 }}
                       />
                       <YAxis 
                         axisLine={false} 
                         tickLine={false} 
-                        tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: 12 }}
+                        tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: isMobile ? 10 : 12 }}
                       />
                       <Tooltip content={<GlassTooltip />} />
                       <Bar 
                         dataKey="value" 
                         radius={[8, 8, 0, 0]}
-                        fill="url(#barGradient)"
                       >
                         {generateChartData(analytics).paymentMethods.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Bar>
-                      <defs>
-                        <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.8}/>
-                          <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0.3}/>
-                        </linearGradient>
-                      </defs>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
               {/* Transaction Volume Line Chart */}
-              <div className="backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-3xl p-8 hover:bg-white/[0.05] hover:border-white/20 transition-all duration-500">
+              <div className="backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-2xl sm:rounded-3xl p-6 sm:p-8 hover:bg-white/[0.05] hover:border-white/20 transition-all duration-500">
                 <div className="mb-6">
-                  <h3 className="text-xl font-light text-white mb-2">Transaction Volume</h3>
+                  <h3 className="text-lg sm:text-xl font-light text-white mb-2">Transaction Volume</h3>
                   <p className="text-white/60 text-sm">Daily transaction count trends</p>
                 </div>
-                <div className="h-80">
+                <div className={`${isMobile ? 'h-64' : 'h-80'}`}>
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={generateChartData(analytics).revenueTrend}>
                       <defs>
                         <linearGradient id="transactionGradient" x1="0" y1="0" x2="1" y2="1">
                           <stop offset="0%" stopColor="#10B981" />
-                          <stop offset="100%" stopColor="#06B6D4" />
+                          <stop offset="100%" stopColor="#22C55E" />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
@@ -696,12 +694,12 @@ export default function AdminDashboard() {
                         dataKey="day" 
                         axisLine={false} 
                         tickLine={false} 
-                        tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: 12 }}
+                        tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: isMobile ? 10 : 12 }}
                       />
                       <YAxis 
                         axisLine={false} 
                         tickLine={false} 
-                        tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: 12 }}
+                        tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: isMobile ? 10 : 12 }}
                       />
                       <Tooltip content={<GlassTooltip />} />
                       <Line
@@ -719,17 +717,17 @@ export default function AdminDashboard() {
             </div>
 
             {/* Real-time Analytics */}
-            <div className="backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-3xl p-8 hover:bg-white/[0.05] hover:border-white/20 transition-all duration-500">
-              <div className="mb-8">
-                <h3 className="text-xl font-light text-white mb-2">Real-time Insights</h3>
+            <div className="backdrop-blur-2xl bg-white/[0.02] border border-white/10 rounded-2xl sm:rounded-3xl p-6 sm:p-8 hover:bg-white/[0.05] hover:border-white/20 transition-all duration-500">
+              <div className="mb-6 sm:mb-8">
+                <h3 className="text-lg sm:text-xl font-light text-white mb-2">Real-time Insights</h3>
                 <p className="text-white/60 text-sm">Live platform performance metrics</p>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'md:grid-cols-3'}`}>
                 {/* Conversion Rate */}
                 <div className="text-center">
                   <div className="mb-4">
-                    <ProgressRing percentage={successRate} size={100} strokeWidth={6} />
+                    <ProgressRing percentage={successRate} size={isMobile ? 80 : 100} strokeWidth={6} />
                   </div>
                   <h4 className="text-white font-medium mb-1">Conversion Rate</h4>
                   <p className="text-white/60 text-sm">Payment success ratio</p>
@@ -738,8 +736,8 @@ export default function AdminDashboard() {
                 {/* Average Transaction */}
                 <div className="text-center">
                   <div className="mb-4 flex items-center justify-center">
-                    <div className="backdrop-blur-xl bg-emerald-500/10 border border-emerald-400/30 rounded-2xl p-6">
-                      <DollarSign className="w-12 h-12 text-emerald-400 mx-auto" />
+                    <div className="backdrop-blur-xl bg-green-500/10 border border-green-400/30 rounded-2xl p-4 sm:p-6">
+                      <DollarSign className="w-10 h-10 sm:w-12 sm:h-12 text-green-400 mx-auto" />
                     </div>
                   </div>
                   <h4 className="text-white font-medium mb-1">
@@ -753,8 +751,8 @@ export default function AdminDashboard() {
                 {/* Active Merchants */}
                 <div className="text-center">
                   <div className="mb-4 flex items-center justify-center">
-                    <div className="backdrop-blur-xl bg-blue-500/10 border border-blue-400/30 rounded-2xl p-6">
-                      <Users className="w-12 h-12 text-blue-400 mx-auto" />
+                    <div className="backdrop-blur-xl bg-green-500/10 border border-green-400/30 rounded-2xl p-4 sm:p-6">
+                      <Users className="w-10 h-10 sm:w-12 sm:h-12 text-green-400 mx-auto" />
                     </div>
                   </div>
                   <h4 className="text-white font-medium mb-1">
