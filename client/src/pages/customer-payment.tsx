@@ -306,15 +306,16 @@ export default function CustomerPayment() {
 
           {/* Bill Split Component - Only show if not already split */}
           {!currentTransaction.isSplit && paymentStatus === "idle" && (
-            <BillSplit
-              transactionId={currentTransaction.id}
-              totalAmount={parseFloat(currentTransaction.price)}
-              onSplitCreated={() => {
-                // Refresh the transaction data to get the updated split information
-                queryClient.invalidateQueries({ queryKey: ["/api/merchants", id, "active-transaction"] });
-              }}
-              disabled={paymentStatus !== "idle"}
-            />
+            <div className="mt-8">
+              <BillSplit
+                transactionId={currentTransaction.id}
+                totalAmount={parseFloat(currentTransaction.price)}
+                onSplitCreated={() => {
+                  // Refresh the transaction data to get the updated split information
+                  queryClient.invalidateQueries({ queryKey: ["/api/merchants", id, "active-transaction"] });
+                }}
+              />
+            </div>
           )}
 
           {/* Split Payment Info - Show if transaction is split */}

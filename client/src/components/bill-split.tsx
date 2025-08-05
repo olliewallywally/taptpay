@@ -20,10 +20,19 @@ export function BillSplit({ transactionId, totalAmount, onSplitCreated }: BillSp
 
   const createSplitMutation = useMutation({
     mutationFn: async (totalSplits: number) => {
-      return apiRequest(`/api/transactions/${transactionId}/split`, {
+      const response = await fetch(`/api/transactions/${transactionId}/split`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({ totalSplits }),
       });
+      
+      if (!response.ok) {
+        throw new Error('Failed to create bill split');
+      }
+      
+      return response.json();
     },
     onSuccess: () => {
       toast({
