@@ -1,4 +1,4 @@
-import { merchants, transactions, merchantSettlements, platformFees, refunds, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund } from "@shared/schema";
+import { merchants, transactions, merchantSettlements, platformFees, refunds, splitPayments, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund } from "@shared/schema";
 import { getDb, isDatabaseConnected } from "./database";
 import { eq, desc, and } from "drizzle-orm";
 
@@ -28,6 +28,13 @@ export interface IStorage {
   updateTransactionStatus(id: number, status: string, windcaveTransactionId?: string): Promise<Transaction | undefined>;
   updateTransactionNfcSession(id: number, nfcSessionId: string): Promise<Transaction | undefined>;
   getTransactionsByMerchant(merchantId: number): Promise<Transaction[]>;
+  
+  // Bill splitting operations
+  createBillSplit(transactionId: number, totalSplits: number): Promise<Transaction | undefined>;
+  createSplitPayment(data: any): Promise<any>;
+  getSplitPaymentsByTransaction(transactionId: number): Promise<any[]>;
+  updateSplitPaymentStatus(id: number, status: string, windcaveTransactionId?: string): Promise<any>;
+  getNextPendingSplit(transactionId: number): Promise<any | undefined>;
   
   // Platform revenue operations (Marketplace Model)
   createPlatformFee(data: InsertPlatformFee): Promise<PlatformFee>;
@@ -99,6 +106,13 @@ export interface IStorage {
     revenue: number;
     transactions: number;
   }>>;
+
+  // Bill splitting operations
+  createBillSplit(transactionId: number, totalSplits: number): Promise<Transaction | undefined>;
+  createSplitPayment(data: any): Promise<any>;
+  getSplitPaymentsByTransaction(transactionId: number): Promise<any[]>;
+  updateSplitPaymentStatus(id: number, status: string, windcaveTransactionId?: string): Promise<any>;
+  getNextPendingSplit(transactionId: number): Promise<any | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -106,10 +120,12 @@ export class MemStorage implements IStorage {
   private transactions: Map<number, Transaction>;
   private platformFees: Map<number, PlatformFee>;
   private refunds: Map<number, Refund>;
+  private splitPayments: Map<number, any>;
   private currentMerchantId: number;
   private currentTransactionId: number;
   private currentPlatformFeeId: number;
   private currentRefundId: number;
+  private currentSplitPaymentId: number;
   private activeTransactionCache: Map<number, Transaction | null>; // Cache for active transactions by merchant
 
   constructor() {
@@ -117,10 +133,12 @@ export class MemStorage implements IStorage {
     this.transactions = new Map();
     this.platformFees = new Map();
     this.refunds = new Map();
+    this.splitPayments = new Map();
     this.currentMerchantId = 1;
     this.currentTransactionId = 1;
     this.currentPlatformFeeId = 1;
     this.currentRefundId = 1;
+    this.currentSplitPaymentId = 1;
     this.activeTransactionCache = new Map();
   }
 
@@ -466,6 +484,111 @@ export class MemStorage implements IStorage {
     return Array.from(this.transactions.values()).filter(
       (transaction) => transaction.merchantId === merchantId
     );
+  }
+
+  // Bill splitting operations
+  async createBillSplit(transactionId: number, totalSplits: number): Promise<Transaction | undefined> {
+    const transaction = this.transactions.get(transactionId);
+    if (!transaction) return undefined;
+
+    const splitAmount = parseFloat(transaction.price) / totalSplits;
+    
+    const updatedTransaction = {
+      ...transaction,
+      isSplit: true,
+      totalSplits: totalSplits,
+      completedSplits: 0,
+      splitAmount: splitAmount.toFixed(2),
+    };
+    
+    this.transactions.set(transactionId, updatedTransaction);
+
+    // Create split payment records
+    for (let i = 1; i <= totalSplits; i++) {
+      const splitPayment = {
+        id: this.currentSplitPaymentId++,
+        transactionId: transactionId,
+        merchantId: transaction.merchantId,
+        splitIndex: i,
+        amount: splitAmount.toFixed(2),
+        status: "pending",
+        windcaveTransactionId: null,
+        paymentMethod: "qr_code",
+        windcaveFeeAmount: (0.20 / totalSplits).toFixed(2), // Distribute fees across splits
+        platformFeeAmount: (0.05 / totalSplits).toFixed(2),
+        merchantNet: ((splitAmount - (0.20 / totalSplits) - (0.05 / totalSplits))).toFixed(2),
+        paidAt: null,
+        createdAt: new Date(),
+      };
+      this.splitPayments.set(splitPayment.id, splitPayment);
+    }
+
+    // Update active transaction cache
+    this.activeTransactionCache.set(transaction.merchantId, updatedTransaction);
+
+    return updatedTransaction;
+  }
+
+  async createSplitPayment(data: any): Promise<any> {
+    const id = this.currentSplitPaymentId++;
+    const splitPayment = {
+      ...data,
+      id,
+      createdAt: new Date(),
+    };
+    this.splitPayments.set(id, splitPayment);
+    return splitPayment;
+  }
+
+  async getSplitPaymentsByTransaction(transactionId: number): Promise<any[]> {
+    return Array.from(this.splitPayments.values()).filter(
+      (split) => split.transactionId === transactionId
+    );
+  }
+
+  async updateSplitPaymentStatus(id: number, status: string, windcaveTransactionId?: string): Promise<any> {
+    const splitPayment = this.splitPayments.get(id);
+    if (!splitPayment) return undefined;
+
+    const updatedSplit = {
+      ...splitPayment,
+      status,
+      windcaveTransactionId: windcaveTransactionId || splitPayment.windcaveTransactionId,
+      paidAt: status === "completed" ? new Date() : splitPayment.paidAt,
+    };
+    
+    this.splitPayments.set(id, updatedSplit);
+
+    // If this split is completed, update the main transaction
+    if (status === "completed") {
+      const transaction = this.transactions.get(splitPayment.transactionId);
+      if (transaction) {
+        const allSplits = await this.getSplitPaymentsByTransaction(splitPayment.transactionId);
+        const completedSplits = allSplits.filter(s => s.status === "completed").length;
+        
+        const updatedTransaction = {
+          ...transaction,
+          completedSplits: completedSplits,
+          status: completedSplits >= transaction.totalSplits ? "completed" : "pending"
+        };
+        
+        this.transactions.set(splitPayment.transactionId, updatedTransaction);
+        
+        // Update cache
+        if (updatedTransaction.status === "completed") {
+          this.activeTransactionCache.delete(transaction.merchantId);
+        } else {
+          this.activeTransactionCache.set(transaction.merchantId, updatedTransaction);
+        }
+      }
+    }
+
+    return updatedSplit;
+  }
+
+  async getNextPendingSplit(transactionId: number): Promise<any | undefined> {
+    const splits = await this.getSplitPaymentsByTransaction(transactionId);
+    return splits.find(split => split.status === "pending");
   }
 
   async updateMerchantRates(id: number, currentProviderRate: string): Promise<Merchant | undefined> {

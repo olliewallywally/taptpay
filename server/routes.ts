@@ -344,6 +344,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create bill split
+  app.post("/api/transactions/:id/split", async (req, res) => {
+    try {
+      const transactionId = parseInt(req.params.id);
+      const { totalSplits } = req.body;
+
+      if (!totalSplits || totalSplits < 2 || totalSplits > 10) {
+        return res.status(400).json({ message: "Total splits must be between 2 and 10" });
+      }
+
+      const updatedTransaction = await storage.createBillSplit(transactionId, totalSplits);
+      
+      if (!updatedTransaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+
+      // Notify connected clients about the split
+      const connections = sseConnections.get(updatedTransaction.merchantId);
+      if (connections) {
+        connections.forEach(conn => {
+          conn.write(`data: ${JSON.stringify({ type: 'transaction_updated', transaction: updatedTransaction })}\n\n`);
+        });
+      }
+
+      res.json(updatedTransaction);
+    } catch (error) {
+      console.error("Error creating bill split:", error);
+      res.status(500).json({ message: "Failed to create bill split" });
+    }
+  });
+
   // NFC Tap to Phone Payment API
   app.post("/api/merchants/:merchantId/nfc-pay", async (req, res) => {
     try {
@@ -537,8 +568,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Transaction not found" });
       }
 
-      // Update status to processing
-      await storage.updateTransactionStatus(transactionId, "processing");
+      let paymentAmount = transaction.price;
+      let currentSplit = null;
+
+      // Check if this is a split transaction
+      if (transaction.isSplit) {
+        // Get the next pending split to pay
+        currentSplit = await storage.getNextPendingSplit(transactionId);
+        
+        if (!currentSplit) {
+          return res.status(400).json({ message: "All splits have been paid" });
+        }
+        
+        paymentAmount = currentSplit.amount;
+        
+        // Update the split status to processing
+        await storage.updateSplitPaymentStatus(currentSplit.id, "processing");
+      } else {
+        // Update status to processing for regular transaction
+        await storage.updateTransactionStatus(transactionId, "processing");
+      }
       
       // Notify clients
       const connections = sseConnections.get(transaction.merchantId);
@@ -551,10 +600,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create Windcave payment session
       const baseUrl = `${req.protocol}://${req.get('host')}`;
-      const merchantReference = `TXN_${transactionId}_${Date.now()}`;
+      const merchantReference = transaction.isSplit 
+        ? `SPLIT_${currentSplit.id}_${Date.now()}`
+        : `TXN_${transactionId}_${Date.now()}`;
       
       const session = await windcaveService.createPaymentSession(
-        transaction.price,
+        paymentAmount,
         merchantReference,
         baseUrl
       );
@@ -576,7 +627,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const status = result?.status === "approved" ? "completed" : "failed";
             const windcaveTransactionId = result?.dpsTxnRef;
             
-            const finalTransaction = await storage.updateTransactionStatus(transactionId, status, windcaveTransactionId);
+            let finalTransaction;
+            
+            if (transaction.isSplit && currentSplit) {
+              // Update the specific split payment
+              await storage.updateSplitPaymentStatus(currentSplit.id, status, windcaveTransactionId);
+              
+              // Get updated transaction (status might change if all splits are completed)
+              finalTransaction = await storage.getTransaction(transactionId);
+              
+              // Create platform fee for this split if successful
+              if (status === "completed") {
+                await storage.createPlatformFee({
+                  transactionId: transactionId,
+                  merchantId: transaction.merchantId,
+                  feeAmount: currentSplit.platformFeeAmount,
+                  transactionAmount: currentSplit.amount,
+                  status: 'collected',
+                });
+              }
+            } else {
+              // Regular transaction processing
+              finalTransaction = await storage.updateTransactionStatus(transactionId, status, windcaveTransactionId);
+              
+              // Create platform fee if successful
+              if (status === "completed") {
+                await storage.createPlatformFee({
+                  transactionId: transactionId,
+                  merchantId: transaction.merchantId,
+                  feeAmount: transaction.platformFeeAmount || "0.05",
+                  transactionAmount: transaction.price,
+                  status: 'collected',
+                });
+              }
+            }
             
             // Notify clients of final result
             const connections = sseConnections.get(transaction.merchantId);
@@ -587,7 +671,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }, 2000);
 
-          res.json({ message: "Payment processing started (simulation mode)" });
+          res.json({ 
+            message: transaction.isSplit 
+              ? `Payment processing started for split ${currentSplit.splitIndex} of ${transaction.totalSplits} (simulation mode)`
+              : "Payment processing started (simulation mode)"
+          });
         }
       } else {
         throw new Error("Failed to create payment session");

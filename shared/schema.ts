@@ -63,6 +63,12 @@ export const transactions = pgTable("transactions", {
   nfcSessionId: text("nfc_session_id"), // For NFC/tap payments
   deviceId: text("device_id"), // Device that initiated the transaction
   
+  // Bill splitting functionality
+  isSplit: boolean("is_split").default(false), // Whether this transaction is split
+  totalSplits: serial("total_splits").default(1), // Total number of splits
+  completedSplits: serial("completed_splits").default(0), // Number of completed splits
+  splitAmount: decimal("split_amount", { precision: 10, scale: 2 }), // Amount per split (price / totalSplits)
+  
   // Fee tracking (Marketplace Model)
   windcaveFeeRate: decimal("windcave_fee_rate", { precision: 5, scale: 4 }).default("0.0290"), // 2.9% typical Windcave rate
   windcaveFeeAmount: decimal("windcave_fee_amount", { precision: 10, scale: 2 }), // Calculated Windcave fee
@@ -74,6 +80,26 @@ export const transactions = pgTable("transactions", {
   totalRefunded: decimal("total_refunded", { precision: 10, scale: 2 }).default("0.00"), // Total amount refunded
   refundableAmount: decimal("refundable_amount", { precision: 10, scale: 2 }), // Amount still available for refund
   
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Split payments table to track individual payments for split bills
+export const splitPayments = pgTable("split_payments", {
+  id: serial("id").primaryKey(),
+  transactionId: serial("transaction_id").references(() => transactions.id),
+  merchantId: serial("merchant_id").references(() => merchants.id),
+  splitIndex: serial("split_index").notNull(), // Which split this is (1, 2, 3, etc.)
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(), // Amount for this split
+  status: text("status").notNull().default("pending"), // pending, processing, completed, failed
+  windcaveTransactionId: text("windcave_transaction_id"), // External payment processor ID for this split
+  paymentMethod: text("payment_method").default("qr_code"), // qr_code, nfc_tap, card_reader, manual
+  
+  // Fee tracking for this split
+  windcaveFeeAmount: decimal("windcave_fee_amount", { precision: 10, scale: 2 }),
+  platformFeeAmount: decimal("platform_fee_amount", { precision: 10, scale: 2 }),
+  merchantNet: decimal("merchant_net", { precision: 10, scale: 2 }),
+  
+  paidAt: timestamp("paid_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -122,6 +148,29 @@ export const platformFees = pgTable("platform_fees", {
   status: text("status").notNull().default("pending"), // pending, collected, failed
   collectedAt: timestamp("collected_at"),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Split payments schemas
+export const insertSplitPaymentSchema = createInsertSchema(splitPayments).omit({
+  id: true,
+  createdAt: true,
+  paidAt: true,
+});
+
+export const createSplitPaymentSchema = z.object({
+  transactionId: z.number().min(1, "Transaction ID is required"),
+  splitIndex: z.number().min(1, "Split index is required"),
+  amount: z.string().refine((val) => {
+    const num = parseFloat(val);
+    return !isNaN(num) && num > 0;
+  }, "Amount must be a positive number"),
+  paymentMethod: z.enum(["qr_code", "nfc_tap", "card_reader", "manual"]).default("qr_code"),
+});
+
+// Bill split creation schema
+export const createBillSplitSchema = z.object({
+  transactionId: z.number().min(1, "Transaction ID is required"),
+  totalSplits: z.number().min(2, "Must have at least 2 splits").max(10, "Maximum 10 splits allowed"),
 });
 
 // Add refund schemas only - keeping existing schemas intact

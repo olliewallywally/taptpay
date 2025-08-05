@@ -203,6 +203,8 @@ export default function MerchantTerminal() {
   // No simulation function needed - payments process only through actual card taps
 
   const getPaymentStatusIndicator = (status: string) => {
+    const transaction = currentTransaction || activeTransaction;
+    
     switch (status) {
       case "pending":
         return (
@@ -211,7 +213,24 @@ export default function MerchantTerminal() {
               <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-blue-300" />
               <span className="text-base sm:text-lg font-medium text-blue-200">Awaiting Payment</span>
             </div>
-            <p className="text-xs sm:text-sm text-blue-300 text-center">Customer can now scan QR code to pay</p>
+            
+            {/* Show split information if transaction is split */}
+            {transaction?.isSplit ? (
+              <div className="text-center space-y-1">
+                <p className="text-xs sm:text-sm text-blue-300">Split Bill Payment</p>
+                <div className="flex items-center justify-center space-x-2">
+                  <span className="text-sm font-bold text-blue-200">
+                    {transaction.completedSplits + 1} of {transaction.totalSplits}
+                  </span>
+                  <span className="text-xs text-blue-300">payments</span>
+                </div>
+                <p className="text-xs text-blue-300">
+                  ${parseFloat(transaction.splitAmount).toFixed(2)} per person
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs sm:text-sm text-blue-300 text-center">Customer can now scan QR code to pay</p>
+            )}
           </div>
         );
       case "processing":
