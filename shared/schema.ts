@@ -1,4 +1,4 @@
-import { pgTable, text, serial, decimal, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, decimal, timestamp, boolean, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -65,8 +65,8 @@ export const transactions = pgTable("transactions", {
   
   // Bill splitting functionality
   isSplit: boolean("is_split").default(false), // Whether this transaction is split
-  totalSplits: serial("total_splits").default(1), // Total number of splits
-  completedSplits: serial("completed_splits").default(0), // Number of completed splits
+  totalSplits: integer("total_splits").default(1), // Total number of splits
+  completedSplits: integer("completed_splits").default(0), // Number of completed splits
   splitAmount: decimal("split_amount", { precision: 10, scale: 2 }), // Amount per split (price / totalSplits)
   
   // Fee tracking (Marketplace Model)
@@ -88,7 +88,7 @@ export const splitPayments = pgTable("split_payments", {
   id: serial("id").primaryKey(),
   transactionId: serial("transaction_id").references(() => transactions.id),
   merchantId: serial("merchant_id").references(() => merchants.id),
-  splitIndex: serial("split_index").notNull(), // Which split this is (1, 2, 3, etc.)
+  splitIndex: integer("split_index").notNull(), // Which split this is (1, 2, 3, etc.)
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(), // Amount for this split
   status: text("status").notNull().default("pending"), // pending, processing, completed, failed
   windcaveTransactionId: text("windcave_transaction_id"), // External payment processor ID for this split

@@ -1559,6 +1559,149 @@ export class DatabaseStorage implements IStorage {
   async getWebhookDeliveries(apiKeyId: number): Promise<any[]> {
     return [];
   }
+
+  // Bill splitting operations
+  async createBillSplit(transactionId: number, totalSplits: number): Promise<Transaction | undefined> {
+    try {
+      // Get the transaction first
+      const [transaction] = await this.db
+        .select()
+        .from(transactions)
+        .where(eq(transactions.id, transactionId));
+      
+      if (!transaction) return undefined;
+
+      const splitAmount = parseFloat(transaction.price) / totalSplits;
+      
+      // Update the transaction with split information
+      const [updatedTransaction] = await this.db
+        .update(transactions)
+        .set({
+          isSplit: true,
+          totalSplits: totalSplits,
+          completedSplits: 0,
+          splitAmount: splitAmount.toFixed(2),
+        })
+        .where(eq(transactions.id, transactionId))
+        .returning();
+
+      // Create split payment records
+      for (let i = 1; i <= totalSplits; i++) {
+        await this.db
+          .insert(splitPayments)
+          .values({
+            transactionId: transactionId,
+            merchantId: transaction.merchantId,
+            splitIndex: i,
+            amount: splitAmount.toFixed(2),
+            status: "pending",
+            windcaveTransactionId: null,
+            paymentMethod: "qr_code",
+            windcaveFeeAmount: (0.20 / totalSplits).toFixed(2),
+            platformFeeAmount: (0.05 / totalSplits).toFixed(2),
+            merchantNet: ((splitAmount - (0.20 / totalSplits) - (0.05 / totalSplits))).toFixed(2),
+            paidAt: null,
+          });
+      }
+
+      return updatedTransaction;
+    } catch (error) {
+      console.error("Database error in createBillSplit:", error);
+      return undefined;
+    }
+  }
+
+  async createSplitPayment(data: any): Promise<any> {
+    try {
+      const [splitPayment] = await this.db
+        .insert(splitPayments)
+        .values(data)
+        .returning();
+      return splitPayment;
+    } catch (error) {
+      console.error("Database error in createSplitPayment:", error);
+      return undefined;
+    }
+  }
+
+  async getSplitPaymentsByTransaction(transactionId: number): Promise<any[]> {
+    try {
+      return await this.db
+        .select()
+        .from(splitPayments)
+        .where(eq(splitPayments.transactionId, transactionId))
+        .orderBy(splitPayments.splitIndex);
+    } catch (error) {
+      console.error("Database error in getSplitPaymentsByTransaction:", error);
+      return [];
+    }
+  }
+
+  async updateSplitPaymentStatus(id: number, status: string, windcaveTransactionId?: string): Promise<any> {
+    try {
+      // Update the split payment
+      const [updatedSplit] = await this.db
+        .update(splitPayments)
+        .set({
+          status,
+          windcaveTransactionId: windcaveTransactionId || undefined,
+          paidAt: status === "completed" ? new Date() : undefined,
+        })
+        .where(eq(splitPayments.id, id))
+        .returning();
+
+      if (status === "completed" && updatedSplit) {
+        // Get all splits for this transaction to check if all are completed
+        const allSplits = await this.getSplitPaymentsByTransaction(updatedSplit.transactionId);
+        const completedSplits = allSplits.filter(s => s.status === "completed").length;
+        
+        // Get the transaction to check total splits
+        const [transaction] = await this.db
+          .select()
+          .from(transactions)
+          .where(eq(transactions.id, updatedSplit.transactionId));
+        
+        if (transaction) {
+          const finalStatus = completedSplits >= transaction.totalSplits ? "completed" : "pending";
+          
+          // Update the main transaction
+          await this.db
+            .update(transactions)
+            .set({
+              completedSplits: completedSplits,
+              status: finalStatus
+            })
+            .where(eq(transactions.id, updatedSplit.transactionId));
+        }
+      }
+
+      return updatedSplit;
+    } catch (error) {
+      console.error("Database error in updateSplitPaymentStatus:", error);
+      return undefined;
+    }
+  }
+
+  async getNextPendingSplit(transactionId: number): Promise<any | undefined> {
+    try {
+      const [split] = await this.db
+        .select()
+        .from(splitPayments)
+        .where(
+          and(
+            eq(splitPayments.transactionId, transactionId),
+            eq(splitPayments.status, "pending")
+          )
+        )
+        .orderBy(splitPayments.splitIndex)
+        .limit(1);
+      
+      return split;
+    } catch (error) {
+      console.error("Database error in getNextPendingSplit:", error);
+      return undefined;
+    }
+  }
 }
 
 // Use database storage if available, fall back to memory storage
