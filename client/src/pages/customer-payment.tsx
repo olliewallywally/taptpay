@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { SlideToPayComponent } from "@/components/slide-to-pay";
+import { BillSplit } from "@/components/bill-split";
 import { sseClient } from "@/lib/sse-client";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Shield, Lock, CheckCircle, XCircle } from "lucide-react";
@@ -297,11 +298,37 @@ export default function CustomerPayment() {
             <SlideToPayComponent 
               onPayment={handlePayment}
               disabled={paymentStatus !== "idle"}
-              amount={parseFloat(currentTransaction.price)}
+              amount={currentTransaction.isSplit ? parseFloat(currentTransaction.splitAmount) : parseFloat(currentTransaction.price)}
               currency="NZD"
               merchantName="Tapt Payment"
             />
           </div>
+
+          {/* Bill Split Component - Only show if not already split */}
+          {!currentTransaction.isSplit && paymentStatus === "idle" && (
+            <BillSplit
+              transactionId={currentTransaction.id}
+              totalAmount={parseFloat(currentTransaction.price)}
+              onSplitCreated={() => {
+                // Refresh the transaction data to get the updated split information
+                queryClient.invalidateQueries({ queryKey: ["/api/merchants", id, "active-transaction"] });
+              }}
+              disabled={paymentStatus !== "idle"}
+            />
+          )}
+
+          {/* Split Payment Info - Show if transaction is split */}
+          {currentTransaction.isSplit && (
+            <div className="mt-6 backdrop-blur-xl bg-blue-500/10 border border-blue-400/30 rounded-2xl p-4 text-center">
+              <div className="text-blue-200 font-medium mb-2">Split Payment</div>
+              <div className="text-white/70 text-sm">
+                Pay ${parseFloat(currentTransaction.splitAmount).toFixed(2)} 
+                <span className="block text-xs mt-1">
+                  ({currentTransaction.completedSplits + 1} of {currentTransaction.totalSplits} payments)
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Security Badges */}
           <div className="flex items-center justify-center space-x-6 pt-6 mt-6 border-t border-white/20">
