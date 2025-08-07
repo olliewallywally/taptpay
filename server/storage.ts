@@ -1155,6 +1155,8 @@ export class DatabaseStorage implements IStorage {
       platformFeeRate: "0.0000", // Not percentage-based
       platformFeeAmount: platformFeeAmount.toString(),
       merchantNet: merchantNet.toString(),
+      totalRefunded: "0.00",
+      refundableAmount: merchantNet.toString(), // Amount merchant receives after fees
     };
 
     const result = await this.db.insert(transactions).values(transactionWithFees).returning();
