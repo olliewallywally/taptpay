@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { 
@@ -25,6 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { MobileHeader } from "@/components/mobile-header";
 
 const getStatusIcon = (status: string) => {
   switch (status) {
@@ -63,6 +64,18 @@ export default function Transactions() {
   const [refundReason, setRefundReason] = useState("");
   const [refundMethod, setRefundMethod] = useState("original_payment_method");
   const [isRefundDialogOpen, setIsRefundDialogOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -235,6 +248,7 @@ export default function Transactions() {
 
   return (
     <div className="min-h-screen relative overflow-hidden">
+      {isMobile && <MobileHeader title="Transactions" />}
       {/* Dynamic black and grey gradients */}
       <div className="fixed inset-0 bg-gradient-to-br from-black via-gray-900 to-gray-800">
         <div className="absolute inset-0 bg-gradient-to-tr from-gray-900/40 via-black/60 to-gray-700/30 animate-gradient-xy"></div>

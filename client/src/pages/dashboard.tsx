@@ -32,6 +32,7 @@ import {
 
 } from "lucide-react";
 import { format } from "date-fns";
+import { MobileHeader } from "@/components/mobile-header";
 
 
 const rateUpdateSchema = z.object({
@@ -272,6 +273,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-800 via-gray-700 to-gray-900">
+      {isMobile && <MobileHeader title="Dashboard" />}
       <div className="container mx-auto px-4 pt-32 pb-8">
         {/* Analytics Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">

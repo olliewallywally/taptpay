@@ -11,8 +11,9 @@ import { apiRequest } from "@/lib/queryClient";
 import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentMerchantId } from "@/lib/auth";
-import { Send, Loader2, CheckCircle, Clock, XCircle, QrCode, Smartphone, Menu, Edit, Split, MoreHorizontal, X } from "lucide-react";
+import { Send, Loader2, CheckCircle, Clock, XCircle, QrCode, Smartphone, Edit, Split, MoreHorizontal } from "lucide-react";
 import { Link } from "wouter";
+import { MobileHeader } from "@/components/mobile-header";
 
 const transactionFormSchema = z.object({
   itemName: z.string().min(1, "Item name is required"),
@@ -25,7 +26,6 @@ export default function MerchantTerminalMobile() {
   const [currentTransaction, setCurrentTransaction] = useState<any>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [activeTab, setActiveTab] = useState<"QR" | "NFC">("QR");
-  const [menuOpen, setMenuOpen] = useState(false);
   const [activeAction, setActiveAction] = useState<string | null>(null);
   
   const queryClient = useQueryClient();
@@ -116,17 +116,7 @@ export default function MerchantTerminalMobile() {
     }
   }, [activeTransaction]);
 
-  // Close menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuOpen && !(event.target as Element).closest('.menu-container')) {
-        setMenuOpen(false);
-      }
-    };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [menuOpen]);
 
   const onSubmit = (data: TransactionFormData) => {
     createTransactionMutation.mutate(data);
@@ -185,34 +175,9 @@ export default function MerchantTerminalMobile() {
 
   return (
     <div className="min-h-screen bg-black text-white relative overflow-hidden">
-      {/* Menu overlay */}
-      {menuOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-40"
-          onClick={() => setMenuOpen(false)}
-        />
-      )}
-
-      {/* Main content container */}
-      <div 
-        className="relative z-10 min-h-screen transition-transform duration-300 ease-in-out"
-        style={{
-          transform: menuOpen ? 'translateX(-70%)' : 'translateX(0)',
-        }}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-6">
-          <div className="flex-1" />
-          <h1 className="text-2xl font-bold text-center text-white">tapt</h1>
-          <div className="flex-1 flex justify-end">
-            <button
-              onClick={() => setMenuOpen(!menuOpen)}
-              className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              <Menu size={24} />
-            </button>
-          </div>
-        </div>
+      <MobileHeader title="tapt" />
+      
+      <div className="relative z-10">{/* Main content container */}
 
         {/* Mode Switcher */}
         <div className="flex justify-center mb-8">
@@ -546,48 +511,6 @@ export default function MerchantTerminalMobile() {
               </div>
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Slide-out Hamburger Menu */}
-      <div 
-        className="menu-container fixed top-0 right-0 h-full bg-gray-900 z-50 transition-transform duration-300 ease-in-out"
-        style={{
-          width: '70%',
-          transform: menuOpen ? 'translateX(0)' : 'translateX(100%)',
-        }}
-      >
-        <div className="p-6">
-          <div className="flex justify-between items-center mb-8">
-            <h2 className="text-xl font-bold text-white">Menu</h2>
-            <button
-              onClick={() => setMenuOpen(false)}
-              className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              <X size={24} className="text-white" />
-            </button>
-          </div>
-          
-          <nav className="space-y-4">
-            <Link href="/dashboard" className="block py-3 px-4 text-white hover:bg-gray-800 rounded-lg transition-colors">
-              Dashboard
-            </Link>
-            <Link href="/transactions" className="block py-3 px-4 text-white hover:bg-gray-800 rounded-lg transition-colors">
-              Transaction History
-            </Link>
-            <Link href="/settings" className="block py-3 px-4 text-white hover:bg-gray-800 rounded-lg transition-colors">
-              Settings
-            </Link>
-            <button 
-              onClick={() => {
-                localStorage.removeItem('auth-token');
-                window.location.href = '/login';
-              }}
-              className="block w-full text-left py-3 px-4 text-white hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              Logout
-            </button>
-          </nav>
         </div>
       </div>
     </div>
