@@ -5,7 +5,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
-import MerchantTerminal from "@/pages/merchant-terminal";
+import MerchantTerminalMobile from "@/pages/merchant-terminal-mobile";
 import CustomerPayment from "@/pages/customer-payment";
 import Receipt from "@/pages/receipt";
 import Dashboard from "@/pages/dashboard";
@@ -140,9 +140,7 @@ function Router() {
         <Route path="/reset-password" component={ResetPassword} />
         <Route path="/merchant">
           <ProtectedRoute>
-            <Layout>
-              <MerchantTerminal />
-            </Layout>
+            <MerchantTerminalMobile />
           </ProtectedRoute>
         </Route>
         <Route path="/dashboard">
