@@ -445,22 +445,20 @@ export default function MerchantTerminalMobile() {
                 <div className="text-center">
                   <h3 className="text-lg font-semibold mb-4 text-white">More Options</h3>
                   <div className="space-y-3">
-                    <Link href="/dashboard">
-                      <Button
-                        variant="outline"
-                        className="w-full border-gray-600 text-gray-300 hover:bg-gray-700"
-                      >
-                        View Dashboard
-                      </Button>
-                    </Link>
-                    <Link href="/transactions">
-                      <Button
-                        variant="outline"
-                        className="w-full border-gray-600 text-gray-300 hover:bg-gray-700"
-                      >
-                        Transaction History
-                      </Button>
-                    </Link>
+                    <Button
+                      variant="outline"
+                      className="w-full border-gray-600 text-gray-300 hover:bg-gray-700"
+                      onClick={() => window.location.href = '/dashboard'}
+                    >
+                      View Dashboard
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full border-gray-600 text-gray-300 hover:bg-gray-700"
+                      onClick={() => window.location.href = '/transactions'}
+                    >
+                      Transaction History
+                    </Button>
                     <Button
                       variant="outline"
                       className="w-full border-gray-600 text-gray-300 hover:bg-gray-700"
@@ -532,20 +530,14 @@ export default function MerchantTerminalMobile() {
           </div>
           
           <nav className="space-y-4">
-            <Link href="/dashboard">
-              <a className="block py-3 px-4 text-white hover:bg-gray-800 rounded-lg transition-colors">
-                Dashboard
-              </a>
+            <Link href="/dashboard" className="block py-3 px-4 text-white hover:bg-gray-800 rounded-lg transition-colors">
+              Dashboard
             </Link>
-            <Link href="/transactions">
-              <a className="block py-3 px-4 text-white hover:bg-gray-800 rounded-lg transition-colors">
-                Transaction History
-              </a>
+            <Link href="/transactions" className="block py-3 px-4 text-white hover:bg-gray-800 rounded-lg transition-colors">
+              Transaction History
             </Link>
-            <Link href="/settings">
-              <a className="block py-3 px-4 text-white hover:bg-gray-800 rounded-lg transition-colors">
-                Settings
-              </a>
+            <Link href="/settings" className="block py-3 px-4 text-white hover:bg-gray-800 rounded-lg transition-colors">
+              Settings
             </Link>
             <button 
               onClick={() => {
