@@ -27,6 +27,7 @@ import {
   X
 } from "lucide-react";
 import { z } from "zod";
+import { MobileHeader } from "@/components/mobile-header";
 
 
 type MerchantDetailsFormData = z.infer<typeof updateMerchantDetailsSchema>;
@@ -37,6 +38,18 @@ export default function Settings() {
   const { toast } = useToast();
   const [editingDetails, setEditingDetails] = useState(false);
   const [editingBankAccount, setEditingBankAccount] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
 
 
   // Get current user first to get their merchant ID
@@ -164,6 +177,7 @@ export default function Settings() {
 
   return (
     <div className="min-h-screen relative overflow-hidden">
+      {isMobile && <MobileHeader title="Settings" />}
       {/* Dark Moving Gradients Background */}
       <div className="fixed inset-0 bg-gradient-to-br from-black via-gray-900 to-gray-800">
         <div className="absolute inset-0 bg-gradient-to-tr from-gray-900/60 via-black/40 to-gray-700/30 animate-gradient-xy"></div>
