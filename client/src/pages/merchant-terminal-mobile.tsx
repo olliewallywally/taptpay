@@ -240,11 +240,11 @@ export default function MerchantTerminalMobile() {
           </div>
         </div>
 
-        {/* Amount Box */}
+        {/* Amount Box - More Rounded */}
         <div className="px-6 mb-6">
           {currentTransaction || activeTransaction ? (
             <div 
-              className="rounded-2xl p-6 text-center"
+              className="rounded-3xl p-6 text-center"
               style={{ backgroundColor: '#00FF66' }}
             >
               <div className="text-black text-lg font-medium mb-2">Total</div>
@@ -257,7 +257,7 @@ export default function MerchantTerminalMobile() {
             </div>
           ) : (
             <div 
-              className="rounded-2xl p-6 text-center border-2 border-dashed"
+              className="rounded-3xl p-6 text-center border-2 border-dashed"
               style={{ borderColor: '#00FF66' }}
             >
               <div className="text-gray-400 text-lg font-medium mb-2">Total</div>
@@ -267,70 +267,74 @@ export default function MerchantTerminalMobile() {
           )}
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex justify-center gap-4 mb-6 px-6">
-          <button
-            onClick={() => handleActionClick("send")}
-            className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
-              activeAction === "send"
-                ? 'text-black'
-                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-            }`}
-            style={{
-              backgroundColor: activeAction === "send" ? '#00FF66' : undefined
-            }}
-          >
-            <Send size={24} />
-            <span className="text-xs mt-1 font-medium">Send</span>
-          </button>
-          
-          <button
-            onClick={() => handleActionClick("edit")}
-            className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
-              activeAction === "edit"
-                ? 'text-black'
-                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-            }`}
-            style={{
-              backgroundColor: activeAction === "edit" ? '#00FF66' : undefined
-            }}
-          >
-            <Edit size={24} />
-            <span className="text-xs mt-1 font-medium">Edit</span>
-          </button>
-          
-          <button
-            onClick={() => handleActionClick("split")}
-            className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
-              activeAction === "split"
-                ? 'text-black'
-                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-            }`}
-            style={{
-              backgroundColor: activeAction === "split" ? '#00FF66' : undefined
-            }}
-          >
-            <Split size={24} />
-            <span className="text-xs mt-1 font-medium">Split</span>
-          </button>
-          
-          <button
-            onClick={() => handleActionClick("more")}
-            className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
-              activeAction === "more"
-                ? 'text-black'
-                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-            }`}
-            style={{
-              backgroundColor: activeAction === "more" ? '#00FF66' : undefined
-            }}
-          >
-            <MoreHorizontal size={24} />
-            <span className="text-xs mt-1 font-medium">More</span>
-          </button>
+        {/* Action Buttons - Connected Dark Grey Box */}
+        <div className="px-6 mb-6">
+          <div className="bg-gray-800 rounded-3xl p-4">
+            <div className="flex justify-center gap-4">
+              <button
+                onClick={() => handleActionClick("send")}
+                className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
+                  activeAction === "send"
+                    ? 'text-black'
+                    : 'text-gray-300 hover:bg-gray-700'
+                }`}
+                style={{
+                  backgroundColor: activeAction === "send" ? '#00FF66' : undefined
+                }}
+              >
+                <Send size={24} />
+                <span className="text-xs mt-1 font-medium">Send</span>
+              </button>
+              
+              <button
+                onClick={() => handleActionClick("edit")}
+                className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
+                  activeAction === "edit"
+                    ? 'text-black'
+                    : 'text-gray-300 hover:bg-gray-700'
+                }`}
+                style={{
+                  backgroundColor: activeAction === "edit" ? '#00FF66' : undefined
+                }}
+              >
+                <Edit size={24} />
+                <span className="text-xs mt-1 font-medium">Edit</span>
+              </button>
+              
+              <button
+                onClick={() => handleActionClick("split")}
+                className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
+                  activeAction === "split"
+                    ? 'text-black'
+                    : 'text-gray-300 hover:bg-gray-700'
+                }`}
+                style={{
+                  backgroundColor: activeAction === "split" ? '#00FF66' : undefined
+                }}
+              >
+                <Split size={24} />
+                <span className="text-xs mt-1 font-medium">Split</span>
+              </button>
+              
+              <button
+                onClick={() => handleActionClick("more")}
+                className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
+                  activeAction === "more"
+                    ? 'text-black'
+                    : 'text-gray-300 hover:bg-gray-700'
+                }`}
+                style={{
+                  backgroundColor: activeAction === "more" ? '#00FF66' : undefined
+                }}
+              >
+                <MoreHorizontal size={24} />
+                <span className="text-xs mt-1 font-medium">More</span>
+              </button>
+            </div>
+          </div>
         </div>
 
-        {/* Action Panel */}
+        {/* Action Panel - Light Grey Dropdown */}
         <div className="px-6">
           <div 
             className="overflow-hidden transition-all duration-250 ease-in-out"
@@ -338,7 +342,7 @@ export default function MerchantTerminalMobile() {
               maxHeight: activeAction ? '400px' : '0px',
             }}
           >
-            <div className="bg-gray-800 rounded-2xl p-6 mb-6">
+            <div className="bg-gray-600 rounded-3xl p-6 mb-6">
               {activeAction === "edit" && (
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold mb-4 text-white">Create Transaction</h3>
@@ -473,10 +477,41 @@ export default function MerchantTerminalMobile() {
           </div>
         </div>
 
-        {/* QR Code Section */}
+        {/* Payment Status Box - Above QR Code with Glass Effect */}
+        {currentTransaction || activeTransaction ? (
+          <div className="px-6 mb-6">
+            <div 
+              className="backdrop-blur-xl border rounded-3xl p-6 shadow-2xl transition-all duration-300"
+              style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                borderColor: 'rgba(255, 255, 255, 0.15)',
+                boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5)'
+              }}
+            >
+              <div className="text-center">
+                <h3 className="text-lg font-bold text-white mb-2">
+                  Transaction #{(currentTransaction || activeTransaction).id}
+                </h3>
+                <p className="text-sm text-white/70 mb-4">
+                  {(currentTransaction || activeTransaction).itemName} - ${(currentTransaction || activeTransaction).price}
+                </p>
+                {getPaymentStatusIndicator((currentTransaction || activeTransaction).status)}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* QR Code Section - With Glass Effect */}
         <div className="px-6">
           {currentTransaction || activeTransaction ? (
-            <div className="bg-white rounded-2xl p-8 flex items-center justify-center">
+            <div 
+              className="backdrop-blur-xl border rounded-3xl p-8 flex items-center justify-center shadow-2xl transition-all duration-300"
+              style={{
+                background: 'rgba(255, 255, 255, 0.95)',
+                borderColor: 'rgba(255, 255, 255, 0.3)',
+                boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)'
+              }}
+            >
               <div className="text-center">
                 <div className="w-48 h-48 mx-auto mb-4">
                   <QRCodeDisplay 
@@ -486,13 +521,17 @@ export default function MerchantTerminalMobile() {
                 <p className="text-gray-600 text-sm">
                   {activeTab === "QR" ? "Scan to pay with any device" : "Tap your phone to pay"}
                 </p>
-                <div className="mt-4 text-center">
-                  {getPaymentStatusIndicator((currentTransaction || activeTransaction).status)}
-                </div>
               </div>
             </div>
           ) : (
-            <div className="bg-white rounded-2xl p-8 flex items-center justify-center">
+            <div 
+              className="backdrop-blur-xl border rounded-3xl p-8 flex items-center justify-center shadow-2xl transition-all duration-300"
+              style={{
+                background: 'rgba(255, 255, 255, 0.95)',
+                borderColor: 'rgba(255, 255, 255, 0.3)',
+                boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)'
+              }}
+            >
               <div className="text-center">
                 <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4">
                   {activeTab === "QR" ? (
