@@ -185,7 +185,7 @@ export default function Settings() {
         <div className="absolute inset-0 bg-gradient-to-t from-gray-600/20 via-transparent to-gray-900/30 animate-pulse"></div>
       </div>
 
-      <div className="relative z-10 max-w-4xl mx-auto px-3 sm:px-4 pt-32 pb-4 sm:pb-8">
+      <div className="relative z-10 max-w-4xl mx-auto px-3 sm:px-4 pb-4 sm:pb-8" style={{ paddingTop: isMobile ? '80px' : '128px' }}>
       <div className="mb-6 sm:mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Settings & Configuration</h1>
         <p className="text-sm sm:text-base text-white/70">Manage your payment processing configuration and API connections</p>

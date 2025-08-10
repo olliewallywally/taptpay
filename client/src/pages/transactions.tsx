@@ -256,7 +256,7 @@ export default function Transactions() {
         <div className="absolute inset-0 bg-gradient-to-t from-gray-600/10 via-transparent to-gray-900/20 animate-pulse"></div>
       </div>
 
-      <div className="relative z-10 p-4 sm:p-6 max-w-7xl mx-auto">
+      <div className="relative z-10 p-4 sm:p-6 max-w-7xl mx-auto" style={{ paddingTop: isMobile ? '80px' : '24px' }}>
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6 sm:mb-8">
           <Link href="/dashboard">
