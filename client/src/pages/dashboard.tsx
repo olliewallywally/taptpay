@@ -274,7 +274,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-800 via-gray-700 to-gray-900">
       {isMobile && <MobileHeader title="Dashboard" />}
-      <div className="container mx-auto px-4 pt-32 pb-8">
+      <div className="container mx-auto px-4 pt-20 pb-8">
         {/* Analytics Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
           <div className="dashboard-card-glass rounded-3xl p-6">
