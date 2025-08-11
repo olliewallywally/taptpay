@@ -73,7 +73,26 @@
   }
 }
 
-/* Liquid glass effect animations removed for minimalistic design */
+/* Modern payment status animations */
+@keyframes shimmer {
+  0%, 100% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  50% {
+    transform: translateX(0%);
+    opacity: 1;
+  }
+}
+
+@keyframes slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
 
 @layer base {
   * {
