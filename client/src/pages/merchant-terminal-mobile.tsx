@@ -691,29 +691,51 @@ export default function MerchantTerminalMobile() {
           </div>
         ) : null}
 
-        {/* QR Code Section - With Glass Effect */}
+        {/* Payment Interface Section - QR or NFC */}
         <div className="px-6">
-          {currentTransaction || activeTransaction ? (
-            <div 
-              className="backdrop-blur-xl border rounded-3xl p-8 flex items-center justify-center shadow-2xl transition-all duration-300"
-              style={{
-                background: 'rgba(255, 255, 255, 0.95)',
-                borderColor: 'rgba(255, 255, 255, 0.3)',
-                boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)'
-              }}
-            >
-              <div className="text-center">
-                <div className="w-48 h-48 mx-auto mb-4">
-                  <QRCodeDisplay 
-                    merchantId={merchantId} 
-                  />
+          {activeTab === "QR" ? (
+            // QR Code Interface
+            currentTransaction || activeTransaction ? (
+              <div 
+                className="backdrop-blur-xl border rounded-3xl p-8 flex items-center justify-center shadow-2xl transition-all duration-300"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.95)',
+                  borderColor: 'rgba(255, 255, 255, 0.3)',
+                  boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)'
+                }}
+              >
+                <div className="text-center">
+                  <div className="w-48 h-48 mx-auto mb-4">
+                    <QRCodeDisplay 
+                      merchantId={merchantId} 
+                    />
+                  </div>
+                  <p className="text-gray-600 text-sm">
+                    Scan to pay with any device
+                  </p>
                 </div>
-                <p className="text-gray-600 text-sm">
-                  {activeTab === "QR" ? "Scan to pay with any device" : "Tap your phone to pay"}
-                </p>
               </div>
-            </div>
+            ) : (
+              <div 
+                className="backdrop-blur-xl border rounded-3xl p-8 flex items-center justify-center shadow-2xl transition-all duration-300"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.95)',
+                  borderColor: 'rgba(255, 255, 255, 0.3)',
+                  boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)'
+                }}
+              >
+                <div className="text-center">
+                  <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4">
+                    <QrCode size={64} className="text-gray-400" />
+                  </div>
+                  <p className="text-gray-600 text-sm">
+                    Create a transaction to show QR code
+                  </p>
+                </div>
+              </div>
+            )
           ) : (
+            // NFC Interface - Clean interface without QR code
             <div 
               className="backdrop-blur-xl border rounded-3xl p-8 flex items-center justify-center shadow-2xl transition-all duration-300"
               style={{
@@ -723,20 +745,132 @@ export default function MerchantTerminalMobile() {
               }}
             >
               <div className="text-center">
-                <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4">
-                  {activeTab === "QR" ? (
-                    <QrCode size={64} className="text-gray-400" />
-                  ) : (
-                    <Smartphone size={64} className="text-gray-400" />
-                  )}
-                </div>
-                <p className="text-gray-600 text-sm">
-                  {activeTab === "QR" ? "Create a transaction to show QR code" : "Create a transaction for NFC payment"}
-                </p>
+                {currentTransaction || activeTransaction ? (
+                  <>
+                    <div className="w-48 h-48 bg-gradient-to-br from-blue-50 to-indigo-100 border-2 border-blue-200 rounded-lg flex flex-col items-center justify-center mb-4">
+                      <Waves size={48} className="text-blue-600 mb-2" />
+                      <div className="text-xs text-blue-600 font-medium">NFC READY</div>
+                    </div>
+                    <p className="text-gray-600 text-sm mb-4">
+                      Ready for contactless payment
+                    </p>
+                    <button 
+                      onClick={createNFCPayment}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors text-sm font-medium"
+                      disabled={nfcPaymentStatus === "creating"}
+                    >
+                      {nfcPaymentStatus === "creating" ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
+                          Starting...
+                        </>
+                      ) : (
+                        "Start NFC Payment"
+                      )}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4">
+                      <Smartphone size={64} className="text-gray-400" />
+                    </div>
+                    <p className="text-gray-600 text-sm">
+                      Create a transaction for NFC payment
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           )}
         </div>
+
+        {/* NFC Payment Overlay for Mobile */}
+        {showNfcOverlay && (
+          <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm">
+            <div className="min-h-screen flex items-center justify-center p-8">
+              <div className="bg-white/5 border border-white/10 rounded-3xl p-12 max-w-md w-full text-center backdrop-blur-xl shadow-2xl relative">
+                
+                {nfcPaymentStatus === "ready" && (
+                  <div className="space-y-12">
+                    <button
+                      onClick={closeNfcOverlay}
+                      className="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                    >
+                      <X className="h-5 w-5 text-white/70" />
+                    </button>
+                    
+                    <div className="mx-auto w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
+                      <Waves className="h-8 w-8 text-white/80" />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="text-5xl font-extralight text-white tracking-tight">${nfcSession?.amount}</div>
+                      <div className="text-white/60 text-lg font-light">{nfcSession?.itemName}</div>
+                    </div>
+                    
+                    <div className="space-y-6">
+                      <div className="text-white/80 text-xl font-light">Tap to Pay</div>
+                      <div className="text-white/50 text-sm">Present card or device to terminal</div>
+                      
+                      <button
+                        onClick={simulateNFCTap}
+                        className="w-full mt-8 py-4 px-6 bg-white/10 hover:bg-white/15 border border-white/20 rounded-2xl text-white/90 text-sm font-light transition-all duration-200 hover:border-white/30"
+                      >
+                        Simulate Payment
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
+                {nfcPaymentStatus === "processing" && (
+                  <div className="space-y-12">
+                    <div className="mx-auto w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
+                      <Loader2 className="h-8 w-8 text-white/80 animate-spin" />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="text-2xl font-light text-white">Processing Payment</div>
+                      <div className="text-white/60 text-sm">Please wait...</div>
+                    </div>
+                  </div>
+                )}
+
+                {nfcPaymentStatus === "completed" && (
+                  <div className="space-y-12">
+                    <div className="mx-auto w-20 h-20 rounded-full bg-green-500/20 border border-green-500/30 flex items-center justify-center">
+                      <CheckCircle className="h-8 w-8 text-green-400" />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="text-2xl font-light text-white">Payment Successful</div>
+                      <div className="text-white/60 text-sm">Transaction completed</div>
+                    </div>
+                  </div>
+                )}
+
+                {nfcPaymentStatus === "failed" && (
+                  <div className="space-y-12">
+                    <div className="mx-auto w-20 h-20 rounded-full bg-red-500/20 border border-red-500/30 flex items-center justify-center">
+                      <XCircle className="h-8 w-8 text-red-400" />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="text-2xl font-light text-white">Payment Failed</div>
+                      <div className="text-white/60 text-sm">Please try again</div>
+                    </div>
+                    
+                    <button
+                      onClick={resetNfcPayment}
+                      className="w-full py-4 px-6 bg-white/10 hover:bg-white/15 border border-white/20 rounded-2xl text-white/90 text-sm font-light transition-all duration-200 hover:border-white/30"
+                    >
+                      Try Again
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
           </div>
           </div>
         </div>
@@ -1020,62 +1154,144 @@ export default function MerchantTerminalMobile() {
               </div>
             )
           ) : (
-            // NFC Interface
-            currentTransaction || activeTransaction ? (
-              <div 
-                className="backdrop-blur-xl border rounded-3xl p-8 flex items-center justify-center shadow-2xl transition-all duration-300"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.95)',
-                  borderColor: 'rgba(255, 255, 255, 0.3)',
-                  boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)'
-                }}
-              >
-                <div className="text-center">
-                  <div className="w-48 h-48 bg-gradient-to-br from-blue-100 to-purple-100 border-2 border-blue-300 rounded-lg flex items-center justify-center mb-4">
-                    <Waves size={64} className="text-blue-600" />
-                  </div>
-                  <p className="text-gray-600 text-sm mb-4">
-                    Ready for contactless payment
-                  </p>
-                  <button 
-                    onClick={createNFCPayment}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors"
-                    disabled={nfcPaymentStatus === "creating"}
-                  >
-                    {nfcPaymentStatus === "creating" ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
-                        Starting...
-                      </>
-                    ) : (
-                      "Start NFC Payment"
-                    )}
-                  </button>
-                </div>
+            // NFC Interface - Clean interface without QR code
+            <div 
+              className="backdrop-blur-xl border rounded-3xl p-8 flex items-center justify-center shadow-2xl transition-all duration-300"
+              style={{
+                background: 'rgba(255, 255, 255, 0.95)',
+                borderColor: 'rgba(255, 255, 255, 0.3)',
+                boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)'
+              }}
+            >
+              <div className="text-center">
+                {currentTransaction || activeTransaction ? (
+                  <>
+                    <div className="w-48 h-48 bg-gradient-to-br from-blue-100 to-purple-100 border-2 border-blue-300 rounded-lg flex flex-col items-center justify-center mb-4">
+                      <Waves size={48} className="text-blue-600 mb-2" />
+                      <div className="text-xs text-blue-600 font-medium">NFC READY</div>
+                    </div>
+                    <p className="text-gray-600 text-sm mb-4">
+                      Ready for contactless payment
+                    </p>
+                    <button 
+                      onClick={createNFCPayment}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors"
+                      disabled={nfcPaymentStatus === "creating"}
+                    >
+                      {nfcPaymentStatus === "creating" ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
+                          Starting...
+                        </>
+                      ) : (
+                        "Start NFC Payment"
+                      )}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4">
+                      <Smartphone size={64} className="text-gray-400" />
+                    </div>
+                    <p className="text-gray-600 text-sm">
+                      Create a transaction for NFC payment
+                    </p>
+                  </>
+                )}
               </div>
-            ) : (
-              <div 
-                className="backdrop-blur-xl border rounded-3xl p-8 flex items-center justify-center shadow-2xl transition-all duration-300"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.95)',
-                  borderColor: 'rgba(255, 255, 255, 0.3)',
-                  boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)'
-                }}
-              >
-                <div className="text-center">
-                  <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4">
-                    <Smartphone size={64} className="text-gray-400" />
-                  </div>
-                  <p className="text-gray-600 text-sm">
-                    Create a transaction for NFC payment
-                  </p>
-                </div>
-              </div>
-            )
+            </div>
           )}
         </div>
 
         {/* NFC Payment Overlay */}
+        {showNfcOverlay && (
+          <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm">
+            <div className="min-h-screen flex items-center justify-center p-8">
+              <div className="bg-white/5 border border-white/10 rounded-3xl p-12 max-w-md w-full text-center backdrop-blur-xl shadow-2xl relative">
+                
+                {nfcPaymentStatus === "ready" && (
+                  <div className="space-y-12">
+                    <button
+                      onClick={closeNfcOverlay}
+                      className="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                    >
+                      <X className="h-5 w-5 text-white/70" />
+                    </button>
+                    
+                    <div className="mx-auto w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
+                      <Waves className="h-8 w-8 text-white/80" />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="text-5xl font-extralight text-white tracking-tight">${nfcSession?.amount}</div>
+                      <div className="text-white/60 text-lg font-light">{nfcSession?.itemName}</div>
+                    </div>
+                    
+                    <div className="space-y-6">
+                      <div className="text-white/80 text-xl font-light">Tap to Pay</div>
+                      <div className="text-white/50 text-sm">Present card or device to terminal</div>
+                      
+                      <button
+                        onClick={simulateNFCTap}
+                        className="w-full mt-8 py-4 px-6 bg-white/10 hover:bg-white/15 border border-white/20 rounded-2xl text-white/90 text-sm font-light transition-all duration-200 hover:border-white/30"
+                      >
+                        Simulate Payment
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
+                {nfcPaymentStatus === "processing" && (
+                  <div className="space-y-12">
+                    <div className="mx-auto w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
+                      <Loader2 className="h-8 w-8 text-white/80 animate-spin" />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="text-2xl font-light text-white">Processing Payment</div>
+                      <div className="text-white/60 text-sm">Please wait...</div>
+                    </div>
+                  </div>
+                )}
+
+                {nfcPaymentStatus === "completed" && (
+                  <div className="space-y-12">
+                    <div className="mx-auto w-20 h-20 rounded-full bg-green-500/20 border border-green-500/30 flex items-center justify-center">
+                      <CheckCircle className="h-8 w-8 text-green-400" />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="text-2xl font-light text-white">Payment Successful</div>
+                      <div className="text-white/60 text-sm">Transaction completed</div>
+                    </div>
+                  </div>
+                )}
+
+                {nfcPaymentStatus === "failed" && (
+                  <div className="space-y-12">
+                    <div className="mx-auto w-20 h-20 rounded-full bg-red-500/20 border border-red-500/30 flex items-center justify-center">
+                      <XCircle className="h-8 w-8 text-red-400" />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="text-2xl font-light text-white">Payment Failed</div>
+                      <div className="text-white/60 text-sm">Please try again</div>
+                    </div>
+                    
+                    <button
+                      onClick={resetNfcPayment}
+                      className="w-full py-4 px-6 bg-white/10 hover:bg-white/15 border border-white/20 rounded-2xl text-white/90 text-sm font-light transition-all duration-200 hover:border-white/30"
+                    >
+                      Try Again
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* NFC Payment Overlay for Desktop */}
         {showNfcOverlay && (
           <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm">
             <div className="min-h-screen flex items-center justify-center p-8">
