@@ -263,7 +263,6 @@ export default function Dashboard() {
 
           {/* Revenue Chart */}
           <div className="dashboard-card-glass rounded-3xl p-8 mb-8">
-            <h2 className="text-lg font-semibold text-white mb-6">Revenue Overview (Last 30 Days)</h2>
             {revenueData && revenueData.length > 0 ? (
               <div className="h-48 md:h-64">
                 <ResponsiveContainer width="100%" height="100%">
@@ -317,15 +316,6 @@ export default function Dashboard() {
 
           {/* Export Data */}
           <div className="dashboard-card-glass rounded-3xl p-8">
-            <div className="mb-6">
-              <h2 className="flex items-center space-x-2 text-lg font-semibold text-white">
-                <Download className="h-4 w-4 text-[#00FF66] drop-shadow-[0_0_8px_#00FF66]" />
-                <span>Export Data</span>
-              </h2>
-              <p className="text-white/70 text-sm">
-                Download your transaction data and business reports
-              </p>
-            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex items-center justify-between p-4 backdrop-blur-lg bg-white/10 border border-white/20 rounded-2xl">
                 <div className="flex items-center space-x-3">
