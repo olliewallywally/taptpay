@@ -289,40 +289,175 @@ export default function MerchantTerminalMobile() {
     switch (status) {
       case "pending":
         return (
-          <div className="flex flex-col items-center space-y-2 p-4 bg-blue-500/20 rounded-xl">
-            <div className="flex items-center space-x-2">
-              <Clock className="w-5 h-5 text-blue-300" />
-              <span className="text-sm font-medium text-blue-200">Awaiting Payment</span>
+          <div className="relative overflow-hidden">
+            {/* Animated Background */}
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 via-cyan-500/10 to-blue-500/10 animate-pulse rounded-2xl"></div>
+            
+            {/* Scanning Lines Effect */}
+            <div className="absolute inset-0 overflow-hidden rounded-2xl">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-400/20 to-transparent animate-[scan_2s_ease-in-out_infinite] transform -translate-x-full"></div>
+            </div>
+            
+            <div className="relative flex flex-col items-center space-y-4 p-6 bg-gradient-to-br from-blue-500/20 via-cyan-500/10 to-blue-500/20 backdrop-blur-sm border border-cyan-400/30 rounded-2xl shadow-[0_0_30px_rgba(0,255,255,0.3)]">
+              {/* Pulsing Icon */}
+              <div className="relative">
+                <div className="absolute inset-0 bg-cyan-400/30 rounded-full animate-ping"></div>
+                <div className="relative p-3 bg-cyan-500/20 rounded-full border border-cyan-400/40">
+                  <Waves className="w-6 h-6 text-cyan-300 animate-pulse" />
+                </div>
+              </div>
+              
+              <div className="text-center">
+                <div className="text-lg font-bold text-cyan-200 mb-1 animate-pulse">
+                  PAYMENT READY
+                </div>
+                <div className="text-sm text-cyan-300/80 tracking-wide">
+                  Waiting for customer...
+                </div>
+              </div>
+              
+              {/* Progress Dots */}
+              <div className="flex space-x-1">
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"
+                    style={{ animationDelay: `${i * 0.3}s` }}
+                  ></div>
+                ))}
+              </div>
             </div>
           </div>
         );
+        
       case "processing":
         return (
-          <div className="flex flex-col items-center space-y-2 p-4 bg-orange-500/20 rounded-xl">
-            <div className="flex items-center space-x-2">
-              <Loader2 className="w-5 h-5 text-orange-300 animate-spin" />
-              <span className="text-sm font-medium text-orange-200">Processing Payment</span>
+          <div className="relative overflow-hidden">
+            {/* Electric Background */}
+            <div className="absolute inset-0 bg-gradient-to-r from-orange-500/20 via-yellow-500/20 to-orange-500/20 animate-pulse rounded-2xl"></div>
+            
+            {/* Lightning Effect */}
+            <div className="absolute inset-0 overflow-hidden rounded-2xl">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-yellow-400 to-transparent animate-[lightning_1s_ease-in-out_infinite]"></div>
+              <div className="absolute bottom-0 right-0 w-full h-1 bg-gradient-to-l from-transparent via-orange-400 to-transparent animate-[lightning_1s_ease-in-out_infinite] animation-delay-500"></div>
+            </div>
+            
+            <div className="relative flex flex-col items-center space-y-4 p-6 bg-gradient-to-br from-orange-500/20 via-yellow-500/10 to-orange-500/20 backdrop-blur-sm border border-yellow-400/40 rounded-2xl shadow-[0_0_40px_rgba(255,165,0,0.4)]">
+              {/* Spinning Processing Icon */}
+              <div className="relative">
+                <div className="absolute inset-0 bg-yellow-400/30 rounded-full animate-spin"></div>
+                <div className="relative p-3 bg-orange-500/20 rounded-full border border-yellow-400/50">
+                  <Loader2 className="w-6 h-6 text-yellow-300 animate-spin" />
+                </div>
+              </div>
+              
+              <div className="text-center">
+                <div className="text-lg font-bold text-yellow-200 mb-1 animate-bounce">
+                  PROCESSING...
+                </div>
+                <div className="text-sm text-orange-300/80 tracking-wide">
+                  Securing transaction
+                </div>
+              </div>
+              
+              {/* Loading Bar */}
+              <div className="w-32 h-2 bg-black/30 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-orange-400 to-yellow-400 animate-[loading_2s_ease-in-out_infinite] rounded-full"></div>
+              </div>
             </div>
           </div>
         );
+        
       case "completed":
         return (
-          <div className="flex flex-col items-center space-y-2 p-4 bg-green-500/20 rounded-xl">
-            <div className="flex items-center space-x-2">
-              <CheckCircle className="w-5 h-5 text-green-300" />
-              <span className="text-sm font-medium text-green-200">Payment Accepted</span>
+          <div className="relative overflow-hidden">
+            {/* Success Burst */}
+            <div className="absolute inset-0 bg-gradient-to-r from-green-500/30 via-emerald-400/30 to-green-500/30 animate-pulse rounded-2xl"></div>
+            
+            {/* Celebration Particles */}
+            <div className="absolute inset-0 overflow-hidden rounded-2xl">
+              {[...Array(8)].map((_, i) => (
+                <div
+                  key={i}
+                  className="absolute w-1 h-1 bg-emerald-400 rounded-full animate-[particle_2s_ease-out_infinite]"
+                  style={{
+                    left: `${20 + i * 10}%`,
+                    animationDelay: `${i * 0.2}s`,
+                  }}
+                ></div>
+              ))}
+            </div>
+            
+            <div className="relative flex flex-col items-center space-y-4 p-6 bg-gradient-to-br from-green-500/30 via-emerald-500/20 to-green-500/30 backdrop-blur-sm border border-emerald-400/50 rounded-2xl shadow-[0_0_50px_rgba(0,255,100,0.5)]">
+              {/* Success Checkmark */}
+              <div className="relative">
+                <div className="absolute inset-0 bg-emerald-400/40 rounded-full animate-ping"></div>
+                <div className="relative p-3 bg-green-500/30 rounded-full border border-emerald-400/60">
+                  <CheckCircle className="w-6 h-6 text-emerald-300 animate-bounce" />
+                </div>
+              </div>
+              
+              <div className="text-center">
+                <div className="text-lg font-bold text-emerald-200 mb-1 animate-pulse">
+                  PAYMENT SUCCESS! 🎉
+                </div>
+                <div className="text-sm text-green-300/80 tracking-wide">
+                  Transaction completed
+                </div>
+              </div>
+              
+              {/* Success Ripple */}
+              <div className="relative">
+                <div className="w-16 h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent animate-[ripple_1s_ease-out_infinite]"></div>
+              </div>
             </div>
           </div>
         );
+        
       case "failed":
         return (
-          <div className="flex flex-col items-center space-y-2 p-4 bg-red-500/20 rounded-xl">
-            <div className="flex items-center space-x-2">
-              <XCircle className="w-5 h-5 text-red-300" />
-              <span className="text-sm font-medium text-red-200">Payment Failed</span>
+          <div className="relative overflow-hidden">
+            {/* Error Flash */}
+            <div className="absolute inset-0 bg-gradient-to-r from-red-500/20 via-pink-500/20 to-red-500/20 animate-pulse rounded-2xl"></div>
+            
+            {/* Warning Lines */}
+            <div className="absolute inset-0 overflow-hidden rounded-2xl">
+              <div className="absolute top-2 left-0 w-full h-0.5 bg-gradient-to-r from-transparent via-red-400 to-transparent animate-[warning_1.5s_ease-in-out_infinite]"></div>
+              <div className="absolute bottom-2 right-0 w-full h-0.5 bg-gradient-to-l from-transparent via-red-400 to-transparent animate-[warning_1.5s_ease-in-out_infinite] animation-delay-750"></div>
+            </div>
+            
+            <div className="relative flex flex-col items-center space-y-4 p-6 bg-gradient-to-br from-red-500/20 via-pink-500/10 to-red-500/20 backdrop-blur-sm border border-red-400/40 rounded-2xl shadow-[0_0_30px_rgba(255,0,0,0.3)]">
+              {/* Error Icon */}
+              <div className="relative">
+                <div className="absolute inset-0 bg-red-400/30 rounded-full animate-pulse"></div>
+                <div className="relative p-3 bg-red-500/20 rounded-full border border-red-400/50">
+                  <XCircle className="w-6 h-6 text-red-300 animate-pulse" />
+                </div>
+              </div>
+              
+              <div className="text-center">
+                <div className="text-lg font-bold text-red-200 mb-1 animate-pulse">
+                  PAYMENT FAILED
+                </div>
+                <div className="text-sm text-red-300/80 tracking-wide">
+                  Please try again
+                </div>
+              </div>
+              
+              {/* Error indicator */}
+              <div className="flex space-x-1">
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className="w-2 h-2 bg-red-400 rounded-full animate-pulse"
+                    style={{ animationDelay: `${i * 0.2}s` }}
+                  ></div>
+                ))}
+              </div>
             </div>
           </div>
         );
+        
       default:
         return null;
     }
