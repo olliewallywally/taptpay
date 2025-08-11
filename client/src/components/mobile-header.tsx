@@ -5,13 +5,12 @@ import { Link } from "wouter";
 interface MobileHeaderProps {
   title: string;
   showMenu?: boolean;
-  children?: React.ReactNode;
 }
 
-export function MobileHeader({ title, showMenu = true, children }: MobileHeaderProps) {
+export function MobileHeader({ title, showMenu = true }: MobileHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Close menu when clicking on content
+  // Close menu when clicking on main content
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuOpen && (event.target as Element).closest('.main-content')) {
@@ -24,10 +23,10 @@ export function MobileHeader({ title, showMenu = true, children }: MobileHeaderP
   }, [menuOpen]);
 
   return (
-    <div className="relative h-screen overflow-hidden">
+    <>
       {/* Background Menu */}
       <div className="fixed inset-0 bg-gray-900 z-[10]">
-        <div className="p-6 pt-8">
+        <div className="p-6 pt-16">
           <nav className="space-y-1">
             <Link 
               href="/merchant" 
@@ -74,13 +73,13 @@ export function MobileHeader({ title, showMenu = true, children }: MobileHeaderP
 
       {/* Main Content that slides */}
       <div 
-        className="main-content relative h-full bg-black z-[20] transition-transform duration-300 ease-in-out"
+        className="main-content fixed inset-0 bg-black z-[20] transition-transform duration-300 ease-in-out"
         style={{
           transform: menuOpen ? 'translateX(70%)' : 'translateX(0)',
         }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between backdrop-blur-xl bg-black/20 border-b border-white/20 p-4">
+        <div className="flex items-center justify-between backdrop-blur-xl bg-black/80 border-b border-white/20 p-4">
           <div className="flex-1 flex justify-start">
             {showMenu && (
               <button
@@ -94,12 +93,7 @@ export function MobileHeader({ title, showMenu = true, children }: MobileHeaderP
           <h1 className="text-xl font-bold text-center text-white">{title}</h1>
           <div className="flex-1" />
         </div>
-
-        {/* Content */}
-        <div className="h-full overflow-auto">
-          {children}
-        </div>
       </div>
-    </div>
+    </>
   );
 }
