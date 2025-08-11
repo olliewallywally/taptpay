@@ -155,46 +155,61 @@ export default function Dashboard() {
 
   return (
     <>
-      {/* Menu Overlay */}
-      {menuOpen && (
-        <div className="fixed inset-0 bg-black/80 z-40" onClick={() => setMenuOpen(false)}>
-          <div className="fixed right-0 top-0 h-full w-80 bg-gray-900 border-l border-white/20 p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-8">
-              <h2 className="text-xl font-bold text-white">Menu</h2>
-              <button onClick={() => setMenuOpen(false)} className="text-white/70 hover:text-white">
-                <X className="h-6 w-6" />
+      {/* Menu Backdrop */}
+      <div 
+        className={`fixed inset-0 bg-black/60 z-40 transition-opacity duration-300 ${
+          menuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={() => setMenuOpen(false)}
+      />
+
+      {/* Sliding Menu */}
+      <div 
+        className={`fixed right-0 top-0 h-full w-80 bg-gray-900 border-l border-white/20 z-50 transform transition-transform duration-300 ease-in-out ${
+          menuOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-8">
+            <h2 className="text-xl font-bold text-white">Menu</h2>
+            <button onClick={() => setMenuOpen(false)} className="text-white/70 hover:text-white">
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+          <nav className="space-y-4">
+            <a href="/dashboard" className="block py-3 px-4 text-white bg-[#00FF66]/20 rounded-xl">
+              Dashboard
+            </a>
+            <a href="/merchant" className="block py-3 px-4 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors">
+              Terminal
+            </a>
+            <a href="/transactions" className="block py-3 px-4 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors">
+              Transactions
+            </a>
+            <a href="/settings" className="block py-3 px-4 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors">
+              Settings
+            </a>
+            <div className="pt-4 mt-4 border-t border-white/20">
+              <button 
+                onClick={() => {
+                  localStorage.removeItem('auth-token');
+                  window.location.href = '/login';
+                }}
+                className="block w-full text-left py-3 px-4 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-colors"
+              >
+                Logout
               </button>
             </div>
-            <nav className="space-y-4">
-              <a href="/dashboard" className="block py-3 px-4 text-white bg-[#00FF66]/20 rounded-xl">
-                Dashboard
-              </a>
-              <a href="/merchant" className="block py-3 px-4 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors">
-                Terminal
-              </a>
-              <a href="/transactions" className="block py-3 px-4 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors">
-                Transactions
-              </a>
-              <a href="/settings" className="block py-3 px-4 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors">
-                Settings
-              </a>
-              <div className="pt-4 mt-4 border-t border-white/20">
-                <button 
-                  onClick={() => {
-                    localStorage.removeItem('auth-token');
-                    window.location.href = '/login';
-                  }}
-                  className="block w-full text-left py-3 px-4 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-colors"
-                >
-                  Logout
-                </button>
-              </div>
-            </nav>
-          </div>
+          </nav>
         </div>
-      )}
+      </div>
 
-      <div className="min-h-screen bg-gradient-to-br from-gray-800 via-gray-700 to-gray-900">
+      {/* Main Content with Slide Animation */}
+      <div 
+        className={`min-h-screen bg-gradient-to-br from-gray-800 via-gray-700 to-gray-900 transform transition-transform duration-300 ease-in-out ${
+          menuOpen ? '-translate-x-80' : 'translate-x-0'
+        }`}
+      >
         {/* Menu Icon */}
         <div className="fixed top-4 right-4 z-30">
           <button
