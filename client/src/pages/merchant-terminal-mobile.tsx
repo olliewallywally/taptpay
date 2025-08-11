@@ -59,15 +59,22 @@ export default function MerchantTerminalMobile() {
           const capabilities = await response.json();
           setNfcCapabilities(capabilities);
           
+          // Allow NFC testing even if device doesn't natively support it
           if (!capabilities.nfcSupported) {
             toast({
-              title: "NFC Not Supported",
-              description: "This device doesn't support NFC payments. Use QR code instead.",
-              variant: "destructive",
+              title: "NFC Simulation Mode",
+              description: "Using simulation mode for NFC payments on this device.",
             });
           }
         } catch (error) {
           console.error('Failed to check NFC capabilities:', error);
+          // Set fallback capabilities for testing
+          setNfcCapabilities({
+            nfcSupported: false,
+            contactlessCard: true,
+            applePay: false,
+            googlePay: false
+          });
         }
       };
       
@@ -197,29 +204,31 @@ export default function MerchantTerminalMobile() {
           amount: parseFloat(transaction.price),
           itemName: transaction.itemName,
           deviceId: navigator.userAgent,
-          nfcCapabilities: nfcCapabilities
+          nfcCapabilities: nfcCapabilities || { nfcSupported: false, contactlessCard: true }
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create NFC payment session');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create NFC payment session');
       }
 
       const result = await response.json();
+      console.log('NFC payment created:', result);
       setNfcSession(result.nfcSession);
       setNfcPaymentStatus("ready");
       setShowNfcOverlay(true);
       
       toast({
-        title: "Payment Terminal Ready",
-        description: "Ask customer to tap their card or digital wallet.",
+        title: "NFC Terminal Ready",
+        description: "Ready to accept contactless payments.",
       });
     } catch (error) {
       console.error('NFC payment creation failed:', error);
       setNfcPaymentStatus("failed");
       toast({
         title: "Payment Failed",
-        description: "Could not create NFC payment session.",
+        description: error.message || "Could not create NFC payment session.",
         variant: "destructive",
       });
     }
@@ -1035,17 +1044,19 @@ export default function MerchantTerminalMobile() {
                     <Waves size={64} className="text-blue-600" />
                   </div>
                   <p className="text-gray-600 text-sm mb-4">
-                    Ready for contactless payment
+                    {nfcCapabilities?.nfcSupported 
+                      ? "Ready for contactless payment" 
+                      : "NFC Simulation Mode - Testing Available"}
                   </p>
                   <button 
                     onClick={createNFCPayment}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors"
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors font-medium"
                     disabled={nfcPaymentStatus === "creating"}
                   >
                     {nfcPaymentStatus === "creating" ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
-                        Starting...
+                        Starting NFC Terminal...
                       </>
                     ) : (
                       "Start NFC Payment"
