@@ -73,76 +73,7 @@
   }
 }
 
-/* Gamified Payment Status Animations */
-@keyframes scan {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(300%);
-  }
-}
-
-@keyframes lightning {
-  0%, 100% {
-    opacity: 0;
-    transform: scaleX(0);
-  }
-  50% {
-    opacity: 1;
-    transform: scaleX(1);
-  }
-}
-
-@keyframes loading {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(200%);
-  }
-}
-
-@keyframes particle {
-  0% {
-    transform: translateY(0) scale(1);
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(-30px) scale(0);
-    opacity: 0;
-  }
-}
-
-@keyframes ripple {
-  0% {
-    transform: scaleX(0);
-    opacity: 1;
-  }
-  100% {
-    transform: scaleX(3);
-    opacity: 0;
-  }
-}
-
-@keyframes warning {
-  0%, 100% {
-    opacity: 0.3;
-    transform: scaleX(0.5);
-  }
-  50% {
-    opacity: 1;
-    transform: scaleX(1);
-  }
-}
-
-.animation-delay-500 {
-  animation-delay: 0.5s;
-}
-
-.animation-delay-750 {
-  animation-delay: 0.75s;
-}
+/* Liquid glass effect animations removed for minimalistic design */
 
 @layer base {
   * {
