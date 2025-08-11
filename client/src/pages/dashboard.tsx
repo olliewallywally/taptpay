@@ -192,7 +192,7 @@ export default function Dashboard() {
           <div className="dashboard-card-glass rounded-3xl p-6">
             <div className="flex flex-row items-center justify-between space-y-0 pb-2">
               <h3 className="text-sm font-medium text-white/90">Total Revenue</h3>
-              <DollarSign className="h-4 w-4 text-green-400" />
+              <DollarSign className="h-4 w-4 text-[#00FF66] drop-shadow-[0_0_8px_#00FF66]" />
             </div>
             <div className="text-2xl font-bold text-white">
               ${analytics?.totalRevenue?.toFixed(2) || "0.00"}
@@ -205,7 +205,7 @@ export default function Dashboard() {
           <div className="dashboard-card-glass rounded-3xl p-6">
             <div className="flex flex-row items-center justify-between space-y-0 pb-2">
               <h3 className="text-sm font-medium text-white/90">Total Transactions</h3>
-              <CreditCard className="h-4 w-4 text-blue-400" />
+              <CreditCard className="h-4 w-4 text-[#00FF66] drop-shadow-[0_0_8px_#00FF66]" />
             </div>
             <div className="text-2xl font-bold text-white">
               {analytics?.totalTransactions || 0}
@@ -218,7 +218,7 @@ export default function Dashboard() {
           <div className="dashboard-card-glass rounded-3xl p-6">
             <div className="flex flex-row items-center justify-between space-y-0 pb-2">
               <h3 className="text-sm font-medium text-white/90">Success Rate</h3>
-              <TrendingUp className="h-4 w-4 text-green-400" />
+              <TrendingUp className="h-4 w-4 text-[#00FF66] drop-shadow-[0_0_8px_#00FF66]" />
             </div>
             <div className="text-2xl font-bold text-white">
               {analytics?.successRate ? `${analytics.successRate.toFixed(1)}%` : "0%"}
@@ -231,7 +231,7 @@ export default function Dashboard() {
           <div className="dashboard-card-glass rounded-3xl p-6">
             <div className="flex flex-row items-center justify-between space-y-0 pb-2">
               <h3 className="text-sm font-medium text-white/90">Avg. Transaction</h3>
-              <PiggyBank className="h-4 w-4 text-purple-400" />
+              <PiggyBank className="h-4 w-4 text-[#00FF66] drop-shadow-[0_0_8px_#00FF66]" />
             </div>
             <div className="text-2xl font-bold text-white">
               ${analytics?.averageTransactionAmount?.toFixed(2) || "0.00"}
@@ -288,7 +288,7 @@ export default function Dashboard() {
           ) : (
             <div className="h-48 md:h-64 flex items-center justify-center">
               <div className="text-center px-4">
-                <TrendingUp className="h-8 w-8 md:h-12 md:w-12 text-white/40 mx-auto mb-4" />
+                <TrendingUp className="h-8 w-8 md:h-12 md:w-12 text-[#00FF66] drop-shadow-[0_0_12px_#00FF66] mx-auto mb-4" />
                 <p className="text-white/70 text-sm md:text-base">No revenue data available yet</p>
                 <p className="text-white/50 text-xs md:text-sm">Complete some transactions to see your revenue performance</p>
               </div>
@@ -300,7 +300,7 @@ export default function Dashboard() {
         <div className="dashboard-card-glass rounded-3xl p-8">
           <div className="mb-6">
             <h2 className="flex items-center space-x-2 text-lg font-semibold text-white">
-              <Download className="h-4 w-4" />
+              <Download className="h-4 w-4 text-[#00FF66] drop-shadow-[0_0_8px_#00FF66]" />
               <span>Export Data</span>
             </h2>
             <p className="text-white/70 text-sm">
@@ -310,7 +310,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="flex items-center justify-between p-4 backdrop-blur-lg bg-white/10 border border-white/20 rounded-2xl">
               <div className="flex items-center space-x-3">
-                <FileSpreadsheet className="h-8 w-8 text-green-400" />
+                <FileSpreadsheet className="h-8 w-8 text-[#00FF66] drop-shadow-[0_0_12px_#00FF66]" />
                 <div>
                   <p className="font-medium text-sm text-white">Transaction Data</p>
                   <p className="text-xs text-white/60">CSV format for Excel</p>
@@ -331,7 +331,7 @@ export default function Dashboard() {
 
             <div className="flex items-center justify-between p-4 backdrop-blur-lg bg-white/10 border border-white/20 rounded-2xl">
               <div className="flex items-center space-x-3">
-                <FileText className="h-8 w-8 text-green-400" />
+                <FileText className="h-8 w-8 text-[#00FF66] drop-shadow-[0_0_12px_#00FF66]" />
                 <div>
                   <p className="font-medium text-sm text-white">Business Report</p>
                   <p className="text-xs text-white/60">PDF with analytics</p>
