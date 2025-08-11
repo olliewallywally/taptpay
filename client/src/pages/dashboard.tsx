@@ -66,14 +66,7 @@ export default function Dashboard() {
     return <div>Redirecting to login...</div>;
   }
 
-  const [isEditingRate, setIsEditingRate] = useState(false);
 
-  const form = useForm<RateUpdateFormData>({
-    resolver: zodResolver(rateUpdateSchema),
-    defaultValues: {
-      currentProviderRate: "",
-    },
-  });
 
   const { data: analytics, isLoading: analyticsLoading } = useQuery({
     queryKey: ["/api/merchants", merchantId, "analytics"],
@@ -102,31 +95,7 @@ export default function Dashboard() {
     },
   });
 
-  const rateUpdateMutation = useMutation({
-    mutationFn: async (data: RateUpdateFormData) => {
-      return apiRequest(`/api/merchants/${merchantId}/analytics`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          currentProviderRate: parseFloat(data.currentProviderRate) / 100,
-        }),
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "analytics"] });
-      setIsEditingRate(false);
-      toast({
-        title: "Rate updated",
-        description: "Your current provider rate has been updated successfully.",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to update rate. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
+
 
   const csvExportMutation = useMutation({
     mutationFn: async () => {
@@ -186,20 +155,7 @@ export default function Dashboard() {
     },
   });
 
-  const handleEditRate = () => {
-    const currentRate = analytics?.currentProviderRate ? (analytics.currentProviderRate * 100).toFixed(2) : "2.90";
-    form.setValue("currentProviderRate", currentRate);
-    setIsEditingRate(true);
-  };
 
-  const handleCancelEdit = () => {
-    setIsEditingRate(false);
-    form.reset();
-  };
-
-  const onSubmit = (data: RateUpdateFormData) => {
-    rateUpdateMutation.mutate(data);
-  };
 
   const downloadCSV = () => {
     csvExportMutation.mutate();
@@ -209,27 +165,7 @@ export default function Dashboard() {
     pdfExportMutation.mutate();
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return <CheckCircle className="h-4 w-4 text-green-400" />;
-      case 'failed':
-        return <XCircle className="h-4 w-4 text-red-400" />;
-      default:
-        return <Clock className="h-4 w-4 text-yellow-400" />;
-    }
-  };
 
-  const getStatusBadgeVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
-    switch (status) {
-      case 'completed':
-        return 'default';
-      case 'failed':
-        return 'destructive';
-      default:
-        return 'secondary';
-    }
-  };
 
   if (analyticsLoading) {
     return (
@@ -251,12 +187,6 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-800 via-gray-700 to-gray-900">
       <div className="container mx-auto px-4 pt-20 pb-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Dashboard</h1>
-          <p className="text-white/70">Monitor your payment performance and business insights</p>
-        </div>
-
         {/* Analytics Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
           <div className="dashboard-card-glass rounded-3xl p-6">
@@ -310,166 +240,6 @@ export default function Dashboard() {
               Average payment amount
             </p>
           </div>
-        </div>
-
-        {/* Savings Calculator */}
-        <div className="dashboard-card-glass rounded-3xl p-8 mb-8">
-          <div className="mb-6">
-            <h2 className="flex items-center space-x-2 text-lg font-semibold text-white">
-              <Calculator className="h-4 w-4" />
-              <span>Savings Calculator</span>
-            </h2>
-            <p className="text-white/70 text-sm">
-              Compare your current payment provider rates with Tapt's pricing
-            </p>
-          </div>
-
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h3 className="text-sm font-medium text-white mb-3">Current Provider</h3>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between p-4 backdrop-blur-lg bg-white/10 border border-white/20 rounded-2xl">
-                      <span className="text-sm text-white/70">Processing Rate</span>
-                      <div className="flex items-center space-x-2">
-                        {isEditingRate ? (
-                          <div className="flex items-center space-x-2">
-                            <FormField
-                              control={form.control}
-                              name="currentProviderRate"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormControl>
-                                    <Input
-                                      {...field}
-                                      className="w-20 h-8 text-xs bg-white/20 border-white/30 text-white"
-                                      placeholder="2.9"
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <span className="text-xs text-white/70">%</span>
-                            <Button type="submit" size="sm" className="h-6 w-6 p-0">
-                              <Check className="h-3 w-3" />
-                            </Button>
-                            <Button 
-                              type="button" 
-                              variant="ghost" 
-                              size="sm" 
-                              className="h-6 w-6 p-0"
-                              onClick={handleCancelEdit}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center space-x-2">
-                            <span className="text-sm text-white">
-                              {analytics?.currentProviderRate ? `${(analytics.currentProviderRate * 100).toFixed(2)}%` : "2.90%"}
-                            </span>
-                            <Button 
-                              type="button" 
-                              variant="ghost" 
-                              size="sm" 
-                              className="h-6 w-6 p-0"
-                              onClick={handleEditRate}
-                            >
-                              <Edit2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between p-4 backdrop-blur-lg bg-white/10 border border-white/20 rounded-2xl">
-                      <span className="text-sm text-white/70">Monthly Cost</span>
-                      <span className="text-sm text-white">
-                        ${analytics?.currentProviderMonthlyCost?.toFixed(2) || "0.00"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-medium text-white mb-3">Tapt Pricing</h3>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between p-4 backdrop-blur-lg bg-green-500/20 border border-green-400/30 rounded-2xl">
-                      <span className="text-sm text-green-200">Processing Rate</span>
-                      <span className="text-sm text-green-200 font-medium">0.50%</span>
-                    </div>
-                    <div className="flex items-center justify-between p-4 backdrop-blur-lg bg-green-500/20 border border-green-400/30 rounded-2xl">
-                      <span className="text-sm text-green-200">Monthly Cost</span>
-                      <span className="text-sm text-green-200 font-medium">
-                        ${analytics?.taptMonthlyCost?.toFixed(2) || "0.00"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {analytics?.monthlySavings && analytics.monthlySavings > 0 && (
-                <div className="p-6 backdrop-blur-lg bg-green-500/20 border border-green-400/30 rounded-2xl">
-                  <div className="text-center">
-                    <h3 className="text-lg font-semibold text-green-200 mb-2">
-                      You could save ${analytics.monthlySavings.toFixed(2)} per month!
-                    </h3>
-                    <p className="text-sm text-green-300">
-                      That's ${(analytics.monthlySavings * 12).toFixed(2)} in annual savings with Tapt's 0.50% processing rate.
-                    </p>
-                  </div>
-                </div>
-              )}
-            </form>
-          </Form>
-        </div>
-
-        {/* Recent Transactions */}
-        <div className="dashboard-card-glass rounded-3xl p-8 mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
-            <h2 className="text-lg font-semibold text-white mb-2 sm:mb-0">Recent Transactions</h2>
-            <Button 
-              variant="outline" 
-              className="border-white/20 text-white hover:bg-white/10"
-              onClick={() => window.location.href = '/transactions'}
-            >
-              View All
-            </Button>
-          </div>
-          
-          {transactions && transactions.length > 0 ? (
-            <div className="space-y-3">
-              {transactions.slice(0, 5).map((transaction: any) => (
-                <div 
-                  key={transaction.id} 
-                  className="flex items-center justify-between p-4 backdrop-blur-lg bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-colors"
-                >
-                  <div className="flex items-center space-x-3">
-                    {getStatusIcon(transaction.status)}
-                    <div>
-                      <p className="text-sm font-medium text-white">{transaction.itemName}</p>
-                      <p className="text-xs text-white/60">
-                        {format(new Date(transaction.createdAt), "MMM d, h:mm a")}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-white">${transaction.price}</p>
-                    <Badge variant={getStatusBadgeVariant(transaction.status)} className="text-xs">
-                      {transaction.status}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <CreditCard className="h-12 w-12 text-white/40 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-white mb-2">No transactions yet</h3>
-              <p className="text-white/60 text-sm">Start accepting payments to see your transaction history here.</p>
-            </div>
-          )}
         </div>
 
         {/* Revenue Chart */}
