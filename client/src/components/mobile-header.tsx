@@ -27,7 +27,7 @@ export function MobileHeader({ title, showMenu = true, children }: MobileHeaderP
     <div className="relative h-screen overflow-hidden">
       {/* Background Menu */}
       <div className="fixed inset-0 bg-gray-900 z-[10]">
-        <div className="p-6 pt-20">
+        <div className="p-6 pt-8">
           <nav className="space-y-1">
             <Link 
               href="/merchant" 
