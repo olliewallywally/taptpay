@@ -1,13 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, ReactNode } from "react";
 import { Menu } from "lucide-react";
 import { Link } from "wouter";
 
 interface MobileHeaderProps {
   title: string;
+  children: ReactNode;
   showMenu?: boolean;
 }
 
-export function MobileHeader({ title, showMenu = true }: MobileHeaderProps) {
+export function MobileHeader({ title, children, showMenu = true }: MobileHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Close menu when clicking on main content
@@ -73,7 +74,7 @@ export function MobileHeader({ title, showMenu = true }: MobileHeaderProps) {
 
       {/* Main Content that slides */}
       <div 
-        className="main-content fixed inset-0 bg-black z-[20] transition-transform duration-300 ease-in-out"
+        className="main-content fixed inset-0 bg-black z-[20] transition-transform duration-300 ease-in-out overflow-hidden"
         style={{
           transform: menuOpen ? 'translateX(70%)' : 'translateX(0)',
         }}
@@ -92,6 +93,11 @@ export function MobileHeader({ title, showMenu = true }: MobileHeaderProps) {
           </div>
           <h1 className="text-xl font-bold text-center text-white">{title}</h1>
           <div className="flex-1" />
+        </div>
+        
+        {/* Content area that scrolls */}
+        <div className="h-full overflow-y-auto" style={{ paddingTop: '0px' }}>
+          {children}
         </div>
       </div>
     </>
