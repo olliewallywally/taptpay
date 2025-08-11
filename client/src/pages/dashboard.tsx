@@ -62,9 +62,9 @@ export default function Dashboard() {
   });
 
   const { data: revenueData } = useQuery({
-    queryKey: ["/api/merchants", merchantId, "revenue-chart"],
+    queryKey: ["/api/merchants", merchantId, "revenue-over-time"],
     queryFn: async () => {
-      const response = await fetch(`/api/merchants/${merchantId}/revenue-chart`);
+      const response = await fetch(`/api/merchants/${merchantId}/revenue-over-time?days=30`);
       if (!response.ok) throw new Error("Failed to fetch revenue data");
       return response.json();
     },
@@ -309,7 +309,7 @@ export default function Dashboard() {
                     />
                     <Line 
                       type="monotone" 
-                      dataKey="amount" 
+                      dataKey="revenue" 
                       stroke="#00FF66" 
                       strokeWidth={2}
                       dot={{ fill: '#00FF66', strokeWidth: 2, r: 3 }}
