@@ -612,26 +612,73 @@ export default function MerchantTerminalMobile() {
 
               {activeAction === "send" && (
                 <div className="text-center">
-                  <h3 className="text-lg font-semibold mb-4 text-white">Share Payment</h3>
-                  <p className="text-gray-300 mb-4">Copy the payment link to share with customers</p>
-                  <Button
-                    onClick={() => {
-                      if (merchant) {
-                        navigator.clipboard.writeText(merchant.paymentUrl);
-                        setCopiedLink(true);
-                        setTimeout(() => setCopiedLink(false), 2000);
-                        toast({
-                          title: "Link Copied",
-                          description: "Payment link copied to clipboard",
-                        });
-                      }
-                      setActiveAction(null);
-                    }}
-                    className="w-full text-black font-semibold rounded-lg"
-                    style={{ backgroundColor: '#00FF66' }}
-                  >
-                    {copiedLink ? "Copied!" : "Copy Payment Link"}
-                  </Button>
+                  <h3 className="text-lg font-semibold mb-4 text-white">
+                    {activeTab === "NFC" ? "NFC Payment" : "Share Payment"}
+                  </h3>
+                  
+                  {activeTab === "NFC" ? (
+                    // NFC Payment Options
+                    <div className="space-y-4">
+                      <p className="text-gray-300 mb-4">Start contactless payment for current transaction</p>
+                      {currentTransaction || activeTransaction ? (
+                        <div className="space-y-3">
+                          <div className="bg-gray-700 rounded-lg p-3 mb-4">
+                            <p className="text-white text-sm font-medium">
+                              {(currentTransaction || activeTransaction).itemName}
+                            </p>
+                            <p className="text-gray-300 text-lg font-bold">
+                              ${(currentTransaction || activeTransaction).price}
+                            </p>
+                          </div>
+                          <Button
+                            onClick={() => {
+                              createNFCPayment();
+                              setActiveAction(null);
+                            }}
+                            disabled={nfcPaymentStatus === "creating"}
+                            className="w-full text-black font-semibold rounded-lg"
+                            style={{ backgroundColor: '#00FF66' }}
+                          >
+                            {nfcPaymentStatus === "creating" ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
+                                Starting NFC...
+                              </>
+                            ) : (
+                              "Start NFC Payment"
+                            )}
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="text-gray-400 text-sm">
+                          Create a transaction first to enable NFC payment
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    // QR Payment Link Sharing
+                    <div>
+                      <p className="text-gray-300 mb-4">Copy the payment link to share with customers</p>
+                      <Button
+                        onClick={() => {
+                          if (merchant) {
+                            navigator.clipboard.writeText(merchant.paymentUrl);
+                            setCopiedLink(true);
+                            setTimeout(() => setCopiedLink(false), 2000);
+                            toast({
+                              title: "Link Copied",
+                              description: "Payment link copied to clipboard",
+                            });
+                          }
+                          setActiveAction(null);
+                        }}
+                        className="w-full text-black font-semibold rounded-lg"
+                        style={{ backgroundColor: '#00FF66' }}
+                      >
+                        {copiedLink ? "Copied!" : "Copy Payment Link"}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -735,52 +782,8 @@ export default function MerchantTerminalMobile() {
               </div>
             )
           ) : (
-            // NFC Interface - Clean interface without QR code
-            <div 
-              className="backdrop-blur-xl border rounded-3xl p-8 flex items-center justify-center shadow-2xl transition-all duration-300"
-              style={{
-                background: 'rgba(255, 255, 255, 0.95)',
-                borderColor: 'rgba(255, 255, 255, 0.3)',
-                boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)'
-              }}
-            >
-              <div className="text-center">
-                {currentTransaction || activeTransaction ? (
-                  <>
-                    <div className="w-48 h-48 bg-gradient-to-br from-blue-50 to-indigo-100 border-2 border-blue-200 rounded-lg flex flex-col items-center justify-center mb-4">
-                      <Waves size={48} className="text-blue-600 mb-2" />
-                      <div className="text-xs text-blue-600 font-medium">NFC READY</div>
-                    </div>
-                    <p className="text-gray-600 text-sm mb-4">
-                      Ready for contactless payment
-                    </p>
-                    <button 
-                      onClick={createNFCPayment}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors text-sm font-medium"
-                      disabled={nfcPaymentStatus === "creating"}
-                    >
-                      {nfcPaymentStatus === "creating" ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
-                          Starting...
-                        </>
-                      ) : (
-                        "Start NFC Payment"
-                      )}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4">
-                      <Smartphone size={64} className="text-gray-400" />
-                    </div>
-                    <p className="text-gray-600 text-sm">
-                      Create a transaction for NFC payment
-                    </p>
-                  </>
-                )}
-              </div>
-            </div>
+            // NFC Interface - Completely empty, functionality moved to Send button
+            <div className="h-48"></div>
           )}
         </div>
 
@@ -1024,6 +1027,19 @@ export default function MerchantTerminalMobile() {
         <div className="px-6 mb-6">
           <div className="bg-gray-800 rounded-3xl overflow-hidden">
             <button
+              onClick={() => setActiveAction(activeAction === "send" ? null : "send")}
+              className="w-full p-4 text-left border-b border-gray-700 hover:bg-gray-700 transition-colors duration-200 flex items-center justify-between"
+            >
+              <div className="flex items-center space-x-3">
+                <Send className="w-5 h-5 text-white" />
+                <span className="text-white font-medium">
+                  {activeTab === "NFC" ? "NFC Payment" : "Share Payment"}
+                </span>
+              </div>
+              <span className="text-gray-400 text-sm">→</span>
+            </button>
+            
+            <button
               onClick={() => setActiveAction(activeAction === "split" ? null : "split")}
               className="w-full p-4 text-left border-b border-gray-700 hover:bg-gray-700 transition-colors duration-200 flex items-center justify-between"
             >
@@ -1055,6 +1071,78 @@ export default function MerchantTerminalMobile() {
                 opacity: activeAction ? 1 : 0
               }}
             >
+              {activeAction === "send" && (
+                <div className="p-6 text-center">
+                  <h3 className="text-lg font-semibold mb-4 text-white">
+                    {activeTab === "NFC" ? "NFC Payment" : "Share Payment"}
+                  </h3>
+                  
+                  {activeTab === "NFC" ? (
+                    // NFC Payment Options
+                    <div className="space-y-4">
+                      <p className="text-gray-300 text-sm mb-4">Start contactless payment for current transaction</p>
+                      {currentTransaction || activeTransaction ? (
+                        <div className="space-y-3">
+                          <div className="bg-gray-700 rounded-lg p-3 mb-4">
+                            <p className="text-white text-sm font-medium">
+                              {(currentTransaction || activeTransaction).itemName}
+                            </p>
+                            <p className="text-gray-300 text-lg font-bold">
+                              ${(currentTransaction || activeTransaction).price}
+                            </p>
+                          </div>
+                          <Button
+                            onClick={() => {
+                              createNFCPayment();
+                              setActiveAction(null);
+                            }}
+                            disabled={nfcPaymentStatus === "creating"}
+                            className="w-full text-black font-semibold rounded-lg"
+                            style={{ backgroundColor: '#00FF66' }}
+                          >
+                            {nfcPaymentStatus === "creating" ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
+                                Starting NFC...
+                              </>
+                            ) : (
+                              "Start NFC Payment"
+                            )}
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="text-gray-400 text-sm">
+                          Create a transaction first to enable NFC payment
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    // QR Payment Link Sharing
+                    <div>
+                      <p className="text-gray-300 text-sm mb-4">Copy the payment link to share with customers</p>
+                      <Button
+                        onClick={() => {
+                          if (merchant) {
+                            navigator.clipboard.writeText(merchant.paymentUrl);
+                            setCopiedLink(true);
+                            setTimeout(() => setCopiedLink(false), 2000);
+                            toast({
+                              title: "Link Copied",
+                              description: "Payment link copied to clipboard",
+                            });
+                          }
+                          setActiveAction(null);
+                        }}
+                        className="w-full text-black font-semibold rounded-lg"
+                        style={{ backgroundColor: '#00FF66' }}
+                      >
+                        {copiedLink ? "Copied!" : "Copy Payment Link"}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {activeAction === "split" && (
                 <div className="p-6 text-center">
                   <h3 className="text-lg font-semibold mb-4 text-white">Split Bill</h3>
@@ -1184,52 +1272,8 @@ export default function MerchantTerminalMobile() {
               </div>
             )
           ) : (
-            // NFC Interface - Clean interface without QR code
-            <div 
-              className="backdrop-blur-xl border rounded-3xl p-8 flex items-center justify-center shadow-2xl transition-all duration-300"
-              style={{
-                background: 'rgba(255, 255, 255, 0.95)',
-                borderColor: 'rgba(255, 255, 255, 0.3)',
-                boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)'
-              }}
-            >
-              <div className="text-center">
-                {currentTransaction || activeTransaction ? (
-                  <>
-                    <div className="w-48 h-48 bg-gradient-to-br from-blue-100 to-purple-100 border-2 border-blue-300 rounded-lg flex flex-col items-center justify-center mb-4">
-                      <Waves size={48} className="text-blue-600 mb-2" />
-                      <div className="text-xs text-blue-600 font-medium">NFC READY</div>
-                    </div>
-                    <p className="text-gray-600 text-sm mb-4">
-                      Ready for contactless payment
-                    </p>
-                    <button 
-                      onClick={createNFCPayment}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors"
-                      disabled={nfcPaymentStatus === "creating"}
-                    >
-                      {nfcPaymentStatus === "creating" ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
-                          Starting...
-                        </>
-                      ) : (
-                        "Start NFC Payment"
-                      )}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4">
-                      <Smartphone size={64} className="text-gray-400" />
-                    </div>
-                    <p className="text-gray-600 text-sm">
-                      Create a transaction for NFC payment
-                    </p>
-                  </>
-                )}
-              </div>
-            </div>
+            // NFC Interface - Completely empty, functionality moved to Send button
+            <div className="h-48"></div>
           )}
         </div>
 
