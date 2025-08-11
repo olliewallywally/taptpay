@@ -205,7 +205,7 @@ export default function Dashboard() {
           </button>
         </div>
 
-        <div className="container mx-auto px-4 pt-16 sm:pt-20 pb-8">
+        <div className="container mx-auto px-4 pt-24 sm:pt-28 pb-8">
           {/* Analytics Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
             <div className="dashboard-card-glass rounded-3xl p-6">
