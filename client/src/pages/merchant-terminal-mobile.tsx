@@ -239,9 +239,14 @@ export default function MerchantTerminalMobile() {
 
         {/* Main Content with Slide Animation */}
         <div 
-          className={`min-h-screen bg-black text-white relative overflow-hidden transform transition-transform duration-300 ease-in-out ${
+          className={`min-h-screen text-white relative overflow-hidden transform transition-transform duration-300 ease-in-out ${
             menuOpen ? '-translate-x-80' : 'translate-x-0'
           }`}
+          style={{
+            background: 'linear-gradient(45deg, #000000, #1a1a1a, #0a0a0a, #2a2a2a)',
+            backgroundSize: '400% 400%',
+            animation: 'gradientMove 15s ease infinite'
+          }}
         >
           {/* Menu Icon */}
           <div className="fixed top-4 right-4 z-30">
