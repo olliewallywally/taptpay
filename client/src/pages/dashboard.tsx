@@ -165,37 +165,37 @@ export default function Dashboard() {
 
       {/* Sliding Menu */}
       <div 
-        className={`fixed right-0 top-0 h-full w-80 bg-gray-900 border-l border-white/20 z-50 transform transition-transform duration-300 ease-in-out ${
+        className={`fixed right-0 top-0 h-full w-80 bg-gray-800 border-l border-gray-600 z-50 transform transition-transform duration-300 ease-in-out ${
           menuOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
         <div className="p-6">
           <div className="flex justify-between items-center mb-8">
-            <h2 className="text-xl font-bold text-white">Menu</h2>
-            <button onClick={() => setMenuOpen(false)} className="text-white/70 hover:text-white">
+            <h2 className="text-xl font-bold text-[#00FF66] drop-shadow-[0_0_8px_#00FF66]">Menu</h2>
+            <button onClick={() => setMenuOpen(false)} className="text-[#00FF66]/70 hover:text-[#00FF66] drop-shadow-[0_0_8px_#00FF66]">
               <X className="h-6 w-6" />
             </button>
           </div>
           <nav className="space-y-4">
-            <a href="/dashboard" className="block py-3 px-4 text-white bg-[#00FF66]/20 rounded-xl">
+            <a href="/dashboard" className="block py-3 px-4 text-[#00FF66] bg-[#00FF66]/20 rounded-xl drop-shadow-[0_0_8px_#00FF66] font-medium">
               Dashboard
             </a>
-            <a href="/merchant" className="block py-3 px-4 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors">
+            <a href="/merchant" className="block py-3 px-4 text-[#00FF66]/70 hover:text-[#00FF66] hover:bg-[#00FF66]/10 rounded-xl transition-colors hover:drop-shadow-[0_0_8px_#00FF66]">
               Terminal
             </a>
-            <a href="/transactions" className="block py-3 px-4 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors">
+            <a href="/transactions" className="block py-3 px-4 text-[#00FF66]/70 hover:text-[#00FF66] hover:bg-[#00FF66]/10 rounded-xl transition-colors hover:drop-shadow-[0_0_8px_#00FF66]">
               Transactions
             </a>
-            <a href="/settings" className="block py-3 px-4 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors">
+            <a href="/settings" className="block py-3 px-4 text-[#00FF66]/70 hover:text-[#00FF66] hover:bg-[#00FF66]/10 rounded-xl transition-colors hover:drop-shadow-[0_0_8px_#00FF66]">
               Settings
             </a>
-            <div className="pt-4 mt-4 border-t border-white/20">
+            <div className="pt-4 mt-4 border-t border-gray-600">
               <button 
                 onClick={() => {
                   localStorage.removeItem('auth-token');
                   window.location.href = '/login';
                 }}
-                className="block w-full text-left py-3 px-4 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-colors"
+                className="block w-full text-left py-3 px-4 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-colors hover:drop-shadow-[0_0_8px_#ff0000]"
               >
                 Logout
               </button>
