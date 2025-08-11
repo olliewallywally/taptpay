@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getCurrentMerchantId } from "@/lib/auth";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Menu, 
   X, 
@@ -10,7 +12,9 @@ import {
   AlertCircle, 
   Clock,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  RotateCcw,
+  DollarSign
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -18,6 +22,12 @@ export default function Transactions() {
   const [isMobile, setIsMobile] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [refundModal, setRefundModal] = useState<any>(null);
+  const [refundAmount, setRefundAmount] = useState("");
+  const [refundReason, setRefundReason] = useState("");
+  
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   
   useEffect(() => {
     const checkScreenSize = () => {
@@ -52,9 +62,73 @@ export default function Transactions() {
     (transaction.windcaveTransactionId && transaction.windcaveTransactionId.toLowerCase().includes(searchTerm.toLowerCase()))
   ) || [];
 
+  // Refund mutation
+  const refundMutation = useMutation({
+    mutationFn: async ({ transactionId, amount, reason }: { transactionId: number, amount: number, reason: string }) => {
+      return apiRequest(`/api/transactions/${transactionId}/refund`, {
+        method: "POST",
+        body: { amount, reason }
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "transactions"] });
+      toast({
+        title: "Refund processed",
+        description: "The refund has been processed successfully.",
+      });
+      setRefundModal(null);
+      setRefundAmount("");
+      setRefundReason("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Refund failed",
+        description: error.message || "Failed to process refund. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleRefund = (transaction: any) => {
+    setRefundModal(transaction);
+    setRefundAmount(transaction.price.toString());
+    setRefundReason("");
+  };
+
+  const processRefund = () => {
+    if (!refundModal || !refundAmount || !refundReason) {
+      toast({
+        title: "Missing information",
+        description: "Please enter both refund amount and reason.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const amount = parseFloat(refundAmount);
+    if (amount <= 0 || amount > parseFloat(refundModal.price)) {
+      toast({
+        title: "Invalid amount",
+        description: "Refund amount must be between $0.01 and the transaction amount.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    refundMutation.mutate({
+      transactionId: refundModal.id,
+      amount,
+      reason: refundReason
+    });
+  };
+
   const exportToCSV = () => {
     if (!transactions || transactions.length === 0) {
-      alert("No transactions to export");
+      toast({
+        title: "No data to export",
+        description: "There are no transactions to export.",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -84,6 +158,11 @@ export default function Transactions() {
     a.download = `transactions-${format(new Date(), "yyyy-MM-dd")}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+    
+    toast({
+      title: "Export successful",
+      description: "Transaction data has been downloaded as CSV.",
+    });
   };
 
   const getStatusIcon = (status: string) => {
@@ -120,7 +199,7 @@ export default function Transactions() {
 
       {/* Sliding Menu */}
       <div 
-        className={`fixed right-0 top-0 h-full w-80 bg-gray-900 border-l border-gray-700 z-50 transform transition-transform duration-300 ease-in-out ${
+        className={`fixed right-0 top-0 h-full ${isMobile ? 'w-full' : 'w-80'} bg-gray-900 ${isMobile ? '' : 'border-l border-gray-700'} z-50 transform transition-transform duration-300 ease-in-out ${
           menuOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -162,7 +241,7 @@ export default function Transactions() {
       {/* Main Content with Slide Animation */}
       <div 
         className={`min-h-screen bg-gradient-to-br from-gray-800 via-gray-700 to-gray-900 transform transition-transform duration-300 ease-in-out ${
-          menuOpen ? '-translate-x-80' : 'translate-x-0'
+          menuOpen ? (isMobile ? '-translate-x-full' : '-translate-x-80') : 'translate-x-0'
         }`}
       >
         {/* Menu Icon */}
@@ -175,14 +254,14 @@ export default function Transactions() {
           </button>
         </div>
 
-        <div className="container mx-auto px-4 pt-24 sm:pt-28 pb-8">
+        <div className={`container mx-auto px-4 ${isMobile ? 'pt-20' : 'pt-28'} pb-8`}>
           {/* Header */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-            <h1 className="text-3xl font-bold text-white">Transactions</h1>
+          <div className={`flex ${isMobile ? 'flex-col' : 'flex-row'} justify-between items-start ${isMobile ? '' : 'sm:items-center'} mb-6 gap-4`}>
+            <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-bold text-white`}>Transactions</h1>
             {transactions && transactions.length > 0 && (
               <button
                 onClick={exportToCSV}
-                className="flex items-center gap-2 px-4 py-2 backdrop-blur-xl bg-black/40 border border-white/20 rounded-xl text-white hover:bg-black/60 transition-colors"
+                className={`flex items-center gap-2 px-4 py-2 backdrop-blur-xl bg-black/40 border border-white/20 rounded-xl text-white hover:bg-black/60 transition-colors ${isMobile ? 'w-full justify-center' : ''}`}
               >
                 <Download className="h-4 w-4" />
                 Export CSV
@@ -197,7 +276,7 @@ export default function Transactions() {
               placeholder="Search transactions..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-4 py-3 backdrop-blur-xl bg-black/40 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:border-[#00FF66]/50 transition-colors"
+              className={`w-full px-4 ${isMobile ? 'py-4 text-base' : 'py-3'} backdrop-blur-xl bg-black/40 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:border-[#00FF66]/50 transition-colors`}
             />
           </div>
 
@@ -221,25 +300,25 @@ export default function Transactions() {
               {filteredTransactions.map((transaction: any) => (
                 <div 
                   key={transaction.id} 
-                  className="dashboard-card-glass rounded-3xl p-6 hover:bg-white/10 transition-all duration-200"
+                  className={`dashboard-card-glass rounded-3xl ${isMobile ? 'p-4' : 'p-6'} hover:bg-white/10 transition-all duration-200`}
                 >
-                  <div className="flex items-start justify-between">
+                  <div className={`flex ${isMobile ? 'flex-col' : 'items-start justify-between'}`}>
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         {getStatusIcon(transaction.status)}
-                        <h3 className="text-lg font-medium text-white">
+                        <h3 className={`${isMobile ? 'text-base' : 'text-lg'} font-medium text-white`}>
                           {transaction.itemName}
                         </h3>
                       </div>
                       
-                      <p className="text-white/70 text-sm mb-3">
+                      <p className={`text-white/70 ${isMobile ? 'text-xs' : 'text-sm'} mb-3`}>
                         {transaction.createdAt 
                           ? format(new Date(transaction.createdAt), "MMM dd, yyyy 'at' HH:mm")
                           : "Date not available"
                         }
                       </p>
                       
-                      <div className="flex items-center gap-4 text-sm">
+                      <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center gap-4'} text-sm`}>
                         <span className="text-white/50">
                           ID: {transaction.windcaveTransactionId || `TXN-${transaction.id}`}
                         </span>
@@ -266,10 +345,20 @@ export default function Transactions() {
                       </div>
                     </div>
                     
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-white">
+                    <div className={`${isMobile ? 'mt-4 flex justify-between items-center' : 'text-right'}`}>
+                      <div className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold text-white`}>
                         ${parseFloat(transaction.price).toFixed(2)}
                       </div>
+                      
+                      {transaction.status === 'completed' && (
+                        <button
+                          onClick={() => handleRefund(transaction)}
+                          className={`flex items-center gap-2 px-3 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 rounded-lg transition-colors ${isMobile ? 'text-sm' : ''}`}
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                          {isMobile ? 'Refund' : 'Process Refund'}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -278,6 +367,106 @@ export default function Transactions() {
           )}
         </div>
       </div>
+
+      {/* Refund Modal */}
+      {refundModal && (
+        <div className="fixed inset-0 bg-black/80 z-60 flex items-center justify-center p-4">
+          <div className={`dashboard-card-glass rounded-3xl ${isMobile ? 'w-full max-w-sm' : 'w-full max-w-md'} max-h-[90vh] overflow-y-auto`}>
+            <div className={`${isMobile ? 'p-4' : 'p-6'}`}>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className={`${isMobile ? 'text-lg' : 'text-xl'} font-bold text-white`}>Process Refund</h3>
+                <button
+                  onClick={() => setRefundModal(null)}
+                  className="text-white/70 hover:text-white"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="space-y-4 mb-6">
+                <div>
+                  <label className="block text-white/90 text-sm font-medium mb-2">
+                    Transaction Details
+                  </label>
+                  <div className="backdrop-blur-xl bg-black/40 border border-white/20 rounded-xl p-4">
+                    <p className="text-white font-medium">{refundModal.itemName}</p>
+                    <p className="text-white/70 text-sm">
+                      {refundModal.createdAt 
+                        ? format(new Date(refundModal.createdAt), "MMM dd, yyyy 'at' HH:mm")
+                        : "Date not available"
+                      }
+                    </p>
+                    <p className="text-white/70 text-sm">
+                      ID: {refundModal.windcaveTransactionId || `TXN-${refundModal.id}`}
+                    </p>
+                    <p className="text-white font-bold text-lg mt-2">
+                      Original Amount: ${parseFloat(refundModal.price).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-white/90 text-sm font-medium mb-2">
+                    Refund Amount
+                  </label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/50" />
+                    <input
+                      type="number"
+                      value={refundAmount}
+                      onChange={(e) => setRefundAmount(e.target.value)}
+                      max={refundModal.price}
+                      min="0.01"
+                      step="0.01"
+                      className="w-full pl-10 pr-4 py-3 backdrop-blur-xl bg-black/40 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:border-[#00FF66]/50 transition-colors"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-white/90 text-sm font-medium mb-2">
+                    Refund Reason
+                  </label>
+                  <textarea
+                    value={refundReason}
+                    onChange={(e) => setRefundReason(e.target.value)}
+                    rows={3}
+                    className="w-full px-4 py-3 backdrop-blur-xl bg-black/40 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:border-[#00FF66]/50 transition-colors resize-none"
+                    placeholder="Enter reason for refund..."
+                  />
+                </div>
+              </div>
+
+              <div className={`flex ${isMobile ? 'flex-col' : 'flex-row'} gap-3`}>
+                <button
+                  onClick={() => setRefundModal(null)}
+                  className={`${isMobile ? 'w-full' : 'flex-1'} px-4 py-3 backdrop-blur-xl bg-black/40 border border-white/20 rounded-xl text-white hover:bg-black/60 transition-colors`}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={processRefund}
+                  disabled={refundMutation.isPending}
+                  className={`${isMobile ? 'w-full' : 'flex-1'} px-4 py-3 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
+                >
+                  {refundMutation.isPending ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-300"></div>
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <RotateCcw className="h-4 w-4" />
+                      Process Refund
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
