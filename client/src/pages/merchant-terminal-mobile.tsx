@@ -185,11 +185,11 @@ export default function MerchantTerminalMobile() {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-black text-white relative overflow-hidden">
-      {isMobile && <MobileHeader title="tapt" />}
-      
-      <div className="relative z-10" style={{ paddingTop: isMobile ? '80px' : '0px' }}>{/* Main content container */}
+  if (isMobile) {
+    return (
+      <MobileHeader title="tapt">
+        <div className="min-h-screen bg-black text-white relative overflow-hidden">
+          <div className="relative z-10 p-4">{/* Main content container */}
 
         {/* Mode Switcher */}
         <div className="flex justify-center mb-8">
@@ -443,6 +443,290 @@ export default function MerchantTerminalMobile() {
                     <Button
                       variant="outline"
                       className="w-full border-gray-600 text-gray-300 hover:bg-gray-700"
+                      onClick={() => setActiveAction(null)}
+                    >
+                      Settings
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Payment Status Box - Above QR Code with Glass Effect */}
+        {currentTransaction || activeTransaction ? (
+          <div className="px-6 mb-6">
+            <div 
+              className="backdrop-blur-xl border rounded-3xl p-6 shadow-2xl transition-all duration-300"
+              style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                borderColor: 'rgba(255, 255, 255, 0.15)',
+                boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5)'
+              }}
+            >
+              <div className="text-center">
+                <h3 className="text-lg font-bold text-white mb-2">
+                  Transaction #{(currentTransaction || activeTransaction).id}
+                </h3>
+                <p className="text-sm text-white/70 mb-4">
+                  {(currentTransaction || activeTransaction).itemName} - ${(currentTransaction || activeTransaction).price}
+                </p>
+                {getPaymentStatusIndicator((currentTransaction || activeTransaction).status)}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* QR Code Section - With Glass Effect */}
+        <div className="px-6">
+          {currentTransaction || activeTransaction ? (
+            <div 
+              className="backdrop-blur-xl border rounded-3xl p-8 flex items-center justify-center shadow-2xl transition-all duration-300"
+              style={{
+                background: 'rgba(255, 255, 255, 0.95)',
+                borderColor: 'rgba(255, 255, 255, 0.3)',
+                boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)'
+              }}
+            >
+              <div className="text-center">
+                <div className="w-48 h-48 mx-auto mb-4">
+                  <QRCodeDisplay 
+                    merchantId={merchantId} 
+                  />
+                </div>
+                <p className="text-gray-600 text-sm">
+                  {activeTab === "QR" ? "Scan to pay with any device" : "Tap your phone to pay"}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div 
+              className="backdrop-blur-xl border rounded-3xl p-8 flex items-center justify-center shadow-2xl transition-all duration-300"
+              style={{
+                background: 'rgba(255, 255, 255, 0.95)',
+                borderColor: 'rgba(255, 255, 255, 0.3)',
+                boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)'
+              }}
+            >
+              <div className="text-center">
+                <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4">
+                  {activeTab === "QR" ? (
+                    <QrCode size={64} className="text-gray-400" />
+                  ) : (
+                    <Smartphone size={64} className="text-gray-400" />
+                  )}
+                </div>
+                <p className="text-gray-600 text-sm">
+                  {activeTab === "QR" ? "Create a transaction to show QR code" : "Create a transaction for NFC payment"}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+          </div>
+        </div>
+      </MobileHeader>
+    );
+  }
+
+  // Desktop/Non-mobile version
+  return (
+    <div className="min-h-screen bg-black text-white relative overflow-hidden">
+      <div className="relative z-10 p-4">{/* Main content container */}
+
+        {/* Mode Switcher */}
+        <div className="flex justify-center mb-8">
+          <div className="flex bg-gray-900 rounded-lg p-1">
+            <button
+              onClick={() => setActiveTab("QR")}
+              className={`px-6 py-2 rounded-md font-medium transition-all duration-200 ${
+                activeTab === "QR"
+                  ? "bg-black text-white"
+                  : "text-gray-400 hover:text-gray-200"
+              }`}
+            >
+              QR
+            </button>
+            <button
+              onClick={() => setActiveTab("NFC")}
+              className={`px-6 py-2 rounded-md font-medium transition-all duration-200 ${
+                activeTab === "NFC"
+                  ? "bg-black text-white"
+                  : "text-gray-400 hover:text-gray-200"
+              }`}
+            >
+              NFC
+            </button>
+          </div>
+        </div>
+
+        {/* Amount Box - More Rounded */}
+        <div className="px-6 mb-6">
+          {currentTransaction || activeTransaction ? (
+            <div 
+              className="rounded-3xl p-6 text-center"
+              style={{ backgroundColor: '#00FF66' }}
+            >
+              <div className="text-black text-lg font-medium mb-2">Total</div>
+              <div className="text-black text-3xl font-bold">
+                ${(currentTransaction || activeTransaction).price}
+              </div>
+              <div className="text-black text-sm font-medium mt-2">
+                {(currentTransaction || activeTransaction).itemName}
+              </div>
+            </div>
+          ) : (
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <div 
+                  className="rounded-3xl p-6 text-center space-y-4"
+                  style={{ backgroundColor: '#00FF66' }}
+                >
+                  <div className="text-black text-lg font-medium">Create Transaction</div>
+                  
+                  <FormField
+                    control={form.control}
+                    name="itemName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Input
+                            placeholder="Item name"
+                            {...field}
+                            className="bg-white/90 border-0 text-black placeholder:text-gray-600 rounded-xl"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="price"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Input
+                            placeholder="0.00"
+                            {...field}
+                            className="bg-white/90 border-0 text-black placeholder:text-gray-600 rounded-xl text-center text-2xl font-bold"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <Button 
+                    type="submit" 
+                    disabled={createTransactionMutation.isPending}
+                    className="w-full bg-black text-white hover:bg-gray-800 rounded-xl py-3 font-medium"
+                  >
+                    {createTransactionMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="mr-2 h-4 w-4" />
+                        Create Transaction
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          )}
+        </div>
+
+        {/* Action Buttons - Connected Dark Grey */}
+        <div className="px-6 mb-6">
+          <div className="bg-gray-800 rounded-3xl overflow-hidden">
+            <button
+              onClick={() => setActiveAction(activeAction === "split" ? null : "split")}
+              className="w-full p-4 text-left border-b border-gray-700 hover:bg-gray-700 transition-colors duration-200 flex items-center justify-between"
+            >
+              <div className="flex items-center space-x-3">
+                <Split className="w-5 h-5 text-white" />
+                <span className="text-white font-medium">Split Bill</span>
+              </div>
+              <span className="text-gray-400 text-sm">→</span>
+            </button>
+            
+            <button
+              onClick={() => setActiveAction(activeAction === "more" ? null : "more")}
+              className="w-full p-4 text-left hover:bg-gray-700 transition-colors duration-200 flex items-center justify-between"
+            >
+              <div className="flex items-center space-x-3">
+                <MoreHorizontal className="w-5 h-5 text-white" />
+                <span className="text-white font-medium">More Options</span>
+              </div>
+              <span className="text-gray-400 text-sm">→</span>
+            </button>
+          </div>
+
+          {/* Action Panel Dropdowns - Light Grey */}
+          <div className="mt-2">
+            <div 
+              className="overflow-hidden transition-all duration-250 ease-in-out bg-gray-600 rounded-3xl"
+              style={{
+                maxHeight: activeAction ? '200px' : '0px',
+                opacity: activeAction ? 1 : 0
+              }}
+            >
+              {activeAction === "split" && (
+                <div className="p-6 text-center">
+                  <h3 className="text-lg font-semibold mb-4 text-white">Split Bill</h3>
+                  <p className="text-gray-300 text-sm mb-4">
+                    Divide the payment between multiple people
+                  </p>
+                  <div className="space-y-3">
+                    <Button
+                      variant="outline"
+                      className="w-full border-gray-500 text-gray-200 hover:bg-gray-500"
+                    >
+                      Split 2 Ways
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full border-gray-500 text-gray-200 hover:bg-gray-500"
+                    >
+                      Split 3 Ways
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full border-gray-500 text-gray-200 hover:bg-gray-500"
+                    >
+                      Custom Split
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {activeAction === "more" && (
+                <div className="p-6 text-center">
+                  <h3 className="text-lg font-semibold mb-4 text-white">More Options</h3>
+                  <div className="space-y-3">
+                    <Button
+                      variant="outline"
+                      className="w-full border-gray-500 text-gray-200 hover:bg-gray-500"
+                      onClick={() => window.location.href = '/dashboard'}
+                    >
+                      View Dashboard
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full border-gray-500 text-gray-200 hover:bg-gray-500"
+                      onClick={() => window.location.href = '/transactions'}
+                    >
+                      Transaction History
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full border-gray-500 text-gray-200 hover:bg-gray-500"
                       onClick={() => setActiveAction(null)}
                     >
                       Settings
