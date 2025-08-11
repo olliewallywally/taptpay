@@ -157,9 +157,7 @@ function Router() {
         </Route>
         <Route path="/transactions">
           <ProtectedRoute>
-            <Layout>
-              <Transactions />
-            </Layout>
+            <Transactions />
           </ProtectedRoute>
         </Route>
         <Route path="/nfc">
