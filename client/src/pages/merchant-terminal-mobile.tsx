@@ -667,8 +667,8 @@ export default function MerchantTerminalMobile() {
           </div>
         </div>
 
-        {/* Payment Status Box - Above QR Code with Glass Effect */}
-        {currentTransaction || activeTransaction ? (
+        {/* Payment Status Box - Above QR Code with Glass Effect - Only show for QR tab */}
+        {(currentTransaction || activeTransaction) && activeTab === "QR" ? (
           <div className="px-6 mb-6">
             <div 
               className="backdrop-blur-xl border rounded-3xl p-6 shadow-2xl transition-all duration-300"
@@ -1116,8 +1116,8 @@ export default function MerchantTerminalMobile() {
           </div>
         </div>
 
-        {/* Payment Status Box - Above QR Code with Glass Effect */}
-        {currentTransaction || activeTransaction ? (
+        {/* Payment Status Box - Above QR Code with Glass Effect - Only show for QR tab */}
+        {(currentTransaction || activeTransaction) && activeTab === "QR" ? (
           <div className="px-6 mb-6">
             <div 
               className="backdrop-blur-xl border rounded-3xl p-6 shadow-2xl transition-all duration-300"
