@@ -25,12 +25,12 @@ export function MobileHeader({ title, showMenu = true }: MobileHeaderProps) {
   return (
     <>
       {/* Menu overlay */}
-      {menuOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-[1000]"
-          onClick={() => setMenuOpen(false)}
-        />
-      )}
+      <div 
+        className={`fixed inset-0 bg-black transition-opacity duration-300 z-[1000] ${
+          menuOpen ? 'bg-opacity-50 pointer-events-auto' : 'bg-opacity-0 pointer-events-none'
+        }`}
+        onClick={() => setMenuOpen(false)}
+      />
 
       {/* Floating Header */}
       <div className="fixed top-4 left-4 right-4 flex items-center justify-between z-[999] backdrop-blur-xl bg-black/20 border border-white/20 rounded-2xl p-4">
@@ -49,53 +49,67 @@ export function MobileHeader({ title, showMenu = true }: MobileHeaderProps) {
       </div>
 
       {/* Slide-out Hamburger Menu */}
-      {showMenu && (
-        <div 
-          className="menu-container fixed top-0 right-0 h-full bg-black/95 backdrop-blur-xl border-l border-white/20 z-[1001] transition-transform duration-300 ease-in-out"
-          style={{
-            width: '70%',
-            transform: menuOpen ? 'translateX(0)' : 'translateX(100%)',
-          }}
-        >
-          <div className="p-6">
-            <div className="flex justify-between items-center mb-8">
-              <h2 className="text-xl font-bold text-white">Navigation</h2>
-              <button
-                onClick={() => setMenuOpen(false)}
-                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+      <div 
+        className="menu-container fixed top-0 right-0 h-full bg-black/95 backdrop-blur-xl border-l border-white/20 z-[1001] transition-transform duration-300 ease-in-out"
+        style={{
+          width: '70%',
+          transform: menuOpen ? 'translateX(0)' : 'translateX(100%)',
+        }}
+      >
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-8">
+            <h2 className="text-xl font-bold text-white">Navigation</h2>
+            <button
+              onClick={() => setMenuOpen(false)}
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+            >
+              <X size={20} className="text-white" />
+            </button>
+          </div>
+          
+          <nav className="space-y-2">
+            <Link 
+              href="/merchant" 
+              onClick={() => setMenuOpen(false)} 
+              className="block py-4 px-4 text-white hover:bg-white/10 rounded-xl transition-all duration-200 font-medium transform hover:scale-105"
+            >
+              🏪 Terminal
+            </Link>
+            <Link 
+              href="/dashboard" 
+              onClick={() => setMenuOpen(false)} 
+              className="block py-4 px-4 text-white hover:bg-white/10 rounded-xl transition-all duration-200 font-medium transform hover:scale-105"
+            >
+              📊 Dashboard
+            </Link>
+            <Link 
+              href="/transactions" 
+              onClick={() => setMenuOpen(false)} 
+              className="block py-4 px-4 text-white hover:bg-white/10 rounded-xl transition-all duration-200 font-medium transform hover:scale-105"
+            >
+              💳 Transactions
+            </Link>
+            <Link 
+              href="/settings" 
+              onClick={() => setMenuOpen(false)} 
+              className="block py-4 px-4 text-white hover:bg-white/10 rounded-xl transition-all duration-200 font-medium transform hover:scale-105"
+            >
+              ⚙️ Settings
+            </Link>
+            <div className="pt-4 mt-4 border-t border-white/20">
+              <button 
+                onClick={() => {
+                  localStorage.removeItem('auth-token');
+                  window.location.href = '/login';
+                }}
+                className="block w-full text-left py-4 px-4 text-red-400 hover:bg-red-500/10 rounded-xl transition-all duration-200 font-medium transform hover:scale-105"
               >
-                <X size={20} className="text-white" />
+                🚪 Logout
               </button>
             </div>
-            
-            <nav className="space-y-2">
-              <Link href="/merchant" onClick={() => setMenuOpen(false)} className="block py-4 px-4 text-white hover:bg-white/10 rounded-xl transition-colors font-medium">
-                🏪 Terminal
-              </Link>
-              <Link href="/dashboard" onClick={() => setMenuOpen(false)} className="block py-4 px-4 text-white hover:bg-white/10 rounded-xl transition-colors font-medium">
-                📊 Dashboard
-              </Link>
-              <Link href="/transactions" onClick={() => setMenuOpen(false)} className="block py-4 px-4 text-white hover:bg-white/10 rounded-xl transition-colors font-medium">
-                💳 Transactions
-              </Link>
-              <Link href="/settings" onClick={() => setMenuOpen(false)} className="block py-4 px-4 text-white hover:bg-white/10 rounded-xl transition-colors font-medium">
-                ⚙️ Settings
-              </Link>
-              <div className="pt-4 mt-4 border-t border-white/20">
-                <button 
-                  onClick={() => {
-                    localStorage.removeItem('auth-token');
-                    window.location.href = '/login';
-                  }}
-                  className="block w-full text-left py-4 px-4 text-red-400 hover:bg-red-500/10 rounded-xl transition-colors font-medium"
-                >
-                  🚪 Logout
-                </button>
-              </div>
-            </nav>
-          </div>
+          </nav>
         </div>
-      )}
+      </div>
     </>
   );
 }
