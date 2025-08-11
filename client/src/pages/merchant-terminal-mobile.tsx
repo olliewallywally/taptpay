@@ -27,6 +27,18 @@ export default function MerchantTerminalMobile() {
   const [copiedLink, setCopiedLink] = useState(false);
   const [activeTab, setActiveTab] = useState<"QR" | "NFC">("QR");
   const [activeAction, setActiveAction] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -175,9 +187,9 @@ export default function MerchantTerminalMobile() {
 
   return (
     <div className="min-h-screen bg-black text-white relative overflow-hidden">
-      <MobileHeader title="tapt" />
+      {isMobile && <MobileHeader title="tapt" />}
       
-      <div className="relative z-10">{/* Main content container */}
+      <div className="relative z-10" style={{ paddingTop: isMobile ? '80px' : '0px' }}>{/* Main content container */}
 
         {/* Mode Switcher */}
         <div className="flex justify-center mb-8">
