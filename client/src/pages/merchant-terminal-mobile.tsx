@@ -182,7 +182,12 @@ export default function MerchantTerminalMobile() {
 
   // NFC Payment Functions
   const createNFCPayment = async () => {
+    console.log('NFC Payment button clicked');
+    console.log('Current transaction:', currentTransaction);
+    console.log('Active transaction:', activeTransaction);
+    
     if (!currentTransaction && !activeTransaction) {
+      console.log('No transaction found');
       toast({
         title: "No Transaction",
         description: "Create a transaction first to enable NFC payment.",
@@ -192,9 +197,11 @@ export default function MerchantTerminalMobile() {
     }
 
     const transaction = currentTransaction || activeTransaction;
+    console.log('Using transaction:', transaction);
     setNfcPaymentStatus("creating");
     
     try {
+      console.log('Making NFC payment request...');
       const response = await fetch(`/api/merchants/${merchantId}/nfc-pay`, {
         method: 'POST',
         headers: {
@@ -208,13 +215,16 @@ export default function MerchantTerminalMobile() {
         }),
       });
 
+      console.log('NFC response status:', response.status);
+      
       if (!response.ok) {
         const errorData = await response.json();
+        console.log('NFC error response:', errorData);
         throw new Error(errorData.message || 'Failed to create NFC payment session');
       }
 
       const result = await response.json();
-      console.log('NFC payment created:', result);
+      console.log('NFC payment created successfully:', result);
       setNfcSession(result.nfcSession);
       setNfcPaymentStatus("ready");
       setShowNfcOverlay(true);
@@ -1049,9 +1059,14 @@ export default function MerchantTerminalMobile() {
                       : "NFC Simulation Mode - Testing Available"}
                   </p>
                   <button 
-                    onClick={createNFCPayment}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors font-medium"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      console.log('NFC Button clicked - event fired');
+                      createNFCPayment();
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors font-medium cursor-pointer"
                     disabled={nfcPaymentStatus === "creating"}
+                    type="button"
                   >
                     {nfcPaymentStatus === "creating" ? (
                       <>
