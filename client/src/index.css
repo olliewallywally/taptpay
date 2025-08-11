@@ -73,17 +73,6 @@
   }
 }
 
-@keyframes pulse {
-  0%, 100% {
-    box-shadow: 0 0 40px rgba(0, 255, 102, 0.4), 0 0 80px rgba(0, 255, 102, 0.2);
-    transform: scale(1);
-  }
-  50% {
-    box-shadow: 0 0 60px rgba(0, 255, 102, 0.6), 0 0 120px rgba(0, 255, 102, 0.3);
-    transform: scale(1.02);
-  }
-}
-
 @layer base {
   * {
     @apply border-border;
