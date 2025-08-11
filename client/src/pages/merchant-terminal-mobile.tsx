@@ -56,6 +56,9 @@ export default function MerchantTerminalMobile() {
       const checkNfcCapabilities = async () => {
         try {
           const response = await fetch('/api/nfc/capabilities');
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
           const capabilities = await response.json();
           setNfcCapabilities(capabilities);
           
@@ -73,7 +76,13 @@ export default function MerchantTerminalMobile() {
             nfcSupported: false,
             contactlessCard: true,
             applePay: false,
-            googlePay: false
+            googlePay: false,
+            recommendations: ["Use simulation mode for testing"]
+          });
+          
+          toast({
+            title: "NFC Capabilities Detection Failed",
+            description: "Using fallback simulation mode for testing.",
           });
         }
       };
