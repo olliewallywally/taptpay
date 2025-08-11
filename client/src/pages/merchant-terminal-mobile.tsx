@@ -191,12 +191,13 @@ export default function MerchantTerminalMobile() {
 
   // NFC Payment Functions
   const createNFCPayment = async () => {
-    console.log('NFC Payment button clicked');
+    console.log('=== createNFCPayment FUNCTION CALLED ===');
     console.log('Current transaction:', currentTransaction);
     console.log('Active transaction:', activeTransaction);
+    console.log('Merchant ID:', merchantId);
     
     if (!currentTransaction && !activeTransaction) {
-      console.log('No transaction found');
+      console.log('No transaction found - showing error toast');
       toast({
         title: "No Transaction",
         description: "Create a transaction first to enable NFC payment.",
@@ -207,24 +208,28 @@ export default function MerchantTerminalMobile() {
 
     const transaction = currentTransaction || activeTransaction;
     console.log('Using transaction:', transaction);
+    console.log('Setting NFC status to creating...');
     setNfcPaymentStatus("creating");
     
     try {
-      console.log('Making NFC payment request...');
+      console.log('Making NFC payment request to:', `/api/merchants/${merchantId}/nfc-pay`);
+      const requestBody = {
+        amount: parseFloat(transaction.price),
+        itemName: transaction.itemName,
+        deviceId: navigator.userAgent,
+        nfcCapabilities: nfcCapabilities || { nfcSupported: false, contactlessCard: true }
+      };
+      console.log('Request body:', requestBody);
+      
       const response = await fetch(`/api/merchants/${merchantId}/nfc-pay`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          amount: parseFloat(transaction.price),
-          itemName: transaction.itemName,
-          deviceId: navigator.userAgent,
-          nfcCapabilities: nfcCapabilities || { nfcSupported: false, contactlessCard: true }
-        }),
+        body: JSON.stringify(requestBody),
       });
 
-      console.log('NFC response status:', response.status);
+      console.log('NFC response received. Status:', response.status);
       
       if (!response.ok) {
         const errorData = await response.json();
@@ -233,10 +238,14 @@ export default function MerchantTerminalMobile() {
       }
 
       const result = await response.json();
-      console.log('NFC payment created successfully:', result);
+      console.log('NFC payment created successfully. Setting session and showing overlay...');
+      console.log('Result:', result);
+      
       setNfcSession(result.nfcSession);
       setNfcPaymentStatus("ready");
       setShowNfcOverlay(true);
+      
+      console.log('State updated. Should show overlay now.');
       
       toast({
         title: "NFC Terminal Ready",
@@ -1067,11 +1076,24 @@ export default function MerchantTerminalMobile() {
                       ? "Ready for contactless payment" 
                       : "NFC Simulation Mode - Testing Available"}
                   </p>
+                  <div className="text-xs text-blue-600 mb-2">
+                    Debug: Status = {nfcPaymentStatus}, Overlay = {showNfcOverlay ? 'shown' : 'hidden'}
+                  </div>
                   <button 
                     onClick={(e) => {
                       e.preventDefault();
-                      console.log('NFC Button clicked - event fired');
-                      createNFCPayment();
+                      e.stopPropagation();
+                      console.log('=== NFC BUTTON CLICKED ===');
+                      console.log('Event:', e);
+                      console.log('Button disabled?', nfcPaymentStatus === "creating");
+                      console.log('NFC Payment Status:', nfcPaymentStatus);
+                      
+                      if (nfcPaymentStatus !== "creating") {
+                        console.log('Calling createNFCPayment...');
+                        createNFCPayment();
+                      } else {
+                        console.log('Button disabled - not calling createNFCPayment');
+                      }
                     }}
                     className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors font-medium cursor-pointer"
                     disabled={nfcPaymentStatus === "creating"}
