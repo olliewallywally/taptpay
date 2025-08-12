@@ -8,10 +8,13 @@ interface QRCodeDisplayProps {
   paymentUrl?: string;
   qrCodeUrl?: string;
   merchantId?: number;
+  stoneId?: number;
 }
 
-export function QRCodeDisplay({ paymentUrl, qrCodeUrl, merchantId }: QRCodeDisplayProps) {
-  const actualQrCodeUrl = qrCodeUrl || (merchantId ? `/api/merchants/${merchantId}/qr` : undefined);
+export function QRCodeDisplay({ paymentUrl, qrCodeUrl, merchantId, stoneId }: QRCodeDisplayProps) {
+  const actualQrCodeUrl = qrCodeUrl || (merchantId ? 
+    (stoneId ? `/api/merchants/${merchantId}/stone/${stoneId}/qr` : `/api/merchants/${merchantId}/qr`) 
+    : undefined);
   const [isDownloading, setIsDownloading] = useState(false);
   const { toast } = useToast();
 
@@ -21,7 +24,9 @@ export function QRCodeDisplay({ paymentUrl, qrCodeUrl, merchantId }: QRCodeDispl
     setIsDownloading(true);
     try {
       // Fetch high-quality QR code for download (800px with download flag)
-      const downloadUrl = `/api/merchants/${merchantId}/qr?size=800&download=true`;
+      const downloadUrl = stoneId 
+        ? `/api/merchants/${merchantId}/stone/${stoneId}/qr?size=800&download=true`
+        : `/api/merchants/${merchantId}/qr?size=800&download=true`;
       const response = await fetch(downloadUrl);
       if (!response.ok) throw new Error('Failed to fetch QR code');
       
@@ -31,7 +36,9 @@ export function QRCodeDisplay({ paymentUrl, qrCodeUrl, merchantId }: QRCodeDispl
       // Create download link
       const link = document.createElement('a');
       link.href = url;
-      link.download = `tapt-payment-qr-merchant-${merchantId}.png`;
+      link.download = stoneId 
+        ? `tapt-payment-qr-merchant-${merchantId}-stone-${stoneId}.png`
+        : `tapt-payment-qr-merchant-${merchantId}.png`;
       document.body.appendChild(link);
       link.click();
       

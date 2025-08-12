@@ -20,12 +20,23 @@ export function getBaseUrl(req?: any): string {
   return 'http://localhost:5000';
 }
 
-export function generatePaymentUrl(merchantId: number, req?: any): string {
+export function generatePaymentUrl(merchantId: number, stoneId?: number, req?: any): string {
   const baseUrl = getBaseUrl(req);
+  if (stoneId) {
+    return `${baseUrl}/pay/${merchantId}/stone/${stoneId}`;
+  }
   return `${baseUrl}/pay/${merchantId}`;
 }
 
-export function generateQrCodeUrl(merchantId: number, req?: any): string {
+export function generateQrCodeUrl(merchantId: number, stoneId?: number, req?: any): string {
   const baseUrl = getBaseUrl(req);
+  if (stoneId) {
+    return `${baseUrl}/api/merchants/${merchantId}/stone/${stoneId}/qr`;
+  }
   return `${baseUrl}/api/merchants/${merchantId}/qr`;
+}
+
+export function generateStonePaymentUrl(merchantId: number, stoneId: number, req?: any): string {
+  const baseUrl = getBaseUrl(req);
+  return `${baseUrl}/pay/${merchantId}/stone/${stoneId}`;
 }
