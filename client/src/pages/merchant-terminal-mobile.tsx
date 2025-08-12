@@ -746,7 +746,79 @@ export default function MerchantTerminalMobile() {
           </div>
         ) : null}
 
+        {/* QR Code Dropdown Section */}
+        <div className="px-6">
+          {activeTab === "QR" ? (
+            <div className="space-y-4">
+              {/* QR Dropdown Button - Always visible when transaction exists */}
+              {(currentTransaction || activeTransaction) && (
+                <button
+                  onClick={() => setShowQrDropdown(!showQrDropdown)}
+                  className="w-full p-4 rounded-2xl text-black font-semibold shadow-lg transition-all duration-300 hover:scale-[1.02]"
+                  style={{ 
+                    backgroundColor: '#00FF66',
+                    boxShadow: '0 8px 25px rgba(0, 255, 102, 0.3)'
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <span>tapt stone 1</span>
+                    <ChevronDown 
+                      className={`h-5 w-5 transition-transform duration-300 ${showQrDropdown ? 'rotate-180' : ''}`} 
+                    />
+                  </div>
+                </button>
+              )}
 
+              {/* QR Code Dropdown Content */}
+              {showQrDropdown && (currentTransaction || activeTransaction) && (
+                <div 
+                  className="backdrop-blur-xl border rounded-2xl p-6 shadow-2xl transition-all duration-500 ease-out transform"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(0, 255, 102, 0.15) 0%, rgba(0, 255, 102, 0.08) 100%)',
+                    borderColor: 'rgba(0, 255, 102, 0.3)',
+                    boxShadow: '0 15px 35px rgba(0, 255, 102, 0.2)',
+                    animation: 'fadeIn 0.5s ease-out'
+                  }}
+                >
+                  <div className="text-center">
+                    <div className="w-48 h-48 mx-auto mb-4 bg-white rounded-xl p-4">
+                      <QRCodeDisplay 
+                        merchantId={merchantId} 
+                      />
+                    </div>
+                    <p className="text-white/80 text-sm font-medium">
+                      Scan to pay with any device
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Placeholder when no transaction */}
+              {!(currentTransaction || activeTransaction) && (
+                <div 
+                  className="backdrop-blur-xl border rounded-3xl p-8 flex items-center justify-center shadow-2xl transition-all duration-300"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.95)',
+                    borderColor: 'rgba(255, 255, 255, 0.3)',
+                    boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)'
+                  }}
+                >
+                  <div className="text-center">
+                    <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4">
+                      <QrCode size={64} className="text-gray-400" />
+                    </div>
+                    <p className="text-gray-600 text-sm">
+                      Create a transaction to show QR code
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            // NFC Interface - Empty space
+            <div className="h-48"></div>
+          )}
+        </div>
 
         {/* NFC Payment Overlay for Mobile */}
         {showNfcOverlay && (
@@ -1165,40 +1237,7 @@ export default function MerchantTerminalMobile() {
           </div>
         </div>
 
-        {/* Payment Status Box - Only shows and drops down when payment is created (second instance) */}
-        {(currentTransaction || activeTransaction) && activeTab === "QR" ? (
-          <div className="px-6 mb-6">
-            {/* Small indicator that drops down from above when transaction exists */}
-            <div 
-              className={`backdrop-blur-xl border rounded-2xl shadow-2xl transition-all duration-700 ease-out transform ${
-                (currentTransaction || activeTransaction)
-                  ? "translate-y-0 opacity-100 scale-100" 
-                  : "translate-y-[-60px] opacity-0 scale-90"
-              }`}
-              style={{
-                background: 'rgba(255, 255, 255, 0.08)',
-                borderColor: 'rgba(255, 255, 255, 0.20)',
-                boxShadow: '0 15px 35px rgba(0, 0, 0, 0.3)',
-                animationDelay: '0.2s'
-              }}
-            >
-              <div className="text-center p-4">
-                <div className="text-xs text-white/60 mb-2 font-medium">
-                  Transaction #{(currentTransaction || activeTransaction).id}
-                </div>
-                <div className="mb-3">
-                  {getPaymentStatusIndicator((currentTransaction || activeTransaction).status)}
-                </div>
-                <div className="text-xs text-white/50">
-                  {(currentTransaction || activeTransaction).status === "pending" && "Awaiting Payment"}
-                  {(currentTransaction || activeTransaction).status === "processing" && "Processing Payment..."}
-                  {(currentTransaction || activeTransaction).status === "completed" && "Payment Successful"}
-                  {(currentTransaction || activeTransaction).status === "failed" && "Payment Failed"}
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : null}
+
 
         {/* QR Code Dropdown Section */}
         <div className="px-6">
