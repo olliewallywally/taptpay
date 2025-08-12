@@ -24,7 +24,12 @@ import {
   CreditCard,
   Edit,
   Save,
-  X
+  X,
+  QrCode,
+  Plus,
+  Trash2,
+  Download,
+  Loader2
 } from "lucide-react";
 import { z } from "zod";
 import { MobileHeader } from "@/components/mobile-header";
@@ -65,6 +70,18 @@ export default function Settings() {
       if (!user?.merchantId) throw new Error("No merchant ID available");
       const response = await fetch(`/api/merchants/${user.merchantId}`);
       if (!response.ok) throw new Error("Failed to fetch merchant");
+      return response.json();
+    },
+    enabled: !!user?.merchantId,
+  });
+
+  // Get tapt stones for this merchant
+  const { data: taptStones = [], isLoading: stonesLoading } = useQuery({
+    queryKey: ["/api/merchants", user?.merchantId, "tapt-stones"],
+    queryFn: async () => {
+      if (!user?.merchantId) throw new Error("No merchant ID available");
+      const response = await fetch(`/api/merchants/${user.merchantId}/tapt-stones`);
+      if (!response.ok) throw new Error("Failed to fetch tapt stones");
       return response.json();
     },
     enabled: !!user?.merchantId,
@@ -166,6 +183,85 @@ export default function Settings() {
       });
     },
   });
+
+  // Create tapt stone mutation
+  const createTaptStoneMutation = useMutation({
+    mutationFn: async () => {
+      if (!user?.merchantId) throw new Error("No merchant ID available");
+      const response = await apiRequest("POST", `/api/merchants/${user.merchantId}/tapt-stones`, {});
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", user?.merchantId, "tapt-stones"] });
+      toast({
+        title: "Success",
+        description: "New tapt stone created successfully!",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create tapt stone",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete tapt stone mutation
+  const deleteTaptStoneMutation = useMutation({
+    mutationFn: async (stoneId: number) => {
+      if (!user?.merchantId) throw new Error("No merchant ID available");
+      const response = await apiRequest("DELETE", `/api/merchants/${user.merchantId}/tapt-stones/${stoneId}`, {});
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", user?.merchantId, "tapt-stones"] });
+      toast({
+        title: "Success",
+        description: "Tapt stone deleted successfully!",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete tapt stone",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Download QR code function
+  const downloadQRCode = async (stoneId: number, stoneNumber: number) => {
+    try {
+      const downloadUrl = `/api/merchants/${user?.merchantId}/stone/${stoneId}/qr?size=800&download=true`;
+      const response = await fetch(downloadUrl);
+      if (!response.ok) throw new Error('Failed to fetch QR code');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `tapt-stone-${stoneNumber}-qr.png`;
+      document.body.appendChild(link);
+      link.click();
+      
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast({
+        title: "QR Code Downloaded",
+        description: `Tapt Stone ${stoneNumber} QR code saved to downloads.`,
+      });
+    } catch (error) {
+      console.error('Failed to download QR code:', error);
+      toast({
+        title: "Download Failed",
+        description: "Could not download QR code. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const onSubmitDetails = (data: MerchantDetailsFormData) => {
     updateDetailsMutation.mutate(data);
@@ -493,6 +589,105 @@ export default function Settings() {
                   </AlertDescription>
                 </Alert>
               )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Tapt Stone Management */}
+      <div className="backdrop-blur-xl bg-white/5 border border-white/20 rounded-3xl p-6 shadow-2xl mb-6 sm:mb-8 hover:bg-white/10 hover:border-white/30 transition-all duration-300">
+        <div className="mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <QrCode className="h-5 w-5 text-white" />
+              <div>
+                <h3 className="text-lg font-semibold text-white">Tapt Stone Management</h3>
+                <p className="text-white/70 text-sm">
+                  Manage your tapt stones and their QR codes (max 10 per merchant)
+                </p>
+              </div>
+            </div>
+            {taptStones.length < 10 && (
+              <Button
+                onClick={() => createTaptStoneMutation.mutate()}
+                disabled={createTaptStoneMutation.isPending}
+                className="backdrop-blur-sm bg-green-500/20 border border-green-500/30 text-green-400 px-4 py-2 rounded-xl hover:bg-green-500/30 hover:border-green-500/40 transition-all duration-300 text-sm font-medium"
+              >
+                {createTaptStoneMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Plus className="w-4 h-4 mr-2" />
+                )}
+                Add Stone
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          {stonesLoading ? (
+            <div className="animate-pulse space-y-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="bg-white/10 rounded-xl p-4 h-16"></div>
+              ))}
+            </div>
+          ) : taptStones.length === 0 ? (
+            <div className="text-center py-8">
+              <QrCode className="h-12 w-12 text-white/40 mx-auto mb-4" />
+              <p className="text-white/70 text-sm">No tapt stones created yet</p>
+              <p className="text-white/50 text-xs mt-1">Create your first tapt stone to start accepting payments</p>
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {taptStones.map((stone: any) => (
+                <div key={stone.id} className="bg-white/10 border border-white/20 rounded-xl p-4 hover:bg-white/15 transition-all duration-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-12 h-12 bg-green-500/20 border border-green-500/30 rounded-lg flex items-center justify-center">
+                        <span className="text-green-400 font-bold text-sm">{stone.stoneNumber}</span>
+                      </div>
+                      <div>
+                        <h4 className="text-white font-medium">{stone.name}</h4>
+                        <p className="text-white/60 text-xs">Created {new Date(stone.createdAt).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        onClick={() => downloadQRCode(stone.id, stone.stoneNumber)}
+                        size="sm"
+                        className="bg-blue-500/20 border border-blue-500/30 text-blue-400 hover:bg-blue-500/30 hover:border-blue-500/40 transition-all duration-200"
+                      >
+                        <Download className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        onClick={() => deleteTaptStoneMutation.mutate(stone.id)}
+                        disabled={deleteTaptStoneMutation.isPending}
+                        size="sm"
+                        className="bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 hover:border-red-500/40 transition-all duration-200"
+                      >
+                        {deleteTaptStoneMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-white/10">
+                    <div className="text-xs text-white/50">
+                      Payment URL: {stone.paymentUrl ? `${stone.paymentUrl.substring(0, 40)}...` : 'Generating...'}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {taptStones.length >= 10 && (
+            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 text-center">
+              <p className="text-yellow-400 text-sm">
+                Maximum of 10 tapt stones reached. Delete a stone to create a new one.
+              </p>
             </div>
           )}
         </div>

@@ -373,7 +373,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid transaction data", errors: validation.error.errors });
       }
 
-      const transaction = await storage.createTransaction(validation.data);
+      // Create transaction data without selectedStoneId for database
+      const { selectedStoneId, ...transactionData } = validation.data;
+      const transaction = await storage.createTransaction(transactionData);
+      
+      // If a specific stone was selected, associate the transaction with it
+      if (selectedStoneId) {
+        try {
+          await storage.associateTransactionWithStone(transaction.id, selectedStoneId);
+        } catch (error) {
+          console.error("Failed to associate transaction with stone:", error);
+          // Continue anyway, transaction is still valid
+        }
+      }
       
       // Notify all connected clients for this merchant
       const connections = sseConnections.get(transaction.merchantId);
