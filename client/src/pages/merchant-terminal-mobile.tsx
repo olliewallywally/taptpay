@@ -286,124 +286,43 @@ export default function MerchantTerminalMobile() {
   };
 
   const getPaymentStatusIndicator = (status: string) => {
-    switch (status) {
-      case "pending":
-        return (
-          <div className="relative group">
-            {/* Animated gradient border */}
-            <div className="absolute inset-0 bg-gradient-to-r from-[#00FF66]/20 via-cyan-400/20 to-[#00FF66]/20 rounded-3xl blur-sm group-hover:blur-md transition-all duration-500"></div>
-            <div className="relative bg-black/40 backdrop-blur-xl border border-[#00FF66]/30 rounded-3xl p-5 overflow-hidden group-hover:border-[#00FF66]/50 transition-all duration-300">
-              {/* Subtle scan line */}
-              <div className="absolute top-0 left-0 h-[1px] w-full bg-gradient-to-r from-transparent via-[#00FF66]/40 to-transparent animate-[shimmer_3s_ease-in-out_infinite]"></div>
-              
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="relative">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#00FF66]/20 to-[#00FF66]/5 border border-[#00FF66]/30 flex items-center justify-center">
-                      <Clock className="w-5 h-5 text-[#00FF66]" />
-                    </div>
-                    <div className="absolute inset-0 rounded-2xl bg-[#00FF66]/10 animate-pulse"></div>
-                  </div>
-                  <div>
-                    <div className="text-white font-semibold text-lg tracking-tight">Ready</div>
-                    <div className="text-[#00FF66]/80 text-sm font-medium">Awaiting customer</div>
-                  </div>
-                </div>
-                <div className="w-2 h-2 bg-[#00FF66] rounded-full animate-pulse shadow-[0_0_10px_#00FF66]"></div>
-              </div>
+    return (
+      <div className="bg-white/10 backdrop-blur border border-white/20 rounded-2xl p-6">
+        <div className="flex items-center justify-center">
+          {status === "pending" && (
+            <div className="relative w-16 h-16">
+              {/* Animated ring */}
+              <div className="absolute inset-0 rounded-full border-4 border-[#00FF66]/30"></div>
+              <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[#00FF66] animate-spin"></div>
             </div>
-          </div>
-        );
-        
-      case "processing":
-        return (
-          <div className="relative group">
-            <div className="absolute inset-0 bg-gradient-to-r from-[#00FF66]/30 via-cyan-300/30 to-[#00FF66]/30 rounded-3xl blur-sm animate-pulse"></div>
-            <div className="relative bg-black/40 backdrop-blur-xl border border-[#00FF66]/40 rounded-3xl p-5 overflow-hidden">
-              {/* Active processing line */}
-              <div className="absolute top-0 left-0 h-[2px] w-full bg-gradient-to-r from-[#00FF66] via-cyan-400 to-[#00FF66] animate-[slide_2s_ease-in-out_infinite]"></div>
-              
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="relative">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#00FF66]/30 to-[#00FF66]/10 border border-[#00FF66]/50 flex items-center justify-center">
-                      <Loader2 className="w-5 h-5 text-[#00FF66] animate-spin" />
-                    </div>
-                    <div className="absolute inset-0 rounded-2xl bg-[#00FF66]/20 animate-ping"></div>
-                  </div>
-                  <div>
-                    <div className="text-white font-semibold text-lg tracking-tight">Processing</div>
-                    <div className="text-[#00FF66]/90 text-sm font-medium">Securing transaction</div>
-                  </div>
-                </div>
-                <div className="flex space-x-1">
-                  {[0, 1, 2].map((i) => (
-                    <div
-                      key={i}
-                      className="w-1.5 h-1.5 bg-[#00FF66] rounded-full animate-bounce"
-                      style={{ animationDelay: `${i * 0.2}s` }}
-                    ></div>
-                  ))}
-                </div>
-              </div>
+          )}
+          
+          {status === "processing" && (
+            <div className="relative w-16 h-16">
+              {/* Faster animated ring */}
+              <div className="absolute inset-0 rounded-full border-4 border-[#00FF66]/30"></div>
+              <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[#00FF66] animate-spin duration-500"></div>
             </div>
-          </div>
-        );
-        
-      case "completed":
-        return (
-          <div className="relative group">
-            <div className="absolute inset-0 bg-gradient-to-r from-[#00FF66]/40 via-emerald-300/40 to-[#00FF66]/40 rounded-3xl blur-sm"></div>
-            <div className="relative bg-black/40 backdrop-blur-xl border border-[#00FF66]/60 rounded-3xl p-5 overflow-hidden">
-              {/* Success glow line */}
-              <div className="absolute top-0 left-0 h-[3px] w-full bg-gradient-to-r from-[#00FF66] to-emerald-400 shadow-[0_0_10px_#00FF66]"></div>
-              
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="relative">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#00FF66]/40 to-emerald-500/20 border border-[#00FF66]/70 flex items-center justify-center shadow-[0_0_20px_rgba(0,255,102,0.3)]">
-                      <CheckCircle className="w-5 h-5 text-[#00FF66]" />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-white font-semibold text-lg tracking-tight">Success</div>
-                    <div className="text-[#00FF66] text-sm font-medium">Payment complete</div>
-                  </div>
-                </div>
-                <div className="w-3 h-3 bg-[#00FF66] rounded-full shadow-[0_0_15px_#00FF66] animate-pulse"></div>
-              </div>
+          )}
+          
+          {status === "completed" && (
+            <div className="relative w-16 h-16 flex items-center justify-center">
+              {/* Success tick with smooth transition */}
+              <div className="absolute inset-0 rounded-full border-4 border-[#00FF66] animate-[fadeIn_0.5s_ease-in-out]"></div>
+              <CheckCircle className="w-8 h-8 text-[#00FF66] animate-[scaleIn_0.5s_ease-in-out]" />
             </div>
-          </div>
-        );
-        
-      case "failed":
-        return (
-          <div className="relative group">
-            <div className="absolute inset-0 bg-gradient-to-r from-red-500/20 via-pink-400/20 to-red-500/20 rounded-3xl blur-sm"></div>
-            <div className="relative bg-black/40 backdrop-blur-xl border border-red-400/40 rounded-3xl p-5 overflow-hidden">
-              <div className="absolute top-0 left-0 h-[1px] w-full bg-gradient-to-r from-transparent via-red-400/60 to-transparent"></div>
-              
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="relative">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-500/20 to-red-500/5 border border-red-400/40 flex items-center justify-center">
-                      <XCircle className="w-5 h-5 text-red-400" />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-white font-semibold text-lg tracking-tight">Failed</div>
-                    <div className="text-red-400/80 text-sm font-medium">Try again</div>
-                  </div>
-                </div>
-                <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></div>
-              </div>
+          )}
+          
+          {status === "failed" && (
+            <div className="relative w-16 h-16 flex items-center justify-center">
+              {/* Failed X with smooth transition */}
+              <div className="absolute inset-0 rounded-full border-4 border-red-400 animate-[fadeIn_0.5s_ease-in-out]"></div>
+              <XCircle className="w-8 h-8 text-red-400 animate-[scaleIn_0.5s_ease-in-out]" />
             </div>
-          </div>
-        );
-        
-      default:
-        return null;
-    }
+          )}
+        </div>
+      </div>
+    );
   };
 
   if (isMobile) {
