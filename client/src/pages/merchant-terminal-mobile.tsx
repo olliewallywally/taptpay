@@ -622,7 +622,7 @@ export default function MerchantTerminalMobile() {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent className="bg-gray-700 border-gray-600">
-                                <SelectItem value="">No specific stone</SelectItem>
+                                <SelectItem value="none">No specific stone</SelectItem>
                                 {taptStones.map((stone: any) => (
                                   <SelectItem key={stone.id} value={stone.id.toString()}>
                                     {stone.name} (Stone {stone.stoneNumber})
