@@ -11,7 +11,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentMerchantId } from "@/lib/auth";
-import { Send, Loader2, CheckCircle, Clock, XCircle, QrCode, Smartphone, Edit, Split, MoreHorizontal, Menu, X, Waves } from "lucide-react";
+import { Send, Loader2, CheckCircle, Clock, XCircle, QrCode, Smartphone, Edit, Split, MoreHorizontal, Menu, X, Waves, ChevronDown } from "lucide-react";
 import { Link } from "wouter";
 
 const transactionFormSchema = z.object({
@@ -34,6 +34,7 @@ export default function MerchantTerminalMobile() {
   const [nfcPaymentStatus, setNfcPaymentStatus] = useState<"idle" | "creating" | "ready" | "processing" | "completed" | "failed">("idle");
   const [nfcSession, setNfcSession] = useState<any>(null);
   const [showNfcOverlay, setShowNfcOverlay] = useState(false);
+  const [showQrDropdown, setShowQrDropdown] = useState(false);
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -745,54 +746,7 @@ export default function MerchantTerminalMobile() {
           </div>
         ) : null}
 
-        {/* Payment Interface Section - QR or NFC */}
-        <div className="px-6">
-          {activeTab === "QR" ? (
-            // QR Code Interface
-            currentTransaction || activeTransaction ? (
-              <div 
-                className="backdrop-blur-xl border rounded-3xl p-8 flex items-center justify-center shadow-2xl transition-all duration-300"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.95)',
-                  borderColor: 'rgba(255, 255, 255, 0.3)',
-                  boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)'
-                }}
-              >
-                <div className="text-center">
-                  <div className="w-48 h-48 mx-auto mb-4">
-                    <QRCodeDisplay 
-                      merchantId={merchantId} 
-                    />
-                  </div>
-                  <p className="text-gray-600 text-sm">
-                    Scan to pay with any device
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div 
-                className="backdrop-blur-xl border rounded-3xl p-8 flex items-center justify-center shadow-2xl transition-all duration-300"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.95)',
-                  borderColor: 'rgba(255, 255, 255, 0.3)',
-                  boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)'
-                }}
-              >
-                <div className="text-center">
-                  <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4">
-                    <QrCode size={64} className="text-gray-400" />
-                  </div>
-                  <p className="text-gray-600 text-sm">
-                    Create a transaction to show QR code
-                  </p>
-                </div>
-              </div>
-            )
-          ) : (
-            // NFC Interface - Completely empty, functionality moved to Send button
-            <div className="h-48"></div>
-          )}
-        </div>
+
 
         {/* NFC Payment Overlay for Mobile */}
         {showNfcOverlay && (
@@ -1246,49 +1200,74 @@ export default function MerchantTerminalMobile() {
           </div>
         ) : null}
 
-        {/* Payment Interface Section - QR or NFC */}
+        {/* QR Code Dropdown Section */}
         <div className="px-6">
           {activeTab === "QR" ? (
-            // QR Code Interface
-            currentTransaction || activeTransaction ? (
-              <div 
-                className="backdrop-blur-xl border rounded-3xl p-8 flex items-center justify-center shadow-2xl transition-all duration-300"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.95)',
-                  borderColor: 'rgba(255, 255, 255, 0.3)',
-                  boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)'
-                }}
-              >
-                <div className="text-center">
-                  <div className="w-48 h-48 mx-auto mb-4">
-                    <QRCodeDisplay 
-                      merchantId={merchantId} 
+            <div className="space-y-4">
+              {/* QR Dropdown Button - Always visible when transaction exists */}
+              {(currentTransaction || activeTransaction) && (
+                <button
+                  onClick={() => setShowQrDropdown(!showQrDropdown)}
+                  className="w-full p-4 rounded-2xl text-black font-semibold shadow-lg transition-all duration-300 hover:scale-[1.02]"
+                  style={{ 
+                    backgroundColor: '#00FF66',
+                    boxShadow: '0 8px 25px rgba(0, 255, 102, 0.3)'
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <span>tapt stone 1</span>
+                    <ChevronDown 
+                      className={`h-5 w-5 transition-transform duration-300 ${showQrDropdown ? 'rotate-180' : ''}`} 
                     />
                   </div>
-                  <p className="text-gray-600 text-sm">
-                    Scan to pay with any device
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div 
-                className="backdrop-blur-xl border rounded-3xl p-8 flex items-center justify-center shadow-2xl transition-all duration-300"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.95)',
-                  borderColor: 'rgba(255, 255, 255, 0.3)',
-                  boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)'
-                }}
-              >
-                <div className="text-center">
-                  <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4">
-                    <QrCode size={64} className="text-gray-400" />
+                </button>
+              )}
+
+              {/* QR Code Dropdown Content */}
+              {showQrDropdown && (currentTransaction || activeTransaction) && (
+                <div 
+                  className="backdrop-blur-xl border rounded-2xl p-6 shadow-2xl transition-all duration-500 ease-out transform"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(0, 255, 102, 0.15) 0%, rgba(0, 255, 102, 0.08) 100%)',
+                    borderColor: 'rgba(0, 255, 102, 0.3)',
+                    boxShadow: '0 15px 35px rgba(0, 255, 102, 0.2)',
+                    animation: 'fadeIn 0.5s ease-out'
+                  }}
+                >
+                  <div className="text-center">
+                    <div className="w-48 h-48 mx-auto mb-4 bg-white rounded-xl p-4">
+                      <QRCodeDisplay 
+                        merchantId={merchantId} 
+                      />
+                    </div>
+                    <p className="text-white/80 text-sm font-medium">
+                      Scan to pay with any device
+                    </p>
                   </div>
-                  <p className="text-gray-600 text-sm">
-                    Create a transaction to show QR code
-                  </p>
                 </div>
-              </div>
-            )
+              )}
+
+              {/* Placeholder when no transaction */}
+              {!(currentTransaction || activeTransaction) && (
+                <div 
+                  className="backdrop-blur-xl border rounded-3xl p-8 flex items-center justify-center shadow-2xl transition-all duration-300"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.95)',
+                    borderColor: 'rgba(255, 255, 255, 0.3)',
+                    boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)'
+                  }}
+                >
+                  <div className="text-center">
+                    <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4">
+                      <QrCode size={64} className="text-gray-400" />
+                    </div>
+                    <p className="text-gray-600 text-sm">
+                      Create a transaction to show QR code
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
           ) : (
             // NFC Interface - Completely empty, functionality moved to Send button
             <div className="h-48"></div>
