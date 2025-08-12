@@ -162,6 +162,7 @@ export default function MerchantTerminalMobile() {
 
 
   const onSubmit = (data: TransactionFormData) => {
+    console.log('Form submitted with data:', data);
     createTransactionMutation.mutate(data);
   };
 
@@ -532,7 +533,7 @@ export default function MerchantTerminalMobile() {
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold mb-4 text-white">Create Transaction</h3>
                   <Form {...form}>
-                    <div className="space-y-4">
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                       <FormField
                         control={form.control}
                         name="itemName"
@@ -568,14 +569,14 @@ export default function MerchantTerminalMobile() {
                         )}
                       />
                       <Button
-                        onClick={form.handleSubmit(onSubmit)}
+                        type="submit"
                         disabled={createTransactionMutation.isPending}
                         className="w-full text-black font-semibold rounded-lg"
                         style={{ backgroundColor: '#00FF66' }}
                       >
                         {createTransactionMutation.isPending ? "Creating..." : "Create Transaction"}
                       </Button>
-                    </div>
+                    </form>
                   </Form>
                 </div>
               )}
