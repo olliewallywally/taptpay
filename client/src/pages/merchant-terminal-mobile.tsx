@@ -287,40 +287,38 @@ export default function MerchantTerminalMobile() {
 
   const getPaymentStatusIndicator = (status: string) => {
     return (
-      <div className="bg-white/10 backdrop-blur border border-white/20 rounded-2xl p-6">
-        <div className="flex items-center justify-center">
-          {status === "pending" && (
-            <div className="relative w-16 h-16">
-              {/* Animated ring */}
-              <div className="absolute inset-0 rounded-full border-4 border-[#00FF66]/30"></div>
-              <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[#00FF66] animate-spin"></div>
-            </div>
-          )}
-          
-          {status === "processing" && (
-            <div className="relative w-16 h-16">
-              {/* Faster animated ring */}
-              <div className="absolute inset-0 rounded-full border-4 border-[#00FF66]/30"></div>
-              <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[#00FF66] animate-spin duration-500"></div>
-            </div>
-          )}
-          
-          {status === "completed" && (
-            <div className="relative w-16 h-16 flex items-center justify-center">
-              {/* Success tick with smooth transition */}
-              <div className="absolute inset-0 rounded-full border-4 border-[#00FF66] animate-[fadeIn_0.5s_ease-in-out]"></div>
-              <CheckCircle className="w-8 h-8 text-[#00FF66] animate-[scaleIn_0.5s_ease-in-out]" />
-            </div>
-          )}
-          
-          {status === "failed" && (
-            <div className="relative w-16 h-16 flex items-center justify-center">
-              {/* Failed X with smooth transition */}
-              <div className="absolute inset-0 rounded-full border-4 border-red-400 animate-[fadeIn_0.5s_ease-in-out]"></div>
-              <XCircle className="w-8 h-8 text-red-400 animate-[scaleIn_0.5s_ease-in-out]" />
-            </div>
-          )}
-        </div>
+      <div className="flex items-center justify-center">
+        {status === "pending" && (
+          <div className="relative w-12 h-12">
+            {/* Static ring for pending */}
+            <div className="absolute inset-0 rounded-full border-3 border-[#00FF66]/40"></div>
+            <Clock className="absolute inset-2 w-8 h-8 text-[#00FF66]/70" />
+          </div>
+        )}
+        
+        {status === "processing" && (
+          <div className="relative w-12 h-12">
+            {/* Animated ring only when processing */}
+            <div className="absolute inset-0 rounded-full border-3 border-[#00FF66]/30"></div>
+            <div className="absolute inset-0 rounded-full border-3 border-transparent border-t-[#00FF66] animate-spin duration-700"></div>
+          </div>
+        )}
+        
+        {status === "completed" && (
+          <div className="relative w-12 h-12 flex items-center justify-center">
+            {/* Success tick with smooth transition */}
+            <div className="absolute inset-0 rounded-full border-3 border-[#00FF66] animate-[fadeIn_0.5s_ease-in-out]"></div>
+            <CheckCircle className="w-6 h-6 text-[#00FF66] animate-[scaleIn_0.5s_ease-in-out]" />
+          </div>
+        )}
+        
+        {status === "failed" && (
+          <div className="relative w-12 h-12 flex items-center justify-center">
+            {/* Failed X with smooth transition */}
+            <div className="absolute inset-0 rounded-full border-3 border-red-400 animate-[fadeIn_0.5s_ease-in-out]"></div>
+            <XCircle className="w-6 h-6 text-red-400 animate-[scaleIn_0.5s_ease-in-out]" />
+          </div>
+        )}
       </div>
     );
   };
@@ -711,25 +709,37 @@ export default function MerchantTerminalMobile() {
           </div>
         </div>
 
-        {/* Payment Status Box - Above QR Code with Glass Effect - Only show for QR tab */}
+        {/* Payment Status Box - Smaller box that drops down when payment is sent */}
         {(currentTransaction || activeTransaction) && activeTab === "QR" ? (
           <div className="px-6 mb-6">
+            {/* Small indicator that shows payment status */}
             <div 
-              className="backdrop-blur-xl border rounded-3xl p-6 shadow-2xl transition-all duration-300"
+              className={`backdrop-blur-xl border rounded-2xl shadow-2xl transition-all duration-500 ease-out transform ${
+                (currentTransaction || activeTransaction).status === "processing" || 
+                (currentTransaction || activeTransaction).status === "completed" || 
+                (currentTransaction || activeTransaction).status === "failed"
+                  ? "translate-y-0 opacity-100 scale-100" 
+                  : "translate-y-[-20px] opacity-80 scale-95"
+              }`}
               style={{
-                background: 'rgba(255, 255, 255, 0.05)',
-                borderColor: 'rgba(255, 255, 255, 0.15)',
-                boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5)'
+                background: 'rgba(255, 255, 255, 0.08)',
+                borderColor: 'rgba(255, 255, 255, 0.20)',
+                boxShadow: '0 15px 35px rgba(0, 0, 0, 0.3)'
               }}
             >
-              <div className="text-center">
-                <h3 className="text-lg font-bold text-white mb-2">
+              <div className="text-center p-4">
+                <div className="text-xs text-white/60 mb-2 font-medium">
                   Transaction #{(currentTransaction || activeTransaction).id}
-                </h3>
-                <p className="text-sm text-white/70 mb-4">
-                  {(currentTransaction || activeTransaction).itemName} - ${(currentTransaction || activeTransaction).price}
-                </p>
-                {getPaymentStatusIndicator((currentTransaction || activeTransaction).status)}
+                </div>
+                <div className="mb-3">
+                  {getPaymentStatusIndicator((currentTransaction || activeTransaction).status)}
+                </div>
+                <div className="text-xs text-white/50">
+                  {(currentTransaction || activeTransaction).status === "pending" && "Awaiting Payment"}
+                  {(currentTransaction || activeTransaction).status === "processing" && "Processing Payment..."}
+                  {(currentTransaction || activeTransaction).status === "completed" && "Payment Successful"}
+                  {(currentTransaction || activeTransaction).status === "failed" && "Payment Failed"}
+                </div>
               </div>
             </div>
           </div>
@@ -1201,25 +1211,37 @@ export default function MerchantTerminalMobile() {
           </div>
         </div>
 
-        {/* Payment Status Box - Above QR Code with Glass Effect - Only show for QR tab */}
+        {/* Payment Status Box - Smaller box that drops down when payment is sent (second instance) */}
         {(currentTransaction || activeTransaction) && activeTab === "QR" ? (
           <div className="px-6 mb-6">
+            {/* Small indicator that shows payment status */}
             <div 
-              className="backdrop-blur-xl border rounded-3xl p-6 shadow-2xl transition-all duration-300"
+              className={`backdrop-blur-xl border rounded-2xl shadow-2xl transition-all duration-500 ease-out transform ${
+                (currentTransaction || activeTransaction).status === "processing" || 
+                (currentTransaction || activeTransaction).status === "completed" || 
+                (currentTransaction || activeTransaction).status === "failed"
+                  ? "translate-y-0 opacity-100 scale-100" 
+                  : "translate-y-[-20px] opacity-80 scale-95"
+              }`}
               style={{
-                background: 'rgba(255, 255, 255, 0.05)',
-                borderColor: 'rgba(255, 255, 255, 0.15)',
-                boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5)'
+                background: 'rgba(255, 255, 255, 0.08)',
+                borderColor: 'rgba(255, 255, 255, 0.20)',
+                boxShadow: '0 15px 35px rgba(0, 0, 0, 0.3)'
               }}
             >
-              <div className="text-center">
-                <h3 className="text-lg font-bold text-white mb-2">
+              <div className="text-center p-4">
+                <div className="text-xs text-white/60 mb-2 font-medium">
                   Transaction #{(currentTransaction || activeTransaction).id}
-                </h3>
-                <p className="text-sm text-white/70 mb-4">
-                  {(currentTransaction || activeTransaction).itemName} - ${(currentTransaction || activeTransaction).price}
-                </p>
-                {getPaymentStatusIndicator((currentTransaction || activeTransaction).status)}
+                </div>
+                <div className="mb-3">
+                  {getPaymentStatusIndicator((currentTransaction || activeTransaction).status)}
+                </div>
+                <div className="text-xs text-white/50">
+                  {(currentTransaction || activeTransaction).status === "pending" && "Awaiting Payment"}
+                  {(currentTransaction || activeTransaction).status === "processing" && "Processing Payment..."}
+                  {(currentTransaction || activeTransaction).status === "completed" && "Payment Successful"}
+                  {(currentTransaction || activeTransaction).status === "failed" && "Payment Failed"}
+                </div>
               </div>
             </div>
           </div>
