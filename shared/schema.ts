@@ -273,6 +273,19 @@ export const insertPlatformFeeSchema = createInsertSchema(platformFees).omit({
   collectedAt: true,
 });
 
+// Tapt Stones table - multiple QR codes per merchant
+export const taptStones = pgTable("tapt_stones", {
+  id: serial("id").primaryKey(),
+  merchantId: serial("merchant_id").references(() => merchants.id),
+  name: text("name").notNull(), // e.g., "Stone 1", "Stone 2", etc.
+  stoneNumber: integer("stone_number").notNull(), // 1, 2, 3, etc.
+  qrCodeUrl: text("qr_code_url"),
+  paymentUrl: text("payment_url"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // API Keys table for ecommerce integration
 export const apiKeys = pgTable("api_keys", {
   id: serial("id").primaryKey(),
@@ -345,6 +358,19 @@ export const updateApiKeySchema = z.object({
   rateLimitPerHour: z.number().min(100).max(10000),
 });
 
+// Tapt Stone schemas
+export const insertTaptStoneSchema = createInsertSchema(taptStones).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const createTaptStoneSchema = z.object({
+  merchantId: z.number().min(1, "Merchant ID is required"),
+  name: z.string().min(1, "Stone name is required").max(50, "Name too long"),
+  stoneNumber: z.number().min(1, "Stone number must be at least 1").max(10, "Maximum 10 stones allowed"),
+});
+
 // User schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -370,3 +396,8 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type Refund = typeof refunds.$inferSelect;
 export type InsertRefund = z.infer<typeof insertRefundSchema>;
 export type CreateRefund = z.infer<typeof createRefundSchema>;
+
+// Tapt Stone types
+export type TaptStone = typeof taptStones.$inferSelect;
+export type InsertTaptStone = z.infer<typeof insertTaptStoneSchema>;
+export type CreateTaptStone = z.infer<typeof createTaptStoneSchema>;

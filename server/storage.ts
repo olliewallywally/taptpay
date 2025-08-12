@@ -1,4 +1,4 @@
-import { merchants, transactions, merchantSettlements, platformFees, refunds, splitPayments, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund } from "@shared/schema";
+import { merchants, transactions, merchantSettlements, platformFees, refunds, splitPayments, taptStones, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone } from "@shared/schema";
 import { getDb, isDatabaseConnected } from "./database";
 import { eq, desc, and } from "drizzle-orm";
 
@@ -49,6 +49,13 @@ export interface IStorage {
   getRefundsByTransaction(transactionId: number): Promise<Refund[]>;
   getRefundsByMerchant(merchantId: number): Promise<Refund[]>;
   updateRefundStatus(id: number, status: string, windcaveRefundId?: string): Promise<Refund | undefined>;
+  
+  // Tapt Stone operations
+  createTaptStone(data: InsertTaptStone): Promise<TaptStone>;
+  getTaptStone(id: number): Promise<TaptStone | undefined>;
+  getTaptStonesByMerchant(merchantId: number): Promise<TaptStone[]>;
+  updateTaptStoneUrls(id: number, qrCodeUrl: string, paymentUrl: string): Promise<TaptStone | undefined>;
+  deleteTaptStone(id: number): Promise<boolean>;
   
   // Analytics operations
   getMerchantAnalytics(merchantId: number): Promise<{
@@ -121,11 +128,13 @@ export class MemStorage implements IStorage {
   private platformFees: Map<number, PlatformFee>;
   private refunds: Map<number, Refund>;
   private splitPayments: Map<number, any>;
+  private taptStones: Map<number, TaptStone>;
   private currentMerchantId: number;
   private currentTransactionId: number;
   private currentPlatformFeeId: number;
   private currentRefundId: number;
   private currentSplitPaymentId: number;
+  private currentTaptStoneId: number;
   private activeTransactionCache: Map<number, Transaction | null>; // Cache for active transactions by merchant
 
   constructor() {
@@ -134,11 +143,13 @@ export class MemStorage implements IStorage {
     this.platformFees = new Map();
     this.refunds = new Map();
     this.splitPayments = new Map();
+    this.taptStones = new Map();
     this.currentMerchantId = 1;
     this.currentTransactionId = 1;
     this.currentPlatformFeeId = 1;
     this.currentRefundId = 1;
     this.currentSplitPaymentId = 1;
+    this.currentTaptStoneId = 1;
     this.activeTransactionCache = new Map();
   }
 
@@ -970,6 +981,55 @@ export class MemStorage implements IStorage {
   async getWebhookDeliveries(apiKeyId: number): Promise<any[]> {
     return [];
   }
+
+  // Tapt Stone operations
+  async createTaptStone(data: InsertTaptStone): Promise<TaptStone> {
+    const id = this.currentTaptStoneId++;
+    const taptStone: TaptStone = {
+      ...data,
+      id,
+      qrCodeUrl: null,
+      paymentUrl: null,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.taptStones.set(id, taptStone);
+    return taptStone;
+  }
+
+  async getTaptStone(id: number): Promise<TaptStone | undefined> {
+    return this.taptStones.get(id);
+  }
+
+  async getTaptStonesByMerchant(merchantId: number): Promise<TaptStone[]> {
+    return Array.from(this.taptStones.values()).filter(
+      (stone) => stone.merchantId === merchantId && stone.isActive
+    );
+  }
+
+  async updateTaptStoneUrls(id: number, qrCodeUrl: string, paymentUrl: string): Promise<TaptStone | undefined> {
+    const stone = this.taptStones.get(id);
+    if (stone) {
+      stone.qrCodeUrl = qrCodeUrl;
+      stone.paymentUrl = paymentUrl;
+      stone.updatedAt = new Date();
+      this.taptStones.set(id, stone);
+      return stone;
+    }
+    return undefined;
+  }
+
+  async deleteTaptStone(id: number): Promise<boolean> {
+    const stone = this.taptStones.get(id);
+    if (stone) {
+      stone.isActive = false;
+      stone.updatedAt = new Date();
+      this.taptStones.set(id, stone);
+      return true;
+    }
+    return false;
+  }
 }
 
 // Database Storage Implementation
@@ -1703,6 +1763,55 @@ export class DatabaseStorage implements IStorage {
       console.error("Database error in getNextPendingSplit:", error);
       return undefined;
     }
+  }
+
+  // Tapt Stone operations
+  async createTaptStone(data: InsertTaptStone): Promise<TaptStone> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db.insert(taptStones).values(data).returning();
+    return result[0];
+  }
+
+  async getTaptStone(id: number): Promise<TaptStone | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db.select().from(taptStones).where(eq(taptStones.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getTaptStonesByMerchant(merchantId: number): Promise<TaptStone[]> {
+    if (!this.db) throw new Error('Database not available');
+    return await this.db
+      .select()
+      .from(taptStones)
+      .where(and(eq(taptStones.merchantId, merchantId), eq(taptStones.isActive, true)))
+      .orderBy(taptStones.stoneNumber);
+  }
+
+  async updateTaptStoneUrls(id: number, qrCodeUrl: string, paymentUrl: string): Promise<TaptStone | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .update(taptStones)
+      .set({ 
+        qrCodeUrl, 
+        paymentUrl, 
+        updatedAt: new Date() 
+      })
+      .where(eq(taptStones.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteTaptStone(id: number): Promise<boolean> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .update(taptStones)
+      .set({ 
+        isActive: false, 
+        updatedAt: new Date() 
+      })
+      .where(eq(taptStones.id, id))
+      .returning();
+    return result.length > 0;
   }
 }
 

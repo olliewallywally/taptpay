@@ -1,12 +1,12 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema } from "@shared/schema";
+import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema } from "@shared/schema";
 import { windcaveService } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, createUser, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
 import { generateBusinessReportPdf } from "./report-generator";
-import { getBaseUrl, generatePaymentUrl, generateQrCodeUrl } from "./url-utils";
+import { getBaseUrl, generatePaymentUrl, generateQrCodeUrl, generateStonePaymentUrl } from "./url-utils";
 import { sendEmail } from "./email-service";
 import QRCode from "qrcode";
 import { z } from "zod";
@@ -271,6 +271,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("QR code generation error:", error);
       res.status(500).json({ message: "Failed to generate QR code" });
+    }
+  });
+
+  // Generate QR code for specific tapt stone
+  app.get("/api/merchants/:id/stone/:stoneId/qr", async (req, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      const stoneId = parseInt(req.params.stoneId);
+      
+      // Verify stone exists and belongs to merchant
+      const stone = await storage.getTaptStone(stoneId);
+      if (!stone || stone.merchantId !== merchantId) {
+        return res.status(404).json({ message: "Tapt stone not found" });
+      }
+
+      // Get size parameter (default to 400, allow up to 1000 for downloads)
+      const size = Math.min(parseInt(req.query.size as string) || 400, 1000);
+      const isDownload = req.query.download === 'true';
+
+      // Set response headers for PNG image - STATIC QR per stone
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'public, max-age=2592000'); // Cache for 30 days - QR never changes per stone
+      res.setHeader('ETag', `"stone-qr-${stoneId}"`); // Static ETag per stone
+      
+      if (isDownload) {
+        res.setHeader('Content-Disposition', `attachment; filename="tapt-payment-qr-merchant-${merchantId}-stone-${stoneId}.png"`);
+      }
+      
+      // Generate QR code with current payment URL for this stone
+      const currentPaymentUrl = generateStonePaymentUrl(merchantId, stoneId, req);
+      const qrBuffer = await QRCode.toBuffer(currentPaymentUrl, {
+        type: 'png',
+        width: size,
+        margin: 4, // Larger margin for better visibility
+        color: {
+          dark: '#16423C', // Forest green
+          light: '#FFFFFF'
+        },
+        errorCorrectionLevel: 'H', // High error correction for better scanning
+      });
+      
+      res.send(qrBuffer);
+    } catch (error) {
+      console.error("Stone QR code generation error:", error);
+      res.status(500).json({ message: "Failed to generate QR code for stone" });
     }
   });
 
@@ -1042,6 +1087,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(transactions);
     } catch (error) {
       res.status(500).json({ message: "Failed to get transactions" });
+    }
+  });
+
+  // Tapt Stone API routes
+  
+  // Get all tapt stones for a merchant
+  app.get("/api/merchants/:id/tapt-stones", async (req, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      const stones = await storage.getTaptStonesByMerchant(merchantId);
+      res.json(stones);
+    } catch (error) {
+      console.error("Error fetching tapt stones:", error);
+      res.status(500).json({ message: "Failed to get tapt stones" });
+    }
+  });
+
+  // Create a new tapt stone
+  app.post("/api/merchants/:id/tapt-stones", async (req, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      
+      // Check if merchant exists
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+
+      // Get existing stones count to determine next stone number
+      const existingStones = await storage.getTaptStonesByMerchant(merchantId);
+      const nextStoneNumber = existingStones.length + 1;
+
+      // Check if merchant already has 10 stones (max limit)
+      if (existingStones.length >= 10) {
+        return res.status(400).json({ message: "Maximum 10 tapt stones allowed per merchant" });
+      }
+
+      const validation = createTaptStoneSchema.safeParse({
+        merchantId,
+        name: `Stone ${nextStoneNumber}`,
+        stoneNumber: nextStoneNumber,
+      });
+
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "Invalid tapt stone data", 
+          errors: validation.error.errors 
+        });
+      }
+
+      const newStone = await storage.createTaptStone(validation.data);
+      
+      // Generate QR code and payment URL for the new stone
+      const baseUrl = getBaseUrl(req);
+      const qrCodeUrl = generateQrCodeUrl(merchantId, newStone.id);
+      const paymentUrl = generatePaymentUrl(merchantId, newStone.id);
+      
+      // Update the stone with the URLs
+      const updatedStone = await storage.updateTaptStoneUrls(newStone.id, qrCodeUrl, paymentUrl);
+      
+      res.json(updatedStone);
+    } catch (error) {
+      console.error("Error creating tapt stone:", error);
+      res.status(500).json({ message: "Failed to create tapt stone" });
+    }
+  });
+
+  // Delete a tapt stone
+  app.delete("/api/tapt-stones/:id", async (req, res) => {
+    try {
+      const stoneId = parseInt(req.params.id);
+      const success = await storage.deleteTaptStone(stoneId);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Tapt stone not found" });
+      }
+      
+      res.json({ message: "Tapt stone deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting tapt stone:", error);
+      res.status(500).json({ message: "Failed to delete tapt stone" });
+    }
+  });
+
+  // Get specific tapt stone details
+  app.get("/api/tapt-stones/:id", async (req, res) => {
+    try {
+      const stoneId = parseInt(req.params.id);
+      const stone = await storage.getTaptStone(stoneId);
+      
+      if (!stone || !stone.isActive) {
+        return res.status(404).json({ message: "Tapt stone not found" });
+      }
+      
+      res.json(stone);
+    } catch (error) {
+      console.error("Error fetching tapt stone:", error);
+      res.status(500).json({ message: "Failed to get tapt stone" });
     }
   });
 
