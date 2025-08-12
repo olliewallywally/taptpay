@@ -710,22 +710,21 @@ export default function MerchantTerminalMobile() {
           </div>
         </div>
 
-        {/* Payment Status Box - Smaller box that drops down when payment is sent */}
+        {/* Payment Status Box - Only shows and drops down when payment is created */}
         {(currentTransaction || activeTransaction) && activeTab === "QR" ? (
           <div className="px-6 mb-6">
-            {/* Small indicator that shows payment status */}
+            {/* Small indicator that drops down from above when transaction exists */}
             <div 
-              className={`backdrop-blur-xl border rounded-2xl shadow-2xl transition-all duration-500 ease-out transform ${
-                (currentTransaction || activeTransaction).status === "processing" || 
-                (currentTransaction || activeTransaction).status === "completed" || 
-                (currentTransaction || activeTransaction).status === "failed"
+              className={`backdrop-blur-xl border rounded-2xl shadow-2xl transition-all duration-700 ease-out transform ${
+                (currentTransaction || activeTransaction)
                   ? "translate-y-0 opacity-100 scale-100" 
-                  : "translate-y-[-20px] opacity-80 scale-95"
+                  : "translate-y-[-60px] opacity-0 scale-90"
               }`}
               style={{
                 background: 'rgba(255, 255, 255, 0.08)',
                 borderColor: 'rgba(255, 255, 255, 0.20)',
-                boxShadow: '0 15px 35px rgba(0, 0, 0, 0.3)'
+                boxShadow: '0 15px 35px rgba(0, 0, 0, 0.3)',
+                animationDelay: '0.2s'
               }}
             >
               <div className="text-center p-4">
@@ -1212,22 +1211,21 @@ export default function MerchantTerminalMobile() {
           </div>
         </div>
 
-        {/* Payment Status Box - Smaller box that drops down when payment is sent (second instance) */}
+        {/* Payment Status Box - Only shows and drops down when payment is created (second instance) */}
         {(currentTransaction || activeTransaction) && activeTab === "QR" ? (
           <div className="px-6 mb-6">
-            {/* Small indicator that shows payment status */}
+            {/* Small indicator that drops down from above when transaction exists */}
             <div 
-              className={`backdrop-blur-xl border rounded-2xl shadow-2xl transition-all duration-500 ease-out transform ${
-                (currentTransaction || activeTransaction).status === "processing" || 
-                (currentTransaction || activeTransaction).status === "completed" || 
-                (currentTransaction || activeTransaction).status === "failed"
+              className={`backdrop-blur-xl border rounded-2xl shadow-2xl transition-all duration-700 ease-out transform ${
+                (currentTransaction || activeTransaction)
                   ? "translate-y-0 opacity-100 scale-100" 
-                  : "translate-y-[-20px] opacity-80 scale-95"
+                  : "translate-y-[-60px] opacity-0 scale-90"
               }`}
               style={{
                 background: 'rgba(255, 255, 255, 0.08)',
                 borderColor: 'rgba(255, 255, 255, 0.20)',
-                boxShadow: '0 15px 35px rgba(0, 0, 0, 0.3)'
+                boxShadow: '0 15px 35px rgba(0, 0, 0, 0.3)',
+                animationDelay: '0.2s'
               }}
             >
               <div className="text-center p-4">
