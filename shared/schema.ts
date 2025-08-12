@@ -251,6 +251,7 @@ export const insertTransactionSchema = createInsertSchema(transactions).omit({
   merchantId: z.number(),
   price: z.string().regex(/^\d+(\.\d{2})?$/, "Price must be a valid decimal"),
   status: z.enum(["pending", "processing", "completed", "failed"]).default("pending"),
+  selectedStoneId: z.number().optional(),
 });
 
 // Password reset schemas

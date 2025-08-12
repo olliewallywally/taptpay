@@ -6,6 +6,7 @@ import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { QRCodeDisplay } from "@/components/qr-code-display";
 import { apiRequest } from "@/lib/queryClient";
 import { sseClient } from "@/lib/sse-client";
@@ -17,6 +18,7 @@ import { Link } from "wouter";
 const transactionFormSchema = z.object({
   itemName: z.string().min(1, "Item name is required"),
   price: z.string().regex(/^\d+(\.\d{2})?$/, "Please enter a valid price (e.g., 4.50)"),
+  selectedStoneId: z.number().optional(),
 });
 
 type TransactionFormData = z.infer<typeof transactionFormSchema>;
@@ -90,6 +92,7 @@ export default function MerchantTerminalMobile() {
     defaultValues: {
       itemName: "",
       price: "",
+      selectedStoneId: undefined,
     },
   });
 
@@ -153,6 +156,7 @@ export default function MerchantTerminalMobile() {
         itemName: data.itemName,
         price: data.price,
         status: "pending",
+        selectedStoneId: data.selectedStoneId,
       });
       return response.json();
     },
@@ -604,6 +608,33 @@ export default function MerchantTerminalMobile() {
                           </FormItem>
                         )}
                       />
+                      
+                      <FormField
+                        control={form.control}
+                        name="selectedStoneId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium text-gray-300">Tapt Stone (Optional)</FormLabel>
+                            <Select onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)} value={field.value?.toString() || ""}>
+                              <FormControl>
+                                <SelectTrigger className="bg-gray-700 border-gray-600 text-white rounded-lg">
+                                  <SelectValue placeholder="Select tapt stone for payment" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent className="bg-gray-700 border-gray-600">
+                                <SelectItem value="">No specific stone</SelectItem>
+                                {taptStones.map((stone: any) => (
+                                  <SelectItem key={stone.id} value={stone.id.toString()}>
+                                    {stone.name} (Stone {stone.stoneNumber})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage className="text-red-300 text-xs" />
+                          </FormItem>
+                        )}
+                      />
+                      
                       <Button
                         type="submit"
                         disabled={createTransactionMutation.isPending}

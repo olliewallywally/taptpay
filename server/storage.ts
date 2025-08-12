@@ -56,6 +56,7 @@ export interface IStorage {
   getTaptStonesByMerchant(merchantId: number): Promise<TaptStone[]>;
   updateTaptStoneUrls(id: number, qrCodeUrl: string, paymentUrl: string): Promise<TaptStone | undefined>;
   deleteTaptStone(id: number): Promise<boolean>;
+  associateTransactionWithStone(transactionId: number, stoneId: number): Promise<void>;
   
   // Analytics operations
   getMerchantAnalytics(merchantId: number): Promise<{
@@ -1030,6 +1031,12 @@ export class MemStorage implements IStorage {
     }
     return false;
   }
+
+  async associateTransactionWithStone(transactionId: number, stoneId: number): Promise<void> {
+    // For MemStorage, we could add a field to track stone associations
+    // but for simplicity, we'll just log this association
+    console.log(`Transaction ${transactionId} associated with stone ${stoneId}`);
+  }
 }
 
 // Database Storage Implementation
@@ -1812,6 +1819,12 @@ export class DatabaseStorage implements IStorage {
       .where(eq(taptStones.id, id))
       .returning();
     return result.length > 0;
+  }
+
+  async associateTransactionWithStone(transactionId: number, stoneId: number): Promise<void> {
+    // For now, we'll just log the association. 
+    // In a full implementation, you might add a junction table or field to track this
+    console.log(`Transaction ${transactionId} associated with stone ${stoneId}`);
   }
 }
 
