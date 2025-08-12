@@ -757,11 +757,12 @@ export default function MerchantTerminalMobile() {
                   className="w-full p-4 rounded-2xl text-black font-semibold shadow-lg transition-all duration-300 hover:scale-[1.02]"
                   style={{ 
                     backgroundColor: '#00FF66',
-                    boxShadow: '0 8px 25px rgba(0, 255, 102, 0.3)'
+                    boxShadow: '0 8px 25px rgba(0, 255, 102, 0.3)',
+                    fontFamily: 'Outfit, sans-serif'
                   }}
                 >
-                  <div className="flex items-center justify-between">
-                    <span>tapt stone 1</span>
+                  <div className="flex items-center justify-center">
+                    <span className="uppercase text-center flex-1">TAPT STONE 1</span>
                     <ChevronDown 
                       className={`h-5 w-5 transition-transform duration-300 ${showQrDropdown ? 'rotate-180' : ''}`} 
                     />
