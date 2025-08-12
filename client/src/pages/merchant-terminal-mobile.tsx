@@ -12,7 +12,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentMerchantId } from "@/lib/auth";
-import { Send, Loader2, CheckCircle, Clock, XCircle, QrCode, Smartphone, Edit, Split, MoreHorizontal, Menu, X, Waves, ChevronDown } from "lucide-react";
+import { Send, Loader2, CheckCircle, Clock, XCircle, QrCode, Smartphone, Edit, Split, MoreHorizontal, Menu, X, Waves, ChevronDown, Copy } from "lucide-react";
 import { Link } from "wouter";
 
 const transactionFormSchema = z.object({
@@ -1034,6 +1034,43 @@ export default function MerchantTerminalMobile() {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Payment Link Box */}
+        {(currentTransaction || activeTransaction) && (
+          <div className="fixed bottom-4 left-4 right-4 z-40">
+            <div 
+              className="backdrop-blur-xl border rounded-2xl p-4 shadow-2xl"
+              style={{
+                background: 'linear-gradient(135deg, rgba(0, 255, 102, 0.15) 0%, rgba(0, 255, 102, 0.08) 100%)',
+                borderColor: 'rgba(0, 255, 102, 0.3)',
+                boxShadow: '0 15px 35px rgba(0, 255, 102, 0.2)'
+              }}
+            >
+              <div className="text-center">
+                <p className="text-white/80 text-sm font-medium mb-2">
+                  Payment Link
+                </p>
+                <div className="flex items-center justify-between bg-white/10 rounded-lg p-3">
+                  <span className="text-white/70 text-xs font-mono truncate flex-1 mr-2">
+                    {window.location.origin}/pay/{merchantId}
+                  </span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${window.location.origin}/pay/${merchantId}`);
+                      toast({
+                        title: "Copied!",
+                        description: "Payment link copied to clipboard",
+                      });
+                    }}
+                    className="text-white/70 hover:text-white p-1 rounded"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
