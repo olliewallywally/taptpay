@@ -28,6 +28,7 @@ export default function MerchantTerminalMobile() {
   const [copiedLink, setCopiedLink] = useState(false);
   const [activeTab, setActiveTab] = useState<"QR" | "NFC">("QR");
   const [activeAction, setActiveAction] = useState<string | null>(null);
+  const [qrCollapsed, setQrCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   
@@ -798,7 +799,26 @@ export default function MerchantTerminalMobile() {
         {/* QR Code Stone Selection Section - Always visible on QR tab */}
         {activeTab === "QR" && (
           <div className="px-6 pb-32" style={{ minHeight: '400px' }}>
-            <div className="space-y-2 mt-4">
+            <div 
+              className="rounded-2xl p-4 cursor-pointer transition-all duration-300 mt-4"
+              style={{ backgroundColor: '#00FF66' }}
+              onClick={() => setQrCollapsed(!qrCollapsed)}
+            >
+              {/* Green Box Header */}
+              <div className="flex items-center justify-between text-black">
+                <h3 className="text-lg font-semibold">QR Codes</h3>
+                <ChevronDown 
+                  className={`transition-transform duration-300 ${qrCollapsed ? 'rotate-180' : ''}`}
+                  size={20}
+                />
+              </div>
+              
+              {/* Collapsible Content */}
+              <div 
+                className={`overflow-hidden transition-all duration-300 ${qrCollapsed ? 'max-h-0' : 'max-h-[800px]'}`}
+              >
+                <div className="bg-white rounded-xl p-4 mt-4">
+                  <div className="space-y-2">
               {/* Individual Stone QR Code Boxes */}
               {taptStones && taptStones.length > 0 && taptStones.map((stone: any) => (
                 <div 
@@ -874,77 +894,92 @@ export default function MerchantTerminalMobile() {
                   </div>
                 </div>
               )}
-            </div>
-          ) : (
-            // NFC Interface - Same stone buttons available here too
-            <div className="space-y-2">
-              {/* Individual Stone Buttons for NFC */}
-              {taptStones.map((stone: any) => (
-                <div key={stone.id} className="space-y-3">
-                  {/* Stone Button */}
-                  <button
-                    onClick={() => setSelectedStoneId(selectedStoneId === stone.id ? null : stone.id)}
-                    className="w-full p-4 rounded-2xl text-black font-semibold shadow-lg transition-all duration-300 hover:scale-[1.02]"
-                    style={{ 
-                      backgroundColor: '#00FF66',
-                      boxShadow: '0 8px 25px rgba(0, 255, 102, 0.3)'
-                    }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span>Stone #{stone.stoneNumber}</span>
-                      <ChevronDown 
-                        className={`h-5 w-5 transition-transform duration-300 ${selectedStoneId === stone.id ? 'rotate-180' : ''}`} 
-                      />
-                    </div>
-                  </button>
-
-                  {/* Stone QR Code Dropdown */}
-                  {selectedStoneId === stone.id && (
-                    <div 
-                      className="backdrop-blur-xl border rounded-2xl p-6 shadow-2xl transition-all duration-500 ease-out transform"
-                      style={{
-                        background: 'linear-gradient(135deg, rgba(0, 255, 102, 0.15) 0%, rgba(0, 255, 102, 0.08) 100%)',
-                        borderColor: 'rgba(0, 255, 102, 0.3)',
-                        boxShadow: '0 15px 35px rgba(0, 255, 102, 0.2)',
-                        animation: 'fadeIn 0.5s ease-out'
-                      }}
-                    >
-                      <div className="text-center">
-                        <div className="w-48 h-48 mx-auto mb-4 bg-white rounded-xl p-4">
-                          <QRCodeDisplay 
-                            merchantId={merchantId} 
-                            stoneId={stone.id}
-                          />
-                        </div>
-                        <p className="text-white/80 text-xs font-medium mb-4">
-                          Scan to pay with {stone.name}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-
-              {/* Placeholder when no stones */}
-              {taptStones.length === 0 && (
-                <div 
-                  className="backdrop-blur-xl border rounded-3xl p-8 flex items-center justify-center shadow-2xl transition-all duration-300"
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.95)',
-                    borderColor: 'rgba(255, 255, 255, 0.3)',
-                    boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)'
-                  }}
-                >
-                  <div className="text-center">
-                    <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4">
-                      <QrCode size={64} className="text-gray-400" />
-                    </div>
-                    <p className="text-gray-600 text-sm">
-                      No tapt stones available
-                    </p>
                   </div>
                 </div>
-              )}
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* NFC Section */}
+        {activeTab === "NFC" && (
+          <div className="px-6 pb-32" style={{ minHeight: '400px' }}>
+            <div 
+              className="rounded-2xl p-4 cursor-pointer transition-all duration-300 mt-4"
+              style={{ backgroundColor: '#00FF66' }}
+              onClick={() => setQrCollapsed(!qrCollapsed)}
+            >
+              {/* Green Box Header */}
+              <div className="flex items-center justify-between text-black">
+                <h3 className="text-lg font-semibold">NFC Stones</h3>
+                <ChevronDown 
+                  className={`transition-transform duration-300 ${qrCollapsed ? 'rotate-180' : ''}`}
+                  size={20}
+                />
+              </div>
+              
+              {/* Collapsible Content */}
+              <div 
+                className={`overflow-hidden transition-all duration-300 ${qrCollapsed ? 'max-h-0' : 'max-h-[800px]'}`}
+              >
+                <div className="bg-white rounded-xl p-4 mt-4">
+                    {/* Individual Stone Buttons for NFC */}
+                    {taptStones.map((stone: any) => (
+                      <div key={stone.id} className="space-y-3">
+                        {/* Stone Button */}
+                        <button
+                          onClick={() => setSelectedStoneId(selectedStoneId === stone.id ? null : stone.id)}
+                          className="w-full p-4 rounded-2xl text-black font-semibold shadow-lg transition-all duration-300 hover:scale-[1.02]"
+                          style={{ 
+                            backgroundColor: '#00FF66',
+                            boxShadow: '0 8px 25px rgba(0, 255, 102, 0.3)'
+                          }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span>Stone #{stone.stoneNumber}</span>
+                            <ChevronDown 
+                              className={`h-5 w-5 transition-transform duration-300 ${selectedStoneId === stone.id ? 'rotate-180' : ''}`} 
+                            />
+                          </div>
+                        </button>
+
+                        {/* Stone NFC Interface */}
+                        {selectedStoneId === stone.id && (
+                          <div 
+                            className="backdrop-blur-xl border rounded-2xl p-6 shadow-2xl transition-all duration-500 ease-out transform"
+                            style={{
+                              background: 'linear-gradient(135deg, rgba(0, 255, 102, 0.15) 0%, rgba(0, 255, 102, 0.08) 100%)',
+                              borderColor: 'rgba(0, 255, 102, 0.3)',
+                              boxShadow: '0 15px 35px rgba(0, 255, 102, 0.2)',
+                              animation: 'fadeIn 0.5s ease-out'
+                            }}
+                          >
+                            <div className="text-center">
+                              <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4 mx-auto">
+                                <Smartphone size={64} className="text-gray-400" />
+                              </div>
+                              <p className="text-gray-600 text-sm">
+                                Create a transaction for NFC payment
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+
+                    {/* Placeholder when no stones */}
+                    {taptStones.length === 0 && (
+                      <div className="text-center">
+                        <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4 mx-auto">
+                          <QrCode size={64} className="text-gray-400" />
+                        </div>
+                        <p className="text-gray-600 text-sm">
+                          No tapt stones available
+                        </p>
+                      </div>
+                    )}
+                </div>
+              </div>
             </div>
           </div>
         )}
