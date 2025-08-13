@@ -304,7 +304,14 @@ export default function MerchantTerminal() {
 
 
   return (
-    <div className="min-h-screen bg-black text-white relative overflow-hidden">
+    <div 
+      className="min-h-screen text-white relative overflow-hidden"
+      style={{
+        background: 'linear-gradient(-45deg, #1a1a1a, #2d2d2d, #1e1e1e, #333333)',
+        backgroundSize: '400% 400%',
+        animation: 'gradient 15s ease infinite'
+      }}
+    >
       {/* Menu overlay */}
       {menuOpen && (
         <div 
