@@ -876,7 +876,7 @@ export default function MerchantTerminalMobile() {
                 <button
                   onClick={() => createTaptStoneMutation.mutate()}
                   disabled={createTaptStoneMutation.isPending}
-                  className="w-full p-4 rounded-2xl text-gray-600 font-medium shadow-lg transition-all duration-300 hover:scale-[1.02] disabled:opacity-50"
+                  className="w-full p-4 rounded-2xl text-black font-medium shadow-lg transition-all duration-300 hover:scale-[1.02] disabled:opacity-50"
                   style={{ 
                     backgroundColor: 'rgba(200, 200, 200, 0.3)',
                     boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
