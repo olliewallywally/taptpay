@@ -386,8 +386,8 @@ export default function MerchantTerminal() {
           )}
         </div>
 
-        {/* Action Buttons - DEBUG: Should show 4 buttons */}
-        <div className="flex justify-center gap-4 mb-6 px-6 bg-red-100 p-4 rounded-lg">
+        {/* Action Buttons */}
+        <div className="flex justify-center gap-4 mb-6 px-6">
           <button
             onClick={() => handleActionClick("send")}
             className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 hover:scale-110 hover:shadow-lg ${
@@ -407,8 +407,7 @@ export default function MerchantTerminal() {
             onClick={() => handleActionClick("edit")}
             className="flex flex-col items-center p-4 rounded-full transition-all duration-200 hover:scale-110 hover:shadow-lg bg-gray-800 text-gray-300 hover:bg-gray-700"
             style={{
-              backgroundColor: activeAction === "edit" ? '#00FF66' : '#374151',
-              border: '3px solid red'
+              backgroundColor: activeAction === "edit" ? '#00FF66' : '#374151'
             }}
           >
             <Edit size={24} />
