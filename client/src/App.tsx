@@ -208,6 +208,7 @@ function Router() {
         
         <Route path="/verify-merchant" component={VerifyMerchant} />
         <Route path="/pay/:merchantId" component={CustomerPayment} />
+        <Route path="/pay/:merchantId/stone/:stoneId" component={CustomerPayment} />
         <Route path="/receipt/:transactionId" component={Receipt} />
         <Route component={NotFound} />
       </Switch>
