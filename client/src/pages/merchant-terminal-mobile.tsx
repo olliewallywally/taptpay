@@ -1489,26 +1489,58 @@ export default function MerchantTerminalMobile() {
                     </div>
                   ) : (
                     // QR Payment Link Sharing
-                    <div>
-                      <p className="text-gray-300 text-sm mb-4">Copy the payment link to share with customers</p>
-                      <Button
-                        onClick={() => {
-                          if (merchant) {
-                            navigator.clipboard.writeText(merchant.paymentUrl);
-                            setCopiedLink(true);
-                            setTimeout(() => setCopiedLink(false), 2000);
-                            toast({
-                              title: "Link Copied",
-                              description: "Payment link copied to clipboard",
-                            });
-                          }
-                          setActiveAction(null);
-                        }}
-                        className="w-full text-black font-semibold rounded-lg"
-                        style={{ backgroundColor: '#00FF66' }}
-                      >
-                        {copiedLink ? "Copied!" : "Copy Payment Link"}
-                      </Button>
+                    <div className="space-y-4">
+                      <p className="text-gray-300 text-sm mb-4">Select a tapt stone and share its payment link</p>
+                      
+                      {/* Stone Selection */}
+                      <div className="text-left">
+                        <label className="text-sm font-medium text-gray-300 block mb-2">Select Tapt Stone</label>
+                        <select
+                          value={selectedStoneId || ''}
+                          onChange={(e) => setSelectedStoneId(e.target.value ? parseInt(e.target.value) : null)}
+                          className="w-full bg-gray-700 border border-gray-600 text-white rounded-lg p-3"
+                        >
+                          <option value="">Select a stone</option>
+                          {taptStones.map((stone: any) => (
+                            <option key={stone.id} value={stone.id}>
+                              {stone.name} (Stone {stone.stoneNumber})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Payment Link Display */}
+                      {selectedStoneId && (
+                        <div className="bg-gray-700 rounded-lg p-4 text-left">
+                          <label className="text-sm font-medium text-gray-300 block mb-2">Payment Link</label>
+                          <div className="bg-gray-800 rounded-lg p-3 mb-3">
+                            <code className="text-green-400 text-sm break-all">
+                              {(() => {
+                                const selectedStone = taptStones.find((s: any) => s.id === selectedStoneId);
+                                return selectedStone?.paymentUrl || `${window.location.origin}/pay/${merchantId}/stone/${selectedStoneId}`;
+                              })()}
+                            </code>
+                          </div>
+                          <Button
+                            onClick={() => {
+                              const selectedStone = taptStones.find((s: any) => s.id === selectedStoneId);
+                              const paymentUrl = selectedStone?.paymentUrl || `${window.location.origin}/pay/${merchantId}/stone/${selectedStoneId}`;
+                              navigator.clipboard.writeText(paymentUrl);
+                              setCopiedLink(true);
+                              setTimeout(() => setCopiedLink(false), 2000);
+                              toast({
+                                title: "Payment Link Copied",
+                                description: `Link for ${selectedStone?.name} copied to clipboard`,
+                              });
+                            }}
+                            className="w-full text-black font-semibold rounded-lg"
+                            style={{ backgroundColor: '#00FF66' }}
+                          >
+                            <Copy className="w-4 h-4 mr-2" />
+                            {copiedLink ? "Copied!" : "Copy Payment Link"}
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1554,70 +1586,10 @@ export default function MerchantTerminalMobile() {
         <div className="px-6">
           {activeTab === "QR" ? (
             <div className="space-y-4">
-              {/* Stone Selection Dropdown - Always visible */}
-              {taptStones.length > 0 && (
-                <div className="mb-4">
-                  <button
-                    onClick={() => setShowQrDropdown(!showQrDropdown)}
-                    className="w-full p-4 rounded-2xl text-black font-semibold shadow-lg transition-all duration-300 hover:scale-[1.02]"
-                    style={{ 
-                      backgroundColor: '#00FF66',
-                      boxShadow: '0 8px 25px rgba(0, 255, 102, 0.3)'
-                    }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span>{selectedStoneId ? taptStones.find(s => s.id === selectedStoneId)?.name || 'Select Stone' : 'Select Stone'}</span>
-                      <ChevronDown 
-                        className={`h-5 w-5 transition-transform duration-300 ${showQrDropdown ? 'rotate-180' : ''}`} 
-                      />
-                    </div>
-                  </button>
-                  
-                  {/* Stone Selection Dropdown */}
-                  {showQrDropdown && (
-                    <div className="mt-3 bg-gray-800 rounded-2xl p-3 space-y-2">
-                      {taptStones.map((stone: any) => (
-                        <button
-                          key={stone.id}
-                          onClick={() => {
-                            setSelectedStoneId(stone.id);
-                            setShowQrDropdown(false);
-                          }}
-                          className={`w-full p-3 rounded-xl text-left transition-all duration-200 ${
-                            selectedStoneId === stone.id
-                              ? 'bg-white/20 text-white'
-                              : 'text-gray-300 hover:bg-white/10 hover:text-white'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium">{stone.name}</span>
-                            <span className="text-sm opacity-70">Stone {stone.stoneNumber}</span>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
 
-              {/* QR Code Display */}
-              {(currentTransaction || activeTransaction) && selectedStoneId && (
-                <button
-                  onClick={() => setShowQrDropdown(!showQrDropdown)}
-                  className="w-full p-4 rounded-2xl text-black font-semibold shadow-lg transition-all duration-300 hover:scale-[1.02] mb-4"
-                  style={{ 
-                    backgroundColor: '#00FF66',
-                    boxShadow: '0 8px 25px rgba(0, 255, 102, 0.3)'
-                  }}
-                >
-                  <div className="text-center">
-                    <span>Show QR Code for {taptStones.find(s => s.id === selectedStoneId)?.name}</span>
-                  </div>
-                </button>
-              )}
 
               {/* QR Code Dropdown Content */}
-              {(currentTransaction || activeTransaction) && selectedStoneId && (
+              {(currentTransaction || activeTransaction) && (
                 <div 
                   className="backdrop-blur-xl border rounded-2xl p-6 shadow-2xl transition-all duration-500 ease-out transform"
                   style={{
@@ -1631,11 +1603,11 @@ export default function MerchantTerminalMobile() {
                     <div className="w-48 h-48 mx-auto mb-4 bg-white rounded-xl p-4">
                       <QRCodeDisplay 
                         merchantId={merchantId} 
-                        stoneId={selectedStoneId || undefined}
+                        stoneId={(currentTransaction || activeTransaction)?.selectedStoneId}
                       />
                     </div>
                     <p className="text-white/80 text-sm font-medium">
-                      Scan to pay with {selectedStoneId ? taptStones.find(s => s.id === selectedStoneId)?.name : 'any device'}
+                      Scan to pay with {(currentTransaction || activeTransaction)?.selectedStoneId ? taptStones.find(s => s.id === (currentTransaction || activeTransaction)?.selectedStoneId)?.name : 'any device'}
                     </p>
                   </div>
                 </div>
