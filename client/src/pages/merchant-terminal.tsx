@@ -32,7 +32,7 @@ export default function MerchantTerminal() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const [selectedStoneId, setSelectedStoneId] = useState<number | null>(null);
-  const [showStones, setShowStones] = useState(false);
+  const [qrCollapsed, setQrCollapsed] = useState(true);
   
   // NFC-specific state
   const [nfcCapabilities, setNfcCapabilities] = useState<any>(null);
@@ -388,45 +388,61 @@ export default function MerchantTerminal() {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex justify-center gap-3 mb-4 px-6">
-          <button 
-            onClick={() => handleActionClick("send")}
-            className={`px-4 py-2 rounded-lg transition-colors ${
-              activeAction === "send" ? 'bg-green-500 text-white' : 'bg-gray-200'
-            }`}
-          >
-            Send
-          </button>
-          <button 
-            onClick={() => handleActionClick("edit")}
-            className={`px-4 py-2 rounded-lg transition-colors ${
-              activeAction === "edit" ? 'bg-green-500 text-white' : 'bg-gray-200'
-            }`}
-          >
-            Edit
-          </button>
-          <button 
-            onClick={() => handleActionClick("split")}
-            className={`px-4 py-2 rounded-lg transition-colors ${
-              activeAction === "split" ? 'bg-green-500 text-white' : 'bg-gray-200'
-            }`}
-          >
-            Split
-          </button>
-          <button 
-            onClick={() => handleActionClick("more")}
-            className={`px-4 py-2 rounded-lg transition-colors ${
-              activeAction === "more" ? 'bg-green-500 text-white' : 'bg-gray-200'
-            }`}
-          >
-            More
-          </button>
-          {/* Toggle for QR section */}
+        <div className="flex justify-center gap-4 mb-6 px-6">
           <button
-            onClick={() => setShowStones(!showStones)}
-            className="px-4 py-2 rounded-lg bg-green-500 text-white"
+            onClick={() => handleActionClick("send")}
+            className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 hover:scale-110 hover:shadow-lg ${
+              activeAction === "send"
+                ? 'text-black'
+                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+            }`}
+            style={{
+              backgroundColor: activeAction === "send" ? '#00FF66' : undefined
+            }}
           >
-            {showStones ? "Hide QR Codes" : "Show QR Codes"}
+            <Send size={24} />
+            <span className="text-xs mt-1 font-medium">Send</span>
+          </button>
+          
+          <button
+            onClick={() => handleActionClick("edit")}
+            className="flex flex-col items-center p-4 rounded-full transition-all duration-200 hover:scale-110 hover:shadow-lg bg-gray-800 text-gray-300 hover:bg-gray-700"
+            style={{
+              backgroundColor: activeAction === "edit" ? '#00FF66' : '#374151'
+            }}
+          >
+            <Edit size={24} />
+            <span className="text-xs mt-1 font-medium">Edit</span>
+          </button>
+          
+          <button
+            onClick={() => handleActionClick("split")}
+            className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 hover:scale-110 hover:shadow-lg ${
+              activeAction === "split"
+                ? 'text-black'
+                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+            }`}
+            style={{
+              backgroundColor: activeAction === "split" ? '#00FF66' : undefined
+            }}
+          >
+            <Split size={24} />
+            <span className="text-xs mt-1 font-medium">Split</span>
+          </button>
+          
+          <button
+            onClick={() => handleActionClick("more")}
+            className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 hover:scale-110 hover:shadow-lg ${
+              activeAction === "more"
+                ? 'text-black'
+                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+            }`}
+            style={{
+              backgroundColor: activeAction === "more" ? '#00FF66' : undefined
+            }}
+          >
+            <MoreHorizontal size={24} />
+            <span className="text-xs mt-1 font-medium">More</span>
           </button>
         </div>
 
@@ -604,47 +620,100 @@ export default function MerchantTerminal() {
           </div>
         </div>
 
-        {/* Collapsible QR Section */}
+        {/* QR Code Section */}
         <div className="px-6">
-          <div
-            className={`transition-all duration-500 overflow-hidden ${
-              showStones ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0"
-            }`}
-          >
-            {taptStones && taptStones.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                {taptStones.map((stone: any) => (
-                  <div
-                    key={stone.id}
-                    className="bg-green-200 border border-green-300 rounded-2xl p-6 shadow-lg"
-                  >
-                    {/* Stone Header */}
-                    <div className="w-full flex items-center justify-center mb-4">
-                      <h3 className="text-lg font-semibold text-gray-800">
-                        Stone #{stone.stoneNumber}
-                      </h3>
-                    </div>
-                    {/* QR Code */}
-                    <div className="text-center">
-                      <div className="w-48 h-48 mx-auto mb-4 bg-white rounded-xl p-4 border">
-                        <QRCodeDisplay merchantId={merchantId} stoneId={stone.id} />
-                      </div>
-                      <p className="text-gray-700 text-xs font-medium">
-                        Scan to pay with {stone.name}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center p-6">
-                <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4 mx-auto">
-                  <QrCode size={64} className="text-gray-400" />
+          {currentTransaction || activeTransaction ? (
+            <div className="bg-white rounded-2xl p-8 flex items-center justify-center transition-all duration-300 hover:scale-105 hover:shadow-xl cursor-pointer">
+              <div className="text-center">
+                <QRCodeDisplay 
+                  merchantId={merchantId}
+                  stoneId={selectedStoneId || undefined}
+                />
+                <p className="text-gray-600 text-sm">
+                  {activeTab === "qr" ? "Scan to pay with any device" : "Tap your phone to pay"}
+                </p>
+                <div className="mt-4 text-center">
+                  {getPaymentStatusIndicator((currentTransaction || activeTransaction).status)}
                 </div>
-                <p className="text-gray-600 text-sm">No tapt stones available</p>
               </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div
+              className="rounded-2xl p-4 transition-all duration-300"
+              style={{ backgroundColor: '#00FF66' }}
+            >
+              {/* Header */}
+              <div
+                className="flex items-center justify-between text-black cursor-pointer"
+                onClick={() => setQrCollapsed(prev => !prev)}
+              >
+                <h3 className="text-lg font-semibold">QR Codes</h3>
+                <ChevronDown
+                  className={`transition-transform duration-300 ${qrCollapsed ? '' : 'rotate-180'}`}
+                  size={20}
+                />
+              </div>
+
+              {/* Collapsible Content */}
+              <div
+                className={`grid transition-all duration-300 overflow-hidden ${
+                  qrCollapsed ? 'max-h-0 opacity-0' : 'max-h-[1000px] opacity-100 mt-4'
+                }`}
+              >
+                <div className="bg-white rounded-xl p-6">
+                  <div className="text-center">
+                    {activeTab === "qr" && (
+                      <div className="space-y-1">
+                        {/* Individual Stone QR Code Boxes */}
+                        {taptStones && taptStones.length > 0 ? (
+                          taptStones.map((stone: any) => (
+                            <div 
+                              key={stone.id}
+                              className="bg-gray-50 border border-gray-200 rounded-2xl p-6 shadow-lg transition-all duration-300"
+                            >
+                              {/* Stone Header */}
+                              <div className="w-full flex items-center justify-center mb-4">
+                                <h3 className="text-lg font-semibold text-gray-800">Stone #{stone.stoneNumber}</h3>
+                              </div>
+
+                              {/* QR Code - Always visible */}
+                              <div className="text-center transition-all duration-300">
+                                <div className="w-48 h-48 mx-auto mb-4 bg-white rounded-xl p-4 border">
+                                  <QRCodeDisplay 
+                                    merchantId={merchantId} 
+                                    stoneId={stone.id}
+                                  />
+                                </div>
+                                <p className="text-gray-600 text-xs font-medium">
+                                  Scan to pay with {stone.name}
+                                </p>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-center">
+                            <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4 mx-auto">
+                              <QrCode size={64} className="text-gray-400" />
+                            </div>
+                            <p className="text-gray-600 text-sm">No tapt stones available</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {activeTab === "nfc" && (
+                      <>
+                        <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4 mx-auto">
+                          <Smartphone size={64} className="text-gray-400" />
+                        </div>
+                        <p className="text-gray-600 text-sm">Create a transaction for NFC payment</p>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
