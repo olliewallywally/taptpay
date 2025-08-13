@@ -446,7 +446,8 @@ export default function MerchantTerminal() {
           <div 
             className="overflow-hidden transition-all duration-250 ease-in-out"
             style={{
-              maxHeight: activeAction ? '400px' : '0px',
+              maxHeight: activeAction ? '600px' : '0px',
+              opacity: activeAction ? 1 : 0
             }}
           >
             <div className="bg-gray-800 rounded-2xl p-6 mb-6 transition-all duration-300 hover:bg-gray-700 hover:scale-105 hover:shadow-lg">
