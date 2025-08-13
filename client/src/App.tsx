@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import MerchantTerminalMobile from "@/pages/merchant-terminal-mobile";
+import MerchantTerminal from "@/pages/merchant-terminal";
 import CustomerPayment from "@/pages/customer-payment";
 import Receipt from "@/pages/receipt";
 import Dashboard from "@/pages/dashboard";
@@ -141,6 +142,16 @@ function Router() {
         <Route path="/merchant">
           <ProtectedRoute>
             <MerchantTerminalMobile />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/merchant-terminal-mobile">
+          <ProtectedRoute>
+            <MerchantTerminalMobile />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/merchant-terminal">
+          <ProtectedRoute>
+            <MerchantTerminal />
           </ProtectedRoute>
         </Route>
         <Route path="/dashboard">
