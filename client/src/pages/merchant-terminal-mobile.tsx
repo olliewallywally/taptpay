@@ -789,81 +789,30 @@ export default function MerchantTerminalMobile() {
           </div>
         </div>
 
-        {/* Payment Status Box - Only shows and drops down when payment is created */}
-        {(currentTransaction || activeTransaction) && activeTab === "QR" ? (
-          <div className="px-6 mb-6">
-            {/* Small indicator that drops down from above when transaction exists */}
-            <div 
-              className={`backdrop-blur-xl border rounded-2xl shadow-2xl transition-all duration-700 ease-out transform ${
-                (currentTransaction || activeTransaction)
-                  ? "translate-y-0 opacity-100 scale-100" 
-                  : "translate-y-[-60px] opacity-0 scale-90"
-              }`}
-              style={{
-                background: 'rgba(255, 255, 255, 0.08)',
-                borderColor: 'rgba(255, 255, 255, 0.20)',
-                boxShadow: '0 15px 35px rgba(0, 0, 0, 0.3)',
-                animationDelay: '0.2s'
-              }}
-            >
-              <div className="text-center p-4">
-                <div className="text-xs text-white/60 mb-2 font-medium">
-                  Transaction #{(currentTransaction || activeTransaction).id}
-                </div>
-                <div className="mb-3">
-                  {getPaymentStatusIndicator((currentTransaction || activeTransaction).status)}
-                </div>
-                <div className="text-xs text-white/50">
-                  {(currentTransaction || activeTransaction).status === "pending" && "Awaiting Payment"}
-                  {(currentTransaction || activeTransaction).status === "processing" && "Processing Payment..."}
-                  {(currentTransaction || activeTransaction).status === "completed" && "Payment Successful"}
-                  {(currentTransaction || activeTransaction).status === "failed" && "Payment Failed"}
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        {/* QR Code Stone Selection Section */}
-        <div className="px-6 pb-32" style={{ minHeight: '500px', backgroundColor: 'rgba(255, 0, 0, 0.1)' }}>
-          {activeTab === "QR" ? (
-            <div className="space-y-4" style={{ position: 'relative', zIndex: 100 }}>
-              {/* Debug: Show loading state and stone count */}
-              <div className="bg-yellow-500 text-black p-4 rounded-lg mb-4">
-                <div className="font-bold text-lg">DEBUG INFO:</div>
-                <div>Loading: {taptStonesLoading ? 'YES' : 'NO'}</div>
-                <div>Stone count: {taptStones.length}</div>
-                <div>Active Tab: {activeTab}</div>
-                <div>Stones: {JSON.stringify(taptStones.map((s: any) => s.name))}</div>
-              </div>
-              
+        {/* QR Code Stone Selection Section - Now before action overlay */}
+        {!activeAction && (
+          <div className="px-6 pb-32" style={{ minHeight: '400px' }}>
+            {activeTab === "QR" ? (
+            <div className="space-y-4 mt-4">
               {/* Individual Stone Buttons for QR */}
-              {taptStones.map((stone: any) => (
-                <div key={stone.id} className="space-y-3 bg-red-500/20 border border-red-500 p-2">
-                  {/* Debug stone info */}
-                  <div className="text-white text-xs">
-                    Stone ID: {stone.id}, Name: {stone.name}
-                  </div>
+              {taptStones.length > 0 && taptStones.map((stone: any) => (
+                <div key={stone.id} className="space-y-3">
                   {/* Stone Button */}
                   <button
                     onClick={() => {
                       console.log('Stone button clicked:', stone.id);
                       setSelectedStoneId(selectedStoneId === stone.id ? null : stone.id);
                     }}
-                    className="w-full p-6 rounded-2xl text-black font-bold shadow-xl transition-all duration-300 hover:scale-[1.02] border-4 border-blue-500"
+                    className="w-full p-4 rounded-2xl text-black font-semibold shadow-lg transition-all duration-300 hover:scale-[1.02]"
                     style={{ 
                       backgroundColor: '#00FF66',
-                      boxShadow: '0 8px 25px rgba(0, 255, 102, 0.3)',
-                      minHeight: '80px',
-                      display: 'block',
-                      position: 'relative',
-                      zIndex: 10
+                      boxShadow: '0 8px 25px rgba(0, 255, 102, 0.3)'
                     }}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-xl">STONE #{stone.stoneNumber}</span>
+                      <span>Stone #{stone.stoneNumber}</span>
                       <ChevronDown 
-                        className={`h-6 w-6 transition-transform duration-300 ${selectedStoneId === stone.id ? 'rotate-180' : ''}`} 
+                        className={`h-5 w-5 transition-transform duration-300 ${selectedStoneId === stone.id ? 'rotate-180' : ''}`} 
                       />
                     </div>
                   </button>
@@ -1010,7 +959,8 @@ export default function MerchantTerminalMobile() {
               )}
             </div>
           )}
-        </div>
+          </div>
+        )}
 
         {/* NFC Payment Overlay for Mobile */}
         {showNfcOverlay && (
