@@ -832,7 +832,7 @@ export default function MerchantTerminalMobile() {
                     className="w-full p-4 rounded-2xl text-black font-semibold shadow-lg transition-all duration-300 hover:scale-[1.02]"
                     style={{ 
                       backgroundColor: '#00FF66',
-                      boxShadow: '0 8px 25px rgba(0, 255, 102, 0.3)',
+                      boxShadow: '0 8px 25px rgba(0, 0, 0, 0.3)',
                       fontFamily: 'Outfit, sans-serif'
                     }}
                   >
@@ -849,9 +849,9 @@ export default function MerchantTerminalMobile() {
                     <div 
                       className="mt-4 backdrop-blur-xl border rounded-2xl p-6 shadow-2xl transition-all duration-500 ease-out transform"
                       style={{
-                        background: 'linear-gradient(135deg, rgba(0, 255, 102, 0.15) 0%, rgba(0, 255, 102, 0.08) 100%)',
-                        borderColor: 'rgba(0, 255, 102, 0.3)',
-                        boxShadow: '0 15px 35px rgba(0, 255, 102, 0.2)',
+                        background: 'rgba(255, 255, 255, 0.08)',
+                        borderColor: 'rgba(255, 255, 255, 0.20)',
+                        boxShadow: '0 15px 35px rgba(0, 0, 0, 0.3)',
                         animation: 'fadeIn 0.5s ease-out'
                       }}
                     >
