@@ -839,12 +839,12 @@ export default function MerchantTerminalMobile() {
             >
               {/* Header */}
               <div
-                className="flex items-center justify-between text-black cursor-pointer"
+                className="flex items-center justify-center text-black cursor-pointer relative"
                 onClick={() => setQrCollapsed(prev => !prev)}
               >
                 <h3 className="text-lg font-semibold">QR Codes</h3>
                 <ChevronDown
-                  className={`transition-transform duration-300 ${qrCollapsed ? '' : 'rotate-180'}`}
+                  className={`absolute right-0 transition-transform duration-300 ${qrCollapsed ? '' : 'rotate-180'}`}
                   size={20}
                 />
               </div>
