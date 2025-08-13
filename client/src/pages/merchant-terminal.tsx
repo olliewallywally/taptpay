@@ -14,7 +14,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentMerchantId } from "@/lib/auth";
-import { Send, Loader2, CheckCircle, Clock, XCircle, Eye, Copy, Check, QrCode, Smartphone, Waves, CreditCard, X, Menu, Edit, Split, MoreHorizontal } from "lucide-react";
+import { Send, Loader2, CheckCircle, Clock, XCircle, Eye, Copy, Check, QrCode, Smartphone, Waves, CreditCard, X, Menu, Edit, Split, MoreHorizontal, ChevronDown } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link } from "wouter";
 
 const transactionFormSchema = z.object({
@@ -30,6 +31,7 @@ export default function MerchantTerminal() {
   const [activeTab, setActiveTab] = useState("qr");
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeAction, setActiveAction] = useState<string | null>(null);
+  const [selectedStoneId, setSelectedStoneId] = useState<number | null>(null);
   
   // NFC-specific state
   const [nfcCapabilities, setNfcCapabilities] = useState<any>(null);
@@ -71,6 +73,16 @@ export default function MerchantTerminal() {
     queryFn: async () => {
       const response = await fetch(`/api/merchants/${merchantId}/active-transaction`);
       if (!response.ok) throw new Error("Failed to fetch active transaction");
+      return response.json();
+    },
+  });
+
+  // Get tapt stones for this merchant
+  const { data: taptStones = [] } = useQuery({
+    queryKey: ["/api/merchants", merchantId, "tapt-stones"],
+    queryFn: async () => {
+      const response = await fetch(`/api/merchants/${merchantId}/tapt-stones`);
+      if (!response.ok) throw new Error("Failed to fetch tapt stones");
       return response.json();
     },
   });
@@ -516,15 +528,50 @@ export default function MerchantTerminal() {
                 <div className="text-center">
                   <h3 className="text-lg font-semibold mb-4 text-white">Share Payment</h3>
                   <p className="text-gray-300 mb-4">Copy the payment link to share with customers</p>
+                  
+                  {/* Stone Selection */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-white/90 mb-2">
+                      Select Tapt Stone (Optional)
+                    </label>
+                    <Select
+                      value={selectedStoneId?.toString() || ""}
+                      onValueChange={(value) => setSelectedStoneId(value ? parseInt(value) : null)}
+                    >
+                      <SelectTrigger className="w-full bg-gray-700 border-gray-600 text-white">
+                        <SelectValue placeholder="General Payment Link" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-700 border-gray-600">
+                        <SelectItem value="" className="text-white hover:bg-gray-600">
+                          General Payment Link
+                        </SelectItem>
+                        {taptStones.map((stone: any) => (
+                          <SelectItem 
+                            key={stone.id} 
+                            value={stone.id.toString()}
+                            className="text-white hover:bg-gray-600"
+                          >
+                            Stone {stone.stoneNumber} - {stone.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   <Button
                     onClick={() => {
-                      if (merchant) {
-                        navigator.clipboard.writeText(merchant.paymentUrl);
+                      const baseUrl = `${window.location.origin}/pay/${merchantId}`;
+                      const stoneParam = selectedStoneId ? `/stone/${selectedStoneId}` : '';
+                      const transactionParam = currentTransaction ? `?transaction=${currentTransaction.id}` : '';
+                      const paymentUrl = `${baseUrl}${stoneParam}${transactionParam}`;
+                      
+                      if (navigator.clipboard) {
+                        navigator.clipboard.writeText(paymentUrl);
                         setCopiedLink(true);
                         setTimeout(() => setCopiedLink(false), 2000);
                         toast({
                           title: "Link Copied",
-                          description: "Payment link copied to clipboard",
+                          description: `Payment link copied to clipboard${selectedStoneId ? ` for Stone ${taptStones.find(s => s.id === selectedStoneId)?.stoneNumber}` : ''}`,
                         });
                       }
                       setActiveAction(null);
@@ -578,6 +625,7 @@ export default function MerchantTerminal() {
               <div className="text-center">
                 <QRCodeDisplay 
                   merchantId={merchantId}
+                  stoneId={selectedStoneId}
                 />
                 <p className="text-gray-600 text-sm">
                   {activeTab === "qr" ? "Scan to pay with any device" : "Tap your phone to pay"}
@@ -588,18 +636,64 @@ export default function MerchantTerminal() {
               </div>
             </div>
           ) : (
-            <div className="bg-white rounded-2xl p-8 flex items-center justify-center transition-all duration-300 hover:scale-105 hover:shadow-xl cursor-pointer">
+            <div className="bg-white rounded-2xl p-8">
               <div className="text-center">
-                <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4">
-                  {activeTab === "qr" ? (
-                    <QrCode size={64} className="text-gray-400" />
-                  ) : (
-                    <Smartphone size={64} className="text-gray-400" />
-                  )}
-                </div>
-                <p className="text-gray-600 text-sm">
-                  {activeTab === "qr" ? "Create a transaction to show QR code" : "Create a transaction for NFC payment"}
-                </p>
+                {activeTab === "qr" && (
+                  <>
+                    {/* Stone Selection for QR generation */}
+                    <div className="mb-6">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Select Tapt Stone for QR Code
+                      </label>
+                      <Select
+                        value={selectedStoneId?.toString() || ""}
+                        onValueChange={(value) => setSelectedStoneId(value ? parseInt(value) : null)}
+                      >
+                        <SelectTrigger className="w-full max-w-xs mx-auto">
+                          <SelectValue placeholder="Choose a stone" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">
+                            General QR Code
+                          </SelectItem>
+                          {taptStones.map((stone: any) => (
+                            <SelectItem 
+                              key={stone.id} 
+                              value={stone.id.toString()}
+                            >
+                              Stone {stone.stoneNumber} - {stone.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Show QR code if stone is selected */}
+                    {selectedStoneId ? (
+                      <QRCodeDisplay 
+                        merchantId={merchantId}
+                        stoneId={selectedStoneId}
+                      />
+                    ) : (
+                      <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4 mx-auto">
+                        <QrCode size={64} className="text-gray-400" />
+                      </div>
+                    )}
+                    
+                    <p className="text-gray-600 text-sm">
+                      {selectedStoneId ? `QR Code for Stone ${taptStones.find(s => s.id === selectedStoneId)?.stoneNumber}` : "Select a stone to generate QR code"}
+                    </p>
+                  </>
+                )}
+                
+                {activeTab === "nfc" && (
+                  <>
+                    <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4 mx-auto">
+                      <Smartphone size={64} className="text-gray-400" />
+                    </div>
+                    <p className="text-gray-600 text-sm">Create a transaction for NFC payment</p>
+                  </>
+                )}
               </div>
             </div>
           )}
