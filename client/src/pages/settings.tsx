@@ -288,17 +288,17 @@ export default function Settings() {
         onClick={() => setMenuOpen(false)}
       />
 
-      {/* Sliding Menu */}
+      {/* Sliding Menu - Mobile Optimized */}
       <div 
-        className={`fixed right-0 top-0 h-full w-80 bg-gray-800 border-l border-gray-700 z-50 transform transition-transform duration-300 ease-in-out ${
+        className={`fixed right-0 top-0 h-full ${isMobile ? 'w-full' : 'w-80'} bg-gray-800 border-l border-gray-700 z-50 transform transition-transform duration-300 ease-in-out ${
           menuOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
-        <div className="p-6">
-          <div className="flex justify-between items-center mb-8">
-            <h2 className="text-xl font-bold text-white">Menu</h2>
+        <div className={`${isMobile ? 'p-4' : 'p-6'}`}>
+          <div className={`flex justify-between items-center ${isMobile ? 'mb-6' : 'mb-8'}`}>
+            <h2 className={`${isMobile ? 'text-lg' : 'text-xl'} font-bold text-white`}>Menu</h2>
             <button onClick={() => setMenuOpen(false)} className="text-white/70 hover:text-white">
-              <X className="h-6 w-6" />
+              <X className={`${isMobile ? 'h-5 w-5' : 'h-6 w-6'}`} />
             </button>
           </div>
           <nav className="space-y-4">
@@ -332,29 +332,31 @@ export default function Settings() {
       {/* Main Content with Slide Animation */}
       <div 
         className={`min-h-screen bg-gradient-to-br from-gray-950 via-black to-gray-900 transform transition-transform duration-300 ease-in-out ${
-          menuOpen ? '-translate-x-80' : 'translate-x-0'
+          menuOpen ? (isMobile ? '-translate-x-full' : '-translate-x-80') : 'translate-x-0'
         }`}
       >
-        {/* Menu Icon */}
+        {/* Menu Icon - Mobile Optimized */}
         <div className="fixed top-4 right-4 z-30">
           <button
             onClick={() => setMenuOpen(true)}
-            className="p-3 backdrop-blur-xl bg-black/40 border border-white/20 rounded-xl text-white hover:bg-black/60 transition-colors"
+            className={`p-3 backdrop-blur-xl bg-black/40 border border-white/20 rounded-xl text-white hover:bg-black/60 transition-colors ${
+              isMobile ? 'p-2' : 'p-3'
+            }`}
           >
-            <Menu className="h-6 w-6" />
+            <Menu className={`${isMobile ? 'h-5 w-5' : 'h-6 w-6'}`} />
           </button>
         </div>
 
-        <div className="container mx-auto px-4 pt-20 pb-8">
-      <div className="mb-6 sm:mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Settings & Configuration</h1>
-        <p className="text-sm sm:text-base text-white/70">Manage your payment processing configuration and API connections</p>
+        <div className={`container mx-auto px-3 sm:px-4 pb-4 sm:pb-8 ${isMobile ? 'pt-16' : 'pt-20'}`}>
+      <div className={`${isMobile ? 'mb-4' : 'mb-6 sm:mb-8'}`}>
+        <h1 className={`font-bold text-white mb-2 ${isMobile ? 'text-xl' : 'text-2xl sm:text-3xl'}`}>Settings & Configuration</h1>
+        <p className={`text-white/70 ${isMobile ? 'text-xs' : 'text-sm sm:text-base'}`}>Manage your payment processing configuration and API connections</p>
       </div>
 
 
 
       {/* Merchant Business Details Card */}
-      <div className="backdrop-blur-xl bg-white/5 border border-white/20 rounded-3xl p-6 shadow-2xl mb-6 sm:mb-8 hover:bg-white/10 hover:border-white/30 transition-all duration-300">
+      <div className={`backdrop-blur-xl bg-white/5 border border-white/20 rounded-3xl shadow-2xl mb-6 sm:mb-8 hover:bg-white/10 hover:border-white/30 transition-all duration-300 ${isMobile ? 'p-4 rounded-2xl' : 'p-6 rounded-3xl'}`}>
         <div className="mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
@@ -369,10 +371,10 @@ export default function Settings() {
             {!editingDetails && (
               <button
                 onClick={() => setEditingDetails(true)}
-                className="backdrop-blur-sm bg-white/10 border border-white/20 text-white px-4 py-2 rounded-xl hover:bg-white/20 hover:border-white/30 transition-all duration-300 text-sm font-medium"
+                className={`backdrop-blur-sm bg-white/10 border border-white/20 text-white rounded-xl hover:bg-white/20 hover:border-white/30 transition-all duration-300 text-sm font-medium ${isMobile ? 'px-3 py-1.5' : 'px-4 py-2'}`}
               >
-                <Edit className="w-4 h-4 mr-2 inline" />
-                Edit
+                <Edit className={`${isMobile ? 'w-3 h-3 mr-1' : 'w-4 h-4 mr-2'} inline`} />
+                {isMobile ? 'Edit' : 'Edit'}
               </button>
             )}
           </div>
