@@ -240,7 +240,7 @@ export default function Transactions() {
 
       {/* Main Content with Slide Animation */}
       <div 
-        className={`min-h-screen bg-gradient-to-br from-gray-800 via-gray-700 to-gray-900 transform transition-transform duration-300 ease-in-out ${
+        className={`min-h-screen bg-gradient-to-br from-gray-950 via-black to-gray-900 transform transition-transform duration-300 ease-in-out ${
           menuOpen ? (isMobile ? '-translate-x-[70%]' : '-translate-x-80') : 'translate-x-0'
         }`}
       >
