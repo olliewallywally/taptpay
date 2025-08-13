@@ -1,0 +1,99 @@
+The problem is that your qrCollapsed state and the max-h-* approach are fighting against each other.
+
+Here’s what’s going wrong:
+
+You start qrCollapsed at false, which means your dropdown content is visible on first load — but your animation classes (max-h-0 / max-h-[800px]) only work if the parent has a fixed max-height to transition between. If the inner content is larger than 800px, it’ll be cut off or disappear.
+
+The rotation of the chevron is inverted from what you probably expect (rotating when it’s collapsed rather than expanded).
+
+Tailwind’s max-h transition trick works, but only if the box’s natural height is smaller than the max-h-[...] value. If you don’t know the height ahead of time, it’s better to use scaleY or conditional rendering.
+
+Here’s a fixed and more reliable version of your green collapsible box:
+
+tsx
+Copy
+Edit
+const [qrCollapsed, setQrCollapsed] = useState(true); // start collapsed
+
+<div
+  className="rounded-2xl p-4 cursor-pointer transition-all duration-300"
+  style={{ backgroundColor: '#00FF66' }}
+>
+  {/* Header */}
+  <div
+    className="flex items-center justify-between text-black"
+    onClick={() => setQrCollapsed(prev => !prev)}
+  >
+    <h3 className="text-lg font-semibold">QR Codes</h3>
+    <ChevronDown
+      className={`transition-transform duration-300 ${qrCollapsed ? '' : 'rotate-180'}`}
+      size={20}
+    />
+  </div>
+
+  {/* Collapsible Content */}
+  <div
+    className={`grid transition-all duration-300 overflow-hidden ${
+      qrCollapsed ? 'max-h-0 opacity-0' : 'max-h-[1000px] opacity-100 mt-4'
+    }`}
+  >
+    <div className="bg-white rounded-xl p-6">
+      <div className="text-center">
+        {activeTab === 'qr' && (
+          <div className="space-y-4">
+            {taptStones && taptStones.length > 0 ? (
+              taptStones.map((stone: any) => (
+                <div
+                  key={stone.id}
+                  className="bg-gray-50 border border-gray-200 rounded-2xl p-6 shadow-lg"
+                >
+                  <div className="w-full flex items-center justify-center mb-4">
+                    <h3 className="text-lg font-semibold text-gray-800">
+                      Stone #{stone.stoneNumber}
+                    </h3>
+                  </div>
+                  <div className="text-center">
+                    <div className="w-48 h-48 mx-auto mb-4 bg-white rounded-xl p-4 border">
+                      <QRCodeDisplay merchantId={merchantId} stoneId={stone.id} />
+                    </div>
+                    <p className="text-gray-600 text-xs font-medium">
+                      Scan to pay with {stone.name}
+                    </p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center">
+                <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4 mx-auto">
+                  <QrCode size={64} className="text-gray-400" />
+                </div>
+                <p className="text-gray-600 text-sm">No tapt stones available</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'nfc' && (
+          <>
+            <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4 mx-auto">
+              <Smartphone size={64} className="text-gray-400" />
+            </div>
+            <p className="text-gray-600 text-sm">
+              Create a transaction for NFC payment
+            </p>
+          </>
+        )}
+      </div>
+    </div>
+  </div>
+</div>
+Key changes:
+qrCollapsed starts as true → the section is hidden by default.
+
+Added opacity + max-h transitions for smoother open/close without disappearing glitches.
+
+Increased max-h-[1000px] so your QR list won’t get cut off (adjust as needed).
+
+Moved the click handler to the header only so clicking inside the QR section won’t collapse it by accident.
+
+Rotation of chevron now flips when expanding instead of collapsing.

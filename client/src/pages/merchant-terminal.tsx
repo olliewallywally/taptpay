@@ -32,7 +32,7 @@ export default function MerchantTerminal() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const [selectedStoneId, setSelectedStoneId] = useState<number | null>(null);
-  const [qrCollapsed, setQrCollapsed] = useState(false);
+  const [qrCollapsed, setQrCollapsed] = useState(true);
   
   // NFC-specific state
   const [nfcCapabilities, setNfcCapabilities] = useState<any>(null);
@@ -638,25 +638,29 @@ export default function MerchantTerminal() {
               </div>
             </div>
           ) : (
-            <div 
-              className="rounded-2xl p-4 cursor-pointer transition-all duration-300"
+            <div
+              className="rounded-2xl p-4 transition-all duration-300"
               style={{ backgroundColor: '#00FF66' }}
-              onClick={() => setQrCollapsed(!qrCollapsed)}
             >
-              {/* Green Box Header */}
-              <div className="flex items-center justify-between text-black">
+              {/* Header */}
+              <div
+                className="flex items-center justify-between text-black cursor-pointer"
+                onClick={() => setQrCollapsed(prev => !prev)}
+              >
                 <h3 className="text-lg font-semibold">QR Codes</h3>
-                <ChevronDown 
-                  className={`transition-transform duration-300 ${qrCollapsed ? 'rotate-180' : ''}`}
+                <ChevronDown
+                  className={`transition-transform duration-300 ${qrCollapsed ? '' : 'rotate-180'}`}
                   size={20}
                 />
               </div>
-              
+
               {/* Collapsible Content */}
-              <div 
-                className={`overflow-hidden transition-all duration-300 ${qrCollapsed ? 'max-h-0' : 'max-h-[800px]'}`}
+              <div
+                className={`grid transition-all duration-300 overflow-hidden ${
+                  qrCollapsed ? 'max-h-0 opacity-0' : 'max-h-[1000px] opacity-100 mt-4'
+                }`}
               >
-                <div className="bg-white rounded-xl p-6 mt-4">
+                <div className="bg-white rounded-xl p-6">
                   <div className="text-center">
                     {activeTab === "qr" && (
                       <div className="space-y-1">
