@@ -842,20 +842,31 @@ export default function MerchantTerminalMobile() {
               
               {/* Individual Stone Buttons for QR */}
               {taptStones.map((stone: any) => (
-                <div key={stone.id} className="space-y-3">
+                <div key={stone.id} className="space-y-3 bg-red-500/20 border border-red-500 p-2">
+                  {/* Debug stone info */}
+                  <div className="text-white text-xs">
+                    Stone ID: {stone.id}, Name: {stone.name}
+                  </div>
                   {/* Stone Button */}
                   <button
-                    onClick={() => setSelectedStoneId(selectedStoneId === stone.id ? null : stone.id)}
-                    className="w-full p-4 rounded-2xl text-black font-semibold shadow-lg transition-all duration-300 hover:scale-[1.02]"
+                    onClick={() => {
+                      console.log('Stone button clicked:', stone.id);
+                      setSelectedStoneId(selectedStoneId === stone.id ? null : stone.id);
+                    }}
+                    className="w-full p-6 rounded-2xl text-black font-bold shadow-xl transition-all duration-300 hover:scale-[1.02] border-4 border-blue-500"
                     style={{ 
                       backgroundColor: '#00FF66',
-                      boxShadow: '0 8px 25px rgba(0, 255, 102, 0.3)'
+                      boxShadow: '0 8px 25px rgba(0, 255, 102, 0.3)',
+                      minHeight: '80px',
+                      display: 'block',
+                      position: 'relative',
+                      zIndex: 10
                     }}
                   >
                     <div className="flex items-center justify-between">
-                      <span>Stone #{stone.stoneNumber}</span>
+                      <span className="text-xl">STONE #{stone.stoneNumber}</span>
                       <ChevronDown 
-                        className={`h-5 w-5 transition-transform duration-300 ${selectedStoneId === stone.id ? 'rotate-180' : ''}`} 
+                        className={`h-6 w-6 transition-transform duration-300 ${selectedStoneId === stone.id ? 'rotate-180' : ''}`} 
                       />
                     </div>
                   </button>
