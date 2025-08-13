@@ -24,6 +24,7 @@ import {
   QrCode,
   CreditCard as Card
 } from "lucide-react";
+import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
 import { format } from "date-fns";
 
 export default function Transactions() {
@@ -283,9 +284,11 @@ export default function Transactions() {
         {/* Tapt Pay Branding - Mobile */}
         {isMobile && (
           <div className="fixed top-3 left-3 z-30">
-            <div className="text-white text-lg font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>
-              tapt pay
-            </div>
+            <img 
+              src={taptLogoPath} 
+              alt="TaptPay" 
+              className="h-8 w-auto object-contain"
+            />
           </div>
         )}
 
