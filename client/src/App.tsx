@@ -150,9 +150,7 @@ function Router() {
         </Route>
         <Route path="/settings">
           <ProtectedRoute>
-            <Layout>
-              <Settings />
-            </Layout>
+            <Settings />
           </ProtectedRoute>
         </Route>
         <Route path="/transactions">
