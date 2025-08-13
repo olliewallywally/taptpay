@@ -1044,9 +1044,9 @@ export default function MerchantTerminalMobile() {
             <div 
               className="backdrop-blur-xl border rounded-2xl p-4 shadow-2xl"
               style={{
-                background: 'linear-gradient(135deg, rgba(0, 255, 102, 0.15) 0%, rgba(0, 255, 102, 0.08) 100%)',
-                borderColor: 'rgba(0, 255, 102, 0.3)',
-                boxShadow: '0 15px 35px rgba(0, 255, 102, 0.2)'
+                background: 'rgba(255, 255, 255, 0.08)',
+                borderColor: 'rgba(255, 255, 255, 0.20)',
+                boxShadow: '0 15px 35px rgba(0, 0, 0, 0.3)'
               }}
             >
               <div className="text-center">
