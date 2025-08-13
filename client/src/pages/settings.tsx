@@ -29,7 +29,11 @@ import {
   Plus,
   Trash2,
   Download,
-  Loader2
+  Loader2,
+  Menu,
+  Mail,
+  Phone,
+  MapPin
 } from "lucide-react";
 import { z } from "zod";
 import { MobileHeader } from "@/components/mobile-header";
