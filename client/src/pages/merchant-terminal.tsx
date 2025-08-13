@@ -724,11 +724,15 @@ export default function MerchantTerminal() {
 
                               {/* QR Code - Always visible */}
                               <div className="text-center transition-all duration-300">
-                                <div className="w-48 h-48 mx-auto mb-4 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
-                                  <QrCode size={64} className="text-gray-400" />
+                                <div className="w-48 h-48 mx-auto mb-4 bg-white border-2 border-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
+                                  <QRCodeDisplay 
+                                    merchantId={merchantId}
+                                    stoneId={stone.id}
+                                    className="w-full h-full"
+                                  />
                                 </div>
                                 <p className="text-gray-600 text-xs font-medium">
-                                  QR code removed from desktop
+                                  Stone #{stone.stoneNumber} QR Code
                                 </p>
                               </div>
                             </div>
