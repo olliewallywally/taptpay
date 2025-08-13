@@ -345,7 +345,7 @@ export default function Settings() {
           </button>
         </div>
 
-        <div className="container mx-auto px-4 pt-32 pb-8">
+        <div className="container mx-auto px-4 pt-20 pb-8">
       <div className="mb-6 sm:mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Settings & Configuration</h1>
         <p className="text-sm sm:text-base text-white/70">Manage your payment processing configuration and API connections</p>
