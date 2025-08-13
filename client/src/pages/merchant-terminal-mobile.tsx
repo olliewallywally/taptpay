@@ -377,37 +377,37 @@ export default function MerchantTerminalMobile() {
 
         {/* Sliding Menu */}
         <div 
-          className={`fixed right-0 top-0 h-full w-80 bg-gray-900 border-l border-gray-700 z-50 transform transition-transform duration-300 ease-in-out ${
+          className={`fixed right-0 top-0 h-full w-80 bg-gray-100 border-l border-gray-300 z-50 transform transition-transform duration-300 ease-in-out ${
             menuOpen ? 'translate-x-0' : 'translate-x-full'
           }`}
         >
           <div className="p-6">
             <div className="flex justify-between items-center mb-8">
-              <h2 className="text-xl font-bold text-white">Menu</h2>
-              <button onClick={() => setMenuOpen(false)} className="text-white/70 hover:text-white">
+              <h2 className="text-xl font-bold text-black">Menu</h2>
+              <button onClick={() => setMenuOpen(false)} className="text-black/70 hover:text-black">
                 <X className="h-6 w-6" />
               </button>
             </div>
             <nav className="space-y-4">
-              <a href="/dashboard" className="block py-3 px-4 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors">
+              <a href="/dashboard" className="block py-3 px-4 text-black/70 hover:text-black hover:bg-black/10 rounded-xl transition-colors">
                 Dashboard
               </a>
-              <a href="/merchant" className="block py-3 px-4 text-[#00FF66] bg-[#00FF66]/20 rounded-xl drop-shadow-[0_0_8px_#00FF66] font-medium">
+              <a href="/merchant" className="block py-3 px-4 text-[#00FF66] bg-gray-200 rounded-xl font-medium">
                 Terminal
               </a>
-              <a href="/transactions" className="block py-3 px-4 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors">
+              <a href="/transactions" className="block py-3 px-4 text-black/70 hover:text-black hover:bg-black/10 rounded-xl transition-colors">
                 Transactions
               </a>
-              <a href="/settings" className="block py-3 px-4 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors">
+              <a href="/settings" className="block py-3 px-4 text-black/70 hover:text-black hover:bg-black/10 rounded-xl transition-colors">
                 Settings
               </a>
-              <div className="pt-4 mt-4 border-t border-gray-700">
+              <div className="pt-4 mt-4 border-t border-gray-300">
                 <button 
                   onClick={() => {
                     localStorage.removeItem('auth-token');
                     window.location.href = '/login';
                   }}
-                  className="block w-full text-left py-3 px-4 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-colors"
+                  className="block w-full text-left py-3 px-4 text-red-600 hover:text-red-700 hover:bg-red-100 rounded-xl transition-colors"
                 >
                   Logout
                 </button>
