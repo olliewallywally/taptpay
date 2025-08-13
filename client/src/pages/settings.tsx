@@ -44,6 +44,7 @@ export default function Settings() {
   const [editingDetails, setEditingDetails] = useState(false);
   const [editingBankAccount, setEditingBankAccount] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   
   useEffect(() => {
     const checkScreenSize = () => {
@@ -274,21 +275,86 @@ export default function Settings() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900">
-      {isMobile && <MobileHeader title="Settings">Settings</MobileHeader>}
-      
-      <div className="max-w-4xl mx-auto px-4 py-8" style={{ paddingTop: isMobile ? '100px' : '40px' }}>
+    <>
+      {/* Menu Backdrop */}
+      <div 
+        className={`fixed inset-0 bg-black/60 z-40 transition-opacity duration-300 ${
+          menuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={() => setMenuOpen(false)}
+      />
+
+      {/* Sliding Menu */}
+      <div 
+        className={`fixed right-0 top-0 h-full w-80 bg-gray-800 border-l border-gray-700 z-50 transform transition-transform duration-300 ease-in-out ${
+          menuOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-8">
+            <h2 className="text-xl font-bold text-white">Menu</h2>
+            <button onClick={() => setMenuOpen(false)} className="text-white/70 hover:text-white">
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+          <nav className="space-y-4">
+            <a href="/dashboard" className="block py-3 px-4 text-white hover:text-white rounded-xl transition-colors">
+              Dashboard
+            </a>
+            <a href="/merchant" className="block py-3 px-4 text-white hover:text-white rounded-xl transition-colors">
+              Terminal
+            </a>
+            <a href="/transactions" className="block py-3 px-4 text-white hover:text-white rounded-xl transition-colors">
+              Transactions
+            </a>
+            <a href="/settings" className="block py-3 px-4 text-[#00CC52] rounded-xl font-medium">
+              Settings
+            </a>
+            <div className="pt-4 mt-4 border-t border-gray-600">
+              <button 
+                onClick={() => {
+                  localStorage.removeItem('auth-token');
+                  window.location.href = '/login';
+                }}
+                className="block w-full text-left py-3 px-4 text-red-400 hover:text-red-300 rounded-xl transition-colors"
+              >
+                Logout
+              </button>
+            </div>
+          </nav>
+        </div>
+      </div>
+
+      {/* Main Content with Slide Animation */}
+      <div 
+        className={`min-h-screen bg-gradient-to-br from-gray-950 via-black to-gray-900 transform transition-transform duration-300 ease-in-out ${
+          menuOpen ? '-translate-x-80' : 'translate-x-0'
+        }`}
+      >
+        {/* Menu Icon */}
+        <div className="fixed top-4 right-4 z-30">
+          <button
+            onClick={() => setMenuOpen(true)}
+            className="p-3 backdrop-blur-xl bg-black/40 border border-white/20 rounded-xl text-white hover:bg-black/60 transition-colors"
+          >
+            <Menu className="h-6 w-6" />
+          </button>
+        </div>
+
+        {/* Tapt Pay Branding */}
+        <div className="fixed top-4 left-4 z-30">
+          <div className="text-white text-xl font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>
+            tapt
+          </div>
+        </div>
+
+        <div className="container mx-auto px-4 pt-32 pb-8">
       <div className="mb-6 sm:mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Settings & Configuration</h1>
         <p className="text-sm sm:text-base text-white/70">Manage your payment processing configuration and API connections</p>
       </div>
 
-      {/* Simple test content to check if rendering works */}
-      <div className="bg-white/10 p-4 rounded-xl mb-4">
-        <p className="text-white">Test content - User: {user ? 'Loaded' : 'Not loaded'}</p>
-        <p className="text-white">Merchant ID: {merchantId || 'None'}</p>
-        <p className="text-white">Merchant: {merchant ? 'Loaded' : 'Loading...'}</p>
-      </div>
+
 
       {/* Merchant Business Details Card */}
       <div className="backdrop-blur-xl bg-white/5 border border-white/20 rounded-3xl p-6 shadow-2xl mb-6 sm:mb-8 hover:bg-white/10 hover:border-white/30 transition-all duration-300">
@@ -841,42 +907,8 @@ export default function Settings() {
           </div>
         </div>
       </div>
-
-      {/* Current Configuration */}
-      <div className="backdrop-blur-xl bg-white/5 border border-white/20 rounded-3xl p-6 shadow-2xl hover:bg-white/10 hover:border-white/30 transition-all duration-300">
-        <div className="mb-6">
-          <h3 className="text-lg font-semibold text-white flex items-center space-x-2">
-            <SettingsIcon className="h-5 w-5 text-white" />
-            <span>Current Configuration</span>
-          </h3>
-          <p className="text-white/70 text-sm">
-            Review your current payment processing setup
-          </p>
-        </div>
-        <div>
-          <div className="space-y-4">
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-white/70">Payment Provider</label>
-                <p className="text-white">Windcave (formerly Payment Express)</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-white/70">Processing Rate</label>
-                <p className="text-white font-semibold text-green-400">$0.20 flat fee per transaction</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-white/70">Currency</label>
-                <p className="text-white">NZD (New Zealand Dollar)</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-white/70">Integration Method</label>
-                <p className="text-white">REST API with Hosted Payment Page</p>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
-      </div>
-    </div>
+    </>
   );
 }
