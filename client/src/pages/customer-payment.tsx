@@ -9,13 +9,14 @@ import { Shield, Lock, CheckCircle, XCircle } from "lucide-react";
 import taptLogo from "@assets/tapt logo_1751676012286.png";
 
 export default function CustomerPayment() {
-  const { merchantId } = useParams<{ merchantId: string }>();
+  const { merchantId, stoneId } = useParams<{ merchantId: string; stoneId?: string }>();
   const [, setLocation] = useLocation();
   const [currentTransaction, setCurrentTransaction] = useState<any>(null);
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
 
   // Debug URL parsing
   const id = merchantId ? parseInt(merchantId) : null;
+  const stoneNumber = stoneId ? parseInt(stoneId) : null;
   
   // Redirect if no valid merchantId
   if (!id) {
