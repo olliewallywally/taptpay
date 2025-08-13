@@ -334,11 +334,11 @@ export default function Transactions() {
                 return (
                 <div 
                   key={transaction.id} 
-                  className={`relative perspective-1000 ${isMobile ? 'h-auto' : 'h-auto'}`}
+                  className={`relative perspective-1000 ${isMobile ? 'min-h-[200px]' : 'min-h-[180px]'}`}
                 >
-                  <div className={`relative w-full transform transition-transform duration-700 preserve-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
+                  <div className={`relative w-full h-full transform transition-transform duration-700 preserve-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
                     {/* Front of Card */}
-                    <div className={`dashboard-card-glass ${isMobile ? 'rounded-2xl p-4' : 'rounded-3xl p-6'} hover:bg-white/10 transition-all duration-200 ${isMobile ? 'hover:scale-[1.02]' : ''} backface-hidden`}>
+                    <div className={`absolute inset-0 dashboard-card-glass ${isMobile ? 'rounded-2xl p-4' : 'rounded-3xl p-6'} hover:bg-white/10 transition-all duration-200 ${isMobile ? 'hover:scale-[1.02]' : ''} backface-hidden`}>
                       <div className={`flex ${isMobile ? 'flex-col' : 'items-start justify-between'}`}>
                         <div className="flex-1">
                           <div className={`flex items-center ${isMobile ? 'gap-2 mb-3' : 'gap-3 mb-2'}`}>
@@ -407,7 +407,7 @@ export default function Transactions() {
                     </div>
 
                     {/* Back of Card */}
-                    <div className={`absolute inset-0 dashboard-card-glass ${isMobile ? 'rounded-2xl p-4' : 'rounded-3xl p-6'} backface-hidden rotate-y-180`}>
+                    <div className={`absolute inset-0 dashboard-card-glass ${isMobile ? 'rounded-2xl p-4' : 'rounded-3xl p-6'} backface-hidden rotate-y-180 overflow-y-auto`}>
                       <div className="h-full flex flex-col">
                         <div className="flex items-center justify-between mb-4">
                           <h3 className={`${isMobile ? 'text-lg' : 'text-xl'} font-bold text-white`}>Transaction Details</h3>
@@ -419,22 +419,22 @@ export default function Transactions() {
                           </button>
                         </div>
 
-                        <div className="space-y-4 flex-1">
+                        <div className={`${isMobile ? 'space-y-3' : 'space-y-4'} flex-1`}>
                           {/* Transaction Info Grid */}
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className={`${isMobile ? 'space-y-3' : 'grid grid-cols-2 gap-4'}`}>
                             <div className="space-y-1">
-                              <div className="flex items-center gap-2 text-white/70 text-sm">
-                                <Hash className="h-4 w-4" />
+                              <div className={`flex items-center gap-2 text-white/70 ${isMobile ? 'text-xs' : 'text-sm'}`}>
+                                <Hash className={`${isMobile ? 'h-3 w-3' : 'h-4 w-4'}`} />
                                 Transaction ID
                               </div>
-                              <p className={`text-white ${isMobile ? 'text-xs' : 'text-sm'} font-mono`}>
+                              <p className={`text-white ${isMobile ? 'text-xs' : 'text-sm'} font-mono break-all`}>
                                 {transaction.windcaveTransactionId || `TXN-${transaction.id}`}
                               </p>
                             </div>
                             
                             <div className="space-y-1">
-                              <div className="flex items-center gap-2 text-white/70 text-sm">
-                                <Calendar className="h-4 w-4" />
+                              <div className={`flex items-center gap-2 text-white/70 ${isMobile ? 'text-xs' : 'text-sm'}`}>
+                                <Calendar className={`${isMobile ? 'h-3 w-3' : 'h-4 w-4'}`} />
                                 Date & Time
                               </div>
                               <p className={`text-white ${isMobile ? 'text-xs' : 'text-sm'}`}>
@@ -447,16 +447,16 @@ export default function Transactions() {
                           </div>
 
                           {/* Payment Method */}
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2 text-white/70 text-sm">
+                          <div className={`${isMobile ? 'space-y-1' : 'space-y-2'}`}>
+                            <div className={`flex items-center gap-2 text-white/70 ${isMobile ? 'text-xs' : 'text-sm'}`}>
                               {getPaymentIcon(transaction.paymentMethod)}
                               Payment Method
                             </div>
-                            <div className={`flex items-center gap-2 px-3 py-2 backdrop-blur-xl bg-black/40 border border-white/20 ${isMobile ? 'rounded-xl' : 'rounded-lg'}`}>
-                              {transaction.paymentMethod === 'nfc_tap' && <Smartphone className="h-4 w-4 text-blue-400" />}
-                              {transaction.paymentMethod === 'qr_code' && <QrCode className="h-4 w-4 text-green-400" />}
-                              {transaction.paymentMethod === 'card_reader' && <Card className="h-4 w-4 text-yellow-400" />}
-                              <span className="text-white">
+                            <div className={`flex items-center gap-2 ${isMobile ? 'px-2 py-2' : 'px-3 py-2'} backdrop-blur-xl bg-black/40 border border-white/20 ${isMobile ? 'rounded-xl' : 'rounded-lg'}`}>
+                              {transaction.paymentMethod === 'nfc_tap' && <Smartphone className={`${isMobile ? 'h-3 w-3' : 'h-4 w-4'} text-blue-400`} />}
+                              {transaction.paymentMethod === 'qr_code' && <QrCode className={`${isMobile ? 'h-3 w-3' : 'h-4 w-4'} text-green-400`} />}
+                              {transaction.paymentMethod === 'card_reader' && <Card className={`${isMobile ? 'h-3 w-3' : 'h-4 w-4'} text-yellow-400`} />}
+                              <span className={`text-white ${isMobile ? 'text-xs' : 'text-sm'}`}>
                                 {transaction.paymentMethod === 'nfc_tap' ? 'NFC Tap Payment' :
                                  transaction.paymentMethod === 'qr_code' ? 'QR Code Payment' :
                                  transaction.paymentMethod === 'card_reader' ? 'Card Reader Payment' :
@@ -466,20 +466,20 @@ export default function Transactions() {
                           </div>
 
                           {/* Amount Breakdown */}
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2 text-white/70 text-sm">
-                              <DollarSign className="h-4 w-4" />
+                          <div className={`${isMobile ? 'space-y-1' : 'space-y-2'}`}>
+                            <div className={`flex items-center gap-2 text-white/70 ${isMobile ? 'text-xs' : 'text-sm'}`}>
+                              <DollarSign className={`${isMobile ? 'h-3 w-3' : 'h-4 w-4'}`} />
                               Amount Details
                             </div>
-                            <div className={`px-3 py-2 backdrop-blur-xl bg-black/40 border border-white/20 ${isMobile ? 'rounded-xl' : 'rounded-lg'}`}>
+                            <div className={`${isMobile ? 'px-2 py-2' : 'px-3 py-2'} backdrop-blur-xl bg-black/40 border border-white/20 ${isMobile ? 'rounded-xl' : 'rounded-lg'}`}>
                               <div className="flex justify-between items-center">
-                                <span className="text-white/70">Total Amount:</span>
-                                <span className="text-white font-bold text-lg">
+                                <span className={`text-white/70 ${isMobile ? 'text-xs' : 'text-sm'}`}>Total Amount:</span>
+                                <span className={`text-white font-bold ${isMobile ? 'text-base' : 'text-lg'}`}>
                                   ${parseFloat(transaction.price).toFixed(2)}
                                 </span>
                               </div>
                               {transaction.fee && (
-                                <div className="flex justify-between items-center mt-1 text-sm">
+                                <div className={`flex justify-between items-center mt-1 ${isMobile ? 'text-xs' : 'text-sm'}`}>
                                   <span className="text-white/50">Processing Fee:</span>
                                   <span className="text-white/70">${transaction.fee.toFixed(2)}</span>
                                 </div>
@@ -488,9 +488,9 @@ export default function Transactions() {
                           </div>
 
                           {/* Status */}
-                          <div className="space-y-2">
-                            <div className="text-white/70 text-sm">Status</div>
-                            <div className={`flex items-center gap-2 px-3 py-2 ${isMobile ? 'rounded-xl' : 'rounded-lg'} ${
+                          <div className={`${isMobile ? 'space-y-1' : 'space-y-2'}`}>
+                            <div className={`text-white/70 ${isMobile ? 'text-xs' : 'text-sm'}`}>Status</div>
+                            <div className={`flex items-center gap-2 ${isMobile ? 'px-2 py-2' : 'px-3 py-2'} ${isMobile ? 'rounded-xl' : 'rounded-lg'} ${
                               transaction.status === 'completed' 
                                 ? 'bg-green-500/20 border border-green-500/30' 
                                 : transaction.status === 'failed'
@@ -498,7 +498,7 @@ export default function Transactions() {
                                 : 'bg-yellow-500/20 border border-yellow-500/30'
                             }`}>
                               {getStatusIcon(transaction.status)}
-                              <span className={`font-medium ${
+                              <span className={`font-medium ${isMobile ? 'text-xs' : 'text-sm'} ${
                                 transaction.status === 'completed' ? 'text-green-300' :
                                 transaction.status === 'failed' ? 'text-red-300' : 'text-yellow-300'
                               }`}>
@@ -510,12 +510,12 @@ export default function Transactions() {
 
                         {/* Actions */}
                         {transaction.status === 'completed' && (
-                          <div className="mt-4 pt-4 border-t border-white/10">
+                          <div className={`${isMobile ? 'mt-2 pt-2' : 'mt-4 pt-4'} border-t border-white/10`}>
                             <button
                               onClick={() => handleRefund(transaction)}
-                              className={`w-full flex items-center justify-center gap-2 ${isMobile ? 'px-4 py-3 rounded-xl' : 'px-3 py-2 rounded-lg'} bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 transition-colors`}
+                              className={`w-full flex items-center justify-center gap-2 ${isMobile ? 'px-3 py-2 text-xs rounded-xl' : 'px-3 py-2 text-sm rounded-lg'} bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 transition-colors`}
                             >
-                              <RotateCcw className="h-4 w-4" />
+                              <RotateCcw className={`${isMobile ? 'h-3 w-3' : 'h-4 w-4'}`} />
                               Process Refund
                             </button>
                           </div>
