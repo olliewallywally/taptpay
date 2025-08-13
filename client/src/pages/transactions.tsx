@@ -14,7 +14,15 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   RotateCcw,
-  DollarSign
+  DollarSign,
+  Eye,
+  EyeOff,
+  RotateCw,
+  Calendar,
+  Hash,
+  Smartphone,
+  QrCode,
+  CreditCard as Card
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -25,9 +33,23 @@ export default function Transactions() {
   const [refundModal, setRefundModal] = useState<any>(null);
   const [refundAmount, setRefundAmount] = useState("");
   const [refundReason, setRefundReason] = useState("");
+  const [flippedCards, setFlippedCards] = useState<Set<number>>(new Set());
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  // Function to toggle card flip
+  const toggleCardFlip = (transactionId: number) => {
+    setFlippedCards(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(transactionId)) {
+        newSet.delete(transactionId);
+      } else {
+        newSet.add(transactionId);
+      }
+      return newSet;
+    });
+  };
   
   useEffect(() => {
     const checkScreenSize = () => {
@@ -307,72 +329,203 @@ export default function Transactions() {
             </div>
           ) : (
             <div className={`${isMobile ? 'space-y-3' : 'space-y-4'}`}>
-              {filteredTransactions.map((transaction: any) => (
+              {filteredTransactions.map((transaction: any) => {
+                const isFlipped = flippedCards.has(transaction.id);
+                return (
                 <div 
                   key={transaction.id} 
-                  className={`dashboard-card-glass ${isMobile ? 'rounded-2xl p-4' : 'rounded-3xl p-6'} hover:bg-white/10 transition-all duration-200 ${isMobile ? 'hover:scale-[1.02]' : ''}`}
+                  className={`relative perspective-1000 ${isMobile ? 'h-auto' : 'h-auto'}`}
                 >
-                  <div className={`flex ${isMobile ? 'flex-col' : 'items-start justify-between'}`}>
-                    <div className="flex-1">
-                      <div className={`flex items-center ${isMobile ? 'gap-2 mb-3' : 'gap-3 mb-2'}`}>
-                        {getStatusIcon(transaction.status)}
-                        <h3 className={`${isMobile ? 'text-lg font-semibold' : 'text-lg font-medium'} text-white`}>
-                          {transaction.itemName}
-                        </h3>
-                      </div>
-                      
-                      <p className={`text-white/70 ${isMobile ? 'text-sm mb-4' : 'text-sm mb-3'}`}>
-                        {transaction.createdAt 
-                          ? format(new Date(transaction.createdAt), "MMM dd, yyyy 'at' HH:mm")
-                          : "Date not available"
-                        }
-                      </p>
-                      
-                      <div className={`flex ${isMobile ? 'flex-col gap-3' : 'items-center gap-4'} ${isMobile ? 'text-sm' : 'text-sm'}`}>
-                        <span className={`text-white/50 ${isMobile ? 'text-xs' : ''}`}>
-                          ID: {transaction.windcaveTransactionId || `TXN-${transaction.id}`}
-                        </span>
-                        
-                        <div className={`flex items-center ${isMobile ? 'gap-2' : 'gap-1'}`}>
-                          {getPaymentIcon(transaction.paymentMethod)}
-                          <span className={`text-white/50 ${isMobile ? 'text-xs' : ''}`}>
-                            {transaction.paymentMethod === 'nfc_tap' ? 'NFC Tap' :
-                             transaction.paymentMethod === 'qr_code' ? 'QR Code' :
-                             transaction.paymentMethod === 'card_reader' ? 'Card Reader' :
-                             'Card Payment'}
-                          </span>
+                  <div className={`relative w-full transform transition-transform duration-700 preserve-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
+                    {/* Front of Card */}
+                    <div className={`dashboard-card-glass ${isMobile ? 'rounded-2xl p-4' : 'rounded-3xl p-6'} hover:bg-white/10 transition-all duration-200 ${isMobile ? 'hover:scale-[1.02]' : ''} backface-hidden`}>
+                      <div className={`flex ${isMobile ? 'flex-col' : 'items-start justify-between'}`}>
+                        <div className="flex-1">
+                          <div className={`flex items-center ${isMobile ? 'gap-2 mb-3' : 'gap-3 mb-2'}`}>
+                            {getStatusIcon(transaction.status)}
+                            <h3 className={`${isMobile ? 'text-lg font-semibold' : 'text-lg font-medium'} text-white`}>
+                              {transaction.itemName}
+                            </h3>
+                            <button
+                              onClick={() => toggleCardFlip(transaction.id)}
+                              className={`ml-auto ${isMobile ? 'p-2' : 'p-1'} text-white/50 hover:text-white transition-colors`}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </button>
+                          </div>
+                          
+                          <p className={`text-white/70 ${isMobile ? 'text-sm mb-4' : 'text-sm mb-3'}`}>
+                            {transaction.createdAt 
+                              ? format(new Date(transaction.createdAt), "MMM dd, yyyy 'at' HH:mm")
+                              : "Date not available"
+                            }
+                          </p>
+                          
+                          <div className={`flex ${isMobile ? 'flex-col gap-3' : 'items-center gap-4'} ${isMobile ? 'text-sm' : 'text-sm'}`}>
+                            <span className={`text-white/50 ${isMobile ? 'text-xs' : ''}`}>
+                              ID: {transaction.windcaveTransactionId || `TXN-${transaction.id}`}
+                            </span>
+                            
+                            <div className={`flex items-center ${isMobile ? 'gap-2' : 'gap-1'}`}>
+                              {getPaymentIcon(transaction.paymentMethod)}
+                              <span className={`text-white/50 ${isMobile ? 'text-xs' : ''}`}>
+                                {transaction.paymentMethod === 'nfc_tap' ? 'NFC Tap' :
+                                 transaction.paymentMethod === 'qr_code' ? 'QR Code' :
+                                 transaction.paymentMethod === 'card_reader' ? 'Card Reader' :
+                                 'Card Payment'}
+                              </span>
+                            </div>
+                            
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              transaction.status === 'completed' 
+                                ? 'bg-green-500/20 text-green-300 border border-green-500/30' 
+                                : transaction.status === 'failed'
+                                ? 'bg-red-500/20 text-red-300 border border-red-500/30'
+                                : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
+                            }`}>
+                              {transaction.status}
+                            </span>
+                          </div>
                         </div>
                         
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          transaction.status === 'completed' 
-                            ? 'bg-green-500/20 text-green-300 border border-green-500/30' 
-                            : transaction.status === 'failed'
-                            ? 'bg-red-500/20 text-red-300 border border-red-500/30'
-                            : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
-                        }`}>
-                          {transaction.status}
-                        </span>
+                        <div className={`${isMobile ? 'mt-5 flex justify-between items-center' : 'text-right'}`}>
+                          <div className={`${isMobile ? 'text-2xl' : 'text-2xl'} font-bold text-white`}>
+                            ${parseFloat(transaction.price).toFixed(2)}
+                          </div>
+                          
+                          {transaction.status === 'completed' && (
+                            <button
+                              onClick={() => handleRefund(transaction)}
+                              className={`flex items-center gap-2 ${isMobile ? 'px-4 py-3 text-sm rounded-xl' : 'px-3 py-2 rounded-lg'} bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 transition-colors`}
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                              {isMobile ? 'Refund' : 'Process Refund'}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    
-                    <div className={`${isMobile ? 'mt-5 flex justify-between items-center' : 'text-right'}`}>
-                      <div className={`${isMobile ? 'text-2xl' : 'text-2xl'} font-bold text-white`}>
-                        ${parseFloat(transaction.price).toFixed(2)}
+
+                    {/* Back of Card */}
+                    <div className={`absolute inset-0 dashboard-card-glass ${isMobile ? 'rounded-2xl p-4' : 'rounded-3xl p-6'} backface-hidden rotate-y-180`}>
+                      <div className="h-full flex flex-col">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className={`${isMobile ? 'text-lg' : 'text-xl'} font-bold text-white`}>Transaction Details</h3>
+                          <button
+                            onClick={() => toggleCardFlip(transaction.id)}
+                            className={`${isMobile ? 'p-2' : 'p-1'} text-white/50 hover:text-white transition-colors`}
+                          >
+                            <EyeOff className="h-4 w-4" />
+                          </button>
+                        </div>
+
+                        <div className="space-y-4 flex-1">
+                          {/* Transaction Info Grid */}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 text-white/70 text-sm">
+                                <Hash className="h-4 w-4" />
+                                Transaction ID
+                              </div>
+                              <p className={`text-white ${isMobile ? 'text-xs' : 'text-sm'} font-mono`}>
+                                {transaction.windcaveTransactionId || `TXN-${transaction.id}`}
+                              </p>
+                            </div>
+                            
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 text-white/70 text-sm">
+                                <Calendar className="h-4 w-4" />
+                                Date & Time
+                              </div>
+                              <p className={`text-white ${isMobile ? 'text-xs' : 'text-sm'}`}>
+                                {transaction.createdAt 
+                                  ? format(new Date(transaction.createdAt), "dd/MM/yyyy HH:mm")
+                                  : "N/A"
+                                }
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Payment Method */}
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-white/70 text-sm">
+                              {getPaymentIcon(transaction.paymentMethod)}
+                              Payment Method
+                            </div>
+                            <div className={`flex items-center gap-2 px-3 py-2 backdrop-blur-xl bg-black/40 border border-white/20 ${isMobile ? 'rounded-xl' : 'rounded-lg'}`}>
+                              {transaction.paymentMethod === 'nfc_tap' && <Smartphone className="h-4 w-4 text-blue-400" />}
+                              {transaction.paymentMethod === 'qr_code' && <QrCode className="h-4 w-4 text-green-400" />}
+                              {transaction.paymentMethod === 'card_reader' && <Card className="h-4 w-4 text-yellow-400" />}
+                              <span className="text-white">
+                                {transaction.paymentMethod === 'nfc_tap' ? 'NFC Tap Payment' :
+                                 transaction.paymentMethod === 'qr_code' ? 'QR Code Payment' :
+                                 transaction.paymentMethod === 'card_reader' ? 'Card Reader Payment' :
+                                 'Card Payment'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Amount Breakdown */}
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-white/70 text-sm">
+                              <DollarSign className="h-4 w-4" />
+                              Amount Details
+                            </div>
+                            <div className={`px-3 py-2 backdrop-blur-xl bg-black/40 border border-white/20 ${isMobile ? 'rounded-xl' : 'rounded-lg'}`}>
+                              <div className="flex justify-between items-center">
+                                <span className="text-white/70">Total Amount:</span>
+                                <span className="text-white font-bold text-lg">
+                                  ${parseFloat(transaction.price).toFixed(2)}
+                                </span>
+                              </div>
+                              {transaction.fee && (
+                                <div className="flex justify-between items-center mt-1 text-sm">
+                                  <span className="text-white/50">Processing Fee:</span>
+                                  <span className="text-white/70">${transaction.fee.toFixed(2)}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Status */}
+                          <div className="space-y-2">
+                            <div className="text-white/70 text-sm">Status</div>
+                            <div className={`flex items-center gap-2 px-3 py-2 ${isMobile ? 'rounded-xl' : 'rounded-lg'} ${
+                              transaction.status === 'completed' 
+                                ? 'bg-green-500/20 border border-green-500/30' 
+                                : transaction.status === 'failed'
+                                ? 'bg-red-500/20 border border-red-500/30'
+                                : 'bg-yellow-500/20 border border-yellow-500/30'
+                            }`}>
+                              {getStatusIcon(transaction.status)}
+                              <span className={`font-medium ${
+                                transaction.status === 'completed' ? 'text-green-300' :
+                                transaction.status === 'failed' ? 'text-red-300' : 'text-yellow-300'
+                              }`}>
+                                {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        {transaction.status === 'completed' && (
+                          <div className="mt-4 pt-4 border-t border-white/10">
+                            <button
+                              onClick={() => handleRefund(transaction)}
+                              className={`w-full flex items-center justify-center gap-2 ${isMobile ? 'px-4 py-3 rounded-xl' : 'px-3 py-2 rounded-lg'} bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 transition-colors`}
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                              Process Refund
+                            </button>
+                          </div>
+                        )}
                       </div>
-                      
-                      {transaction.status === 'completed' && (
-                        <button
-                          onClick={() => handleRefund(transaction)}
-                          className={`flex items-center gap-2 ${isMobile ? 'px-4 py-3 text-sm rounded-xl' : 'px-3 py-2 rounded-lg'} bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 transition-colors`}
-                        >
-                          <RotateCcw className="h-4 w-4" />
-                          {isMobile ? 'Refund' : 'Process Refund'}
-                        </button>
-                      )}
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
