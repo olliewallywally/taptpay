@@ -826,16 +826,16 @@ export default function MerchantTerminalMobile() {
                   {taptStones && taptStones.length > 0 && taptStones.map((stone: any) => (
                     <div 
                       key={stone.id}
-                      className="bg-gray-100 rounded-xl p-4 space-y-3"
+                      className="bg-gray-100 rounded-xl p-4"
                     >
                       {/* Stone Header */}
-                      <div className="text-center">
+                      <div className="text-center mb-4">
                         <h3 className="text-sm font-semibold text-black">Stone #{stone.stoneNumber}</h3>
                       </div>
 
                       {/* QR Code - Always visible */}
                       <div className="text-center">
-                        <div className="w-32 h-32 mx-auto mb-2 bg-white rounded-lg p-2 border">
+                        <div className="w-32 h-32 mx-auto mb-4 bg-white rounded-lg p-2 border">
                           <QRCodeDisplay 
                             merchantId={merchantId} 
                             stoneId={stone.id}
