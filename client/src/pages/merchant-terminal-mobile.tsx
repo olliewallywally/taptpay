@@ -816,13 +816,8 @@ export default function MerchantTerminalMobile() {
         <div className="px-6">
           {activeTab === "QR" ? (
             <div className="space-y-4">
-              {/* Debug: Show what we have */}
-              <div className="text-white text-xs p-2 bg-red-500/20 rounded">
-                Debug: hasTransaction={!!(currentTransaction || activeTransaction)}, stonesCount={taptStones.length}, isMobile={isMobile}
-              </div>
-              
-              {/* Tapt Stone Buttons - Show available stones when transaction exists */}
-              {(currentTransaction || activeTransaction) && taptStones.map((stone: any) => (
+              {/* Tapt Stone Buttons - Always show when stones exist */}
+              {taptStones.map((stone: any) => (
                 <div key={stone.id}>
                   <button
                     onClick={() => {
@@ -1043,42 +1038,7 @@ export default function MerchantTerminalMobile() {
           </div>
         )}
 
-        {/* Payment Link Box */}
-        {(currentTransaction || activeTransaction) && (
-          <div className="fixed bottom-4 left-4 right-4 z-40">
-            <div 
-              className="backdrop-blur-xl border rounded-2xl p-4 shadow-2xl"
-              style={{
-                background: 'rgba(255, 255, 255, 0.08)',
-                borderColor: 'rgba(255, 255, 255, 0.20)',
-                boxShadow: '0 15px 35px rgba(0, 0, 0, 0.3)'
-              }}
-            >
-              <div className="text-center">
-                <p className="text-white/80 text-sm font-medium mb-2">
-                  Payment Link
-                </p>
-                <div className="flex items-center justify-between bg-white/10 rounded-lg p-3">
-                  <span className="text-white/70 text-xs font-mono truncate flex-1 mr-2">
-                    {window.location.origin}/pay/{merchantId}
-                  </span>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(`${window.location.origin}/pay/${merchantId}`);
-                      toast({
-                        title: "Copied!",
-                        description: "Payment link copied to clipboard",
-                      });
-                    }}
-                    className="text-white/70 hover:text-white p-1 rounded"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+
           </div>
           </div>
         </div>
