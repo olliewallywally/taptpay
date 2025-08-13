@@ -32,28 +32,28 @@ export function MobileHeader({ title, children, showMenu = true }: MobileHeaderP
             <Link 
               href="/merchant" 
               onClick={() => setMenuOpen(false)} 
-              className="block py-4 px-4 text-gray-800 hover:text-green-500 transition-colors duration-200 font-medium text-lg"
+              className="block py-4 px-4 text-white hover:text-green-500 transition-colors duration-200 font-medium text-lg"
             >
               Terminal
             </Link>
             <Link 
               href="/dashboard" 
               onClick={() => setMenuOpen(false)} 
-              className="block py-4 px-4 text-gray-800 hover:text-green-500 transition-colors duration-200 font-medium text-lg"
+              className="block py-4 px-4 text-white hover:text-green-500 transition-colors duration-200 font-medium text-lg"
             >
               Dashboard
             </Link>
             <Link 
               href="/transactions" 
               onClick={() => setMenuOpen(false)} 
-              className="block py-4 px-4 text-gray-800 hover:text-green-500 transition-colors duration-200 font-medium text-lg"
+              className="block py-4 px-4 text-white hover:text-green-500 transition-colors duration-200 font-medium text-lg"
             >
               Transactions
             </Link>
             <Link 
               href="/settings" 
               onClick={() => setMenuOpen(false)} 
-              className="block py-4 px-4 text-gray-800 hover:text-green-500 transition-colors duration-200 font-medium text-lg"
+              className="block py-4 px-4 text-white hover:text-green-500 transition-colors duration-200 font-medium text-lg"
             >
               Settings
             </Link>
@@ -63,7 +63,7 @@ export function MobileHeader({ title, children, showMenu = true }: MobileHeaderP
                   localStorage.removeItem('auth-token');
                   window.location.href = '/login';
                 }}
-                className="block w-full text-left py-4 px-4 text-red-600 hover:text-red-700 transition-colors duration-200 font-medium text-lg"
+                className="block w-full text-left py-4 px-4 text-white hover:text-red-400 transition-colors duration-200 font-medium text-lg"
               >
                 Logout
               </button>
