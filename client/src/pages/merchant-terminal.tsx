@@ -32,7 +32,7 @@ export default function MerchantTerminal() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const [selectedStoneId, setSelectedStoneId] = useState<number | null>(null);
-  const [qrCollapsed, setQrCollapsed] = useState(true);
+  const [qrCollapsed, setQrCollapsed] = useState(false);
   
   // NFC-specific state
   const [nfcCapabilities, setNfcCapabilities] = useState<any>(null);
@@ -682,16 +682,12 @@ export default function MerchantTerminal() {
           </div>
         </div>
 
-        {/* QR Code Section */}
+        {/* QR Code Section - Always visible */}
         <div>
-          {currentTransaction || activeTransaction ? (
-            <div className="text-center p-4">
-            </div>
-          ) : (
-            <div
-              className="rounded-2xl p-4 transition-all duration-300"
-              style={{ backgroundColor: '#00FF66' }}
-            >
+          <div
+            className="rounded-2xl p-4 transition-all duration-300"
+            style={{ backgroundColor: '#00FF66' }}
+          >
               {/* Header */}
               <div
                 className="flex items-center justify-center text-black cursor-pointer relative"
@@ -760,7 +756,6 @@ export default function MerchantTerminal() {
                 </div>
               </div>
             </div>
-          )}
         </div>
 
 
