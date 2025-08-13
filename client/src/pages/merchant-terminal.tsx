@@ -526,36 +526,44 @@ export default function MerchantTerminal() {
 
               {activeAction === "send" && (
                 <div className="text-center">
-                  <h3 className="text-lg font-semibold mb-4 text-white">Share Payment</h3>
-                  <p className="text-gray-300 mb-4">Copy the payment link to share with customers</p>
+                  <h3 className="text-lg font-semibold mb-3 text-white">Share Payment</h3>
+                  <p className="text-gray-300 mb-4 text-sm">Copy the payment link to share with customers</p>
                   
-                  {/* Stone Selection */}
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-white/90 mb-2">
-                      Select Tapt Stone (Optional)
+                  {/* Stone Selection - More Prominent */}
+                  <div className="mb-4 text-left">
+                    <label className="block text-sm font-medium text-white mb-2">
+                      Select Tapt Stone Link
                     </label>
                     <Select
                       value={selectedStoneId?.toString() || ""}
                       onValueChange={(value) => setSelectedStoneId(value ? parseInt(value) : null)}
                     >
-                      <SelectTrigger className="w-full bg-gray-700 border-gray-600 text-white">
-                        <SelectValue placeholder="General Payment Link" />
+                      <SelectTrigger className="w-full bg-gray-700 border-gray-600 text-white hover:bg-gray-600">
+                        <SelectValue placeholder="Choose which stone link to share" />
                       </SelectTrigger>
-                      <SelectContent className="bg-gray-700 border-gray-600">
-                        <SelectItem value="" className="text-white hover:bg-gray-600">
-                          General Payment Link
+                      <SelectContent className="bg-gray-800 border-gray-600">
+                        <SelectItem value="" className="text-white hover:bg-gray-700">
+                          🔗 General Payment Link
                         </SelectItem>
                         {taptStones.map((stone: any) => (
                           <SelectItem 
                             key={stone.id} 
                             value={stone.id.toString()}
-                            className="text-white hover:bg-gray-600"
+                            className="text-white hover:bg-gray-700"
                           >
-                            Stone {stone.stoneNumber} - {stone.name}
+                            🪨 Stone {stone.stoneNumber} - {stone.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                    
+                    {/* Show selected stone info */}
+                    <div className="mt-2 text-xs text-gray-400">
+                      {selectedStoneId 
+                        ? `Sharing link for Stone ${taptStones.find(s => s.id === selectedStoneId)?.stoneNumber}`
+                        : "Sharing general payment link"
+                      }
+                    </div>
                   </div>
 
                   <Button
@@ -571,15 +579,15 @@ export default function MerchantTerminal() {
                         setTimeout(() => setCopiedLink(false), 2000);
                         toast({
                           title: "Link Copied",
-                          description: `Payment link copied to clipboard${selectedStoneId ? ` for Stone ${taptStones.find(s => s.id === selectedStoneId)?.stoneNumber}` : ''}`,
+                          description: `Payment link copied${selectedStoneId ? ` for Stone ${taptStones.find(s => s.id === selectedStoneId)?.stoneNumber}` : ''}`,
                         });
                       }
                       setActiveAction(null);
                     }}
-                    className="w-full text-black font-semibold rounded-lg"
+                    className="w-full text-black font-semibold rounded-lg py-3"
                     style={{ backgroundColor: '#00FF66' }}
                   >
-                    {copiedLink ? "Copied!" : "Copy Payment Link"}
+                    {copiedLink ? "✓ Copied!" : "Copy Payment Link"}
                   </Button>
                 </div>
               )}
