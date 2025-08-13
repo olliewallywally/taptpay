@@ -220,6 +220,13 @@ export default function Dashboard() {
           </button>
         </div>
 
+        {/* Tapt Pay Branding */}
+        <div className="fixed top-4 left-4 z-30">
+          <div className="text-white text-xl font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>
+            tapt pay
+          </div>
+        </div>
+
         <div className="container mx-auto px-4 pt-24 sm:pt-28 pb-8">
           {/* Analytics Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
