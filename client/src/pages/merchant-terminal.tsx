@@ -536,14 +536,14 @@ export default function MerchantTerminal() {
                 </div>
               )}
 
-              {(activeAction === "send" || activeAction === "share") && (
-                <div className="bg-red-500 p-4 rounded-lg">
+              {activeAction === "send" && (
+                <div className="bg-red-500 p-4 rounded-lg border-4 border-white">
                   <div className="text-white text-center space-y-4">
-                    <h3 className="text-lg font-semibold">Share Payment Link</h3>
-                    <p className="text-sm">Choose which tapt stone link to share</p>
+                    <h3 className="text-lg font-semibold">🚨 CACHE TEST 🚨</h3>
+                    <p className="text-sm">This is the NEW INTERFACE - timestamp: {Date.now()}</p>
                     
-                    <div className="bg-yellow-500 p-2 rounded text-black text-xs">
-                      DEBUG: Action={activeAction}, Stones={taptStones?.length || 0}
+                    <div className="bg-yellow-500 p-2 rounded text-black text-xs font-bold">
+                      🔥 FORCED UPDATE: Action={activeAction}, Stones={taptStones?.length || 0} 🔥
                     </div>
                     
                     <div className="space-y-3">
