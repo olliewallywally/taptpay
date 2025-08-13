@@ -1273,6 +1273,17 @@ export default function MerchantTerminalMobile() {
             </button>
             
             <button
+              onClick={() => setActiveAction(activeAction === "edit" ? null : "edit")}
+              className="w-full p-4 text-left border-b border-gray-700 hover:bg-gray-700 transition-colors duration-200 flex items-center justify-between"
+            >
+              <div className="flex items-center space-x-3">
+                <Edit className="w-5 h-5 text-white" />
+                <span className="text-white font-medium">Create Transaction</span>
+              </div>
+              <span className="text-gray-400 text-sm">→</span>
+            </button>
+            
+            <button
               onClick={() => setActiveAction(activeAction === "split" ? null : "split")}
               className="w-full p-4 text-left border-b border-gray-700 hover:bg-gray-700 transition-colors duration-200 flex items-center justify-between"
             >
@@ -1373,6 +1384,25 @@ export default function MerchantTerminalMobile() {
                       </Button>
                     </div>
                   )}
+                </div>
+              )}
+
+              {activeAction === "edit" && (
+                <div className="p-6 text-center">
+                  <h3 className="text-lg font-semibold mb-4 text-white">Create Transaction</h3>
+                  <p className="text-gray-300 text-sm mb-4">Enter transaction details</p>
+                  <div className="space-y-3">
+                    <Button
+                      onClick={() => {
+                        setActiveAction(null);
+                        setShowTransactionForm(true);
+                      }}
+                      className="w-full text-black font-semibold rounded-lg"
+                      style={{ backgroundColor: '#00FF66' }}
+                    >
+                      Create New Transaction
+                    </Button>
+                  </div>
                 </div>
               )}
 
