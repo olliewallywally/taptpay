@@ -637,9 +637,6 @@ export default function MerchantTerminal() {
         <div>
           {currentTransaction || activeTransaction ? (
             <div className="text-center p-4">
-              <p className="text-gray-400 text-sm mb-4">
-                Transaction active - QR display disabled on desktop
-              </p>
             </div>
           ) : (
             <div
