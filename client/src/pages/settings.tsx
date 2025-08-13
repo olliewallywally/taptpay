@@ -63,28 +63,30 @@ export default function Settings() {
     retry: false,
   });
 
+  const merchantId = (user as any)?.merchantId;
+
   // Get current merchant data using the authenticated user's merchant ID
   const { data: merchant, isLoading: merchantLoading } = useQuery({
-    queryKey: ["/api/merchants", user?.merchantId],
+    queryKey: ["/api/merchants", merchantId],
     queryFn: async () => {
-      if (!user?.merchantId) throw new Error("No merchant ID available");
-      const response = await fetch(`/api/merchants/${user.merchantId}`);
+      if (!merchantId) throw new Error("No merchant ID available");
+      const response = await fetch(`/api/merchants/${merchantId}`);
       if (!response.ok) throw new Error("Failed to fetch merchant");
       return response.json();
     },
-    enabled: !!user?.merchantId,
+    enabled: !!merchantId,
   });
 
   // Get tapt stones for this merchant
   const { data: taptStones = [], isLoading: stonesLoading } = useQuery({
-    queryKey: ["/api/merchants", user?.merchantId, "tapt-stones"],
+    queryKey: ["/api/merchants", merchantId, "tapt-stones"],
     queryFn: async () => {
-      if (!user?.merchantId) throw new Error("No merchant ID available");
-      const response = await fetch(`/api/merchants/${user.merchantId}/tapt-stones`);
+      if (!merchantId) throw new Error("No merchant ID available");
+      const response = await fetch(`/api/merchants/${merchantId}/tapt-stones`);
       if (!response.ok) throw new Error("Failed to fetch tapt stones");
       return response.json();
     },
-    enabled: !!user?.merchantId,
+    enabled: !!merchantId,
   });
 
   // Get Windcave API status
@@ -142,11 +144,11 @@ export default function Settings() {
   // Mutations for updating merchant data
   const updateDetailsMutation = useMutation({
     mutationFn: async (data: MerchantDetailsFormData) => {
-      if (!user?.merchantId) throw new Error("No merchant ID available");
-      return apiRequest("PUT", `/api/merchants/${user.merchantId}/details`, data);
+      if (!merchantId) throw new Error("No merchant ID available");
+      return apiRequest("PUT", `/api/merchants/${merchantId}/details`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", user?.merchantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId] });
       setEditingDetails(false);
       toast({
         title: "Business Details Updated",
@@ -164,11 +166,11 @@ export default function Settings() {
 
   const updateBankAccountMutation = useMutation({
     mutationFn: async (data: BankAccountFormData) => {
-      if (!user?.merchantId) throw new Error("No merchant ID available");
-      return apiRequest("PUT", `/api/merchants/${user.merchantId}/bank-account`, data);
+      if (!merchantId) throw new Error("No merchant ID available");
+      return apiRequest("PUT", `/api/merchants/${merchantId}/bank-account`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", user?.merchantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId] });
       setEditingBankAccount(false);
       toast({
         title: "Bank Account Updated",
@@ -187,12 +189,12 @@ export default function Settings() {
   // Create tapt stone mutation
   const createTaptStoneMutation = useMutation({
     mutationFn: async () => {
-      if (!user?.merchantId) throw new Error("No merchant ID available");
-      const response = await apiRequest("POST", `/api/merchants/${user.merchantId}/tapt-stones`, {});
+      if (!merchantId) throw new Error("No merchant ID available");
+      const response = await apiRequest("POST", `/api/merchants/${merchantId}/tapt-stones`, {});
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", user?.merchantId, "tapt-stones"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "tapt-stones"] });
       toast({
         title: "Success",
         description: "New tapt stone created successfully!",
@@ -210,12 +212,12 @@ export default function Settings() {
   // Delete tapt stone mutation
   const deleteTaptStoneMutation = useMutation({
     mutationFn: async (stoneId: number) => {
-      if (!user?.merchantId) throw new Error("No merchant ID available");
-      const response = await apiRequest("DELETE", `/api/merchants/${user.merchantId}/tapt-stones/${stoneId}`, {});
+      if (!merchantId) throw new Error("No merchant ID available");
+      const response = await apiRequest("DELETE", `/api/merchants/${merchantId}/tapt-stones/${stoneId}`, {});
       return response;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", user?.merchantId, "tapt-stones"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "tapt-stones"] });
       toast({
         title: "Success",
         description: "Tapt stone deleted successfully!",
@@ -233,7 +235,7 @@ export default function Settings() {
   // Download QR code function
   const downloadQRCode = async (stoneId: number, stoneNumber: number) => {
     try {
-      const downloadUrl = `/api/merchants/${user?.merchantId}/stone/${stoneId}/qr?size=800&download=true`;
+      const downloadUrl = `/api/merchants/${merchantId}/stone/${stoneId}/qr?size=800&download=true`;
       const response = await fetch(downloadUrl);
       if (!response.ok) throw new Error('Failed to fetch QR code');
       
@@ -273,7 +275,7 @@ export default function Settings() {
 
   return (
     <div className="min-h-screen relative overflow-hidden">
-      {isMobile && <MobileHeader title="Settings" />}
+      {isMobile && <MobileHeader title="Settings">Settings</MobileHeader>}
       {/* Dark Moving Gradients Background */}
       <div className="fixed inset-0 bg-gradient-to-br from-black via-gray-900 to-gray-800">
         <div className="absolute inset-0 bg-gradient-to-tr from-gray-900/60 via-black/40 to-gray-700/30 animate-gradient-xy"></div>
