@@ -36,7 +36,7 @@ import {
   MapPin
 } from "lucide-react";
 import { z } from "zod";
-import { MobileHeader } from "@/components/mobile-header";
+
 
 
 type MerchantDetailsFormData = z.infer<typeof updateMerchantDetailsSchema>;
