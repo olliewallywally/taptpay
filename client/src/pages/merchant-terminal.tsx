@@ -640,51 +640,65 @@ export default function MerchantTerminal() {
             <div className="bg-white rounded-2xl p-8">
               <div className="text-center">
                 {activeTab === "qr" && (
-                  <>
-                    {/* Stone Selection for QR generation */}
-                    <div className="mb-6">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Select Tapt Stone for QR Code
-                      </label>
-                      <Select
-                        value={selectedStoneId?.toString() || ""}
-                        onValueChange={(value) => setSelectedStoneId(value ? parseInt(value) : null)}
-                      >
-                        <SelectTrigger className="w-full max-w-xs mx-auto">
-                          <SelectValue placeholder="Choose a stone" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="">
-                            General QR Code
-                          </SelectItem>
-                          {taptStones.map((stone: any) => (
-                            <SelectItem 
-                              key={stone.id} 
-                              value={stone.id.toString()}
-                            >
-                              Stone {stone.stoneNumber} - {stone.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <div className="space-y-4">
+                    {/* Individual Stone Buttons */}
+                    {taptStones && taptStones.length > 0 ? (
+                      taptStones.map((stone: any) => (
+                        <div key={stone.id} className="space-y-3">
+                          {/* Stone Button */}
+                          <button
+                            onClick={() => {
+                              setSelectedStoneId(selectedStoneId === stone.id ? null : stone.id);
+                            }}
+                            className="w-full p-4 rounded-2xl text-black font-semibold shadow-lg transition-all duration-300 hover:scale-[1.02]"
+                            style={{ 
+                              backgroundColor: '#00FF66',
+                              boxShadow: '0 8px 25px rgba(0, 255, 102, 0.3)'
+                            }}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span>Stone #{stone.stoneNumber}</span>
+                              <ChevronDown 
+                                className={`h-5 w-5 transition-transform duration-300 ${selectedStoneId === stone.id ? 'rotate-180' : ''}`} 
+                              />
+                            </div>
+                          </button>
 
-                    {/* Show QR code if stone is selected */}
-                    {selectedStoneId ? (
-                      <QRCodeDisplay 
-                        merchantId={merchantId}
-                        stoneId={selectedStoneId}
-                      />
+                          {/* Stone QR Code Dropdown */}
+                          {selectedStoneId === stone.id && (
+                            <div 
+                              className="backdrop-blur-xl border rounded-2xl p-6 shadow-2xl transition-all duration-500 ease-out transform"
+                              style={{
+                                background: 'linear-gradient(135deg, rgba(0, 255, 102, 0.05) 0%, rgba(0, 255, 102, 0.02) 100%)',
+                                borderColor: 'rgba(0, 255, 102, 0.2)',
+                                boxShadow: '0 15px 35px rgba(0, 255, 102, 0.1)',
+                                animation: 'fadeIn 0.5s ease-out'
+                              }}
+                            >
+                              <div className="text-center">
+                                <div className="w-48 h-48 mx-auto mb-4 bg-white rounded-xl p-4">
+                                  <QRCodeDisplay 
+                                    merchantId={merchantId} 
+                                    stoneId={stone.id}
+                                  />
+                                </div>
+                                <p className="text-gray-600 text-sm font-medium mb-4">
+                                  Scan to pay with {stone.name}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))
                     ) : (
-                      <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4 mx-auto">
-                        <QrCode size={64} className="text-gray-400" />
+                      <div className="text-center">
+                        <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4 mx-auto">
+                          <QrCode size={64} className="text-gray-400" />
+                        </div>
+                        <p className="text-gray-600 text-sm">No tapt stones available</p>
                       </div>
                     )}
-                    
-                    <p className="text-gray-600 text-sm">
-                      {selectedStoneId ? `QR Code for Stone ${taptStones.find((s: any) => s.id === selectedStoneId)?.stoneNumber}` : "Select a stone to generate QR code"}
-                    </p>
-                  </>
+                  </div>
                 )}
                 
                 {activeTab === "nfc" && (
