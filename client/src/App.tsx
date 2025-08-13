@@ -9,7 +9,7 @@ import MerchantTerminalMobile from "@/pages/merchant-terminal-mobile";
 import CustomerPayment from "@/pages/customer-payment";
 import Receipt from "@/pages/receipt";
 import Dashboard from "@/pages/dashboard";
-import Settings from "@/pages/settings";
+import Settings from "@/pages/settings-simple";
 import Transactions from "@/pages/transactions";
 import NFCPayment from "@/pages/nfc-payment";
 
