@@ -1255,6 +1255,289 @@ export default function MerchantTerminalMobile() {
             </Form>
           )}
         </div>
+        {/* Action Buttons - Connected Dark Grey Box */}
+        <div className="px-6 mb-6">
+          <div className="bg-gray-800 rounded-3xl p-4">
+            <div className="flex justify-center gap-4">
+              <button
+                onClick={() => handleActionClick("send")}
+                className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
+                  activeAction === "send"
+                    ? 'text-black'
+                    : 'text-gray-300 hover:bg-gray-700'
+                }`}
+                style={{
+                  backgroundColor: activeAction === "send" ? '#00FF66' : undefined
+                }}
+              >
+                <Send size={24} />
+                <span className="text-xs mt-1 font-medium">Send</span>
+              </button>
+              
+              <button
+                onClick={() => handleActionClick("edit")}
+                className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
+                  activeAction === "edit"
+                    ? 'text-black'
+                    : 'text-gray-300 hover:bg-gray-700'
+                }`}
+                style={{
+                  backgroundColor: activeAction === "edit" ? '#00FF66' : undefined
+                }}
+              >
+                <Edit size={24} />
+                <span className="text-xs mt-1 font-medium">Edit</span>
+              </button>
+              
+              <button
+                onClick={() => handleActionClick("split")}
+                className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
+                  activeAction === "split"
+                    ? 'text-black'
+                    : 'text-gray-300 hover:bg-gray-700'
+                }`}
+                style={{
+                  backgroundColor: activeAction === "split" ? '#00FF66' : undefined
+                }}
+              >
+                <Split size={24} />
+                <span className="text-xs mt-1 font-medium">Split</span>
+              </button>
+              
+              <button
+                onClick={() => handleActionClick("more")}
+                className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
+                  activeAction === "more"
+                    ? 'text-black'
+                    : 'text-gray-300 hover:bg-gray-700'
+                }`}
+                style={{
+                  backgroundColor: activeAction === "more" ? '#00FF66' : undefined
+                }}
+              >
+                <MoreHorizontal size={24} />
+                <span className="text-xs mt-1 font-medium">More</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Panel - Light Grey Dropdown */}
+        <div className="px-6">
+          <div 
+            className="overflow-hidden transition-all duration-250 ease-in-out"
+            style={{
+              maxHeight: activeAction ? '400px' : '0px',
+            }}
+          >
+            <div className="bg-gray-600 rounded-3xl p-6 mb-6">
+              {activeAction === "edit" && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold mb-4 text-white">Create Transaction</h3>
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                      <FormField
+                        control={form.control}
+                        name="itemName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium text-gray-300">Item Name</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="Enter item name"
+                                {...field}
+                                className="bg-gray-700 border-gray-600 text-white rounded-lg"
+                              />
+                            </FormControl>
+                            <FormMessage className="text-red-300 text-xs" />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="price"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium text-gray-300">Price ($)</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="Enter price"
+                                {...field}
+                                className="bg-gray-700 border-gray-600 text-white rounded-lg"
+                              />
+                            </FormControl>
+                            <FormMessage className="text-red-300 text-xs" />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="selectedStoneId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium text-gray-300">Tapt Stone (Optional)</FormLabel>
+                            <Select onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)} value={field.value?.toString() || ""}>
+                              <FormControl>
+                                <SelectTrigger className="bg-gray-700 border-gray-600 text-white rounded-lg">
+                                  <SelectValue placeholder="Select tapt stone for payment" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent className="bg-gray-700 border-gray-600">
+                                <SelectItem value="none">No specific stone</SelectItem>
+                                {taptStones.map((stone: any) => (
+                                  <SelectItem key={stone.id} value={stone.id.toString()}>
+                                    {stone.name} (Stone {stone.stoneNumber})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage className="text-red-300 text-xs" />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <Button
+                        type="submit"
+                        disabled={createTransactionMutation.isPending}
+                        className="w-full text-black font-semibold rounded-lg"
+                        style={{ backgroundColor: '#00FF66' }}
+                      >
+                        {createTransactionMutation.isPending ? "Creating..." : "Create Transaction"}
+                      </Button>
+                    </form>
+                  </Form>
+                </div>
+              )}
+
+              {activeAction === "split" && (
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold mb-4 text-white">Split the Bill</h3>
+                  <p className="text-gray-300 mb-4">How many ways would you like to split this payment?</p>
+                  <div className="flex justify-center gap-3 mb-4">
+                    {[2, 3, 4, 5].map((num) => (
+                      <button
+                        key={num}
+                        onClick={() => {
+                          toast({
+                            title: "Bill Split",
+                            description: `Transaction will be split ${num} ways`,
+                          });
+                          setActiveAction(null);
+                        }}
+                        className="w-12 h-12 rounded-full font-semibold transition-colors text-black"
+                        style={{ backgroundColor: '#00FF66' }}
+                      >
+                        {num}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {activeAction === "send" && (
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold mb-4 text-white">
+                    {activeTab === "NFC" ? "NFC Payment" : "Share Payment"}
+                  </h3>
+                  
+                  {activeTab === "NFC" ? (
+                    // NFC Payment Options
+                    <div className="space-y-4">
+                      <p className="text-gray-300 text-sm mb-4">Start contactless payment for current transaction</p>
+                      {currentTransaction || activeTransaction ? (
+                        <div className="space-y-3">
+                          <div className="bg-gray-700 rounded-lg p-3 mb-4">
+                            <p className="text-white text-sm font-medium">
+                              {(currentTransaction || activeTransaction).itemName}
+                            </p>
+                            <p className="text-gray-300 text-lg font-bold">
+                              ${(currentTransaction || activeTransaction).price}
+                            </p>
+                          </div>
+                          <Button
+                            onClick={() => {
+                              createNFCPayment();
+                              setActiveAction(null);
+                            }}
+                            disabled={nfcPaymentStatus === "creating"}
+                            className="w-full text-black font-semibold rounded-lg"
+                            style={{ backgroundColor: '#00FF66' }}
+                          >
+                            {nfcPaymentStatus === "creating" ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
+                                Starting NFC...
+                              </>
+                            ) : (
+                              "Start NFC Payment"
+                            )}
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="text-gray-400 text-sm">
+                          Create a transaction first to enable NFC payment
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    // QR Payment Link Sharing
+                    <div>
+                      <p className="text-gray-300 text-sm mb-4">Copy the payment link to share with customers</p>
+                      <Button
+                        onClick={() => {
+                          if (merchant) {
+                            navigator.clipboard.writeText(merchant.paymentUrl);
+                            setCopiedLink(true);
+                            setTimeout(() => setCopiedLink(false), 2000);
+                            toast({
+                              title: "Link Copied",
+                              description: "Payment link copied to clipboard",
+                            });
+                          }
+                          setActiveAction(null);
+                        }}
+                        className="w-full text-black font-semibold rounded-lg"
+                        style={{ backgroundColor: '#00FF66' }}
+                      >
+                        {copiedLink ? "Copied!" : "Copy Payment Link"}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeAction === "more" && (
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold mb-4 text-white">More Options</h3>
+                  <div className="space-y-3">
+                    <Button
+                      variant="outline"
+                      className="w-full border-gray-500 text-gray-200 hover:bg-gray-500"
+                      onClick={() => window.location.href = '/dashboard'}
+                    >
+                      View Dashboard
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full border-gray-500 text-gray-200 hover:bg-gray-500"
+                      onClick={() => window.location.href = '/transactions'}
+                    >
+                      Transaction History
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full border-gray-500 text-gray-200 hover:bg-gray-500"
+                      onClick={() => window.location.href = '/settings'}
+                    >
+                      Settings
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
 
 
 
