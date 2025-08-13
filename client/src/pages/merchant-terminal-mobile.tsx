@@ -816,12 +816,6 @@ export default function MerchantTerminalMobile() {
         <div className="px-6">
           {activeTab === "QR" ? (
             <div className="space-y-4">
-              {/* Debug info */}
-              {console.log('Debug - currentTransaction:', currentTransaction)}
-              {console.log('Debug - activeTransaction:', activeTransaction)}
-              {console.log('Debug - taptStones:', taptStones)}
-              {console.log('Debug - has transaction:', !!(currentTransaction || activeTransaction))}
-              
               {/* Tapt Stone Buttons - Show available stones when transaction exists */}
               {(currentTransaction || activeTransaction) && taptStones.map((stone: any) => (
                 <div key={stone.id}>
