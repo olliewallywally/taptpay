@@ -245,23 +245,32 @@ export default function Transactions() {
         }`}
       >
         {/* Menu Icon */}
-        <div className="fixed top-4 right-4 z-30">
+        <div className={`fixed ${isMobile ? 'top-3 right-3' : 'top-4 right-4'} z-30`}>
           <button
             onClick={() => setMenuOpen(true)}
-            className="p-3 backdrop-blur-xl bg-black/40 border border-white/20 rounded-xl text-white hover:bg-black/60 transition-colors"
+            className={`${isMobile ? 'p-4' : 'p-3'} backdrop-blur-xl bg-black/40 border border-white/20 ${isMobile ? 'rounded-2xl' : 'rounded-xl'} text-white hover:bg-black/60 transition-colors`}
           >
-            <Menu className="h-6 w-6" />
+            <Menu className={`${isMobile ? 'h-7 w-7' : 'h-6 w-6'}`} />
           </button>
         </div>
 
-        <div className={`container mx-auto px-4 ${isMobile ? 'pt-20' : 'pt-28'} pb-8`}>
+        {/* Tapt Pay Branding - Mobile */}
+        {isMobile && (
+          <div className="fixed top-3 left-3 z-30">
+            <div className="text-white text-lg font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>
+              tapt pay
+            </div>
+          </div>
+        )}
+
+        <div className={`container mx-auto ${isMobile ? 'px-3' : 'px-4'} ${isMobile ? 'pt-16' : 'pt-28'} ${isMobile ? 'pb-4' : 'pb-8'}`}>
           {/* Header */}
-          <div className={`flex ${isMobile ? 'flex-col' : 'flex-row'} justify-between items-start ${isMobile ? '' : 'sm:items-center'} mb-6 gap-4`}>
-            <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-bold text-white`}>Transactions</h1>
+          <div className={`flex ${isMobile ? 'flex-col' : 'flex-row'} justify-between items-start ${isMobile ? '' : 'sm:items-center'} ${isMobile ? 'mb-4' : 'mb-6'} ${isMobile ? 'gap-3' : 'gap-4'}`}>
+            <h1 className={`${isMobile ? 'text-xl' : 'text-3xl'} font-bold text-white`}>Transactions</h1>
             {transactions && transactions.length > 0 && (
               <button
                 onClick={exportToCSV}
-                className={`flex items-center gap-2 px-4 py-2 backdrop-blur-xl bg-black/40 border border-white/20 rounded-xl text-white hover:bg-black/60 transition-colors ${isMobile ? 'w-full justify-center' : ''}`}
+                className={`flex items-center gap-2 ${isMobile ? 'px-4 py-3 text-sm' : 'px-4 py-2'} backdrop-blur-xl bg-black/40 border border-white/20 rounded-xl text-white hover:bg-black/60 transition-colors ${isMobile ? 'w-full justify-center' : ''}`}
               >
                 <Download className="h-4 w-4" />
                 Export CSV
@@ -270,62 +279,63 @@ export default function Transactions() {
           </div>
 
           {/* Search */}
-          <div className="mb-6">
+          <div className={`${isMobile ? 'mb-4' : 'mb-6'}`}>
             <input
               type="text"
               placeholder="Search transactions..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className={`w-full px-4 ${isMobile ? 'py-4 text-base' : 'py-3'} backdrop-blur-xl bg-black/40 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:border-[#00FF66]/50 transition-colors`}
+              className={`w-full ${isMobile ? 'px-4 py-4 text-base rounded-2xl' : 'px-4 py-3 rounded-xl'} backdrop-blur-xl bg-black/40 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-[#00FF66]/50 transition-colors`}
             />
           </div>
 
           {/* Content */}
           {isLoading ? (
-            <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00FF66]"></div>
+            <div className={`flex flex-col items-center justify-center ${isMobile ? 'py-16' : 'py-12'}`}>
+              <div className={`animate-spin rounded-full ${isMobile ? 'h-10 w-10' : 'h-8 w-8'} border-b-2 border-[#00FF66] mb-4`}></div>
+              <p className={`text-white/70 ${isMobile ? 'text-sm' : 'text-base'}`}>Loading transactions...</p>
             </div>
           ) : !transactions || transactions.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="dashboard-card-glass rounded-3xl p-12 mx-auto max-w-md">
-                <CreditCard className="mx-auto h-12 w-12 text-white/40 mb-4" />
-                <h3 className="text-xl font-medium text-white mb-2">No transactions yet</h3>
-                <p className="text-white/70">
+            <div className={`text-center ${isMobile ? 'py-8' : 'py-12'}`}>
+              <div className={`dashboard-card-glass ${isMobile ? 'rounded-2xl p-8' : 'rounded-3xl p-12'} mx-auto max-w-md`}>
+                <CreditCard className={`mx-auto ${isMobile ? 'h-10 w-10' : 'h-12 w-12'} text-white/40 mb-4`} />
+                <h3 className={`${isMobile ? 'text-lg' : 'text-xl'} font-medium text-white mb-2`}>No transactions yet</h3>
+                <p className={`text-white/70 ${isMobile ? 'text-sm' : ''}`}>
                   Transactions will appear here once you start processing payments
                 </p>
               </div>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className={`${isMobile ? 'space-y-3' : 'space-y-4'}`}>
               {filteredTransactions.map((transaction: any) => (
                 <div 
                   key={transaction.id} 
-                  className={`dashboard-card-glass rounded-3xl ${isMobile ? 'p-4' : 'p-6'} hover:bg-white/10 transition-all duration-200`}
+                  className={`dashboard-card-glass ${isMobile ? 'rounded-2xl p-4' : 'rounded-3xl p-6'} hover:bg-white/10 transition-all duration-200 ${isMobile ? 'hover:scale-[1.02]' : ''}`}
                 >
                   <div className={`flex ${isMobile ? 'flex-col' : 'items-start justify-between'}`}>
                     <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
+                      <div className={`flex items-center ${isMobile ? 'gap-2 mb-3' : 'gap-3 mb-2'}`}>
                         {getStatusIcon(transaction.status)}
-                        <h3 className={`${isMobile ? 'text-base' : 'text-lg'} font-medium text-white`}>
+                        <h3 className={`${isMobile ? 'text-lg font-semibold' : 'text-lg font-medium'} text-white`}>
                           {transaction.itemName}
                         </h3>
                       </div>
                       
-                      <p className={`text-white/70 ${isMobile ? 'text-xs' : 'text-sm'} mb-3`}>
+                      <p className={`text-white/70 ${isMobile ? 'text-sm mb-4' : 'text-sm mb-3'}`}>
                         {transaction.createdAt 
                           ? format(new Date(transaction.createdAt), "MMM dd, yyyy 'at' HH:mm")
                           : "Date not available"
                         }
                       </p>
                       
-                      <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center gap-4'} text-sm`}>
-                        <span className="text-white/50">
+                      <div className={`flex ${isMobile ? 'flex-col gap-3' : 'items-center gap-4'} ${isMobile ? 'text-sm' : 'text-sm'}`}>
+                        <span className={`text-white/50 ${isMobile ? 'text-xs' : ''}`}>
                           ID: {transaction.windcaveTransactionId || `TXN-${transaction.id}`}
                         </span>
                         
-                        <div className="flex items-center gap-1">
+                        <div className={`flex items-center ${isMobile ? 'gap-2' : 'gap-1'}`}>
                           {getPaymentIcon(transaction.paymentMethod)}
-                          <span className="text-white/50">
+                          <span className={`text-white/50 ${isMobile ? 'text-xs' : ''}`}>
                             {transaction.paymentMethod === 'nfc_tap' ? 'NFC Tap' :
                              transaction.paymentMethod === 'qr_code' ? 'QR Code' :
                              transaction.paymentMethod === 'card_reader' ? 'Card Reader' :
@@ -345,15 +355,15 @@ export default function Transactions() {
                       </div>
                     </div>
                     
-                    <div className={`${isMobile ? 'mt-4 flex justify-between items-center' : 'text-right'}`}>
-                      <div className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold text-white`}>
+                    <div className={`${isMobile ? 'mt-5 flex justify-between items-center' : 'text-right'}`}>
+                      <div className={`${isMobile ? 'text-2xl' : 'text-2xl'} font-bold text-white`}>
                         ${parseFloat(transaction.price).toFixed(2)}
                       </div>
                       
                       {transaction.status === 'completed' && (
                         <button
                           onClick={() => handleRefund(transaction)}
-                          className={`flex items-center gap-2 px-3 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 rounded-lg transition-colors ${isMobile ? 'text-sm' : ''}`}
+                          className={`flex items-center gap-2 ${isMobile ? 'px-4 py-3 text-sm rounded-xl' : 'px-3 py-2 rounded-lg'} bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 transition-colors`}
                         >
                           <RotateCcw className="h-4 w-4" />
                           {isMobile ? 'Refund' : 'Process Refund'}
@@ -371,8 +381,8 @@ export default function Transactions() {
       {/* Refund Modal */}
       {refundModal && (
         <div className="fixed inset-0 bg-black/80 z-60 flex items-center justify-center p-4">
-          <div className={`dashboard-card-glass rounded-3xl ${isMobile ? 'w-full max-w-sm' : 'w-full max-w-md'} max-h-[90vh] overflow-y-auto`}>
-            <div className={`${isMobile ? 'p-4' : 'p-6'}`}>
+          <div className={`dashboard-card-glass ${isMobile ? 'rounded-2xl w-full max-w-sm' : 'rounded-3xl w-full max-w-md'} max-h-[90vh] overflow-y-auto`}>
+            <div className={`${isMobile ? 'p-5' : 'p-6'}`}>
               <div className="flex items-center justify-between mb-6">
                 <h3 className={`${isMobile ? 'text-lg' : 'text-xl'} font-bold text-white`}>Process Refund</h3>
                 <button
@@ -418,7 +428,7 @@ export default function Transactions() {
                       max={refundModal.price}
                       min="0.01"
                       step="0.01"
-                      className="w-full pl-10 pr-4 py-3 backdrop-blur-xl bg-black/40 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:border-[#00FF66]/50 transition-colors"
+                      className={`w-full pl-10 pr-4 ${isMobile ? 'py-4 text-base' : 'py-3'} backdrop-blur-xl bg-black/40 border border-white/20 ${isMobile ? 'rounded-2xl' : 'rounded-xl'} text-white placeholder-white/50 focus:outline-none focus:border-[#00FF66]/50 transition-colors`}
                       placeholder="0.00"
                     />
                   </div>
@@ -431,24 +441,24 @@ export default function Transactions() {
                   <textarea
                     value={refundReason}
                     onChange={(e) => setRefundReason(e.target.value)}
-                    rows={3}
-                    className="w-full px-4 py-3 backdrop-blur-xl bg-black/40 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:border-[#00FF66]/50 transition-colors resize-none"
+                    rows={isMobile ? 4 : 3}
+                    className={`w-full px-4 ${isMobile ? 'py-4 text-base' : 'py-3'} backdrop-blur-xl bg-black/40 border border-white/20 ${isMobile ? 'rounded-2xl' : 'rounded-xl'} text-white placeholder-white/50 focus:outline-none focus:border-[#00FF66]/50 transition-colors resize-none`}
                     placeholder="Enter reason for refund..."
                   />
                 </div>
               </div>
 
-              <div className={`flex ${isMobile ? 'flex-col' : 'flex-row'} gap-3`}>
+              <div className={`flex ${isMobile ? 'flex-col gap-4' : 'flex-row gap-3'}`}>
                 <button
                   onClick={() => setRefundModal(null)}
-                  className={`${isMobile ? 'w-full' : 'flex-1'} px-4 py-3 backdrop-blur-xl bg-black/40 border border-white/20 rounded-xl text-white hover:bg-black/60 transition-colors`}
+                  className={`${isMobile ? 'w-full py-4' : 'flex-1 py-3'} px-4 backdrop-blur-xl bg-black/40 border border-white/20 ${isMobile ? 'rounded-2xl' : 'rounded-xl'} text-white hover:bg-black/60 transition-colors`}
                 >
                   Cancel
                 </button>
                 <button
                   onClick={processRefund}
                   disabled={refundMutation.isPending}
-                  className={`${isMobile ? 'w-full' : 'flex-1'} px-4 py-3 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
+                  className={`${isMobile ? 'w-full py-4' : 'flex-1 py-3'} px-4 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 ${isMobile ? 'rounded-2xl' : 'rounded-xl'} transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
                 >
                   {refundMutation.isPending ? (
                     <>
