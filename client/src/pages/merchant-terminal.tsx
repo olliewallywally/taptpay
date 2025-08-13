@@ -543,12 +543,12 @@ export default function MerchantTerminal() {
                       <label className="block text-sm font-medium text-gray-300 text-left">
                         Select Tapt Stone (optional):
                       </label>
-                      <Select value={selectedStoneId?.toString() || ""} onValueChange={(value) => setSelectedStoneId(value ? parseInt(value) : null)}>
+                      <Select value={selectedStoneId?.toString() || "general"} onValueChange={(value) => setSelectedStoneId(value && value !== "general" ? parseInt(value) : null)}>
                         <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
                           <SelectValue placeholder="General Payment Link" />
                         </SelectTrigger>
                         <SelectContent className="bg-gray-700 border-gray-600">
-                          <SelectItem value="">General Payment Link</SelectItem>
+                          <SelectItem value="general">General Payment Link</SelectItem>
                           {taptStones.map((stone: any) => (
                             <SelectItem key={stone.id} value={stone.id.toString()}>
                               Stone {stone.stoneNumber} - {stone.name}
