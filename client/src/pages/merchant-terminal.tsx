@@ -649,32 +649,22 @@ export default function MerchantTerminal() {
                           className="bg-gray-50 border border-gray-200 rounded-2xl p-6 shadow-lg transition-all duration-300"
                         >
                           {/* Stone Header */}
-                          <button
-                            onClick={() => {
-                              setSelectedStoneId(selectedStoneId === stone.id ? null : stone.id);
-                            }}
-                            className="w-full flex items-center justify-between mb-4 text-left hover:text-gray-700 transition-colors"
-                          >
+                          <div className="w-full flex items-center justify-center mb-4">
                             <h3 className="text-lg font-semibold text-gray-800">Stone #{stone.stoneNumber}</h3>
-                            <ChevronDown 
-                              className={`h-5 w-5 text-gray-600 transition-transform duration-300 ${selectedStoneId === stone.id ? 'rotate-180' : ''}`} 
-                            />
-                          </button>
+                          </div>
 
-                          {/* QR Code - Collapsed by default */}
-                          {selectedStoneId === stone.id && (
-                            <div className="text-center transition-all duration-500 ease-out">
-                              <div className="w-48 h-48 mx-auto mb-4 bg-white rounded-xl p-4 border">
-                                <QRCodeDisplay 
-                                  merchantId={merchantId} 
-                                  stoneId={stone.id}
-                                />
-                              </div>
-                              <p className="text-gray-600 text-sm font-medium">
-                                Scan to pay with {stone.name}
-                              </p>
+                          {/* QR Code - Always visible */}
+                          <div className="text-center transition-all duration-300">
+                            <div className="w-48 h-48 mx-auto mb-4 bg-white rounded-xl p-4 border">
+                              <QRCodeDisplay 
+                                merchantId={merchantId} 
+                                stoneId={stone.id}
+                              />
                             </div>
-                          )}
+                            <p className="text-gray-600 text-sm font-medium">
+                              Scan to pay with {stone.name}
+                            </p>
+                          </div>
                         </div>
                       ))
                     ) : (
