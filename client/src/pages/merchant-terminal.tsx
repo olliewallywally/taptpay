@@ -531,41 +531,42 @@ export default function MerchantTerminal() {
               {activeAction === "send" && (
                 <div className="text-center space-y-4">
                   <h3 className="text-lg font-semibold text-white">Share Payment</h3>
-                  <p className="text-gray-300 text-sm">Copy the payment link to share with customers</p>
+                  <p className="text-gray-300 text-sm">Choose which link to share</p>
                   
-                  {/* DEBUG INFO */}
-                  <div className="text-xs text-gray-500">
-                    DEBUG: Stones loaded: {taptStones?.length || 0}, Selected: {selectedStoneId || 'none'}
-                  </div>
-                  
-                  {/* STONE SELECTION DROPDOWN */}
-                  <div className="w-full">
-                    <div className="mb-2">
-                      <label className="block text-sm font-medium text-white">
-                        Which Tapt Stone?
-                      </label>
-                    </div>
+                  {/* SIMPLE BUTTON SELECTION */}
+                  <div className="space-y-2">
+                    <div className="text-sm text-white text-left">Select Stone:</div>
                     
-                    <div className="w-full bg-gray-700 rounded-lg border border-gray-600">
-                      <select 
-                        value={selectedStoneId || ""}
-                        onChange={(e) => setSelectedStoneId(e.target.value ? parseInt(e.target.value) : null)}
-                        className="w-full bg-gray-700 text-white p-3 rounded-lg border-0 focus:ring-2 focus:ring-green-500"
+                    {/* General Link Button */}
+                    <button
+                      onClick={() => setSelectedStoneId(null)}
+                      className={`w-full p-3 rounded-lg text-left transition-all ${
+                        selectedStoneId === null 
+                          ? 'bg-green-600 text-black font-semibold' 
+                          : 'bg-gray-700 text-white hover:bg-gray-600'
+                      }`}
+                    >
+                      🔗 General Payment Link
+                    </button>
+                    
+                    {/* Stone Buttons */}
+                    {taptStones?.map((stone: any) => (
+                      <button
+                        key={stone.id}
+                        onClick={() => setSelectedStoneId(stone.id)}
+                        className={`w-full p-3 rounded-lg text-left transition-all ${
+                          selectedStoneId === stone.id 
+                            ? 'bg-green-600 text-black font-semibold' 
+                            : 'bg-gray-700 text-white hover:bg-gray-600'
+                        }`}
                       >
-                        <option value="">General Payment Link</option>
-                        {taptStones.map((stone: any) => (
-                          <option key={stone.id} value={stone.id}>
-                            Stone {stone.stoneNumber} - {stone.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                        🪨 Stone {stone.stoneNumber} - {stone.name}
+                      </button>
+                    ))}
                     
-                    <div className="mt-2 text-xs text-gray-400">
-                      {selectedStoneId 
-                        ? `Will share Stone ${taptStones.find((s: any) => s.id === selectedStoneId)?.stoneNumber} link`
-                        : "Will share general payment link"
-                      }
+                    {/* Debug Info */}
+                    <div className="text-xs text-gray-400 text-left">
+                      Stones available: {taptStones?.length || 0} | Selected: {selectedStoneId || 'general'}
                     </div>
                   </div>
 
@@ -582,7 +583,7 @@ export default function MerchantTerminal() {
                         setTimeout(() => setCopiedLink(false), 2000);
                         toast({
                           title: "Link Copied",
-                          description: `Payment link copied${selectedStoneId ? ` for Stone ${taptStones.find((s: any) => s.id === selectedStoneId)?.stoneNumber}` : ''}`,
+                          description: `${selectedStoneId ? `Stone ${taptStones.find((s: any) => s.id === selectedStoneId)?.stoneNumber} link` : 'General payment link'} copied`,
                         });
                       }
                       setActiveAction(null);
