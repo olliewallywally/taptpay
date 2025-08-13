@@ -117,7 +117,7 @@ export default function MerchantTerminalMobile() {
   });
 
   // Get tapt stones for this merchant
-  const { data: taptStones = [] } = useQuery({
+  const { data: taptStones = [], isLoading: taptStonesLoading } = useQuery({
     queryKey: ["/api/merchants", merchantId, "tapt-stones"],
     queryFn: async () => {
       const response = await fetch(`/api/merchants/${merchantId}/tapt-stones`);
@@ -125,6 +125,11 @@ export default function MerchantTerminalMobile() {
       return response.json();
     },
   });
+
+  // Debug logging
+  useEffect(() => {
+    console.log("Tapt Stones Debug:", { taptStones, taptStonesLoading, activeTab });
+  }, [taptStones, taptStonesLoading, activeTab]);
 
   // Set default selected stone when stones are loaded
   useEffect(() => {
@@ -823,6 +828,18 @@ export default function MerchantTerminalMobile() {
         <div className="px-6">
           {activeTab === "QR" ? (
             <div className="space-y-4">
+              {/* Debug: Show loading state and stone count */}
+              {taptStonesLoading && (
+                <div className="text-white text-center p-4">
+                  Loading stones...
+                </div>
+              )}
+              {!taptStonesLoading && (
+                <div className="text-white text-center p-2 text-xs">
+                  Debug: Found {taptStones.length} stones
+                </div>
+              )}
+              
               {/* Individual Stone Buttons for QR */}
               {taptStones.map((stone: any) => (
                 <div key={stone.id} className="space-y-3">
