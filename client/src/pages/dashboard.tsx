@@ -17,6 +17,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
+import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
 import { format } from "date-fns";
 
 export default function Dashboard() {
@@ -222,9 +223,11 @@ export default function Dashboard() {
 
         {/* Tapt Pay Branding */}
         <div className="fixed top-4 left-4 z-30">
-          <div className="text-white text-xl font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>
-            tapt pay
-          </div>
+          <img 
+            src={taptLogoPath} 
+            alt="TaptPay" 
+            className="h-8 w-auto object-contain"
+          />
         </div>
 
         <div className="container mx-auto px-4 pt-24 sm:pt-28 pb-8">
