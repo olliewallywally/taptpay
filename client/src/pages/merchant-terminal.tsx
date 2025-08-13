@@ -342,7 +342,7 @@ export default function MerchantTerminal() {
         </div>
 
         {/* Content Wrapper - Reduce width by 35% */}
-        <div className="max-w-[65%] mx-auto">
+        <div className="w-full max-w-lg mx-auto px-4">
           {/* Mode Switcher */}
           <div className="flex justify-center mb-8">
             <div className="flex bg-gray-900 rounded-lg p-1 transition-all duration-300 hover:bg-gray-800 hover:scale-105 hover:shadow-lg">
@@ -370,7 +370,7 @@ export default function MerchantTerminal() {
           </div>
 
           {/* Amount Box */}
-          <div className="px-6 mb-6">
+          <div className="mb-6">
           {currentTransaction || activeTransaction ? (
             <div 
               className="rounded-2xl p-6 text-center transition-all duration-300 hover:scale-105 hover:shadow-lg cursor-pointer"
@@ -397,7 +397,7 @@ export default function MerchantTerminal() {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex justify-center gap-4 mb-6 px-6">
+        <div className="flex justify-center gap-4 mb-6">
           <button
             onClick={() => handleActionClick("send")}
             className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 hover:scale-110 hover:shadow-lg ${
@@ -456,7 +456,7 @@ export default function MerchantTerminal() {
         </div>
 
         {/* Action Panel */}
-        <div className="px-6">
+        <div>
           <div 
             className="overflow-hidden transition-all duration-250 ease-in-out"
             style={{
@@ -634,7 +634,7 @@ export default function MerchantTerminal() {
         </div>
 
         {/* QR Code Section */}
-        <div className="px-6">
+        <div>
           {currentTransaction || activeTransaction ? (
             <div className="bg-white rounded-2xl p-8 flex items-center justify-center transition-all duration-300 hover:scale-105 hover:shadow-xl cursor-pointer">
               <div className="text-center">
