@@ -817,88 +817,68 @@ export default function MerchantTerminalMobile() {
 
               {/* Collapsible Content */}
               <div
-                className={`grid transition-all duration-300 overflow-hidden ${
+                className={`transition-all duration-300 overflow-hidden ${
                   qrCollapsed ? 'max-h-0 opacity-0' : 'max-h-[1000px] opacity-100 mt-4'
                 }`}
               >
-                <div className="bg-white rounded-xl p-4">
-                  <div className="space-y-2">
-              {/* Individual Stone QR Code Boxes */}
-              {taptStones && taptStones.length > 0 && taptStones.map((stone: any) => (
-                <div 
-                  key={stone.id}
-                  className="backdrop-blur-xl border rounded-2xl p-6 shadow-2xl transition-all duration-300"
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.95)',
-                    borderColor: 'rgba(255, 255, 255, 0.3)',
-                    boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)'
-                  }}
-                >
-                  {/* Stone Header */}
-                  <div className="w-full flex items-center justify-center mb-4">
-                    <h3 className="text-lg font-semibold text-black">Stone #{stone.stoneNumber}</h3>
-                  </div>
+                <div className="bg-white rounded-xl p-4 space-y-4">
+                  {/* Individual Stone QR Code Boxes */}
+                  {taptStones && taptStones.length > 0 && taptStones.map((stone: any) => (
+                    <div 
+                      key={stone.id}
+                      className="bg-gray-100 rounded-xl p-4 space-y-3"
+                    >
+                      {/* Stone Header */}
+                      <div className="text-center">
+                        <h3 className="text-sm font-semibold text-black">Stone #{stone.stoneNumber}</h3>
+                      </div>
 
-                  {/* QR Code - Always visible */}
-                  <div className="text-center transition-all duration-300">
-                    <div className="w-48 h-48 mx-auto mb-4 bg-white rounded-xl p-4 border">
-                      <QRCodeDisplay 
-                        merchantId={merchantId} 
-                        stoneId={stone.id}
-                      />
+                      {/* QR Code - Always visible */}
+                      <div className="text-center">
+                        <div className="w-32 h-32 mx-auto mb-2 bg-white rounded-lg p-2 border">
+                          <QRCodeDisplay 
+                            merchantId={merchantId} 
+                            stoneId={stone.id}
+                          />
+                        </div>
+                        <p className="text-gray-600 text-xs">
+                          Scan to pay with {stone.name}
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-gray-600 text-xs font-medium">
-                      Scan to pay with {stone.name}
-                    </p>
-                  </div>
-                </div>
-              ))}
-              
+                  ))}
 
+                  {/* Add Tapt Stone Button - Show when transaction exists and less than 10 stones */}
+                  {(currentTransaction || activeTransaction) && taptStones.length < 10 && (
+                    <button
+                      onClick={() => createTaptStoneMutation.mutate()}
+                      disabled={createTaptStoneMutation.isPending}
+                      className="w-full p-3 rounded-xl text-black font-medium transition-all duration-300 hover:scale-[1.02] disabled:opacity-50"
+                      style={{ 
+                        backgroundColor: 'rgba(200, 200, 200, 0.5)',
+                      }}
+                    >
+                      <div className="flex items-center justify-center space-x-2">
+                        {createTaptStoneMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <span className="text-sm">Add Tapt Stone</span>
+                        )}
+                      </div>
+                    </button>
+                  )}
 
-              {/* Add Tapt Stone Button - Show when transaction exists and less than 10 stones */}
-              {(currentTransaction || activeTransaction) && taptStones.length < 10 && (
-                <button
-                  onClick={() => createTaptStoneMutation.mutate()}
-                  disabled={createTaptStoneMutation.isPending}
-                  className="w-full p-4 rounded-2xl text-black font-medium shadow-lg transition-all duration-300 hover:scale-[1.02] disabled:opacity-50"
-                  style={{ 
-                    backgroundColor: 'rgba(200, 200, 200, 0.3)',
-                    boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
-                    fontFamily: 'Outfit, sans-serif'
-                  }}
-                >
-                  <div className="flex items-center justify-center space-x-2">
-                    {createTaptStoneMutation.isPending ? (
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                    ) : (
-                      <span>Add Tapt Stone</span>
-                    )}
-                  </div>
-                </button>
-              )}
-
-              {/* Placeholder when no stones */}
-              {taptStones.length === 0 && (
-                <div 
-                  className="backdrop-blur-xl border rounded-3xl p-8 flex items-center justify-center shadow-2xl transition-all duration-300"
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.95)',
-                    borderColor: 'rgba(255, 255, 255, 0.3)',
-                    boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)'
-                  }}
-                >
-                  <div className="text-center">
-                    <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4">
-                      <Smartphone size={64} className="text-gray-400" />
+                  {/* Placeholder when no stones */}
+                  {taptStones.length === 0 && (
+                    <div className="bg-gray-100 rounded-xl p-6 text-center">
+                      <div className="w-24 h-24 bg-gray-200 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mx-auto mb-3">
+                        <Smartphone size={32} className="text-gray-400" />
+                      </div>
+                      <p className="text-gray-600 text-xs">
+                        Create a stone to enable NFC payments
+                      </p>
                     </div>
-                    <p className="text-gray-600 text-sm">
-                      Create a stone to enable NFC payments
-                    </p>
-                  </div>
-                </div>
-              )}
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
