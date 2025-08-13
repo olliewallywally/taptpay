@@ -636,18 +636,10 @@ export default function MerchantTerminal() {
         {/* QR Code Section */}
         <div>
           {currentTransaction || activeTransaction ? (
-            <div className="bg-white rounded-2xl p-8 flex items-center justify-center transition-all duration-300 hover:scale-105 hover:shadow-xl cursor-pointer">
-              <div className="text-center">
-                <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4 mx-auto">
-                  <QrCode size={64} className="text-gray-400" />
-                </div>
-                <p className="text-gray-600 text-sm">
-                  {activeTab === "qr" ? "QR code removed from desktop" : "Tap your phone to pay"}
-                </p>
-                <div className="mt-4 text-center">
-                  {getPaymentStatusIndicator((currentTransaction || activeTransaction).status)}
-                </div>
-              </div>
+            <div className="text-center p-4">
+              <p className="text-gray-400 text-sm mb-4">
+                Transaction active - QR display disabled on desktop
+              </p>
             </div>
           ) : (
             <div
