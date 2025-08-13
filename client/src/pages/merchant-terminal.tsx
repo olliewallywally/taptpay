@@ -715,7 +715,7 @@ export default function MerchantTerminal() {
                           taptStones.map((stone: any) => (
                             <div 
                               key={stone.id}
-                              className="bg-gray-50 border border-gray-200 rounded-2xl p-6 shadow-lg transition-all duration-300"
+                              className="bg-gray-50 border border-gray-200 rounded-2xl p-6 shadow-lg transition-all duration-300 mb-6"
                             >
                               {/* Stone Header */}
                               <div className="w-full flex items-center justify-center mb-4">
@@ -728,12 +728,45 @@ export default function MerchantTerminal() {
                                   <QRCodeDisplay 
                                     merchantId={merchantId}
                                     stoneId={stone.id}
-                                    className="w-full h-full"
                                   />
                                 </div>
-                                <p className="text-gray-600 text-xs font-medium">
+                                <p className="text-gray-600 text-xs font-medium mb-3">
                                   Stone #{stone.stoneNumber} QR Code
                                 </p>
+                                
+                                {/* Download Button */}
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      const qrUrl = `/api/merchants/${merchantId}/stone/${stone.id}/qr`;
+                                      const response = await fetch(qrUrl);
+                                      const blob = await response.blob();
+                                      const url = window.URL.createObjectURL(blob);
+                                      const link = document.createElement('a');
+                                      link.href = url;
+                                      link.download = `stone-${stone.stoneNumber}-qr-code.png`;
+                                      document.body.appendChild(link);
+                                      link.click();
+                                      document.body.removeChild(link);
+                                      window.URL.revokeObjectURL(url);
+                                      
+                                      toast({
+                                        title: "QR Code Downloaded",
+                                        description: `Stone ${stone.stoneNumber} QR code saved to downloads`,
+                                      });
+                                    } catch (error) {
+                                      console.error("Download failed:", error);
+                                      toast({
+                                        title: "Download Failed",
+                                        description: "Could not download QR code",
+                                        variant: "destructive",
+                                      });
+                                    }
+                                  }}
+                                  className="px-4 py-2 bg-gray-800 text-white text-xs rounded-lg hover:bg-gray-700 transition-colors font-medium"
+                                >
+                                  Download QR Code
+                                </button>
                               </div>
                             </div>
                           ))
