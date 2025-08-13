@@ -360,7 +360,7 @@ export default function Settings() {
         <div className="mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <Building className="h-5 w-5 text-white" />
+              <Building className="h-5 w-5 text-[#00FF66] drop-shadow-[0_0_8px_#00FF66]" />
               <div>
                 <h3 className="text-lg font-semibold text-white">Business Details</h3>
                 <p className="text-white/70 text-sm">
@@ -512,7 +512,7 @@ export default function Settings() {
         <div className="mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <CreditCard className="h-5 w-5 text-white" />
+              <CreditCard className="h-5 w-5 text-[#00FF66] drop-shadow-[0_0_8px_#00FF66]" />
               <div>
                 <h3 className="text-lg font-semibold text-white">Bank Account Details</h3>
                 <p className="text-white/70 text-sm">
@@ -667,7 +667,7 @@ export default function Settings() {
         <div className="mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <QrCode className="h-5 w-5 text-white" />
+              <QrCode className="h-5 w-5 text-[#00FF66] drop-shadow-[0_0_8px_#00FF66]" />
               <div>
                 <h3 className="text-lg font-semibold text-white">Tapt Stone Management</h3>
                 <p className="text-white/70 text-sm">
@@ -701,7 +701,7 @@ export default function Settings() {
             </div>
           ) : taptStones.length === 0 ? (
             <div className="text-center py-8">
-              <QrCode className="h-12 w-12 text-white/40 mx-auto mb-4" />
+              <QrCode className="h-12 w-12 text-[#00FF66]/40 drop-shadow-[0_0_8px_#00FF66] mx-auto mb-4" />
               <p className="text-white/70 text-sm">No tapt stones created yet</p>
               <p className="text-white/50 text-xs mt-1">Create your first tapt stone to start accepting payments</p>
             </div>
@@ -765,7 +765,7 @@ export default function Settings() {
       <div className="backdrop-blur-xl bg-white/5 border border-white/20 rounded-3xl p-6 shadow-2xl mb-6 sm:mb-8 hover:bg-white/10 hover:border-white/30 transition-all duration-300">
         <div className="mb-6">
           <h3 className="text-lg font-semibold text-white flex items-center space-x-2">
-            <Shield className="h-5 w-5 text-white" />
+            <Shield className="h-5 w-5 text-[#00FF66] drop-shadow-[0_0_8px_#00FF66]" />
             <span>Payment Gateway Status</span>
           </h3>
           <p className="text-white/70 text-sm">
