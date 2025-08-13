@@ -345,13 +345,6 @@ export default function Settings() {
           </button>
         </div>
 
-        {/* Tapt Pay Branding */}
-        <div className="fixed top-4 left-4 z-30">
-          <div className="text-white text-xl font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>
-            tapt
-          </div>
-        </div>
-
         <div className="container mx-auto px-4 pt-32 pb-8">
       <div className="mb-6 sm:mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Settings & Configuration</h1>
