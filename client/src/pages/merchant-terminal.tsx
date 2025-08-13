@@ -728,6 +728,39 @@ export default function MerchantTerminal() {
             </div>
           )}
         </div>
+
+        {/* Bottom QR Code Box - Only show on QR tab */}
+        {activeTab === "qr" && (
+          <div className="mt-6">
+            <div
+              className="rounded-2xl p-4 transition-all duration-300"
+              style={{ backgroundColor: '#00FF66' }}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-center text-black cursor-pointer relative">
+                <h3 className="text-lg font-semibold">QR Code</h3>
+              </div>
+
+              {/* QR Code Content */}
+              <div className="mt-4">
+                <div className="bg-white rounded-xl p-6">
+                  <div className="text-center">
+                    <div className="w-48 h-48 mx-auto mb-4 bg-white rounded-xl p-4 border">
+                      <QRCodeDisplay 
+                        merchantId={merchantId} 
+                        stoneId={undefined}
+                      />
+                    </div>
+                    <p className="text-gray-600 text-xs font-medium">
+                      General payment QR code
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         </div> {/* End Content Wrapper */}
       </div>
 
