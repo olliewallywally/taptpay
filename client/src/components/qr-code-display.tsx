@@ -62,51 +62,18 @@ export function QRCodeDisplay({ paymentUrl, qrCodeUrl, merchantId, stoneId }: QR
     }
   };
   return (
-    <div className="text-center">
-      <div className="mb-4">
-        {actualQrCodeUrl ? (
-          <img 
-            src={actualQrCodeUrl} 
-            alt="Payment QR Code" 
-            className="w-44 h-44 object-contain mx-auto"
-          />
-        ) : (
-          <div className="w-48 h-48 mx-auto flex items-center justify-center">
-            <div className="text-center">
-              <QrCode className="w-16 h-16 text-white/60 mb-2 mx-auto" />
-              <p className="text-sm text-white/70">QR Code will appear<br />when transaction is created</p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {actualQrCodeUrl && (
-        <div className="mb-3 sm:mb-4">
-          <Button
-            onClick={handleDownloadQR}
-            disabled={isDownloading}
-            className="w-full sm:w-auto backdrop-blur-sm bg-white/5 border border-white/15 text-white hover:bg-white/8 hover:border-white/20 px-4 py-2 h-10 sm:h-9 rounded-lg text-xs sm:text-sm font-medium transition-all duration-300"
-          >
-            {isDownloading ? (
-              <>
-                <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 animate-spin" />
-                <span className="hidden sm:inline">Downloading...</span>
-                <span className="sm:hidden">Downloading</span>
-              </>
-            ) : (
-              <>
-                <Download className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Download QR Code</span>
-                <span className="sm:hidden">Download</span>
-              </>
-            )}
-          </Button>
+    <div className="w-full h-full">
+      {actualQrCodeUrl ? (
+        <img 
+          src={actualQrCodeUrl} 
+          alt="Payment QR Code" 
+          className="w-full h-full object-contain"
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center bg-gray-100">
+          <QrCode className="w-8 h-8 text-gray-400" />
         </div>
       )}
-
-      <p className="text-xs text-white/60 mt-4">
-        Customers scan this QR code to pay
-      </p>
     </div>
   );
 }
