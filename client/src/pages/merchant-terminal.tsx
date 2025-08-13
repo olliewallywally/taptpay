@@ -160,6 +160,9 @@ export default function MerchantTerminal() {
   };
 
   const handleActionClick = (action: string) => {
+    console.log("Action clicked:", action);
+    console.log("Current activeAction:", activeAction);
+    console.log("Tapt stones:", taptStones);
     if (activeAction === action) {
       setActiveAction(null);
     } else {
@@ -528,6 +531,11 @@ export default function MerchantTerminal() {
                 <div className="text-center space-y-4">
                   <h3 className="text-lg font-semibold text-white">Share Payment</h3>
                   <p className="text-gray-300 text-sm">Copy the payment link to share with customers</p>
+                  
+                  {/* DEBUG INFO */}
+                  <div className="text-xs text-gray-500">
+                    DEBUG: Stones loaded: {taptStones?.length || 0}, Selected: {selectedStoneId || 'none'}
+                  </div>
                   
                   {/* STONE SELECTION DROPDOWN */}
                   <div className="w-full">
