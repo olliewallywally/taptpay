@@ -290,7 +290,7 @@ export default function Settings() {
 
       {/* Sliding Menu - Mobile Optimized */}
       <div 
-        className={`fixed right-0 top-0 h-full ${isMobile ? 'w-full' : 'w-80'} bg-gray-800 border-l border-gray-700 z-50 transform transition-transform duration-300 ease-in-out ${
+        className={`fixed right-0 top-0 h-full ${isMobile ? 'w-[70%]' : 'w-80'} bg-gray-800 border-l border-gray-700 z-50 transform transition-transform duration-300 ease-in-out ${
           menuOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -332,7 +332,7 @@ export default function Settings() {
       {/* Main Content with Slide Animation */}
       <div 
         className={`min-h-screen bg-gradient-to-br from-gray-950 via-black to-gray-900 transform transition-transform duration-300 ease-in-out ${
-          menuOpen ? (isMobile ? '-translate-x-full' : '-translate-x-80') : 'translate-x-0'
+          menuOpen ? (isMobile ? '-translate-x-[70%]' : '-translate-x-80') : 'translate-x-0'
         }`}
       >
         {/* Menu Icon - Mobile Optimized */}
