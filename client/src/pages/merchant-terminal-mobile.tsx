@@ -745,7 +745,7 @@ export default function MerchantTerminalMobile() {
                       {/* Stone Selection */}
                       {taptStones && taptStones.length > 0 && (
                         <div className="space-y-3">
-                          <label className="block text-sm font-medium text-gray-300 text-left">
+                          <label className="block text-sm font-medium text-gray-300 text-center">
                             Select Tapt Stone:
                           </label>
                           <div className="grid grid-cols-1 gap-2">
