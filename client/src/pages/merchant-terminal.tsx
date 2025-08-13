@@ -560,7 +560,7 @@ export default function MerchantTerminal() {
                     {/* Show selected stone info */}
                     <div className="mt-2 text-xs text-gray-400">
                       {selectedStoneId 
-                        ? `Sharing link for Stone ${taptStones.find(s => s.id === selectedStoneId)?.stoneNumber}`
+                        ? `Sharing link for Stone ${taptStones.find((s: any) => s.id === selectedStoneId)?.stoneNumber}`
                         : "Sharing general payment link"
                       }
                     </div>
@@ -579,7 +579,7 @@ export default function MerchantTerminal() {
                         setTimeout(() => setCopiedLink(false), 2000);
                         toast({
                           title: "Link Copied",
-                          description: `Payment link copied${selectedStoneId ? ` for Stone ${taptStones.find(s => s.id === selectedStoneId)?.stoneNumber}` : ''}`,
+                          description: `Payment link copied${selectedStoneId ? ` for Stone ${taptStones.find((s: any) => s.id === selectedStoneId)?.stoneNumber}` : ''}`,
                         });
                       }
                       setActiveAction(null);
@@ -633,7 +633,7 @@ export default function MerchantTerminal() {
               <div className="text-center">
                 <QRCodeDisplay 
                   merchantId={merchantId}
-                  stoneId={selectedStoneId}
+                  stoneId={selectedStoneId || undefined}
                 />
                 <p className="text-gray-600 text-sm">
                   {activeTab === "qr" ? "Scan to pay with any device" : "Tap your phone to pay"}
@@ -689,7 +689,7 @@ export default function MerchantTerminal() {
                     )}
                     
                     <p className="text-gray-600 text-sm">
-                      {selectedStoneId ? `QR Code for Stone ${taptStones.find(s => s.id === selectedStoneId)?.stoneNumber}` : "Select a stone to generate QR code"}
+                      {selectedStoneId ? `QR Code for Stone ${taptStones.find((s: any) => s.id === selectedStoneId)?.stoneNumber}` : "Select a stone to generate QR code"}
                     </p>
                   </>
                 )}
