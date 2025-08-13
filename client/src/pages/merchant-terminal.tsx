@@ -15,6 +15,7 @@ import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { Send, Loader2, CheckCircle, Clock, XCircle, Eye, Copy, Check, QrCode, Smartphone, Waves, CreditCard, X, Menu, Edit, Split, MoreHorizontal, ChevronDown } from "lucide-react";
+import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link } from "wouter";
 
@@ -329,9 +330,14 @@ export default function MerchantTerminal() {
       >
         {/* Header */}
         <div className="flex items-center justify-between p-6">
-          <div className="flex-1" />
-          <h1 className="text-2xl font-bold text-center text-white">tapt</h1>
-          <div className="flex-1 flex justify-end">
+          <div className="flex items-center">
+            <img 
+              src={taptLogoPath} 
+              alt="TaptPay" 
+              className="h-8 w-auto object-contain"
+            />
+          </div>
+          <div className="flex items-center">
             <button
               onClick={() => setMenuOpen(!menuOpen)}
               className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
