@@ -447,7 +447,7 @@ export default function MerchantTerminalMobile() {
           }}
         >
           {/* Menu Icon */}
-          <div className="fixed top-4 right-4 z-30">
+          <div className="fixed top-4 left-4 z-30">
             <button
               onClick={() => setMenuOpen(true)}
               className="p-3 backdrop-blur-xl bg-black/40 border border-white/20 rounded-xl text-white hover:bg-black/60 transition-colors"

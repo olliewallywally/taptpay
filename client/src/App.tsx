@@ -141,7 +141,7 @@ function Router() {
         <Route path="/reset-password" component={ResetPassword} />
         <Route path="/merchant">
           <ProtectedRoute>
-            <MerchantTerminalMobile />
+            <MerchantTerminal />
           </ProtectedRoute>
         </Route>
         <Route path="/merchant-terminal-mobile">
