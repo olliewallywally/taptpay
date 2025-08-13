@@ -745,23 +745,17 @@ export default function MerchantTerminal() {
           </div>
           
           <nav className="space-y-1">
-            <Link href="/dashboard">
-              <a className="block py-3 px-4 text-white rounded-xl transition-colors font-medium">
-                Dashboard
-              </a>
+            <Link href="/dashboard" className="block py-3 px-4 text-white rounded-xl transition-colors font-medium hover:bg-gray-700">
+              Dashboard
             </Link>
-            <a href="/merchant" className="block py-3 px-4 text-[#00CC52] rounded-xl font-medium">
+            <Link href="/merchant" className="block py-3 px-4 text-[#00CC52] rounded-xl font-medium">
               Terminal
-            </a>
-            <Link href="/transactions">
-              <a className="block py-3 px-4 text-white rounded-xl transition-colors font-medium">
-                Transactions
-              </a>
             </Link>
-            <Link href="/settings">
-              <a className="block py-3 px-4 text-white rounded-xl transition-colors font-medium">
-                Settings
-              </a>
+            <Link href="/transactions" className="block py-3 px-4 text-white rounded-xl transition-colors font-medium hover:bg-gray-700">
+              Transactions
+            </Link>
+            <Link href="/settings" className="block py-3 px-4 text-white rounded-xl transition-colors font-medium hover:bg-gray-700">
+              Settings
             </Link>
             <div className="pt-4 mt-4 border-t border-gray-600">
               <button 
