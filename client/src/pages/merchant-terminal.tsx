@@ -16,7 +16,6 @@ import { useToast } from "@/hooks/use-toast";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { Send, Loader2, CheckCircle, Clock, XCircle, Eye, Copy, Check, QrCode, Smartphone, Waves, CreditCard, X, Menu, Edit, Split, MoreHorizontal, ChevronDown } from "lucide-react";
 import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link } from "wouter";
 
 const transactionFormSchema = z.object({
@@ -166,11 +165,16 @@ export default function MerchantTerminal() {
     console.log("Current activeAction:", activeAction);
     console.log("Tapt stones:", taptStones);
     
-    // Force send to work
+    // Force send to work with error boundary
     if (action === "send") {
-      setActiveAction("send");
-      console.log("FORCED SEND ACTION SET");
-      return;
+      try {
+        setActiveAction("send");
+        console.log("FORCED SEND ACTION SET");
+        return;
+      } catch (error) {
+        console.error("Error setting send action:", error);
+        return;
+      }
     }
     
     if (activeAction === action) {
@@ -554,39 +558,37 @@ export default function MerchantTerminal() {
                   <p className="text-gray-300 text-sm">Copy the payment link to share with customers</p>
                   
                   {/* Stone Selection */}
-                  {taptStones && Array.isArray(taptStones) && taptStones.length > 0 ? (
-                    <div className="space-y-1">
-                      <label className="block text-xs font-medium text-gray-300 text-center">
-                        Select Tapt Stone:
-                      </label>
-                      <Select 
-                        value={selectedStoneId?.toString() || ""} 
-                        onValueChange={(value) => {
-                          console.log("Stone selected:", value);
+                  <div className="space-y-1">
+                    <label className="block text-xs font-medium text-gray-300 text-center">
+                      Select Tapt Stone:
+                    </label>
+                    {taptStones && Array.isArray(taptStones) && taptStones.length > 0 ? (
+                      <select 
+                        value={selectedStoneId || ""} 
+                        onChange={(e) => {
+                          console.log("Stone selected:", e.target.value);
                           try {
+                            const value = e.target.value;
                             setSelectedStoneId(value ? parseInt(value, 10) : null);
                           } catch (error) {
                             console.error("Error setting stone ID:", error);
                           }
                         }}
+                        className="w-full bg-gray-700 border-gray-600 text-white rounded-md px-3 py-2 border focus:outline-none focus:ring-2 focus:ring-green-500"
                       >
-                        <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
-                          <SelectValue placeholder="Choose a stone" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-gray-700 border-gray-600">
-                          {taptStones?.map((stone: any) => (
-                            <SelectItem key={`stone-${stone.id}`} value={stone.id?.toString() || ""}>
-                              Stone {stone.stoneNumber} - {stone.name}
-                            </SelectItem>
-                          )) || []}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  ) : (
-                    <div className="text-center py-4">
-                      <p className="text-gray-400 text-sm">No Tapt Stones available</p>
-                    </div>
-                  )}
+                        <option value="">Choose a stone</option>
+                        {taptStones.map((stone: any) => (
+                          <option key={`stone-${stone.id}`} value={stone.id}>
+                            Stone {stone.stoneNumber} - {stone.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="text-center py-4">
+                        <p className="text-gray-400 text-sm">No Tapt Stones available</p>
+                      </div>
+                    )}
+                  </div>
 
                   <Button
                     onClick={() => {
