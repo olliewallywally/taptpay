@@ -241,7 +241,7 @@ export default function MerchantTerminal() {
     switch (status) {
       case "pending":
         return (
-          <div className="flex flex-col items-center space-y-2 sm:space-y-3 p-4 sm:p-6 bg-blue-500/10 backdrop-blur-sm rounded-2xl border border-blue-400/30">
+          <div className="flex flex-col items-center space-y-1 sm:space-y-3 p-4 sm:p-6 bg-blue-500/10 backdrop-blur-sm rounded-2xl border border-blue-400/30">
             <div className="flex items-center space-x-2 sm:space-x-3">
               <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-blue-300" />
               <span className="text-base sm:text-lg font-medium text-blue-200">Awaiting Payment</span>
@@ -268,7 +268,7 @@ export default function MerchantTerminal() {
         );
       case "processing":
         return (
-          <div className="flex flex-col items-center space-y-2 sm:space-y-3 p-4 sm:p-6 bg-orange-500/10 backdrop-blur-sm rounded-2xl border border-orange-400/30">
+          <div className="flex flex-col items-center space-y-1 sm:space-y-3 p-4 sm:p-6 bg-orange-500/10 backdrop-blur-sm rounded-2xl border border-orange-400/30">
             <div className="flex items-center space-x-2 sm:space-x-3">
               <Loader2 className="w-5 h-5 sm:w-7 sm:h-7 text-orange-300 animate-spin" />
               <span className="text-base sm:text-lg font-medium text-orange-200">Processing Payment</span>
@@ -278,7 +278,7 @@ export default function MerchantTerminal() {
         );
       case "completed":
         return (
-          <div className="flex flex-col items-center space-y-2 sm:space-y-3 p-4 sm:p-6 bg-green-500/10 backdrop-blur-sm rounded-2xl border border-green-400/30">
+          <div className="flex flex-col items-center space-y-1 sm:space-y-3 p-4 sm:p-6 bg-green-500/10 backdrop-blur-sm rounded-2xl border border-green-400/30">
             <div className="flex items-center space-x-2 sm:space-x-3">
               <CheckCircle className="w-5 h-5 sm:w-7 sm:h-7 text-green-300" />
               <span className="text-base sm:text-lg font-medium text-green-200">Payment Accepted</span>
@@ -288,7 +288,7 @@ export default function MerchantTerminal() {
         );
       case "failed":
         return (
-          <div className="flex flex-col items-center space-y-2 sm:space-y-3 p-4 sm:p-6 bg-red-500/10 backdrop-blur-sm rounded-2xl border border-red-400/30">
+          <div className="flex flex-col items-center space-y-1 sm:space-y-3 p-4 sm:p-6 bg-red-500/10 backdrop-blur-sm rounded-2xl border border-red-400/30">
             <div className="flex items-center space-x-2 sm:space-x-3">
               <XCircle className="w-5 h-5 sm:w-7 sm:h-7 text-red-300" />
               <span className="text-base sm:text-lg font-medium text-red-200">Payment Failed</span>
@@ -454,12 +454,12 @@ export default function MerchantTerminal() {
               opacity: activeAction ? 1 : 0
             }}
           >
-            <div className="bg-gray-800 rounded-2xl p-4 mb-3 transition-all duration-300 hover:bg-gray-700 hover:scale-105 hover:shadow-lg">
+            <div className="bg-gray-800 rounded-2xl p-3 mb-2 transition-all duration-300 hover:bg-gray-700 hover:scale-105 hover:shadow-lg">
               {activeAction === "edit" && (
-                <div className="space-y-2">
-                  <h3 className="text-base font-semibold mb-2 text-white">Edit Transaction</h3>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-semibold mb-1 text-white">Edit Transaction</h3>
                   <Form {...form}>
-                    <div className="space-y-2">
+                    <div className="space-y-1">
                       <FormField
                         control={form.control}
                         name="itemName"
@@ -508,7 +508,7 @@ export default function MerchantTerminal() {
 
               {activeAction === "split" && (
                 <div className="text-center">
-                  <h3 className="text-base font-semibold mb-2 text-white">Split the Bill</h3>
+                  <h3 className="text-sm font-semibold mb-1 text-white">Split the Bill</h3>
                   <p className="text-gray-300 mb-4">How many ways would you like to split this payment?</p>
                   <div className="flex justify-center gap-3 mb-4">
                     {[2, 3, 4, 5].map((num) => (
@@ -522,7 +522,7 @@ export default function MerchantTerminal() {
                           });
                           setActiveAction(null);
                         }}
-                        className="w-12 h-10 rounded-full font-semibold transition-colors text-black"
+                        className="w-12 h-8 rounded-full font-semibold transition-colors text-black"
                         style={{ backgroundColor: '#00FF66' }}
                       >
                         {num}
@@ -533,13 +533,13 @@ export default function MerchantTerminal() {
               )}
 
               {activeAction === "send" && (
-                <div className="text-center space-y-2">
+                <div className="text-center space-y-1">
                   <h3 className="text-lg font-semibold text-white">Share Payment Link</h3>
                   <p className="text-gray-300 text-sm">Copy the payment link to share with customers</p>
                   
                   {/* Stone Selection */}
                   {taptStones && taptStones.length > 0 && (
-                    <div className="space-y-2">
+                    <div className="space-y-1">
                       <label className="block text-xs font-medium text-gray-300 text-left">
                         Select Tapt Stone (optional):
                       </label>
@@ -587,7 +587,7 @@ export default function MerchantTerminal() {
 
               {activeAction === "more" && (
                 <div className="text-center">
-                  <h3 className="text-base font-semibold mb-2 text-white">More Options</h3>
+                  <h3 className="text-sm font-semibold mb-1 text-white">More Options</h3>
                   <div className="space-y-3">
                     <Link href="/dashboard">
                       <Button
@@ -640,7 +640,7 @@ export default function MerchantTerminal() {
             <div className="bg-white rounded-2xl p-8">
               <div className="text-center">
                 {activeTab === "qr" && (
-                  <div className="space-y-2">
+                  <div className="space-y-1">
                     {/* Individual Stone QR Code Boxes */}
                     {taptStones && taptStones.length > 0 ? (
                       taptStones.map((stone: any) => (
@@ -711,7 +711,7 @@ export default function MerchantTerminal() {
             </button>
           </div>
           
-          <nav className="space-y-2">
+          <nav className="space-y-1">
             <Link href="/dashboard">
               <a className="block py-3 px-4 text-white rounded-xl transition-colors font-medium">
                 Dashboard
