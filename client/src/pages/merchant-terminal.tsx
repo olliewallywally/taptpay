@@ -554,48 +554,81 @@ export default function MerchantTerminal() {
                   <p className="text-gray-300 text-sm">Copy the payment link to share with customers</p>
                   
                   {/* Stone Selection */}
-                  {taptStones && taptStones.length > 0 && (
+                  {taptStones && Array.isArray(taptStones) && taptStones.length > 0 ? (
                     <div className="space-y-1">
                       <label className="block text-xs font-medium text-gray-300 text-center">
                         Select Tapt Stone:
                       </label>
-                      <Select value={selectedStoneId?.toString()} onValueChange={(value) => setSelectedStoneId(value ? parseInt(value) : null)}>
+                      <Select 
+                        value={selectedStoneId?.toString() || ""} 
+                        onValueChange={(value) => {
+                          console.log("Stone selected:", value);
+                          try {
+                            setSelectedStoneId(value ? parseInt(value, 10) : null);
+                          } catch (error) {
+                            console.error("Error setting stone ID:", error);
+                          }
+                        }}
+                      >
                         <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
                           <SelectValue placeholder="Choose a stone" />
                         </SelectTrigger>
                         <SelectContent className="bg-gray-700 border-gray-600">
-                          {taptStones.map((stone: any) => (
-                            <SelectItem key={stone.id} value={stone.id.toString()}>
+                          {taptStones?.map((stone: any) => (
+                            <SelectItem key={`stone-${stone.id}`} value={stone.id?.toString() || ""}>
                               Stone {stone.stoneNumber} - {stone.name}
                             </SelectItem>
-                          ))}
+                          )) || []}
                         </SelectContent>
                       </Select>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4">
+                      <p className="text-gray-400 text-sm">No Tapt Stones available</p>
                     </div>
                   )}
 
                   <Button
-                    onClick={() => {
-                      if (!selectedStoneId) {
+                    onClick={async () => {
+                      try {
+                        console.log("Copy button clicked, selectedStoneId:", selectedStoneId);
+                        
+                        if (!selectedStoneId) {
+                          toast({
+                            title: "Select a Stone",
+                            description: "Please select a Tapt Stone to copy its payment link",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        
+                        const selectedStone = taptStones?.find((stone: any) => stone.id === selectedStoneId);
+                        console.log("Selected stone:", selectedStone);
+                        
+                        if (selectedStone && selectedStone.paymentUrl) {
+                          await navigator.clipboard.writeText(selectedStone.paymentUrl);
+                          setCopiedLink(true);
+                          setTimeout(() => setCopiedLink(false), 2000);
+                          toast({
+                            title: "Stone Link Copied",
+                            description: `${selectedStone.name} payment link copied to clipboard`,
+                          });
+                          setActiveAction(null);
+                        } else {
+                          toast({
+                            title: "Error",
+                            description: "Could not find payment link for selected stone",
+                            variant: "destructive",
+                          });
+                        }
+                      } catch (error) {
+                        console.error("Error copying payment link:", error);
                         toast({
-                          title: "Select a Stone",
-                          description: "Please select a Tapt Stone to copy its payment link",
+                          title: "Copy Failed",
+                          description: "Could not copy payment link to clipboard",
                           variant: "destructive",
                         });
-                        return;
                       }
-                      
-                      const selectedStone = taptStones?.find((stone: any) => stone.id === selectedStoneId);
-                      if (selectedStone) {
-                        navigator.clipboard.writeText(selectedStone.paymentUrl);
-                        setCopiedLink(true);
-                        setTimeout(() => setCopiedLink(false), 2000);
-                        toast({
-                          title: "Stone Link Copied",
-                          description: `${selectedStone.name} payment link copied to clipboard`,
-                        });
-                      }
-                      setActiveAction(null);
                     }}
                     className="w-full text-black font-semibold rounded-lg"
                     style={{ backgroundColor: '#00FF66' }}
