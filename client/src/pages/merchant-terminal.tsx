@@ -589,7 +589,7 @@ export default function MerchantTerminal() {
                   )}
 
                   <Button
-                    onClick={async () => {
+                    onClick={() => {
                       try {
                         console.log("Copy button clicked, selectedStoneId:", selectedStoneId);
                         
@@ -606,14 +606,22 @@ export default function MerchantTerminal() {
                         console.log("Selected stone:", selectedStone);
                         
                         if (selectedStone && selectedStone.paymentUrl) {
-                          await navigator.clipboard.writeText(selectedStone.paymentUrl);
-                          setCopiedLink(true);
-                          setTimeout(() => setCopiedLink(false), 2000);
-                          toast({
-                            title: "Stone Link Copied",
-                            description: `${selectedStone.name} payment link copied to clipboard`,
+                          navigator.clipboard.writeText(selectedStone.paymentUrl).then(() => {
+                            setCopiedLink(true);
+                            setTimeout(() => setCopiedLink(false), 2000);
+                            toast({
+                              title: "Stone Link Copied",
+                              description: `${selectedStone.name} payment link copied to clipboard`,
+                            });
+                            setActiveAction(null);
+                          }).catch((error) => {
+                            console.error("Clipboard error:", error);
+                            toast({
+                              title: "Copy Failed", 
+                              description: "Could not copy to clipboard",
+                              variant: "destructive",
+                            });
                           });
-                          setActiveAction(null);
                         } else {
                           toast({
                             title: "Error",
