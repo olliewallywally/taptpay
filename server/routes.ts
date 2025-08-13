@@ -986,7 +986,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update merchant business details
-  app.put("/api/merchants/:id/details", async (req, res) => {
+  app.put("/api/merchants/:id/details", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = parseInt(req.params.id);
       const validation = updateMerchantDetailsSchema.safeParse(req.body);
@@ -1050,7 +1050,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/merchants/:id/bank-account", async (req, res) => {
+  app.put("/api/merchants/:id/bank-account", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = parseInt(req.params.id);
       const validation = updateBankAccountSchema.safeParse(req.body);

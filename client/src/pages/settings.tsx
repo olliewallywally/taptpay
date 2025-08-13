@@ -273,6 +273,46 @@ export default function Settings() {
     updateBankAccountMutation.mutate(data);
   };
 
+  // Show loading state while user data is loading
+  if (userLoading) {
+    return (
+      <div className="min-h-screen relative overflow-hidden">
+        {isMobile && <MobileHeader title="Settings">Settings</MobileHeader>}
+        <div className="fixed inset-0 bg-gradient-to-br from-black via-gray-900 to-gray-800">
+          <div className="absolute inset-0 bg-gradient-to-tr from-gray-900/60 via-black/40 to-gray-700/30 animate-gradient-xy"></div>
+          <div className="absolute inset-0 bg-gradient-to-bl from-gray-800/40 via-gray-900/60 to-black/50 animate-gradient-reverse"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-gray-600/20 via-transparent to-gray-900/30 animate-pulse"></div>
+        </div>
+        <div className="relative z-10 flex items-center justify-center min-h-screen">
+          <div className="text-white text-center">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+            <p>Loading settings...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error if no user or merchant ID
+  if (!user || !merchantId) {
+    return (
+      <div className="min-h-screen relative overflow-hidden">
+        {isMobile && <MobileHeader title="Settings">Settings</MobileHeader>}
+        <div className="fixed inset-0 bg-gradient-to-br from-black via-gray-900 to-gray-800">
+          <div className="absolute inset-0 bg-gradient-to-tr from-gray-900/60 via-black/40 to-gray-700/30 animate-gradient-xy"></div>
+          <div className="absolute inset-0 bg-gradient-to-bl from-gray-800/40 via-gray-900/60 to-black/50 animate-gradient-reverse"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-gray-600/20 via-transparent to-gray-900/30 animate-pulse"></div>
+        </div>
+        <div className="relative z-10 flex items-center justify-center min-h-screen">
+          <div className="text-white text-center">
+            <AlertCircle className="h-8 w-8 mx-auto mb-4 text-red-400" />
+            <p>Unable to load settings. Please try logging in again.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen relative overflow-hidden">
       {isMobile && <MobileHeader title="Settings">Settings</MobileHeader>}
