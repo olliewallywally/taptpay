@@ -825,20 +825,17 @@ export default function MerchantTerminalMobile() {
         ) : null}
 
         {/* QR Code Stone Selection Section */}
-        <div className="px-6">
+        <div className="px-6 pb-32" style={{ minHeight: '500px', backgroundColor: 'rgba(255, 0, 0, 0.1)' }}>
           {activeTab === "QR" ? (
-            <div className="space-y-4">
+            <div className="space-y-4" style={{ position: 'relative', zIndex: 100 }}>
               {/* Debug: Show loading state and stone count */}
-              {taptStonesLoading && (
-                <div className="text-white text-center p-4">
-                  Loading stones...
-                </div>
-              )}
-              {!taptStonesLoading && (
-                <div className="text-white text-center p-2 text-xs">
-                  Debug: Found {taptStones.length} stones
-                </div>
-              )}
+              <div className="bg-yellow-500 text-black p-4 rounded-lg mb-4">
+                <div className="font-bold text-lg">DEBUG INFO:</div>
+                <div>Loading: {taptStonesLoading ? 'YES' : 'NO'}</div>
+                <div>Stone count: {taptStones.length}</div>
+                <div>Active Tab: {activeTab}</div>
+                <div>Stones: {JSON.stringify(taptStones.map((s: any) => s.name))}</div>
+              </div>
               
               {/* Individual Stone Buttons for QR */}
               {taptStones.map((stone: any) => (
