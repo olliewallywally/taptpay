@@ -837,7 +837,7 @@ export default function MerchantTerminalMobile() {
                     }}
                   >
                     <div className="flex items-center justify-center">
-                      <span className="uppercase text-center flex-1">TAPT STONE {stone.stoneNumber}</span>
+                      <span className="uppercase text-center flex-1">STONE #{stone.stoneNumber}</span>
                       <ChevronDown 
                         className={`h-5 w-5 transition-transform duration-300 ${selectedStoneId === stone.id && showQrDropdown ? 'rotate-180' : ''}`} 
                       />
