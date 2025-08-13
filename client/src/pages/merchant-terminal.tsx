@@ -525,43 +525,37 @@ export default function MerchantTerminal() {
               )}
 
               {activeAction === "send" && (
-                <div className="text-center">
-                  <h3 className="text-lg font-semibold mb-3 text-white">Share Payment</h3>
-                  <p className="text-gray-300 mb-4 text-sm">Copy the payment link to share with customers</p>
+                <div className="text-center space-y-4">
+                  <h3 className="text-lg font-semibold text-white">Share Payment</h3>
+                  <p className="text-gray-300 text-sm">Copy the payment link to share with customers</p>
                   
-                  {/* Stone Selection - More Prominent */}
-                  <div className="mb-4 text-left">
-                    <label className="block text-sm font-medium text-white mb-2">
-                      Select Tapt Stone Link
-                    </label>
-                    <Select
-                      value={selectedStoneId?.toString() || ""}
-                      onValueChange={(value) => setSelectedStoneId(value ? parseInt(value) : null)}
-                    >
-                      <SelectTrigger className="w-full bg-gray-700 border-gray-600 text-white hover:bg-gray-600">
-                        <SelectValue placeholder="Choose which stone link to share" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-gray-800 border-gray-600">
-                        <SelectItem value="" className="text-white hover:bg-gray-700">
-                          🔗 General Payment Link
-                        </SelectItem>
-                        {taptStones.map((stone: any) => (
-                          <SelectItem 
-                            key={stone.id} 
-                            value={stone.id.toString()}
-                            className="text-white hover:bg-gray-700"
-                          >
-                            🪨 Stone {stone.stoneNumber} - {stone.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  {/* STONE SELECTION DROPDOWN */}
+                  <div className="w-full">
+                    <div className="mb-2">
+                      <label className="block text-sm font-medium text-white">
+                        Which Tapt Stone?
+                      </label>
+                    </div>
                     
-                    {/* Show selected stone info */}
+                    <div className="w-full bg-gray-700 rounded-lg border border-gray-600">
+                      <select 
+                        value={selectedStoneId || ""}
+                        onChange={(e) => setSelectedStoneId(e.target.value ? parseInt(e.target.value) : null)}
+                        className="w-full bg-gray-700 text-white p-3 rounded-lg border-0 focus:ring-2 focus:ring-green-500"
+                      >
+                        <option value="">General Payment Link</option>
+                        {taptStones.map((stone: any) => (
+                          <option key={stone.id} value={stone.id}>
+                            Stone {stone.stoneNumber} - {stone.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    
                     <div className="mt-2 text-xs text-gray-400">
                       {selectedStoneId 
-                        ? `Sharing link for Stone ${taptStones.find((s: any) => s.id === selectedStoneId)?.stoneNumber}`
-                        : "Sharing general payment link"
+                        ? `Will share Stone ${taptStones.find((s: any) => s.id === selectedStoneId)?.stoneNumber} link`
+                        : "Will share general payment link"
                       }
                     </div>
                   </div>
