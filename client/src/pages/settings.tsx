@@ -35,6 +35,7 @@ import {
   Phone,
   MapPin
 } from "lucide-react";
+import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
 import { z } from "zod";
 
 
@@ -345,6 +346,15 @@ export default function Settings() {
           >
             <Menu className={`${isMobile ? 'h-5 w-5' : 'h-6 w-6'}`} />
           </button>
+        </div>
+
+        {/* TaptPay Branding */}
+        <div className="fixed top-4 left-4 z-30">
+          <img 
+            src={taptLogoPath} 
+            alt="TaptPay" 
+            className="h-8 w-auto object-contain"
+          />
         </div>
 
         <div className={`container mx-auto px-3 sm:px-4 pb-4 sm:pb-8 ${isMobile ? 'pt-16' : 'pt-20'}`}>
