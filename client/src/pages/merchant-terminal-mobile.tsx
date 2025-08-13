@@ -348,7 +348,7 @@ export default function MerchantTerminalMobile() {
     return (
       <div className="flex items-center justify-center">
         {status === "pending" && (
-          <div className="relative w-12 h-12">
+          <div className="relative w-12 h-10">
             {/* Static ring for pending */}
             <div className="absolute inset-0 rounded-full border-3 border-[#00FF66]/40"></div>
             <Clock className="absolute inset-2 w-8 h-8 text-[#00FF66]/70" />
@@ -356,7 +356,7 @@ export default function MerchantTerminalMobile() {
         )}
         
         {status === "processing" && (
-          <div className="relative w-12 h-12">
+          <div className="relative w-12 h-10">
             {/* Animated ring only when processing */}
             <div className="absolute inset-0 rounded-full border-3 border-[#00FF66]/30"></div>
             <div className="absolute inset-0 rounded-full border-3 border-transparent border-t-[#00FF66] animate-spin duration-700"></div>
@@ -364,7 +364,7 @@ export default function MerchantTerminalMobile() {
         )}
         
         {status === "completed" && (
-          <div className="relative w-12 h-12 flex items-center justify-center">
+          <div className="relative w-12 h-10 flex items-center justify-center">
             {/* Success tick with smooth transition */}
             <div className="absolute inset-0 rounded-full border-3 border-[#00FF66] animate-[fadeIn_0.5s_ease-in-out]"></div>
             <CheckCircle className="w-6 h-6 text-[#00FF66] animate-[scaleIn_0.5s_ease-in-out]" />
@@ -372,7 +372,7 @@ export default function MerchantTerminalMobile() {
         )}
         
         {status === "failed" && (
-          <div className="relative w-12 h-12 flex items-center justify-center">
+          <div className="relative w-12 h-10 flex items-center justify-center">
             {/* Failed X with smooth transition */}
             <div className="absolute inset-0 rounded-full border-3 border-red-400 animate-[fadeIn_0.5s_ease-in-out]"></div>
             <XCircle className="w-6 h-6 text-red-400 animate-[scaleIn_0.5s_ease-in-out]" />
@@ -406,7 +406,7 @@ export default function MerchantTerminalMobile() {
                 <X className="h-6 w-6" />
               </button>
             </div>
-            <nav className="space-y-4">
+            <nav className="space-y-2">
               <a href="/dashboard" className="block py-3 px-4 text-white hover:text-white rounded-xl transition-colors">
                 Dashboard
               </a>
@@ -588,16 +588,16 @@ export default function MerchantTerminalMobile() {
           >
             <div className="bg-gray-600 rounded-3xl p-6 mb-4">
               {activeAction === "edit" && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold mb-4 text-white">Create Transaction</h3>
+                <div className="space-y-2">
+                  <h3 className="text-base font-semibold mb-2 text-white">Create Transaction</h3>
                   <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2">
                       <FormField
                         control={form.control}
                         name="itemName"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-sm font-medium text-gray-300">Item Name</FormLabel>
+                            <FormLabel className="text-xs font-medium text-gray-300">Item Name</FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="Enter item name"
@@ -614,7 +614,7 @@ export default function MerchantTerminalMobile() {
                         name="price"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-sm font-medium text-gray-300">Price ($)</FormLabel>
+                            <FormLabel className="text-xs font-medium text-gray-300">Price ($)</FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="Enter price"
@@ -632,7 +632,7 @@ export default function MerchantTerminalMobile() {
                         name="selectedStoneId"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-sm font-medium text-gray-300">Tapt Stone (Optional)</FormLabel>
+                            <FormLabel className="text-xs font-medium text-gray-300">Tapt Stone (Optional)</FormLabel>
                             <Select onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)} value={field.value?.toString() || ""}>
                               <FormControl>
                                 <SelectTrigger className="bg-gray-700 border-gray-600 text-white rounded-lg">
@@ -668,7 +668,7 @@ export default function MerchantTerminalMobile() {
 
               {activeAction === "split" && (
                 <div className="text-center">
-                  <h3 className="text-lg font-semibold mb-4 text-white">Split the Bill</h3>
+                  <h3 className="text-base font-semibold mb-2 text-white">Split the Bill</h3>
                   <p className="text-gray-300 mb-4">How many ways would you like to split this payment?</p>
                   <div className="flex justify-center gap-3 mb-4">
                     {[2, 3, 4, 5].map((num) => (
@@ -681,7 +681,7 @@ export default function MerchantTerminalMobile() {
                           });
                           setActiveAction(null);
                         }}
-                        className="w-12 h-12 rounded-full font-semibold transition-colors text-black"
+                        className="w-12 h-10 rounded-full font-semibold transition-colors text-black"
                         style={{ backgroundColor: '#00FF66' }}
                       >
                         {num}
@@ -693,18 +693,18 @@ export default function MerchantTerminalMobile() {
 
               {activeAction === "send" && (
                 <div className="text-center">
-                  <h3 className="text-lg font-semibold mb-4 text-white">
+                  <h3 className="text-base font-semibold mb-2 text-white">
                     {activeTab === "NFC" ? "NFC Payment" : "Share Payment"}
                   </h3>
                   
                   {activeTab === "NFC" ? (
                     // NFC Payment Options
-                    <div className="space-y-4">
+                    <div className="space-y-2">
                       <p className="text-gray-300 mb-4">Start contactless payment for current transaction</p>
                       {currentTransaction || activeTransaction ? (
                         <div className="space-y-3">
                           <div className="bg-gray-700 rounded-lg p-3 mb-4">
-                            <p className="text-white text-sm font-medium">
+                            <p className="text-white text-xs font-medium">
                               {(currentTransaction || activeTransaction).itemName}
                             </p>
                             <p className="text-gray-300 text-lg font-bold">
@@ -765,7 +765,7 @@ export default function MerchantTerminalMobile() {
 
               {activeAction === "more" && (
                 <div className="text-center">
-                  <h3 className="text-lg font-semibold mb-4 text-white">More Options</h3>
+                  <h3 className="text-base font-semibold mb-2 text-white">More Options</h3>
                   <div className="space-y-3">
                     <Button
                       variant="outline"
@@ -798,7 +798,7 @@ export default function MerchantTerminalMobile() {
         {/* QR Code Stone Selection Section - Always visible on QR tab */}
         {activeTab === "QR" && (
           <div className="px-6 pb-32" style={{ minHeight: '400px' }}>
-            <div className="space-y-4 mt-4">
+            <div className="space-y-2 mt-4">
               {/* Individual Stone QR Code Boxes */}
               {taptStones && taptStones.length > 0 && taptStones.map((stone: any) => (
                 <div 
@@ -823,7 +823,7 @@ export default function MerchantTerminalMobile() {
                         stoneId={stone.id}
                       />
                     </div>
-                    <p className="text-gray-600 text-sm font-medium">
+                    <p className="text-gray-600 text-xs font-medium">
                       Scan to pay with {stone.name}
                     </p>
                   </div>
@@ -877,7 +877,7 @@ export default function MerchantTerminalMobile() {
             </div>
           ) : (
             // NFC Interface - Same stone buttons available here too
-            <div className="space-y-4">
+            <div className="space-y-2">
               {/* Individual Stone Buttons for NFC */}
               {taptStones.map((stone: any) => (
                 <div key={stone.id} className="space-y-3">
@@ -916,7 +916,7 @@ export default function MerchantTerminalMobile() {
                             stoneId={stone.id}
                           />
                         </div>
-                        <p className="text-white/80 text-sm font-medium mb-4">
+                        <p className="text-white/80 text-xs font-medium mb-4">
                           Scan to pay with {stone.name}
                         </p>
                       </div>
@@ -974,7 +974,7 @@ export default function MerchantTerminalMobile() {
             >
               {nfcPaymentStatus === "ready" && (
                 <div className="space-y-8">
-                  <div className="space-y-4">
+                  <div className="space-y-2">
                     <div className="text-6xl font-extralight text-white tracking-tight">
                       ${nfcSession?.amount}
                     </div>
@@ -1117,7 +1117,7 @@ export default function MerchantTerminalMobile() {
               <div className="text-black text-3xl font-bold">
                 ${(currentTransaction || activeTransaction).price}
               </div>
-              <div className="text-black text-sm font-medium mt-2">
+              <div className="text-black text-xs font-medium mt-2">
                 {(currentTransaction || activeTransaction).itemName}
               </div>
             </div>
@@ -1125,7 +1125,7 @@ export default function MerchantTerminalMobile() {
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <div 
-                  className="rounded-3xl p-6 text-center space-y-4"
+                  className="rounded-3xl p-6 text-center space-y-2"
                   style={{ backgroundColor: '#00FF66' }}
                 >
                   <div className="text-black text-lg font-medium">Create Transaction</div>
@@ -1261,18 +1261,18 @@ export default function MerchantTerminalMobile() {
               maxHeight: activeAction ? '400px' : '0px',
             }}
           >
-            <div className="bg-gray-600 rounded-3xl p-6 mb-6">
+            <div className="bg-gray-600 rounded-3xl p-4 mb-3">
               {activeAction === "edit" && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold mb-4 text-white">Create Transaction</h3>
+                <div className="space-y-2">
+                  <h3 className="text-base font-semibold mb-2 text-white">Create Transaction</h3>
                   <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2">
                       <FormField
                         control={form.control}
                         name="itemName"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-sm font-medium text-gray-300">Item Name</FormLabel>
+                            <FormLabel className="text-xs font-medium text-gray-300">Item Name</FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="Enter item name"
@@ -1289,7 +1289,7 @@ export default function MerchantTerminalMobile() {
                         name="price"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-sm font-medium text-gray-300">Price ($)</FormLabel>
+                            <FormLabel className="text-xs font-medium text-gray-300">Price ($)</FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="Enter price"
@@ -1307,7 +1307,7 @@ export default function MerchantTerminalMobile() {
                         name="selectedStoneId"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-sm font-medium text-gray-300">Tapt Stone (Optional)</FormLabel>
+                            <FormLabel className="text-xs font-medium text-gray-300">Tapt Stone (Optional)</FormLabel>
                             <Select onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)} value={field.value?.toString() || ""}>
                               <FormControl>
                                 <SelectTrigger className="bg-gray-700 border-gray-600 text-white rounded-lg">
@@ -1343,7 +1343,7 @@ export default function MerchantTerminalMobile() {
 
               {activeAction === "split" && (
                 <div className="text-center">
-                  <h3 className="text-lg font-semibold mb-4 text-white">Split the Bill</h3>
+                  <h3 className="text-base font-semibold mb-2 text-white">Split the Bill</h3>
                   <p className="text-gray-300 mb-4">How many ways would you like to split this payment?</p>
                   <div className="flex justify-center gap-3 mb-4">
                     {[2, 3, 4, 5].map((num) => (
@@ -1356,7 +1356,7 @@ export default function MerchantTerminalMobile() {
                           });
                           setActiveAction(null);
                         }}
-                        className="w-12 h-12 rounded-full font-semibold transition-colors text-black"
+                        className="w-12 h-10 rounded-full font-semibold transition-colors text-black"
                         style={{ backgroundColor: '#00FF66' }}
                       >
                         {num}
@@ -1368,18 +1368,18 @@ export default function MerchantTerminalMobile() {
 
               {activeAction === "send" && (
                 <div className="text-center">
-                  <h3 className="text-lg font-semibold mb-4 text-white">
+                  <h3 className="text-base font-semibold mb-2 text-white">
                     {activeTab === "NFC" ? "NFC Payment" : "Share Payment"}
                   </h3>
                   
                   {activeTab === "NFC" ? (
                     // NFC Payment Options
-                    <div className="space-y-4">
+                    <div className="space-y-2">
                       <p className="text-gray-300 text-sm mb-4">Start contactless payment for current transaction</p>
                       {currentTransaction || activeTransaction ? (
                         <div className="space-y-3">
                           <div className="bg-gray-700 rounded-lg p-3 mb-4">
-                            <p className="text-white text-sm font-medium">
+                            <p className="text-white text-xs font-medium">
                               {(currentTransaction || activeTransaction).itemName}
                             </p>
                             <p className="text-gray-300 text-lg font-bold">
@@ -1413,12 +1413,12 @@ export default function MerchantTerminalMobile() {
                     </div>
                   ) : (
                     // QR Payment Link Sharing
-                    <div className="space-y-4">
+                    <div className="space-y-2">
                       <p className="text-gray-300 text-sm mb-4">Select a tapt stone and share its payment link</p>
                       
                       {/* Stone Selection */}
                       <div className="text-left">
-                        <label className="text-sm font-medium text-gray-300 block mb-2">Select Tapt Stone</label>
+                        <label className="text-xs font-medium text-gray-300 block mb-2">Select Tapt Stone</label>
                         <select
                           value={selectedStoneId || ''}
                           onChange={(e) => setSelectedStoneId(e.target.value ? parseInt(e.target.value) : null)}
@@ -1436,7 +1436,7 @@ export default function MerchantTerminalMobile() {
                       {/* Payment Link Display */}
                       {selectedStoneId && (
                         <div className="bg-gray-700 rounded-lg p-4 text-left">
-                          <label className="text-sm font-medium text-gray-300 block mb-2">Payment Link</label>
+                          <label className="text-xs font-medium text-gray-300 block mb-2">Payment Link</label>
                           <div className="bg-gray-800 rounded-lg p-3 mb-3">
                             <code className="text-green-400 text-sm break-all">
                               {(() => {
@@ -1472,7 +1472,7 @@ export default function MerchantTerminalMobile() {
 
               {activeAction === "more" && (
                 <div className="text-center">
-                  <h3 className="text-lg font-semibold mb-4 text-white">More Options</h3>
+                  <h3 className="text-base font-semibold mb-2 text-white">More Options</h3>
                   <div className="space-y-3">
                     <Button
                       variant="outline"
@@ -1621,7 +1621,7 @@ export default function MerchantTerminalMobile() {
             >
               {nfcPaymentStatus === "ready" && (
                 <div className="space-y-10">
-                  <div className="space-y-4">
+                  <div className="space-y-2">
                     <div className="text-7xl font-extralight text-white tracking-tight">
                       ${nfcSession?.amount}
                     </div>
