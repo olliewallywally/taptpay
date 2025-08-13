@@ -199,7 +199,7 @@ export default function Transactions() {
 
       {/* Sliding Menu */}
       <div 
-        className={`fixed right-0 top-0 h-full ${isMobile ? 'w-[70%]' : 'w-80'} bg-gray-900 ${isMobile ? '' : 'border-l border-gray-700'} z-50 transform transition-transform duration-300 ease-in-out ${
+        className={`fixed right-0 top-0 h-full ${isMobile ? 'w-[70%]' : 'w-80'} bg-gray-800 ${isMobile ? '' : 'border-l border-gray-700'} z-50 transform transition-transform duration-300 ease-in-out ${
           menuOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -211,25 +211,25 @@ export default function Transactions() {
             </button>
           </div>
           <nav className="space-y-4">
-            <a href="/dashboard" className="block py-3 px-4 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors">
+            <a href="/dashboard" className="block py-3 px-4 text-white rounded-xl transition-colors font-medium">
               Dashboard
             </a>
-            <a href="/merchant" className="block py-3 px-4 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors">
+            <a href="/merchant" className="block py-3 px-4 text-white rounded-xl transition-colors font-medium">
               Terminal
             </a>
-            <a href="/transactions" className="block py-3 px-4 text-[#00FF66] bg-[#00FF66]/20 rounded-xl drop-shadow-[0_0_8px_#00FF66] font-medium">
+            <a href="/transactions" className="block py-3 px-4 text-[#00CC52] rounded-xl font-medium">
               Transactions
             </a>
-            <a href="/settings" className="block py-3 px-4 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors">
+            <a href="/settings" className="block py-3 px-4 text-white rounded-xl transition-colors font-medium">
               Settings
             </a>
-            <div className="pt-4 mt-4 border-t border-gray-700">
+            <div className="pt-4 mt-4 border-t border-gray-600">
               <button 
                 onClick={() => {
                   localStorage.removeItem('auth-token');
                   window.location.href = '/login';
                 }}
-                className="block w-full text-left py-3 px-4 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-colors"
+                className="block w-full text-left py-3 px-4 text-red-400 hover:text-red-300 rounded-xl transition-colors font-medium"
               >
                 Logout
               </button>
