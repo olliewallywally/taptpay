@@ -638,12 +638,11 @@ export default function MerchantTerminal() {
           {currentTransaction || activeTransaction ? (
             <div className="bg-white rounded-2xl p-8 flex items-center justify-center transition-all duration-300 hover:scale-105 hover:shadow-xl cursor-pointer">
               <div className="text-center">
-                <QRCodeDisplay 
-                  merchantId={merchantId}
-                  stoneId={selectedStoneId || undefined}
-                />
+                <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4 mx-auto">
+                  <QrCode size={64} className="text-gray-400" />
+                </div>
                 <p className="text-gray-600 text-sm">
-                  {activeTab === "qr" ? "Scan to pay with any device" : "Tap your phone to pay"}
+                  {activeTab === "qr" ? "QR code removed from desktop" : "Tap your phone to pay"}
                 </p>
                 <div className="mt-4 text-center">
                   {getPaymentStatusIndicator((currentTransaction || activeTransaction).status)}
@@ -691,14 +690,11 @@ export default function MerchantTerminal() {
 
                               {/* QR Code - Always visible */}
                               <div className="text-center transition-all duration-300">
-                                <div className="w-48 h-48 mx-auto mb-4 bg-white rounded-xl p-4 border">
-                                  <QRCodeDisplay 
-                                    merchantId={merchantId} 
-                                    stoneId={stone.id}
-                                  />
+                                <div className="w-48 h-48 mx-auto mb-4 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                                  <QrCode size={64} className="text-gray-400" />
                                 </div>
                                 <p className="text-gray-600 text-xs font-medium">
-                                  Scan to pay with {stone.name}
+                                  QR code removed from desktop
                                 </p>
                               </div>
                             </div>
