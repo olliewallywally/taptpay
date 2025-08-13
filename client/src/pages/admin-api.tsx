@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,7 +31,9 @@ import {
   ExternalLink,
   Code,
   Book,
-  Zap
+  Zap,
+  Menu,
+  X
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -77,6 +79,19 @@ export default function AdminApi() {
     webhookUrl: '',
     rateLimitPerHour: 1000,
   });
+  const [isMobile, setIsMobile] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -100,9 +115,9 @@ export default function AdminApi() {
   const createKeyMutation = useMutation({
     mutationFn: (data: any) => apiRequest(`/api/admin/api-keys`, {
       method: 'POST',
-      body: data,
+      body: JSON.stringify(data),
     }),
-    onSuccess: (response) => {
+    onSuccess: (response: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/api-keys'] });
       setIsCreateDialogOpen(false);
       setNewKeyData({
@@ -130,6 +145,7 @@ export default function AdminApi() {
   const revokeKeyMutation = useMutation({
     mutationFn: (keyId: number) => apiRequest(`/api/admin/api-keys/${keyId}/revoke`, {
       method: 'POST',
+      body: JSON.stringify({}),
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/api-keys'] });
@@ -174,31 +190,102 @@ export default function AdminApi() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-950 via-purple-900 to-pink-800 p-4 sm:p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
-        
-        {/* Header */}
-        <div className="backdrop-blur-xl bg-white/5 border border-white/20 rounded-2xl p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-white flex items-center gap-3">
-                <Code className="h-8 w-8 text-blue-400" />
-                Tapt API Management
-              </h1>
-              <p className="text-white/60 mt-2">Manage API keys and integrations for ecommerce platforms</p>
+    <div className="relative min-h-screen">
+      {/* Backdrop Overlay */}
+      <div 
+        className={`fixed inset-0 bg-black/50 z-40 transition-opacity duration-300 ${
+          menuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={() => setMenuOpen(false)}
+      />
+
+      {/* Sliding Menu - Mobile Optimized */}
+      <div 
+        className={`fixed right-0 top-0 h-full ${isMobile ? 'w-[70%]' : 'w-80'} bg-gray-800 border-l border-gray-700 z-50 transform transition-transform duration-300 ease-in-out ${
+          menuOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+        <div className={`${isMobile ? 'p-4' : 'p-6'}`}>
+          <div className={`flex justify-between items-center ${isMobile ? 'mb-6' : 'mb-8'}`}>
+            <h2 className={`${isMobile ? 'text-lg' : 'text-xl'} font-bold text-white`}>Admin Menu</h2>
+            <button onClick={() => setMenuOpen(false)} className="text-white/70 hover:text-white">
+              <X className={`${isMobile ? 'h-5 w-5' : 'h-6 w-6'}`} />
+            </button>
+          </div>
+          <nav className="space-y-4">
+            <a href="/admin/dashboard" className="block py-3 px-4 text-white hover:text-white rounded-xl transition-colors">
+              Admin Dashboard
+            </a>
+            <a href="/admin/revenue" className="block py-3 px-4 text-white hover:text-white rounded-xl transition-colors">
+              Revenue Analytics
+            </a>
+            <a href="/admin/api" className="block py-3 px-4 text-[#00FF66] rounded-xl font-medium">
+              API Management
+            </a>
+            <div className="pt-4 mt-4 border-t border-gray-600">
+              <button 
+                onClick={() => {
+                  localStorage.removeItem('admin-token');
+                  window.location.href = '/admin/login';
+                }}
+                className="block w-full text-left py-3 px-4 text-red-400 hover:text-red-300 rounded-xl transition-colors"
+              >
+                Logout
+              </button>
             </div>
+          </nav>
+        </div>
+      </div>
+
+      {/* Main Content with Slide Animation */}
+      <div 
+        className={`min-h-screen bg-gradient-to-br from-gray-950 via-black to-gray-900 transform transition-transform duration-300 ease-in-out ${
+          menuOpen ? (isMobile ? '-translate-x-[70%]' : '-translate-x-80') : 'translate-x-0'
+        }`}
+      >
+        {/* Menu Icon - Mobile Optimized */}
+        <div className="fixed top-4 right-4 z-30">
+          <button
+            onClick={() => setMenuOpen(true)}
+            className={`backdrop-blur-xl bg-black/40 border border-white/20 rounded-xl text-white hover:bg-black/60 transition-colors ${
+              isMobile ? 'p-2' : 'p-3'
+            }`}
+          >
+            <Menu className={`${isMobile ? 'h-5 w-5' : 'h-6 w-6'}`} />
+          </button>
+        </div>
+
+        {/* Tapt Pay Admin Branding */}
+        <div className="fixed top-4 left-4 z-30">
+          <div className="text-white text-xl font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>
+            tapt admin
+          </div>
+        </div>
+
+        <div className={`container mx-auto px-3 sm:px-4 pb-4 sm:pb-8 ${isMobile ? 'pt-16' : 'pt-20'}`}>
+          <div className={`${isMobile ? 'mb-4' : 'mb-6 sm:mb-8'}`}>
+            <h1 className={`font-bold text-white mb-2 ${isMobile ? 'text-xl' : 'text-2xl sm:text-3xl'} flex items-center gap-3`}>
+              <Code className="h-8 w-8 text-[#00FF66] drop-shadow-[0_0_8px_#00FF66]" />
+              API Management
+            </h1>
+            <p className={`text-white/70 ${isMobile ? 'text-xs' : 'text-sm sm:text-base'}`}>Manage API keys and integrations for ecommerce platforms</p>
+          </div>
+        
+        {/* Action Buttons */}
+        <div className={`backdrop-blur-xl bg-white/5 border border-white/20 rounded-3xl shadow-2xl mb-6 sm:mb-8 hover:bg-white/10 hover:border-white/30 transition-all duration-300 ${isMobile ? 'p-4 rounded-2xl' : 'p-6 rounded-3xl'}`}>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex gap-3">
               <Button 
                 onClick={() => window.open('https://docs.tapt.co.nz/api', '_blank')}
                 variant="outline"
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                className="backdrop-blur-sm bg-white/10 border border-white/20 text-white hover:bg-white/20 hover:border-white/30 transition-all duration-300"
               >
                 <Book className="h-4 w-4 mr-2" />
                 API Docs
               </Button>
               <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button className="bg-blue-500/80 border-blue-400/50 text-white hover:bg-blue-500">
+                  <Button className="bg-[#00FF66]/20 border border-[#00FF66]/30 text-[#00FF66] hover:bg-[#00FF66]/30 hover:border-[#00FF66]/40 transition-all duration-300">
                     <Plus className="h-4 w-4 mr-2" />
                     Create API Key
                   </Button>
@@ -332,76 +419,72 @@ export default function AdminApi() {
 
           <TabsContent value="overview" className="space-y-6">
             {/* API Metrics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card className="bg-white/5 border-white/20 backdrop-blur-xl">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-white flex items-center gap-2 text-sm">
-                    <Activity className="h-4 w-4 text-green-400" />
-                    Total API Calls
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-white">{metrics?.totalRequests?.toLocaleString() || '0'}</div>
-                  <p className="text-white/60 text-xs">All time requests</p>
-                </CardContent>
-              </Card>
+            <div className={`grid gap-3 sm:gap-6 mb-6 sm:mb-8 ${isMobile ? 'grid-cols-2' : 'grid-cols-2 lg:grid-cols-4'}`}>
+              <div className="backdrop-blur-xl bg-white/5 border border-white/20 rounded-3xl p-6 shadow-2xl hover:bg-white/10 hover:border-white/30 transition-all duration-300">
+                <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <h3 className="text-sm font-medium text-white/90">Total API Calls</h3>
+                  <Activity className="h-4 w-4 text-[#00FF66] drop-shadow-[0_0_8px_#00FF66]" />
+                </div>
+                <div className="text-2xl font-bold text-white">
+                  {metrics?.totalRequests?.toLocaleString() || '0'}
+                </div>
+                <p className="text-xs text-white/70">
+                  All time requests
+                </p>
+              </div>
               
-              <Card className="bg-white/5 border-white/20 backdrop-blur-xl">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-white flex items-center gap-2 text-sm">
-                    <CheckCircle className="h-4 w-4 text-blue-400" />
-                    Success Rate
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-white">
-                    {metrics ? Math.round((metrics.successfulRequests / metrics.totalRequests) * 100) : 0}%
-                  </div>
-                  <p className="text-white/60 text-xs">Successful responses</p>
-                </CardContent>  
-              </Card>
+              <div className="backdrop-blur-xl bg-white/5 border border-white/20 rounded-3xl p-6 shadow-2xl hover:bg-white/10 hover:border-white/30 transition-all duration-300">
+                <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <h3 className="text-sm font-medium text-white/90">Success Rate</h3>
+                  <CheckCircle className="h-4 w-4 text-[#00FF66] drop-shadow-[0_0_8px_#00FF66]" />
+                </div>
+                <div className="text-2xl font-bold text-white">
+                  {metrics ? Math.round((metrics.successfulRequests / metrics.totalRequests) * 100) : 0}%
+                </div>
+                <p className="text-xs text-white/70">
+                  Successful API responses
+                </p>
+              </div>
 
-              <Card className="bg-white/5 border-white/20 backdrop-blur-xl">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-white flex items-center gap-2 text-sm">
-                    <Zap className="h-4 w-4 text-yellow-400" />
-                    Avg Response Time
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-white">{metrics?.averageResponseTime || 0}ms</div>
-                  <p className="text-white/60 text-xs">Average latency</p>
-                </CardContent>
-              </Card>
+              <div className="backdrop-blur-xl bg-white/5 border border-white/20 rounded-3xl p-6 shadow-2xl hover:bg-white/10 hover:border-white/30 transition-all duration-300">
+                <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <h3 className="text-sm font-medium text-white/90">Avg Response Time</h3>
+                  <Clock className="h-4 w-4 text-[#00FF66] drop-shadow-[0_0_8px_#00FF66]" />
+                </div>
+                <div className="text-2xl font-bold text-white">
+                  {metrics?.averageResponseTime || 0}ms
+                </div>
+                <p className="text-xs text-white/70">
+                  Average response time
+                </p>
+              </div>
 
-              <Card className="bg-white/5 border-white/20 backdrop-blur-xl">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-white flex items-center gap-2 text-sm">
-                    <Globe className="h-4 w-4 text-purple-400" />
-                    Active Keys
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-white">
-                    {apiKeys.filter((key: ApiKey) => key.status === 'active').length}
-                  </div>
-                  <p className="text-white/60 text-xs">Currently active</p>
-                </CardContent>
-              </Card>
+              <div className="backdrop-blur-xl bg-white/5 border border-white/20 rounded-3xl p-6 shadow-2xl hover:bg-white/10 hover:border-white/30 transition-all duration-300">
+                <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <h3 className="text-sm font-medium text-white/90">Today's Requests</h3>
+                  <Zap className="h-4 w-4 text-[#00FF66] drop-shadow-[0_0_8px_#00FF66]" />
+                </div>
+                <div className="text-2xl font-bold text-white">
+                  {metrics?.requestsToday?.toLocaleString() || '0'}
+                </div>
+                <p className="text-xs text-white/70">
+                  Requests in last 24h
+                </p>
+              </div>
             </div>
 
             {/* Quick Start Guide */}
-            <Card className="bg-white/5 border-white/20 backdrop-blur-xl">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center gap-2">
-                  <Book className="h-5 w-5 text-blue-400" />
+            <div className={`backdrop-blur-xl bg-white/5 border border-white/20 rounded-3xl shadow-2xl mb-6 sm:mb-8 hover:bg-white/10 hover:border-white/30 transition-all duration-300 ${isMobile ? 'p-4 rounded-2xl' : 'p-6 rounded-3xl'}`}>
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <Book className="h-5 w-5 text-[#00FF66] drop-shadow-[0_0_8px_#00FF66]" />
                   Quick Start Guide
-                </CardTitle>
-                <CardDescription className="text-white/70">
+                </h3>
+                <p className="text-white/70 text-sm">
                   Get started with Tapt API integration in minutes
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+                </p>
+              </div>
+              <div className="space-y-4">
                 <div className="grid md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <h4 className="font-medium text-white flex items-center gap-2">
@@ -425,8 +508,8 @@ export default function AdminApi() {
                     <p className="text-white/60 text-sm">Integrate with your store and start accepting payments through Tapt.</p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </TabsContent>
 
           <TabsContent value="keys" className="space-y-6">
@@ -443,7 +526,7 @@ export default function AdminApi() {
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto"></div>
                     <p className="text-white/60 mt-2">Loading API keys...</p>
                   </div>
-                ) : apiKeys.length === 0 ? (
+                ) : (apiKeys as ApiKey[]).length === 0 ? (
                   <div className="text-center py-8">
                     <Key className="h-12 w-12 text-white/40 mx-auto mb-4" />
                     <h3 className="text-lg font-medium text-white mb-2">No API keys yet</h3>
@@ -455,7 +538,7 @@ export default function AdminApi() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {apiKeys.map((key: ApiKey) => (
+                    {(apiKeys as ApiKey[]).map((key: ApiKey) => (
                       <div key={key.id} className="bg-white/5 border border-white/20 rounded-xl p-4">
                         <div className="flex items-start justify-between mb-3">
                           <div>
@@ -618,6 +701,7 @@ export default function AdminApi() {
             </Card>
           </TabsContent>
         </Tabs>
+        </div>
       </div>
     </div>
   );
