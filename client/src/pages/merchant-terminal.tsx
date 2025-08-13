@@ -548,15 +548,14 @@ export default function MerchantTerminal() {
                   {/* Stone Selection */}
                   {taptStones && taptStones.length > 0 && (
                     <div className="space-y-1">
-                      <label className="block text-xs font-medium text-gray-300 text-left">
-                        Select Tapt Stone (optional):
+                      <label className="block text-xs font-medium text-gray-300 text-center">
+                        Select Tapt Stone:
                       </label>
-                      <Select value={selectedStoneId?.toString() || "general"} onValueChange={(value) => setSelectedStoneId(value && value !== "general" ? parseInt(value) : null)}>
+                      <Select value={selectedStoneId?.toString()} onValueChange={(value) => setSelectedStoneId(value ? parseInt(value) : null)}>
                         <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
-                          <SelectValue placeholder="General Payment Link" />
+                          <SelectValue placeholder="Choose a stone" />
                         </SelectTrigger>
                         <SelectContent className="bg-gray-700 border-gray-600">
-                          <SelectItem value="general">General Payment Link</SelectItem>
                           {taptStones.map((stone: any) => (
                             <SelectItem key={stone.id} value={stone.id.toString()}>
                               Stone {stone.stoneNumber} - {stone.name}
@@ -569,18 +568,23 @@ export default function MerchantTerminal() {
 
                   <Button
                     onClick={() => {
-                      const baseUrl = `${window.location.origin}/pay/${merchantId}`;
-                      const stoneParam = selectedStoneId ? `/stone/${selectedStoneId}` : '';
-                      const transactionParam = currentTransaction ? `?transaction=${currentTransaction.id}` : '';
-                      const paymentUrl = `${baseUrl}${stoneParam}${transactionParam}`;
+                      if (!selectedStoneId) {
+                        toast({
+                          title: "Select a Stone",
+                          description: "Please select a Tapt Stone to copy its payment link",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
                       
-                      if (navigator.clipboard) {
-                        navigator.clipboard.writeText(paymentUrl);
+                      const selectedStone = taptStones?.find((stone: any) => stone.id === selectedStoneId);
+                      if (selectedStone) {
+                        navigator.clipboard.writeText(selectedStone.paymentUrl);
                         setCopiedLink(true);
                         setTimeout(() => setCopiedLink(false), 2000);
                         toast({
-                          title: "Link Copied",
-                          description: `Payment link copied${selectedStoneId && taptStones?.length ? ` for Stone ${taptStones.find((s: any) => s.id === selectedStoneId)?.stoneNumber}` : ''}`,
+                          title: "Stone Link Copied",
+                          description: `${selectedStone.name} payment link copied to clipboard`,
                         });
                       }
                       setActiveAction(null);
@@ -651,12 +655,12 @@ export default function MerchantTerminal() {
             >
               {/* Header */}
               <div
-                className="flex items-center justify-between text-black cursor-pointer"
+                className="flex items-center justify-center text-black cursor-pointer relative"
                 onClick={() => setQrCollapsed(prev => !prev)}
               >
                 <h3 className="text-lg font-semibold">QR Codes</h3>
                 <ChevronDown
-                  className={`transition-transform duration-300 ${qrCollapsed ? '' : 'rotate-180'}`}
+                  className={`absolute right-0 transition-transform duration-300 ${qrCollapsed ? '' : 'rotate-180'}`}
                   size={20}
                 />
               </div>
