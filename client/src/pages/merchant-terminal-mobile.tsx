@@ -834,13 +834,52 @@ export default function MerchantTerminalMobile() {
                       </div>
 
                       {/* QR Code Container */}
-                      <div className="text-center mb-6">
+                      <div className="text-center mb-4">
                         <div className="w-40 h-40 mx-auto bg-white rounded-lg p-3 border shadow-sm">
                           <QRCodeDisplay 
                             merchantId={merchantId} 
                             stoneId={stone.id}
                           />
                         </div>
+                      </div>
+
+                      {/* Download Button - Separate line */}
+                      <div className="text-center mb-4">
+                        <button
+                          onClick={async () => {
+                            try {
+                              const downloadUrl = `/api/merchants/${merchantId}/stone/${stone.id}/qr?size=800&download=true`;
+                              const response = await fetch(downloadUrl);
+                              if (!response.ok) throw new Error('Failed to fetch QR code');
+                              
+                              const blob = await response.blob();
+                              const url = window.URL.createObjectURL(blob);
+                              
+                              const link = document.createElement('a');
+                              link.href = url;
+                              link.download = `tapt-payment-qr-stone-${stone.stoneNumber}.png`;
+                              document.body.appendChild(link);
+                              link.click();
+                              
+                              document.body.removeChild(link);
+                              window.URL.revokeObjectURL(url);
+                              
+                              toast({
+                                title: "QR Code Downloaded",
+                                description: `Stone ${stone.stoneNumber} QR code saved to downloads`,
+                              });
+                            } catch (error) {
+                              toast({
+                                title: "Download Failed",
+                                description: "Could not download QR code. Please try again.",
+                                variant: "destructive",
+                              });
+                            }
+                          }}
+                          className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-300 transition-colors"
+                        >
+                          Download QR Code
+                        </button>
                       </div>
 
                       {/* Description Text - Separate line */}
