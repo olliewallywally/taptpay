@@ -63,7 +63,7 @@ export function MobileHeader({ title, children, showMenu = true }: MobileHeaderP
                   localStorage.removeItem('auth-token');
                   window.location.href = '/login';
                 }}
-                className="block w-full text-left py-4 px-4 text-white hover:text-red-400 transition-colors duration-200 font-medium text-lg"
+                className="block w-full text-left py-4 px-4 text-red-400 hover:text-red-500 transition-colors duration-200 font-medium text-lg"
               >
                 Logout
               </button>
