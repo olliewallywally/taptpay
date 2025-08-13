@@ -341,34 +341,36 @@ export default function MerchantTerminal() {
           </div>
         </div>
 
-        {/* Mode Switcher */}
-        <div className="flex justify-center mb-8">
-          <div className="flex bg-gray-900 rounded-lg p-1 transition-all duration-300 hover:bg-gray-800 hover:scale-105 hover:shadow-lg">
-            <button
-              onClick={() => setActiveTab("qr")}
-              className={`px-6 py-2 rounded-md font-medium transition-all duration-200 ${
-                activeTab === "qr"
-                  ? "bg-black text-white"
-                  : "text-gray-400 hover:text-gray-200"
-              }`}
-            >
-              QR
-            </button>
-            <button
-              onClick={() => setActiveTab("nfc")}
-              className={`px-6 py-2 rounded-md font-medium transition-all duration-200 ${
-                activeTab === "nfc"
-                  ? "bg-black text-white"
-                  : "text-gray-400 hover:text-gray-200"
-              }`}
-            >
-              NFC
-            </button>
+        {/* Content Wrapper - Reduce width by 35% */}
+        <div className="max-w-[65%] mx-auto">
+          {/* Mode Switcher */}
+          <div className="flex justify-center mb-8">
+            <div className="flex bg-gray-900 rounded-lg p-1 transition-all duration-300 hover:bg-gray-800 hover:scale-105 hover:shadow-lg">
+              <button
+                onClick={() => setActiveTab("qr")}
+                className={`px-6 py-2 rounded-md font-medium transition-all duration-200 ${
+                  activeTab === "qr"
+                    ? "bg-black text-white"
+                    : "text-gray-400 hover:text-gray-200"
+                }`}
+              >
+                QR
+              </button>
+              <button
+                onClick={() => setActiveTab("nfc")}
+                className={`px-6 py-2 rounded-md font-medium transition-all duration-200 ${
+                  activeTab === "nfc"
+                    ? "bg-black text-white"
+                    : "text-gray-400 hover:text-gray-200"
+                }`}
+              >
+                NFC
+              </button>
+            </div>
           </div>
-        </div>
 
-        {/* Amount Box */}
-        <div className="px-6 mb-6">
+          {/* Amount Box */}
+          <div className="px-6 mb-6">
           {currentTransaction || activeTransaction ? (
             <div 
               className="rounded-2xl p-6 text-center transition-all duration-300 hover:scale-105 hover:shadow-lg cursor-pointer"
@@ -726,6 +728,7 @@ export default function MerchantTerminal() {
             </div>
           )}
         </div>
+        </div> {/* End Content Wrapper */}
       </div>
 
       {/* Slide-out Hamburger Menu */}
