@@ -87,9 +87,13 @@ export default function Transactions() {
   // Refund mutation
   const refundMutation = useMutation({
     mutationFn: async ({ transactionId, amount, reason }: { transactionId: number, amount: number, reason: string }) => {
-      return apiRequest(`/api/transactions/${transactionId}/refund`, {
+      return apiRequest(`/api/transactions/${transactionId}/refunds`, {
         method: "POST",
-        body: { amount, reason }
+        body: { 
+          refundAmount: amount.toString(), 
+          refundReason: reason,
+          refundMethod: "original_payment_method"
+        }
       });
     },
     onSuccess: () => {
