@@ -572,7 +572,7 @@ export default function MerchantTerminal() {
                         setTimeout(() => setCopiedLink(false), 2000);
                         toast({
                           title: "Link Copied",
-                          description: `Payment link copied${selectedStoneId ? ` for Stone ${taptStones.find((s: any) => s.id === selectedStoneId)?.stoneNumber}` : ''}`,
+                          description: `Payment link copied${selectedStoneId && taptStones?.length ? ` for Stone ${taptStones.find((s: any) => s.id === selectedStoneId)?.stoneNumber}` : ''}`,
                         });
                       }
                       setActiveAction(null);
