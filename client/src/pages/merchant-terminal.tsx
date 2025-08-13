@@ -609,7 +609,7 @@ export default function MerchantTerminal() {
 
       {/* Slide-out Hamburger Menu */}
       <div 
-        className="menu-container fixed top-0 right-0 h-full bg-gray-900 z-50 transition-transform duration-300 ease-in-out"
+        className="menu-container fixed top-0 right-0 h-full bg-gray-800 z-50 transition-transform duration-300 ease-in-out"
         style={{
           width: '70%',
           transform: menuOpen ? 'translateX(0)' : 'translateX(100%)',
@@ -628,459 +628,40 @@ export default function MerchantTerminal() {
           
           <nav className="space-y-4">
             <Link href="/dashboard">
-              <a className="block py-3 px-4 text-white hover:bg-gray-800 rounded-lg transition-colors">
+              <a className="block py-3 px-4 text-white rounded-xl transition-colors font-medium">
                 Dashboard
               </a>
             </Link>
+            <a href="/merchant" className="block py-3 px-4 text-[#00CC52] rounded-xl font-medium">
+              Terminal
+            </a>
             <Link href="/transactions">
-              <a className="block py-3 px-4 text-white hover:bg-gray-800 rounded-lg transition-colors">
-                Transaction History
+              <a className="block py-3 px-4 text-white rounded-xl transition-colors font-medium">
+                Transactions
               </a>
             </Link>
             <Link href="/settings">
-              <a className="block py-3 px-4 text-white hover:bg-gray-800 rounded-lg transition-colors">
+              <a className="block py-3 px-4 text-white rounded-xl transition-colors font-medium">
                 Settings
               </a>
             </Link>
-            <button 
-              onClick={() => {
-                localStorage.removeItem('auth-token');
-                window.location.href = '/login';
-              }}
-              className="block w-full text-left py-3 px-4 text-white hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              Logout
-            </button>
+            <div className="pt-4 mt-4 border-t border-gray-600">
+              <button 
+                onClick={() => {
+                  localStorage.removeItem('auth-token');
+                  window.location.href = '/login';
+                }}
+                className="block w-full text-left py-3 px-4 text-red-400 hover:text-red-300 rounded-xl transition-colors font-medium"
+              >
+                Logout
+              </button>
+            </div>
           </nav>
         </div>
       </div>
     </div>
   );
 }
-                <QRCodeDisplay 
-                  paymentUrl={merchant?.paymentUrl}
-                  qrCodeUrl={merchant?.qrCodeUrl}
-                  merchantId={merchantId}
-                />
-              </div>
-            </div>
-          </TabsContent>
-
-          {/* NFC Tab Content */}
           <TabsContent value="nfc" className="space-y-4 sm:space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               
-              {/* NFC Transaction Entry Card */}
-              <div className="backdrop-blur-xl bg-white/3 border border-white/8 rounded-2xl p-4 sm:p-6 shadow-2xl transition-all duration-300 hover:bg-white/6 hover:border-white/15 hover:transform hover:translate-y-[-2px] hover:shadow-[0_12px_40px_rgba(0,0,0,0.15)]">
-                <div className="mb-3 sm:mb-4">
-                  <h2 className="text-base sm:text-lg font-bold text-white mb-1 sm:mb-2">NFC Payment</h2>
-                  <p className="text-xs sm:text-sm text-white/70">Create contactless payment</p>
-                </div>
-
-                <Form {...form}>
-                  <div className="space-y-3 sm:space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="itemName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs sm:text-sm font-medium text-white">Item Name</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="Coffee, Lunch, etc."
-                              {...field}
-                              className="backdrop-blur-sm bg-white/5 border-white/15 text-black sm:text-white placeholder:text-gray-600 sm:placeholder:text-white/60 focus:bg-white/8 focus:border-white/20 h-11 sm:h-10 text-base font-medium"
-                            />
-                          </FormControl>
-                          <FormMessage className="text-red-300 text-xs" />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="price"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs sm:text-sm font-medium text-white">Price ($)</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="4.50"
-                              {...field}
-                              className="backdrop-blur-sm bg-white/5 border-white/15 text-black sm:text-white placeholder:text-gray-600 sm:placeholder:text-white/60 focus:bg-white/8 focus:border-white/20 h-11 sm:h-10 text-base font-medium"
-                            />
-                          </FormControl>
-                          <FormMessage className="text-red-300 text-xs" />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    {/* NFC Create Payment Button */}
-                    {nfcPaymentStatus === "idle" && (
-                      <button 
-                        onClick={createNFCPayment}
-                        disabled={!nfcCapabilities?.nfcSupported || !form.watch("price") || !form.watch("itemName")}
-                        style={{
-                          width: '100%',
-                          padding: '16px',
-                          background: (!nfcCapabilities?.nfcSupported || !form.watch("price") || !form.watch("itemName")) 
-                            ? 'rgba(107, 114, 128, 0.5)' 
-                            : 'linear-gradient(to right, rgba(34, 197, 94, 0.8), rgba(16, 185, 129, 0.8), rgba(34, 197, 94, 0.8))',
-                          border: '1px solid rgba(34, 197, 94, 0.5)',
-                          borderRadius: '12px',
-                          color: 'white',
-                          fontSize: '16px',
-                          fontWeight: '500',
-                          cursor: (!nfcCapabilities?.nfcSupported || !form.watch("price") || !form.watch("itemName")) ? 'not-allowed' : 'pointer',
-                          opacity: (!nfcCapabilities?.nfcSupported || !form.watch("price") || !form.watch("itemName")) ? 0.5 : 1,
-                          transition: 'all 0.3s ease',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '8px'
-                        }}
-                      >
-                        <Waves className="w-4 h-4" />
-                        Create NFC Payment
-                      </button>
-                    )}
-                  </div>
-                </Form>
-              </div>
-
-              {/* NFC Status Card */}
-              <div className="backdrop-blur-xl bg-white/3 border border-white/8 rounded-2xl p-4 sm:p-6 shadow-2xl transition-all duration-300 hover:bg-white/6 hover:border-white/15 hover:transform hover:translate-y-[-2px] hover:shadow-[0_12px_40px_rgba(0,0,0,0.15)]">
-                <div className="mb-3 sm:mb-4">
-                  <h2 className="text-base sm:text-lg font-bold text-white mb-1 sm:mb-2">NFC Status</h2>
-                  <p className="text-xs sm:text-sm text-white/70">Contactless payment ready</p>
-                </div>
-                
-                <div className="text-center space-y-4">
-                  {!nfcCapabilities?.nfcSupported && (
-                    <div className="p-4 bg-red-500/10 border border-red-400/30 rounded-xl">
-                      <p className="text-red-300 text-sm">NFC not supported on this device</p>
-                    </div>
-                  )}
-                  
-                  {nfcCapabilities?.nfcSupported && nfcPaymentStatus === "idle" && (
-                    <div className="p-4 bg-blue-500/10 border border-blue-400/30 rounded-xl">
-                      <Smartphone className="w-8 h-8 text-blue-300 mx-auto mb-2" />
-                      <p className="text-blue-300 text-sm">Ready for NFC payment</p>
-                    </div>
-                  )}
-
-                  {nfcSession && !showNfcOverlay && (
-                    <div className="p-4 bg-green-500/10 border border-green-400/30 rounded-xl">
-                      <div className="flex items-center justify-center gap-3 mb-3">
-                        {nfcPaymentStatus === "ready" && <Waves className="h-5 w-5 text-blue-400 animate-pulse" />}
-                        {nfcPaymentStatus === "processing" && <Loader2 className="h-5 w-5 text-yellow-400 animate-spin" />}
-                        {nfcPaymentStatus === "completed" && <CheckCircle className="h-5 w-5 text-green-400" />}
-                        {nfcPaymentStatus === "failed" && <XCircle className="h-5 w-5 text-red-400" />}
-                        
-                        <span className="text-white font-light">
-                          {nfcPaymentStatus === "ready" && "Waiting for Customer"}
-                          {nfcPaymentStatus === "processing" && "Processing Payment..."}
-                          {nfcPaymentStatus === "completed" && "Payment Received"}
-                          {nfcPaymentStatus === "failed" && "Payment Failed"}
-                        </span>
-                      </div>
-                      
-                      {nfcPaymentStatus === "ready" && (
-                        <button
-                          onClick={() => setShowNfcOverlay(true)}
-                          style={{
-                            background: 'linear-gradient(to right, rgba(34, 197, 94, 0.8), rgba(16, 185, 129, 0.8))',
-                            border: '1px solid rgba(34, 197, 94, 0.5)',
-                            borderRadius: '8px',
-                            color: 'white',
-                            padding: '8px 16px',
-                            fontSize: '14px',
-                            fontWeight: '300',
-                            cursor: 'pointer',
-                            transition: 'all 0.3s ease'
-                          }}
-                        >
-                          Show Payment Screen
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </TabsContent>
-        </Tabs>
-
-        {/* Bottom Row: Payment Link + Customer Page */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
-          {/* Payment Link Section */}
-          <div className="backdrop-blur-xl bg-white/3 border border-white/8 rounded-2xl p-4 sm:p-6 shadow-2xl transition-all duration-300 hover:bg-white/6 hover:border-white/15 hover:transform hover:translate-y-[-2px] hover:shadow-[0_12px_40px_rgba(0,0,0,0.15)]">
-            <div className="mb-3 sm:mb-4">
-              <h2 className="text-base sm:text-lg font-bold text-white mb-1 sm:mb-2">Payment Link</h2>
-              <p className="text-xs sm:text-sm text-white/70">Share this link with customers</p>
-            </div>
-            
-            {merchant?.paymentUrl && (
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 p-3 bg-white/3 border border-white/10 rounded-xl">
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs sm:text-sm text-white/90 truncate font-mono break-all">
-                    {merchant.paymentUrl}
-                  </p>
-                </div>
-                <Button
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(merchant.paymentUrl);
-                      setCopiedLink(true);
-                      toast({
-                        title: "Copied!",
-                        description: "Payment link copied to clipboard",
-                      });
-                      setTimeout(() => setCopiedLink(false), 2000);
-                    } catch (err) {
-                      toast({
-                        title: "Failed to copy",
-                        description: "Please copy the link manually",
-                        variant: "destructive",
-                      });
-                    }
-                  }}
-                  size="sm"
-                  className="backdrop-blur-sm bg-white/5 border border-white/15 text-white hover:bg-white/8 hover:border-white/20 shrink-0 px-3 py-2 h-9 text-sm font-medium"
-                >
-                  {copiedLink ? (
-                    <>
-                      <Check className="h-4 w-4 mr-1 sm:mr-0" />
-                      <span className="sm:hidden">Copied</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-4 w-4 mr-1 sm:mr-0" />
-                      <span className="sm:hidden">Copy</span>
-                    </>
-                  )}
-                </Button>
-              </div>
-            )}
-          </div>
-
-          {/* Customer Payment Page Button */}
-          <div className="backdrop-blur-xl bg-white/3 border border-white/8 rounded-2xl p-4 sm:p-6 shadow-2xl transition-all duration-300 hover:bg-white/6 hover:border-white/15 hover:transform hover:translate-y-[-2px] hover:shadow-[0_12px_40px_rgba(0,0,0,0.15)]">
-            <div className="flex items-center justify-center h-full">
-              {merchant?.paymentUrl && (
-                <Link href={`/pay/${merchantId}`} className="w-full">
-                  <Button className="w-full backdrop-blur-sm bg-white/5 border border-white/15 text-white hover:bg-white/8 hover:border-white/20 px-4 sm:px-6 py-3 h-12 sm:h-11 rounded-xl font-medium transition-all duration-300 text-sm sm:text-base">
-                    <Eye className="mr-2 h-4 w-4" />
-                    <span className="hidden sm:inline">View Customer Payment Page</span>
-                    <span className="sm:hidden">Customer Page</span>
-                  </Button>
-                </Link>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Transactions Button - Bottom of page */}
-        <div className="mt-6 sm:mt-8 mb-6 sm:mb-8">
-          <div className="flex justify-center">
-            <Link href="/transactions" className="w-full sm:w-auto">
-              <button className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 backdrop-blur-sm bg-white/5 border border-white/15 text-white rounded-2xl hover:bg-white/8 hover:border-white/20 transition-all duration-300 font-medium text-sm sm:text-base h-12 sm:h-11">
-                <Eye className="h-4 w-4 sm:h-5 sm:w-5" />
-                <span className="hidden sm:inline">View All Transactions</span>
-                <span className="sm:hidden">All Transactions</span>
-              </button>
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* NFC Glass Overlay Effect when NFC Payment is Active */}
-      {showNfcOverlay && (
-        <div className="fixed inset-0 z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.95)' }}>
-          <div className="min-h-screen flex items-center justify-center p-6">
-            <div style={{ 
-              background: 'rgba(255, 255, 255, 0.05)', 
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              borderRadius: '24px',
-              padding: '32px',
-              backdropFilter: 'blur(20px)',
-              boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5)'
-            }} className="max-w-sm w-full text-center relative">
-              
-              {nfcPaymentStatus === "ready" && (
-                <div className="space-y-12">
-                  {/* Close Button */}
-                  <button
-                    onClick={() => setShowNfcOverlay(false)}
-                    style={{
-                      position: 'absolute',
-                      top: '16px',
-                      right: '16px',
-                      width: '40px',
-                      height: '40px',
-                      borderRadius: '50%',
-                      background: 'rgba(255, 255, 255, 0.1)',
-                      border: 'none',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease'
-                    }}
-                    onMouseEnter={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.2)'}
-                    onMouseLeave={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.1)'}
-                  >
-                    <X style={{ width: '20px', height: '20px', color: 'rgba(255, 255, 255, 0.8)' }} />
-                  </button>
-                  
-                  {/* Minimal NFC Icon */}
-                  <div className="mx-auto w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
-                    <Waves className="h-8 w-8 text-white/80" />
-                  </div>
-                  
-                  {/* Clean Typography */}
-                  <div className="space-y-3">
-                    <div className="text-5xl font-extralight text-white tracking-tight">${nfcSession?.amount}</div>
-                    <div className="text-white/60 text-lg font-light">{nfcSession?.itemName}</div>
-                  </div>
-                  
-                  {/* Simple Instruction */}
-                  <div className="space-y-4">
-                    <div className="text-white/80 text-xl font-light">Tap to Pay</div>
-                    <div className="text-white/50 text-sm">Present card or device to terminal</div>
-                    
-                    {/* NFC Payment Area - Pure Visual Indicator */}
-                    <div className="w-full mt-8 py-6 px-8 bg-white/5 border border-white/20 rounded-2xl text-white/90 text-lg font-light text-center">
-                      <div className="animate-pulse">Ready for contactless payment</div>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {nfcPaymentStatus === "processing" && (
-                <div className="space-y-12">
-                  {/* Close Button */}
-                  <button
-                    onClick={() => setShowNfcOverlay(false)}
-                    style={{
-                      position: 'absolute',
-                      top: '16px',
-                      right: '16px',
-                      width: '40px',
-                      height: '40px',
-                      borderRadius: '50%',
-                      background: 'rgba(255, 255, 255, 0.1)',
-                      border: 'none',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease'
-                    }}
-                    onMouseEnter={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.2)'}
-                    onMouseLeave={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.1)'}
-                  >
-                    <X style={{ width: '20px', height: '20px', color: 'rgba(255, 255, 255, 0.8)' }} />
-                  </button>
-                  
-                  {/* Minimal Processing Indicator */}
-                  <div className="mx-auto w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
-                    <Loader2 className="h-8 w-8 text-white/80 animate-spin" />
-                  </div>
-                  
-                  {/* Clean Processing Text */}
-                  <div className="space-y-4">
-                    <div className="text-white/90 text-2xl font-light">Processing</div>
-                    <div className="text-white/60 text-sm">Please wait...</div>
-                  </div>
-                </div>
-              )}
-              
-              {nfcPaymentStatus === "completed" && (
-                <div className="space-y-12">
-                  {/* Close Button */}
-                  <button
-                    onClick={() => setShowNfcOverlay(false)}
-                    style={{
-                      position: 'absolute',
-                      top: '16px',
-                      right: '16px',
-                      width: '40px',
-                      height: '40px',
-                      borderRadius: '50%',
-                      background: 'rgba(255, 255, 255, 0.1)',
-                      border: 'none',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease'
-                    }}
-                    onMouseEnter={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.2)'}
-                    onMouseLeave={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.1)'}
-                  >
-                    <X style={{ width: '20px', height: '20px', color: 'rgba(255, 255, 255, 0.8)' }} />
-                  </button>
-                  
-                  {/* Success Icon */}
-                  <div className="mx-auto w-20 h-20 rounded-full bg-green-500/10 border border-green-400/30 flex items-center justify-center">
-                    <CheckCircle className="h-8 w-8 text-green-400" />
-                  </div>
-                  
-                  {/* Success Message */}
-                  <div className="space-y-3">
-                    <div className="text-green-300 text-xl font-light">Payment Complete</div>
-                    <div className="text-4xl font-extralight text-white tracking-tight">${nfcSession?.amount}</div>
-                    <div className="text-white/60 text-lg font-light">{nfcSession?.itemName}</div>
-                  </div>
-                </div>
-              )}
-              
-              {nfcPaymentStatus === "failed" && (
-                <div className="space-y-12">
-                  {/* Close Button */}
-                  <button
-                    onClick={() => {
-                      setShowNfcOverlay(false);
-                      setNfcPaymentStatus("idle");
-                      setNfcSession(null);
-                    }}
-                    style={{
-                      position: 'absolute',
-                      top: '16px',
-                      right: '16px',
-                      width: '40px',
-                      height: '40px',
-                      borderRadius: '50%',
-                      background: 'rgba(255, 255, 255, 0.1)',
-                      border: 'none',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease'
-                    }}
-                    onMouseEnter={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.2)'}
-                    onMouseLeave={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.1)'}
-                  >
-                    <X style={{ width: '20px', height: '20px', color: 'rgba(255, 255, 255, 0.8)' }} />
-                  </button>
-                  
-                  {/* Error Icon */}
-                  <div className="mx-auto w-20 h-20 rounded-full bg-red-500/10 border border-red-400/30 flex items-center justify-center">
-                    <XCircle className="h-8 w-8 text-red-400" />
-                  </div>
-                  
-                  {/* Error Message */}
-                  <div className="space-y-4">
-                    <div className="text-red-300 text-xl font-light">Payment Failed</div>
-                    <div className="text-white/60 text-sm">Please try again</div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
