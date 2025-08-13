@@ -389,16 +389,16 @@ export default function MerchantTerminalMobile() {
               </button>
             </div>
             <nav className="space-y-4">
-              <a href="/dashboard" className="block py-3 px-4 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors">
+              <a href="/dashboard" className="block py-3 px-4 text-white hover:text-white rounded-xl transition-colors">
                 Dashboard
               </a>
-              <a href="/merchant" className="block py-3 px-4 text-[#00FF66] bg-gray-700 rounded-xl font-medium">
+              <a href="/merchant" className="block py-3 px-4 text-[#00CC52] rounded-xl font-medium">
                 Terminal
               </a>
-              <a href="/transactions" className="block py-3 px-4 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors">
+              <a href="/transactions" className="block py-3 px-4 text-white hover:text-white rounded-xl transition-colors">
                 Transactions
               </a>
-              <a href="/settings" className="block py-3 px-4 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors">
+              <a href="/settings" className="block py-3 px-4 text-white hover:text-white rounded-xl transition-colors">
                 Settings
               </a>
               <div className="pt-4 mt-4 border-t border-gray-600">
