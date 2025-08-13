@@ -583,10 +583,10 @@ export default function MerchantTerminalMobile() {
           <div 
             className="overflow-hidden transition-all duration-250 ease-in-out"
             style={{
-              maxHeight: activeAction ? '400px' : '0px',
+              maxHeight: activeAction ? '70vh' : '0px',
             }}
           >
-            <div className="bg-gray-600 rounded-3xl p-6 mb-6">
+            <div className="bg-gray-600 rounded-3xl p-6 mb-4">
               {activeAction === "edit" && (
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold mb-4 text-white">Create Transaction</h3>
