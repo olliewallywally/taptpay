@@ -778,6 +778,42 @@ export default function MerchantTerminal() {
                             <p className="text-gray-600 text-sm">No tapt stones available</p>
                           </div>
                         )}
+                        
+                        {/* Create Stone Button */}
+                        <div className="text-center mt-6 pt-4 border-t border-gray-200">
+                          <button
+                            onClick={async () => {
+                              try {
+                                const stoneNumber = (taptStones?.length || 0) + 1;
+                                const response = await apiRequest(`/api/merchants/${merchantId}/tapt-stones`, {
+                                  method: 'POST',
+                                  body: {
+                                    name: `Stone ${stoneNumber}`,
+                                    stoneNumber: stoneNumber
+                                  }
+                                });
+                                
+                                // Refresh the stones data
+                                queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "tapt-stones"] });
+                                
+                                toast({
+                                  title: "Stone Created",
+                                  description: `Stone ${stoneNumber} has been created successfully`,
+                                });
+                              } catch (error) {
+                                console.error("Failed to create stone:", error);
+                                toast({
+                                  title: "Creation Failed",
+                                  description: "Could not create new stone",
+                                  variant: "destructive",
+                                });
+                              }
+                            }}
+                            className="px-6 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium"
+                          >
+                            + Create New Stone
+                          </button>
+                        </div>
                       </div>
                     )}
                     
