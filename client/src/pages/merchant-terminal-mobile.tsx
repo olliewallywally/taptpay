@@ -746,27 +746,9 @@ export default function MerchantTerminalMobile() {
                       {taptStones && taptStones.length > 0 && (
                         <div className="space-y-3">
                           <label className="block text-sm font-medium text-gray-300 text-left">
-                            Select Tapt Stone (optional):
+                            Select Tapt Stone:
                           </label>
                           <div className="grid grid-cols-1 gap-2">
-                            <button
-                              onClick={() => {
-                                if (merchant) {
-                                  navigator.clipboard.writeText(merchant.paymentUrl);
-                                  setCopiedLink(true);
-                                  setTimeout(() => setCopiedLink(false), 2000);
-                                  toast({
-                                    title: "General Link Copied",
-                                    description: "General payment link copied to clipboard",
-                                  });
-                                }
-                                setActiveAction(null);
-                              }}
-                              className="w-full p-3 bg-gray-700 text-white rounded-lg text-sm hover:bg-gray-600 transition-colors"
-                            >
-                              General Payment Link
-                            </button>
-                            
                             {taptStones.map((stone: any) => (
                               <button
                                 key={stone.id}
