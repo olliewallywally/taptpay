@@ -329,7 +329,9 @@ export default function MerchantTerminal() {
       >
         {/* Header */}
         <div className="flex items-center justify-between p-6">
-          <div className="flex-1 flex justify-start">
+          <div className="flex-1" />
+          <h1 className="text-2xl font-bold text-center text-white">tapt</h1>
+          <div className="flex-1 flex justify-end">
             <button
               onClick={() => setMenuOpen(!menuOpen)}
               className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
@@ -337,8 +339,6 @@ export default function MerchantTerminal() {
               <Menu size={24} />
             </button>
           </div>
-          <h1 className="text-2xl font-bold text-center text-white">tapt</h1>
-          <div className="flex-1" />
         </div>
 
         {/* Content Wrapper - Reduce width by 35% */}
