@@ -163,6 +163,14 @@ export default function MerchantTerminal() {
     console.log("Action clicked:", action);
     console.log("Current activeAction:", activeAction);
     console.log("Tapt stones:", taptStones);
+    
+    // Force send to work
+    if (action === "send") {
+      setActiveAction("send");
+      console.log("FORCED SEND ACTION SET");
+      return;
+    }
+    
     if (activeAction === action) {
       setActiveAction(null);
     } else {
@@ -528,71 +536,69 @@ export default function MerchantTerminal() {
                 </div>
               )}
 
-              {activeAction === "send" && (
-                <div className="text-center space-y-4">
-                  <h3 className="text-lg font-semibold text-white">Share Payment</h3>
-                  <p className="text-gray-300 text-sm">Choose which link to share</p>
-                  
-                  {/* SIMPLE BUTTON SELECTION */}
-                  <div className="space-y-2">
-                    <div className="text-sm text-white text-left">Select Stone:</div>
+              {(activeAction === "send" || activeAction === "share") && (
+                <div className="bg-red-500 p-4 rounded-lg">
+                  <div className="text-white text-center space-y-4">
+                    <h3 className="text-lg font-semibold">Share Payment Link</h3>
+                    <p className="text-sm">Choose which tapt stone link to share</p>
                     
-                    {/* General Link Button */}
-                    <button
-                      onClick={() => setSelectedStoneId(null)}
-                      className={`w-full p-3 rounded-lg text-left transition-all ${
-                        selectedStoneId === null 
-                          ? 'bg-green-600 text-black font-semibold' 
-                          : 'bg-gray-700 text-white hover:bg-gray-600'
-                      }`}
-                    >
-                      🔗 General Payment Link
-                    </button>
-                    
-                    {/* Stone Buttons */}
-                    {taptStones?.map((stone: any) => (
-                      <button
-                        key={stone.id}
-                        onClick={() => setSelectedStoneId(stone.id)}
-                        className={`w-full p-3 rounded-lg text-left transition-all ${
-                          selectedStoneId === stone.id 
-                            ? 'bg-green-600 text-black font-semibold' 
-                            : 'bg-gray-700 text-white hover:bg-gray-600'
-                        }`}
-                      >
-                        🪨 Stone {stone.stoneNumber} - {stone.name}
-                      </button>
-                    ))}
-                    
-                    {/* Debug Info */}
-                    <div className="text-xs text-gray-400 text-left">
-                      Stones available: {taptStones?.length || 0} | Selected: {selectedStoneId || 'general'}
+                    <div className="bg-yellow-500 p-2 rounded text-black text-xs">
+                      DEBUG: Action={activeAction}, Stones={taptStones?.length || 0}
                     </div>
-                  </div>
-
-                  <Button
-                    onClick={() => {
-                      const baseUrl = `${window.location.origin}/pay/${merchantId}`;
-                      const stoneParam = selectedStoneId ? `/stone/${selectedStoneId}` : '';
-                      const transactionParam = currentTransaction ? `?transaction=${currentTransaction.id}` : '';
-                      const paymentUrl = `${baseUrl}${stoneParam}${transactionParam}`;
+                    
+                    <div className="space-y-3">
+                      <div className="text-left text-sm font-medium">Select Stone:</div>
                       
-                      if (navigator.clipboard) {
-                        navigator.clipboard.writeText(paymentUrl);
-                        setCopiedLink(true);
-                        setTimeout(() => setCopiedLink(false), 2000);
-                        toast({
-                          title: "Link Copied",
-                          description: `${selectedStoneId ? `Stone ${taptStones.find((s: any) => s.id === selectedStoneId)?.stoneNumber} link` : 'General payment link'} copied`,
-                        });
-                      }
-                      setActiveAction(null);
-                    }}
-                    className="w-full text-black font-semibold rounded-lg py-3"
-                    style={{ backgroundColor: '#00FF66' }}
-                  >
-                    {copiedLink ? "✓ Copied!" : "Copy Payment Link"}
-                  </Button>
+                      <button
+                        onClick={() => {
+                          setSelectedStoneId(null);
+                          console.log("Selected general link");
+                        }}
+                        className="w-full p-4 rounded-lg bg-blue-600 text-white font-medium text-left"
+                      >
+                        General Payment Link
+                      </button>
+                      
+                      {taptStones && taptStones.length > 0 ? (
+                        taptStones.map((stone: any) => (
+                          <button
+                            key={stone.id}
+                            onClick={() => {
+                              setSelectedStoneId(stone.id);
+                              console.log("Selected stone:", stone.id);
+                            }}
+                            className="w-full p-4 rounded-lg bg-purple-600 text-white font-medium text-left"
+                          >
+                            Stone {stone.stoneNumber}: {stone.name}
+                          </button>
+                        ))
+                      ) : (
+                        <div className="text-red-200">No stones loaded</div>
+                      )}
+                      
+                      <div className="text-xs text-gray-200">
+                        Current selection: {selectedStoneId ? `Stone ${selectedStoneId}` : 'General'}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        const baseUrl = `${window.location.origin}/pay/${merchantId}`;
+                        const stoneParam = selectedStoneId ? `/stone/${selectedStoneId}` : '';
+                        const paymentUrl = `${baseUrl}${stoneParam}`;
+                        console.log("Generated URL:", paymentUrl);
+                        
+                        if (navigator.clipboard) {
+                          navigator.clipboard.writeText(paymentUrl);
+                          alert(`Copied: ${paymentUrl}`);
+                        }
+                        setActiveAction(null);
+                      }}
+                      className="w-full p-4 rounded-lg bg-green-600 text-black font-bold"
+                    >
+                      COPY PAYMENT LINK
+                    </button>
+                  </div>
                 </div>
               )}
 
