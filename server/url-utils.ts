@@ -23,7 +23,9 @@ export function getBaseUrl(req?: any): string {
 export function generatePaymentUrl(merchantId: number, stoneId?: number, req?: any): string {
   const baseUrl = getBaseUrl(req);
   if (stoneId) {
-    return `${baseUrl}/pay/${merchantId}/stone/${stoneId}`;
+    // Ensure stoneId is converted to number to prevent [object Object] in URL
+    const stoneIdNumber = typeof stoneId === 'number' ? stoneId : parseInt(String(stoneId));
+    return `${baseUrl}/pay/${merchantId}/stone/${stoneIdNumber}`;
   }
   return `${baseUrl}/pay/${merchantId}`;
 }
@@ -31,12 +33,16 @@ export function generatePaymentUrl(merchantId: number, stoneId?: number, req?: a
 export function generateQrCodeUrl(merchantId: number, stoneId?: number, req?: any): string {
   const baseUrl = getBaseUrl(req);
   if (stoneId) {
-    return `${baseUrl}/api/merchants/${merchantId}/stone/${stoneId}/qr`;
+    // Ensure stoneId is converted to number to prevent [object Object] in URL
+    const stoneIdNumber = typeof stoneId === 'number' ? stoneId : parseInt(String(stoneId));
+    return `${baseUrl}/api/merchants/${merchantId}/stone/${stoneIdNumber}/qr`;
   }
   return `${baseUrl}/api/merchants/${merchantId}/qr`;
 }
 
 export function generateStonePaymentUrl(merchantId: number, stoneId: number, req?: any): string {
   const baseUrl = getBaseUrl(req);
-  return `${baseUrl}/pay/${merchantId}/stone/${stoneId}`;
+  // Ensure stoneId is converted to number to prevent [object Object] in URL
+  const stoneIdNumber = typeof stoneId === 'number' ? stoneId : parseInt(String(stoneId));
+  return `${baseUrl}/pay/${merchantId}/stone/${stoneIdNumber}`;
 }

@@ -1153,8 +1153,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Generate QR code and payment URL for the new stone
       const baseUrl = getBaseUrl(req);
-      const qrCodeUrl = generateQrCodeUrl(merchantId, newStone.id);
-      const paymentUrl = generatePaymentUrl(merchantId, newStone.id);
+      const stoneId = Number(newStone.id); // Ensure it's a number
+      const qrCodeUrl = generateQrCodeUrl(merchantId, stoneId);
+      const paymentUrl = generatePaymentUrl(merchantId, stoneId);
       
       // Update the stone with the URLs
       const updatedStone = await storage.updateTaptStoneUrls(newStone.id, qrCodeUrl, paymentUrl);
