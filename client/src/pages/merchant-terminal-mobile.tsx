@@ -739,26 +739,78 @@ export default function MerchantTerminalMobile() {
                     </div>
                   ) : (
                     // QR Payment Link Sharing
-                    <div>
+                    <div className="space-y-4">
                       <p className="text-gray-300 mb-4">Copy the payment link to share with customers</p>
-                      <Button
-                        onClick={() => {
-                          if (merchant) {
-                            navigator.clipboard.writeText(merchant.paymentUrl);
-                            setCopiedLink(true);
-                            setTimeout(() => setCopiedLink(false), 2000);
-                            toast({
-                              title: "Link Copied",
-                              description: "Payment link copied to clipboard",
-                            });
-                          }
-                          setActiveAction(null);
-                        }}
-                        className="w-full text-black font-semibold rounded-lg"
-                        style={{ backgroundColor: '#00FF66' }}
-                      >
-                        {copiedLink ? "Copied!" : "Copy Payment Link"}
-                      </Button>
+                      
+                      {/* Stone Selection */}
+                      {taptStones && taptStones.length > 0 && (
+                        <div className="space-y-3">
+                          <label className="block text-sm font-medium text-gray-300 text-left">
+                            Select Tapt Stone (optional):
+                          </label>
+                          <div className="grid grid-cols-1 gap-2">
+                            <button
+                              onClick={() => {
+                                if (merchant) {
+                                  navigator.clipboard.writeText(merchant.paymentUrl);
+                                  setCopiedLink(true);
+                                  setTimeout(() => setCopiedLink(false), 2000);
+                                  toast({
+                                    title: "General Link Copied",
+                                    description: "General payment link copied to clipboard",
+                                  });
+                                }
+                                setActiveAction(null);
+                              }}
+                              className="w-full p-3 bg-gray-700 text-white rounded-lg text-sm hover:bg-gray-600 transition-colors"
+                            >
+                              General Payment Link
+                            </button>
+                            
+                            {taptStones.map((stone: any) => (
+                              <button
+                                key={stone.id}
+                                onClick={() => {
+                                  navigator.clipboard.writeText(stone.paymentUrl);
+                                  setCopiedLink(true);
+                                  setTimeout(() => setCopiedLink(false), 2000);
+                                  toast({
+                                    title: "Stone Link Copied",
+                                    description: `${stone.name} payment link copied to clipboard`,
+                                  });
+                                  setActiveAction(null);
+                                }}
+                                className="w-full p-3 rounded-lg text-sm font-medium transition-colors text-black"
+                                style={{ backgroundColor: '#00FF66' }}
+                              >
+                                Copy {stone.name} Link
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Fallback for no stones */}
+                      {(!taptStones || taptStones.length === 0) && (
+                        <Button
+                          onClick={() => {
+                            if (merchant) {
+                              navigator.clipboard.writeText(merchant.paymentUrl);
+                              setCopiedLink(true);
+                              setTimeout(() => setCopiedLink(false), 2000);
+                              toast({
+                                title: "Link Copied",
+                                description: "Payment link copied to clipboard",
+                              });
+                            }
+                            setActiveAction(null);
+                          }}
+                          className="w-full text-black font-semibold rounded-lg"
+                          style={{ backgroundColor: '#00FF66' }}
+                        >
+                          {copiedLink ? "Copied!" : "Copy Payment Link"}
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>
