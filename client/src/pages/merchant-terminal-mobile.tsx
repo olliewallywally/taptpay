@@ -128,8 +128,14 @@ export default function MerchantTerminalMobile() {
 
   // Debug logging
   useEffect(() => {
-    console.log("Tapt Stones Debug:", { taptStones, taptStonesLoading, activeTab });
-  }, [taptStones, taptStonesLoading, activeTab]);
+    console.log("Tapt Stones Debug:", { 
+      taptStones, 
+      taptStonesLoading, 
+      activeTab,
+      activeAction,
+      showingStonesSection: !activeAction && activeTab === "QR"
+    });
+  }, [taptStones, taptStonesLoading, activeTab, activeAction]);
 
   // Set default selected stone when stones are loaded
   useEffect(() => {
@@ -794,8 +800,11 @@ export default function MerchantTerminalMobile() {
           <div className="px-6 pb-32" style={{ minHeight: '400px' }}>
             {activeTab === "QR" ? (
             <div className="space-y-4 mt-4">
+              <div className="text-white text-center text-sm mb-2">
+                {taptStones.length} stones available
+              </div>
               {/* Individual Stone Buttons for QR */}
-              {taptStones.length > 0 && taptStones.map((stone: any) => (
+              {taptStones && taptStones.length > 0 && taptStones.map((stone: any) => (
                 <div key={stone.id} className="space-y-3">
                   {/* Stone Button */}
                   <button
