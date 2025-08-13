@@ -312,7 +312,7 @@ export default function MerchantTerminal() {
 
         {/* Mode Switcher */}
         <div className="flex justify-center mb-8">
-          <div className="flex bg-gray-900 rounded-lg p-1">
+          <div className="flex bg-gray-900 rounded-lg p-1 transition-all duration-300 hover:bg-gray-800 hover:scale-105 hover:shadow-lg">
             <button
               onClick={() => setActiveTab("qr")}
               className={`px-6 py-2 rounded-md font-medium transition-all duration-200 ${
@@ -340,7 +340,7 @@ export default function MerchantTerminal() {
         <div className="px-6 mb-6">
           {currentTransaction || activeTransaction ? (
             <div 
-              className="rounded-2xl p-6 text-center"
+              className="rounded-2xl p-6 text-center transition-all duration-300 hover:scale-105 hover:shadow-lg cursor-pointer"
               style={{ backgroundColor: '#00FF66' }}
             >
               <div className="text-black text-lg font-medium mb-2">Total</div>
@@ -353,7 +353,7 @@ export default function MerchantTerminal() {
             </div>
           ) : (
             <div 
-              className="rounded-2xl p-6 text-center border-2 border-dashed"
+              className="rounded-2xl p-6 text-center border-2 border-dashed transition-all duration-300 hover:scale-105 hover:shadow-lg cursor-pointer"
               style={{ borderColor: '#00FF66' }}
             >
               <div className="text-gray-400 text-lg font-medium mb-2">Total</div>
@@ -367,7 +367,7 @@ export default function MerchantTerminal() {
         <div className="flex justify-center gap-4 mb-6 px-6">
           <button
             onClick={() => handleActionClick("send")}
-            className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
+            className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 hover:scale-110 hover:shadow-lg ${
               activeAction === "send"
                 ? 'text-black'
                 : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
@@ -382,7 +382,7 @@ export default function MerchantTerminal() {
           
           <button
             onClick={() => handleActionClick("edit")}
-            className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
+            className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 hover:scale-110 hover:shadow-lg ${
               activeAction === "edit"
                 ? 'text-black'
                 : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
@@ -397,7 +397,7 @@ export default function MerchantTerminal() {
           
           <button
             onClick={() => handleActionClick("split")}
-            className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
+            className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 hover:scale-110 hover:shadow-lg ${
               activeAction === "split"
                 ? 'text-black'
                 : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
@@ -412,7 +412,7 @@ export default function MerchantTerminal() {
           
           <button
             onClick={() => handleActionClick("more")}
-            className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
+            className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 hover:scale-110 hover:shadow-lg ${
               activeAction === "more"
                 ? 'text-black'
                 : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
@@ -434,7 +434,7 @@ export default function MerchantTerminal() {
               maxHeight: activeAction ? '400px' : '0px',
             }}
           >
-            <div className="bg-gray-800 rounded-2xl p-6 mb-6">
+            <div className="bg-gray-800 rounded-2xl p-6 mb-6 transition-all duration-300 hover:bg-gray-700 hover:scale-105 hover:shadow-lg">
               {activeAction === "edit" && (
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold mb-4 text-white">Edit Transaction</h3>
@@ -574,11 +574,10 @@ export default function MerchantTerminal() {
         {/* QR Code Section */}
         <div className="px-6">
           {currentTransaction || activeTransaction ? (
-            <div className="bg-white rounded-2xl p-8 flex items-center justify-center">
+            <div className="bg-white rounded-2xl p-8 flex items-center justify-center transition-all duration-300 hover:scale-105 hover:shadow-xl cursor-pointer">
               <div className="text-center">
                 <QRCodeDisplay 
-                  merchantId={merchantId} 
-                  className="w-48 h-48 mx-auto mb-4"
+                  merchantId={merchantId}
                 />
                 <p className="text-gray-600 text-sm">
                   {activeTab === "qr" ? "Scan to pay with any device" : "Tap your phone to pay"}
@@ -589,7 +588,7 @@ export default function MerchantTerminal() {
               </div>
             </div>
           ) : (
-            <div className="bg-white rounded-2xl p-8 flex items-center justify-center">
+            <div className="bg-white rounded-2xl p-8 flex items-center justify-center transition-all duration-300 hover:scale-105 hover:shadow-xl cursor-pointer">
               <div className="text-center">
                 <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4">
                   {activeTab === "qr" ? (
@@ -662,6 +661,3 @@ export default function MerchantTerminal() {
     </div>
   );
 }
-          <TabsContent value="nfc" className="space-y-4 sm:space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-              
