@@ -457,21 +457,21 @@ export default function MerchantTerminal() {
           >
             <div className="bg-gray-800 rounded-2xl p-3 mb-2 transition-all duration-300 hover:bg-gray-700 hover:scale-105 hover:shadow-lg">
               {activeAction === "edit" && (
-                <div className="space-y-1">
-                  <h3 className="text-sm font-semibold mb-1 text-white">Edit Transaction</h3>
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold text-white">Edit Transaction</h3>
                   <Form {...form}>
-                    <div className="space-y-1">
+                    <div className="space-y-2">
                       <FormField
                         control={form.control}
                         name="itemName"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-xs font-medium text-gray-300">Item Name</FormLabel>
+                            <FormLabel className="text-xs text-gray-300">Item Name</FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="Enter item name"
                                 {...field}
-                                className="bg-gray-700 border-gray-600 text-white rounded-lg"
+                                className="bg-gray-700 border-gray-600 text-white rounded-lg h-8"
                               />
                             </FormControl>
                             <FormMessage className="text-red-300 text-xs" />
@@ -483,12 +483,12 @@ export default function MerchantTerminal() {
                         name="price"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-xs font-medium text-gray-300">Price ($)</FormLabel>
+                            <FormLabel className="text-xs text-gray-300">Price ($)</FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="Enter price"
                                 {...field}
-                                className="bg-gray-700 border-gray-600 text-white rounded-lg"
+                                className="bg-gray-700 border-gray-600 text-white rounded-lg h-8"
                               />
                             </FormControl>
                             <FormMessage className="text-red-300 text-xs" />
@@ -497,7 +497,7 @@ export default function MerchantTerminal() {
                       />
                       <Button
                         onClick={form.handleSubmit(onSubmit)}
-                        className="w-full text-black font-semibold rounded-lg"
+                        className="w-full text-black font-semibold rounded-lg h-8 text-sm"
                         style={{ backgroundColor: '#00FF66' }}
                       >
                         Create Transaction
