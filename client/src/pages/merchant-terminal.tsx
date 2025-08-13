@@ -454,18 +454,18 @@ export default function MerchantTerminal() {
               opacity: activeAction ? 1 : 0
             }}
           >
-            <div className="bg-gray-800 rounded-2xl p-6 mb-6 transition-all duration-300 hover:bg-gray-700 hover:scale-105 hover:shadow-lg">
+            <div className="bg-gray-800 rounded-2xl p-4 mb-3 transition-all duration-300 hover:bg-gray-700 hover:scale-105 hover:shadow-lg">
               {activeAction === "edit" && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold mb-4 text-white">Edit Transaction</h3>
+                <div className="space-y-2">
+                  <h3 className="text-base font-semibold mb-2 text-white">Edit Transaction</h3>
                   <Form {...form}>
-                    <div className="space-y-4">
+                    <div className="space-y-2">
                       <FormField
                         control={form.control}
                         name="itemName"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-sm font-medium text-gray-300">Item Name</FormLabel>
+                            <FormLabel className="text-xs font-medium text-gray-300">Item Name</FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="Enter item name"
@@ -482,7 +482,7 @@ export default function MerchantTerminal() {
                         name="price"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-sm font-medium text-gray-300">Price ($)</FormLabel>
+                            <FormLabel className="text-xs font-medium text-gray-300">Price ($)</FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="Enter price"
@@ -508,7 +508,7 @@ export default function MerchantTerminal() {
 
               {activeAction === "split" && (
                 <div className="text-center">
-                  <h3 className="text-lg font-semibold mb-4 text-white">Split the Bill</h3>
+                  <h3 className="text-base font-semibold mb-2 text-white">Split the Bill</h3>
                   <p className="text-gray-300 mb-4">How many ways would you like to split this payment?</p>
                   <div className="flex justify-center gap-3 mb-4">
                     {[2, 3, 4, 5].map((num) => (
@@ -522,7 +522,7 @@ export default function MerchantTerminal() {
                           });
                           setActiveAction(null);
                         }}
-                        className="w-12 h-12 rounded-full font-semibold transition-colors text-black"
+                        className="w-12 h-10 rounded-full font-semibold transition-colors text-black"
                         style={{ backgroundColor: '#00FF66' }}
                       >
                         {num}
@@ -533,14 +533,14 @@ export default function MerchantTerminal() {
               )}
 
               {activeAction === "send" && (
-                <div className="text-center space-y-4">
+                <div className="text-center space-y-2">
                   <h3 className="text-lg font-semibold text-white">Share Payment Link</h3>
                   <p className="text-gray-300 text-sm">Copy the payment link to share with customers</p>
                   
                   {/* Stone Selection */}
                   {taptStones && taptStones.length > 0 && (
                     <div className="space-y-2">
-                      <label className="block text-sm font-medium text-gray-300 text-left">
+                      <label className="block text-xs font-medium text-gray-300 text-left">
                         Select Tapt Stone (optional):
                       </label>
                       <Select value={selectedStoneId?.toString() || "general"} onValueChange={(value) => setSelectedStoneId(value && value !== "general" ? parseInt(value) : null)}>
@@ -587,7 +587,7 @@ export default function MerchantTerminal() {
 
               {activeAction === "more" && (
                 <div className="text-center">
-                  <h3 className="text-lg font-semibold mb-4 text-white">More Options</h3>
+                  <h3 className="text-base font-semibold mb-2 text-white">More Options</h3>
                   <div className="space-y-3">
                     <Link href="/dashboard">
                       <Button
@@ -640,7 +640,7 @@ export default function MerchantTerminal() {
             <div className="bg-white rounded-2xl p-8">
               <div className="text-center">
                 {activeTab === "qr" && (
-                  <div className="space-y-4">
+                  <div className="space-y-2">
                     {/* Individual Stone QR Code Boxes */}
                     {taptStones && taptStones.length > 0 ? (
                       taptStones.map((stone: any) => (
@@ -661,7 +661,7 @@ export default function MerchantTerminal() {
                                 stoneId={stone.id}
                               />
                             </div>
-                            <p className="text-gray-600 text-sm font-medium">
+                            <p className="text-gray-600 text-xs font-medium">
                               Scan to pay with {stone.name}
                             </p>
                           </div>
@@ -711,7 +711,7 @@ export default function MerchantTerminal() {
             </button>
           </div>
           
-          <nav className="space-y-4">
+          <nav className="space-y-2">
             <Link href="/dashboard">
               <a className="block py-3 px-4 text-white rounded-xl transition-colors font-medium">
                 Dashboard
