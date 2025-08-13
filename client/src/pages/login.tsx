@@ -13,7 +13,7 @@ import { useLocation, Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { LogIn, Shield, UserPlus, Store, ArrowLeft } from "lucide-react";
-import taptLogoPath from "@assets/tapt logo v2_1751682549877.png";
+import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
 import { createMerchantSchema, type CreateMerchant } from "@shared/schema";
 
 const loginSchema = z.object({
@@ -148,9 +148,11 @@ export default function Login() {
             {/* Logo Section */}
             <div className="text-center mb-8">
               <div className="flex justify-center mb-6">
-                <div className="w-16 h-16 bg-white backdrop-blur-lg rounded-2xl flex items-center justify-center border border-white/30 shadow-lg">
-                  <span className="text-black font-bold text-xl">T</span>
-                </div>
+                <img 
+                  src={taptLogoPath} 
+                  alt="TaptPay" 
+                  className="h-12 w-auto object-contain"
+                />
               </div>
               <h1 className="text-2xl font-light text-white mb-2">
                 Create Your Account
@@ -338,9 +340,11 @@ export default function Login() {
           {/* Logo Section */}
           <div className="text-center mb-8">
             <div className="flex justify-center mb-6">
-              <span className="text-white font-black text-4xl tracking-wider lowercase" style={{ fontFamily: 'Nunito, system-ui, sans-serif' }}>
-                tapt
-              </span>
+              <img 
+                src={taptLogoPath} 
+                alt="TaptPay" 
+                className="h-12 w-auto object-contain"
+              />
             </div>
             <h1 className="text-2xl font-light text-white mb-2">
               Welcome back
