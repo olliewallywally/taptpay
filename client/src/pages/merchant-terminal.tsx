@@ -32,6 +32,7 @@ export default function MerchantTerminal() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const [selectedStoneId, setSelectedStoneId] = useState<number | null>(null);
+  const [qrCollapsed, setQrCollapsed] = useState(false);
   
   // NFC-specific state
   const [nfcCapabilities, setNfcCapabilities] = useState<any>(null);
@@ -637,55 +638,75 @@ export default function MerchantTerminal() {
               </div>
             </div>
           ) : (
-            <div className="bg-white rounded-2xl p-8">
-              <div className="text-center">
-                {activeTab === "qr" && (
-                  <div className="space-y-1">
-                    {/* Individual Stone QR Code Boxes */}
-                    {taptStones && taptStones.length > 0 ? (
-                      taptStones.map((stone: any) => (
-                        <div 
-                          key={stone.id}
-                          className="bg-gray-50 border border-gray-200 rounded-2xl p-6 shadow-lg transition-all duration-300"
-                        >
-                          {/* Stone Header */}
-                          <div className="w-full flex items-center justify-center mb-4">
-                            <h3 className="text-lg font-semibold text-gray-800">Stone #{stone.stoneNumber}</h3>
-                          </div>
+            <div 
+              className="rounded-2xl p-4 cursor-pointer transition-all duration-300"
+              style={{ backgroundColor: '#00FF66' }}
+              onClick={() => setQrCollapsed(!qrCollapsed)}
+            >
+              {/* Green Box Header */}
+              <div className="flex items-center justify-between text-black">
+                <h3 className="text-lg font-semibold">QR Codes</h3>
+                <ChevronDown 
+                  className={`transition-transform duration-300 ${qrCollapsed ? 'rotate-180' : ''}`}
+                  size={20}
+                />
+              </div>
+              
+              {/* Collapsible Content */}
+              <div 
+                className={`overflow-hidden transition-all duration-300 ${qrCollapsed ? 'max-h-0' : 'max-h-[800px]'}`}
+              >
+                <div className="bg-white rounded-xl p-6 mt-4">
+                  <div className="text-center">
+                    {activeTab === "qr" && (
+                      <div className="space-y-1">
+                        {/* Individual Stone QR Code Boxes */}
+                        {taptStones && taptStones.length > 0 ? (
+                          taptStones.map((stone: any) => (
+                            <div 
+                              key={stone.id}
+                              className="bg-gray-50 border border-gray-200 rounded-2xl p-6 shadow-lg transition-all duration-300"
+                            >
+                              {/* Stone Header */}
+                              <div className="w-full flex items-center justify-center mb-4">
+                                <h3 className="text-lg font-semibold text-gray-800">Stone #{stone.stoneNumber}</h3>
+                              </div>
 
-                          {/* QR Code - Always visible */}
-                          <div className="text-center transition-all duration-300">
-                            <div className="w-48 h-48 mx-auto mb-4 bg-white rounded-xl p-4 border">
-                              <QRCodeDisplay 
-                                merchantId={merchantId} 
-                                stoneId={stone.id}
-                              />
+                              {/* QR Code - Always visible */}
+                              <div className="text-center transition-all duration-300">
+                                <div className="w-48 h-48 mx-auto mb-4 bg-white rounded-xl p-4 border">
+                                  <QRCodeDisplay 
+                                    merchantId={merchantId} 
+                                    stoneId={stone.id}
+                                  />
+                                </div>
+                                <p className="text-gray-600 text-xs font-medium">
+                                  Scan to pay with {stone.name}
+                                </p>
+                              </div>
                             </div>
-                            <p className="text-gray-600 text-xs font-medium">
-                              Scan to pay with {stone.name}
-                            </p>
+                          ))
+                        ) : (
+                          <div className="text-center">
+                            <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4 mx-auto">
+                              <QrCode size={64} className="text-gray-400" />
+                            </div>
+                            <p className="text-gray-600 text-sm">No tapt stones available</p>
                           </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center">
-                        <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4 mx-auto">
-                          <QrCode size={64} className="text-gray-400" />
-                        </div>
-                        <p className="text-gray-600 text-sm">No tapt stones available</p>
+                        )}
                       </div>
                     )}
+                    
+                    {activeTab === "nfc" && (
+                      <>
+                        <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4 mx-auto">
+                          <Smartphone size={64} className="text-gray-400" />
+                        </div>
+                        <p className="text-gray-600 text-sm">Create a transaction for NFC payment</p>
+                      </>
+                    )}
                   </div>
-                )}
-                
-                {activeTab === "nfc" && (
-                  <>
-                    <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4 mx-auto">
-                      <Smartphone size={64} className="text-gray-400" />
-                    </div>
-                    <p className="text-gray-600 text-sm">Create a transaction for NFC payment</p>
-                  </>
-                )}
+                </div>
               </div>
             </div>
           )}
