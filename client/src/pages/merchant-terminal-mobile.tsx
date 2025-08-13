@@ -795,10 +795,9 @@ export default function MerchantTerminalMobile() {
           </div>
         </div>
 
-        {/* QR Code Stone Selection Section - Now before action overlay */}
-        {!activeAction && (
+        {/* QR Code Stone Selection Section - Always visible on QR tab */}
+        {activeTab === "QR" && (
           <div className="px-6 pb-32" style={{ minHeight: '400px' }}>
-            {activeTab === "QR" ? (
             <div className="space-y-4 mt-4">
               {/* Individual Stone QR Code Boxes */}
               {taptStones && taptStones.length > 0 && taptStones.map((stone: any) => (
@@ -841,6 +840,8 @@ export default function MerchantTerminalMobile() {
                   )}
                 </div>
               ))}
+              
+
 
               {/* Add Tapt Stone Button - Show when transaction exists and less than 10 stones */}
               {(currentTransaction || activeTransaction) && taptStones.length < 10 && (
@@ -956,7 +957,6 @@ export default function MerchantTerminalMobile() {
                 </div>
               )}
             </div>
-          )}
           </div>
         )}
 
