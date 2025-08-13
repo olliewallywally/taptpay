@@ -34,48 +34,7 @@ export async function seedDatabase() {
     await createUser('demo@tapt.co.nz', 'demo123', demoMerchant[0].id, 'merchant');
     console.log('Created demo user account');
 
-    // Create sample transactions
-    const sampleTransactions = [
-      {
-        merchantId: demoMerchant[0].id,
-        itemName: "Coffee & Muffin",
-        price: "12.50",
-        status: "completed",
-        windcaveTransactionId: "TXN001",
-      },
-      {
-        merchantId: demoMerchant[0].id,
-        itemName: "Lunch Special",
-        price: "18.90",
-        status: "completed",
-        windcaveTransactionId: "TXN002",
-      },
-      {
-        merchantId: demoMerchant[0].id,
-        itemName: "Gift Card",
-        price: "50.00",
-        status: "completed",
-        windcaveTransactionId: "TXN003",
-      },
-      {
-        merchantId: demoMerchant[0].id,
-        itemName: "Book Purchase",
-        price: "25.99",
-        status: "failed",
-        windcaveTransactionId: "TXN004",
-      },
-      {
-        merchantId: demoMerchant[0].id,
-        itemName: "Service Fee",
-        price: "75.00",
-        status: "pending",
-        windcaveTransactionId: null,
-      },
-    ];
-
-    for (const transaction of sampleTransactions) {
-      await db.insert(transactions).values(transaction);
-    }
+    // No sample transactions - only show real transactions created by users
 
     console.log('Database seeding completed successfully');
   } catch (error) {
