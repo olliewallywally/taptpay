@@ -26,44 +26,44 @@ export function MobileHeader({ title, children, showMenu = true }: MobileHeaderP
   return (
     <>
       {/* Background Menu */}
-      <div className="fixed inset-0 bg-gray-300 z-[10]">
+      <div className="fixed inset-0 bg-gray-800 z-[10]">
         <div className="p-6 pt-16">
-          <nav className="space-y-1">
+          <nav className="space-y-4">
             <Link 
               href="/merchant" 
               onClick={() => setMenuOpen(false)} 
-              className="block py-4 px-4 text-white hover:text-green-500 transition-colors duration-200 font-medium text-lg"
+              className="block py-3 px-4 text-white rounded-xl transition-colors font-medium"
             >
               Terminal
             </Link>
             <Link 
               href="/dashboard" 
               onClick={() => setMenuOpen(false)} 
-              className="block py-4 px-4 text-white hover:text-green-500 transition-colors duration-200 font-medium text-lg"
+              className="block py-3 px-4 text-white rounded-xl transition-colors font-medium"
             >
               Dashboard
             </Link>
             <Link 
               href="/transactions" 
               onClick={() => setMenuOpen(false)} 
-              className="block py-4 px-4 text-white hover:text-green-500 transition-colors duration-200 font-medium text-lg"
+              className="block py-3 px-4 text-white rounded-xl transition-colors font-medium"
             >
               Transactions
             </Link>
             <Link 
               href="/settings" 
               onClick={() => setMenuOpen(false)} 
-              className="block py-4 px-4 text-white hover:text-green-500 transition-colors duration-200 font-medium text-lg"
+              className="block py-3 px-4 text-white rounded-xl transition-colors font-medium"
             >
               Settings
             </Link>
-            <div className="pt-4 mt-4 border-t border-gray-400">
+            <div className="pt-4 mt-4 border-t border-gray-600">
               <button 
                 onClick={() => {
                   localStorage.removeItem('auth-token');
                   window.location.href = '/login';
                 }}
-                className="block w-full text-left py-4 px-4 text-red-400 hover:text-red-500 transition-colors duration-200 font-medium text-lg"
+                className="block w-full text-left py-3 px-4 text-red-400 hover:text-red-300 rounded-xl transition-colors font-medium"
               >
                 Logout
               </button>
