@@ -291,8 +291,21 @@ export default function CustomerPayment() {
 
           {/* Price */}
           <div className="text-5xl font-bold text-white mb-12">
-            ${parseFloat(currentTransaction.price).toFixed(2)}
+            ${currentTransaction.isSplit 
+              ? parseFloat(currentTransaction.splitAmount).toFixed(2) 
+              : parseFloat(currentTransaction.price).toFixed(2)
+            }
           </div>
+
+          {/* Show original price when split */}
+          {currentTransaction.isSplit && (
+            <div className="text-lg text-white/70 mb-6 -mt-8">
+              <span className="line-through">${parseFloat(currentTransaction.price).toFixed(2)}</span>
+              <span className="ml-2 text-sm">
+                (Split {currentTransaction.completedSplits + 1}/{currentTransaction.totalSplits})
+              </span>
+            </div>
+          )}
 
           {/* Slide to Pay Widget */}
           <div>
