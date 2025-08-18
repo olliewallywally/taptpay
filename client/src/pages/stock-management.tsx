@@ -64,10 +64,12 @@ export default function StockManagement() {
   const merchantId = getCurrentMerchantId();
 
   // Fetch stock items
-  const { data: stockItems, isLoading } = useQuery({
+  const { data: stockItems, isLoading, error } = useQuery({
     queryKey: ["/api/merchants", merchantId, "stock-items"],
     enabled: !!merchantId,
   });
+
+
 
   // Create stock item mutation
   const createStockMutation = useMutation({
@@ -177,6 +179,16 @@ export default function StockManagement() {
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Debug logging
+  console.log("Stock Management Debug:", {
+    merchantId,
+    stockItems,
+    isLoading,
+    error,
+    stockItemsLength: stockItems?.length,
+    filteredItemsLength: filteredItems.length
+  });
 
   if (!user) {
     return (
@@ -398,6 +410,15 @@ export default function StockManagement() {
                 </div>
               </CardContent>
             </Card>
+          </div>
+
+          {/* Debug Info */}
+          <div className="mb-4 p-4 bg-gray-800 rounded-lg text-white text-xs">
+            <div>Merchant ID: {merchantId}</div>
+            <div>Loading: {isLoading ? 'Yes' : 'No'}</div>
+            <div>Stock Items: {stockItems ? JSON.stringify(stockItems, null, 2) : 'None'}</div>
+            <div>Filtered Items Count: {filteredItems.length}</div>
+            <div>Error: {error ? JSON.stringify(error) : 'None'}</div>
           </div>
 
           {/* Stock Items Grid */}
