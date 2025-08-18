@@ -488,7 +488,7 @@ export default function StockManagement() {
                     
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
-                        <DollarSign className="w-5 h-5 text-[#00FF66] drop-shadow-[0_0_8px_#00FF66]" />
+                        <DollarSign className="w-5 h-5 text-[#00FF66]" />
                         <span className="text-2xl font-bold text-[#00FF66]">
                           ${parseFloat(item.cost).toFixed(2)}
                         </span>
@@ -505,7 +505,7 @@ export default function StockManagement() {
           ) : (
             <Card className="dashboard-card-glass backdrop-blur-xl bg-black/40 border border-white/20 shadow-2xl">
               <CardContent className="p-12 text-center">
-                <div className="w-16 h-16 bg-gradient-to-br from-[#00FF66] to-[#00CC52] rounded-full flex items-center justify-center mx-auto mb-4 drop-shadow-[0_0_8px_#00FF66]">
+                <div className="w-16 h-16 bg-gradient-to-br from-[#00FF66] to-[#00CC52] rounded-full flex items-center justify-center mx-auto mb-4">
                   <Package className="w-8 h-8 text-black" />
                 </div>
                 <h3 className="text-xl font-semibold text-white mb-2">
