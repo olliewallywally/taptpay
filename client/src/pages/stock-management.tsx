@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -11,7 +11,9 @@ import {
   ShoppingCart,
   DollarSign,
   FileText,
-  Search
+  Search,
+  Menu,
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,6 +44,7 @@ export default function StockManagement() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<StockItem | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -191,55 +194,87 @@ export default function StockManagement() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">
-      {/* Background Effects */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-green-300 to-emerald-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse" />
-        <div className="absolute top-40 right-20 w-96 h-96 bg-gradient-to-r from-emerald-300 to-teal-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse delay-75" />
-        <div className="absolute -bottom-8 left-40 w-96 h-96 bg-gradient-to-r from-teal-300 to-green-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse delay-150" />
+    <>
+      {/* Menu Backdrop */}
+      <div 
+        className={`fixed inset-0 bg-black/60 z-40 transition-opacity duration-300 ${
+          menuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={() => setMenuOpen(false)}
+      />
+
+      {/* Sliding Menu */}
+      <div 
+        className={`fixed right-0 top-0 h-full w-80 bg-gray-800 border-l border-gray-700 z-50 transform transition-transform duration-300 ease-in-out ${
+          menuOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-8">
+            <h2 className="text-xl font-bold text-white">Menu</h2>
+            <button onClick={() => setMenuOpen(false)} className="text-white/70 hover:text-white">
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+          <nav className="space-y-4">
+            <Link href="/dashboard" className="block py-3 px-4 text-white hover:text-white rounded-xl transition-colors">
+              Dashboard
+            </Link>
+            <Link href="/merchant-terminal" className="block py-3 px-4 text-white hover:text-white rounded-xl transition-colors">
+              Terminal
+            </Link>
+            <Link href="/transactions" className="block py-3 px-4 text-white hover:text-white rounded-xl transition-colors">
+              Transactions
+            </Link>
+            <Link href="/stock" className="block py-3 px-4 text-[#00CC52] rounded-xl font-medium">
+              Stock
+            </Link>
+            <Link href="/settings" className="block py-3 px-4 text-white hover:text-white rounded-xl transition-colors">
+              Settings
+            </Link>
+            <div className="pt-4 mt-4 border-t border-gray-600">
+              <button 
+                onClick={() => {
+                  localStorage.removeItem('auth-token');
+                  window.location.href = '/login';
+                }}
+                className="block w-full text-left py-3 px-4 text-red-400 hover:text-red-300 rounded-xl transition-colors"
+              >
+                Logout
+              </button>
+            </div>
+          </nav>
+        </div>
       </div>
 
-      <div className="relative z-10 p-4 lg:p-8">
-        {/* Header */}
-        <div className="max-w-7xl mx-auto mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Stock Management</h1>
-              <p className="text-gray-600 mt-1">Manage your inventory and product catalog</p>
-            </div>
-            
-            {/* Navigation Menu */}
-            <div className="flex flex-wrap gap-2">
-              <Button 
-                variant="outline" 
-                onClick={() => setLocation("/dashboard")}
-                className="bg-white/50 backdrop-blur-sm border-white/20 hover:bg-white/70"
-              >
-                Dashboard
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => setLocation("/merchant-terminal")}
-                className="bg-white/50 backdrop-blur-sm border-white/20 hover:bg-white/70"
-              >
-                Terminal
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => setLocation("/transactions")}
-                className="bg-white/50 backdrop-blur-sm border-white/20 hover:bg-white/70"
-              >
-                Transactions
-              </Button>
-              <Button 
-                variant="default"
-                className="bg-green-600 hover:bg-green-700"
-              >
-                Stock
-              </Button>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">
+        {/* Background Effects */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-green-300 to-emerald-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse" />
+          <div className="absolute top-40 right-20 w-96 h-96 bg-gradient-to-r from-emerald-300 to-teal-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse delay-75" />
+          <div className="absolute -bottom-8 left-40 w-96 h-96 bg-gradient-to-r from-teal-300 to-green-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse delay-150" />
+        </div>
+
+        {/* Menu Icon */}
+        <div className="fixed top-4 right-4 z-30">
+          <button
+            onClick={() => setMenuOpen(true)}
+            className="p-3 backdrop-blur-xl bg-black/40 border border-white/20 rounded-xl text-white hover:bg-black/60 transition-colors"
+          >
+            <Menu className="h-6 w-6" />
+          </button>
+        </div>
+
+        <div className="relative z-10 p-4 lg:p-8">
+          {/* Header */}
+          <div className="max-w-7xl mx-auto mb-8 pt-16">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">Stock Management</h1>
+                <p className="text-gray-600 mt-1">Manage your inventory and product catalog</p>
+              </div>
             </div>
           </div>
-        </div>
 
         {/* Main Content */}
         <div className="max-w-7xl mx-auto">
@@ -464,7 +499,8 @@ export default function StockManagement() {
             </Card>
           )}
         </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
