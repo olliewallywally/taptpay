@@ -40,10 +40,19 @@ export function BillSplit({ transactionId, totalAmount, onSplitCreated }: BillSp
         description: `Bill split into ${splitCount} payments of $${(totalAmount / splitCount).toFixed(2)} each`,
       });
       
-      // Invalidate transaction query to refresh data
+      // Invalidate both transaction queries to refresh data
       queryClient.invalidateQueries({ 
         queryKey: [`/api/transactions/${transactionId}`] 
       });
+      
+      // Also invalidate the active transaction query for immediate UI update
+      const urlParams = window.location.pathname.split('/');
+      const merchantId = urlParams[2]; // Extract merchant ID from URL
+      if (merchantId) {
+        queryClient.invalidateQueries({ 
+          queryKey: ["/api/merchants", parseInt(merchantId), "active-transaction"] 
+        });
+      }
       
       // Collapse the component after successful creation
       setIsExpanded(false);

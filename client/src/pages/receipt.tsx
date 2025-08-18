@@ -144,7 +144,11 @@ export default function Receipt() {
     );
   }
 
-  const { gstAmount, netAmount, gstRate } = calculateGst(parseFloat(transaction.price));
+  // Use split amount if transaction is split, otherwise use original price
+  const effectiveAmount = transaction.isSplit 
+    ? parseFloat(transaction.splitAmount) 
+    : parseFloat(transaction.price);
+  const { gstAmount, netAmount, gstRate } = calculateGst(effectiveAmount);
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-3 sm:p-4">
@@ -221,9 +225,18 @@ export default function Receipt() {
                 <Separator />
                 
                 <div className="flex justify-between text-lg font-bold">
-                  <span>Total:</span>
-                  <span>${parseFloat(transaction.price).toFixed(2)}</span>
+                  <span>Total{transaction.isSplit ? ' (Split Payment)' : ''}:</span>
+                  <span>${effectiveAmount.toFixed(2)}</span>
                 </div>
+
+                {/* Show split payment info if applicable */}
+                {transaction.isSplit && (
+                  <div className="text-xs text-gray-500 text-center mt-2">
+                    Payment {transaction.completedSplits + 1} of {transaction.totalSplits} 
+                    <br />
+                    Original total: ${parseFloat(transaction.price).toFixed(2)}
+                  </div>
+                )}
               </div>
 
               {/* Payment Method */}
