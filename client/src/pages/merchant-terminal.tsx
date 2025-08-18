@@ -344,7 +344,7 @@ export default function MerchantTerminal() {
           <div className="flex items-center">
             <button
               onClick={() => setMenuOpen(!menuOpen)}
-              className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+              className="p-2 rounded-lg transition-colors"
             >
               <Menu size={24} />
             </button>
@@ -355,13 +355,13 @@ export default function MerchantTerminal() {
         <div className="w-full max-w-lg mx-auto px-4">
           {/* Mode Switcher */}
           <div className="flex justify-center mb-8">
-            <div className="flex bg-gray-900 rounded-lg p-1 transition-all duration-300 hover:bg-gray-800 hover:scale-105 hover:shadow-lg">
+            <div className="flex bg-gray-900 rounded-lg p-1">
               <button
                 onClick={() => setActiveTab("qr")}
                 className={`px-6 py-2 rounded-md font-medium transition-all duration-200 ${
                   activeTab === "qr"
                     ? "bg-black text-white"
-                    : "text-gray-400 hover:text-gray-200"
+                    : "text-gray-400"
                 }`}
               >
                 QR
@@ -371,7 +371,7 @@ export default function MerchantTerminal() {
                 className={`px-6 py-2 rounded-md font-medium transition-all duration-200 ${
                   activeTab === "nfc"
                     ? "bg-black text-white"
-                    : "text-gray-400 hover:text-gray-200"
+                    : "text-gray-400"
                 }`}
               >
                 NFC
@@ -396,7 +396,7 @@ export default function MerchantTerminal() {
             </div>
           ) : (
             <div 
-              className="rounded-2xl p-6 text-center border-2 border-dashed transition-all duration-300 hover:scale-105 hover:shadow-lg cursor-pointer"
+              className="rounded-2xl p-6 text-center border-2 border-dashed cursor-pointer"
               style={{ borderColor: '#00FF66' }}
             >
               <div className="text-gray-400 text-lg font-medium mb-2">Total</div>
@@ -474,7 +474,7 @@ export default function MerchantTerminal() {
               opacity: activeAction ? 1 : 0
             }}
           >
-            <div className="bg-gray-800 rounded-2xl p-3 mb-2 transition-all duration-300 hover:bg-gray-700 hover:scale-105 hover:shadow-lg">
+            <div className="bg-gray-800 rounded-2xl p-3 mb-2">
               {activeAction === "edit" && (
                 <div className="space-y-2">
                   <h3 className="text-sm font-semibold text-white">Edit Transaction</h3>
@@ -763,7 +763,7 @@ export default function MerchantTerminal() {
                                       });
                                     }
                                   }}
-                                  className="px-4 py-2 bg-gray-800 text-white text-xs rounded-lg hover:bg-gray-700 transition-colors font-medium"
+                                  className="px-4 py-2 bg-gray-800 text-white text-xs rounded-lg transition-colors font-medium"
                                 >
                                   Download QR Code
                                 </button>
@@ -809,7 +809,7 @@ export default function MerchantTerminal() {
                                 });
                               }
                             }}
-                            className="px-6 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium"
+                            className="px-6 py-3 bg-gray-800 text-white rounded-lg transition-colors font-medium"
                           >
                             + Create New Stone
                           </button>
@@ -849,26 +849,26 @@ export default function MerchantTerminal() {
             <h2 className="text-xl font-bold text-white">Menu</h2>
             <button
               onClick={() => setMenuOpen(false)}
-              className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+              className="p-2 rounded-lg transition-colors"
             >
               <X size={24} className="text-white" />
             </button>
           </div>
           
           <nav className="space-y-1">
-            <Link href="/dashboard" className="block py-3 px-4 text-white rounded-xl transition-colors font-medium hover:bg-gray-700">
+            <Link href="/dashboard" className="block py-3 px-4 text-white rounded-xl transition-colors font-medium">
               Dashboard
             </Link>
             <Link href="/merchant" className="block py-3 px-4 text-[#00CC52] rounded-xl font-medium">
               Terminal
             </Link>
-            <Link href="/transactions" className="block py-3 px-4 text-white rounded-xl transition-colors font-medium hover:bg-gray-700">
+            <Link href="/transactions" className="block py-3 px-4 text-white rounded-xl transition-colors font-medium">
               Transactions
             </Link>
-            <Link href="/stock" className="block py-3 px-4 text-white rounded-xl transition-colors font-medium hover:bg-gray-700">
+            <Link href="/stock" className="block py-3 px-4 text-white rounded-xl transition-colors font-medium">
               Stock
             </Link>
-            <Link href="/settings" className="block py-3 px-4 text-white rounded-xl transition-colors font-medium hover:bg-gray-700">
+            <Link href="/settings" className="block py-3 px-4 text-white rounded-xl transition-colors font-medium">
               Settings
             </Link>
             <div className="pt-4 mt-4 border-t border-gray-600">
@@ -877,7 +877,7 @@ export default function MerchantTerminal() {
                   localStorage.removeItem('auth-token');
                   window.location.href = '/login';
                 }}
-                className="block w-full text-left py-3 px-4 text-red-400 hover:text-red-300 rounded-xl transition-colors font-medium"
+                className="block w-full text-left py-3 px-4 text-red-400 rounded-xl transition-colors font-medium"
               >
                 Logout
               </button>
