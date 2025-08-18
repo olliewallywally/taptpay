@@ -155,6 +155,11 @@ function Router() {
             <MerchantTerminal />
           </ProtectedRoute>
         </Route>
+        <Route path="/terminal">
+          <ProtectedRoute>
+            <MerchantTerminal />
+          </ProtectedRoute>
+        </Route>
         <Route path="/dashboard">
           <ProtectedRoute>
             <Dashboard />
