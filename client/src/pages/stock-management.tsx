@@ -264,11 +264,11 @@ export default function StockManagement() {
         </div>
 
         {/* Tapt Pay Branding */}
-        <div className="fixed top-4 left-4 z-30">
+        <div className="fixed top-4 left-4 z-30 bg-white/10 backdrop-blur-lg rounded-lg p-2 border border-white/20">
           <img 
             src={taptLogoPath} 
             alt="TaptPay" 
-            className="h-8 w-auto object-contain"
+            className="h-6 w-auto object-contain"
           />
         </div>
 
