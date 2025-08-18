@@ -287,6 +287,18 @@ export const taptStones = pgTable("tapt_stones", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Stock Items table - merchant inventory management
+export const stockItems = pgTable("stock_items", {
+  id: serial("id").primaryKey(),
+  merchantId: serial("merchant_id").references(() => merchants.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  cost: decimal("cost", { precision: 10, scale: 2 }).notNull(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // API Keys table for ecommerce integration
 export const apiKeys = pgTable("api_keys", {
   id: serial("id").primaryKey(),
@@ -372,6 +384,25 @@ export const createTaptStoneSchema = z.object({
   stoneNumber: z.number().min(1, "Stone number must be at least 1").max(10, "Maximum 10 stones allowed"),
 });
 
+// Stock Item schemas
+export const insertStockItemSchema = createInsertSchema(stockItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const createStockItemSchema = z.object({
+  name: z.string().min(1, "Item name is required").max(100, "Name too long"),
+  description: z.string().max(500, "Description too long").optional(),
+  cost: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid cost format"),
+});
+
+export const updateStockItemSchema = z.object({
+  name: z.string().min(1, "Item name is required").max(100, "Name too long"),
+  description: z.string().max(500, "Description too long").optional(),
+  cost: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid cost format"),
+});
+
 // User schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -402,3 +433,8 @@ export type CreateRefund = z.infer<typeof createRefundSchema>;
 export type TaptStone = typeof taptStones.$inferSelect;
 export type InsertTaptStone = z.infer<typeof insertTaptStoneSchema>;
 export type CreateTaptStone = z.infer<typeof createTaptStoneSchema>;
+
+// Stock Item types
+export type StockItem = typeof stockItems.$inferSelect;
+export type InsertStockItem = z.infer<typeof insertStockItemSchema>;
+export type CreateStockItem = z.infer<typeof createStockItemSchema>;
