@@ -234,58 +234,6 @@ export default function Dashboard() {
         </div>
 
         <div className="container mx-auto px-4 pt-24 sm:pt-28 pb-8">
-          {/* Transaction Milestone Progress */}
-          <div className="mb-6 sm:mb-8">
-            <div className="dashboard-card-glass rounded-3xl p-6">
-              <div className="flex flex-col space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-semibold text-white">Transaction Milestone</h3>
-                    <p className="text-sm text-white/70">Progress toward 200,000 transactions - Gift awaits!</p>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-[#00FF66]">
-                      {analytics?.totalTransactions?.toLocaleString() || "0"}
-                    </div>
-                    <div className="text-sm text-white/70">
-                      / 200,000
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm text-white/70">
-                    <span>Progress</span>
-                    <span>{((analytics?.totalTransactions || 0) / 200000 * 100).toFixed(1)}%</span>
-                  </div>
-                  <div className="w-full bg-gray-700/50 rounded-full h-4 relative overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-[#00FF66] to-[#00CC52] rounded-full transition-all duration-1000 ease-out relative"
-                      style={{ width: `${Math.min((analytics?.totalTransactions || 0) / 200000 * 100, 100)}%` }}
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse"></div>
-                    </div>
-                    {/* Gift Icon at the end */}
-                    <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
-                      <div className="w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center text-xs">
-                        🎁
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Milestone markers */}
-                  <div className="flex justify-between text-xs text-white/50 mt-1">
-                    <span>0</span>
-                    <span>50K</span>
-                    <span>100K</span>
-                    <span>150K</span>
-                    <span className="text-yellow-400 font-semibold">200K 🎁</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
           {/* Analytics Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
             <div className="dashboard-card-glass rounded-3xl p-6">
@@ -392,6 +340,58 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Transaction Milestone Progress */}
+          <div className="mb-6 sm:mb-8">
+            <div className="dashboard-card-glass rounded-3xl p-6">
+              <div className="flex flex-col space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">Transaction Milestone</h3>
+                    <p className="text-sm text-white/70">Progress toward 200,000 transactions - Gift awaits!</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-[#00FF66]">
+                      {analytics?.totalTransactions?.toLocaleString() || "0"}
+                    </div>
+                    <div className="text-sm text-white/70">
+                      / 200,000
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm text-white/70">
+                    <span>Progress</span>
+                    <span>{((analytics?.totalTransactions || 0) / 200000 * 100).toFixed(1)}%</span>
+                  </div>
+                  <div className="w-full bg-gray-700/50 rounded-full h-4 relative overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-[#00FF66] to-[#00CC52] rounded-full transition-all duration-1000 ease-out relative"
+                      style={{ width: `${Math.min((analytics?.totalTransactions || 0) / 200000 * 100, 100)}%` }}
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse"></div>
+                    </div>
+                    {/* Gift Icon at the end */}
+                    <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                      <div className="w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center text-xs">
+                        🎁
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Milestone markers */}
+                  <div className="flex justify-between text-xs text-white/50 mt-1">
+                    <span>0</span>
+                    <span>50K</span>
+                    <span>100K</span>
+                    <span>150K</span>
+                    <span className="text-yellow-400 font-semibold">200K 🎁</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Export Data */}
