@@ -247,12 +247,16 @@ export default function StockManagement() {
         </div>
       </div>
 
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">
+      <div 
+        className={`min-h-screen bg-gradient-to-br from-gray-950 via-black to-gray-900 transform transition-transform duration-300 ease-in-out ${
+          menuOpen ? '-translate-x-80' : 'translate-x-0'
+        }`}
+      >
         {/* Background Effects */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-green-300 to-emerald-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse" />
-          <div className="absolute top-40 right-20 w-96 h-96 bg-gradient-to-r from-emerald-300 to-teal-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse delay-75" />
-          <div className="absolute -bottom-8 left-40 w-96 h-96 bg-gradient-to-r from-teal-300 to-green-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse delay-150" />
+          <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-green-400/20 to-emerald-400/20 rounded-full mix-blend-screen filter blur-xl animate-pulse" />
+          <div className="absolute top-40 right-20 w-96 h-96 bg-gradient-to-r from-emerald-400/20 to-teal-400/20 rounded-full mix-blend-screen filter blur-xl animate-pulse delay-75" />
+          <div className="absolute -bottom-8 left-40 w-96 h-96 bg-gradient-to-r from-teal-400/20 to-green-400/20 rounded-full mix-blend-screen filter blur-xl animate-pulse delay-150" />
         </div>
 
         {/* Menu Icon */}
@@ -265,13 +269,22 @@ export default function StockManagement() {
           </button>
         </div>
 
+        {/* Tapt Pay Branding */}
+        <div className="fixed top-4 left-4 z-30">
+          <img 
+            src={taptLogoPath} 
+            alt="TaptPay" 
+            className="h-8 w-auto object-contain"
+          />
+        </div>
+
         <div className="relative z-10 p-4 lg:p-8">
           {/* Header */}
           <div className="max-w-7xl mx-auto mb-8 pt-16">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">Stock Management</h1>
-                <p className="text-gray-600 mt-1">Manage your inventory and product catalog</p>
+                <h1 className="text-3xl font-bold text-white">Stock Management</h1>
+                <p className="text-gray-400 mt-1">Manage your inventory and product catalog</p>
               </div>
             </div>
           </div>
@@ -280,7 +293,7 @@ export default function StockManagement() {
         <div className="max-w-7xl mx-auto">
           {/* Search and Create Bar */}
           <div className="mb-8">
-            <Card className="backdrop-blur-xl bg-white/20 border border-white/30 shadow-2xl">
+            <Card className="dashboard-card-glass backdrop-blur-xl bg-black/40 border border-white/20 shadow-2xl">
               <CardContent className="p-6">
                 <div className="flex flex-col sm:flex-row gap-4 items-center">
                   <div className="relative flex-1">
@@ -289,7 +302,7 @@ export default function StockManagement() {
                       placeholder="Search stock items..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 bg-white/50 backdrop-blur-sm border-white/20"
+                      className="pl-10 bg-black/40 backdrop-blur-sm border-white/20 text-white placeholder:text-gray-500"
                     />
                   </div>
                   
@@ -303,7 +316,7 @@ export default function StockManagement() {
                     <DialogTrigger asChild>
                       <Button 
                         onClick={() => setIsCreateDialogOpen(true)}
-                        className="bg-green-600 hover:bg-green-700 text-white shadow-lg"
+                        className="bg-[#00FF66] hover:bg-[#00CC52] text-black font-medium shadow-lg"
                       >
                         <Plus className="w-4 h-4 mr-2" />
                         Create Item
@@ -317,18 +330,19 @@ export default function StockManagement() {
                       </DialogHeader>
                       <div className="space-y-4">
                         <div>
-                          <label className="text-sm font-medium text-gray-700 mb-1 block">
+                          <label className="text-sm font-medium text-white mb-1 block">
                             Item Name *
                           </label>
                           <Input
                             placeholder="Enter item name"
                             value={formData.name}
                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                            className="bg-black/40 border-white/20 text-white placeholder:text-gray-500"
                           />
                         </div>
                         
                         <div>
-                          <label className="text-sm font-medium text-gray-700 mb-1 block">
+                          <label className="text-sm font-medium text-white mb-1 block">
                             Description
                           </label>
                           <Textarea
@@ -336,11 +350,12 @@ export default function StockManagement() {
                             value={formData.description}
                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                             rows={3}
+                            className="bg-black/40 border-white/20 text-white placeholder:text-gray-500"
                           />
                         </div>
                         
                         <div>
-                          <label className="text-sm font-medium text-gray-700 mb-1 block">
+                          <label className="text-sm font-medium text-white mb-1 block">
                             Cost *
                           </label>
                           <div className="relative">
@@ -351,7 +366,7 @@ export default function StockManagement() {
                               placeholder="0.00"
                               value={formData.cost}
                               onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
-                              className="pl-10"
+                              className="pl-10 bg-black/40 border-white/20 text-white placeholder:text-gray-500"
                             />
                           </div>
                         </div>
@@ -371,7 +386,7 @@ export default function StockManagement() {
                           <Button
                             onClick={handleSubmit}
                             disabled={createStockMutation.isPending || updateStockMutation.isPending}
-                            className="flex-1 bg-green-600 hover:bg-green-700"
+                            className="flex-1 bg-[#00FF66] hover:bg-[#00CC52] text-black font-medium"
                           >
                             {(createStockMutation.isPending || updateStockMutation.isPending) 
                               ? "Saving..." 
@@ -391,13 +406,13 @@ export default function StockManagement() {
           {isLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[1, 2, 3, 4, 5, 6].map((i) => (
-                <Card key={i} className="backdrop-blur-xl bg-white/20 border border-white/30 shadow-2xl">
+                <Card key={i} className="dashboard-card-glass backdrop-blur-xl bg-black/40 border border-white/20 shadow-2xl">
                   <CardContent className="p-6">
                     <div className="animate-pulse">
-                      <div className="h-6 bg-gray-200 rounded w-3/4 mb-3"></div>
-                      <div className="h-4 bg-gray-200 rounded w-full mb-2"></div>
-                      <div className="h-4 bg-gray-200 rounded w-2/3 mb-4"></div>
-                      <div className="h-8 bg-gray-200 rounded w-1/3"></div>
+                      <div className="h-6 bg-gray-600 rounded w-3/4 mb-3"></div>
+                      <div className="h-4 bg-gray-600 rounded w-full mb-2"></div>
+                      <div className="h-4 bg-gray-600 rounded w-2/3 mb-4"></div>
+                      <div className="h-8 bg-gray-600 rounded w-1/3"></div>
                     </div>
                   </CardContent>
                 </Card>
@@ -406,18 +421,18 @@ export default function StockManagement() {
           ) : filteredItems.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredItems.map((item: StockItem) => (
-                <Card key={item.id} className="backdrop-blur-xl bg-white/20 border border-white/30 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-105">
+                <Card key={item.id} className="dashboard-card-glass backdrop-blur-xl bg-black/40 border border-white/20 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-105">
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center space-x-3">
-                        <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-emerald-500 rounded-xl flex items-center justify-center shadow-lg">
-                          <Package className="w-6 h-6 text-white" />
+                        <div className="w-12 h-12 bg-gradient-to-br from-[#00FF66] to-[#00CC52] rounded-xl flex items-center justify-center shadow-lg drop-shadow-[0_0_8px_#00FF66]">
+                          <Package className="w-6 h-6 text-black" />
                         </div>
                         <div>
-                          <CardTitle className="text-lg font-semibold text-gray-900 line-clamp-1">
+                          <CardTitle className="text-lg font-semibold text-white line-clamp-1">
                             {item.name}
                           </CardTitle>
-                          <Badge variant="outline" className="mt-1 bg-green-50 text-green-700 border-green-200">
+                          <Badge variant="outline" className="mt-1 bg-[#00FF66]/20 text-[#00FF66] border-[#00FF66]/30">
                             <ShoppingCart className="w-3 h-3 mr-1" />
                             In Stock
                           </Badge>
@@ -429,17 +444,17 @@ export default function StockManagement() {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleEdit(item)}
-                          className="h-8 w-8 p-0 hover:bg-blue-100"
+                          className="h-8 w-8 p-0 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300"
                         >
-                          <Edit className="w-4 h-4 text-blue-600" />
+                          <Edit className="w-4 h-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => deleteStockMutation.mutate(item.id)}
-                          className="h-8 w-8 p-0 hover:bg-red-100"
+                          className="h-8 w-8 p-0 hover:bg-red-500/20 text-red-400 hover:text-red-300"
                         >
-                          <Trash2 className="w-4 h-4 text-red-600" />
+                          <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
                     </div>
@@ -448,8 +463,8 @@ export default function StockManagement() {
                   <CardContent className="pt-0">
                     {item.description && (
                       <div className="flex items-start space-x-2 mb-4">
-                        <FileText className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
-                        <p className="text-sm text-gray-600 line-clamp-2">
+                        <FileText className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                        <p className="text-sm text-gray-300 line-clamp-2">
                           {item.description}
                         </p>
                       </div>
@@ -457,13 +472,13 @@ export default function StockManagement() {
                     
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
-                        <DollarSign className="w-5 h-5 text-green-600" />
-                        <span className="text-2xl font-bold text-green-600">
+                        <DollarSign className="w-5 h-5 text-[#00FF66] drop-shadow-[0_0_8px_#00FF66]" />
+                        <span className="text-2xl font-bold text-[#00FF66]">
                           ${parseFloat(item.cost).toFixed(2)}
                         </span>
                       </div>
                       
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-gray-400">
                         Added {new Date(item.createdAt).toLocaleDateString()}
                       </div>
                     </div>
@@ -472,15 +487,15 @@ export default function StockManagement() {
               ))}
             </div>
           ) : (
-            <Card className="backdrop-blur-xl bg-white/20 border border-white/30 shadow-2xl">
+            <Card className="dashboard-card-glass backdrop-blur-xl bg-black/40 border border-white/20 shadow-2xl">
               <CardContent className="p-12 text-center">
-                <div className="w-16 h-16 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Package className="w-8 h-8 text-white" />
+                <div className="w-16 h-16 bg-gradient-to-br from-[#00FF66] to-[#00CC52] rounded-full flex items-center justify-center mx-auto mb-4 drop-shadow-[0_0_8px_#00FF66]">
+                  <Package className="w-8 h-8 text-black" />
                 </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                <h3 className="text-xl font-semibold text-white mb-2">
                   {searchTerm ? "No items found" : "No stock items yet"}
                 </h3>
-                <p className="text-gray-600 mb-6">
+                <p className="text-gray-300 mb-6">
                   {searchTerm 
                     ? "Try adjusting your search terms" 
                     : "Start building your inventory by creating your first stock item"
@@ -489,7 +504,7 @@ export default function StockManagement() {
                 {!searchTerm && (
                   <Button 
                     onClick={() => setIsCreateDialogOpen(true)}
-                    className="bg-green-600 hover:bg-green-700"
+                    className="bg-[#00FF66] hover:bg-[#00CC52] text-black font-medium"
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     Create First Item
