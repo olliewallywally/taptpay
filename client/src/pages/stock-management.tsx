@@ -257,9 +257,9 @@ export default function StockManagement() {
         <div className="fixed top-4 right-4 z-30">
           <button
             onClick={() => setMenuOpen(true)}
-            className="p-3 backdrop-blur-xl bg-black/40 border border-white/20 rounded-xl text-white hover:bg-black/60 transition-colors"
+            className="p-2 sm:p-3 backdrop-blur-xl bg-black/40 border border-white/20 rounded-xl text-white hover:bg-black/60 transition-colors"
           >
-            <Menu className="h-6 w-6" />
+            <Menu className="h-5 w-5 sm:h-6 sm:w-6" />
           </button>
         </div>
 
@@ -268,17 +268,17 @@ export default function StockManagement() {
           <img 
             src={taptLogoPath} 
             alt="TaptPay" 
-            className="h-8 w-auto object-contain"
+            className="h-6 sm:h-8 w-auto object-contain"
           />
         </div>
 
         <div className="relative z-10 p-4 lg:p-8">
           {/* Header */}
-          <div className="max-w-7xl mx-auto mb-8 pt-16">
+          <div className="max-w-7xl mx-auto mb-6 sm:mb-8 pt-16 sm:pt-20">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <h1 className="text-3xl font-bold text-white">Stock Management</h1>
-                <p className="text-gray-400 mt-1">Manage your inventory and product catalog</p>
+                <h1 className="text-2xl sm:text-3xl font-bold text-white">Stock Management</h1>
+                <p className="text-sm sm:text-base text-gray-400 mt-1">Manage your inventory and product catalog</p>
               </div>
             </div>
           </div>
@@ -286,9 +286,9 @@ export default function StockManagement() {
         {/* Main Content */}
         <div className="max-w-7xl mx-auto">
           {/* Search and Create Bar */}
-          <div className="mb-8">
+          <div className="mb-6 sm:mb-8">
             <Card className="dashboard-card-glass backdrop-blur-xl bg-black/40 border border-white/20 shadow-2xl">
-              <CardContent className="p-6">
+              <CardContent className="p-4 sm:p-6">
                 <div className="flex flex-col sm:flex-row gap-4 items-center">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -310,10 +310,11 @@ export default function StockManagement() {
                     <DialogTrigger asChild>
                       <Button 
                         onClick={() => setIsCreateDialogOpen(true)}
-                        className="bg-[#00FF66] hover:bg-[#00CC52] text-black font-medium shadow-lg"
+                        className="bg-[#00FF66] hover:bg-[#00CC52] text-black font-medium shadow-lg w-full sm:w-auto"
                       >
                         <Plus className="w-4 h-4 mr-2" />
-                        Create Item
+                        <span className="hidden sm:inline">Create Item</span>
+                        <span className="sm:hidden">Create</span>
                       </Button>
                     </DialogTrigger>
                     <DialogContent className="sm:max-w-md bg-gray-800/90 border-gray-600/50 backdrop-blur-xl">
@@ -401,7 +402,7 @@ export default function StockManagement() {
 
           {/* Stock Items Grid */}
           {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {[1, 2, 3, 4, 5, 6].map((i) => (
                 <Card key={i} className="dashboard-card-glass backdrop-blur-xl bg-black/40 border border-white/20 shadow-2xl">
                   <CardContent className="p-6">
@@ -416,7 +417,7 @@ export default function StockManagement() {
               ))}
             </div>
           ) : filteredItems.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {filteredItems.map((item: StockItem) => (
                 <Card key={item.id} className="dashboard-card-glass backdrop-blur-xl bg-black/40 border border-white/20 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-105">
                   <CardHeader className="pb-3">
