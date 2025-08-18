@@ -97,10 +97,16 @@ export default function MerchantTerminal() {
   const { data: stockItems = [] } = useQuery({
     queryKey: ["/api/merchants", merchantId, "stock-items"],
     queryFn: async () => {
-      const response = await fetch(`/api/merchants/${merchantId}/stock-items`);
+      const response = await fetch(`/api/merchants/${merchantId}/stock-items`, {
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+          "Content-Type": "application/json"
+        }
+      });
       if (!response.ok) throw new Error("Failed to fetch stock items");
       return response.json();
     },
+    enabled: !!merchantId,
   });
 
   // Create transaction mutation
