@@ -27,6 +27,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { getCurrentMerchantId } from "@/lib/auth";
+import taptLogoPath from "@assets/tapt logo v2_1751682549877.png";
 
 interface StockItem {
   id: number;
