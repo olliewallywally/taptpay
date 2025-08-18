@@ -383,7 +383,7 @@ export default function MerchantTerminal() {
           <div className="mb-6">
           {currentTransaction || activeTransaction ? (
             <div 
-              className="rounded-2xl p-6 text-center transition-all duration-300 hover:scale-105 hover:shadow-lg cursor-pointer"
+              className="rounded-2xl p-6 text-center"
               style={{ backgroundColor: '#00FF66' }}
             >
               <div className="text-black text-lg font-medium mb-2">Total</div>
@@ -410,7 +410,7 @@ export default function MerchantTerminal() {
         <div className="flex justify-center gap-4 mb-6">
           <button
             onClick={() => handleActionClick("send")}
-            className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 hover:scale-110 hover:shadow-lg ${
+            className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
               activeAction === "send"
                 ? 'text-black'
                 : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
@@ -425,7 +425,7 @@ export default function MerchantTerminal() {
           
           <button
             onClick={() => handleActionClick("edit")}
-            className="flex flex-col items-center p-4 rounded-full transition-all duration-200 hover:scale-110 hover:shadow-lg bg-gray-800 text-gray-300 hover:bg-gray-700"
+            className="flex flex-col items-center p-4 rounded-full transition-all duration-200 bg-gray-800 text-gray-300 hover:bg-gray-700"
             style={{
               backgroundColor: activeAction === "edit" ? '#00FF66' : '#374151'
             }}
@@ -436,7 +436,7 @@ export default function MerchantTerminal() {
           
           <button
             onClick={() => handleActionClick("split")}
-            className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 hover:scale-110 hover:shadow-lg ${
+            className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
               activeAction === "split"
                 ? 'text-black'
                 : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
@@ -451,7 +451,7 @@ export default function MerchantTerminal() {
           
           <button
             onClick={() => handleActionClick("more")}
-            className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 hover:scale-110 hover:shadow-lg ${
+            className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
               activeAction === "more"
                 ? 'text-black'
                 : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
@@ -685,7 +685,7 @@ export default function MerchantTerminal() {
         {/* QR Code Section - Always visible */}
         <div>
           <div
-            className="rounded-2xl p-4 transition-all duration-300"
+            className="rounded-2xl p-4"
             style={{ backgroundColor: '#00FF66' }}
           >
               {/* Header */}
@@ -715,7 +715,7 @@ export default function MerchantTerminal() {
                           taptStones.map((stone: any) => (
                             <div 
                               key={stone.id}
-                              className="bg-gray-50 border border-gray-200 rounded-2xl p-6 shadow-lg transition-all duration-300 mb-6"
+                              className="bg-gray-50 border border-gray-200 rounded-2xl p-6 shadow-lg mb-6"
                             >
                               {/* Stone Header */}
                               <div className="w-full flex items-center justify-center mb-4">
@@ -723,7 +723,7 @@ export default function MerchantTerminal() {
                               </div>
 
                               {/* QR Code - Always visible */}
-                              <div className="text-center transition-all duration-300">
+                              <div className="text-center">
                                 <div className="w-48 h-48 mx-auto mb-4 bg-white border-2 border-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
                                   <QRCodeDisplay 
                                     merchantId={merchantId}
