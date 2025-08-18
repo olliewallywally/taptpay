@@ -548,7 +548,7 @@ export default function MerchantTerminal() {
                   
                   {/* Stock Item Search */}
                   <div className="relative">
-                    <FormLabel className="text-xs text-gray-300">Search Stock Items</FormLabel>
+                    <label className="text-xs text-gray-300">Search Stock Items</label>
                     <Input
                       placeholder="Type to search stock items..."
                       value={stockSearchInput}
@@ -582,7 +582,7 @@ export default function MerchantTerminal() {
                   {/* Selected Stock Items Tags */}
                   {selectedStockItems.length > 0 && (
                     <div className="space-y-1">
-                      <FormLabel className="text-xs text-gray-300">Selected Items</FormLabel>
+                      <label className="text-xs text-gray-300">Selected Items</label>
                       <div className="flex flex-wrap gap-1">
                         {selectedStockItems.map((item) => (
                           <div
