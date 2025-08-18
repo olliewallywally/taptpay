@@ -251,12 +251,7 @@ export default function StockManagement() {
           menuOpen ? '-translate-x-80' : 'translate-x-0'
         }`}
       >
-        {/* Background Effects */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-green-400/20 to-emerald-400/20 rounded-full mix-blend-screen filter blur-xl animate-pulse" />
-          <div className="absolute top-40 right-20 w-96 h-96 bg-gradient-to-r from-emerald-400/20 to-teal-400/20 rounded-full mix-blend-screen filter blur-xl animate-pulse delay-75" />
-          <div className="absolute -bottom-8 left-40 w-96 h-96 bg-gradient-to-r from-teal-400/20 to-green-400/20 rounded-full mix-blend-screen filter blur-xl animate-pulse delay-150" />
-        </div>
+
 
         {/* Menu Icon */}
         <div className="fixed top-4 right-4 z-30">
