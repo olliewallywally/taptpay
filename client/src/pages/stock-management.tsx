@@ -66,6 +66,18 @@ export default function StockManagement() {
   // Fetch stock items
   const { data: stockItems, isLoading, error } = useQuery({
     queryKey: ["/api/merchants", merchantId, "stock-items"],
+    queryFn: async () => {
+      const response = await fetch(`/api/merchants/${merchantId}/stock-items`, {
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("authToken")}`,
+          "Content-Type": "application/json"
+        }
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch stock items: ${response.statusText}`);
+      }
+      return response.json();
+    },
     enabled: !!merchantId,
   });
 
@@ -180,15 +192,7 @@ export default function StockManagement() {
     item.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Debug logging
-  console.log("Stock Management Debug:", {
-    merchantId,
-    stockItems,
-    isLoading,
-    error,
-    stockItemsLength: stockItems?.length,
-    filteredItemsLength: filteredItems.length
-  });
+
 
   if (!user) {
     return (
@@ -412,14 +416,7 @@ export default function StockManagement() {
             </Card>
           </div>
 
-          {/* Debug Info */}
-          <div className="mb-4 p-4 bg-gray-800 rounded-lg text-white text-xs">
-            <div>Merchant ID: {merchantId}</div>
-            <div>Loading: {isLoading ? 'Yes' : 'No'}</div>
-            <div>Stock Items: {stockItems ? JSON.stringify(stockItems, null, 2) : 'None'}</div>
-            <div>Filtered Items Count: {filteredItems.length}</div>
-            <div>Error: {error ? JSON.stringify(error) : 'None'}</div>
-          </div>
+
 
           {/* Stock Items Grid */}
           {isLoading ? (
