@@ -29,7 +29,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getCurrentMerchantId } from "@/lib/auth";
-import taptLogoPath from "@assets/tapt logo v2_1751682549877.png";
+import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
 
 interface StockItem {
   id: number;
@@ -264,11 +264,11 @@ export default function StockManagement() {
         </div>
 
         {/* Tapt Pay Branding */}
-        <div className="fixed top-4 left-4 z-30 bg-white/10 backdrop-blur-lg rounded-lg p-2 border border-white/20">
+        <div className="fixed top-4 left-4 z-30">
           <img 
             src={taptLogoPath} 
             alt="TaptPay" 
-            className="h-6 w-auto object-contain"
+            className="h-8 w-auto object-contain"
           />
         </div>
 
