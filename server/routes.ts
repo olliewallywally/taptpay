@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema } from "@shared/schema";
+import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema } from "@shared/schema";
 import { windcaveService } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, createUser, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
@@ -2271,6 +2271,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching API usage:", error);  
       res.status(500).json({ message: "Failed to fetch API usage" });
+    }
+  });
+
+  // =============================================================================
+  // STOCK MANAGEMENT ENDPOINTS
+  // =============================================================================
+  
+  // Get all stock items for a merchant
+  app.get("/api/merchants/:merchantId/stock-items", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = parseInt(req.params.merchantId);
+      
+      // Verify merchant ownership or admin access
+      if (!req.merchant && req.user?.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      if (req.merchant && req.merchant.id !== merchantId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const stockItems = await storage.getStockItemsByMerchant(merchantId);
+      res.json(stockItems);
+    } catch (error) {
+      console.error("Error fetching stock items:", error);
+      res.status(500).json({ message: "Failed to fetch stock items" });
+    }
+  });
+
+  // Create a new stock item
+  app.post("/api/merchants/:merchantId/stock-items", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = parseInt(req.params.merchantId);
+      
+      // Verify merchant ownership
+      if (!req.merchant || req.merchant.id !== merchantId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const validatedData = createStockItemSchema.parse(req.body);
+      
+      const stockItem = await storage.createStockItem({
+        merchantId,
+        ...validatedData,
+      });
+      
+      res.status(201).json(stockItem);
+    } catch (error) {
+      console.error("Error creating stock item:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create stock item" });
+    }
+  });
+
+  // Update a stock item
+  app.put("/api/merchants/:merchantId/stock-items/:itemId", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = parseInt(req.params.merchantId);
+      const itemId = parseInt(req.params.itemId);
+      
+      // Verify merchant ownership
+      if (!req.merchant || req.merchant.id !== merchantId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const validatedData = updateStockItemSchema.parse(req.body);
+      
+      const stockItem = await storage.updateStockItem(itemId, validatedData);
+      
+      if (!stockItem) {
+        return res.status(404).json({ message: "Stock item not found" });
+      }
+      
+      res.json(stockItem);
+    } catch (error) {
+      console.error("Error updating stock item:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update stock item" });
+    }
+  });
+
+  // Delete a stock item
+  app.delete("/api/merchants/:merchantId/stock-items/:itemId", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = parseInt(req.params.merchantId);
+      const itemId = parseInt(req.params.itemId);
+      
+      // Verify merchant ownership
+      if (!req.merchant || req.merchant.id !== merchantId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const success = await storage.deleteStockItem(itemId);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Stock item not found" });
+      }
+      
+      res.json({ message: "Stock item deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting stock item:", error);
+      res.status(500).json({ message: "Failed to delete stock item" });
     }
   });
 

@@ -1,4 +1,4 @@
-import { merchants, transactions, merchantSettlements, platformFees, refunds, splitPayments, taptStones, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone } from "@shared/schema";
+import { merchants, transactions, merchantSettlements, platformFees, refunds, splitPayments, taptStones, stockItems, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem } from "@shared/schema";
 import { getDb, isDatabaseConnected } from "./database";
 import { eq, desc, and } from "drizzle-orm";
 
@@ -57,6 +57,13 @@ export interface IStorage {
   updateTaptStoneUrls(id: number, qrCodeUrl: string, paymentUrl: string): Promise<TaptStone | undefined>;
   deleteTaptStone(id: number): Promise<boolean>;
   associateTransactionWithStone(transactionId: number, stoneId: number): Promise<void>;
+  
+  // Stock Item operations
+  createStockItem(data: InsertStockItem): Promise<StockItem>;
+  getStockItem(id: number): Promise<StockItem | undefined>;
+  getStockItemsByMerchant(merchantId: number): Promise<StockItem[]>;
+  updateStockItem(id: number, data: Partial<InsertStockItem>): Promise<StockItem | undefined>;
+  deleteStockItem(id: number): Promise<boolean>;
   
   // Analytics operations
   getMerchantAnalytics(merchantId: number): Promise<{
@@ -130,12 +137,14 @@ export class MemStorage implements IStorage {
   private refunds: Map<number, Refund>;
   private splitPayments: Map<number, any>;
   private taptStones: Map<number, TaptStone>;
+  private stockItems: Map<number, StockItem>;
   private currentMerchantId: number;
   private currentTransactionId: number;
   private currentPlatformFeeId: number;
   private currentRefundId: number;
   private currentSplitPaymentId: number;
   private currentTaptStoneId: number;
+  private currentStockItemId: number;
   private activeTransactionCache: Map<number, Transaction | null>; // Cache for active transactions by merchant
 
   constructor() {
@@ -145,12 +154,14 @@ export class MemStorage implements IStorage {
     this.refunds = new Map();
     this.splitPayments = new Map();
     this.taptStones = new Map();
+    this.stockItems = new Map();
     this.currentMerchantId = 1;
     this.currentTransactionId = 1;
     this.currentPlatformFeeId = 1;
     this.currentRefundId = 1;
     this.currentSplitPaymentId = 1;
     this.currentTaptStoneId = 1;
+    this.currentStockItemId = 1;
     this.activeTransactionCache = new Map();
   }
 
@@ -1036,6 +1047,55 @@ export class MemStorage implements IStorage {
     // For MemStorage, we could add a field to track stone associations
     // but for simplicity, we'll just log this association
     console.log(`Transaction ${transactionId} associated with stone ${stoneId}`);
+  }
+
+  // Stock Item operations
+  async createStockItem(data: InsertStockItem): Promise<StockItem> {
+    const id = this.currentStockItemId++;
+    const stockItem: StockItem = {
+      ...data,
+      id,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.stockItems.set(id, stockItem);
+    return stockItem;
+  }
+
+  async getStockItem(id: number): Promise<StockItem | undefined> {
+    return this.stockItems.get(id);
+  }
+
+  async getStockItemsByMerchant(merchantId: number): Promise<StockItem[]> {
+    return Array.from(this.stockItems.values()).filter(
+      (item) => item.merchantId === merchantId && item.isActive
+    );
+  }
+
+  async updateStockItem(id: number, data: Partial<InsertStockItem>): Promise<StockItem | undefined> {
+    const item = this.stockItems.get(id);
+    if (item) {
+      const updatedItem = {
+        ...item,
+        ...data,
+        updatedAt: new Date(),
+      };
+      this.stockItems.set(id, updatedItem);
+      return updatedItem;
+    }
+    return undefined;
+  }
+
+  async deleteStockItem(id: number): Promise<boolean> {
+    const item = this.stockItems.get(id);
+    if (item) {
+      item.isActive = false;
+      item.updatedAt = new Date();
+      this.stockItems.set(id, item);
+      return true;
+    }
+    return false;
   }
 }
 

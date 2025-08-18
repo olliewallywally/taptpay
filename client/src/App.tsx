@@ -26,6 +26,7 @@ import AdminRevenue from "@/pages/admin-revenue";
 import AdminApi from "@/pages/admin-api";
 import CreateMerchant from "@/pages/create-merchant";
 import VerifyMerchant from "@/pages/verify-merchant";
+import StockManagement from "@/pages/stock-management";
 
 import { Layout } from "@/components/layout";
 import { PageTransition } from "@/components/page-transition";
@@ -167,6 +168,11 @@ function Router() {
         <Route path="/transactions">
           <ProtectedRoute>
             <Transactions />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/stock">
+          <ProtectedRoute>
+            <StockManagement />
           </ProtectedRoute>
         </Route>
         <Route path="/nfc">
