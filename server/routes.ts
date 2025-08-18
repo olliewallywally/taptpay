@@ -2284,11 +2284,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const merchantId = parseInt(req.params.merchantId);
       
       // Verify merchant ownership or admin access
-      if (!req.merchant && req.user?.role !== 'admin') {
-        return res.status(403).json({ message: "Access denied" });
-      }
-      
-      if (req.merchant && req.merchant.id !== merchantId) {
+      if (req.user?.role !== 'admin' && req.user?.merchantId !== merchantId) {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -2305,8 +2301,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const merchantId = parseInt(req.params.merchantId);
       
-      // Verify merchant ownership
-      if (!req.merchant || req.merchant.id !== merchantId) {
+      // Verify merchant ownership or admin access
+      if (req.user?.role !== 'admin' && req.user?.merchantId !== merchantId) {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -2333,8 +2329,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const merchantId = parseInt(req.params.merchantId);
       const itemId = parseInt(req.params.itemId);
       
-      // Verify merchant ownership
-      if (!req.merchant || req.merchant.id !== merchantId) {
+      // Verify merchant ownership or admin access
+      if (req.user?.role !== 'admin' && req.user?.merchantId !== merchantId) {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -2362,8 +2358,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const merchantId = parseInt(req.params.merchantId);
       const itemId = parseInt(req.params.itemId);
       
-      // Verify merchant ownership
-      if (!req.merchant || req.merchant.id !== merchantId) {
+      // Verify merchant ownership or admin access
+      if (req.user?.role !== 'admin' && req.user?.merchantId !== merchantId) {
         return res.status(403).json({ message: "Access denied" });
       }
       
