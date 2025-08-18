@@ -14,7 +14,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentMerchantId } from "@/lib/auth";
-import { Send, Loader2, CheckCircle, Clock, XCircle, Eye, Copy, Check, QrCode, Smartphone, Waves, CreditCard, X, Menu, Edit, Split, MoreHorizontal, ChevronDown } from "lucide-react";
+import { Send, Loader2, CheckCircle, Clock, XCircle, Eye, Copy, Check, QrCode, Smartphone, Waves, CreditCard, X, Menu, Edit, Split, MoreHorizontal, ChevronDown, Tag } from "lucide-react";
 import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
 import { Link } from "wouter";
 
@@ -33,6 +33,11 @@ export default function MerchantTerminal() {
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const [selectedStoneId, setSelectedStoneId] = useState<number | null>(null);
   const [qrCollapsed, setQrCollapsed] = useState(false);
+  
+  // Stock item tagging state
+  const [selectedStockItems, setSelectedStockItems] = useState<any[]>([]);
+  const [stockSearchInput, setStockSearchInput] = useState("");
+  const [filteredStockItems, setFilteredStockItems] = useState<any[]>([]);
   
   // NFC-specific state
   const [nfcCapabilities, setNfcCapabilities] = useState<any>(null);
@@ -88,6 +93,16 @@ export default function MerchantTerminal() {
     },
   });
 
+  // Get stock items for this merchant
+  const { data: stockItems = [] } = useQuery({
+    queryKey: ["/api/merchants", merchantId, "stock-items"],
+    queryFn: async () => {
+      const response = await fetch(`/api/merchants/${merchantId}/stock-items`);
+      if (!response.ok) throw new Error("Failed to fetch stock items");
+      return response.json();
+    },
+  });
+
   // Create transaction mutation
   const createTransactionMutation = useMutation({
     mutationFn: async (data: TransactionFormData) => {
@@ -115,6 +130,58 @@ export default function MerchantTerminal() {
       });
     },
   });
+
+  // Filter stock items based on search input
+  useEffect(() => {
+    if (stockSearchInput.trim() === "") {
+      setFilteredStockItems([]);
+    } else {
+      const filtered = stockItems.filter((item: any) =>
+        item.name.toLowerCase().includes(stockSearchInput.toLowerCase()) ||
+        item.description?.toLowerCase().includes(stockSearchInput.toLowerCase())
+      );
+      setFilteredStockItems(filtered.slice(0, 5)); // Show max 5 suggestions
+    }
+  }, [stockSearchInput, stockItems]);
+
+  // Calculate total price from selected stock items
+  const calculateTotalPrice = () => {
+    return selectedStockItems.reduce((total, item) => total + parseFloat(item.price), 0).toFixed(2);
+  };
+
+  // Add stock item as tag
+  const addStockItem = (stockItem: any) => {
+    if (!selectedStockItems.find(item => item.id === stockItem.id)) {
+      setSelectedStockItems(prev => [...prev, stockItem]);
+      setStockSearchInput("");
+      setFilteredStockItems([]);
+      
+      // Update form values
+      const newTotal = calculateTotalPrice();
+      form.setValue("price", (parseFloat(newTotal) + parseFloat(stockItem.price)).toFixed(2));
+      
+      // Update item name with all selected items
+      const allItemNames = [...selectedStockItems, stockItem].map(item => item.name).join(", ");
+      form.setValue("itemName", allItemNames);
+    }
+  };
+
+  // Remove stock item tag
+  const removeStockItem = (stockItemId: number) => {
+    setSelectedStockItems(prev => {
+      const newItems = prev.filter(item => item.id !== stockItemId);
+      
+      // Update form values
+      const newTotal = newItems.reduce((total, item) => total + parseFloat(item.price), 0).toFixed(2);
+      form.setValue("price", newTotal);
+      
+      // Update item name
+      const allItemNames = newItems.map(item => item.name).join(", ");
+      form.setValue("itemName", allItemNames || "");
+      
+      return newItems;
+    });
+  };
 
   // Set up SSE connection
   useEffect(() => {
@@ -478,6 +545,65 @@ export default function MerchantTerminal() {
               {activeAction === "edit" && (
                 <div className="space-y-2">
                   <h3 className="text-sm font-semibold text-white">Edit Transaction</h3>
+                  
+                  {/* Stock Item Search */}
+                  <div className="relative">
+                    <FormLabel className="text-xs text-gray-300">Search Stock Items</FormLabel>
+                    <Input
+                      placeholder="Type to search stock items..."
+                      value={stockSearchInput}
+                      onChange={(e) => setStockSearchInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && filteredStockItems.length > 0) {
+                          e.preventDefault();
+                          addStockItem(filteredStockItems[0]);
+                        }
+                      }}
+                      className="bg-gray-700 border-gray-600 text-white rounded-lg h-8 mb-2"
+                    />
+                    
+                    {/* Stock item suggestions dropdown */}
+                    {filteredStockItems.length > 0 && (
+                      <div className="absolute z-10 w-full bg-gray-700 border border-gray-600 rounded-lg mt-1 max-h-32 overflow-y-auto">
+                        {filteredStockItems.map((item: any) => (
+                          <div
+                            key={item.id}
+                            onClick={() => addStockItem(item)}
+                            className="p-2 cursor-pointer text-white text-xs border-b border-gray-600 last:border-b-0"
+                          >
+                            <div className="font-medium">{item.name}</div>
+                            <div className="text-gray-400">${parseFloat(item.price).toFixed(2)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Selected Stock Items Tags */}
+                  {selectedStockItems.length > 0 && (
+                    <div className="space-y-1">
+                      <FormLabel className="text-xs text-gray-300">Selected Items</FormLabel>
+                      <div className="flex flex-wrap gap-1">
+                        {selectedStockItems.map((item) => (
+                          <div
+                            key={item.id}
+                            className="flex items-center gap-1 bg-gray-600 rounded-full px-2 py-1 text-xs text-white"
+                          >
+                            <Tag size={12} />
+                            <span>{item.name}</span>
+                            <span className="text-gray-300">${parseFloat(item.price).toFixed(2)}</span>
+                            <button
+                              onClick={() => removeStockItem(item.id)}
+                              className="ml-1 text-gray-400"
+                            >
+                              <X size={10} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <Form {...form}>
                     <div className="space-y-2">
                       <FormField
@@ -488,9 +614,10 @@ export default function MerchantTerminal() {
                             <FormLabel className="text-xs text-gray-300">Item Name</FormLabel>
                             <FormControl>
                               <Input
-                                placeholder="Enter item name"
+                                placeholder="Enter item name or use stock items above"
                                 {...field}
                                 className="bg-gray-700 border-gray-600 text-white rounded-lg h-8"
+                                readOnly={selectedStockItems.length > 0}
                               />
                             </FormControl>
                             <FormMessage className="text-red-300 text-xs" />
@@ -502,12 +629,15 @@ export default function MerchantTerminal() {
                         name="price"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-xs text-gray-300">Price ($)</FormLabel>
+                            <FormLabel className="text-xs text-gray-300">
+                              Price ($) {selectedStockItems.length > 0 && "(Auto-calculated)"}
+                            </FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="Enter price"
                                 {...field}
                                 className="bg-gray-700 border-gray-600 text-white rounded-lg h-8"
+                                readOnly={selectedStockItems.length > 0}
                               />
                             </FormControl>
                             <FormMessage className="text-red-300 text-xs" />
