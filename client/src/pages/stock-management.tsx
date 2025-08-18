@@ -225,6 +225,13 @@ export default function StockManagement() {
                 Terminal
               </Button>
               <Button 
+                variant="outline" 
+                onClick={() => setLocation("/transactions")}
+                className="bg-white/50 backdrop-blur-sm border-white/20 hover:bg-white/70"
+              >
+                Transactions
+              </Button>
+              <Button 
                 variant="default"
                 className="bg-green-600 hover:bg-green-700"
               >

@@ -865,6 +865,9 @@ export default function MerchantTerminal() {
             <Link href="/transactions" className="block py-3 px-4 text-white rounded-xl transition-colors font-medium hover:bg-gray-700">
               Transactions
             </Link>
+            <Link href="/stock" className="block py-3 px-4 text-white rounded-xl transition-colors font-medium hover:bg-gray-700">
+              Stock
+            </Link>
             <Link href="/settings" className="block py-3 px-4 text-white rounded-xl transition-colors font-medium hover:bg-gray-700">
               Settings
             </Link>

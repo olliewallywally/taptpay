@@ -187,6 +187,9 @@ export default function Dashboard() {
             <a href="/transactions" className="block py-3 px-4 text-white hover:text-white rounded-xl transition-colors">
               Transactions
             </a>
+            <a href="/stock" className="block py-3 px-4 text-white hover:text-white rounded-xl transition-colors">
+              Stock
+            </a>
             <a href="/settings" className="block py-3 px-4 text-white hover:text-white rounded-xl transition-colors">
               Settings
             </a>
