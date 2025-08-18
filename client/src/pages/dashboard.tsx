@@ -366,16 +366,20 @@ export default function Dashboard() {
                     <span>Progress</span>
                     <span>{((analytics?.totalTransactions || 0) / 200000 * 100).toFixed(1)}%</span>
                   </div>
-                  <div className="w-full bg-gray-700/50 rounded-full h-4 relative overflow-hidden">
+                  <div className="w-full bg-gray-800/80 rounded-full h-6 relative overflow-hidden border border-gray-600/50">
                     <div 
-                      className="h-full bg-gradient-to-r from-[#00FF66] to-[#00CC52] rounded-full transition-all duration-1000 ease-out relative"
-                      style={{ width: `${Math.min((analytics?.totalTransactions || 0) / 200000 * 100, 100)}%` }}
+                      className="h-full bg-gradient-to-r from-[#00FF66] to-[#00DD55] rounded-full transition-all duration-2000 ease-out relative shadow-[0_0_12px_#00FF66]"
+                      style={{ 
+                        width: `${Math.max(2, Math.min((analytics?.totalTransactions || 0) / 200000 * 100, 100))}%`,
+                        minWidth: analytics?.totalTransactions > 0 ? '8px' : '0px'
+                      }}
                     >
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse"></div>
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse"></div>
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#00DD55] to-[#00FF66] opacity-80"></div>
                     </div>
                     {/* Gift Icon at the end */}
-                    <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
-                      <div className="w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center text-xs">
+                    <div className="absolute right-1 top-1/2 transform -translate-y-1/2">
+                      <div className="w-5 h-5 bg-yellow-400 rounded-full flex items-center justify-center text-xs shadow-lg">
                         🎁
                       </div>
                     </div>
