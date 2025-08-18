@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -60,7 +61,7 @@ export default function StockManagement() {
     retry: false,
   });
 
-  const merchantId = user?.user?.merchantId;
+  const merchantId = getCurrentMerchantId();
 
   // Fetch stock items
   const { data: stockItems, isLoading } = useQuery({
@@ -71,10 +72,7 @@ export default function StockManagement() {
   // Create stock item mutation
   const createStockMutation = useMutation({
     mutationFn: async (data: { name: string; description: string; cost: string }) => {
-      return apiRequest(`/api/merchants/${merchantId}/stock-items`, {
-        method: 'POST',
-        body: data
-      });
+      return apiRequest("POST", `/api/merchants/${merchantId}/stock-items`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "stock-items"] });
@@ -97,9 +95,10 @@ export default function StockManagement() {
   // Update stock item mutation
   const updateStockMutation = useMutation({
     mutationFn: async (data: { id: number; name: string; description: string; cost: string }) => {
-      return apiRequest(`/api/merchants/${merchantId}/stock-items/${data.id}`, {
-        method: 'PUT',
-        body: { name: data.name, description: data.description, cost: data.cost }
+      return apiRequest("PUT", `/api/merchants/${merchantId}/stock-items/${data.id}`, { 
+        name: data.name, 
+        description: data.description, 
+        cost: data.cost 
       });
     },
     onSuccess: () => {
@@ -123,9 +122,7 @@ export default function StockManagement() {
   // Delete stock item mutation
   const deleteStockMutation = useMutation({
     mutationFn: async (itemId: number) => {
-      return apiRequest(`/api/merchants/${merchantId}/stock-items/${itemId}`, {
-        method: 'DELETE'
-      });
+      return apiRequest("DELETE", `/api/merchants/${merchantId}/stock-items/${itemId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "stock-items"] });
@@ -329,6 +326,9 @@ export default function StockManagement() {
                         <DialogTitle>
                           {editingItem ? "Edit Stock Item" : "Create New Stock Item"}
                         </DialogTitle>
+                        <DialogDescription>
+                          {editingItem ? "Update the details of your stock item." : "Add a new item to your inventory."}
+                        </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4">
                         <div>
