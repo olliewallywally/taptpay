@@ -1920,6 +1920,54 @@ export class DatabaseStorage implements IStorage {
     // In a full implementation, you might add a junction table or field to track this
     console.log(`Transaction ${transactionId} associated with stone ${stoneId}`);
   }
+
+  // Stock Item methods for DatabaseStorage
+  async createStockItem(data: InsertStockItem): Promise<StockItem> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db.insert(stockItems).values(data).returning();
+    return result[0];
+  }
+
+  async getStockItem(id: number): Promise<StockItem | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db.select().from(stockItems).where(eq(stockItems.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getStockItemsByMerchant(merchantId: number): Promise<StockItem[]> {
+    if (!this.db) throw new Error('Database not available');
+    return await this.db
+      .select()
+      .from(stockItems)
+      .where(and(eq(stockItems.merchantId, merchantId), eq(stockItems.isActive, true)))
+      .orderBy(stockItems.name);
+  }
+
+  async updateStockItem(id: number, data: Partial<InsertStockItem>): Promise<StockItem | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .update(stockItems)
+      .set({ 
+        ...data,
+        updatedAt: new Date() 
+      })
+      .where(eq(stockItems.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteStockItem(id: number): Promise<boolean> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .update(stockItems)
+      .set({ 
+        isActive: false, 
+        updatedAt: new Date() 
+      })
+      .where(eq(stockItems.id, id))
+      .returning();
+    return result.length > 0;
+  }
 }
 
 // Use database storage if available, fall back to memory storage
