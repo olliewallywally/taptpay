@@ -173,10 +173,10 @@ export default function StockManagement() {
     });
   };
 
-  const filteredItems = stockItems?.filter((item: StockItem) =>
+  const filteredItems = (stockItems as StockItem[] || []).filter((item: StockItem) =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.description.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  );
 
   if (!user) {
     return (
@@ -316,12 +316,12 @@ export default function StockManagement() {
                         Create Item
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-md">
+                    <DialogContent className="sm:max-w-md bg-gray-800/90 border-gray-600/50 backdrop-blur-xl">
                       <DialogHeader>
-                        <DialogTitle>
+                        <DialogTitle className="text-white">
                           {editingItem ? "Edit Stock Item" : "Create New Stock Item"}
                         </DialogTitle>
-                        <DialogDescription>
+                        <DialogDescription className="text-gray-300">
                           {editingItem ? "Update the details of your stock item." : "Add a new item to your inventory."}
                         </DialogDescription>
                       </DialogHeader>
@@ -334,7 +334,7 @@ export default function StockManagement() {
                             placeholder="Enter item name"
                             value={formData.name}
                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                            className="bg-black/40 border-white/20 text-white placeholder:text-gray-500"
+                            className="bg-gray-700/80 border-gray-600/50 text-white placeholder:text-gray-400"
                           />
                         </div>
                         
@@ -347,7 +347,7 @@ export default function StockManagement() {
                             value={formData.description}
                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                             rows={3}
-                            className="bg-black/40 border-white/20 text-white placeholder:text-gray-500"
+                            className="bg-gray-700/80 border-gray-600/50 text-white placeholder:text-gray-400"
                           />
                         </div>
                         
@@ -363,7 +363,7 @@ export default function StockManagement() {
                               placeholder="0.00"
                               value={formData.cost}
                               onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
-                              className="pl-10 bg-black/40 border-white/20 text-white placeholder:text-gray-500"
+                              className="pl-10 bg-gray-700/80 border-gray-600/50 text-white placeholder:text-gray-400"
                             />
                           </div>
                         </div>
