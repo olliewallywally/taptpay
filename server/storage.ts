@@ -75,6 +75,8 @@ export interface IStorage {
     savings: number;
     currentProviderRate: number;
     ourRate: number;
+    weeklyTransactions: number;
+    weeklyRevenue: number;
   }>;
   
   // Export operations
@@ -677,12 +679,26 @@ export class MemStorage implements IStorage {
     savings: number;
     currentProviderRate: number;
     ourRate: number;
+    weeklyTransactions: number;
+    weeklyRevenue: number;
   }> {
     const merchant = this.merchants.get(merchantId);
     const transactions = await this.getTransactionsByMerchant(merchantId);
     
     const completedTransactions = transactions.filter(t => t.status === "completed");
     const totalRevenue = completedTransactions.reduce((sum, t) => sum + parseFloat(t.price), 0);
+    
+    // Calculate weekly metrics (last 7 days)
+    const now = new Date();
+    const weekAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
+    
+    const weeklyTransactionsList = transactions.filter(t => {
+      const transactionDate = t.createdAt ? new Date(t.createdAt) : null;
+      return transactionDate && transactionDate >= weekAgo;
+    });
+    
+    const weeklyCompletedTransactions = weeklyTransactionsList.filter(t => t.status === "completed");
+    const weeklyRevenue = weeklyCompletedTransactions.reduce((sum, t) => sum + parseFloat(t.price), 0);
     
     const currentProviderRate = parseFloat(merchant?.currentProviderRate || "0.029");
     const ourRate = parseFloat(merchant?.ourRate || "0.002");
@@ -700,6 +716,8 @@ export class MemStorage implements IStorage {
       savings,
       currentProviderRate: currentProviderRate * 100, // Convert to percentage
       ourRate: ourRate * 100, // Convert to percentage
+      weeklyTransactions: weeklyTransactionsList.length,
+      weeklyRevenue,
     };
   }
 
@@ -1343,6 +1361,8 @@ export class DatabaseStorage implements IStorage {
     savings: number;
     currentProviderRate: number;
     ourRate: number;
+    weeklyTransactions: number;
+    weeklyRevenue: number;
   }> {
     if (!this.db) throw new Error('Database not available');
     
@@ -1354,6 +1374,18 @@ export class DatabaseStorage implements IStorage {
     const totalRevenue = merchantTransactions
       .filter(t => t.status === 'completed')
       .reduce((sum, t) => sum + parseFloat(t.price), 0);
+    
+    // Calculate weekly metrics (last 7 days)
+    const now = new Date();
+    const weekAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
+    
+    const weeklyTransactionsList = merchantTransactions.filter(t => {
+      const transactionDate = t.createdAt ? new Date(t.createdAt) : null;
+      return transactionDate && transactionDate >= weekAgo;
+    });
+    
+    const weeklyCompletedTransactions = weeklyTransactionsList.filter(t => t.status === 'completed');
+    const weeklyRevenue = weeklyCompletedTransactions.reduce((sum, t) => sum + parseFloat(t.price), 0);
     
     const currentProviderRate = merchant && merchant.currentProviderRate 
       ? parseFloat(merchant.currentProviderRate) 
@@ -1373,6 +1405,8 @@ export class DatabaseStorage implements IStorage {
       savings,
       currentProviderRate,
       ourRate,
+      weeklyTransactions: weeklyTransactionsList.length,
+      weeklyRevenue,
     };
   }
 

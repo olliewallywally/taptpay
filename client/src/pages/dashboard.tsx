@@ -264,27 +264,27 @@ export default function Dashboard() {
 
             <div className="dashboard-card-glass rounded-3xl p-6">
               <div className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <h3 className="text-sm font-medium text-white/90">Success Rate</h3>
+                <h3 className="text-sm font-medium text-white/90">This Week's Transactions</h3>
                 <TrendingUp className="h-4 w-4 text-[#00FF66] drop-shadow-[0_0_8px_#00FF66]" />
               </div>
               <div className="text-2xl font-bold text-white">
-                {analytics?.successRate ? `${analytics.successRate.toFixed(1)}%` : "0%"}
+                {analytics?.weeklyTransactions || 0}
               </div>
               <p className="text-xs text-white/70">
-                Based on completed transactions
+                Transactions in the last 7 days
               </p>
             </div>
 
             <div className="dashboard-card-glass rounded-3xl p-6">
               <div className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <h3 className="text-sm font-medium text-white/90">Avg. Transaction</h3>
+                <h3 className="text-sm font-medium text-white/90">This Week's Revenue</h3>
                 <PiggyBank className="h-4 w-4 text-[#00FF66] drop-shadow-[0_0_8px_#00FF66]" />
               </div>
               <div className="text-2xl font-bold text-white">
-                ${analytics?.averageTransactionAmount?.toFixed(2) || "0.00"}
+                ${analytics?.weeklyRevenue?.toFixed(2) || "0.00"}
               </div>
               <p className="text-xs text-white/70">
-                Average payment amount
+                Revenue in the last 7 days
               </p>
             </div>
           </div>
