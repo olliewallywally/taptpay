@@ -915,12 +915,9 @@ export default function MerchantTerminal() {
                             onClick={async () => {
                               try {
                                 const stoneNumber = (taptStones?.length || 0) + 1;
-                                const response = await apiRequest(`/api/merchants/${merchantId}/tapt-stones`, {
-                                  method: 'POST',
-                                  body: {
-                                    name: `Stone ${stoneNumber}`,
-                                    stoneNumber: stoneNumber
-                                  }
+                                const response = await apiRequest('POST', `/api/merchants/${merchantId}/tapt-stones`, {
+                                  name: `Stone ${stoneNumber}`,
+                                  stoneNumber: stoneNumber
                                 });
                                 
                                 // Refresh the stones data
