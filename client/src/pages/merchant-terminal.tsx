@@ -413,7 +413,7 @@ export default function MerchantTerminal() {
             className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
               activeAction === "send"
                 ? 'text-black'
-                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                : 'bg-gray-800 text-gray-300'
             }`}
             style={{
               backgroundColor: activeAction === "send" ? '#00FF66' : undefined
@@ -425,7 +425,7 @@ export default function MerchantTerminal() {
           
           <button
             onClick={() => handleActionClick("edit")}
-            className="flex flex-col items-center p-4 rounded-full transition-all duration-200 bg-gray-800 text-gray-300 hover:bg-gray-700"
+            className="flex flex-col items-center p-4 rounded-full transition-all duration-200 bg-gray-800 text-gray-300"
             style={{
               backgroundColor: activeAction === "edit" ? '#00FF66' : '#374151'
             }}
@@ -439,7 +439,7 @@ export default function MerchantTerminal() {
             className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
               activeAction === "split"
                 ? 'text-black'
-                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                : 'bg-gray-800 text-gray-300'
             }`}
             style={{
               backgroundColor: activeAction === "split" ? '#00FF66' : undefined
@@ -454,7 +454,7 @@ export default function MerchantTerminal() {
             className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
               activeAction === "more"
                 ? 'text-black'
-                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                : 'bg-gray-800 text-gray-300'
             }`}
             style={{
               backgroundColor: activeAction === "more" ? '#00FF66' : undefined
@@ -655,7 +655,7 @@ export default function MerchantTerminal() {
                     <Link href="/dashboard">
                       <Button
                         variant="outline"
-                        className="w-full border-gray-600 text-gray-300 hover:bg-gray-700"
+                        className="w-full border-gray-600 text-gray-300"
                       >
                         View Dashboard
                       </Button>
@@ -663,14 +663,14 @@ export default function MerchantTerminal() {
                     <Link href="/transactions">
                       <Button
                         variant="outline"
-                        className="w-full border-gray-600 text-gray-300 hover:bg-gray-700"
+                        className="w-full border-gray-600 text-gray-300"
                       >
                         Transaction History
                       </Button>
                     </Link>
                     <Button
                       variant="outline"
-                      className="w-full border-gray-600 text-gray-300 hover:bg-gray-700"
+                      className="w-full border-gray-600 text-gray-300"
                       onClick={() => setActiveAction(null)}
                     >
                       Settings
