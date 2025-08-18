@@ -146,7 +146,7 @@ export default function MerchantTerminal() {
 
   // Calculate total price from selected stock items
   const calculateTotalPrice = () => {
-    return selectedStockItems.reduce((total, item) => total + parseFloat(item.price), 0).toFixed(2);
+    return selectedStockItems.reduce((total, item) => total + parseFloat(item.cost), 0).toFixed(2);
   };
 
   // Add stock item as tag
@@ -158,7 +158,7 @@ export default function MerchantTerminal() {
       
       // Update form values
       const newTotal = calculateTotalPrice();
-      form.setValue("price", (parseFloat(newTotal) + parseFloat(stockItem.price)).toFixed(2));
+      form.setValue("price", (parseFloat(newTotal) + parseFloat(stockItem.cost)).toFixed(2));
       
       // Update item name with all selected items
       const allItemNames = [...selectedStockItems, stockItem].map(item => item.name).join(", ");
@@ -172,7 +172,7 @@ export default function MerchantTerminal() {
       const newItems = prev.filter(item => item.id !== stockItemId);
       
       // Update form values
-      const newTotal = newItems.reduce((total, item) => total + parseFloat(item.price), 0).toFixed(2);
+      const newTotal = newItems.reduce((total, item) => total + parseFloat(item.cost), 0).toFixed(2);
       form.setValue("price", newTotal);
       
       // Update item name
@@ -572,7 +572,7 @@ export default function MerchantTerminal() {
                             className="p-2 cursor-pointer text-white text-xs border-b border-gray-600 last:border-b-0"
                           >
                             <div className="font-medium">{item.name}</div>
-                            <div className="text-gray-400">${parseFloat(item.price).toFixed(2)}</div>
+                            <div className="text-gray-400">${parseFloat(item.cost).toFixed(2)}</div>
                           </div>
                         ))}
                       </div>
@@ -591,7 +591,7 @@ export default function MerchantTerminal() {
                           >
                             <Tag size={12} />
                             <span>{item.name}</span>
-                            <span className="text-gray-300">${parseFloat(item.price).toFixed(2)}</span>
+                            <span className="text-gray-300">${parseFloat(item.cost).toFixed(2)}</span>
                             <button
                               onClick={() => removeStockItem(item.id)}
                               className="ml-1 text-gray-400"
