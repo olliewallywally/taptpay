@@ -18,7 +18,7 @@ import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
 
 export default function Landing() {
   const handleGetStarted = () => {
-    window.location.href = "https://taptpay.online";
+    window.location.href = "/login";
   };
 
   return (
