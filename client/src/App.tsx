@@ -44,7 +44,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       const token = localStorage.getItem("authToken");
       if (!token) {
         setIsChecking(false);
-        window.location.href = "https://taptpay.online/login";
+        setLocation("/login");
         return;
       }
       
@@ -61,7 +61,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
         } else {
           // Token is invalid, remove it and redirect to login
           localStorage.removeItem("authToken");
-          window.location.href = "https://taptpay.online/login";
+          setLocation("/login");
         }
       } catch (error) {
         // Network error or server down, keep token for now
@@ -97,7 +97,7 @@ function AdminProtectedRoute({ children }: { children: React.ReactNode }) {
       if (!token) {
         setIsAuthenticated(false);
         setIsChecking(false);
-        window.location.href = "https://taptpay.online/admin";
+        setLocation("/admin/login");
         return;
       }
 
@@ -112,13 +112,13 @@ function AdminProtectedRoute({ children }: { children: React.ReactNode }) {
           localStorage.removeItem("adminAuthToken");
           localStorage.removeItem("adminUser");
           setIsAuthenticated(false);
-          window.location.href = "https://taptpay.online/admin";
+          setLocation("/admin/login");
         }
       } catch (error) {
         localStorage.removeItem("adminAuthToken");
         localStorage.removeItem("adminUser");
         setIsAuthenticated(false);
-        window.location.href = "https://taptpay.online/admin";
+        setLocation("/admin/login");
       }
       
       setIsChecking(false);
@@ -139,52 +139,85 @@ function Router() {
     <PageTransition>
       <Switch>
         <Route path="/" component={Login} />
-        <Route path="/login">
-          <Redirect to="https://taptpay.online/login" />
-        </Route>
-        <Route path="/signup">
-          <Redirect to="https://taptpay.online/signup" />
-        </Route>
-        <Route path="/forgot-password">
-          <Redirect to="https://taptpay.online/forgot-password" />
-        </Route>
-        <Route path="/reset-password">
-          <Redirect to="https://taptpay.online/reset-password" />
-        </Route>
-        <Route path="/app">
-          <Redirect to="https://taptpay.online/login" />
-        </Route>
-        {/* Redirect all app routes to taptpay.online */}
+        <Route path="/login" component={Login} />
+        <Route path="/signup" component={MerchantSignup} />
+        <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/reset-password" component={ResetPassword} />
         <Route path="/merchant">
-          <Redirect to="https://taptpay.online/merchant" />
+          <ProtectedRoute>
+            <MerchantTerminal />
+          </ProtectedRoute>
         </Route>
         <Route path="/merchant-terminal-mobile">
-          <Redirect to="https://taptpay.online/merchant-terminal-mobile" />
+          <ProtectedRoute>
+            <MerchantTerminalMobile />
+          </ProtectedRoute>
         </Route>
         <Route path="/merchant-terminal">
-          <Redirect to="https://taptpay.online/merchant-terminal" />
+          <ProtectedRoute>
+            <MerchantTerminal />
+          </ProtectedRoute>
         </Route>
         <Route path="/terminal">
-          <Redirect to="https://taptpay.online/terminal" />
+          <ProtectedRoute>
+            <MerchantTerminal />
+          </ProtectedRoute>
         </Route>
         <Route path="/dashboard">
-          <Redirect to="https://taptpay.online/dashboard" />
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
         </Route>
         <Route path="/settings">
-          <Redirect to="https://taptpay.online/settings" />
+          <ProtectedRoute>
+            <Settings />
+          </ProtectedRoute>
         </Route>
         <Route path="/transactions">
-          <Redirect to="https://taptpay.online/transactions" />
+          <ProtectedRoute>
+            <Transactions />
+          </ProtectedRoute>
         </Route>
         <Route path="/stock">
-          <Redirect to="https://taptpay.online/stock" />
+          <ProtectedRoute>
+            <StockManagement />
+          </ProtectedRoute>
         </Route>
         <Route path="/nfc">
-          <Redirect to="https://taptpay.online/nfc" />
+          <ProtectedRoute>
+            <NFCPayment />
+          </ProtectedRoute>
         </Route>
 
-        <Route path="/admin">
-          <Redirect to="https://taptpay.online/admin/login" />
+        <Route path="/admin/login" component={AdminLogin} />
+        <Route path="/admin/dashboard">
+          <AdminProtectedRoute>
+            <AdminDashboard />
+          </AdminProtectedRoute>
+        </Route>
+        
+        <Route path="/admin/revenue">
+          <AdminProtectedRoute>
+            <AdminRevenue />
+          </AdminProtectedRoute>
+        </Route>
+        
+        <Route path="/admin/merchants/:merchantId">
+          <AdminProtectedRoute>
+            <AdminMerchantDetail />
+          </AdminProtectedRoute>
+        </Route>
+        
+        <Route path="/admin/create-merchant">
+          <AdminProtectedRoute>
+            <CreateMerchant />
+          </AdminProtectedRoute>
+        </Route>
+        
+        <Route path="/admin/api">
+          <AdminProtectedRoute>
+            <AdminApi />
+          </AdminProtectedRoute>
         </Route>
         
         <Route path="/verify-merchant" component={VerifyMerchant} />
