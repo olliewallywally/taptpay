@@ -15,8 +15,7 @@ import Transactions from "@/pages/transactions";
 import NFCPayment from "@/pages/nfc-payment";
 
 
-import Landing from "@/pages/landing";
-import RedirectToApp from "@/pages/redirect-to-app";
+
 import Login from "@/pages/login";
 import MerchantSignup from "@/pages/merchant-signup";
 import ForgotPassword from "@/pages/forgot-password";
@@ -32,7 +31,7 @@ import StockManagement from "@/pages/stock-management";
 
 import { Layout } from "@/components/layout";
 import { PageTransition } from "@/components/page-transition";
-import { Redirect } from "@/components/redirect";
+
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [, setLocation] = useLocation();
