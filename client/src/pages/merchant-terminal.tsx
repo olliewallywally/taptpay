@@ -417,7 +417,7 @@ export default function MerchantTerminal() {
           <div className="flex items-center">
             <button
               onClick={() => setMenuOpen(!menuOpen)}
-              className="p-2 rounded-lg transition-colors"
+              className="p-1 rounded-lg transition-colors"
             >
               <Menu size={24} />
             </button>
@@ -804,13 +804,22 @@ export default function MerchantTerminal() {
                         Transaction History
                       </Button>
                     </Link>
-                    <Button
-                      variant="outline"
-                      className="w-full border-gray-600 text-gray-300"
-                      onClick={() => setActiveAction(null)}
-                    >
-                      Settings
-                    </Button>
+                    <Link href="/stock">
+                      <Button
+                        variant="outline"
+                        className="w-full border-gray-600 text-gray-300"
+                      >
+                        Stock Management
+                      </Button>
+                    </Link>
+                    <Link href="/settings">
+                      <Button
+                        variant="outline"
+                        className="w-full border-gray-600 text-gray-300"
+                      >
+                        Settings
+                      </Button>
+                    </Link>
                   </div>
                 </div>
               )}
