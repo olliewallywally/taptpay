@@ -4,9 +4,7 @@
 
 This project is a full-stack payment terminal application enabling QR code and NFC-based transactions. Its core purpose is to provide merchants with a real-time payment interface where customers can pay by scanning QR codes or tapping their devices. The system ensures real-time updates via Server-Sent Events (SSE) and features a modern, intuitive user interface.
 
-The business operates on two domains:
-- **taptpay.co.nz**: Landing page for marketing and business information
-- **taptpay.online**: Web application for merchant login, terminal, and admin access
+
 
 The business vision is to offer a streamlined, efficient, and modern payment solution, simplifying transactions for both merchants and customers, with a revenue model based on fixed fees per transaction.
 
