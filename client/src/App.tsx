@@ -16,6 +16,7 @@ import NFCPayment from "@/pages/nfc-payment";
 
 
 import Landing from "@/pages/landing";
+import RedirectToApp from "@/pages/redirect-to-app";
 import Login from "@/pages/login";
 import MerchantSignup from "@/pages/merchant-signup";
 import ForgotPassword from "@/pages/forgot-password";
@@ -137,7 +138,7 @@ function Router() {
   return (
     <PageTransition>
       <Switch>
-        <Route path="/" component={Landing} />
+        <Route path="/" component={Login} />
         <Route path="/login">
           <Redirect to="https://taptpay.online/login" />
         </Route>
