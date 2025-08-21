@@ -218,7 +218,7 @@ export default function Dashboard() {
         <div className="fixed top-4 right-4 z-30">
           <button
             onClick={() => setMenuOpen(true)}
-            className="p-3 backdrop-blur-xl bg-black/40 border border-white/20 rounded-xl text-white hover:bg-black/60 transition-colors"
+            className="p-2 backdrop-blur-xl bg-black/40 border border-white/20 rounded-xl text-white hover:bg-black/60 transition-colors"
           >
             <Menu className="h-6 w-6" />
           </button>
