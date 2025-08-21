@@ -610,6 +610,39 @@ export default function MerchantTerminal() {
                     </div>
                   )}
 
+                  {/* Stone Selection */}
+                  <div className="space-y-1">
+                    <label className="block text-xs font-medium text-gray-300">
+                      Select Tapt Stone:
+                    </label>
+                    {taptStones && Array.isArray(taptStones) && taptStones.length > 0 ? (
+                      <select 
+                        value={selectedStoneId || ""} 
+                        onChange={(e) => {
+                          console.log("Stone selected:", e.target.value);
+                          try {
+                            const value = e.target.value;
+                            setSelectedStoneId(value ? parseInt(value, 10) : null);
+                          } catch (error) {
+                            console.error("Error setting stone ID:", error);
+                          }
+                        }}
+                        className="w-full bg-gray-700 border-gray-600 text-white rounded-md px-3 py-2 border focus:outline-none focus:ring-2 focus:ring-green-500"
+                      >
+                        <option value="">Choose a stone</option>
+                        {taptStones.map((stone: any) => (
+                          <option key={`stone-${stone.id}`} value={stone.id}>
+                            Stone {stone.stoneNumber} - {stone.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="text-center py-2">
+                        <p className="text-gray-400 text-xs">No Tapt Stones available</p>
+                      </div>
+                    )}
+                  </div>
+
                   <Form {...form}>
                     <div className="space-y-2">
                       <FormField
