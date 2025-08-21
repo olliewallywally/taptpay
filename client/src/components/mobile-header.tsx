@@ -51,6 +51,13 @@ export function MobileHeader({ title, children, showMenu = true }: MobileHeaderP
               Transactions
             </Link>
             <Link 
+              href="/stock" 
+              onClick={() => setMenuOpen(false)} 
+              className="block py-3 px-4 text-white rounded-xl transition-colors font-medium"
+            >
+              Stock
+            </Link>
+            <Link 
               href="/settings" 
               onClick={() => setMenuOpen(false)} 
               className="block py-3 px-4 text-white rounded-xl transition-colors font-medium"
@@ -80,12 +87,12 @@ export function MobileHeader({ title, children, showMenu = true }: MobileHeaderP
         }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between backdrop-blur-xl bg-black/80 border-b border-white/20 p-4">
+        <div className="flex items-center justify-between backdrop-blur-xl bg-black/80 border-b border-white/20 px-4 py-3">
           <div className="flex-1 flex justify-start">
             {showMenu && (
               <button
                 onClick={() => setMenuOpen(!menuOpen)}
-                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                className="p-1 hover:bg-white/10 rounded-lg transition-colors"
               >
                 <Menu size={20} className="text-white" />
               </button>

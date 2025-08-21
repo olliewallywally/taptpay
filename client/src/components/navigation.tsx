@@ -43,6 +43,7 @@ export function Navigation() {
 
   // Secondary navigation for management (moved to "More" dropdown)
   const secondaryLinks = [
+    { path: "/stock", label: "Stock" },
     { path: "/transactions", label: "Transactions" },
     { path: "/settings", label: "Settings" },
     { path: customerViewPath, label: "Customer View" },
