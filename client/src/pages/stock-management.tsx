@@ -430,7 +430,7 @@ export default function StockManagement() {
           ) : filteredItems.length > 0 ? (
             <div className="grid grid-cols-2 gap-3">
               {filteredItems.map((item: StockItem) => (
-                <div key={item.id} className="rounded-2xl p-4" style={{ backgroundColor: '#3a3a3a' }}>
+                <div key={item.id} className="rounded-2xl p-4 hover:scale-105 transition-transform duration-200 cursor-pointer" style={{ backgroundColor: '#3a3a3a' }}>
                   <div className="flex flex-col h-full">
                     {/* Header with icon and actions */}
                     <div className="flex items-center justify-between mb-3">
