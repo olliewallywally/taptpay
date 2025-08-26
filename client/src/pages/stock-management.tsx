@@ -418,7 +418,7 @@ export default function StockManagement() {
           {isLoading ? (
             <div className="grid grid-cols-2 gap-3">
               {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="rounded-2xl p-4" style={{ backgroundColor: '#474747' }}>
+                <div key={i} className="rounded-2xl p-4" style={{ backgroundColor: '#3a3a3a' }}>
                   <div className="animate-pulse">
                     <div className="h-4 bg-gray-600 rounded w-3/4 mb-2"></div>
                     <div className="h-3 bg-gray-600 rounded w-1/2 mb-3"></div>
@@ -430,26 +430,26 @@ export default function StockManagement() {
           ) : filteredItems.length > 0 ? (
             <div className="grid grid-cols-2 gap-3">
               {filteredItems.map((item: StockItem) => (
-                <div key={item.id} className="rounded-2xl p-4" style={{ backgroundColor: '#474747' }}>
+                <div key={item.id} className="rounded-2xl p-4" style={{ backgroundColor: '#3a3a3a' }}>
                   <div className="flex flex-col h-full">
                     {/* Header with icon and actions */}
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center space-x-2">
-                        <Package className="w-5 h-5 text-white" />
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center space-x-2 flex-1 min-w-0">
+                        <Package className="w-5 h-5 text-white flex-shrink-0" />
                         <span className="text-sm font-medium text-white truncate">{item.name}</span>
                       </div>
-                      <div className="flex space-x-1">
+                      <div className="flex space-x-1 ml-2 flex-shrink-0">
                         <button
                           onClick={() => handleEdit(item)}
-                          className="p-1 hover:bg-white/10 rounded text-white"
+                          className="p-1.5 hover:bg-white/10 rounded text-white transition-colors"
                         >
-                          <Edit className="w-3 h-3" />
+                          <Edit className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => deleteStockMutation.mutate(item.id)}
-                          className="p-1 hover:bg-white/10 rounded text-red-400"
+                          className="p-1.5 hover:bg-white/10 rounded text-red-400 transition-colors"
                         >
-                          <Trash2 className="w-3 h-3" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
@@ -475,7 +475,7 @@ export default function StockManagement() {
               ))}
             </div>
           ) : (
-            <div className="rounded-2xl p-8 text-center" style={{ backgroundColor: '#474747' }}>
+            <div className="rounded-2xl p-8 text-center" style={{ backgroundColor: '#3a3a3a' }}>
               <Package className="w-12 h-12 text-white mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-white mb-2">
                 {searchTerm ? "No items found" : "No stock items yet"}
