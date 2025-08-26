@@ -300,39 +300,37 @@ export default function StockManagement() {
           </div>
 
         {/* Main Content */}
-        <div className="max-w-7xl mx-auto">
-          {/* Search and Create Bar */}
-          <div className="mb-6 sm:mb-8">
-            <Card className="dashboard-card-glass backdrop-blur-xl bg-black/40 border border-white/20 shadow-2xl">
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex flex-col sm:flex-row gap-4 items-center">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                    <Input
-                      placeholder="Search stock items..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 bg-black/40 backdrop-blur-sm border-white/20 text-white placeholder:text-gray-500"
-                    />
-                  </div>
-                  
-                  <Dialog open={isCreateDialogOpen || !!editingItem} onOpenChange={(open) => {
-                    if (!open) {
-                      setIsCreateDialogOpen(false);
-                      setEditingItem(null);
-                      resetForm();
-                    }
-                  }}>
-                    <DialogTrigger asChild>
-                      <Button 
-                        onClick={() => setIsCreateDialogOpen(true)}
-                        className="bg-[#00FF66] hover:bg-[#00CC52] text-black font-medium shadow-lg w-full sm:w-auto"
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        <span className="hidden sm:inline">Create Item</span>
-                        <span className="sm:hidden">Create</span>
-                      </Button>
-                    </DialogTrigger>
+        <div className="max-w-7xl mx-auto px-4">
+          {/* Header Section - Green Box */}
+          <div className="mb-4 sm:mb-6">
+            <div className="rounded-2xl p-4 sm:p-6" style={{ backgroundColor: '#00FF66' }}>
+              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-600 w-4 h-4" />
+                  <Input
+                    placeholder="Search stock items..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 bg-white border-0 text-black placeholder:text-gray-600 rounded-lg"
+                  />
+                </div>
+                
+                <Dialog open={isCreateDialogOpen || !!editingItem} onOpenChange={(open) => {
+                  if (!open) {
+                    setIsCreateDialogOpen(false);
+                    setEditingItem(null);
+                    resetForm();
+                  }
+                }}>
+                  <DialogTrigger asChild>
+                    <Button 
+                      onClick={() => setIsCreateDialogOpen(true)}
+                      className="bg-black hover:bg-gray-800 text-white font-medium rounded-lg w-full sm:w-auto border-0"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      <span>Create Item</span>
+                    </Button>
+                  </DialogTrigger>
                     <DialogContent className="sm:max-w-md bg-gray-800/90 border-gray-600/50 backdrop-blur-xl">
                       <DialogHeader>
                         <DialogTitle className="text-white">
@@ -411,123 +409,93 @@ export default function StockManagement() {
                       </div>
                     </DialogContent>
                   </Dialog>
-                </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
 
 
-
-          {/* Stock Items Grid */}
+          {/* Stock Items Grid - 2 Column Mobile Design */}
           {isLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            <div className="grid grid-cols-2 gap-3">
               {[1, 2, 3, 4, 5, 6].map((i) => (
-                <Card key={i} className="dashboard-card-glass backdrop-blur-xl bg-black/40 border border-white/20 shadow-2xl">
-                  <CardContent className="p-6">
-                    <div className="animate-pulse">
-                      <div className="h-6 bg-gray-600 rounded w-3/4 mb-3"></div>
-                      <div className="h-4 bg-gray-600 rounded w-full mb-2"></div>
-                      <div className="h-4 bg-gray-600 rounded w-2/3 mb-4"></div>
-                      <div className="h-8 bg-gray-600 rounded w-1/3"></div>
-                    </div>
-                  </CardContent>
-                </Card>
+                <div key={i} className="rounded-2xl p-4" style={{ backgroundColor: '#474747' }}>
+                  <div className="animate-pulse">
+                    <div className="h-4 bg-gray-600 rounded w-3/4 mb-2"></div>
+                    <div className="h-3 bg-gray-600 rounded w-1/2 mb-3"></div>
+                    <div className="h-6 bg-gray-600 rounded w-2/3"></div>
+                  </div>
+                </div>
               ))}
             </div>
           ) : filteredItems.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            <div className="grid grid-cols-2 gap-3">
               {filteredItems.map((item: StockItem) => (
-                <Card key={item.id} className="dashboard-card-glass backdrop-blur-xl bg-black/40 border border-white/20 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-105">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-12 h-12 bg-gradient-to-br from-[#00FF66] to-[#00CC52] rounded-xl flex items-center justify-center shadow-lg drop-shadow-[0_0_8px_#00FF66]">
-                          <Package className="w-6 h-6 text-black" />
-                        </div>
-                        <div>
-                          <CardTitle className="text-lg font-semibold text-white line-clamp-1">
-                            {item.name}
-                          </CardTitle>
-                          <Badge variant="outline" className="mt-1 bg-[#00FF66]/20 text-[#00FF66] border-[#00FF66]/30">
-                            <ShoppingCart className="w-3 h-3 mr-1" />
-                            In Stock
-                          </Badge>
-                        </div>
+                <div key={item.id} className="rounded-2xl p-4" style={{ backgroundColor: '#474747' }}>
+                  <div className="flex flex-col h-full">
+                    {/* Header with icon and actions */}
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center space-x-2">
+                        <Package className="w-5 h-5 text-white" />
+                        <span className="text-sm font-medium text-white truncate">{item.name}</span>
                       </div>
-                      
                       <div className="flex space-x-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
+                        <button
                           onClick={() => handleEdit(item)}
-                          className="h-8 w-8 p-0 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300"
+                          className="p-1 hover:bg-white/10 rounded text-white"
                         >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
+                          <Edit className="w-3 h-3" />
+                        </button>
+                        <button
                           onClick={() => deleteStockMutation.mutate(item.id)}
-                          className="h-8 w-8 p-0 hover:bg-red-500/20 text-red-400 hover:text-red-300"
+                          className="p-1 hover:bg-white/10 rounded text-red-400"
                         >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                          <Trash2 className="w-3 h-3" />
+                        </button>
                       </div>
                     </div>
-                  </CardHeader>
-                  
-                  <CardContent className="pt-0">
+                    
+                    {/* Description */}
                     {item.description && (
-                      <div className="flex items-start space-x-2 mb-4">
-                        <FileText className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                        <p className="text-sm text-gray-300 line-clamp-2">
-                          {item.description}
-                        </p>
-                      </div>
+                      <p className="text-xs text-gray-300 mb-3 line-clamp-2">
+                        {item.description}
+                      </p>
                     )}
                     
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <DollarSign className="w-5 h-5 text-[#00FF66]" />
-                        <span className="text-2xl font-bold text-[#00FF66]">
+                    {/* Price */}
+                    <div className="mt-auto">
+                      <div className="flex items-center space-x-1">
+                        <DollarSign className="w-4 h-4 text-white" />
+                        <span className="text-lg font-bold text-white">
                           ${parseFloat(item.cost).toFixed(2)}
                         </span>
                       </div>
-                      
-                      <div className="text-xs text-gray-400">
-                        Added {new Date(item.createdAt).toLocaleDateString()}
-                      </div>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               ))}
             </div>
           ) : (
-            <Card className="dashboard-card-glass backdrop-blur-xl bg-black/40 border border-white/20 shadow-2xl">
-              <CardContent className="p-12 text-center">
-                <div className="w-16 h-16 bg-gradient-to-br from-[#00FF66] to-[#00CC52] rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Package className="w-8 h-8 text-black" />
-                </div>
-                <h3 className="text-xl font-semibold text-white mb-2">
-                  {searchTerm ? "No items found" : "No stock items yet"}
-                </h3>
-                <p className="text-gray-300 mb-6">
-                  {searchTerm 
-                    ? "Try adjusting your search terms" 
-                    : "Start building your inventory by creating your first stock item"
-                  }
-                </p>
-                {!searchTerm && (
-                  <Button 
-                    onClick={() => setIsCreateDialogOpen(true)}
-                    className="bg-[#00FF66] hover:bg-[#00CC52] text-black font-medium"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create First Item
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
+            <div className="rounded-2xl p-8 text-center" style={{ backgroundColor: '#474747' }}>
+              <Package className="w-12 h-12 text-white mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-white mb-2">
+                {searchTerm ? "No items found" : "No stock items yet"}
+              </h3>
+              <p className="text-gray-300 mb-6 text-sm">
+                {searchTerm 
+                  ? "Try adjusting your search terms" 
+                  : "Start building your inventory by creating your first stock item"
+                }
+              </p>
+              {!searchTerm && (
+                <Button 
+                  onClick={() => setIsCreateDialogOpen(true)}
+                  className="bg-black hover:bg-gray-800 text-white font-medium rounded-lg"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Your First Item
+                </Button>
+              )}
+            </div>
           )}
         </div>
         </div>
