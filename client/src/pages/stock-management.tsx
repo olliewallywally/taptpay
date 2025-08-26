@@ -432,18 +432,18 @@ export default function StockManagement() {
               {filteredItems.map((item: StockItem) => (
                 <div key={item.id} className="rounded-2xl p-4 hover:scale-105 transition-transform duration-200 cursor-pointer" style={{ backgroundColor: '#3a3a3a' }}>
                   <div className="flex flex-col h-full">
-                    {/* Top right buttons */}
+                    {/* Top right buttons - UPDATED */}
                     <div className="flex justify-end mb-1">
-                      <div className="flex space-x-0.5">
+                      <div className="flex gap-0">
                         <button
                           onClick={() => handleEdit(item)}
-                          className="p-1 hover:bg-white/10 rounded text-white transition-colors"
+                          className="p-0.5 hover:bg-white/20 rounded-sm text-white transition-colors"
                         >
                           <Edit className="w-3 h-3" />
                         </button>
                         <button
                           onClick={() => deleteStockMutation.mutate(item.id)}
-                          className="p-1 hover:bg-white/10 rounded text-red-400 transition-colors"
+                          className="p-0.5 hover:bg-white/20 rounded-sm text-red-400 transition-colors"
                         >
                           <Trash2 className="w-3 h-3" />
                         </button>
