@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { SlideToPayComponent } from "@/components/slide-to-pay";
+import { DigitalWalletButtons } from "@/components/digital-wallet-buttons";
 import { BillSplit } from "@/components/bill-split";
 import { sseClient } from "@/lib/sse-client";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -307,14 +308,23 @@ export default function CustomerPayment() {
             </div>
           )}
 
-          {/* Slide to Pay Widget */}
-          <div>
-            <SlideToPayComponent 
-              onPayment={handlePayment}
-              disabled={paymentStatus !== "idle"}
+          {/* Digital Wallet Payment Options */}
+          <div className="mb-8">
+            <DigitalWalletButtons 
               amount={currentTransaction.isSplit ? parseFloat(currentTransaction.splitAmount) : parseFloat(currentTransaction.price)}
               currency="NZD"
               merchantName="Tapt Payment"
+              itemName={currentTransaction.itemName}
+              onPaymentStart={() => setPaymentStatus("processing")}
+              onPaymentSuccess={(paymentData) => {
+                console.log("Payment successful:", paymentData);
+                handlePayment();
+              }}
+              onPaymentError={(error) => {
+                console.error("Payment error:", error);
+                setPaymentStatus("error");
+              }}
+              disabled={paymentStatus !== "idle"}
             />
           </div>
 

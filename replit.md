@@ -92,5 +92,8 @@ The application adopts a monorepo structure, separating client, server, and shar
 **Email Service (for authentication/verification):**
 -   SendGrid (or similar, adaptable)
 
-**NFC Integration:**
--   Built-in "tap to phone" NFC payment API with support for Apple Pay, Google Pay, Samsung Pay, and contactless cards.
+**Digital Wallet Integration:**
+-   Native Apple Pay and Google Pay integration with proper branded buttons and compliance
+-   Payment Request API implementation for cross-browser compatibility
+-   Built-in "tap to phone" NFC payment API with support for Apple Pay, Google Pay, Samsung Pay, and contactless cards
+-   Feature detection and graceful fallback for unsupported devices
