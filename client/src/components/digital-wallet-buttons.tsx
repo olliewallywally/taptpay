@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Smartphone, CreditCard } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 
 interface DigitalWalletButtonsProps {
   amount: number;
   currency: string;
   merchantName: string;
   itemName: string;
+  transactionId?: number;
   onPaymentStart: () => void;
   onPaymentSuccess: (paymentData: any) => void;
   onPaymentError: (error: string) => void;
@@ -18,6 +20,7 @@ export function DigitalWalletButtons({
   currency = "NZD",
   merchantName,
   itemName,
+  transactionId,
   onPaymentStart,
   onPaymentSuccess,
   onPaymentError,
@@ -50,6 +53,11 @@ export function DigitalWalletButtons({
       return;
     }
 
+    if (!transactionId) {
+      onPaymentError("Transaction ID is required for Apple Pay");
+      return;
+    }
+
     try {
       onPaymentStart();
 
@@ -73,16 +81,46 @@ export function DigitalWalletButtons({
       const session = new window.ApplePaySession(3, paymentRequest);
 
       session.onvalidatemerchant = async (event: any) => {
-        // This would typically validate with your backend
-        // For now, we'll simulate the validation
-        console.log("Apple Pay merchant validation required", event);
-        onPaymentError("Apple Pay merchant validation not configured. Please contact support.");
+        try {
+          // Call backend for merchant validation
+          const response = await apiRequest("POST", "/api/payments/apple-pay/validate", {
+            validationURL: event.validationURL,
+            displayName: merchantName
+          });
+          
+          const merchantSession = await response.json();
+          session.completeMerchantValidation(merchantSession);
+        } catch (error) {
+          console.error("Merchant validation failed:", error);
+          onPaymentError("Apple Pay merchant validation failed");
+          session.abort();
+        }
       };
 
-      session.onpaymentauthorized = (event: any) => {
-        console.log("Apple Pay payment authorized", event);
-        onPaymentSuccess(event.payment);
-        session.completePayment(window.ApplePaySession.STATUS_SUCCESS);
+      session.onpaymentauthorized = async (event: any) => {
+        try {
+          // Process payment through backend
+          const response = await apiRequest("POST", "/api/payments/apple-pay/process", {
+            payment: event.payment,
+            transactionId: transactionId,
+            amount: amount,
+            currency: currency
+          });
+
+          const result = await response.json();
+          
+          if (result.success) {
+            onPaymentSuccess(result);
+            session.completePayment(window.ApplePaySession.STATUS_SUCCESS);
+          } else {
+            onPaymentError("Apple Pay payment failed");
+            session.completePayment(window.ApplePaySession.STATUS_FAILURE);
+          }
+        } catch (error) {
+          console.error("Payment processing failed:", error);
+          onPaymentError("Apple Pay payment processing failed");
+          session.completePayment(window.ApplePaySession.STATUS_FAILURE);
+        }
       };
 
       session.oncancel = () => {
@@ -99,6 +137,11 @@ export function DigitalWalletButtons({
   const handleGooglePay = async () => {
     if (!paymentRequestSupported || !googlePaySupported) {
       onPaymentError("Google Pay is not supported in this browser");
+      return;
+    }
+
+    if (!transactionId) {
+      onPaymentError("Transaction ID is required for Google Pay");
       return;
     }
 
@@ -120,8 +163,8 @@ export function DigitalWalletButtons({
             tokenizationSpecification: {
               type: 'PAYMENT_GATEWAY',
               parameters: {
-                gateway: 'windcave', // Your payment processor
-                gatewayMerchantId: 'your-merchant-id'
+                gateway: 'windcave',
+                gatewayMerchantId: 'test-merchant'
               }
             }
           }]
@@ -141,9 +184,29 @@ export function DigitalWalletButtons({
       const request = new PaymentRequest(paymentMethods, paymentDetails);
       const response = await request.show();
       
-      console.log("Google Pay payment response", response);
-      onPaymentSuccess(response);
-      response.complete('success');
+      try {
+        // Process payment through backend
+        const backendResponse = await apiRequest("POST", "/api/payments/google-pay/process", {
+          paymentMethodData: response.details,
+          transactionId: transactionId,
+          amount: amount,
+          currency: currency
+        });
+
+        const result = await backendResponse.json();
+        
+        if (result.success) {
+          onPaymentSuccess(result);
+          response.complete('success');
+        } else {
+          onPaymentError("Google Pay payment failed");
+          response.complete('fail');
+        }
+      } catch (error) {
+        console.error("Payment processing failed:", error);
+        onPaymentError("Google Pay payment processing failed");
+        response.complete('fail');
+      }
     } catch (error) {
       console.error("Google Pay error:", error);
       onPaymentError("Google Pay payment failed");
