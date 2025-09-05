@@ -255,7 +255,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Generate QR code with current payment URL
-      const currentPaymentUrl = generatePaymentUrl(merchantId, req);
+      const currentPaymentUrl = generatePaymentUrl(merchantId, undefined, req);
       const qrBuffer = await QRCode.toBuffer(currentPaymentUrl, {
         type: 'png',
         width: size,
@@ -329,8 +329,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Ensure URLs are always current for this environment
-      const currentPaymentUrl = generatePaymentUrl(id, req);
-      const currentQrCodeUrl = generateQrCodeUrl(id, req);
+      const currentPaymentUrl = generatePaymentUrl(id, undefined, req);
+      const currentQrCodeUrl = generateQrCodeUrl(id, undefined, req);
       
       // Return merchant with current URLs
       const merchantWithCurrentUrls = {
@@ -1354,10 +1354,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const merchantData = req.body;
       
-      // Create merchant
-      const newMerchant = await storage.createMerchant({
+      // Create merchant  
+      const newMerchant = await storage.createMerchantWithPassword({
         name: merchantData.name,
-        email: merchantData.contactEmail, // Add the missing email field
+        email: merchantData.contactEmail,
         businessName: merchantData.businessName,
         contactEmail: merchantData.contactEmail,
         contactPhone: merchantData.contactPhone,
@@ -1367,9 +1367,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         bankAccountNumber: merchantData.bankAccountNumber,
         bankBranch: merchantData.bankBranch,
         accountHolderName: merchantData.accountHolderName,
-        qrCodeUrl: generateQrCodeUrl(0, req), // Will be updated with actual merchant ID
-        paymentUrl: generatePaymentUrl(0, req) // Will be updated with actual merchant ID
-      });
+        qrCodeUrl: generateQrCodeUrl(0, undefined, req), // Will be updated with actual merchant ID
+        paymentUrl: generatePaymentUrl(0, undefined, req) // Will be updated with actual merchant ID
+      }, "tempPassword");
 
       // Update URLs with actual merchant ID
       await storage.updateMerchantDetails(newMerchant.id, {
@@ -1450,8 +1450,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Test the payment URL by making a simple HTTP request
-      const paymentUrl = generatePaymentUrl(merchantId, req);
-      const qrCodeUrl = generateQrCodeUrl(merchantId, req);
+      const paymentUrl = generatePaymentUrl(merchantId, undefined, req);
+      const qrCodeUrl = generateQrCodeUrl(merchantId, undefined, req);
       
       try {
         // Simple connectivity test
@@ -2484,7 +2484,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         method: 'POST',
         statusCode: 500,
         responseTime: Date.now() - startTime,
-        errorMessage: error.message
+        errorMessage: error instanceof Error ? error.message : 'Unknown error'
       });
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -2549,9 +2549,225 @@ export async function registerRoutes(app: Express): Promise<Server> {
         method: 'GET',
         statusCode: 500,
         responseTime: Date.now() - startTime,
-        errorMessage: error.message
+        errorMessage: error instanceof Error ? error.message : 'Unknown error'
       });
       res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Digital Wallet Payment Processing Endpoints
+
+  // Apple Pay merchant validation endpoint
+  app.post("/api/payments/apple-pay/validate", async (req, res) => {
+    try {
+      const { validationURL, displayName } = req.body;
+
+      if (!validationURL) {
+        return res.status(400).json({ error: "Validation URL is required" });
+      }
+
+      // In production, this would validate with Apple's servers using merchant certificates
+      // For now, we'll simulate the validation response
+      const isSimulation = !windcaveService.isConfigured();
+      
+      if (isSimulation) {
+        // Simulated Apple Pay merchant session
+        const merchantSession = {
+          epochTimestamp: Date.now(),
+          expiresAt: Date.now() + (5 * 60 * 1000), // 5 minutes
+          merchantSessionIdentifier: `merchant_session_${Date.now()}`,
+          nonce: crypto.randomBytes(16).toString('hex'),
+          merchantIdentifier: "merchant.com.tapt.payment",
+          domainName: req.headers.host || "localhost:5000",
+          displayName: displayName || "Tapt Payment"
+        };
+
+        res.json(merchantSession);
+      } else {
+        // In production, implement actual Apple Pay merchant validation
+        // This requires Apple Pay merchant certificates and proper setup
+        return res.status(501).json({ 
+          error: "Apple Pay merchant validation not configured for production" 
+        });
+      }
+    } catch (error) {
+      console.error("Apple Pay validation error:", error);
+      res.status(500).json({ error: "Failed to validate Apple Pay merchant" });
+    }
+  });
+
+  // Apple Pay payment processing endpoint
+  app.post("/api/payments/apple-pay/process", async (req, res) => {
+    try {
+      const { payment, transactionId, amount, currency = "NZD" } = req.body;
+
+      if (!payment || !transactionId || !amount) {
+        return res.status(400).json({ error: "Payment data, transaction ID, and amount are required" });
+      }
+
+      // Get the transaction
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction not found" });
+      }
+
+      // Update transaction status to processing
+      await storage.updateTransactionStatus(transactionId, "processing");
+
+      const isSimulation = !windcaveService.isConfigured();
+
+      if (isSimulation) {
+        // Simulate Apple Pay payment processing
+        const paymentResult = {
+          success: true,
+          transactionId: `applepay_${Date.now()}`,
+          paymentMethod: "apple_pay",
+          amount: amount,
+          currency: currency,
+          status: "completed"
+        };
+
+        // Update transaction to completed
+        const updatedTransaction = await storage.updateTransactionStatus(
+          transactionId, 
+          "completed", 
+          paymentResult.transactionId
+        );
+
+        // Collect platform fee
+        await storage.createPlatformFee({
+          transactionId: transactionId,
+          merchantId: transaction.merchantId,
+          feeAmount: transaction.platformFeeAmount || "0.05",
+          transactionAmount: transaction.price,
+          status: 'collected',
+        });
+
+        // Notify connected clients
+        const connections = sseConnections.get(transaction.merchantId);
+        if (connections) {
+          connections.forEach(conn => {
+            conn.write(`data: ${JSON.stringify({ 
+              type: 'transaction_updated', 
+              transaction: updatedTransaction 
+            })}\n\n`);
+          });
+        }
+
+        res.json(paymentResult);
+      } else {
+        // In production, process actual Apple Pay payment token with Windcave
+        // This would decrypt the payment token and submit to payment processor
+        return res.status(501).json({ 
+          error: "Apple Pay payment processing not configured for production" 
+        });
+      }
+    } catch (error) {
+      console.error("Apple Pay processing error:", error);
+      res.status(500).json({ error: "Failed to process Apple Pay payment" });
+    }
+  });
+
+  // Google Pay payment processing endpoint
+  app.post("/api/payments/google-pay/process", async (req, res) => {
+    try {
+      const { paymentMethodData, transactionId, amount, currency = "NZD" } = req.body;
+
+      if (!paymentMethodData || !transactionId || !amount) {
+        return res.status(400).json({ error: "Payment method data, transaction ID, and amount are required" });
+      }
+
+      // Get the transaction
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction not found" });
+      }
+
+      // Update transaction status to processing
+      await storage.updateTransactionStatus(transactionId, "processing");
+
+      const isSimulation = !windcaveService.isConfigured();
+
+      if (isSimulation) {
+        // Simulate Google Pay payment processing
+        const paymentResult = {
+          success: true,
+          transactionId: `googlepay_${Date.now()}`,
+          paymentMethod: "google_pay",
+          amount: amount,
+          currency: currency,
+          status: "completed"
+        };
+
+        // Update transaction to completed
+        const updatedTransaction = await storage.updateTransactionStatus(
+          transactionId, 
+          "completed", 
+          paymentResult.transactionId
+        );
+
+        // Collect platform fee
+        await storage.createPlatformFee({
+          transactionId: transactionId,
+          merchantId: transaction.merchantId,
+          feeAmount: transaction.platformFeeAmount || "0.05",
+          transactionAmount: transaction.price,
+          status: 'collected',
+        });
+
+        // Notify connected clients
+        const connections = sseConnections.get(transaction.merchantId);
+        if (connections) {
+          connections.forEach(conn => {
+            conn.write(`data: ${JSON.stringify({ 
+              type: 'transaction_updated', 
+              transaction: updatedTransaction 
+            })}\n\n`);
+          });
+        }
+
+        res.json(paymentResult);
+      } else {
+        // In production, process actual Google Pay payment token with Windcave
+        // This would validate and process the payment token
+        return res.status(501).json({ 
+          error: "Google Pay payment processing not configured for production" 
+        });
+      }
+    } catch (error) {
+      console.error("Google Pay processing error:", error);
+      res.status(500).json({ error: "Failed to process Google Pay payment" });
+    }
+  });
+
+  // Digital wallet configuration endpoint
+  app.get("/api/payments/digital-wallet/config", async (req, res) => {
+    try {
+      const userAgent = req.headers['user-agent'] || '';
+      const isIOS = /iPhone|iPad|iPod/.test(userAgent);
+      const isAndroid = /Android/.test(userAgent);
+      const isChrome = /Chrome/.test(userAgent) && /Google Inc/.test(req.headers['user-agent'] || '');
+
+      const config = {
+        applePaySupported: isIOS,
+        googlePaySupported: isAndroid && isChrome,
+        paymentRequestSupported: !!globalThis.PaymentRequest,
+        environment: windcaveService.isConfigured() ? "production" : "test",
+        merchantId: process.env.APPLE_PAY_MERCHANT_ID || "merchant.com.tapt.payment",
+        merchantName: "Tapt Payment",
+        supportedNetworks: ["visa", "mastercard", "amex", "eftpos"],
+        countryCode: "NZ",
+        currencyCode: "NZD",
+        googlePayGateway: {
+          gateway: "windcave",
+          gatewayMerchantId: process.env.WINDCAVE_MERCHANT_ID || "test-merchant"
+        }
+      };
+
+      res.json(config);
+    } catch (error) {
+      console.error("Digital wallet config error:", error);
+      res.status(500).json({ error: "Failed to get digital wallet configuration" });
     }
   });
 

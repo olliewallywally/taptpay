@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { SlideToPayComponent } from "@/components/slide-to-pay";
 import { DigitalWalletButtons } from "@/components/digital-wallet-buttons";
 import { BillSplit } from "@/components/bill-split";
 import { sseClient } from "@/lib/sse-client";
@@ -315,10 +314,12 @@ export default function CustomerPayment() {
               currency="NZD"
               merchantName="Tapt Payment"
               itemName={currentTransaction.itemName}
+              transactionId={currentTransaction.id}
               onPaymentStart={() => setPaymentStatus("processing")}
               onPaymentSuccess={(paymentData) => {
                 console.log("Payment successful:", paymentData);
-                handlePayment();
+                // Digital wallet payment is already processed by backend
+                setPaymentStatus("success");
               }}
               onPaymentError={(error) => {
                 console.error("Payment error:", error);
