@@ -31,17 +31,9 @@ export function DigitalWalletButtons({
   const [paymentRequestSupported, setPaymentRequestSupported] = useState(false);
 
   useEffect(() => {
-    // Detect device type and show appropriate payment method
-    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
-    
-    if (isIOS) {
-      setApplePaySupported(true);
-      setGooglePaySupported(false);
-    } else {
-      setApplePaySupported(false);
-      setGooglePaySupported(true);
-    }
-    
+    // Show Google Pay on all devices for consistent UI
+    setApplePaySupported(false);
+    setGooglePaySupported(true);
     setPaymentRequestSupported(true);
   }, []);
 
