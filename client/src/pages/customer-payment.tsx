@@ -341,7 +341,7 @@ export default function CustomerPayment() {
                 totalAmount={parseFloat(currentTransaction.price)}
                 onSplitCreated={() => {
                   // Refresh the transaction data to get the updated split information
-                  queryClient.invalidateQueries({ queryKey: ["/api/merchants", id, "active-transaction"] });
+                  queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
                 }}
               />
             </div>
