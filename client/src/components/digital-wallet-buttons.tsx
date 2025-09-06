@@ -269,38 +269,6 @@ export function DigitalWalletButtons({
           )}
         </div>
       )}
-
-      {/* Fallback/Manual Payment Button */}
-      <button
-        onClick={handleFallbackPayment}
-        disabled={disabled}
-        className="w-full h-12 backdrop-blur-xl bg-white/10 border border-white/20 rounded-lg text-white font-medium hover:bg-white/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        <span className="flex items-center justify-center space-x-2">
-          <CreditCard className="w-4 h-4" />
-          <span>Pay with Card</span>
-        </span>
-      </button>
-
-      {/* NFC/Tap to Pay Option */}
-      <button
-        onClick={handleFallbackPayment}
-        disabled={disabled}
-        className="w-full h-12 backdrop-blur-xl bg-emerald-500/10 border border-emerald-400/30 rounded-lg text-emerald-200 font-medium hover:bg-emerald-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        <span className="flex items-center justify-center space-x-2">
-          <Smartphone className="w-4 h-4" />
-          <span>Tap to Pay</span>
-        </span>
-      </button>
-
-      {/* Warning Message */}
-      {!applePaySupported && !googlePaySupported && (
-        <div className="text-xs text-white/60 text-center mt-4 p-3 backdrop-blur-xl bg-yellow-500/10 border border-yellow-400/30 rounded-lg">
-          <p>Digital wallets not available on this device.</p>
-          <p>Use card payment or NFC instead.</p>
-        </div>
-      )}
     </div>
   );
 }
