@@ -6,7 +6,7 @@ import { BillSplit } from "@/components/bill-split";
 import { sseClient } from "@/lib/sse-client";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Shield, Lock, CheckCircle, XCircle } from "lucide-react";
-import taptLogo from "@assets/tapt logo_1751676012286.png";
+import taptLogo from "@assets/tapt logo v2_1751682549877.png";
 
 export default function CustomerPayment() {
   const { merchantId, stoneId } = useParams<{ merchantId: string; stoneId?: string }>();
