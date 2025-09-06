@@ -221,41 +221,54 @@ export function DigitalWalletButtons({
 
   return (
     <div className="space-y-3">
-      {/* Apple Pay Button */}
-      {applePaySupported && (
-        <button
-          onClick={handleApplePay}
-          disabled={disabled}
-          className="w-full h-12 bg-black text-white rounded-lg flex items-center justify-center font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          style={{
-            background: 'linear-gradient(135deg, #000000 0%, #1a1a1a 100%)',
-            border: '1px solid rgba(255, 255, 255, 0.1)'
-          }}
-        >
-          <span className="flex items-center space-x-2">
-            <span>🍎</span>
-            <span>Pay</span>
-          </span>
-        </button>
-      )}
+      {/* Digital Wallet Buttons - Side by Side */}
+      {(applePaySupported || googlePaySupported) && (
+        <div className="flex space-x-3 mb-3">
+          {/* Apple Pay Button */}
+          {applePaySupported && (
+            <button
+              onClick={handleApplePay}
+              disabled={disabled}
+              className="flex-1 h-12 bg-black text-white rounded-lg flex items-center justify-center font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                background: 'linear-gradient(135deg, #000000 0%, #1a1a1a 100%)',
+                border: '1px solid rgba(255, 255, 255, 0.1)'
+              }}
+            >
+              <span className="flex items-center space-x-2">
+                <span>🍎</span>
+                <span>Pay</span>
+              </span>
+            </button>
+          )}
 
-      {/* Google Pay Button */}
-      {googlePaySupported && (
-        <button
-          onClick={handleGooglePay}
-          disabled={disabled}
-          className="w-full h-12 bg-white text-black rounded-lg flex items-center justify-center font-medium hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-gray-300"
-        >
-          <span className="flex items-center space-x-2">
-            <span className="text-blue-600 font-bold">G</span>
-            <span className="text-red-600 font-bold">o</span>
-            <span className="text-yellow-500 font-bold">o</span>
-            <span className="text-blue-600 font-bold">g</span>
-            <span className="text-green-600 font-bold">l</span>
-            <span className="text-red-600 font-bold">e</span>
-            <span className="ml-1">Pay</span>
-          </span>
-        </button>
+          {/* Google Pay Button */}
+          {googlePaySupported && (
+            <button
+              onClick={handleGooglePay}
+              disabled={disabled}
+              className="flex-1 h-12 bg-white text-black rounded-lg flex items-center justify-center font-medium hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-gray-300"
+            >
+              <span className="flex items-center space-x-2">
+                <span className="text-blue-600 font-bold">G</span>
+                <span className="text-red-600 font-bold">o</span>
+                <span className="text-yellow-500 font-bold">o</span>
+                <span className="text-blue-600 font-bold">g</span>
+                <span className="text-green-600 font-bold">l</span>
+                <span className="text-red-600 font-bold">e</span>
+                <span className="ml-1">Pay</span>
+              </span>
+            </button>
+          )}
+
+          {/* If only one digital wallet is supported, fill the space */}
+          {applePaySupported && !googlePaySupported && (
+            <div className="flex-1"></div>
+          )}
+          {!applePaySupported && googlePaySupported && (
+            <div className="flex-1"></div>
+          )}
+        </div>
       )}
 
       {/* Fallback/Manual Payment Button */}
