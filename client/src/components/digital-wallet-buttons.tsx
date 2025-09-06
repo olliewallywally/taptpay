@@ -219,11 +219,7 @@ export function DigitalWalletButtons({
             <button
               onClick={handleApplePay}
               disabled={disabled}
-              className="flex-1 h-12 bg-black text-white rounded-lg flex items-center justify-center font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{
-                background: 'linear-gradient(135deg, #000000 0%, #1a1a1a 100%)',
-                border: '1px solid rgba(255, 255, 255, 0.1)'
-              }}
+              className="flex-1 h-12 backdrop-blur-xl bg-white/10 border border-white/20 rounded-lg text-white font-medium hover:bg-white/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg width="50" height="20" viewBox="0 0 50 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M8.9 2.9c-.5.6-.9 1.4-.8 2.2.8.1 1.7-.4 2.2-1 .5-.6.8-1.4.7-2.2-.8 0-1.6.4-2.1 1zm2.1 3.5c-1.2-.1-2.2.7-2.8.7-.6 0-1.5-.7-2.5-.7-1.3 0-2.5.7-3.2 1.8-1.4 2.4-.4 5.9 1 7.8.7 1 1.5 2 2.5 2 1 0 1.4-.6 2.6-.6 1.2 0 1.5.6 2.6.6 1.1 0 1.8-1 2.5-2 .8-1.1 1.1-2.2 1.1-2.3 0 0-2.1-.8-2.1-3.2 0-2.1 1.7-3.1 1.8-3.2-1-1.5-2.5-1.6-3.1-1.6-.4-.1-.9-.3-1.4-.3z" fill="white"/>
@@ -237,15 +233,12 @@ export function DigitalWalletButtons({
             <button
               onClick={handleGooglePay}
               disabled={disabled}
-              className="flex-1 h-12 bg-white text-black rounded-lg flex items-center justify-center font-medium hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-gray-300"
+              className="flex-1 h-12 backdrop-blur-xl bg-white/10 border border-white/20 rounded-lg text-white font-medium hover:bg-white/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <svg width="70" height="20" viewBox="0 0 70 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M31.9 8.6c0 2.7-2.1 4.7-4.7 4.7-2.6 0-4.7-2-4.7-4.7 0-2.6 2.1-4.7 4.7-4.7 2.6 0 4.7 2.1 4.7 4.7zm-2.1 0c0-1.5-1.1-2.5-2.6-2.5s-2.6 1-2.6 2.5c0 1.5 1.1 2.5 2.6 2.5s2.6-1 2.6-2.5z" fill="#4285F4"/>
-                <path d="M42.4 8.6c0 2.7-2.1 4.7-4.7 4.7-2.6 0-4.7-2-4.7-4.7 0-2.6 2.1-4.7 4.7-4.7 2.6 0 4.7 2.1 4.7 4.7zm-2.1 0c0-1.5-1.1-2.5-2.6-2.5s-2.6 1-2.6 2.5c0 1.5 1.1 2.5 2.6 2.5s2.6-1 2.6-2.5z" fill="#EA4335"/>
-                <path d="M52.4 4.1v8.5c0 3.5-2.1 4.9-4.5 4.9-2.3 0-3.7-1.5-4.2-2.8l1.8-.8c.3.8 1.1 1.7 2.4 1.7 1.6 0 2.5-1 2.5-2.8v-.7h-.1c-.5.6-1.4 1.1-2.5 1.1-2.4 0-4.6-2.1-4.6-4.7s2.2-4.7 4.6-4.7c1.1 0 2 .5 2.5 1.1h.1V4.1h2zm-1.9 4.5c0-1.5-1-2.5-2.3-2.5-1.3 0-2.4 1-2.4 2.5s1.1 2.5 2.4 2.5c1.3 0 2.3-1 2.3-2.5z" fill="#4285F4"/>
-                <path d="M55.2 1v12.1h-2.1V1h2.1z" fill="#34A853"/>
-                <path d="M62.4 10.4l1.7 1.1c-.6.8-1.9 2.2-4.2 2.2-2.9 0-5-2.2-5-4.7 0-2.8 2.1-4.7 4.8-4.7 2.6 0 3.9 2.1 4.3 3.2l.2.6L58 9.8c.5 1 1.3 1.5 2.4 1.5 1.1 0 1.9-.5 2.4-1.3zm-6.2-2.1h5.1c-.3-.9-1.1-1.4-2.1-1.4-1.3 0-2.4.6-3 1.4z" fill="#EA4335"/>
-                <path d="M8.4 6.2v2h4.8c-.2 1.1-.8 1.9-1.6 2.5-.7.6-1.7.9-3.2.9-2.5 0-4.5-2-4.5-4.5S5.9 2.6 8.4 2.6c1.4 0 2.4.5 3.1 1.2l1.4-1.4c-1.1-1-2.5-1.8-4.5-1.8-3.6 0-6.6 3-6.6 6.6s3 6.6 6.6 6.6c1.9 0 3.4-.6 4.5-1.8 1.2-1.2 1.5-2.8 1.5-4.1 0-.4 0-.8-.1-1.1H8.4v-.6z" fill="#4285F4"/>
+              <svg width="41" height="17" viewBox="0 0 41 17" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M19.526 9.731V6.273h4.621c.043.343.068.686.068 1.029 0 3.771-2.522 6.448-5.977 6.448a6.462 6.462 0 01-6.462-6.462c0-3.572 2.896-6.462 6.462-6.462 1.733 0 3.195.571 4.337 1.515l-1.267 1.267c-.686-.657-1.619-1.168-3.07-1.168-2.494 0-4.543 2.074-4.543 4.848s2.049 4.848 4.543 4.848c2.903 0 4.005-2.074 4.164-3.143h-4.164v-.99l-.712-.849z" fill="white"/>
+                <path d="M25.713 5.282c1.481 0 2.408 1.04 2.408 2.391v5.232h-1.714V8.074c0-.849-.457-1.354-1.168-1.354-.766 0-1.28.559-1.28 1.434v4.751h-1.714V5.468h1.714v.743c.4-.571 1.04-.929 1.754-.929z" fill="white"/>
+                <path d="M33.516 8.951c-.183-1.063-.984-1.594-1.911-1.594-1.063 0-1.834.665-2.017 1.594h3.928zm1.491 1.063c0 .157-.011.297-.034.434h-5.384c.183 1.097 1.063 1.777 2.183 1.777.994 0 1.662-.434 1.937-1.06l1.474.617c-.606 1.234-1.834 1.903-3.411 1.903-2.126 0-3.862-1.554-3.862-3.931 0-2.286 1.691-3.931 3.794-3.931 2.057 0 3.726 1.645 3.726 3.863.011.109-.023.218-.023.328z" fill="white"/>
               </svg>
             </button>
           )}
