@@ -31,20 +31,10 @@ export function DigitalWalletButtons({
   const [paymentRequestSupported, setPaymentRequestSupported] = useState(false);
 
   useEffect(() => {
-    // Check Apple Pay support
-    if (window.ApplePaySession) {
-      const isApplePaySupported = window.ApplePaySession.canMakePayments();
-      setApplePaySupported(isApplePaySupported);
-    }
-
-    // Check Payment Request API support
-    if (window.PaymentRequest) {
-      setPaymentRequestSupported(true);
-      
-      // Check Google Pay support (works best in Chrome)
-      const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
-      setGooglePaySupported(isChrome);
-    }
+    // Always show both buttons for demo/testing purposes
+    setApplePaySupported(true);
+    setGooglePaySupported(true);
+    setPaymentRequestSupported(true);
   }, []);
 
   const handleApplePay = async () => {
