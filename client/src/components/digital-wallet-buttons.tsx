@@ -235,10 +235,10 @@ export function DigitalWalletButtons({
                 border: '1px solid rgba(255, 255, 255, 0.1)'
               }}
             >
-              <span className="flex items-center space-x-2">
-                <span>🍎</span>
-                <span>Pay</span>
-              </span>
+              <svg width="50" height="20" viewBox="0 0 50 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M8.9 2.9c-.5.6-.9 1.4-.8 2.2.8.1 1.7-.4 2.2-1 .5-.6.8-1.4.7-2.2-.8 0-1.6.4-2.1 1zm2.1 3.5c-1.2-.1-2.2.7-2.8.7-.6 0-1.5-.7-2.5-.7-1.3 0-2.5.7-3.2 1.8-1.4 2.4-.4 5.9 1 7.8.7 1 1.5 2 2.5 2 1 0 1.4-.6 2.6-.6 1.2 0 1.5.6 2.6.6 1.1 0 1.8-1 2.5-2 .8-1.1 1.1-2.2 1.1-2.3 0 0-2.1-.8-2.1-3.2 0-2.1 1.7-3.1 1.8-3.2-1-1.5-2.5-1.6-3.1-1.6-.4-.1-.9-.3-1.4-.3z" fill="white"/>
+                <text x="18" y="15" fill="white" fontSize="11" fontFamily="-apple-system, BlinkMacSystemFont, sans-serif">Pay</text>
+              </svg>
             </button>
           )}
 
@@ -249,15 +249,14 @@ export function DigitalWalletButtons({
               disabled={disabled}
               className="flex-1 h-12 bg-white text-black rounded-lg flex items-center justify-center font-medium hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-gray-300"
             >
-              <span className="flex items-center space-x-2">
-                <span className="text-blue-600 font-bold">G</span>
-                <span className="text-red-600 font-bold">o</span>
-                <span className="text-yellow-500 font-bold">o</span>
-                <span className="text-blue-600 font-bold">g</span>
-                <span className="text-green-600 font-bold">l</span>
-                <span className="text-red-600 font-bold">e</span>
-                <span className="ml-1">Pay</span>
-              </span>
+              <svg width="70" height="20" viewBox="0 0 70 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M31.9 8.6c0 2.7-2.1 4.7-4.7 4.7-2.6 0-4.7-2-4.7-4.7 0-2.6 2.1-4.7 4.7-4.7 2.6 0 4.7 2.1 4.7 4.7zm-2.1 0c0-1.5-1.1-2.5-2.6-2.5s-2.6 1-2.6 2.5c0 1.5 1.1 2.5 2.6 2.5s2.6-1 2.6-2.5z" fill="#4285F4"/>
+                <path d="M42.4 8.6c0 2.7-2.1 4.7-4.7 4.7-2.6 0-4.7-2-4.7-4.7 0-2.6 2.1-4.7 4.7-4.7 2.6 0 4.7 2.1 4.7 4.7zm-2.1 0c0-1.5-1.1-2.5-2.6-2.5s-2.6 1-2.6 2.5c0 1.5 1.1 2.5 2.6 2.5s2.6-1 2.6-2.5z" fill="#EA4335"/>
+                <path d="M52.4 4.1v8.5c0 3.5-2.1 4.9-4.5 4.9-2.3 0-3.7-1.5-4.2-2.8l1.8-.8c.3.8 1.1 1.7 2.4 1.7 1.6 0 2.5-1 2.5-2.8v-.7h-.1c-.5.6-1.4 1.1-2.5 1.1-2.4 0-4.6-2.1-4.6-4.7s2.2-4.7 4.6-4.7c1.1 0 2 .5 2.5 1.1h.1V4.1h2zm-1.9 4.5c0-1.5-1-2.5-2.3-2.5-1.3 0-2.4 1-2.4 2.5s1.1 2.5 2.4 2.5c1.3 0 2.3-1 2.3-2.5z" fill="#4285F4"/>
+                <path d="M55.2 1v12.1h-2.1V1h2.1z" fill="#34A853"/>
+                <path d="M62.4 10.4l1.7 1.1c-.6.8-1.9 2.2-4.2 2.2-2.9 0-5-2.2-5-4.7 0-2.8 2.1-4.7 4.8-4.7 2.6 0 3.9 2.1 4.3 3.2l.2.6L58 9.8c.5 1 1.3 1.5 2.4 1.5 1.1 0 1.9-.5 2.4-1.3zm-6.2-2.1h5.1c-.3-.9-1.1-1.4-2.1-1.4-1.3 0-2.4.6-3 1.4z" fill="#EA4335"/>
+                <path d="M8.4 6.2v2h4.8c-.2 1.1-.8 1.9-1.6 2.5-.7.6-1.7.9-3.2.9-2.5 0-4.5-2-4.5-4.5S5.9 2.6 8.4 2.6c1.4 0 2.4.5 3.1 1.2l1.4-1.4c-1.1-1-2.5-1.8-4.5-1.8-3.6 0-6.6 3-6.6 6.6s3 6.6 6.6 6.6c1.9 0 3.4-.6 4.5-1.8 1.2-1.2 1.5-2.8 1.5-4.1 0-.4 0-.8-.1-1.1H8.4v-.6z" fill="#4285F4"/>
+              </svg>
             </button>
           )}
 
