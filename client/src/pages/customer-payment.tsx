@@ -290,21 +290,25 @@ export default function CustomerPayment() {
           </h2>
 
           {/* Price */}
-          <div className="text-5xl font-bold text-white mb-12">
+          <div className="text-5xl font-bold text-white mb-4">
             ${currentTransaction.isSplit 
               ? parseFloat(currentTransaction.splitAmount).toFixed(2) 
               : parseFloat(currentTransaction.price).toFixed(2)
             }
           </div>
 
-          {/* Show original price when split */}
+          {/* Show split info when split */}
           {currentTransaction.isSplit && (
-            <div className="text-lg text-white/70 mb-6 -mt-8">
-              <span className="line-through">${parseFloat(currentTransaction.price).toFixed(2)}</span>
-              <span className="ml-2 text-sm">
-                (Split {currentTransaction.completedSplits + 1}/{currentTransaction.totalSplits})
+            <div className="text-lg text-white/70 mb-8">
+              <span className="text-sm">
+                Split {currentTransaction.completedSplits + 1}/{currentTransaction.totalSplits}
               </span>
             </div>
+          )}
+
+          {/* Add spacing when not split */}
+          {!currentTransaction.isSplit && (
+            <div className="mb-8"></div>
           )}
 
           {/* Digital Wallet Payment Options */}

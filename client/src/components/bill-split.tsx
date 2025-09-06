@@ -46,12 +46,15 @@ export function BillSplit({ transactionId, totalAmount, onSplitCreated }: BillSp
       });
       
       // Also invalidate the active transaction query for immediate UI update
-      const urlParams = window.location.pathname.split('/');
-      const merchantId = urlParams[2]; // Extract merchant ID from URL
-      if (merchantId) {
-        queryClient.invalidateQueries({ 
-          queryKey: ["/api/merchants", parseInt(merchantId), "active-transaction"] 
-        });
+      const pathParts = window.location.pathname.split('/');
+      const payIndex = pathParts.indexOf('pay');
+      if (payIndex !== -1 && pathParts[payIndex + 1]) {
+        const merchantId = parseInt(pathParts[payIndex + 1]);
+        if (!isNaN(merchantId)) {
+          queryClient.invalidateQueries({ 
+            queryKey: ["/api/merchants", merchantId, "active-transaction"] 
+          });
+        }
       }
       
       // Collapse the component after successful creation
