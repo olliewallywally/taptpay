@@ -31,9 +31,17 @@ export function DigitalWalletButtons({
   const [paymentRequestSupported, setPaymentRequestSupported] = useState(false);
 
   useEffect(() => {
-    // Always show both buttons for demo/testing purposes
-    setApplePaySupported(true);
-    setGooglePaySupported(true);
+    // Detect device type and show appropriate payment method
+    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    
+    if (isIOS) {
+      setApplePaySupported(true);
+      setGooglePaySupported(false);
+    } else {
+      setApplePaySupported(false);
+      setGooglePaySupported(true);
+    }
+    
     setPaymentRequestSupported(true);
   }, []);
 
@@ -211,15 +219,15 @@ export function DigitalWalletButtons({
 
   return (
     <div className="space-y-3">
-      {/* Digital Wallet Buttons - Side by Side */}
+      {/* Single Full-Width Digital Wallet Button */}
       {(applePaySupported || googlePaySupported) && (
-        <div className="flex space-x-3 mb-3">
-          {/* Apple Pay Button */}
+        <div className="w-full">
+          {/* Apple Pay Button - iOS devices */}
           {applePaySupported && (
             <button
               onClick={handleApplePay}
               disabled={disabled}
-              className="flex-1 h-12 backdrop-blur-xl bg-white/10 border border-white/20 rounded-lg text-white font-medium hover:bg-white/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full h-12 backdrop-blur-xl bg-white/10 border border-white/20 rounded-lg text-white font-medium hover:bg-white/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg width="50" height="20" viewBox="0 0 50 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M8.9 2.9c-.5.6-.9 1.4-.8 2.2.8.1 1.7-.4 2.2-1 .5-.6.8-1.4.7-2.2-.8 0-1.6.4-2.1 1zm2.1 3.5c-1.2-.1-2.2.7-2.8.7-.6 0-1.5-.7-2.5-.7-1.3 0-2.5.7-3.2 1.8-1.4 2.4-.4 5.9 1 7.8.7 1 1.5 2 2.5 2 1 0 1.4-.6 2.6-.6 1.2 0 1.5.6 2.6.6 1.1 0 1.8-1 2.5-2 .8-1.1 1.1-2.2 1.1-2.3 0 0-2.1-.8-2.1-3.2 0-2.1 1.7-3.1 1.8-3.2-1-1.5-2.5-1.6-3.1-1.6-.4-.1-.9-.3-1.4-.3z" fill="white"/>
@@ -228,12 +236,12 @@ export function DigitalWalletButtons({
             </button>
           )}
 
-          {/* Google Pay Button */}
+          {/* Google Pay Button - Non-iOS devices */}
           {googlePaySupported && (
             <button
               onClick={handleGooglePay}
               disabled={disabled}
-              className="flex-1 h-12 backdrop-blur-xl bg-white/10 border border-white/20 rounded-lg text-white font-medium hover:bg-white/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full h-12 backdrop-blur-xl bg-white/10 border border-white/20 rounded-lg text-white font-medium hover:bg-white/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg width="41" height="17" viewBox="0 0 41 17" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M19.526 9.731V6.273h4.621c.043.343.068.686.068 1.029 0 3.771-2.522 6.448-5.977 6.448a6.462 6.462 0 01-6.462-6.462c0-3.572 2.896-6.462 6.462-6.462 1.733 0 3.195.571 4.337 1.515l-1.267 1.267c-.686-.657-1.619-1.168-3.07-1.168-2.494 0-4.543 2.074-4.543 4.848s2.049 4.848 4.543 4.848c2.903 0 4.005-2.074 4.164-3.143h-4.164v-.99l-.712-.849z" fill="white"/>
@@ -241,14 +249,6 @@ export function DigitalWalletButtons({
                 <path d="M33.516 8.951c-.183-1.063-.984-1.594-1.911-1.594-1.063 0-1.834.665-2.017 1.594h3.928zm1.491 1.063c0 .157-.011.297-.034.434h-5.384c.183 1.097 1.063 1.777 2.183 1.777.994 0 1.662-.434 1.937-1.06l1.474.617c-.606 1.234-1.834 1.903-3.411 1.903-2.126 0-3.862-1.554-3.862-3.931 0-2.286 1.691-3.931 3.794-3.931 2.057 0 3.726 1.645 3.726 3.863.011.109-.023.218-.023.328z" fill="white"/>
               </svg>
             </button>
-          )}
-
-          {/* If only one digital wallet is supported, fill the space */}
-          {applePaySupported && !googlePaySupported && (
-            <div className="flex-1"></div>
-          )}
-          {!applePaySupported && googlePaySupported && (
-            <div className="flex-1"></div>
           )}
         </div>
       )}
