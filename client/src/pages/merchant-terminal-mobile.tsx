@@ -12,6 +12,7 @@ import { EnhancedPaymentStatus } from "@/components/enhanced-payment-status";
 import { apiRequest } from "@/lib/queryClient";
 import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
+import { useDeviceStatusMonitoring, useSSEConnectionMonitoring } from "@/components/notification-system";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { Send, Loader2, CheckCircle, Clock, XCircle, QrCode, Smartphone, Edit, Split, MoreHorizontal, Menu, X, Waves, ChevronDown, Copy } from "lucide-react";
 import { Link } from "wouter";
@@ -211,6 +212,10 @@ export default function MerchantTerminalMobile() {
       sseClient.disconnect();
     };
   }, [merchantId, queryClient]);
+
+  // Device status monitoring
+  useDeviceStatusMonitoring();
+  useSSEConnectionMonitoring(merchantId);
 
   // Update current transaction from active transaction query
   useEffect(() => {
