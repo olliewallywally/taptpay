@@ -14,28 +14,13 @@ import {
   Download,
   FileText,
   FileSpreadsheet,
-  Menu,
-  X,
 } from "lucide-react";
-import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { format } from "date-fns";
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
-  const [isMobile, setIsMobile] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  
-  useEffect(() => {
-    const checkScreenSize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    checkScreenSize();
-    window.addEventListener('resize', checkScreenSize);
-    
-    return () => window.removeEventListener('resize', checkScreenSize);
-  }, []);
-
+  const isMobile = useIsMobile();
   const { toast } = useToast();
   const merchantId = getCurrentMerchantId();
   
@@ -155,85 +140,7 @@ export default function Dashboard() {
   }
 
   return (
-    <>
-      {/* Menu Backdrop */}
-      <div 
-        className={`fixed inset-0 bg-black/60 z-40 transition-opacity duration-300 ${
-          menuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
-        onClick={() => setMenuOpen(false)}
-      />
-
-      {/* Sliding Menu */}
-      <div 
-        className={`fixed right-0 top-0 h-full w-80 bg-gray-800 border-l border-gray-700 z-50 transform transition-transform duration-300 ease-in-out ${
-          menuOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
-      >
-        <div className="p-6">
-          <div className="flex justify-between items-center mb-8">
-            <h2 className="text-xl font-bold text-white">Menu</h2>
-            <button onClick={() => setMenuOpen(false)} className="text-white/70 hover:text-white">
-              <X className="h-6 w-6" />
-            </button>
-          </div>
-          <nav className="space-y-4">
-            <a href="/dashboard" className="block py-3 px-4 text-[#00CC52] rounded-xl font-medium">
-              Dashboard
-            </a>
-            <a href="/merchant" className="block py-3 px-4 text-white hover:text-white rounded-xl transition-colors">
-              Terminal
-            </a>
-            <a href="/transactions" className="block py-3 px-4 text-white hover:text-white rounded-xl transition-colors">
-              Transactions
-            </a>
-            <a href="/stock" className="block py-3 px-4 text-white hover:text-white rounded-xl transition-colors">
-              Stock
-            </a>
-            <a href="/settings" className="block py-3 px-4 text-white hover:text-white rounded-xl transition-colors">
-              Settings
-            </a>
-            <div className="pt-4 mt-4 border-t border-gray-600">
-              <button 
-                onClick={() => {
-                  localStorage.removeItem('auth-token');
-                  window.location.href = '/login';
-                }}
-                className="block w-full text-left py-3 px-4 text-red-400 hover:text-red-300 rounded-xl transition-colors"
-              >
-                Logout
-              </button>
-            </div>
-          </nav>
-        </div>
-      </div>
-
-      {/* Main Content with Slide Animation */}
-      <div 
-        className={`min-h-screen bg-gradient-to-br from-gray-950 via-black to-gray-900 transform transition-transform duration-300 ease-in-out ${
-          menuOpen ? '-translate-x-80' : 'translate-x-0'
-        }`}
-      >
-        {/* Menu Icon */}
-        <div className="fixed top-4 right-4 z-30">
-          <button
-            onClick={() => setMenuOpen(true)}
-            className="p-2 backdrop-blur-xl bg-black/40 border border-white/20 rounded-xl text-white hover:bg-black/60 transition-colors"
-          >
-            <Menu className="h-6 w-6" />
-          </button>
-        </div>
-
-        {/* Tapt Pay Branding */}
-        <div className="fixed top-4 left-4 z-30">
-          <img 
-            src={taptLogoPath} 
-            alt="TaptPay" 
-            className="h-8 w-auto object-contain"
-          />
-        </div>
-
-        <div className="container mx-auto px-4 pt-24 sm:pt-28 pb-8">
+    <div className="container mx-auto px-4 pt-24 pb-8">
           {/* Analytics Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
             <div className="dashboard-card-glass rounded-3xl p-6">
@@ -444,8 +351,6 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-        </div>
-      </div>
-    </>
+    </div>
   );
 }
