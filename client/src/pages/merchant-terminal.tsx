@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { QRCodeDisplay } from "@/components/qr-code-display";
 import { MerchantUrlDisplay } from "@/components/merchant-url-display";
+import { EnhancedPaymentStatus } from "@/components/enhanced-payment-status";
 import { apiRequest } from "@/lib/queryClient";
 import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
@@ -478,6 +479,16 @@ export default function MerchantTerminal() {
             </div>
           )}
         </div>
+
+        {/* Enhanced Payment Status Box */}
+        {(currentTransaction || activeTransaction) && (
+          <div className="mb-6">
+            <EnhancedPaymentStatus 
+              transaction={currentTransaction || activeTransaction}
+              className="mx-auto max-w-md"
+            />
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="flex justify-center gap-4 mb-6">
