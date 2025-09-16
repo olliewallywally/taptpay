@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { QRCodeDisplay } from "@/components/qr-code-display";
+import { EnhancedPaymentStatus } from "@/components/enhanced-payment-status";
 import { apiRequest } from "@/lib/queryClient";
 import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
@@ -485,25 +486,18 @@ export default function MerchantTerminalMobile() {
           </div>
         </div>
 
-        {/* Amount Box - More Rounded */}
+        {/* Enhanced Payment Status */}
         <div className="px-6 mb-6">
           {currentTransaction || activeTransaction ? (
-            <div 
-              className="rounded-3xl p-6 text-center"
-              style={{ backgroundColor: '#00FF66' }}
-            >
-              <div className="text-black text-lg font-medium mb-2">Total</div>
-              <div className="text-black text-4xl font-bold">
-                ${parseFloat((currentTransaction || activeTransaction).price).toFixed(2)}
-              </div>
-              <div className="text-black text-sm mt-2">
-                {(currentTransaction || activeTransaction).itemName}
-              </div>
-            </div>
+            <EnhancedPaymentStatus 
+              transaction={currentTransaction || activeTransaction}
+              className="border-2 border-green-400"
+            />
           ) : (
             <div 
               className="rounded-3xl p-6 text-center border-2 border-dashed"
               style={{ borderColor: '#00FF66' }}
+              data-testid="no-transaction-placeholder"
             >
               <div className="text-gray-400 text-lg font-medium mb-2">Total</div>
               <div className="text-gray-400 text-4xl font-bold">$0.00</div>
@@ -1206,21 +1200,13 @@ export default function MerchantTerminalMobile() {
           </div>
         </div>
 
-        {/* Amount Box - More Rounded */}
+        {/* Enhanced Payment Status - Mobile */}
         <div className="px-6 mb-6">
           {currentTransaction || activeTransaction ? (
-            <div 
-              className="rounded-3xl p-6 text-center"
-              style={{ backgroundColor: '#00FF66' }}
-            >
-              <div className="text-black text-lg font-medium mb-2">Total</div>
-              <div className="text-black text-3xl font-bold">
-                ${(currentTransaction || activeTransaction).price}
-              </div>
-              <div className="text-black text-xs font-medium mt-2">
-                {(currentTransaction || activeTransaction).itemName}
-              </div>
-            </div>
+            <EnhancedPaymentStatus 
+              transaction={currentTransaction || activeTransaction}
+              className="border-2 border-green-400"
+            />
           ) : (
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
