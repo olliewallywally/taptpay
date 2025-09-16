@@ -222,7 +222,7 @@ export function DigitalWalletButtons({
             <button
               onClick={handleApplePay}
               disabled={disabled}
-              className="w-full h-12 backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl text-white font-medium hover:bg-white/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-xl"
+              className="w-full h-12 bg-gradient-to-r from-gray-900 to-black border border-gray-600 rounded-2xl text-white font-medium hover:from-gray-800 hover:to-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-xl"
             >
               <svg width="50" height="20" viewBox="0 0 50 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M8.9 2.9c-.5.6-.9 1.4-.8 2.2.8.1 1.7-.4 2.2-1 .5-.6.8-1.4.7-2.2-.8 0-1.6.4-2.1 1zm2.1 3.5c-1.2-.1-2.2.7-2.8.7-.6 0-1.5-.7-2.5-.7-1.3 0-2.5.7-3.2 1.8-1.4 2.4-.4 5.9 1 7.8.7 1 1.5 2 2.5 2 1 0 1.4-.6 2.6-.6 1.2 0 1.5.6 2.6.6 1.1 0 1.8-1 2.5-2 .8-1.1 1.1-2.2 1.1-2.3 0 0-2.1-.8-2.1-3.2 0-2.1 1.7-3.1 1.8-3.2-1-1.5-2.5-1.6-3.1-1.6-.4-.1-.9-.3-1.4-.3z" fill="white"/>
@@ -236,7 +236,7 @@ export function DigitalWalletButtons({
             <button
               onClick={handleGooglePay}
               disabled={disabled}
-              className="w-full h-12 backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl text-white font-medium hover:bg-white/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-xl"
+              className="w-full h-12 bg-gradient-to-r from-gray-900 to-black border border-gray-600 rounded-2xl text-white font-medium hover:from-gray-800 hover:to-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-xl"
             >
               <svg width="41" height="17" viewBox="0 0 41 17" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M19.526 9.731V6.273h4.621c.043.343.068.686.068 1.029 0 3.771-2.522 6.448-5.977 6.448a6.462 6.462 0 01-6.462-6.462c0-3.572 2.896-6.462 6.462-6.462 1.733 0 3.195.571 4.337 1.515l-1.267 1.267c-.686-.657-1.619-1.168-3.07-1.168-2.494 0-4.543 2.074-4.543 4.848s2.049 4.848 4.543 4.848c2.903 0 4.005-2.074 4.164-3.143h-4.164v-.99l-.712-.849z" fill="white"/>

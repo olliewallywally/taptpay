@@ -91,7 +91,7 @@ export function BillSplit({ transactionId, totalAmount, onSplitCreated }: BillSp
       <Button
         onClick={() => setIsExpanded(!isExpanded)}
         disabled={createSplitMutation.isPending || isCreatingSplit}
-        className="w-full h-14 bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 text-white font-semibold rounded-2xl shadow-lg transition-all duration-300 transform hover:scale-105"
+        className="w-full h-14 bg-gradient-to-r from-blue-600/80 to-purple-600/80 border border-blue-400/30 hover:from-blue-500/90 hover:to-purple-500/90 text-white font-semibold rounded-2xl shadow-xl transition-all duration-300 transform hover:scale-105"
       >
         <div className="flex items-center justify-center space-x-3">
           <Users className="w-5 h-5" />
@@ -106,7 +106,7 @@ export function BillSplit({ transactionId, totalAmount, onSplitCreated }: BillSp
 
       {/* Expanded Content */}
       {isExpanded && (
-        <div className="mt-4 p-6 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 shadow-xl animate-in slide-in-from-top-5 duration-300">
+        <div className="mt-4 p-6 bg-gradient-to-br from-blue-900/60 to-purple-900/60 rounded-2xl border border-blue-400/30 shadow-xl animate-in slide-in-from-top-5 duration-300">
           <div className="space-y-6">
             {/* Split Counter */}
             <div className="flex items-center justify-center space-x-4">
@@ -115,7 +115,7 @@ export function BillSplit({ transactionId, totalAmount, onSplitCreated }: BillSp
                 size="icon"
                 onClick={() => adjustSplitCount(-1)}
                 disabled={splitCount <= 2 || createSplitMutation.isPending || isCreatingSplit}
-                className="h-12 w-12 rounded-full bg-white/10 border-white/30 hover:bg-white/20 text-white"
+                className="h-12 w-12 rounded-full bg-blue-600/70 border-blue-400/50 hover:bg-blue-500/80 text-white"
               >
                 <Minus className="w-5 h-5" />
               </Button>
@@ -130,7 +130,7 @@ export function BillSplit({ transactionId, totalAmount, onSplitCreated }: BillSp
                 size="icon"
                 onClick={() => adjustSplitCount(1)}
                 disabled={splitCount >= 10 || createSplitMutation.isPending || isCreatingSplit}
-                className="h-12 w-12 rounded-full bg-white/10 border-white/30 hover:bg-white/20 text-white"
+                className="h-12 w-12 rounded-full bg-blue-600/70 border-blue-400/50 hover:bg-blue-500/80 text-white"
               >
                 <Plus className="w-5 h-5" />
               </Button>
@@ -153,7 +153,7 @@ export function BillSplit({ transactionId, totalAmount, onSplitCreated }: BillSp
                 onClick={() => setIsExpanded(false)}
                 disabled={createSplitMutation.isPending || isCreatingSplit}
                 variant="outline"
-                className="flex-1 h-12 bg-white/5 border-white/30 hover:bg-white/10 text-white rounded-xl"
+                className="flex-1 h-12 bg-gray-700/80 border-gray-500/50 hover:bg-gray-600/80 text-white rounded-xl"
               >
                 Cancel
               </Button>
