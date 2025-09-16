@@ -4,8 +4,7 @@ import { getCurrentMerchantId } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { 
-  Menu, 
-  X, 
+ 
   Download, 
   CreditCard, 
   CheckCircle, 
@@ -24,12 +23,11 @@ import {
   QrCode,
   CreditCard as Card
 } from "lucide-react";
-import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { format } from "date-fns";
 
 export default function Transactions() {
-  const [isMobile, setIsMobile] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const isMobile = useIsMobile();
   const [searchTerm, setSearchTerm] = useState("");
   const [refundModal, setRefundModal] = useState<any>(null);
   const [refundAmount, setRefundAmount] = useState("");
@@ -52,16 +50,6 @@ export default function Transactions() {
     });
   };
   
-  useEffect(() => {
-    const checkScreenSize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    checkScreenSize();
-    window.addEventListener('resize', checkScreenSize);
-    
-    return () => window.removeEventListener('resize', checkScreenSize);
-  }, []);
 
   const merchantId = getCurrentMerchantId();
   
@@ -88,13 +76,10 @@ export default function Transactions() {
   // Refund mutation
   const refundMutation = useMutation({
     mutationFn: async ({ transactionId, amount, reason }: { transactionId: number, amount: number, reason: string }) => {
-      return apiRequest(`/api/transactions/${transactionId}/refunds`, {
-        method: "POST",
-        body: { 
-          refundAmount: amount.toString(), 
-          refundReason: reason,
-          refundMethod: "original_payment_method"
-        }
+      return apiRequest("POST", `/api/transactions/${transactionId}/refunds`, { 
+        refundAmount: amount.toString(), 
+        refundReason: reason,
+        refundMethod: "original_payment_method"
       });
     },
     onSuccess: () => {
@@ -215,84 +200,8 @@ export default function Transactions() {
   };
 
   return (
-    <>
-      {/* Menu Backdrop */}
-      <div 
-        className={`fixed inset-0 bg-black/60 z-40 transition-opacity duration-300 ${
-          menuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
-        onClick={() => setMenuOpen(false)}
-      />
-
-      {/* Sliding Menu */}
-      <div 
-        className={`fixed right-0 top-0 h-full ${isMobile ? 'w-[70%]' : 'w-80'} bg-gray-800 ${isMobile ? '' : 'border-l border-gray-700'} z-50 transform transition-transform duration-300 ease-in-out ${
-          menuOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
-      >
-        <div className="p-6">
-          <div className="flex justify-between items-center mb-8">
-            <h2 className="text-xl font-bold text-white">Menu</h2>
-            <button onClick={() => setMenuOpen(false)} className="text-white/70 hover:text-white">
-              <X className="h-6 w-6" />
-            </button>
-          </div>
-          <nav className="space-y-4">
-            <a href="/dashboard" className="block py-3 px-4 text-white rounded-xl transition-colors font-medium">
-              Dashboard
-            </a>
-            <a href="/merchant" className="block py-3 px-4 text-white rounded-xl transition-colors font-medium">
-              Terminal
-            </a>
-            <a href="/transactions" className="block py-3 px-4 text-[#00CC52] rounded-xl font-medium">
-              Transactions
-            </a>
-            <a href="/settings" className="block py-3 px-4 text-white rounded-xl transition-colors font-medium">
-              Settings
-            </a>
-            <div className="pt-4 mt-4 border-t border-gray-600">
-              <button 
-                onClick={() => {
-                  localStorage.removeItem('auth-token');
-                  window.location.href = '/login';
-                }}
-                className="block w-full text-left py-3 px-4 text-red-400 hover:text-red-300 rounded-xl transition-colors font-medium"
-              >
-                Logout
-              </button>
-            </div>
-          </nav>
-        </div>
-      </div>
-
-      {/* Main Content with Slide Animation */}
-      <div 
-        className={`min-h-screen bg-gradient-to-br from-gray-950 via-black to-gray-900 transform transition-transform duration-300 ease-in-out ${
-          menuOpen ? (isMobile ? '-translate-x-[70%]' : '-translate-x-80') : 'translate-x-0'
-        }`}
-      >
-        {/* Menu Icon */}
-        <div className={`fixed ${isMobile ? 'top-3 right-3' : 'top-4 right-4'} z-30`}>
-          <button
-            onClick={() => setMenuOpen(true)}
-            className={`${isMobile ? 'p-4' : 'p-3'} backdrop-blur-xl bg-black/40 border border-white/20 ${isMobile ? 'rounded-2xl' : 'rounded-xl'} text-white hover:bg-black/60 transition-colors`}
-          >
-            <Menu className={`${isMobile ? 'h-7 w-7' : 'h-6 w-6'}`} />
-          </button>
-        </div>
-
-        {/* Tapt Pay Branding - Mobile */}
-        {isMobile && (
-          <div className="fixed top-3 left-3 z-30">
-            <img 
-              src={taptLogoPath} 
-              alt="TaptPay" 
-              className="h-8 w-auto object-contain"
-            />
-          </div>
-        )}
-
-        <div className={`container mx-auto ${isMobile ? 'px-3' : 'px-4'} ${isMobile ? 'pt-16' : 'pt-28'} ${isMobile ? 'pb-4' : 'pb-8'}`}>
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-black to-gray-900">
+      <div className={`container mx-auto ${isMobile ? 'px-3' : 'px-4'} ${isMobile ? 'pt-6' : 'pt-8'} ${isMobile ? 'pb-4' : 'pb-8'}`}>
           {/* Header */}
           <div className={`flex ${isMobile ? 'flex-col' : 'flex-row'} justify-between items-start ${isMobile ? '' : 'sm:items-center'} ${isMobile ? 'mb-4' : 'mb-6'} ${isMobile ? 'gap-3' : 'gap-4'}`}>
             <h1 className={`${isMobile ? 'text-xl' : 'text-3xl'} font-bold text-white`}>Transactions</h1>
@@ -726,7 +635,7 @@ export default function Transactions() {
                   onClick={() => setRefundModal(null)}
                   className="text-white/70 hover:text-white"
                 >
-                  <X className="h-6 w-6" />
+                  ✕
                 </button>
               </div>
 
@@ -814,6 +723,6 @@ export default function Transactions() {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }
