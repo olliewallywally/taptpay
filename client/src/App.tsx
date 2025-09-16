@@ -165,22 +165,30 @@ function Router() {
         </Route>
         <Route path="/dashboard">
           <ProtectedRoute>
-            <Dashboard />
+            <Layout>
+              <Dashboard />
+            </Layout>
           </ProtectedRoute>
         </Route>
         <Route path="/settings">
           <ProtectedRoute>
-            <Settings />
+            <Layout>
+              <Settings />
+            </Layout>
           </ProtectedRoute>
         </Route>
         <Route path="/transactions">
           <ProtectedRoute>
-            <Transactions />
+            <Layout>
+              <Transactions />
+            </Layout>
           </ProtectedRoute>
         </Route>
         <Route path="/stock">
           <ProtectedRoute>
-            <StockManagement />
+            <Layout>
+              <StockManagement />
+            </Layout>
           </ProtectedRoute>
         </Route>
         <Route path="/nfc">
