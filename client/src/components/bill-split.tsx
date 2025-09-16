@@ -91,7 +91,7 @@ export function BillSplit({ transactionId, totalAmount, onSplitCreated }: BillSp
       <Button
         onClick={() => setIsExpanded(!isExpanded)}
         disabled={createSplitMutation.isPending || isCreatingSplit}
-        className="w-full h-14 bg-gradient-to-r from-blue-600/80 to-purple-600/80 border border-blue-400/30 hover:from-blue-500/90 hover:to-purple-500/90 text-white font-semibold rounded-2xl shadow-xl transition-all duration-300 transform hover:scale-105"
+        className="w-full h-14 bg-gradient-to-r from-green-600/80 to-emerald-600/80 border border-green-400/30 hover:from-green-500/90 hover:to-emerald-500/90 text-white font-semibold rounded-2xl shadow-xl transition-all duration-300 transform hover:scale-105"
       >
         <div className="flex items-center justify-center space-x-3">
           <Users className="w-5 h-5" />
