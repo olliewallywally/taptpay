@@ -30,7 +30,7 @@ type TransactionFormData = z.infer<typeof transactionFormSchema>;
 export default function MerchantTerminal() {
   const [currentTransaction, setCurrentTransaction] = useState<any>(null);
   const [copiedLink, setCopiedLink] = useState(false);
-  const [activeTab, setActiveTab] = useState("qr");
+  const [stonesCollapsed, setStonesCollapsed] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const [selectedStoneId, setSelectedStoneId] = useState<number | null>(null);
@@ -768,123 +768,110 @@ export default function MerchantTerminal() {
                 </div>
               )}
 
-              {/* QR Code Display */}
-              <div className="bg-white rounded-2xl p-6">
-                <div className="text-center">
-                  <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                    <TabsList className="grid w-full grid-cols-3 mb-4">
-                      <TabsTrigger value="qr" className="text-xs">QR Code</TabsTrigger>
-                      <TabsTrigger value="stones" className="text-xs">Stones</TabsTrigger>
-                      <TabsTrigger value="nfc" className="text-xs">NFC</TabsTrigger>
-                    </TabsList>
-                    
-                    <TabsContent value="qr" className="space-y-4">
-                      <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4 mx-auto">
-                        {currentTransaction || activeTransaction ? (
-                          <QRCodeDisplay 
-                            transaction={currentTransaction || activeTransaction}
-                            merchantId={merchantId}
-                          />
-                        ) : (
-                          <QrCode size={64} className="text-gray-400" />
-                        )}
-                      </div>
-                      <p className="text-gray-600 text-sm">
-                        {currentTransaction || activeTransaction 
-                          ? "Customer can scan this QR code to pay" 
-                          : "Create a transaction to generate QR code"
-                        }
-                      </p>
-                    </TabsContent>
-                    
-                    <TabsContent value="stones" className="space-y-4">
-                      <div className="text-center">
-                        {taptStones && Array.isArray(taptStones) && taptStones.length > 0 ? (
-                          taptStones.map((stone: any) => (
-                            <div key={stone.id} className="mb-6 last:mb-0">
-                              <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4 mx-auto">
-                                <QRCodeDisplay 
-                                  transaction={currentTransaction || activeTransaction}
-                                  merchantId={merchantId}
-                                  stoneId={stone.id}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <p className="text-black text-sm font-medium">
-                                  Stone {stone.stoneNumber} - {stone.name}
-                                </p>
-                                <button
-                                  onClick={async () => {
-                                    try {
-                                      const canvas = document.querySelector(`canvas[data-stone-id="${stone.id}"]`) as HTMLCanvasElement;
-                                      if (canvas) {
-                                        const link = document.createElement('a');
-                                        link.download = `stone-${stone.stoneNumber}-qr.png`;
-                                        link.href = canvas.toDataURL();
-                                        link.click();
-                                      }
-                                    } catch (error) {
-                                      console.error('Download failed:', error);
-                                    }
-                                  }}
-                                  className="px-4 py-2 bg-gray-800 text-white text-xs rounded-lg transition-colors font-medium"
-                                >
-                                  Download QR Code
-                                </button>
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="text-center">
+              {/* Stones Section - Collapsible Green Box */}
+              <div 
+                className="rounded-2xl p-4 transition-all duration-300"
+                style={{ backgroundColor: '#00FF66' }}
+              >
+                {/* Header */}
+                <div
+                  className="flex items-center justify-center text-black cursor-pointer relative"
+                  onClick={() => setStonesCollapsed(prev => !prev)}
+                >
+                  <h3 className="text-lg font-semibold">Stones</h3>
+                  <ChevronDown
+                    className={`absolute right-0 transition-transform duration-300 ${
+                      stonesCollapsed ? '' : 'rotate-180'
+                    }`}
+                    size={20}
+                  />
+                </div>
+
+                {/* Collapsible Content */}
+                <div
+                  className={`transition-all duration-300 overflow-hidden ${
+                    stonesCollapsed ? 'max-h-0 opacity-0' : 'max-h-[1000px] opacity-100 mt-4'
+                  }`}
+                >
+                  <div className="bg-gray-800 rounded-xl p-6">
+                    <div className="text-center">
+                      {taptStones && Array.isArray(taptStones) && taptStones.length > 0 ? (
+                        taptStones.map((stone: any) => (
+                          <div key={stone.id} className="mb-6 last:mb-0">
                             <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4 mx-auto">
-                              <QrCode size={64} className="text-gray-400" />
+                              <QRCodeDisplay 
+                                merchantId={merchantId}
+                                stoneId={stone.id}
+                              />
                             </div>
-                            <p className="text-gray-600 text-sm">No tapt stones available</p>
+                            <div className="space-y-2">
+                              <p className="text-white text-sm font-medium">
+                                Stone {stone.stoneNumber} - {stone.name}
+                              </p>
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    const canvas = document.querySelector(`canvas[data-stone-id="${stone.id}"]`) as HTMLCanvasElement;
+                                    if (canvas) {
+                                      const link = document.createElement('a');
+                                      link.download = `stone-${stone.stoneNumber}-qr.png`;
+                                      link.href = canvas.toDataURL();
+                                      link.click();
+                                    }
+                                  } catch (error) {
+                                    console.error('Download failed:', error);
+                                  }
+                                }}
+                                className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white text-xs rounded-lg transition-colors font-medium"
+                              >
+                                Download QR Code
+                              </button>
+                            </div>
                           </div>
-                        )}
-                        
-                        {/* Create Stone Button */}
-                        <div className="text-center mt-6 pt-4 border-t border-gray-200">
-                          <button
-                            onClick={async () => {
-                              try {
-                                const stoneNumber = (taptStones?.length || 0) + 1;
-                                const response = await apiRequest('POST', `/api/merchants/${merchantId}/tapt-stones`, {
-                                  name: `Stone ${stoneNumber}`,
-                                  stoneNumber: stoneNumber
-                                });
-                                
-                                // Refresh the stones data
-                                queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "tapt-stones"] });
-                                
-                                toast({
-                                  title: "Stone Created",
-                                  description: `Stone ${stoneNumber} has been created successfully`,
-                                });
-                              } catch (error) {
-                                console.error("Failed to create stone:", error);
-                                toast({
-                                  title: "Creation Failed",
-                                  description: "Could not create new stone",
-                                  variant: "destructive",
-                                });
-                              }
-                            }}
-                            className="px-6 py-3 bg-gray-800 text-white rounded-lg transition-colors font-medium"
-                          >
-                            + Create New Stone
-                          </button>
+                        ))
+                      ) : (
+                        <div className="text-center">
+                          <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4 mx-auto">
+                            <QrCode size={64} className="text-gray-400" />
+                          </div>
+                          <p className="text-gray-300 text-sm">No tapt stones available</p>
                         </div>
+                      )}
+                      
+                      {/* Create Stone Button */}
+                      <div className="text-center mt-6 pt-4 border-t border-gray-600">
+                        <button
+                          onClick={async () => {
+                            try {
+                              const stoneNumber = (taptStones?.length || 0) + 1;
+                              const response = await apiRequest('POST', `/api/merchants/${merchantId}/tapt-stones`, {
+                                name: `Stone ${stoneNumber}`,
+                                stoneNumber: stoneNumber
+                              });
+                              
+                              // Refresh the stones data
+                              queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "tapt-stones"] });
+                              
+                              toast({
+                                title: "Stone Created",
+                                description: `Stone ${stoneNumber} has been created successfully`,
+                              });
+                            } catch (error) {
+                              console.error("Failed to create stone:", error);
+                              toast({
+                                title: "Creation Failed",
+                                description: "Could not create new stone",
+                                variant: "destructive",
+                              });
+                            }
+                          }}
+                          className="px-6 py-3 bg-gray-600 hover:bg-gray-500 text-white rounded-lg transition-colors font-medium"
+                        >
+                          + Create New Stone
+                        </button>
                       </div>
-                    </TabsContent>
-                    
-                    <TabsContent value="nfc" className="space-y-4">
-                      <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4 mx-auto">
-                        <Smartphone size={64} className="text-gray-400" />
-                      </div>
-                      <p className="text-gray-600 text-sm">Create a transaction for NFC payment</p>
-                    </TabsContent>
-                  </Tabs>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
