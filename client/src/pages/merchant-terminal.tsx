@@ -14,6 +14,7 @@ import { EnhancedPaymentStatus } from "@/components/enhanced-payment-status";
 import { apiRequest } from "@/lib/queryClient";
 import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
+import { useDeviceStatusMonitoring, useSSEConnectionMonitoring } from "@/components/notification-system";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { Send, Loader2, CheckCircle, Clock, XCircle, Eye, Copy, Check, QrCode, Smartphone, Waves, CreditCard, X, Menu, Edit, Split, MoreHorizontal, ChevronDown, Tag } from "lucide-react";
 import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
@@ -203,6 +204,10 @@ export default function MerchantTerminal() {
       sseClient.disconnect();
     };
   }, [merchantId, queryClient]);
+
+  // Device status monitoring
+  useDeviceStatusMonitoring();
+  useSSEConnectionMonitoring(merchantId);
 
   // Check NFC capabilities on load
   useEffect(() => {
