@@ -386,7 +386,6 @@ export default function MerchantTerminal() {
     }
   };
 
-
   return (
     <div 
       className="min-h-screen text-white relative overflow-hidden"
@@ -430,531 +429,402 @@ export default function MerchantTerminal() {
           </div>
         </div>
 
-        {/* Content Wrapper - Reduce width by 35% */}
-        <div className="w-full max-w-lg mx-auto px-4">
-          {/* Mode Switcher */}
-          <div className="flex justify-center mb-8">
-            <div className="flex bg-gray-900 rounded-lg p-1">
-              <button
-                onClick={() => setActiveTab("qr")}
-                className={`px-6 py-2 rounded-md font-medium transition-all duration-200 ${
-                  activeTab === "qr"
-                    ? "bg-black text-white"
-                    : "text-gray-400"
-                }`}
-              >
-                QR
-              </button>
-              <button
-                onClick={() => setActiveTab("nfc")}
-                className={`px-6 py-2 rounded-md font-medium transition-all duration-200 ${
-                  activeTab === "nfc"
-                    ? "bg-black text-white"
-                    : "text-gray-400"
-                }`}
-              >
-                NFC
-              </button>
-            </div>
-          </div>
-
-          {/* Amount Box */}
-          <div className="mb-6">
-          {currentTransaction || activeTransaction ? (
-            <div 
-              className="rounded-2xl p-6 text-center"
-              style={{ backgroundColor: '#00FF66' }}
-            >
-              <div className="text-black text-lg font-medium mb-2">Total</div>
-              <div className="text-black text-4xl font-bold">
-                ${parseFloat((currentTransaction || activeTransaction).price).toFixed(2)}
-              </div>
-              <div className="text-black text-sm mt-2">
-                {(currentTransaction || activeTransaction).itemName}
-              </div>
-            </div>
-          ) : (
-            <div 
-              className="rounded-2xl p-6 text-center border-2 border-dashed cursor-pointer"
-              style={{ borderColor: '#00FF66' }}
-            >
-              <div className="text-gray-400 text-lg font-medium mb-2">Total</div>
-              <div className="text-gray-400 text-4xl font-bold">$0.00</div>
-              <div className="text-gray-400 text-sm mt-2">No active transaction</div>
-            </div>
-          )}
-        </div>
-
-        {/* Enhanced Payment Status Box */}
-        {(currentTransaction || activeTransaction) && (
-          <div className="mb-6">
-            <EnhancedPaymentStatus 
-              transaction={currentTransaction || activeTransaction}
-              className="mx-auto max-w-md"
-            />
-          </div>
-        )}
-
-        {/* Action Buttons */}
-        <div className="flex justify-center gap-4 mb-6">
-          <button
-            onClick={() => handleActionClick("send")}
-            className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
-              activeAction === "send"
-                ? 'text-black'
-                : 'bg-gray-800 text-gray-300'
-            }`}
-            style={{
-              backgroundColor: activeAction === "send" ? '#00FF66' : undefined
-            }}
-          >
-            <Send size={24} />
-            <span className="text-xs mt-1 font-medium">Send</span>
-          </button>
-          
-          <button
-            onClick={() => handleActionClick("edit")}
-            className="flex flex-col items-center p-4 rounded-full transition-all duration-200 bg-gray-800 text-gray-300"
-            style={{
-              backgroundColor: activeAction === "edit" ? '#00FF66' : '#374151'
-            }}
-          >
-            <Edit size={24} />
-            <span className="text-xs mt-1 font-medium">Edit</span>
-          </button>
-          
-          <button
-            onClick={() => handleActionClick("split")}
-            className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
-              activeAction === "split"
-                ? 'text-black'
-                : 'bg-gray-800 text-gray-300'
-            }`}
-            style={{
-              backgroundColor: activeAction === "split" ? '#00FF66' : undefined
-            }}
-          >
-            <Split size={24} />
-            <span className="text-xs mt-1 font-medium">Split</span>
-          </button>
-          
-          <button
-            onClick={() => handleActionClick("more")}
-            className={`flex flex-col items-center p-4 rounded-full transition-all duration-200 ${
-              activeAction === "more"
-                ? 'text-black'
-                : 'bg-gray-800 text-gray-300'
-            }`}
-            style={{
-              backgroundColor: activeAction === "more" ? '#00FF66' : undefined
-            }}
-          >
-            <MoreHorizontal size={24} />
-            <span className="text-xs mt-1 font-medium">More</span>
-          </button>
-        </div>
-
-        {/* Action Panel */}
-        <div>
-          <div 
-            className="overflow-hidden transition-all duration-250 ease-in-out"
-            style={{
-              maxHeight: activeAction ? '600px' : '0px',
-              opacity: activeAction ? 1 : 0
-            }}
-          >
-            <div className="bg-gray-800 rounded-2xl p-3 mb-2">
-              {activeAction === "edit" && (
-                <div className="space-y-2">
-                  <h3 className="text-sm font-semibold text-white">Edit Transaction</h3>
-                  
-                  {/* Stock Item Search */}
-                  <div className="relative">
-                    <label className="text-xs text-gray-300">Search Stock Items</label>
-                    <Input
-                      placeholder="Type to search stock items..."
-                      value={stockSearchInput}
-                      onChange={(e) => setStockSearchInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && filteredStockItems.length > 0) {
-                          e.preventDefault();
-                          addStockItem(filteredStockItems[0]);
-                        }
-                      }}
-                      className="bg-gray-700 border-gray-600 text-white rounded-lg h-8 mb-2"
-                    />
-                    
-                    {/* Stock item suggestions dropdown */}
-                    {filteredStockItems.length > 0 && (
-                      <div className="absolute z-10 w-full bg-gray-700 border border-gray-600 rounded-lg mt-1 max-h-32 overflow-y-auto">
-                        {filteredStockItems.map((item: any) => (
-                          <div
-                            key={item.id}
-                            onClick={() => addStockItem(item)}
-                            className="p-2 cursor-pointer text-white text-xs border-b border-gray-600 last:border-b-0"
-                          >
-                            <div className="font-medium">{item.name}</div>
-                            <div className="text-gray-400">${parseFloat(item.cost).toFixed(2)}</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Selected Stock Items Tags */}
-                  {selectedStockItems.length > 0 && (
-                    <div className="space-y-1">
-                      <label className="text-xs text-gray-300">Selected Items</label>
-                      <div className="flex flex-wrap gap-1">
-                        {selectedStockItems.map((item) => (
-                          <div
-                            key={item.id}
-                            className="flex items-center gap-1 bg-gray-600 rounded-full px-2 py-1 text-xs text-white"
-                          >
-                            <Tag size={12} />
-                            <span>{item.name}</span>
-                            <span className="text-gray-300">${parseFloat(item.cost).toFixed(2)}</span>
-                            <button
-                              onClick={() => removeStockItem(item.id)}
-                              className="ml-1 text-gray-400"
-                            >
-                              <X size={10} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
+        {/* Two-Pane Layout Container */}
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+            {/* Left Pane: Amount & Actions */}
+            <div className="space-y-6">
+              {/* Amount Box */}
+              <div>
+                {currentTransaction || activeTransaction ? (
+                  <div 
+                    className="rounded-2xl p-6 text-center"
+                    style={{ backgroundColor: '#00FF66' }}
+                    data-testid="active-transaction-display"
+                  >
+                    <div className="text-black text-lg font-medium mb-2">Total</div>
+                    <div className="text-black text-4xl font-bold">
+                      ${parseFloat((currentTransaction || activeTransaction).price).toFixed(2)}
                     </div>
-                  )}
-
-                  {/* Stone Selection */}
-                  <div className="space-y-1">
-                    <label className="block text-xs font-medium text-gray-300">
-                      Select Tapt Stone:
-                    </label>
-                    {taptStones && Array.isArray(taptStones) && taptStones.length > 0 ? (
-                      <select 
-                        value={selectedStoneId || ""} 
-                        onChange={(e) => {
-                          console.log("Stone selected:", e.target.value);
-                          try {
-                            const value = e.target.value;
-                            setSelectedStoneId(value ? parseInt(value, 10) : null);
-                          } catch (error) {
-                            console.error("Error setting stone ID:", error);
-                          }
-                        }}
-                        className="w-full bg-gray-700 border-gray-600 text-white rounded-md px-3 py-2 border focus:outline-none focus:ring-2 focus:ring-green-500"
-                      >
-                        <option value="">Choose a stone</option>
-                        {taptStones.map((stone: any) => (
-                          <option key={`stone-${stone.id}`} value={stone.id}>
-                            Stone {stone.stoneNumber} - {stone.name}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <div className="text-center py-2">
-                        <p className="text-gray-400 text-xs">No Tapt Stones available</p>
-                      </div>
-                    )}
-                  </div>
-
-                  <Form {...form}>
-                    <div className="space-y-2">
-                      <FormField
-                        control={form.control}
-                        name="itemName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-xs text-gray-300">Item Name</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="Enter item name or use stock items above"
-                                {...field}
-                                className="bg-gray-700 border-gray-600 text-white rounded-lg h-8"
-                                readOnly={selectedStockItems.length > 0}
-                              />
-                            </FormControl>
-                            <FormMessage className="text-red-300 text-xs" />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="price"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-xs text-gray-300">
-                              Price ($) {selectedStockItems.length > 0 && "(Auto-calculated)"}
-                            </FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="Enter price"
-                                {...field}
-                                className="bg-gray-700 border-gray-600 text-white rounded-lg h-8"
-                                readOnly={selectedStockItems.length > 0}
-                              />
-                            </FormControl>
-                            <FormMessage className="text-red-300 text-xs" />
-                          </FormItem>
-                        )}
-                      />
-                      <Button
-                        onClick={form.handleSubmit(onSubmit)}
-                        className="w-full text-black font-semibold rounded-lg h-8 text-sm"
-                        style={{ backgroundColor: '#00FF66' }}
-                      >
-                        Create Transaction
-                      </Button>
+                    <div className="text-black text-sm mt-2">
+                      {(currentTransaction || activeTransaction).itemName}
                     </div>
-                  </Form>
-                </div>
-              )}
+                  </div>
+                ) : (
+                  <div 
+                    className="rounded-2xl p-6 text-center border-2 border-dashed cursor-pointer"
+                    style={{ borderColor: '#00FF66' }}
+                    data-testid="no-transaction-placeholder"
+                  >
+                    <div className="text-gray-400 text-lg font-medium mb-2">Total</div>
+                    <div className="text-gray-400 text-4xl font-bold">$0.00</div>
+                    <div className="text-gray-400 text-sm mt-2">
+                      No active transaction
+                    </div>
+                    <div className="text-gray-500 text-xs mt-3">
+                      Click "New Payment" below to get started
+                    </div>
+                  </div>
+                )}
+              </div>
 
-              {activeAction === "split" && (
-                <div className="text-center">
-                  <h3 className="text-sm font-semibold mb-1 text-white">Split the Bill</h3>
-                  <p className="text-gray-300 mb-4">How many ways would you like to split this payment?</p>
-                  <div className="flex justify-center gap-3 mb-4">
-                    {[2, 3, 4, 5].map((num) => (
+              {/* Quick Amount Presets */}
+              {!currentTransaction && !activeTransaction && (
+                <div className="bg-gray-800/50 rounded-2xl p-4">
+                  <h3 className="text-sm font-medium text-white mb-3">Quick Amounts</h3>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[5, 10, 20, 25, 50, 100].map((amount) => (
                       <button
-                        key={num}
+                        key={amount}
                         onClick={() => {
-                          // Handle split logic here
-                          toast({
-                            title: "Bill Split",
-                            description: `Transaction will be split ${num} ways`,
-                          });
-                          setActiveAction(null);
+                          form.setValue("price", amount.toString());
+                          form.setValue("itemName", `$${amount} Item`);
+                          setActiveAction("edit");
                         }}
-                        className="w-12 h-8 rounded-full font-semibold transition-colors text-black"
-                        style={{ backgroundColor: '#00FF66' }}
+                        className="p-3 bg-gray-700 hover:bg-gray-600 rounded-xl text-white font-medium transition-colors"
+                        data-testid={`quick-amount-${amount}`}
                       >
-                        {num}
+                        ${amount}
                       </button>
                     ))}
                   </div>
                 </div>
               )}
 
-              {activeAction === "send" && (
-                <div className="text-center space-y-1">
-                  <h3 className="text-lg font-semibold text-white">Share Payment Link</h3>
-                  <p className="text-gray-300 text-sm">Copy the payment link to share with customers</p>
+              {/* Primary Action Buttons */}
+              <div className="bg-gray-800/50 rounded-2xl p-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => handleActionClick("edit")}
+                    className={`flex flex-col items-center p-4 rounded-xl transition-all duration-200 ${
+                      activeAction === "edit" 
+                        ? 'text-black' 
+                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                    }`}
+                    style={{
+                      backgroundColor: activeAction === "edit" ? '#00FF66' : undefined
+                    }}
+                    data-testid="button-new-payment"
+                  >
+                    <Edit size={24} />
+                    <span className="text-xs mt-1 font-medium">New Payment</span>
+                  </button>
                   
-                  {/* Stone Selection */}
-                  <div className="space-y-1">
-                    <label className="block text-xs font-medium text-gray-300 text-center">
-                      Select Tapt Stone:
-                    </label>
-                    {taptStones && Array.isArray(taptStones) && taptStones.length > 0 ? (
-                      <select 
-                        value={selectedStoneId || ""} 
-                        onChange={(e) => {
-                          console.log("Stone selected:", e.target.value);
-                          try {
-                            const value = e.target.value;
-                            setSelectedStoneId(value ? parseInt(value, 10) : null);
-                          } catch (error) {
-                            console.error("Error setting stone ID:", error);
-                          }
-                        }}
-                        className="w-full bg-gray-700 border-gray-600 text-white rounded-md px-3 py-2 border focus:outline-none focus:ring-2 focus:ring-green-500"
-                      >
-                        <option value="">Choose a stone</option>
-                        {taptStones.map((stone: any) => (
-                          <option key={`stone-${stone.id}`} value={stone.id}>
-                            Stone {stone.stoneNumber} - {stone.name}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <div className="text-center py-4">
-                        <p className="text-gray-400 text-sm">No Tapt Stones available</p>
+                  <button
+                    onClick={() => handleActionClick("split")}
+                    className={`flex flex-col items-center p-4 rounded-xl transition-all duration-200 ${
+                      activeAction === "split"
+                        ? 'text-black'
+                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                    }`}
+                    style={{
+                      backgroundColor: activeAction === "split" ? '#00FF66' : undefined
+                    }}
+                    data-testid="button-split-bill"
+                  >
+                    <Split size={24} />
+                    <span className="text-xs mt-1 font-medium">Split Bill</span>
+                  </button>
+                  
+                  <button
+                    onClick={() => handleActionClick("send")}
+                    className={`flex flex-col items-center p-4 rounded-xl transition-all duration-200 ${
+                      activeAction === "send"
+                        ? 'text-black'
+                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                    }`}
+                    style={{
+                      backgroundColor: activeAction === "send" ? '#00FF66' : undefined
+                    }}
+                    data-testid="button-share-link"
+                  >
+                    <Send size={24} />
+                    <span className="text-xs mt-1 font-medium">Share Link</span>
+                  </button>
+                  
+                  <button
+                    onClick={() => handleActionClick("more")}
+                    className={`flex flex-col items-center p-4 rounded-xl transition-all duration-200 ${
+                      activeAction === "more"
+                        ? 'text-black'
+                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                    }`}
+                    style={{
+                      backgroundColor: activeAction === "more" ? '#00FF66' : undefined
+                    }}
+                    data-testid="button-more-options"
+                  >
+                    <MoreHorizontal size={24} />
+                    <span className="text-xs mt-1 font-medium">More</span>
+                  </button>
+                </div>
+                
+                {/* Action Panel */}
+                <div 
+                  className="overflow-hidden transition-all duration-250 ease-in-out"
+                  style={{
+                    maxHeight: activeAction ? '600px' : '0px',
+                    opacity: activeAction ? 1 : 0
+                  }}
+                >
+                  <div className="bg-gray-800 rounded-2xl p-4 mt-3">
+                    {activeAction === "edit" && (
+                      <div className="space-y-2">
+                        <h3 className="text-sm font-semibold text-white">Edit Transaction</h3>
+                        
+                        {/* Stock Item Search */}
+                        <div className="relative">
+                          <label className="text-xs text-gray-300">Search Stock Items</label>
+                          <Input
+                            placeholder="Type to search stock items..."
+                            value={stockSearchInput}
+                            onChange={(e) => setStockSearchInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && filteredStockItems.length > 0) {
+                                e.preventDefault();
+                                addStockItem(filteredStockItems[0]);
+                              }
+                            }}
+                            className="bg-gray-700 border-gray-600 text-white rounded-lg h-8 mb-2"
+                          />
+                          
+                          {/* Stock item suggestions dropdown */}
+                          {filteredStockItems.length > 0 && (
+                            <div className="absolute z-10 w-full bg-gray-700 border border-gray-600 rounded-lg mt-1 max-h-32 overflow-y-auto">
+                              {filteredStockItems.map((item: any) => (
+                                <div
+                                  key={item.id}
+                                  onClick={() => addStockItem(item)}
+                                  className="p-2 cursor-pointer text-white text-xs border-b border-gray-600 last:border-b-0"
+                                >
+                                  <div className="font-medium">{item.name}</div>
+                                  <div className="text-gray-400">${parseFloat(item.cost).toFixed(2)}</div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Selected Stock Items Tags */}
+                        {selectedStockItems.length > 0 && (
+                          <div className="space-y-1">
+                            <label className="text-xs text-gray-300">Selected Items</label>
+                            <div className="flex flex-wrap gap-1">
+                              {selectedStockItems.map((item) => (
+                                <div
+                                  key={item.id}
+                                  className="flex items-center gap-1 bg-gray-600 rounded-full px-2 py-1 text-xs text-white"
+                                >
+                                  <Tag size={12} />
+                                  <span>{item.name}</span>
+                                  <span className="text-gray-300">${parseFloat(item.cost).toFixed(2)}</span>
+                                  <button
+                                    onClick={() => removeStockItem(item.id)}
+                                    className="ml-1 text-gray-400"
+                                  >
+                                    <X size={10} />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Stone Selection */}
+                        <div className="space-y-1">
+                          <label className="block text-xs font-medium text-gray-300">
+                            Select Tapt Stone:
+                          </label>
+                          {taptStones && Array.isArray(taptStones) && taptStones.length > 0 ? (
+                            <select 
+                              value={selectedStoneId || ""} 
+                              onChange={(e) => {
+                                console.log("Stone selected:", e.target.value);
+                                try {
+                                  const value = e.target.value;
+                                  setSelectedStoneId(value ? parseInt(value, 10) : null);
+                                } catch (error) {
+                                  console.error("Error setting stone ID:", error);
+                                }
+                              }}
+                              className="w-full bg-gray-700 border-gray-600 text-white rounded-md px-3 py-2 border focus:outline-none focus:ring-2 focus:ring-green-500"
+                            >
+                              <option value="">Choose a stone</option>
+                              {taptStones.map((stone: any) => (
+                                <option key={`stone-${stone.id}`} value={stone.id}>
+                                  Stone {stone.stoneNumber} - {stone.name}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <div className="text-center py-2">
+                              <p className="text-gray-400 text-xs">No Tapt Stones available</p>
+                            </div>
+                          )}
+                        </div>
+
+                        <Form {...form}>
+                          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2">
+                            <FormField
+                              control={form.control}
+                              name="itemName"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs text-gray-300">Item Name</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      placeholder="Enter item name or use stock items above"
+                                      {...field}
+                                      className="bg-gray-700 border-gray-600 text-white rounded-lg h-8"
+                                      readOnly={selectedStockItems.length > 0}
+                                    />
+                                  </FormControl>
+                                  <FormMessage className="text-red-300 text-xs" />
+                                </FormItem>
+                              )}
+                            />
+                            
+                            <FormField
+                              control={form.control}
+                              name="price"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs text-gray-300">Price ($)</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      placeholder="0.00"
+                                      {...field}
+                                      className="bg-gray-700 border-gray-600 text-white rounded-lg h-8"
+                                    />
+                                  </FormControl>
+                                  <FormMessage className="text-red-300 text-xs" />
+                                </FormItem>
+                              )}
+                            />
+
+                            <Button
+                              type="submit"
+                              disabled={createTransactionMutation.isPending}
+                              className="w-full bg-green-600 hover:bg-green-700 text-white h-8 text-xs font-medium"
+                              data-testid="button-create-transaction"
+                            >
+                              {createTransactionMutation.isPending ? (
+                                <>
+                                  <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                                  Creating...
+                                </>
+                              ) : (
+                                "Create Transaction"
+                              )}
+                            </Button>
+                          </form>
+                        </Form>
+                      </div>
+                    )}
+
+                    {activeAction === "split" && (
+                      <div className="space-y-2">
+                        <h3 className="text-sm font-semibold text-white">Split Bill</h3>
+                        <p className="text-xs text-gray-400">Split a bill between multiple customers</p>
+                        <div className="text-center py-4">
+                          <p className="text-gray-500 text-xs">Split bill feature coming soon</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {activeAction === "send" && (
+                      <div className="space-y-2">
+                        <h3 className="text-sm font-semibold text-white">Share Payment Link</h3>
+                        <p className="text-xs text-gray-400">Send payment link to customer via email or SMS</p>
+                        <div className="text-center py-4">
+                          <p className="text-gray-500 text-xs">Share link feature coming soon</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {activeAction === "more" && (
+                      <div className="space-y-2">
+                        <h3 className="text-sm font-semibold text-white">More Options</h3>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button className="p-2 bg-gray-700 rounded text-xs">Recurring</button>
+                          <button className="p-2 bg-gray-700 rounded text-xs">Invoice</button>
+                          <button className="p-2 bg-gray-700 rounded text-xs">Receipt</button>
+                          <button className="p-2 bg-gray-700 rounded text-xs">History</button>
+                        </div>
                       </div>
                     )}
                   </div>
-
-                  <Button
-                    onClick={() => {
-                      try {
-                        console.log("Copy button clicked, selectedStoneId:", selectedStoneId);
-                        
-                        if (!selectedStoneId) {
-                          toast({
-                            title: "Select a Stone",
-                            description: "Please select a Tapt Stone to copy its payment link",
-                            variant: "destructive",
-                          });
-                          return;
-                        }
-                        
-                        const selectedStone = taptStones?.find((stone: any) => stone.id === selectedStoneId);
-                        console.log("Selected stone:", selectedStone);
-                        
-                        if (selectedStone && selectedStone.paymentUrl) {
-                          navigator.clipboard.writeText(selectedStone.paymentUrl).then(() => {
-                            setCopiedLink(true);
-                            setTimeout(() => setCopiedLink(false), 2000);
-                            toast({
-                              title: "Stone Link Copied",
-                              description: `${selectedStone.name} payment link copied to clipboard`,
-                            });
-                            setActiveAction(null);
-                          }).catch((error) => {
-                            console.error("Clipboard error:", error);
-                            toast({
-                              title: "Copy Failed", 
-                              description: "Could not copy to clipboard",
-                              variant: "destructive",
-                            });
-                          });
-                        } else {
-                          toast({
-                            title: "Error",
-                            description: "Could not find payment link for selected stone",
-                            variant: "destructive",
-                          });
-                        }
-                      } catch (error) {
-                        console.error("Error copying payment link:", error);
-                        toast({
-                          title: "Copy Failed",
-                          description: "Could not copy payment link to clipboard",
-                          variant: "destructive",
-                        });
-                      }
-                    }}
-                    className="w-full text-black font-semibold rounded-lg"
-                    style={{ backgroundColor: '#00FF66' }}
-                  >
-                    {copiedLink ? "✓ Copied!" : "Copy Payment Link"}
-                  </Button>
                 </div>
-              )}
-
-              {activeAction === "more" && (
-                <div className="text-center">
-                  <h3 className="text-sm font-semibold mb-1 text-white">More Options</h3>
-                  <div className="space-y-3">
-                    <Link href="/dashboard">
-                      <Button
-                        variant="outline"
-                        className="w-full border-gray-600 text-gray-300"
-                      >
-                        View Dashboard
-                      </Button>
-                    </Link>
-                    <Link href="/transactions">
-                      <Button
-                        variant="outline"
-                        className="w-full border-gray-600 text-gray-300"
-                      >
-                        Transaction History
-                      </Button>
-                    </Link>
-                    <Link href="/stock">
-                      <Button
-                        variant="outline"
-                        className="w-full border-gray-600 text-gray-300"
-                      >
-                        Stock Management
-                      </Button>
-                    </Link>
-                    <Link href="/settings">
-                      <Button
-                        variant="outline"
-                        className="w-full border-gray-600 text-gray-300"
-                      >
-                        Settings
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* QR Code Section - Always visible */}
-        <div>
-          <div
-            className="rounded-2xl p-4"
-            style={{ backgroundColor: '#00FF66' }}
-          >
-              {/* Header */}
-              <div
-                className="flex items-center justify-center text-black cursor-pointer relative"
-                onClick={() => setQrCollapsed(prev => !prev)}
-              >
-                <h3 className="text-lg font-semibold">QR Codes</h3>
-                <ChevronDown
-                  className={`absolute right-0 transition-transform duration-300 ${qrCollapsed ? '' : 'rotate-180'}`}
-                  size={20}
-                />
               </div>
+            </div>
 
-              {/* Collapsible Content */}
-              <div
-                className={`grid transition-all duration-300 overflow-hidden ${
-                  qrCollapsed ? 'max-h-0 opacity-0' : 'max-h-[1000px] opacity-100 mt-4'
-                }`}
-              >
-                <div className="bg-white rounded-xl p-6">
-                  <div className="text-center">
-                    {activeTab === "qr" && (
-                      <div className="space-y-1">
-                        {/* Individual Stone QR Code Boxes */}
-                        {taptStones && taptStones.length > 0 ? (
+            {/* Right Pane: QR Code & Payment Status */}
+            <div className="space-y-6">
+              {/* Payment Status */}
+              {(currentTransaction || activeTransaction) && (
+                <div>
+                  {getPaymentStatusIndicator((currentTransaction || activeTransaction)?.status)}
+                </div>
+              )}
+
+              {/* QR Code Display */}
+              <div className="bg-white rounded-2xl p-6">
+                <div className="text-center">
+                  <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                    <TabsList className="grid w-full grid-cols-3 mb-4">
+                      <TabsTrigger value="qr" className="text-xs">QR Code</TabsTrigger>
+                      <TabsTrigger value="stones" className="text-xs">Stones</TabsTrigger>
+                      <TabsTrigger value="nfc" className="text-xs">NFC</TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="qr" className="space-y-4">
+                      <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4 mx-auto">
+                        {currentTransaction || activeTransaction ? (
+                          <QRCodeDisplay 
+                            transaction={currentTransaction || activeTransaction}
+                            merchantId={merchantId}
+                          />
+                        ) : (
+                          <QrCode size={64} className="text-gray-400" />
+                        )}
+                      </div>
+                      <p className="text-gray-600 text-sm">
+                        {currentTransaction || activeTransaction 
+                          ? "Customer can scan this QR code to pay" 
+                          : "Create a transaction to generate QR code"
+                        }
+                      </p>
+                    </TabsContent>
+                    
+                    <TabsContent value="stones" className="space-y-4">
+                      <div className="text-center">
+                        {taptStones && Array.isArray(taptStones) && taptStones.length > 0 ? (
                           taptStones.map((stone: any) => (
-                            <div 
-                              key={stone.id}
-                              className="bg-gray-50 border border-gray-200 rounded-2xl p-6 shadow-lg mb-6"
-                            >
-                              {/* Stone Header */}
-                              <div className="w-full flex items-center justify-center mb-4">
-                                <h3 className="text-lg font-semibold text-gray-800">Stone #{stone.stoneNumber}</h3>
+                            <div key={stone.id} className="mb-6 last:mb-0">
+                              <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4 mx-auto">
+                                <QRCodeDisplay 
+                                  transaction={currentTransaction || activeTransaction}
+                                  merchantId={merchantId}
+                                  stoneId={stone.id}
+                                />
                               </div>
-
-                              {/* QR Code - Always visible */}
-                              <div className="text-center">
-                                <div className="w-48 h-48 mx-auto mb-4 bg-white border-2 border-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
-                                  <QRCodeDisplay 
-                                    merchantId={merchantId}
-                                    stoneId={stone.id}
-                                  />
-                                </div>
-                                <p className="text-gray-600 text-xs font-medium mb-3">
-                                  Stone #{stone.stoneNumber} QR Code
+                              <div className="space-y-2">
+                                <p className="text-black text-sm font-medium">
+                                  Stone {stone.stoneNumber} - {stone.name}
                                 </p>
-                                
-                                {/* Download Button */}
                                 <button
                                   onClick={async () => {
                                     try {
-                                      const qrUrl = `/api/merchants/${merchantId}/stone/${stone.id}/qr`;
-                                      const response = await fetch(qrUrl);
-                                      const blob = await response.blob();
-                                      const url = window.URL.createObjectURL(blob);
-                                      const link = document.createElement('a');
-                                      link.href = url;
-                                      link.download = `stone-${stone.stoneNumber}-qr-code.png`;
-                                      document.body.appendChild(link);
-                                      link.click();
-                                      document.body.removeChild(link);
-                                      window.URL.revokeObjectURL(url);
-                                      
-                                      toast({
-                                        title: "QR Code Downloaded",
-                                        description: `Stone ${stone.stoneNumber} QR code saved to downloads`,
-                                      });
+                                      const canvas = document.querySelector(`canvas[data-stone-id="${stone.id}"]`) as HTMLCanvasElement;
+                                      if (canvas) {
+                                        const link = document.createElement('a');
+                                        link.download = `stone-${stone.stoneNumber}-qr.png`;
+                                        link.href = canvas.toDataURL();
+                                        link.click();
+                                      }
                                     } catch (error) {
-                                      console.error("Download failed:", error);
-                                      toast({
-                                        title: "Download Failed",
-                                        description: "Could not download QR code",
-                                        variant: "destructive",
-                                      });
+                                      console.error('Download failed:', error);
                                     }
                                   }}
                                   className="px-4 py-2 bg-gray-800 text-white text-xs rounded-lg transition-colors font-medium"
@@ -1006,25 +876,20 @@ export default function MerchantTerminal() {
                           </button>
                         </div>
                       </div>
-                    )}
+                    </TabsContent>
                     
-                    {activeTab === "nfc" && (
-                      <>
-                        <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4 mx-auto">
-                          <Smartphone size={64} className="text-gray-400" />
-                        </div>
-                        <p className="text-gray-600 text-sm">Create a transaction for NFC payment</p>
-                      </>
-                    )}
-                  </div>
+                    <TabsContent value="nfc" className="space-y-4">
+                      <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4 mx-auto">
+                        <Smartphone size={64} className="text-gray-400" />
+                      </div>
+                      <p className="text-gray-600 text-sm">Create a transaction for NFC payment</p>
+                    </TabsContent>
+                  </Tabs>
                 </div>
               </div>
             </div>
+          </div>
         </div>
-
-
-
-        </div> {/* End Content Wrapper */}
       </div>
 
       {/* Slide-out Hamburger Menu */}
