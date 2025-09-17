@@ -320,71 +320,501 @@ export default function MerchantTerminal() {
   // Real NFC hardware would trigger payment completion through SSE events
   // No simulation function needed - payments process only through actual card taps
 
-  const getPaymentStatusIndicator = (status: string) => {
-    const transaction = currentTransaction || activeTransaction;
-    
-    switch (status) {
-      case "pending":
-        return (
-          <div className="flex flex-col items-center space-y-1 sm:space-y-3 p-4 sm:p-6 bg-blue-500/10 backdrop-blur-sm rounded-2xl border border-blue-400/30">
-            <div className="flex items-center space-x-2 sm:space-x-3">
-              <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-blue-300" />
-              <span className="text-base sm:text-lg font-medium text-blue-200">Awaiting Payment</span>
-            </div>
-            
-            {/* Show split information if transaction is split */}
-            {transaction?.isSplit ? (
-              <div className="text-center space-y-1">
-                <p className="text-xs sm:text-sm text-blue-300">Split Bill Payment</p>
-                <div className="flex items-center justify-center space-x-2">
-                  <span className="text-sm font-bold text-blue-200">
-                    {transaction.completedSplits + 1} of {transaction.totalSplits}
-                  </span>
-                  <span className="text-xs text-blue-300">payments</span>
+// StonesSection Component
+function StonesSection({ 
+  stonesCollapsed, 
+  setStonesCollapsed, 
+  taptStones, 
+  merchantId, 
+  queryClient, 
+  toast 
+}: {
+  stonesCollapsed: boolean;
+  setStonesCollapsed: (value: boolean | ((prev: boolean) => boolean)) => void;
+  taptStones: any[];
+  merchantId: string;
+  queryClient: any;
+  toast: any;
+}) {
+  return (
+    <div 
+      className="rounded-2xl p-4 transition-all duration-300"
+      style={{ backgroundColor: '#00FF66' }}
+      data-testid="stones-section"
+    >
+      <div
+        className="flex items-center justify-center text-black cursor-pointer relative"
+        onClick={() => setStonesCollapsed(prev => !prev)}
+        data-testid="stones-header"
+      >
+        <h3 className="text-lg font-semibold">Stones</h3>
+        <ChevronDown
+          className={`absolute right-0 transition-transform duration-300 ${
+            stonesCollapsed ? '' : 'rotate-180'
+          }`}
+          size={20}
+          data-testid="stones-chevron"
+        />
+      </div>
+
+      <div
+        className={`transition-all duration-300 overflow-hidden ${
+          stonesCollapsed ? 'max-h-0 opacity-0' : 'max-h-[1000px] opacity-100 mt-4'
+        }`}
+      >
+        <div className="bg-gray-800 rounded-xl p-6">
+          <div className="text-center">
+            {taptStones && Array.isArray(taptStones) && taptStones.length > 0 ? (
+              taptStones.map((stone: any) => (
+                <div key={stone.id} className="mb-6 last:mb-0" data-testid={`stone-item-${stone.id}`}>
+                  <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4 mx-auto">
+                    <QRCodeDisplay 
+                      merchantId={parseInt(merchantId)}
+                      stoneId={stone.id}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-white text-sm font-medium">
+                      Stone {stone.stoneNumber} - {stone.name}
+                    </p>
+                    <button
+                      onClick={async () => {
+                        try {
+                          const canvas = document.querySelector(`canvas[data-stone-id="${stone.id}"]`) as HTMLCanvasElement;
+                          if (canvas) {
+                            const link = document.createElement('a');
+                            link.download = `stone-${stone.stoneNumber}-qr.png`;
+                            link.href = canvas.toDataURL();
+                            link.click();
+                          }
+                        } catch (error) {
+                          console.error('Download failed:', error);
+                        }
+                      }}
+                      className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white text-xs rounded-lg transition-colors font-medium"
+                      data-testid={`download-qr-${stone.id}`}
+                    >
+                      Download QR Code
+                    </button>
+                  </div>
                 </div>
-                <p className="text-xs text-blue-300">
-                  ${parseFloat(transaction.splitAmount).toFixed(2)} per person
-                </p>
-              </div>
+              ))
             ) : (
-              <p className="text-xs sm:text-sm text-blue-300 text-center">Customer can now scan QR code to pay</p>
+              <div className="text-center">
+                <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4 mx-auto">
+                  <QrCode size={64} className="text-gray-400" />
+                </div>
+                <p className="text-gray-300 text-sm">No tapt stones available</p>
+              </div>
             )}
-          </div>
-        );
-      case "processing":
-        return (
-          <div className="flex flex-col items-center space-y-1 sm:space-y-3 p-4 sm:p-6 bg-orange-500/10 backdrop-blur-sm rounded-2xl border border-orange-400/30">
-            <div className="flex items-center space-x-2 sm:space-x-3">
-              <Loader2 className="w-5 h-5 sm:w-7 sm:h-7 text-orange-300 animate-spin" />
-              <span className="text-base sm:text-lg font-medium text-orange-200">Processing Payment</span>
+            
+            <div className="text-center mt-6 pt-4 border-t border-gray-600">
+              <button
+                onClick={async () => {
+                  try {
+                    const stoneNumber = (taptStones?.length || 0) + 1;
+                    const response = await apiRequest('POST', `/api/merchants/${merchantId}/tapt-stones`, {
+                      name: `Stone ${stoneNumber}`,
+                      stoneNumber: stoneNumber
+                    });
+                    
+                    queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "tapt-stones"] });
+                    
+                    toast({
+                      title: "Stone Created",
+                      description: `Stone ${stoneNumber} has been created successfully`,
+                    });
+                  } catch (error) {
+                    console.error("Failed to create stone:", error);
+                    toast({
+                      title: "Creation Failed",
+                      description: "Could not create new stone",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+                className="px-6 py-3 bg-gray-600 hover:bg-gray-500 text-white rounded-lg transition-colors font-medium"
+                data-testid="create-stone-button"
+              >
+                + Create New Stone
+              </button>
             </div>
-            <p className="text-xs sm:text-sm text-orange-300 text-center">Payment is being processed...</p>
           </div>
-        );
-      case "completed":
-        return (
-          <div className="flex flex-col items-center space-y-1 sm:space-y-3 p-4 sm:p-6 bg-green-500/10 backdrop-blur-sm rounded-2xl border border-green-400/30">
-            <div className="flex items-center space-x-2 sm:space-x-3">
-              <CheckCircle className="w-5 h-5 sm:w-7 sm:h-7 text-green-300" />
-              <span className="text-base sm:text-lg font-medium text-green-200">Payment Accepted</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ActionsToolbar Component
+function ActionsToolbar({ 
+  activeAction, 
+  handleActionClick, 
+  stockTaggingComponent, 
+  itemFormComponent 
+}: {
+  activeAction: string | null;
+  handleActionClick: (action: string) => void;
+  stockTaggingComponent: React.ReactNode;
+  itemFormComponent: React.ReactNode;
+}) {
+  const actionButtons = [
+    { id: "edit", icon: Edit, label: "New Payment", testId: "button-new-payment" },
+    { id: "split", icon: Split, label: "Split Bill", testId: "button-split-bill" },
+    { id: "send", icon: Send, label: "Share Link", testId: "button-share-link" },
+    { id: "more", icon: MoreHorizontal, label: "More", testId: "button-more-options" }
+  ];
+
+  return (
+    <div className="bg-gray-800/50 rounded-2xl p-4" data-testid="actions-toolbar">
+      <div className="grid grid-cols-2 gap-3">
+        {actionButtons.map(({ id, icon: IconComponent, label, testId }) => (
+          <button
+            key={id}
+            onClick={() => handleActionClick(id)}
+            className={`flex flex-col items-center p-4 rounded-xl transition-all duration-200 ${
+              activeAction === id 
+                ? 'text-black' 
+                : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+            }`}
+            style={{
+              backgroundColor: activeAction === id ? '#00FF66' : undefined
+            }}
+            data-testid={testId}
+          >
+            <IconComponent size={24} />
+            <span className="text-xs mt-1 font-medium">{label}</span>
+          </button>
+        ))}
+      </div>
+      
+      {/* Action Panel */}
+      <div 
+        className="overflow-hidden transition-all duration-250 ease-in-out"
+        style={{
+          maxHeight: activeAction ? '600px' : '0px',
+          opacity: activeAction ? 1 : 0
+        }}
+      >
+        <div className="bg-gray-800 rounded-2xl p-4 mt-3">
+          {activeAction === "edit" && (
+            <div className="space-y-2" data-testid="edit-panel">
+              <h3 className="text-sm font-semibold text-white">Edit Transaction</h3>
+              {stockTaggingComponent}
+              {itemFormComponent}
             </div>
-            <p className="text-xs sm:text-sm text-green-300 text-center">Transaction completed successfully!</p>
-          </div>
-        );
-      case "failed":
-        return (
-          <div className="flex flex-col items-center space-y-1 sm:space-y-3 p-4 sm:p-6 bg-red-500/10 backdrop-blur-sm rounded-2xl border border-red-400/30">
-            <div className="flex items-center space-x-2 sm:space-x-3">
-              <XCircle className="w-5 h-5 sm:w-7 sm:h-7 text-red-300" />
-              <span className="text-base sm:text-lg font-medium text-red-200">Payment Failed</span>
+          )}
+
+          {activeAction === "split" && (
+            <div className="space-y-2" data-testid="split-panel">
+              <h3 className="text-sm font-semibold text-white">Split Bill</h3>
+              <p className="text-xs text-gray-400">Split a bill between multiple customers</p>
+              <div className="text-center py-4">
+                <p className="text-gray-500 text-xs">Split bill feature coming soon</p>
+              </div>
             </div>
-            <p className="text-xs sm:text-sm text-red-300 text-center">Please try again or contact support</p>
+          )}
+
+          {activeAction === "send" && (
+            <div className="space-y-2" data-testid="send-panel">
+              <h3 className="text-sm font-semibold text-white">Share Payment Link</h3>
+              <p className="text-xs text-gray-400">Send payment link to customer via email or SMS</p>
+              <div className="text-center py-4">
+                <p className="text-gray-500 text-xs">Share link feature coming soon</p>
+              </div>
+            </div>
+          )}
+
+          {activeAction === "more" && (
+            <div className="space-y-2" data-testid="more-panel">
+              <h3 className="text-sm font-semibold text-white">More Options</h3>
+              <div className="grid grid-cols-2 gap-2">
+                <button className="p-2 bg-gray-700 rounded text-xs">Recurring</button>
+                <button className="p-2 bg-gray-700 rounded text-xs">Invoice</button>
+                <button className="p-2 bg-gray-700 rounded text-xs">Receipt</button>
+                <button className="p-2 bg-gray-700 rounded text-xs">History</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ItemForm Component
+function ItemForm({ 
+  form, 
+  onSubmit, 
+  taptStones, 
+  selectedStoneId, 
+  setSelectedStoneId, 
+  selectedStockItems, 
+  isSubmitting 
+}: {
+  form: any;
+  onSubmit: (data: any) => void;
+  taptStones: any[];
+  selectedStoneId: number | null;
+  setSelectedStoneId: (id: number | null) => void;
+  selectedStockItems: any[];
+  isSubmitting: boolean;
+}) {
+  return (
+    <div className="space-y-2" data-testid="item-form-container">
+      <div className="space-y-1">
+        <label className="block text-xs font-medium text-gray-300">
+          Select Tapt Stone:
+        </label>
+        {taptStones && Array.isArray(taptStones) && taptStones.length > 0 ? (
+          <select 
+            value={selectedStoneId || ""} 
+            onChange={(e) => {
+              const value = e.target.value;
+              setSelectedStoneId(value ? parseInt(value, 10) : null);
+            }}
+            className="w-full bg-gray-700 border-gray-600 text-white rounded-md px-3 py-2 border focus:outline-none focus:ring-2 focus:ring-green-500"
+            data-testid="stone-selector"
+          >
+            <option value="">Choose a stone</option>
+            {taptStones.map((stone: any) => (
+              <option key={`stone-${stone.id}`} value={stone.id}>
+                Stone {stone.stoneNumber} - {stone.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <div className="text-center py-2">
+            <p className="text-gray-400 text-xs">No Tapt Stones available</p>
           </div>
-        );
-      default:
-        return null;
+        )}
+      </div>
+
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2">
+          <FormField
+            control={form.control}
+            name="itemName"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-xs text-gray-300">Item Name</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="Enter item name or use stock items above"
+                    {...field}
+                    className="bg-gray-700 border-gray-600 text-white rounded-lg h-8"
+                    readOnly={selectedStockItems.length > 0}
+                    data-testid="input-item-name"
+                  />
+                </FormControl>
+                <FormMessage className="text-red-300 text-xs" />
+              </FormItem>
+            )}
+          />
+          
+          <FormField
+            control={form.control}
+            name="price"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-xs text-gray-300">Price ($)</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="0.00"
+                    {...field}
+                    className="bg-gray-700 border-gray-600 text-white rounded-lg h-8"
+                    data-testid="input-price"
+                  />
+                </FormControl>
+                <FormMessage className="text-red-300 text-xs" />
+              </FormItem>
+            )}
+          />
+
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full bg-green-600 hover:bg-green-700 text-white h-8 text-xs font-medium"
+            data-testid="button-create-transaction"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              "Create Transaction"
+            )}
+          </Button>
+        </form>
+      </Form>
+    </div>
+  );
+}
+
+// StockTagging Component
+function StockTagging({ 
+  stockSearchInput, 
+  setStockSearchInput, 
+  filteredStockItems, 
+  selectedStockItems, 
+  addStockItem, 
+  removeStockItem 
+}: {
+  stockSearchInput: string;
+  setStockSearchInput: (value: string) => void;
+  filteredStockItems: any[];
+  selectedStockItems: any[];
+  addStockItem: (item: any) => void;
+  removeStockItem: (id: number) => void;
+}) {
+  return (
+    <div className="space-y-2" data-testid="stock-tagging-container">
+      <div className="relative">
+        <label className="text-xs text-gray-300">Search Stock Items</label>
+        <Input
+          placeholder="Type to search stock items..."
+          value={stockSearchInput}
+          onChange={(e) => setStockSearchInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && filteredStockItems.length > 0) {
+              e.preventDefault();
+              addStockItem(filteredStockItems[0]);
+            }
+          }}
+          className="bg-gray-700 border-gray-600 text-white rounded-lg h-8 mb-2"
+          data-testid="stock-search-input"
+        />
+        
+        {filteredStockItems.length > 0 && (
+          <div className="absolute z-10 w-full bg-gray-700 border border-gray-600 rounded-lg mt-1 max-h-32 overflow-y-auto" data-testid="stock-suggestions">
+            {filteredStockItems.map((item: any) => (
+              <div
+                key={item.id}
+                onClick={() => addStockItem(item)}
+                className="p-2 cursor-pointer text-white text-xs border-b border-gray-600 last:border-b-0 hover:bg-gray-600"
+                data-testid={`stock-suggestion-${item.id}`}
+              >
+                <div className="font-medium">{item.name}</div>
+                <div className="text-gray-400">${parseFloat(item.cost).toFixed(2)}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {selectedStockItems.length > 0 && (
+        <div className="space-y-1">
+          <label className="text-xs text-gray-300">Selected Items</label>
+          <div className="flex flex-wrap gap-1" data-testid="selected-stock-items">
+            {selectedStockItems.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center gap-1 bg-gray-600 rounded-full px-2 py-1 text-xs text-white"
+                data-testid={`selected-stock-item-${item.id}`}
+              >
+                <Tag size={12} />
+                <span>{item.name}</span>
+                <span className="text-gray-300">${parseFloat(item.cost).toFixed(2)}</span>
+                <button
+                  onClick={() => removeStockItem(item.id)}
+                  className="ml-1 text-gray-400 hover:text-white"
+                  data-testid={`remove-stock-item-${item.id}`}
+                >
+                  <X size={10} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// PaymentStatus Component
+function PaymentStatus({ transaction }: { transaction: any }) {
+  if (!transaction?.status) return null;
+
+  const statusConfig = {
+    pending: {
+      bgColor: "bg-blue-500/10",
+      borderColor: "border-blue-400/30",
+      iconColor: "text-blue-300",
+      textColor: "text-blue-200",
+      icon: Clock,
+      title: "Awaiting Payment",
+      description: "Customer can now scan QR code to pay"
+    },
+    processing: {
+      bgColor: "bg-orange-500/10", 
+      borderColor: "border-orange-400/30",
+      iconColor: "text-orange-300",
+      textColor: "text-orange-200",
+      icon: Loader2,
+      title: "Processing Payment",
+      description: "Payment is being processed..."
+    },
+    completed: {
+      bgColor: "bg-green-500/10",
+      borderColor: "border-green-400/30", 
+      iconColor: "text-green-300",
+      textColor: "text-green-200",
+      icon: CheckCircle,
+      title: "Payment Accepted",
+      description: "Transaction completed successfully!"
+    },
+    failed: {
+      bgColor: "bg-red-500/10",
+      borderColor: "border-red-400/30",
+      iconColor: "text-red-300",
+      textColor: "text-red-200", 
+      icon: XCircle,
+      title: "Payment Failed",
+      description: "Please try again or contact support"
     }
   };
+
+  const config = statusConfig[transaction.status as keyof typeof statusConfig];
+  if (!config) return null;
+
+  const IconComponent = config.icon;
+
+  return (
+    <div 
+      className={`flex flex-col items-center space-y-1 sm:space-y-3 p-4 sm:p-6 backdrop-blur-sm rounded-2xl border ${config.bgColor} ${config.borderColor}`}
+      data-testid={`payment-status-${transaction.status}`}
+    >
+      <div className="flex items-center space-x-2 sm:space-x-3">
+        <IconComponent 
+          className={`w-5 h-5 sm:w-6 sm:h-6 ${config.iconColor} ${transaction.status === 'processing' ? 'animate-spin' : ''}`} 
+        />
+        <span className={`text-base sm:text-lg font-medium ${config.textColor}`}>
+          {config.title}
+        </span>
+      </div>
+      
+      {transaction.isSplit ? (
+        <div className="text-center space-y-1">
+          <p className={`text-xs sm:text-sm ${config.iconColor}`}>Split Bill Payment</p>
+          <div className="flex items-center justify-center space-x-2">
+            <span className={`text-sm font-bold ${config.textColor}`}>
+              {transaction.completedSplits + 1} of {transaction.totalSplits}
+            </span>
+            <span className={`text-xs ${config.iconColor}`}>payments</span>
+          </div>
+          <p className={`text-xs ${config.iconColor}`}>
+            ${parseFloat(transaction.splitAmount).toFixed(2)} per person
+          </p>
+        </div>
+      ) : (
+        <p className={`text-xs sm:text-sm ${config.iconColor} text-center`}>
+          {config.description}
+        </p>
+      )}
+    </div>
+  );
+}
 
   return (
     <div 
@@ -492,388 +922,50 @@ export default function MerchantTerminal() {
                 </div>
               )}
 
-              {/* Primary Action Buttons */}
-              <div className="bg-gray-800/50 rounded-2xl p-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => handleActionClick("edit")}
-                    className={`flex flex-col items-center p-4 rounded-xl transition-all duration-200 ${
-                      activeAction === "edit" 
-                        ? 'text-black' 
-                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                    }`}
-                    style={{
-                      backgroundColor: activeAction === "edit" ? '#00FF66' : undefined
-                    }}
-                    data-testid="button-new-payment"
-                  >
-                    <Edit size={24} />
-                    <span className="text-xs mt-1 font-medium">New Payment</span>
-                  </button>
-                  
-                  <button
-                    onClick={() => handleActionClick("split")}
-                    className={`flex flex-col items-center p-4 rounded-xl transition-all duration-200 ${
-                      activeAction === "split"
-                        ? 'text-black'
-                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                    }`}
-                    style={{
-                      backgroundColor: activeAction === "split" ? '#00FF66' : undefined
-                    }}
-                    data-testid="button-split-bill"
-                  >
-                    <Split size={24} />
-                    <span className="text-xs mt-1 font-medium">Split Bill</span>
-                  </button>
-                  
-                  <button
-                    onClick={() => handleActionClick("send")}
-                    className={`flex flex-col items-center p-4 rounded-xl transition-all duration-200 ${
-                      activeAction === "send"
-                        ? 'text-black'
-                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                    }`}
-                    style={{
-                      backgroundColor: activeAction === "send" ? '#00FF66' : undefined
-                    }}
-                    data-testid="button-share-link"
-                  >
-                    <Send size={24} />
-                    <span className="text-xs mt-1 font-medium">Share Link</span>
-                  </button>
-                  
-                  <button
-                    onClick={() => handleActionClick("more")}
-                    className={`flex flex-col items-center p-4 rounded-xl transition-all duration-200 ${
-                      activeAction === "more"
-                        ? 'text-black'
-                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                    }`}
-                    style={{
-                      backgroundColor: activeAction === "more" ? '#00FF66' : undefined
-                    }}
-                    data-testid="button-more-options"
-                  >
-                    <MoreHorizontal size={24} />
-                    <span className="text-xs mt-1 font-medium">More</span>
-                  </button>
-                </div>
-                
-                {/* Action Panel */}
-                <div 
-                  className="overflow-hidden transition-all duration-250 ease-in-out"
-                  style={{
-                    maxHeight: activeAction ? '600px' : '0px',
-                    opacity: activeAction ? 1 : 0
-                  }}
-                >
-                  <div className="bg-gray-800 rounded-2xl p-4 mt-3">
-                    {activeAction === "edit" && (
-                      <div className="space-y-2">
-                        <h3 className="text-sm font-semibold text-white">Edit Transaction</h3>
-                        
-                        {/* Stock Item Search */}
-                        <div className="relative">
-                          <label className="text-xs text-gray-300">Search Stock Items</label>
-                          <Input
-                            placeholder="Type to search stock items..."
-                            value={stockSearchInput}
-                            onChange={(e) => setStockSearchInput(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' && filteredStockItems.length > 0) {
-                                e.preventDefault();
-                                addStockItem(filteredStockItems[0]);
-                              }
-                            }}
-                            className="bg-gray-700 border-gray-600 text-white rounded-lg h-8 mb-2"
-                          />
-                          
-                          {/* Stock item suggestions dropdown */}
-                          {filteredStockItems.length > 0 && (
-                            <div className="absolute z-10 w-full bg-gray-700 border border-gray-600 rounded-lg mt-1 max-h-32 overflow-y-auto">
-                              {filteredStockItems.map((item: any) => (
-                                <div
-                                  key={item.id}
-                                  onClick={() => addStockItem(item)}
-                                  className="p-2 cursor-pointer text-white text-xs border-b border-gray-600 last:border-b-0"
-                                >
-                                  <div className="font-medium">{item.name}</div>
-                                  <div className="text-gray-400">${parseFloat(item.cost).toFixed(2)}</div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Selected Stock Items Tags */}
-                        {selectedStockItems.length > 0 && (
-                          <div className="space-y-1">
-                            <label className="text-xs text-gray-300">Selected Items</label>
-                            <div className="flex flex-wrap gap-1">
-                              {selectedStockItems.map((item) => (
-                                <div
-                                  key={item.id}
-                                  className="flex items-center gap-1 bg-gray-600 rounded-full px-2 py-1 text-xs text-white"
-                                >
-                                  <Tag size={12} />
-                                  <span>{item.name}</span>
-                                  <span className="text-gray-300">${parseFloat(item.cost).toFixed(2)}</span>
-                                  <button
-                                    onClick={() => removeStockItem(item.id)}
-                                    className="ml-1 text-gray-400"
-                                  >
-                                    <X size={10} />
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Stone Selection */}
-                        <div className="space-y-1">
-                          <label className="block text-xs font-medium text-gray-300">
-                            Select Tapt Stone:
-                          </label>
-                          {taptStones && Array.isArray(taptStones) && taptStones.length > 0 ? (
-                            <select 
-                              value={selectedStoneId || ""} 
-                              onChange={(e) => {
-                                console.log("Stone selected:", e.target.value);
-                                try {
-                                  const value = e.target.value;
-                                  setSelectedStoneId(value ? parseInt(value, 10) : null);
-                                } catch (error) {
-                                  console.error("Error setting stone ID:", error);
-                                }
-                              }}
-                              className="w-full bg-gray-700 border-gray-600 text-white rounded-md px-3 py-2 border focus:outline-none focus:ring-2 focus:ring-green-500"
-                            >
-                              <option value="">Choose a stone</option>
-                              {taptStones.map((stone: any) => (
-                                <option key={`stone-${stone.id}`} value={stone.id}>
-                                  Stone {stone.stoneNumber} - {stone.name}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <div className="text-center py-2">
-                              <p className="text-gray-400 text-xs">No Tapt Stones available</p>
-                            </div>
-                          )}
-                        </div>
-
-                        <Form {...form}>
-                          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2">
-                            <FormField
-                              control={form.control}
-                              name="itemName"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-xs text-gray-300">Item Name</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      placeholder="Enter item name or use stock items above"
-                                      {...field}
-                                      className="bg-gray-700 border-gray-600 text-white rounded-lg h-8"
-                                      readOnly={selectedStockItems.length > 0}
-                                    />
-                                  </FormControl>
-                                  <FormMessage className="text-red-300 text-xs" />
-                                </FormItem>
-                              )}
-                            />
-                            
-                            <FormField
-                              control={form.control}
-                              name="price"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-xs text-gray-300">Price ($)</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      placeholder="0.00"
-                                      {...field}
-                                      className="bg-gray-700 border-gray-600 text-white rounded-lg h-8"
-                                    />
-                                  </FormControl>
-                                  <FormMessage className="text-red-300 text-xs" />
-                                </FormItem>
-                              )}
-                            />
-
-                            <Button
-                              type="submit"
-                              disabled={createTransactionMutation.isPending}
-                              className="w-full bg-green-600 hover:bg-green-700 text-white h-8 text-xs font-medium"
-                              data-testid="button-create-transaction"
-                            >
-                              {createTransactionMutation.isPending ? (
-                                <>
-                                  <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                                  Creating...
-                                </>
-                              ) : (
-                                "Create Transaction"
-                              )}
-                            </Button>
-                          </form>
-                        </Form>
-                      </div>
-                    )}
-
-                    {activeAction === "split" && (
-                      <div className="space-y-2">
-                        <h3 className="text-sm font-semibold text-white">Split Bill</h3>
-                        <p className="text-xs text-gray-400">Split a bill between multiple customers</p>
-                        <div className="text-center py-4">
-                          <p className="text-gray-500 text-xs">Split bill feature coming soon</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {activeAction === "send" && (
-                      <div className="space-y-2">
-                        <h3 className="text-sm font-semibold text-white">Share Payment Link</h3>
-                        <p className="text-xs text-gray-400">Send payment link to customer via email or SMS</p>
-                        <div className="text-center py-4">
-                          <p className="text-gray-500 text-xs">Share link feature coming soon</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {activeAction === "more" && (
-                      <div className="space-y-2">
-                        <h3 className="text-sm font-semibold text-white">More Options</h3>
-                        <div className="grid grid-cols-2 gap-2">
-                          <button className="p-2 bg-gray-700 rounded text-xs">Recurring</button>
-                          <button className="p-2 bg-gray-700 rounded text-xs">Invoice</button>
-                          <button className="p-2 bg-gray-700 rounded text-xs">Receipt</button>
-                          <button className="p-2 bg-gray-700 rounded text-xs">History</button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+              {/* Actions Toolbar */}
+              <ActionsToolbar 
+                activeAction={activeAction}
+                handleActionClick={handleActionClick}
+                stockTaggingComponent={
+                  <StockTagging 
+                    stockSearchInput={stockSearchInput}
+                    setStockSearchInput={setStockSearchInput}
+                    filteredStockItems={filteredStockItems}
+                    selectedStockItems={selectedStockItems}
+                    addStockItem={addStockItem}
+                    removeStockItem={removeStockItem}
+                  />
+                }
+                itemFormComponent={
+                  <ItemForm 
+                    form={form}
+                    onSubmit={onSubmit}
+                    taptStones={taptStones}
+                    selectedStoneId={selectedStoneId}
+                    setSelectedStoneId={setSelectedStoneId}
+                    selectedStockItems={selectedStockItems}
+                    isSubmitting={createTransactionMutation.isPending}
+                  />
+                }
+              />
             </div>
 
             {/* Right Pane: QR Code & Payment Status */}
             <div className="space-y-6">
               {/* Payment Status */}
               {(currentTransaction || activeTransaction) && (
-                <div>
-                  {getPaymentStatusIndicator((currentTransaction || activeTransaction)?.status)}
-                </div>
+                <PaymentStatus transaction={currentTransaction || activeTransaction} />
               )}
 
-              {/* Stones Section - Collapsible Green Box */}
-              <div 
-                className="rounded-2xl p-4 transition-all duration-300"
-                style={{ backgroundColor: '#00FF66' }}
-              >
-                {/* Header */}
-                <div
-                  className="flex items-center justify-center text-black cursor-pointer relative"
-                  onClick={() => setStonesCollapsed(prev => !prev)}
-                >
-                  <h3 className="text-lg font-semibold">Stones</h3>
-                  <ChevronDown
-                    className={`absolute right-0 transition-transform duration-300 ${
-                      stonesCollapsed ? '' : 'rotate-180'
-                    }`}
-                    size={20}
-                  />
-                </div>
-
-                {/* Collapsible Content */}
-                <div
-                  className={`transition-all duration-300 overflow-hidden ${
-                    stonesCollapsed ? 'max-h-0 opacity-0' : 'max-h-[1000px] opacity-100 mt-4'
-                  }`}
-                >
-                  <div className="bg-gray-800 rounded-xl p-6">
-                    <div className="text-center">
-                      {taptStones && Array.isArray(taptStones) && taptStones.length > 0 ? (
-                        taptStones.map((stone: any) => (
-                          <div key={stone.id} className="mb-6 last:mb-0">
-                            <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4 mx-auto">
-                              <QRCodeDisplay 
-                                merchantId={merchantId}
-                                stoneId={stone.id}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <p className="text-white text-sm font-medium">
-                                Stone {stone.stoneNumber} - {stone.name}
-                              </p>
-                              <button
-                                onClick={async () => {
-                                  try {
-                                    const canvas = document.querySelector(`canvas[data-stone-id="${stone.id}"]`) as HTMLCanvasElement;
-                                    if (canvas) {
-                                      const link = document.createElement('a');
-                                      link.download = `stone-${stone.stoneNumber}-qr.png`;
-                                      link.href = canvas.toDataURL();
-                                      link.click();
-                                    }
-                                  } catch (error) {
-                                    console.error('Download failed:', error);
-                                  }
-                                }}
-                                className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white text-xs rounded-lg transition-colors font-medium"
-                              >
-                                Download QR Code
-                              </button>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-center">
-                          <div className="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4 mx-auto">
-                            <QrCode size={64} className="text-gray-400" />
-                          </div>
-                          <p className="text-gray-300 text-sm">No tapt stones available</p>
-                        </div>
-                      )}
-                      
-                      {/* Create Stone Button */}
-                      <div className="text-center mt-6 pt-4 border-t border-gray-600">
-                        <button
-                          onClick={async () => {
-                            try {
-                              const stoneNumber = (taptStones?.length || 0) + 1;
-                              const response = await apiRequest('POST', `/api/merchants/${merchantId}/tapt-stones`, {
-                                name: `Stone ${stoneNumber}`,
-                                stoneNumber: stoneNumber
-                              });
-                              
-                              // Refresh the stones data
-                              queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "tapt-stones"] });
-                              
-                              toast({
-                                title: "Stone Created",
-                                description: `Stone ${stoneNumber} has been created successfully`,
-                              });
-                            } catch (error) {
-                              console.error("Failed to create stone:", error);
-                              toast({
-                                title: "Creation Failed",
-                                description: "Could not create new stone",
-                                variant: "destructive",
-                              });
-                            }
-                          }}
-                          className="px-6 py-3 bg-gray-600 hover:bg-gray-500 text-white rounded-lg transition-colors font-medium"
-                        >
-                          + Create New Stone
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              {/* Stones Section */}
+              <StonesSection 
+                stonesCollapsed={stonesCollapsed}
+                setStonesCollapsed={setStonesCollapsed}
+                taptStones={taptStones}
+                merchantId={merchantId}
+                queryClient={queryClient}
+                toast={toast}
+              />
             </div>
           </div>
         </div>
