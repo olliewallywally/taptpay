@@ -621,8 +621,6 @@ export default function Transactions() {
               })}
             </div>
           )}
-        </div>
-      </div>
 
       {/* Refund Modal */}
       {refundModal && (
