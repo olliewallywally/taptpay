@@ -3,6 +3,11 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { seedDatabase } from "./seed";
 import { isDatabaseConnected } from "./database";
+import { 
+  startServerWithPortManagement, 
+  setupGracefulShutdown, 
+  getPortConflictHelp 
+} from "./port-manager";
 
 const app = express();
 app.use(express.json());
@@ -79,11 +84,19 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = 5000;
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
-  });
+  const host = "0.0.0.0";
+
+  // Setup graceful shutdown handling
+  setupGracefulShutdown(server, port);
+
+  // Start server with port management
+  const serverStarted = await startServerWithPortManagement(server, port, host);
+  
+  if (!serverStarted) {
+    log("❌ Failed to start server due to port conflicts");
+    log(getPortConflictHelp(port));
+    process.exit(1);
+  }
+
+  log(`✅ Server successfully running on ${host}:${port}`);
 })();
