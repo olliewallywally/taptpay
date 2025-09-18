@@ -145,22 +145,30 @@ function Router() {
         <Route path="/reset-password" component={ResetPassword} />
         <Route path="/merchant">
           <ProtectedRoute>
-            <MerchantTerminal />
+            <Layout>
+              <MerchantTerminal />
+            </Layout>
           </ProtectedRoute>
         </Route>
         <Route path="/merchant-terminal-mobile">
           <ProtectedRoute>
-            <MerchantTerminalMobile />
+            <Layout>
+              <MerchantTerminalMobile />
+            </Layout>
           </ProtectedRoute>
         </Route>
         <Route path="/merchant-terminal">
           <ProtectedRoute>
-            <MerchantTerminal />
+            <Layout>
+              <MerchantTerminal />
+            </Layout>
           </ProtectedRoute>
         </Route>
         <Route path="/terminal">
           <ProtectedRoute>
-            <MerchantTerminal />
+            <Layout>
+              <MerchantTerminal />
+            </Layout>
           </ProtectedRoute>
         </Route>
         <Route path="/dashboard">
