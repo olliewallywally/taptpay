@@ -140,7 +140,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="container mx-auto px-4 pt-24 pb-8">
+    <div className="container mx-auto px-4 pt-32 pb-8">
           {/* Analytics Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
             <div className="dashboard-card-glass rounded-3xl p-6">
