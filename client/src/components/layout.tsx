@@ -19,27 +19,22 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-black to-gray-900">
-      {/* Simple Header */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-sm shadow-sm border-b border-white/20">
-        <div className="flex items-center justify-between px-4 py-3">
-          {/* Logo */}
-          <div className="flex items-center">
-            <img 
-              src={taptLogoPath} 
-              alt="Tapt Logo" 
-              className="h-8 w-auto filter brightness-0 invert"
-            />
-          </div>
-          
-          {/* Hamburger Menu */}
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            className="p-2 rounded-lg hover:bg-white/10 transition-colors text-white"
-          >
-            {menuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
-        </div>
+      {/* Logo - Left Corner */}
+      <div className="fixed top-6 left-6 z-50">
+        <img 
+          src={taptLogoPath} 
+          alt="Tapt Logo" 
+          className="h-8 w-auto filter brightness-0 invert"
+        />
       </div>
+      
+      {/* Menu Icon - Right Corner */}
+      <button
+        onClick={() => setMenuOpen(!menuOpen)}
+        className="fixed top-6 right-6 z-50 p-2 rounded-lg hover:bg-white/10 transition-colors text-white"
+      >
+        {menuOpen ? <X size={24} /> : <Menu size={24} />}
+      </button>
 
       {/* Mobile Menu Overlay */}
       {menuOpen && (
