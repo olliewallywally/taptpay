@@ -962,7 +962,7 @@ function PaymentStatus({ transaction }: { transaction: any }) {
                 stonesCollapsed={stonesCollapsed}
                 setStonesCollapsed={setStonesCollapsed}
                 taptStones={taptStones}
-                merchantId={merchantId}
+                merchantId={merchantId.toString()}
                 queryClient={queryClient}
                 toast={toast}
               />
