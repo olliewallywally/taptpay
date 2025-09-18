@@ -230,10 +230,10 @@ export default function MerchantTerminal() {
 
   // Update current transaction from active transaction query
   useEffect(() => {
-    if (activeTransaction) {
+    if (activeTransaction && currentTransaction?.id !== activeTransaction.id) {
       setCurrentTransaction(activeTransaction);
     }
-  }, [activeTransaction]);
+  }, [activeTransaction, currentTransaction?.id]);
 
   const onSubmit = (data: TransactionFormData) => {
     createTransactionMutation.mutate(data);
