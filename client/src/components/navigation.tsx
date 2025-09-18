@@ -55,7 +55,7 @@ export function Navigation() {
     <div className="absolute top-0 left-0 right-0 z-20">
       <div className="container mx-auto px-4 pt-4">
         {/* Glass Morphism Navigation Bubble */}
-        <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl shadow-2xl">
+        <div className="backdrop-blur-xl bg-black/20 border border-white/30 rounded-2xl shadow-2xl">
           <div className="px-3 py-2 sm:px-6 sm:py-4">
             <div className="flex items-center justify-between">
             {/* Logo and Title */}
@@ -85,8 +85,8 @@ export function Navigation() {
                       href={link.path}
                       className={`px-4 py-2 text-sm font-medium rounded-lg transition-all backdrop-blur-sm border min-w-[90px] text-center ${
                         isActive(link.path) 
-                          ? "bg-white/25 text-black shadow-lg border-white/40" 
-                          : "bg-white/10 text-black hover:text-black hover:bg-white/20 border-white/20"
+                          ? "bg-white/90 text-black shadow-lg border-white/60" 
+                          : "bg-white/20 text-white hover:text-black hover:bg-white/70 border-white/30"
                       }`}
                     >
                       {link.label}
@@ -96,7 +96,7 @@ export function Navigation() {
 
                 {/* Secondary Navigation Dropdown */}
                 <div className="relative group">
-                  <button className="px-4 py-2 text-sm font-medium rounded-lg transition-all backdrop-blur-sm border bg-white/10 text-black hover:bg-white/20 border-white/20 flex items-center justify-center min-w-[90px]">
+                  <button className="px-4 py-2 text-sm font-medium rounded-lg transition-all backdrop-blur-sm border bg-white/20 text-white hover:bg-white/70 hover:text-black border-white/30 flex items-center justify-center min-w-[90px]">
                     More
                     <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -126,7 +126,7 @@ export function Navigation() {
                 {/* Logout Button */}
                 <button
                   onClick={handleLogout}
-                  className="px-4 py-2 text-sm font-medium rounded-lg transition-all backdrop-blur-sm border bg-white/10 text-black hover:bg-white/20 hover:text-black border-white/20 min-w-[90px] flex items-center justify-center"
+                  className="px-4 py-2 text-sm font-medium rounded-lg transition-all backdrop-blur-sm border bg-white/20 text-white hover:bg-white/70 hover:text-black border-white/30 min-w-[90px] flex items-center justify-center"
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
