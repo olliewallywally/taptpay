@@ -843,11 +843,6 @@ function PaymentStatus({ transaction }: { transaction: any }) {
         {/* Header */}
         <div className="flex items-center justify-between p-6">
           <div className="flex items-center">
-            <img 
-              src={taptLogoPath} 
-              alt="TaptPay" 
-              className="h-8 w-auto object-contain"
-            />
           </div>
           <div className="flex items-center">
             <button
