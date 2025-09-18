@@ -32,8 +32,8 @@ export default function Login() {
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: loginType === 'merchant' ? "" : "oliverleonard.professional@gmail.com",
-      password: loginType === 'merchant' ? "" : "TAPTpay",
+      email: "",
+      password: "",
     },
   });
 
@@ -58,8 +58,8 @@ export default function Login() {
 
   // Update form defaults when login type changes
   useEffect(() => {
-    form.setValue("email", loginType === 'merchant' ? "" : "oliverleonard.professional@gmail.com");
-    form.setValue("password", loginType === 'merchant' ? "" : "TAPTpay");
+    form.setValue("email", "");
+    form.setValue("password", "");
   }, [loginType, form]);
 
   const loginMutation = useMutation({
