@@ -19,16 +19,7 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-black to-gray-900">
-      {/* Logo - Left Corner */}
-      <div className="fixed top-6 left-6 z-50">
-        <img 
-          src={taptLogoPath} 
-          alt="Tapt Logo" 
-          className="h-8 w-auto filter brightness-0 invert"
-        />
-      </div>
-      
-      {/* Menu Icon - Right Corner */}
+      {/* Menu Icon - Right Corner (stays fixed) */}
       <button
         onClick={() => setMenuOpen(!menuOpen)}
         className="fixed top-6 right-6 z-50 p-2 rounded-lg hover:bg-white/10 transition-colors text-white"
@@ -71,8 +62,20 @@ export function Layout({ children }: LayoutProps) {
       </div>
 
       {/* Content with slide-over effect */}
-      <div className={`transition-transform duration-300 ${menuOpen ? '-translate-x-80' : 'translate-x-0'}`}>
-        {children}
+      <div className={`relative transition-transform duration-300 ${menuOpen ? '-translate-x-80' : 'translate-x-0'}`}>
+        {/* Logo - moves with content */}
+        <div className="absolute top-6 left-6 z-30">
+          <img 
+            src={taptLogoPath} 
+            alt="Tapt Logo" 
+            className="h-8 w-auto filter brightness-0 invert"
+          />
+        </div>
+        
+        {/* Content with proper top spacing */}
+        <div className="pt-20">
+          {children}
+        </div>
       </div>
     </div>
   );
