@@ -36,44 +36,42 @@ export function Layout({ children }: LayoutProps) {
         {menuOpen ? <X size={24} /> : <Menu size={24} />}
       </button>
 
-      {/* Mobile Menu Overlay */}
-      {menuOpen && (
-        <div className="fixed inset-0 z-40 bg-black bg-opacity-50" onClick={() => setMenuOpen(false)}>
-          <div className="fixed top-0 right-0 h-full w-80 bg-gray-900 border-l border-white/20 shadow-xl transform transition-transform duration-300">
-            <div className="p-6 pt-20">
-              <nav className="space-y-4">
-                <Link href="/merchant" onClick={() => setMenuOpen(false)} className="block py-3 px-4 text-white rounded-xl hover:bg-white/10 transition-colors font-medium">
-                  Terminal
-                </Link>
-                <Link href="/dashboard" onClick={() => setMenuOpen(false)} className="block py-3 px-4 text-white rounded-xl hover:bg-white/10 transition-colors font-medium">
-                  Dashboard
-                </Link>
-                <Link href="/transactions" onClick={() => setMenuOpen(false)} className="block py-3 px-4 text-white rounded-xl hover:bg-white/10 transition-colors font-medium">
-                  Transactions
-                </Link>
-                <Link href="/stock" onClick={() => setMenuOpen(false)} className="block py-3 px-4 text-white rounded-xl hover:bg-white/10 transition-colors font-medium">
-                  Stock
-                </Link>
-                <Link href="/settings" onClick={() => setMenuOpen(false)} className="block py-3 px-4 text-white rounded-xl hover:bg-white/10 transition-colors font-medium">
-                  Settings
-                </Link>
-                <div className="pt-4 mt-4 border-t border-white/20">
-                  <button 
-                    onClick={handleLogout}
-                    className="flex items-center w-full text-left py-3 px-4 text-red-400 hover:bg-red-950/30 rounded-xl transition-colors font-medium"
-                  >
-                    <LogOut className="w-4 h-4 mr-2" />
-                    Logout
-                  </button>
-                </div>
-              </nav>
+      {/* Slide-over Menu */}
+      <div className={`fixed top-0 right-0 h-full w-80 bg-gray-900 border-l border-white/20 shadow-xl transform transition-transform duration-300 z-40 ${
+        menuOpen ? 'translate-x-0' : 'translate-x-full'
+      }`}>
+        <div className="p-6 pt-20">
+          <nav className="space-y-4">
+            <Link href="/merchant" onClick={() => setMenuOpen(false)} className="block py-3 px-4 text-white rounded-xl hover:bg-white/10 transition-colors font-medium">
+              Terminal
+            </Link>
+            <Link href="/dashboard" onClick={() => setMenuOpen(false)} className="block py-3 px-4 text-white rounded-xl hover:bg-white/10 transition-colors font-medium">
+              Dashboard
+            </Link>
+            <Link href="/transactions" onClick={() => setMenuOpen(false)} className="block py-3 px-4 text-white rounded-xl hover:bg-white/10 transition-colors font-medium">
+              Transactions
+            </Link>
+            <Link href="/stock" onClick={() => setMenuOpen(false)} className="block py-3 px-4 text-white rounded-xl hover:bg-white/10 transition-colors font-medium">
+              Stock
+            </Link>
+            <Link href="/settings" onClick={() => setMenuOpen(false)} className="block py-3 px-4 text-white rounded-xl hover:bg-white/10 transition-colors font-medium">
+              Settings
+            </Link>
+            <div className="pt-4 mt-4 border-t border-white/20">
+              <button 
+                onClick={handleLogout}
+                className="flex items-center w-full text-left py-3 px-4 text-red-400 hover:bg-red-950/30 rounded-xl transition-colors font-medium"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Logout
+              </button>
             </div>
-          </div>
+          </nav>
         </div>
-      )}
+      </div>
 
-      {/* Content with proper top spacing */}
-      <div className="pt-16">
+      {/* Content with slide-over effect */}
+      <div className={`transition-transform duration-300 ${menuOpen ? '-translate-x-80' : 'translate-x-0'}`}>
         {children}
       </div>
     </div>
