@@ -1,21 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { MobileHeader } from "@/components/mobile-header";
-import { useState, useEffect } from "react";
 
 export default function SettingsSimple() {
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const checkScreenSize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    checkScreenSize();
-    window.addEventListener('resize', checkScreenSize);
-    
-    return () => window.removeEventListener('resize', checkScreenSize);
-  }, []);
-
   // Get current user
   const { data: user, isLoading: userLoading } = useQuery({
     queryKey: ["/api/auth/me"],
@@ -37,10 +22,7 @@ export default function SettingsSimple() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-900">
-      {isMobile && <MobileHeader title="Settings">Settings</MobileHeader>}
-      
-      <div className="max-w-4xl mx-auto px-4 py-8" style={{ paddingTop: isMobile ? '100px' : '40px' }}>
+      <div className="max-w-4xl mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold text-white mb-8">Settings</h1>
         
         <div className="bg-gray-800 p-6 rounded-lg mb-6">
@@ -64,6 +46,5 @@ export default function SettingsSimple() {
           </div>
         )}
       </div>
-    </div>
   );
 }
