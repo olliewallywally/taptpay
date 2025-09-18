@@ -125,7 +125,7 @@ export default function Dashboard() {
   if (analyticsLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-950 via-black to-gray-900">
-        <div className="container mx-auto px-4 pt-32 pb-8">
+        <div className="container mx-auto px-4 py-8">
           <div className="animate-pulse">
             <div className="h-8 backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl w-64 mb-6"></div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -140,7 +140,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="container mx-auto px-4 pt-32 pb-8">
+    <div className="container mx-auto px-4 py-8">
           {/* Analytics Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
             <div className="dashboard-card-glass rounded-3xl p-6">
