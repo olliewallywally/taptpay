@@ -940,55 +940,6 @@ function PaymentStatus({ transaction }: { transaction: any }) {
         </div>
       </div>
 
-      {/* Slide-out Hamburger Menu */}
-      <div 
-        className="menu-container fixed top-0 right-0 h-full bg-gray-800 z-50 transition-transform duration-300 ease-in-out"
-        style={{
-          width: '70%',
-          transform: menuOpen ? 'translateX(0)' : 'translateX(100%)',
-        }}
-      >
-        <div className="p-6">
-          <div className="flex justify-between items-center mb-8">
-            <h2 className="text-xl font-bold text-white">Menu</h2>
-            <button
-              onClick={() => setMenuOpen(false)}
-              className="p-2 rounded-lg transition-colors"
-            >
-              <X size={24} className="text-white" />
-            </button>
-          </div>
-          
-          <nav className="space-y-1">
-            <Link href="/dashboard" className="block py-3 px-4 text-white rounded-xl transition-colors font-medium">
-              Dashboard
-            </Link>
-            <Link href="/merchant" className="block py-3 px-4 text-[#00CC52] rounded-xl font-medium">
-              Terminal
-            </Link>
-            <Link href="/transactions" className="block py-3 px-4 text-white rounded-xl transition-colors font-medium">
-              Transactions
-            </Link>
-            <Link href="/stock" className="block py-3 px-4 text-white rounded-xl transition-colors font-medium">
-              Stock
-            </Link>
-            <Link href="/settings" className="block py-3 px-4 text-white rounded-xl transition-colors font-medium">
-              Settings
-            </Link>
-            <div className="pt-4 mt-4 border-t border-gray-600">
-              <button 
-                onClick={() => {
-                  localStorage.removeItem('auth-token');
-                  window.location.href = '/login';
-                }}
-                className="block w-full text-left py-3 px-4 text-red-400 rounded-xl transition-colors font-medium"
-              >
-                Logout
-              </button>
-            </div>
-          </nav>
-        </div>
-      </div>
     </div>
   );
 }
