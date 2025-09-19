@@ -11,12 +11,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { QRCodeDisplay } from "@/components/qr-code-display";
 import { MerchantUrlDisplay } from "@/components/merchant-url-display";
 import { EnhancedPaymentStatus } from "@/components/enhanced-payment-status";
+import { BillSplit } from "@/components/bill-split";
 import { apiRequest } from "@/lib/queryClient";
 import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
 import { useDeviceStatusMonitoring, useSSEConnectionMonitoring } from "@/components/notification-system";
 import { getCurrentMerchantId } from "@/lib/auth";
-import { Send, Loader2, CheckCircle, Clock, XCircle, Eye, Copy, Check, QrCode, Smartphone, Waves, CreditCard, X, Edit, Split, MoreHorizontal, ChevronDown, Tag } from "lucide-react";
+import { Send, Loader2, CheckCircle, Clock, XCircle, Eye, Copy, Check, QrCode, Smartphone, Waves, CreditCard, X, Edit, Split, MoreHorizontal, ChevronDown, Tag, Share, Link2, Mail, MessageCircle } from "lucide-react";
 import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
 import { Link } from "wouter";
 
@@ -45,6 +46,10 @@ export default function MerchantTerminal() {
   const [nfcPaymentStatus, setNfcPaymentStatus] = useState<"idle" | "creating" | "ready" | "processing" | "completed" | "failed">("idle");
   const [nfcSession, setNfcSession] = useState<any>(null);
   const [showNfcOverlay, setShowNfcOverlay] = useState(false);
+  
+  // Split payments state
+  const [splitPayments, setSplitPayments] = useState<any[]>([]);
+  const [copiedPaymentLink, setCopiedPaymentLink] = useState(false);
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -108,6 +113,17 @@ export default function MerchantTerminal() {
       return response.json();
     },
     enabled: !!merchantId,
+  });
+
+  // Get split payments for the current transaction (if it's split)
+  const { data: currentSplitPayments = [] } = useQuery({
+    queryKey: ["/api/transactions", activeTransaction?.id, "split-payments"],
+    queryFn: async () => {
+      const response = await fetch(`/api/transactions/${activeTransaction?.id}/split-payments`);
+      if (!response.ok) throw new Error("Failed to fetch split payments");
+      return response.json();
+    },
+    enabled: !!activeTransaction?.id && activeTransaction?.isSplit,
   });
 
   // Create transaction mutation
@@ -190,13 +206,44 @@ export default function MerchantTerminal() {
     });
   };
 
+  // Helper function for efficient transaction change detection
+  const hasTransactionChanged = (prev: any | null, current: any | null): boolean => {
+    if (!prev || !current || prev.id !== current.id) return true;
+    
+    // Check only the fields that are likely to change
+    return (
+      prev.status !== current.status ||
+      prev.completedSplits !== current.completedSplits ||
+      prev.isSplit !== current.isSplit ||
+      prev.totalSplits !== current.totalSplits ||
+      prev.windcaveTransactionId !== current.windcaveTransactionId ||
+      prev.paymentMethod !== current.paymentMethod
+    );
+  };
+
   // Set up SSE connection
   useEffect(() => {
     sseClient.connect(merchantId);
     
     sseClient.subscribe("transaction_updated", (message) => {
-      setCurrentTransaction(message.transaction);
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
+      // Update cache directly instead of invalidating to prevent feedback loop
+      queryClient.setQueryData(["/api/merchants", merchantId, "active-transaction"], message.transaction);
+      
+      // Only update state if transaction actually changed (efficient comparison)
+      setCurrentTransaction((prev: any) => 
+        hasTransactionChanged(prev, message.transaction) ? message.transaction : prev
+      );
+    });
+
+    // Add specific handler for split payment updates
+    sseClient.subscribe("split_payment_updated", (message) => {
+      // Handle split payment specific updates
+      if (message.transactionId && message.splitPayments) {
+        queryClient.setQueryData(
+          ["/api/transactions", message.transactionId, "split-payments"], 
+          message.splitPayments
+        );
+      }
     });
 
     return () => {
@@ -232,7 +279,7 @@ export default function MerchantTerminal() {
     if (activeTransaction && currentTransaction?.id !== activeTransaction.id) {
       setCurrentTransaction(activeTransaction);
     }
-  }, [activeTransaction, currentTransaction?.id]);
+  }, [activeTransaction]);
 
   const onSubmit = (data: TransactionFormData) => {
     createTransactionMutation.mutate(data);
@@ -318,6 +365,50 @@ export default function MerchantTerminal() {
 
   // Real NFC hardware would trigger payment completion through SSE events
   // No simulation function needed - payments process only through actual card taps
+
+  // Share Payment Link Functions
+  const copyPaymentLinkToClipboard = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedPaymentLink(true);
+      toast({
+        title: "Link Copied!",
+        description: "Payment link has been copied to clipboard",
+      });
+      setTimeout(() => setCopiedPaymentLink(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy link:', error);
+      toast({
+        title: "Copy Failed",
+        description: "Unable to copy payment link to clipboard",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const sharePaymentLink = async (method: string, url: string) => {
+    switch (method) {
+      case 'email':
+        const emailSubject = encodeURIComponent(`Payment Request - ${merchant?.businessName || 'Payment'}`);
+        const emailBody = encodeURIComponent(`Please complete your payment using this link: ${url}`);
+        window.open(`mailto:?subject=${emailSubject}&body=${emailBody}`, '_blank');
+        break;
+      case 'sms':
+        const smsBody = encodeURIComponent(`Payment link: ${url}`);
+        window.open(`sms:?body=${smsBody}`, '_blank');
+        break;
+      case 'copy':
+        await copyPaymentLinkToClipboard(url);
+        break;
+      default:
+        break;
+    }
+  };
+
+  const onSplitCreated = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/transactions", activeTransaction?.id, "split-payments"] });
+  };
 
 // StonesSection Component
 function StonesSection({ 
@@ -512,8 +603,49 @@ function ActionsToolbar({
             <div className="space-y-2" data-testid="split-panel">
               <h3 className="text-sm font-semibold text-white">Split Bill</h3>
               <p className="text-xs text-gray-400">Split a bill between multiple customers</p>
-              <div className="text-center py-4">
-                <p className="text-gray-500 text-xs">Split bill feature coming soon</p>
+              <div className="py-2">
+                {activeTransaction ? (
+                  activeTransaction.isSplit ? (
+                    <div className="space-y-3">
+                      <div className="bg-gray-700 rounded-xl p-3">
+                        <p className="text-green-400 text-sm font-semibold text-center">
+                          ✅ Bill Split into {activeTransaction.totalSplits} payments
+                        </p>
+                        <p className="text-gray-300 text-xs text-center mt-1">
+                          {activeTransaction.completedSplits} of {activeTransaction.totalSplits} payments completed
+                        </p>
+                      </div>
+                      
+                      {currentSplitPayments.length > 0 && (
+                        <div className="space-y-2">
+                          <h4 className="text-xs font-medium text-gray-300">Individual Payments:</h4>
+                          <div className="grid grid-cols-2 gap-2">
+                            {currentSplitPayments.map((split: any) => (
+                              <div key={split.id} className="bg-gray-700 rounded-lg p-2">
+                                <p className="text-xs text-white">Split {split.splitIndex}</p>
+                                <p className="text-xs text-green-400">${split.amount}</p>
+                                <p className={`text-xs ${split.status === 'completed' ? 'text-green-400' : 'text-yellow-400'}`}>
+                                  {split.status}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <BillSplit 
+                      transactionId={activeTransaction.id}
+                      totalAmount={parseFloat(activeTransaction.price)}
+                      merchantId={merchantId!.toString()}
+                      onSplitCreated={onSplitCreated}
+                    />
+                  )
+                ) : (
+                  <div className="text-center py-3">
+                    <p className="text-gray-400 text-xs">Create a transaction first to split the bill</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -522,8 +654,95 @@ function ActionsToolbar({
             <div className="space-y-2" data-testid="send-panel">
               <h3 className="text-sm font-semibold text-white">Share Payment Link</h3>
               <p className="text-xs text-gray-400">Send payment link to customer via email or SMS</p>
-              <div className="text-center py-4">
-                <p className="text-gray-500 text-xs">Share link feature coming soon</p>
+              <div className="py-2">
+                {merchant?.paymentUrl ? (
+                  <div className="space-y-3">
+                    {/* Payment URL Display */}
+                    <div className="bg-gray-700 rounded-xl p-3">
+                      <p className="text-xs text-gray-300 mb-2">Payment Link:</p>
+                      <div className="bg-gray-800 rounded-lg p-2 text-xs text-white break-all">
+                        {merchant.paymentUrl}
+                      </div>
+                    </div>
+
+                    {/* Copy Link Button */}
+                    <Button
+                      onClick={() => copyPaymentLinkToClipboard(merchant.paymentUrl)}
+                      className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg h-10"
+                      data-testid="copy-payment-link"
+                    >
+                      {copiedPaymentLink ? (
+                        <>
+                          <Check size={16} className="mr-2" />
+                          Link Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={16} className="mr-2" />
+                          Copy Link
+                        </>
+                      )}
+                    </Button>
+
+                    {/* Share Options */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <Button
+                        onClick={() => sharePaymentLink('email', merchant.paymentUrl)}
+                        variant="outline"
+                        className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 text-xs py-2"
+                        data-testid="share-email"
+                      >
+                        <Mail size={14} className="mr-1" />
+                        Email
+                      </Button>
+                      <Button
+                        onClick={() => sharePaymentLink('sms', merchant.paymentUrl)}
+                        variant="outline"
+                        className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 text-xs py-2"
+                        data-testid="share-sms"
+                      >
+                        <MessageCircle size={14} className="mr-1" />
+                        SMS
+                      </Button>
+                      <Button
+                        onClick={() => window.open(merchant.qrCodeUrl, '_blank')}
+                        variant="outline"
+                        className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 text-xs py-2"
+                        data-testid="view-qr"
+                      >
+                        <QrCode size={14} className="mr-1" />
+                        QR Code
+                      </Button>
+                    </div>
+
+                    {/* Tapt Stone Links */}
+                    {taptStones && taptStones.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="text-xs font-medium text-gray-300">Stone-Specific Links:</h4>
+                        <div className="space-y-1">
+                          {taptStones.map((stone: any) => (
+                            <div key={stone.id} className="bg-gray-700 rounded-lg p-2 flex items-center justify-between">
+                              <span className="text-xs text-white">Stone {stone.stoneNumber}</span>
+                              <Button
+                                onClick={() => copyPaymentLinkToClipboard(stone.paymentUrl)}
+                                variant="ghost" 
+                                size="sm"
+                                className="text-gray-300 hover:text-white h-6 px-2"
+                                data-testid={`copy-stone-link-${stone.id}`}
+                              >
+                                <Copy size={12} />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-3">
+                    <p className="text-gray-400 text-xs">Payment URL not available</p>
+                  </div>
+                )}
               </div>
             </div>
           )}

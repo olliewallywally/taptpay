@@ -8,10 +8,11 @@ import { useToast } from '@/hooks/use-toast';
 interface BillSplitProps {
   transactionId: number;
   totalAmount: number;
+  merchantId: string;
   onSplitCreated: () => void;
 }
 
-export function BillSplit({ transactionId, totalAmount, onSplitCreated }: BillSplitProps) {
+export function BillSplit({ transactionId, totalAmount, merchantId, onSplitCreated }: BillSplitProps) {
   const [splitCount, setSplitCount] = useState(2);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isCreatingSplit, setIsCreatingSplit] = useState(false);
@@ -34,33 +35,25 @@ export function BillSplit({ transactionId, totalAmount, onSplitCreated }: BillSp
       
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast({
         title: "Bill Split Created",
         description: `Bill split into ${splitCount} payments of $${(totalAmount / splitCount).toFixed(2)} each`,
       });
       
-      // Invalidate both transaction queries to refresh data
-      queryClient.invalidateQueries({ 
-        queryKey: [`/api/transactions/${transactionId}`] 
-      });
-      
-      // Also invalidate the active transaction query for immediate UI update
-      const pathParts = window.location.pathname.split('/');
-      const payIndex = pathParts.indexOf('pay');
-      if (payIndex !== -1 && pathParts[payIndex + 1]) {
-        const merchantId = parseInt(pathParts[payIndex + 1]);
-        if (!isNaN(merchantId)) {
-          queryClient.invalidateQueries({ 
-            queryKey: ["/api/merchants", merchantId, "active-transaction"] 
-          });
-        }
+      // Use setQueryData to update cache with the returned data to avoid unnecessary refetch
+      if (data && data.transaction) {
+        queryClient.setQueryData(
+          ["api/merchants", merchantId, "active-transaction"], 
+          data.transaction
+        );
       }
       
       // Collapse the component after successful creation
       setIsExpanded(false);
       setIsCreatingSplit(false);
       
+      // Let parent handle any additional query invalidations
       onSplitCreated();
     },
     onError: (error: any) => {
