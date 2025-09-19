@@ -816,52 +816,45 @@ function PaymentStatus({ transaction }: { transaction: any }) {
 }
 
   return (
-    <div 
-      className="min-h-screen text-white relative overflow-hidden"
-      style={{
-        background: 'linear-gradient(-45deg, #1a1a1a, #2d2d2d, #1e1e1e, #333333)',
-        backgroundSize: '400% 400%',
-        animation: 'gradient 15s ease infinite'
-      }}
-    >
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-black to-gray-900 text-white relative overflow-hidden">
 
       {/* Main content container */}
       <div className="relative z-10 min-h-screen">
 
         {/* Two-Pane Layout Container */}
-        <div className="max-w-6xl mx-auto px-4 pt-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="max-w-6xl mx-auto px-2 sm:px-4 pt-4 sm:pt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8">
             
             {/* Left Pane: Amount & Actions */}
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {/* Amount Box */}
               <div>
                 {currentTransaction || activeTransaction ? (
                   <div 
-                    className="rounded-2xl p-6 text-center"
+                    className="rounded-2xl p-4 sm:p-6 text-center"
                     style={{ backgroundColor: '#00FF66' }}
                     data-testid="active-transaction-display"
                   >
-                    <div className="text-black text-lg font-medium mb-2">Total</div>
-                    <div className="text-black text-4xl font-bold">
+                    <div className="text-black text-base sm:text-lg font-medium mb-1 sm:mb-2">Total</div>
+                    <div className="text-black text-3xl sm:text-4xl font-bold">
                       ${parseFloat((currentTransaction || activeTransaction).price).toFixed(2)}
                     </div>
-                    <div className="text-black text-sm mt-2">
+                    <div className="text-black text-xs sm:text-sm mt-1 sm:mt-2">
                       {(currentTransaction || activeTransaction).itemName}
                     </div>
                   </div>
                 ) : (
                   <div 
-                    className="rounded-2xl p-6 text-center border-2 border-dashed cursor-pointer"
+                    className="rounded-2xl p-4 sm:p-6 text-center border-2 border-dashed cursor-pointer"
                     style={{ borderColor: '#00FF66' }}
                     data-testid="no-transaction-placeholder"
                   >
-                    <div className="text-gray-400 text-lg font-medium mb-2">Total</div>
-                    <div className="text-gray-400 text-4xl font-bold">$0.00</div>
-                    <div className="text-gray-400 text-sm mt-2">
+                    <div className="text-gray-400 text-base sm:text-lg font-medium mb-1 sm:mb-2">Total</div>
+                    <div className="text-gray-400 text-3xl sm:text-4xl font-bold">$0.00</div>
+                    <div className="text-gray-400 text-xs sm:text-sm mt-1 sm:mt-2">
                       No active transaction
                     </div>
-                    <div className="text-gray-500 text-xs mt-3">
+                    <div className="text-gray-500 text-xs mt-2 sm:mt-3">
                       Click "New Payment" below to get started
                     </div>
                   </div>
@@ -870,8 +863,8 @@ function PaymentStatus({ transaction }: { transaction: any }) {
 
               {/* Quick Amount Presets */}
               {!currentTransaction && !activeTransaction && (
-                <div className="bg-gray-800/50 rounded-2xl p-4">
-                  <h3 className="text-sm font-medium text-white mb-3">Quick Amounts</h3>
+                <div className="bg-gray-800/50 rounded-2xl p-3 sm:p-4">
+                  <h3 className="text-xs sm:text-sm font-medium text-white mb-2 sm:mb-3">Quick Amounts</h3>
                   <div className="grid grid-cols-3 gap-2">
                     {[5, 10, 20, 25, 50, 100].map((amount) => (
                       <button
@@ -881,7 +874,7 @@ function PaymentStatus({ transaction }: { transaction: any }) {
                           form.setValue("itemName", `$${amount} Item`);
                           setActiveAction("edit");
                         }}
-                        className="p-3 bg-gray-700 hover:bg-gray-600 rounded-xl text-white font-medium transition-colors"
+                        className="p-2 sm:p-3 bg-gray-700 hover:bg-gray-600 rounded-xl text-white text-sm sm:text-base font-medium transition-colors"
                         data-testid={`quick-amount-${amount}`}
                       >
                         ${amount}
@@ -920,7 +913,7 @@ function PaymentStatus({ transaction }: { transaction: any }) {
             </div>
 
             {/* Right Pane: QR Code & Payment Status */}
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {/* Payment Status */}
               {(currentTransaction || activeTransaction) && (
                 <PaymentStatus transaction={currentTransaction || activeTransaction} />
