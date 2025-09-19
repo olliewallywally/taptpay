@@ -450,18 +450,22 @@ function ActionsToolbar({
   activeAction, 
   handleActionClick, 
   stockTaggingComponent, 
-  itemFormComponent 
+  itemFormComponent,
+  form,
+  setActiveAction 
 }: {
   activeAction: string | null;
   handleActionClick: (action: string) => void;
   stockTaggingComponent: React.ReactNode;
   itemFormComponent: React.ReactNode;
+  form: any;
+  setActiveAction: (action: string) => void;
 }) {
   const actionButtons = [
     { id: "edit", icon: Edit, label: "New Payment", testId: "button-new-payment" },
     { id: "split", icon: Split, label: "Split Bill", testId: "button-split-bill" },
     { id: "send", icon: Send, label: "Share Link", testId: "button-share-link" },
-    { id: "more", icon: MoreHorizontal, label: "More", testId: "button-more-options" }
+    { id: "quick", icon: Tag, label: "Quick Amounts", testId: "button-quick-amounts" }
   ];
 
   return (
@@ -524,14 +528,24 @@ function ActionsToolbar({
             </div>
           )}
 
-          {activeAction === "more" && (
-            <div className="space-y-2" data-testid="more-panel">
-              <h3 className="text-sm font-semibold text-white">More Options</h3>
-              <div className="grid grid-cols-2 gap-2">
-                <button className="p-2 bg-gray-700 rounded text-xs">Recurring</button>
-                <button className="p-2 bg-gray-700 rounded text-xs">Invoice</button>
-                <button className="p-2 bg-gray-700 rounded text-xs">Receipt</button>
-                <button className="p-2 bg-gray-700 rounded text-xs">History</button>
+          {activeAction === "quick" && (
+            <div className="space-y-2" data-testid="quick-panel">
+              <h3 className="text-sm font-semibold text-white">Quick Amounts</h3>
+              <div className="grid grid-cols-3 gap-2">
+                {[5, 10, 20, 25, 50, 100].map((amount) => (
+                  <button
+                    key={amount}
+                    onClick={() => {
+                      form.setValue("price", amount.toString());
+                      form.setValue("itemName", `$${amount} Item`);
+                      setActiveAction("edit");
+                    }}
+                    className="p-2 sm:p-3 bg-gray-700 hover:bg-gray-600 rounded-xl text-white text-sm font-medium transition-colors"
+                    data-testid={`quick-amount-${amount}`}
+                  >
+                    ${amount}
+                  </button>
+                ))}
               </div>
             </div>
           )}
@@ -826,7 +840,7 @@ function PaymentStatus({ transaction }: { transaction: any }) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-12">
             
             {/* Left Pane: Amount & Actions */}
-            <div className="space-y-4 sm:space-y-6 max-w-md mx-auto lg:mx-0">
+            <div className="space-y-4 sm:space-y-6 max-w-lg mx-auto lg:mx-0">
               {/* Amount Box */}
               <div>
                 {currentTransaction || activeTransaction ? (
@@ -861,28 +875,6 @@ function PaymentStatus({ transaction }: { transaction: any }) {
                 )}
               </div>
 
-              {/* Quick Amount Presets */}
-              {(
-                <div className="bg-gray-800/50 rounded-2xl p-3 sm:p-4 max-w-sm mx-auto">
-                  <h3 className="text-xs sm:text-sm font-medium text-white mb-2 sm:mb-3">Quick Amounts</h3>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[5, 10, 20, 25, 50, 100].map((amount) => (
-                      <button
-                        key={amount}
-                        onClick={() => {
-                          form.setValue("price", amount.toString());
-                          form.setValue("itemName", `$${amount} Item`);
-                          setActiveAction("edit");
-                        }}
-                        className="p-2 sm:p-3 bg-gray-700 hover:bg-gray-600 rounded-xl text-white text-sm sm:text-base font-medium transition-colors"
-                        data-testid={`quick-amount-${amount}`}
-                      >
-                        ${amount}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               {/* Actions Toolbar */}
               <ActionsToolbar 
@@ -909,11 +901,13 @@ function PaymentStatus({ transaction }: { transaction: any }) {
                     isSubmitting={createTransactionMutation.isPending}
                   />
                 }
+                form={form}
+                setActiveAction={setActiveAction}
               />
             </div>
 
             {/* Right Pane: QR Code & Payment Status */}
-            <div className="space-y-4 sm:space-y-6 max-w-md mx-auto lg:mx-0">
+            <div className="space-y-4 sm:space-y-6 max-w-lg mx-auto lg:mx-0">
               {/* Payment Status */}
               {(currentTransaction || activeTransaction) && (
                 <PaymentStatus transaction={currentTransaction || activeTransaction} />
