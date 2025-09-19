@@ -822,11 +822,11 @@ function PaymentStatus({ transaction }: { transaction: any }) {
       <div className="relative z-10 min-h-screen">
 
         {/* Two-Pane Layout Container */}
-        <div className="max-w-6xl mx-auto px-2 sm:px-4 pt-4 sm:pt-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8">
+        <div className="max-w-5xl mx-auto px-3 sm:px-6 pt-4 sm:pt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-12">
             
             {/* Left Pane: Amount & Actions */}
-            <div className="space-y-4 sm:space-y-6">
+            <div className="space-y-4 sm:space-y-6 max-w-md mx-auto lg:mx-0">
               {/* Amount Box */}
               <div>
                 {currentTransaction || activeTransaction ? (
@@ -862,8 +862,8 @@ function PaymentStatus({ transaction }: { transaction: any }) {
               </div>
 
               {/* Quick Amount Presets */}
-              {!currentTransaction && !activeTransaction && (
-                <div className="bg-gray-800/50 rounded-2xl p-3 sm:p-4">
+              {(
+                <div className="bg-gray-800/50 rounded-2xl p-3 sm:p-4 max-w-sm mx-auto">
                   <h3 className="text-xs sm:text-sm font-medium text-white mb-2 sm:mb-3">Quick Amounts</h3>
                   <div className="grid grid-cols-3 gap-2">
                     {[5, 10, 20, 25, 50, 100].map((amount) => (
@@ -913,7 +913,7 @@ function PaymentStatus({ transaction }: { transaction: any }) {
             </div>
 
             {/* Right Pane: QR Code & Payment Status */}
-            <div className="space-y-4 sm:space-y-6">
+            <div className="space-y-4 sm:space-y-6 max-w-md mx-auto lg:mx-0">
               {/* Payment Status */}
               {(currentTransaction || activeTransaction) && (
                 <PaymentStatus transaction={currentTransaction || activeTransaction} />
