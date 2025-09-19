@@ -106,7 +106,7 @@ export function BillSplit({ transactionId, totalAmount, onSplitCreated }: BillSp
 
       {/* Expanded Content */}
       {isExpanded && (
-        <div className="mt-4 p-6 bg-gradient-to-br from-blue-900/60 to-purple-900/60 rounded-2xl border border-blue-400/30 shadow-xl animate-in slide-in-from-top-5 duration-300">
+        <div className="mt-4 p-6 bg-gradient-to-br from-green-900/60 to-emerald-900/60 rounded-2xl border border-green-400/30 shadow-xl animate-in slide-in-from-top-5 duration-300">
           <div className="space-y-6">
             {/* Split Counter */}
             <div className="flex items-center justify-center space-x-4">
@@ -115,7 +115,7 @@ export function BillSplit({ transactionId, totalAmount, onSplitCreated }: BillSp
                 size="icon"
                 onClick={() => adjustSplitCount(-1)}
                 disabled={splitCount <= 2 || createSplitMutation.isPending || isCreatingSplit}
-                className="h-12 w-12 rounded-full bg-blue-600/70 border-blue-400/50 hover:bg-blue-500/80 text-white"
+                className="h-12 w-12 rounded-full bg-green-600/70 border-green-400/50 hover:bg-green-500/80 text-white"
               >
                 <Minus className="w-5 h-5" />
               </Button>
@@ -130,7 +130,7 @@ export function BillSplit({ transactionId, totalAmount, onSplitCreated }: BillSp
                 size="icon"
                 onClick={() => adjustSplitCount(1)}
                 disabled={splitCount >= 10 || createSplitMutation.isPending || isCreatingSplit}
-                className="h-12 w-12 rounded-full bg-blue-600/70 border-blue-400/50 hover:bg-blue-500/80 text-white"
+                className="h-12 w-12 rounded-full bg-green-600/70 border-green-400/50 hover:bg-green-500/80 text-white"
               >
                 <Plus className="w-5 h-5" />
               </Button>
@@ -161,7 +161,7 @@ export function BillSplit({ transactionId, totalAmount, onSplitCreated }: BillSp
               <Button
                 onClick={handleCreateSplit}
                 disabled={createSplitMutation.isPending || isCreatingSplit}
-                className="flex-1 h-12 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg transition-all duration-200"
+                className="flex-1 h-12 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold rounded-xl shadow-lg transition-all duration-200"
               >
                 {createSplitMutation.isPending || isCreatingSplit
                   ? "Creating..."
