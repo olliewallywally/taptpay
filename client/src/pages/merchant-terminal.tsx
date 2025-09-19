@@ -840,7 +840,7 @@ function PaymentStatus({ transaction }: { transaction: any }) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-12">
             
             {/* Left Pane: Amount & Actions */}
-            <div className="space-y-4 sm:space-y-6 max-w-lg mx-auto lg:mx-0">
+            <div className="space-y-4 sm:space-y-6 w-full max-w-2xl mx-auto lg:mx-0">
               {/* Amount Box */}
               <div>
                 {currentTransaction || activeTransaction ? (
@@ -907,7 +907,7 @@ function PaymentStatus({ transaction }: { transaction: any }) {
             </div>
 
             {/* Right Pane: QR Code & Payment Status */}
-            <div className="space-y-4 sm:space-y-6 max-w-lg mx-auto lg:mx-0">
+            <div className="space-y-4 sm:space-y-6 w-full max-w-2xl mx-auto lg:mx-0">
               {/* Payment Status */}
               {(currentTransaction || activeTransaction) && (
                 <PaymentStatus transaction={currentTransaction || activeTransaction} />
