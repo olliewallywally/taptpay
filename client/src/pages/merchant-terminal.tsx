@@ -16,7 +16,7 @@ import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
 import { useDeviceStatusMonitoring, useSSEConnectionMonitoring } from "@/components/notification-system";
 import { getCurrentMerchantId } from "@/lib/auth";
-import { Send, Loader2, CheckCircle, Clock, XCircle, Eye, Copy, Check, QrCode, Smartphone, Waves, CreditCard, X, Menu, Edit, Split, MoreHorizontal, ChevronDown, Tag } from "lucide-react";
+import { Send, Loader2, CheckCircle, Clock, XCircle, Eye, Copy, Check, QrCode, Smartphone, Waves, CreditCard, X, Edit, Split, MoreHorizontal, ChevronDown, Tag } from "lucide-react";
 import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
 import { Link } from "wouter";
 
@@ -31,7 +31,6 @@ export default function MerchantTerminal() {
   const [currentTransaction, setCurrentTransaction] = useState<any>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [stonesCollapsed, setStonesCollapsed] = useState(true);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const [selectedStoneId, setSelectedStoneId] = useState<number | null>(null);
   const [qrCollapsed, setQrCollapsed] = useState(false);
@@ -825,37 +824,12 @@ function PaymentStatus({ transaction }: { transaction: any }) {
         animation: 'gradient 15s ease infinite'
       }}
     >
-      {/* Menu overlay */}
-      {menuOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-40"
-          onClick={() => setMenuOpen(false)}
-        />
-      )}
 
       {/* Main content container */}
-      <div 
-        className="relative z-10 min-h-screen transition-transform duration-300 ease-in-out"
-        style={{
-          transform: menuOpen ? 'translateX(-70%)' : 'translateX(0)',
-        }}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-6">
-          <div className="flex items-center">
-          </div>
-          <div className="flex items-center">
-            <button
-              onClick={() => setMenuOpen(!menuOpen)}
-              className="p-1 rounded-lg transition-colors"
-            >
-              <Menu size={24} />
-            </button>
-          </div>
-        </div>
+      <div className="relative z-10 min-h-screen">
 
         {/* Two-Pane Layout Container */}
-        <div className="max-w-6xl mx-auto px-4">
+        <div className="max-w-6xl mx-auto px-4 pt-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             
             {/* Left Pane: Amount & Actions */}
