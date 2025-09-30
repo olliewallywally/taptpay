@@ -117,7 +117,7 @@ export const AnimatedBrandBackground = memo(({
       </div>
 
       {/* Content Layer */}
-      <div className="relative z-10 w-full">
+      <div className="relative z-10 flex items-center justify-center w-full">
         {children}
       </div>
     </div>
