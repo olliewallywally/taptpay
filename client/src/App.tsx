@@ -14,8 +14,8 @@ import Dashboard from "@/pages/dashboard";
 import Settings from "@/pages/settings";
 import Transactions from "@/pages/transactions";
 import NFCPayment from "@/pages/nfc-payment";
-
-
+import CryptoTerminal from "@/pages/crypto-terminal";
+import CryptoPayment from "@/pages/crypto-payment";
 
 import Login from "@/pages/login";
 import MerchantSignup from "@/pages/merchant-signup";
@@ -204,6 +204,13 @@ function Router() {
             <NFCPayment />
           </ProtectedRoute>
         </Route>
+        <Route path="/crypto-terminal">
+          <ProtectedRoute>
+            <Layout>
+              <CryptoTerminal />
+            </Layout>
+          </ProtectedRoute>
+        </Route>
 
         <Route path="/admin/login" component={AdminLogin} />
         <Route path="/admin/dashboard">
@@ -239,6 +246,7 @@ function Router() {
         <Route path="/verify-merchant" component={VerifyMerchant} />
         <Route path="/pay/:merchantId" component={CustomerPayment} />
         <Route path="/pay/:merchantId/stone/:stoneId" component={CustomerPayment} />
+        <Route path="/crypto-pay/:transactionId" component={CryptoPayment} />
         <Route path="/receipt/:transactionId" component={Receipt} />
         <Route component={NotFound} />
       </Switch>

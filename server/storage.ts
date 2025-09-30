@@ -1,4 +1,4 @@
-import { merchants, transactions, merchantSettlements, platformFees, refunds, splitPayments, taptStones, stockItems, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem } from "@shared/schema";
+import { merchants, transactions, merchantSettlements, platformFees, refunds, splitPayments, taptStones, stockItems, cryptoTransactions, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type CryptoTransaction, type InsertCryptoTransaction } from "@shared/schema";
 import { getDb, isDatabaseConnected } from "./database";
 import { eq, desc, and } from "drizzle-orm";
 
@@ -64,6 +64,12 @@ export interface IStorage {
   getStockItemsByMerchant(merchantId: number): Promise<StockItem[]>;
   updateStockItem(id: number, data: Partial<InsertStockItem>): Promise<StockItem | undefined>;
   deleteStockItem(id: number): Promise<boolean>;
+  
+  // Crypto Transaction operations
+  createCryptoTransaction(data: InsertCryptoTransaction): Promise<CryptoTransaction>;
+  getCryptoTransaction(id: number): Promise<CryptoTransaction | undefined>;
+  getCryptoTransactionByTransactionId(transactionId: number): Promise<CryptoTransaction | undefined>;
+  updateCryptoTransactionStatus(id: number, status: string, confirmations?: number): Promise<CryptoTransaction | undefined>;
   
   // Analytics operations
   getMerchantAnalytics(merchantId: number): Promise<{
@@ -140,9 +146,11 @@ export class MemStorage implements IStorage {
   private splitPayments: Map<number, any>;
   private taptStones: Map<number, TaptStone>;
   private stockItems: Map<number, StockItem>;
+  private cryptoTransactions: Map<number, CryptoTransaction>;
   private currentMerchantId: number;
   private currentTransactionId: number;
   private currentPlatformFeeId: number;
+  private currentCryptoTransactionId: number;
   private currentRefundId: number;
   private currentSplitPaymentId: number;
   private currentTaptStoneId: number;
@@ -157,6 +165,7 @@ export class MemStorage implements IStorage {
     this.splitPayments = new Map();
     this.taptStones = new Map();
     this.stockItems = new Map();
+    this.cryptoTransactions = new Map();
     this.currentMerchantId = 1;
     this.currentTransactionId = 1;
     this.currentPlatformFeeId = 1;
@@ -164,6 +173,7 @@ export class MemStorage implements IStorage {
     this.currentSplitPaymentId = 1;
     this.currentTaptStoneId = 1;
     this.currentStockItemId = 1;
+    this.currentCryptoTransactionId = 1;
     this.activeTransactionCache = new Map();
   }
 
@@ -1115,6 +1125,47 @@ export class MemStorage implements IStorage {
     }
     return false;
   }
+
+  async createCryptoTransaction(data: InsertCryptoTransaction): Promise<CryptoTransaction> {
+    const id = this.currentCryptoTransactionId++;
+    const cryptoTransaction: CryptoTransaction = {
+      ...data,
+      id,
+      confirmations: 0,
+      createdAt: new Date(),
+      completedAt: null,
+      blockchainTxHash: null,
+      networkFeeAmount: null,
+      networkFeeFiat: null,
+    };
+    this.cryptoTransactions.set(id, cryptoTransaction);
+    return cryptoTransaction;
+  }
+
+  async getCryptoTransaction(id: number): Promise<CryptoTransaction | undefined> {
+    return this.cryptoTransactions.get(id);
+  }
+
+  async getCryptoTransactionByTransactionId(transactionId: number): Promise<CryptoTransaction | undefined> {
+    return Array.from(this.cryptoTransactions.values()).find(
+      (ct) => ct.transactionId === transactionId
+    );
+  }
+
+  async updateCryptoTransactionStatus(id: number, status: string, confirmations?: number): Promise<CryptoTransaction | undefined> {
+    const cryptoTx = this.cryptoTransactions.get(id);
+    if (cryptoTx) {
+      const updated = {
+        ...cryptoTx,
+        status,
+        confirmations: confirmations ?? cryptoTx.confirmations,
+        completedAt: status === 'confirmed' || status === 'completed' ? new Date() : cryptoTx.completedAt,
+      };
+      this.cryptoTransactions.set(id, updated);
+      return updated;
+    }
+    return undefined;
+  }
 }
 
 // Database Storage Implementation
@@ -1967,6 +2018,42 @@ export class DatabaseStorage implements IStorage {
       .where(eq(stockItems.id, id))
       .returning();
     return result.length > 0;
+  }
+
+  // Crypto Transaction methods for DatabaseStorage
+  async createCryptoTransaction(data: InsertCryptoTransaction): Promise<CryptoTransaction> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db.insert(cryptoTransactions).values(data).returning();
+    return result[0];
+  }
+
+  async getCryptoTransaction(id: number): Promise<CryptoTransaction | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db.select().from(cryptoTransactions).where(eq(cryptoTransactions.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getCryptoTransactionByTransactionId(transactionId: number): Promise<CryptoTransaction | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db.select().from(cryptoTransactions).where(eq(cryptoTransactions.transactionId, transactionId)).limit(1);
+    return result[0];
+  }
+
+  async updateCryptoTransactionStatus(id: number, status: string, confirmations?: number): Promise<CryptoTransaction | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const updateData: any = { status };
+    if (confirmations !== undefined) {
+      updateData.confirmations = confirmations;
+    }
+    if (status === 'confirmed' || status === 'completed') {
+      updateData.completedAt = new Date();
+    }
+    const result = await this.db
+      .update(cryptoTransactions)
+      .set(updateData)
+      .where(eq(cryptoTransactions.id, id))
+      .returning();
+    return result[0];
   }
 }
 
