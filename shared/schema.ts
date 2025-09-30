@@ -6,7 +6,7 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
-  merchantId: serial("merchant_id").references(() => merchants.id),
+  merchantId: integer("merchant_id").references(() => merchants.id),
   role: text("role").notNull().default("merchant"), // merchant, admin
   resetToken: text("reset_token"),
   resetTokenExpiry: timestamp("reset_token_expiry"),
@@ -46,13 +46,27 @@ export const merchants = pgTable("merchants", {
   // Theme customization
   themeId: text("theme_id").default("classic"),
   
+  // Crypto payment settings
+  coinbaseCommerceApiKey: text("coinbase_commerce_api_key"),
+  coinbaseWebhookSecret: text("coinbase_webhook_secret"),
+  cryptoEnabled: boolean("crypto_enabled").default(false),
+  enabledCryptocurrencies: text("enabled_cryptocurrencies").array(),
+  autoConvertToFiat: boolean("auto_convert_to_fiat").default(false),
+  minConfirmations: integer("min_confirmations").default(1),
+  
+  // Payment method for platform fees
+  stripeCustomerId: text("stripe_customer_id"),
+  stripePaymentMethodId: text("stripe_payment_method_id"),
+  paymentMethodLast4: text("payment_method_last4"),
+  paymentMethodBrand: text("payment_method_brand"),
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const transactions = pgTable("transactions", {
   id: serial("id").primaryKey(),
-  merchantId: serial("merchant_id").references(() => merchants.id),
+  merchantId: integer("merchant_id").references(() => merchants.id),
   itemName: text("item_name").notNull(),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   status: text("status").notNull().default("pending"), // pending, processing, completed, failed, refunded, partially_refunded
@@ -83,11 +97,45 @@ export const transactions = pgTable("transactions", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Crypto transactions table for cryptocurrency payments
+export const cryptoTransactions = pgTable("crypto_transactions", {
+  id: serial("id").primaryKey(),
+  transactionId: integer("transaction_id").references(() => transactions.id),
+  merchantId: integer("merchant_id").references(() => merchants.id),
+  
+  // Crypto payment details
+  cryptocurrency: text("cryptocurrency").notNull(), // BTC, ETH, USDC, etc.
+  walletAddress: text("wallet_address").notNull(), // Generated unique address for this payment
+  cryptoAmount: text("crypto_amount").notNull(), // Amount in crypto (stored as string for precision)
+  fiatAmount: decimal("fiat_amount", { precision: 10, scale: 2 }).notNull(), // Original amount in fiat
+  exchangeRate: decimal("exchange_rate", { precision: 18, scale: 8 }).notNull(), // Crypto to fiat rate at time of payment
+  
+  // Coinbase Commerce details
+  coinbaseChargeId: text("coinbase_charge_id").unique(), // Coinbase Commerce charge ID
+  coinbaseChargeCode: text("coinbase_charge_code"), // Short code for the charge
+  hostedUrl: text("hosted_url"), // Coinbase hosted payment page URL
+  
+  // Blockchain tracking
+  blockchainTxHash: text("blockchain_tx_hash"), // Transaction hash on blockchain
+  confirmations: integer("confirmations").default(0), // Number of blockchain confirmations
+  requiredConfirmations: integer("required_confirmations").default(1), // Required confirmations for completion
+  
+  // Network fees
+  networkFeeAmount: text("network_fee_amount"), // Gas/network fees (in crypto)
+  networkFeeFiat: decimal("network_fee_fiat", { precision: 10, scale: 2 }), // Network fees in fiat
+  
+  // Status and timing
+  status: text("status").notNull().default("pending"), // pending, confirming, confirmed, completed, failed, expired
+  expiresAt: timestamp("expires_at"), // When the payment request expires
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Split payments table to track individual payments for split bills
 export const splitPayments = pgTable("split_payments", {
   id: serial("id").primaryKey(),
-  transactionId: serial("transaction_id").references(() => transactions.id),
-  merchantId: serial("merchant_id").references(() => merchants.id),
+  transactionId: integer("transaction_id").references(() => transactions.id),
+  merchantId: integer("merchant_id").references(() => merchants.id),
   splitIndex: integer("split_index").notNull(), // Which split this is (1, 2, 3, etc.)
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(), // Amount for this split
   status: text("status").notNull().default("pending"), // pending, processing, completed, failed
@@ -106,8 +154,8 @@ export const splitPayments = pgTable("split_payments", {
 // Refunds table to track all refund activities
 export const refunds = pgTable("refunds", {
   id: serial("id").primaryKey(),
-  transactionId: serial("transaction_id").references(() => transactions.id),
-  merchantId: serial("merchant_id").references(() => merchants.id),
+  transactionId: integer("transaction_id").references(() => transactions.id),
+  merchantId: integer("merchant_id").references(() => merchants.id),
   refundAmount: decimal("refund_amount", { precision: 10, scale: 2 }).notNull(),
   refundReason: text("refund_reason"),
   refundMethod: text("refund_method").default("original_payment_method"), // original_payment_method, bank_transfer, manual
@@ -127,7 +175,7 @@ export const refunds = pgTable("refunds", {
 // Platform settlements - tracks money owed to merchants (Marketplace Model)
 export const merchantSettlements = pgTable("merchant_settlements", {
   id: serial("id").primaryKey(),
-  merchantId: serial("merchant_id").references(() => merchants.id),
+  merchantId: integer("merchant_id").references(() => merchants.id),
   settlementPeriod: text("settlement_period").notNull(), // e.g., "2025-01-01"
   totalTransactionAmount: decimal("total_transaction_amount", { precision: 10, scale: 2 }).notNull(),
   totalWindcaveFees: decimal("total_windcave_fees", { precision: 10, scale: 2 }).notNull(),
@@ -141,8 +189,8 @@ export const merchantSettlements = pgTable("merchant_settlements", {
 // Platform fees table for tracking revenue collection
 export const platformFees = pgTable("platform_fees", {
   id: serial("id").primaryKey(),
-  transactionId: serial("transaction_id").references(() => transactions.id),
-  merchantId: serial("merchant_id").references(() => merchants.id),
+  transactionId: integer("transaction_id").references(() => transactions.id),
+  merchantId: integer("merchant_id").references(() => merchants.id),
   feeAmount: decimal("fee_amount", { precision: 10, scale: 2 }).notNull(),
   transactionAmount: decimal("transaction_amount", { precision: 10, scale: 2 }).notNull(),
   status: text("status").notNull().default("pending"), // pending, collected, failed
@@ -277,7 +325,7 @@ export const insertPlatformFeeSchema = createInsertSchema(platformFees).omit({
 // Tapt Stones table - multiple QR codes per merchant
 export const taptStones = pgTable("tapt_stones", {
   id: serial("id").primaryKey(),
-  merchantId: serial("merchant_id").references(() => merchants.id),
+  merchantId: integer("merchant_id").references(() => merchants.id),
   name: text("name").notNull(), // e.g., "Stone 1", "Stone 2", etc.
   stoneNumber: integer("stone_number").notNull(), // 1, 2, 3, etc.
   qrCodeUrl: text("qr_code_url"),
@@ -290,7 +338,7 @@ export const taptStones = pgTable("tapt_stones", {
 // Stock Items table - merchant inventory management
 export const stockItems = pgTable("stock_items", {
   id: serial("id").primaryKey(),
-  merchantId: serial("merchant_id").references(() => merchants.id),
+  merchantId: integer("merchant_id").references(() => merchants.id),
   name: text("name").notNull(),
   description: text("description"),
   cost: decimal("cost", { precision: 10, scale: 2 }).notNull(),
@@ -302,7 +350,7 @@ export const stockItems = pgTable("stock_items", {
 // API Keys table for ecommerce integration
 export const apiKeys = pgTable("api_keys", {
   id: serial("id").primaryKey(),
-  merchantId: serial("merchant_id").references(() => merchants.id),
+  merchantId: integer("merchant_id").references(() => merchants.id),
   keyName: text("key_name").notNull(), // User-friendly name for the key
   apiKey: text("api_key").notNull().unique(), // The actual API key (hashed)
   keyPrefix: text("key_prefix").notNull(), // First 8 chars for display (e.g., "tapt_live_")
@@ -312,7 +360,7 @@ export const apiKeys = pgTable("api_keys", {
   webhookUrl: text("webhook_url"), // Optional webhook endpoint
   webhookSecret: text("webhook_secret"), // Secret for webhook signing
   lastUsedAt: timestamp("last_used_at"),
-  rateLimitPerHour: serial("rate_limit_per_hour").default(1000), // API rate limiting
+  rateLimitPerHour: integer("rate_limit_per_hour").default(1000), // API rate limiting
   createdAt: timestamp("created_at").defaultNow(),
   expiresAt: timestamp("expires_at"), // Optional expiration
 });
@@ -320,16 +368,16 @@ export const apiKeys = pgTable("api_keys", {
 // API Requests tracking table
 export const apiRequests = pgTable("api_requests", {
   id: serial("id").primaryKey(),
-  apiKeyId: serial("api_key_id").references(() => apiKeys.id),
-  merchantId: serial("merchant_id").references(() => merchants.id),
+  apiKeyId: integer("api_key_id").references(() => apiKeys.id),
+  merchantId: integer("merchant_id").references(() => merchants.id),
   endpoint: text("endpoint").notNull(), // e.g., "/api/v1/transactions"
   method: text("method").notNull(), // GET, POST, PUT, DELETE
-  statusCode: serial("status_code").notNull(), // HTTP status code
-  responseTime: serial("response_time"), // Response time in milliseconds
+  statusCode: integer("status_code").notNull(), // HTTP status code
+  responseTime: integer("response_time"), // Response time in milliseconds
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
-  requestSize: serial("request_size"), // Request body size in bytes
-  responseSize: serial("response_size"), // Response body size in bytes
+  requestSize: integer("request_size"), // Request body size in bytes
+  responseSize: integer("response_size"), // Response body size in bytes
   errorMessage: text("error_message"), // Error details if any
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -337,16 +385,16 @@ export const apiRequests = pgTable("api_requests", {
 // Webhook Deliveries tracking
 export const webhookDeliveries = pgTable("webhook_deliveries", {
   id: serial("id").primaryKey(),
-  apiKeyId: serial("api_key_id").references(() => apiKeys.id),
-  merchantId: serial("merchant_id").references(() => merchants.id),
-  transactionId: serial("transaction_id").references(() => transactions.id),
+  apiKeyId: integer("api_key_id").references(() => apiKeys.id),
+  merchantId: integer("merchant_id").references(() => merchants.id),
+  transactionId: integer("transaction_id").references(() => transactions.id),
   eventType: text("event_type").notNull(), // transaction.created, transaction.completed, etc.
   webhookUrl: text("webhook_url").notNull(),
   payload: text("payload").notNull(), // JSON payload sent
-  httpStatus: serial("http_status"), // Response HTTP status
+  httpStatus: integer("http_status"), // Response HTTP status
   responseBody: text("response_body"), // Response from merchant webhook
-  attemptCount: serial("attempt_count").default(1),
-  maxAttempts: serial("max_attempts").default(3),
+  attemptCount: integer("attempt_count").default(1),
+  maxAttempts: integer("max_attempts").default(3),
   nextRetryAt: timestamp("next_retry_at"),
   deliveredAt: timestamp("delivered_at"),
   failedAt: timestamp("failed_at"),
@@ -411,6 +459,34 @@ export const insertUserSchema = createInsertSchema(users).omit({
   resetTokenExpiry: true,
 });
 
+// Crypto transaction schemas
+export const insertCryptoTransactionSchema = createInsertSchema(cryptoTransactions).omit({
+  id: true,
+  createdAt: true,
+  completedAt: true,
+});
+
+export const createCryptoTransactionSchema = z.object({
+  itemName: z.string().min(1, "Item name is required"),
+  fiatAmount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid amount format"),
+  cryptocurrency: z.enum(["BTC", "ETH", "USDC", "USDT", "LTC", "BCH"]).default("BTC"),
+});
+
+// Merchant settings schemas
+export const updateMerchantCryptoSettingsSchema = z.object({
+  coinbaseCommerceApiKey: z.string().min(1, "API key is required"),
+  cryptoEnabled: z.boolean().default(true),
+  enabledCryptocurrencies: z.array(z.string()).min(1, "Select at least one cryptocurrency"),
+  autoConvertToFiat: z.boolean().default(false),
+  minConfirmations: z.number().min(1).max(6).default(1),
+});
+
+export const updateMerchantPaymentMethodSchema = z.object({
+  stripePaymentMethodId: z.string().min(1, "Payment method is required"),
+  paymentMethodLast4: z.string().length(4, "Last 4 digits required"),
+  paymentMethodBrand: z.string().min(1, "Card brand is required"),
+});
+
 // Type exports - consolidated to avoid duplicates
 export type Merchant = typeof merchants.$inferSelect;
 export type InsertMerchant = z.infer<typeof createMerchantSchema>;
@@ -438,3 +514,8 @@ export type CreateTaptStone = z.infer<typeof createTaptStoneSchema>;
 export type StockItem = typeof stockItems.$inferSelect;
 export type InsertStockItem = z.infer<typeof insertStockItemSchema>;
 export type CreateStockItem = z.infer<typeof createStockItemSchema>;
+
+// Crypto Transaction types
+export type CryptoTransaction = typeof cryptoTransactions.$inferSelect;
+export type InsertCryptoTransaction = z.infer<typeof insertCryptoTransactionSchema>;
+export type CreateCryptoTransaction = z.infer<typeof createCryptoTransactionSchema>;
