@@ -285,11 +285,9 @@ export default function Dashboard() {
                     <p className="text-xs text-white/70 sm:hidden">Target: 200K 🎁</p>
                   </div>
                   <div className="text-left sm:text-right">
-                    <div className="text-xl sm:text-2xl font-bold text-[#00FF66]">
-                      {analytics?.totalTransactions?.toLocaleString() || "0"}
-                    </div>
-                    <div className="text-xs sm:text-sm text-white/70">
-                      / 200,000
+                    <div className="text-xl sm:text-2xl font-bold">
+                      <span className="text-[#00FF66]">{analytics?.totalTransactions?.toLocaleString() || "0"}</span>
+                      <span className="text-xs sm:text-sm text-white/70"> / 200,000</span>
                     </div>
                   </div>
                 </div>
