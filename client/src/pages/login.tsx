@@ -15,6 +15,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { LogIn, Shield, UserPlus, Store, ArrowLeft, ChevronDown, ChevronUp } from "lucide-react";
 import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
 import { createMerchantSchema, type CreateMerchant } from "@shared/schema";
+import { AnimatedBrandBackground } from "@/components/backgrounds/AnimatedBrandBackground";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -133,53 +134,8 @@ export default function Login() {
 
   if (showSignup) {
     return (
-      <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
-        {/* Solid Turquoise Background */}
-        <div className="absolute inset-0 bg-[#00D4D4]">
-          {/* Large Blue Circle - Bottom Right Corner */}
-          <div className="absolute w-96 h-96 bg-[#0000FF] rounded-full bottom-[-120px] right-[-120px]" 
-            style={{ 
-              animation: 'slowFloat1 20s ease-in-out infinite',
-            }}
-          />
-          {/* Smaller Blue Circle - Above on Angle */}
-          <div className="absolute w-48 h-48 bg-[#0000FF] rounded-full bottom-[200px] right-[250px]" 
-            style={{ 
-              animation: 'slowFloat2 25s ease-in-out infinite',
-            }}
-          />
-          
-          {/* Floating Line-art Shapes */}
-          {/* Triangle 1 */}
-          <svg className="absolute top-[15%] left-[10%] w-12 h-12 text-white opacity-60" style={{ animation: 'floatShape1 15s ease-in-out infinite' }}>
-            <polygon points="24,4 44,44 4,44" fill="none" stroke="currentColor" strokeWidth="2" />
-          </svg>
-          {/* Triangle 2 */}
-          <svg className="absolute top-[70%] left-[80%] w-10 h-10 text-white opacity-60" style={{ animation: 'floatShape2 18s ease-in-out infinite' }}>
-            <polygon points="20,4 36,36 4,36" fill="none" stroke="currentColor" strokeWidth="2" />
-          </svg>
-          {/* Box 1 */}
-          <svg className="absolute top-[25%] right-[15%] w-11 h-11 text-white opacity-60" style={{ animation: 'floatShape3 20s ease-in-out infinite' }}>
-            <rect x="4" y="4" width="36" height="36" fill="none" stroke="currentColor" strokeWidth="2" />
-          </svg>
-          {/* Box 2 */}
-          <svg className="absolute bottom-[30%] left-[20%] w-9 h-9 text-white opacity-60" style={{ animation: 'floatShape4 16s ease-in-out infinite' }}>
-            <rect x="4" y="4" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2" />
-          </svg>
-          {/* X 1 */}
-          <svg className="absolute top-[60%] right-[25%] w-10 h-10 text-white opacity-60" style={{ animation: 'floatShape5 14s ease-in-out infinite' }}>
-            <line x1="6" y1="6" x2="34" y2="34" stroke="currentColor" strokeWidth="2" />
-            <line x1="34" y1="6" x2="6" y2="34" stroke="currentColor" strokeWidth="2" />
-          </svg>
-          {/* X 2 */}
-          <svg className="absolute top-[40%] left-[15%] w-12 h-12 text-white opacity-60" style={{ animation: 'floatShape6 17s ease-in-out infinite' }}>
-            <line x1="8" y1="8" x2="40" y2="40" stroke="currentColor" strokeWidth="2" />
-            <line x1="40" y1="8" x2="8" y2="40" stroke="currentColor" strokeWidth="2" />
-          </svg>
-        </div>
-
-        {/* Glass Morphism Container - Smaller */}
-        <div className="relative z-10 w-full max-w-sm">
+      <AnimatedBrandBackground>
+        <div className="w-full max-w-sm">
           <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-8 shadow-2xl">
             
             {/* Logo Section */}
@@ -339,58 +295,13 @@ export default function Login() {
             </div>
           </div>
         </div>
-      </div>
+      </AnimatedBrandBackground>
     );
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
-      {/* Solid Turquoise Background */}
-      <div className="absolute inset-0 bg-[#00D4D4]">
-        {/* Large Blue Circle - Bottom Right Corner */}
-        <div className="absolute w-96 h-96 bg-[#0000FF] rounded-full bottom-[-120px] right-[-120px]" 
-          style={{ 
-            animation: 'slowFloat1 20s ease-in-out infinite',
-          }}
-        />
-        {/* Smaller Blue Circle - Above on Angle */}
-        <div className="absolute w-48 h-48 bg-[#0000FF] rounded-full bottom-[200px] right-[250px]" 
-          style={{ 
-            animation: 'slowFloat2 25s ease-in-out infinite',
-          }}
-        />
-        
-        {/* Floating Line-art Shapes */}
-        {/* Triangle 1 */}
-        <svg className="absolute top-[15%] left-[10%] w-12 h-12 text-white opacity-60" style={{ animation: 'floatShape1 15s ease-in-out infinite' }}>
-          <polygon points="24,4 44,44 4,44" fill="none" stroke="currentColor" strokeWidth="2" />
-        </svg>
-        {/* Triangle 2 */}
-        <svg className="absolute top-[70%] left-[80%] w-10 h-10 text-white opacity-60" style={{ animation: 'floatShape2 18s ease-in-out infinite' }}>
-          <polygon points="20,4 36,36 4,36" fill="none" stroke="currentColor" strokeWidth="2" />
-        </svg>
-        {/* Box 1 */}
-        <svg className="absolute top-[25%] right-[15%] w-11 h-11 text-white opacity-60" style={{ animation: 'floatShape3 20s ease-in-out infinite' }}>
-          <rect x="4" y="4" width="36" height="36" fill="none" stroke="currentColor" strokeWidth="2" />
-        </svg>
-        {/* Box 2 */}
-        <svg className="absolute bottom-[30%] left-[20%] w-9 h-9 text-white opacity-60" style={{ animation: 'floatShape4 16s ease-in-out infinite' }}>
-          <rect x="4" y="4" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2" />
-        </svg>
-        {/* X 1 */}
-        <svg className="absolute top-[60%] right-[25%] w-10 h-10 text-white opacity-60" style={{ animation: 'floatShape5 14s ease-in-out infinite' }}>
-          <line x1="6" y1="6" x2="34" y2="34" stroke="currentColor" strokeWidth="2" />
-          <line x1="34" y1="6" x2="6" y2="34" stroke="currentColor" strokeWidth="2" />
-        </svg>
-        {/* X 2 */}
-        <svg className="absolute top-[40%] left-[15%] w-12 h-12 text-white opacity-60" style={{ animation: 'floatShape6 17s ease-in-out infinite' }}>
-          <line x1="8" y1="8" x2="40" y2="40" stroke="currentColor" strokeWidth="2" />
-          <line x1="40" y1="8" x2="8" y2="40" stroke="currentColor" strokeWidth="2" />
-        </svg>
-      </div>
-
-      {/* Compact Glass Container */}
-      <div className="relative z-10 w-full max-w-xs">
+    <AnimatedBrandBackground>
+      <div className="w-full max-w-xs">
         <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 shadow-2xl">
           
           {/* Logo Section - Compact */}
@@ -566,6 +477,6 @@ export default function Login() {
           </div>
         </div>
       </div>
-    </div>
+    </AnimatedBrandBackground>
   );
 }
