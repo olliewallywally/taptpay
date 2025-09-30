@@ -137,13 +137,13 @@ export default function Login() {
         {/* Solid Turquoise Background */}
         <div className="absolute inset-0 bg-[#00D4D4]">
           {/* Large Blue Circle - Bottom Corner */}
-          <div className="absolute w-96 h-96 bg-[#2B92C8] rounded-full bottom-[-100px] left-[-100px]" 
+          <div className="absolute w-96 h-96 bg-[#0000FF] rounded-full bottom-[-100px] left-[-100px]" 
             style={{ 
               animation: 'slowFloat1 20s ease-in-out infinite',
             }}
           />
           {/* Smaller Blue Circle - Above on Angle */}
-          <div className="absolute w-48 h-48 bg-[#2B92C8] rounded-full bottom-[150px] left-[200px]" 
+          <div className="absolute w-48 h-48 bg-[#0000FF] rounded-full bottom-[150px] left-[200px]" 
             style={{ 
               animation: 'slowFloat2 25s ease-in-out infinite',
             }}
@@ -320,13 +320,13 @@ export default function Login() {
       {/* Solid Turquoise Background */}
       <div className="absolute inset-0 bg-[#00D4D4]">
         {/* Large Blue Circle - Bottom Corner */}
-        <div className="absolute w-96 h-96 bg-[#2B92C8] rounded-full bottom-[-100px] left-[-100px]" 
+        <div className="absolute w-96 h-96 bg-[#0000FF] rounded-full bottom-[-100px] left-[-100px]" 
           style={{ 
             animation: 'slowFloat1 20s ease-in-out infinite',
           }}
         />
         {/* Smaller Blue Circle - Above on Angle */}
-        <div className="absolute w-48 h-48 bg-[#2B92C8] rounded-full bottom-[150px] left-[200px]" 
+        <div className="absolute w-48 h-48 bg-[#0000FF] rounded-full bottom-[150px] left-[200px]" 
           style={{ 
             animation: 'slowFloat2 25s ease-in-out infinite',
           }}
