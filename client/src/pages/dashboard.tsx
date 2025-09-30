@@ -204,32 +204,46 @@ export default function Dashboard() {
           </div>
 
           {/* Revenue Chart */}
-          <div className="dashboard-card-glass rounded-3xl p-8 mb-8">
+          <div className="dashboard-card-glass rounded-3xl p-6 md:p-8 mb-8">
+            <div className="mb-6">
+              <h3 className="text-xl font-semibold text-white mb-1">Revenue Performance</h3>
+              <p className="text-sm text-white/70">Last 30 days revenue trend</p>
+            </div>
+            
             {revenueData && revenueData.length > 0 ? (
-              <div className="h-48 md:h-64">
+              <div className="h-64 md:h-80 flex items-center justify-center">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={revenueData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                  <LineChart data={revenueData} margin={{ top: 10, right: 10, left: 0, bottom: 10 }}>
+                    <defs>
+                      <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#00FF66" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#00FF66" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.15)" />
                     <XAxis 
                       dataKey="date" 
-                      stroke="rgba(255,255,255,0.7)"
-                      fontSize={isMobile ? 10 : 12}
+                      stroke="rgba(255,255,255,0.8)"
+                      fontSize={isMobile ? 11 : 13}
                       tickFormatter={(value) => {
                         const date = new Date(value);
                         return isMobile ? format(date, "M/d") : format(date, "MMM d");
                       }}
+                      tick={{ fill: 'rgba(255,255,255,0.8)' }}
                     />
                     <YAxis 
-                      stroke="rgba(255,255,255,0.7)"
-                      fontSize={isMobile ? 10 : 12}
+                      stroke="rgba(255,255,255,0.8)"
+                      fontSize={isMobile ? 11 : 13}
                       tickFormatter={(value) => `$${value}`}
+                      tick={{ fill: 'rgba(255,255,255,0.8)' }}
                     />
                     <Tooltip 
                       contentStyle={{ 
-                        backgroundColor: 'rgba(0,0,0,0.8)', 
-                        border: '1px solid rgba(255,255,255,0.2)',
-                        borderRadius: '8px',
-                        fontSize: '12px'
+                        backgroundColor: 'rgba(0,0,0,0.9)', 
+                        border: '1px solid rgba(0,255,102,0.3)',
+                        borderRadius: '12px',
+                        fontSize: '13px',
+                        padding: '12px'
                       }}
                       labelFormatter={(value) => format(new Date(value), "MMM d, yyyy")}
                       formatter={(value: any) => [`$${value}`, "Revenue"]}
@@ -238,19 +252,20 @@ export default function Dashboard() {
                       type="monotone" 
                       dataKey="revenue" 
                       stroke="#00FF66" 
-                      strokeWidth={2}
-                      dot={{ fill: '#00FF66', strokeWidth: 2, r: 3 }}
-                      activeDot={{ r: 5, stroke: '#00FF66', strokeWidth: 2 }}
+                      strokeWidth={3}
+                      fill="url(#revenueGradient)"
+                      dot={{ fill: '#00FF66', strokeWidth: 2, r: 4, stroke: '#001a0d' }}
+                      activeDot={{ r: 6, stroke: '#00FF66', strokeWidth: 3, fill: '#001a0d' }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="h-48 md:h-64 flex items-center justify-center">
+              <div className="h-64 md:h-80 flex items-center justify-center">
                 <div className="text-center px-4">
-                  <TrendingUp className="h-8 w-8 md:h-12 md:w-12 text-[#00FF66] drop-shadow-[0_0_12px_#00FF66] mx-auto mb-4" />
-                  <p className="text-white/70 text-sm md:text-base">No revenue data available yet</p>
-                  <p className="text-white/50 text-xs md:text-sm">Complete some transactions to see your revenue performance</p>
+                  <TrendingUp className="h-12 w-12 md:h-16 md:w-16 text-[#00FF66] drop-shadow-[0_0_16px_#00FF66] mx-auto mb-4" />
+                  <p className="text-white/80 text-base md:text-lg font-medium mb-2">No revenue data available yet</p>
+                  <p className="text-white/60 text-sm md:text-base">Complete some transactions to see your revenue performance</p>
                 </div>
               </div>
             )}
