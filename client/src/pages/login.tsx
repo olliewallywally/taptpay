@@ -463,19 +463,21 @@ export default function Login() {
             <div className="mt-4">
               <button
                 onClick={() => setShowMoreOptions(!showMoreOptions)}
-                className="w-full flex items-center justify-center space-x-1 text-white/70 hover:text-white transition-colors py-2"
+                className="w-full flex items-center justify-center space-x-1 text-white/70 hover:text-white transition-colors duration-200 py-2 active:scale-95"
               >
                 <span className="text-xs">More options</span>
-                {showMoreOptions ? (
-                  <ChevronUp className="w-3 h-3" />
-                ) : (
+                <div className={`transition-transform duration-300 ${showMoreOptions ? 'rotate-180' : 'rotate-0'}`}>
                   <ChevronDown className="w-3 h-3" />
-                )}
+                </div>
               </button>
 
-              {/* Collapsible More Options */}
-              {showMoreOptions && (
-                <div className="mt-3 space-y-3 border-t border-white/20 pt-3">
+              {/* Collapsible More Options with Smooth Animation */}
+              <div 
+                className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                  showMoreOptions ? 'max-h-32 opacity-100 mt-3' : 'max-h-0 opacity-0 mt-0'
+                }`}
+              >
+                <div className="space-y-3 border-t border-white/20 pt-3">
                   {/* Forgot Password */}
                   <Link href="/forgot-password">
                     <Button variant="ghost" className="w-full text-xs text-white/70 hover:text-white hover:bg-white/10 py-2">
@@ -493,7 +495,7 @@ export default function Login() {
                     <span>Create New Account</span>
                   </Button>
                 </div>
-              )}
+              </div>
             </div>
           )}
 
