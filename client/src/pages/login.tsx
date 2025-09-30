@@ -148,6 +148,34 @@ export default function Login() {
               animation: 'slowFloat2 25s ease-in-out infinite',
             }}
           />
+          
+          {/* Floating Line-art Shapes */}
+          {/* Triangle 1 */}
+          <svg className="absolute top-[15%] left-[10%] w-8 h-8 text-white opacity-30" style={{ animation: 'floatShape1 15s ease-in-out infinite' }}>
+            <polygon points="16,2 30,30 2,30" fill="none" stroke="currentColor" strokeWidth="1.5" />
+          </svg>
+          {/* Triangle 2 */}
+          <svg className="absolute top-[70%] left-[80%] w-6 h-6 text-white opacity-30" style={{ animation: 'floatShape2 18s ease-in-out infinite' }}>
+            <polygon points="12,2 22,22 2,22" fill="none" stroke="currentColor" strokeWidth="1.5" />
+          </svg>
+          {/* Box 1 */}
+          <svg className="absolute top-[25%] right-[15%] w-7 h-7 text-white opacity-30" style={{ animation: 'floatShape3 20s ease-in-out infinite' }}>
+            <rect x="2" y="2" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5" />
+          </svg>
+          {/* Box 2 */}
+          <svg className="absolute bottom-[30%] left-[20%] w-5 h-5 text-white opacity-30" style={{ animation: 'floatShape4 16s ease-in-out infinite' }}>
+            <rect x="2" y="2" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" />
+          </svg>
+          {/* X 1 */}
+          <svg className="absolute top-[60%] right-[25%] w-6 h-6 text-white opacity-30" style={{ animation: 'floatShape5 14s ease-in-out infinite' }}>
+            <line x1="4" y1="4" x2="20" y2="20" stroke="currentColor" strokeWidth="1.5" />
+            <line x1="20" y1="4" x2="4" y2="20" stroke="currentColor" strokeWidth="1.5" />
+          </svg>
+          {/* X 2 */}
+          <svg className="absolute top-[40%] left-[15%] w-8 h-8 text-white opacity-30" style={{ animation: 'floatShape6 17s ease-in-out infinite' }}>
+            <line x1="6" y1="6" x2="26" y2="26" stroke="currentColor" strokeWidth="1.5" />
+            <line x1="26" y1="6" x2="6" y2="26" stroke="currentColor" strokeWidth="1.5" />
+          </svg>
         </div>
 
         {/* Glass Morphism Container - Smaller */}
@@ -331,6 +359,34 @@ export default function Login() {
             animation: 'slowFloat2 25s ease-in-out infinite',
           }}
         />
+        
+        {/* Floating Line-art Shapes */}
+        {/* Triangle 1 */}
+        <svg className="absolute top-[15%] left-[10%] w-8 h-8 text-white opacity-30" style={{ animation: 'floatShape1 15s ease-in-out infinite' }}>
+          <polygon points="16,2 30,30 2,30" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        </svg>
+        {/* Triangle 2 */}
+        <svg className="absolute top-[70%] left-[80%] w-6 h-6 text-white opacity-30" style={{ animation: 'floatShape2 18s ease-in-out infinite' }}>
+          <polygon points="12,2 22,22 2,22" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        </svg>
+        {/* Box 1 */}
+        <svg className="absolute top-[25%] right-[15%] w-7 h-7 text-white opacity-30" style={{ animation: 'floatShape3 20s ease-in-out infinite' }}>
+          <rect x="2" y="2" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        </svg>
+        {/* Box 2 */}
+        <svg className="absolute bottom-[30%] left-[20%] w-5 h-5 text-white opacity-30" style={{ animation: 'floatShape4 16s ease-in-out infinite' }}>
+          <rect x="2" y="2" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        </svg>
+        {/* X 1 */}
+        <svg className="absolute top-[60%] right-[25%] w-6 h-6 text-white opacity-30" style={{ animation: 'floatShape5 14s ease-in-out infinite' }}>
+          <line x1="4" y1="4" x2="20" y2="20" stroke="currentColor" strokeWidth="1.5" />
+          <line x1="20" y1="4" x2="4" y2="20" stroke="currentColor" strokeWidth="1.5" />
+        </svg>
+        {/* X 2 */}
+        <svg className="absolute top-[40%] left-[15%] w-8 h-8 text-white opacity-30" style={{ animation: 'floatShape6 17s ease-in-out infinite' }}>
+          <line x1="6" y1="6" x2="26" y2="26" stroke="currentColor" strokeWidth="1.5" />
+          <line x1="26" y1="6" x2="6" y2="26" stroke="currentColor" strokeWidth="1.5" />
+        </svg>
       </div>
 
       {/* Compact Glass Container */}

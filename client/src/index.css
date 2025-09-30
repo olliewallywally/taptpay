@@ -796,3 +796,58 @@
     transform: translate(-20px, 30px);
   }
 }
+
+/* Floating Shape Animations */
+@keyframes floatShape1 {
+  0%, 100% { 
+    transform: translate(0, 0) rotate(0deg);
+  }
+  50% { 
+    transform: translate(15px, -25px) rotate(10deg);
+  }
+}
+
+@keyframes floatShape2 {
+  0%, 100% { 
+    transform: translate(0, 0) rotate(0deg);
+  }
+  50% { 
+    transform: translate(-20px, 20px) rotate(-15deg);
+  }
+}
+
+@keyframes floatShape3 {
+  0%, 100% { 
+    transform: translate(0, 0) rotate(0deg);
+  }
+  50% { 
+    transform: translate(-15px, -15px) rotate(12deg);
+  }
+}
+
+@keyframes floatShape4 {
+  0%, 100% { 
+    transform: translate(0, 0) rotate(0deg);
+  }
+  50% { 
+    transform: translate(20px, 15px) rotate(-10deg);
+  }
+}
+
+@keyframes floatShape5 {
+  0%, 100% { 
+    transform: translate(0, 0) rotate(0deg);
+  }
+  50% { 
+    transform: translate(-10px, -20px) rotate(20deg);
+  }
+}
+
+@keyframes floatShape6 {
+  0%, 100% { 
+    transform: translate(0, 0) rotate(0deg);
+  }
+  50% { 
+    transform: translate(25px, 10px) rotate(-8deg);
+  }
+}
