@@ -180,6 +180,82 @@ export default function Settings() {
           </div>
         </div>
 
+        {/* Crypto Payment Settings */}
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+          <h2 className="text-xl font-semibold text-white flex items-center space-x-2 mb-4">
+            <Coins className="h-5 w-5 text-orange-500" />
+            <span>Crypto Payment Settings</span>
+          </h2>
+          
+          <Alert className="bg-blue-900/30 border-blue-700 mb-4">
+            <AlertCircle className="h-4 w-4 text-blue-400" />
+            <AlertTitle className="text-blue-300">Enable Crypto Payments</AlertTitle>
+            <AlertDescription className="text-blue-200">
+              Configure your Coinbase Commerce account to accept Bitcoin, Ethereum, and other cryptocurrencies. Platform fee: 0.5% per transaction.
+            </AlertDescription>
+          </Alert>
+          
+          <div className="space-y-4">
+            <div>
+              <Label className="text-gray-300">Coinbase Commerce API Key</Label>
+              <Input
+                type="password"
+                placeholder="Enter your Coinbase Commerce API key"
+                className="bg-gray-700 border-gray-600 text-white"
+                defaultValue={merchant?.coinbaseCommerceApiKey ? "••••••••••••••••" : ""}
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Get your API key from <a href="https://commerce.coinbase.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Coinbase Commerce Dashboard</a>
+              </p>
+            </div>
+            
+            <div className="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
+              <span className="text-white">Crypto Payments Enabled</span>
+              <Badge variant={merchant?.cryptoEnabled ? "default" : "secondary"} className={merchant?.cryptoEnabled ? "bg-green-600" : "bg-gray-600"}>
+                {merchant?.cryptoEnabled ? "Enabled" : "Disabled"}
+              </Badge>
+            </div>
+          </div>
+        </div>
+
+        {/* Payment Method for Platform Fees */}
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+          <h2 className="text-xl font-semibold text-white flex items-center space-x-2 mb-4">
+            <CreditCard className="h-5 w-5 text-blue-500" />
+            <span>Payment Method</span>
+          </h2>
+          
+          <Alert className="bg-purple-900/30 border-purple-700 mb-4">
+            <AlertCircle className="h-4 w-4 text-purple-400" />
+            <AlertTitle className="text-purple-300">Platform Fee Payment</AlertTitle>
+            <AlertDescription className="text-purple-200">
+              Add a payment method to automatically pay platform fees (0.5%) on transactions. Crypto payments go directly to your Coinbase wallet.
+            </AlertDescription>
+          </Alert>
+          
+          <div className="space-y-4">
+            {merchant?.stripePaymentMethodId ? (
+              <div className="flex items-center justify-between p-4 bg-gray-700 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <CreditCard className="h-5 w-5 text-blue-400" />
+                  <div>
+                    <p className="text-white font-medium">{merchant.paymentMethodBrand?.toUpperCase()} •••• {merchant.paymentMethodLast4}</p>
+                    <p className="text-gray-400 text-sm">Default payment method</p>
+                  </div>
+                </div>
+                <Button variant="outline" size="sm" className="border-gray-600 text-gray-300">
+                  Update
+                </Button>
+              </div>
+            ) : (
+              <Button className="w-full bg-blue-600 hover:bg-blue-700">
+                <CreditCard className="h-4 w-4 mr-2" />
+                Add Payment Method
+              </Button>
+            )}
+          </div>
+        </div>
+
         {/* Debug Information */}
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <h2 className="text-xl font-semibold text-white flex items-center space-x-2 mb-4">

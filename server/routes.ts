@@ -22,6 +22,13 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+const createCryptoTransactionSchema = z.object({
+  merchantId: z.number(),
+  itemName: z.string().min(1),
+  fiatAmount: z.string().regex(/^\d+(\.\d{1,2})?$/),
+  cryptocurrency: z.enum(["BTC", "ETH", "USDC", "USDT", "LTC", "BCH"]),
+});
+
 export async function registerRoutes(app: Express): Promise<Server> {
   
   // Admin authentication middleware
@@ -917,6 +924,197 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error generating PDF report:", error);
       res.status(500).json({ message: "Failed to generate PDF report" });
+    }
+  });
+
+  // ======================
+  // CRYPTO TRANSACTION ROUTES
+  // ======================
+
+  // Create crypto transaction
+  app.post("/api/crypto-transactions", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const validation = createCryptoTransactionSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid request data", errors: validation.error.errors });
+      }
+      
+      const { merchantId, itemName, fiatAmount, cryptocurrency } = validation.data;
+      
+      // Verify the user owns this merchant
+      if (req.user.merchantId !== merchantId) {
+        return res.status(403).json({ message: "Unauthorized to create transactions for this merchant" });
+      }
+      
+      // Get merchant to check crypto settings
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+      
+      if (!merchant.cryptoEnabled) {
+        return res.status(400).json({ message: "Crypto payments not enabled for this merchant" });
+      }
+      
+      // Create regular transaction first
+      const transaction = await storage.createTransaction({
+        merchantId,
+        itemName,
+        price: fiatAmount,
+        status: "pending",
+        paymentMethod: "crypto"
+      });
+      
+      // Mock exchange rate (in production, fetch from CoinGecko or similar)
+      const mockExchangeRates: { [key: string]: number } = {
+        "BTC": 0.000015, // 1 NZD = 0.000015 BTC
+        "ETH": 0.00025,  // 1 NZD = 0.00025 ETH
+        "USDC": 0.60,    // 1 NZD = 0.60 USDC
+        "USDT": 0.60,
+        "LTC": 0.005,
+        "BCH": 0.002
+      };
+      
+      const exchangeRate = mockExchangeRates[cryptocurrency] || 0.000015;
+      const cryptoAmount = (parseFloat(fiatAmount) * exchangeRate).toFixed(8);
+      
+      // Generate mock wallet address (in production, use Coinbase Commerce API)
+      const mockWalletAddress = `${cryptocurrency}_${crypto.randomBytes(20).toString('hex')}`;
+      
+      // Create crypto transaction record
+      const cryptoTransaction = await storage.createCryptoTransaction({
+        transactionId: transaction.id,
+        merchantId,
+        cryptocurrency,
+        walletAddress: mockWalletAddress,
+        cryptoAmount,
+        fiatAmount,
+        exchangeRate: exchangeRate.toString(),
+        coinbaseChargeId: `charge_${crypto.randomBytes(16).toString('hex')}`,
+        coinbaseChargeCode: crypto.randomBytes(4).toString('hex').toUpperCase(),
+        hostedUrl: `${req.protocol}://${req.get('host')}/crypto-pay/${transaction.id}`,
+        requiredConfirmations: merchant.minConfirmations || 1,
+        status: "pending",
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000) // 1 hour expiry
+      });
+      
+      // Notify SSE clients
+      const connections = sseConnections.get(merchantId);
+      if (connections) {
+        connections.forEach(conn => {
+          conn.write(`data: ${JSON.stringify({ 
+            type: 'crypto_transaction_created', 
+            transaction,
+            cryptoTransaction 
+          })}\n\n`);
+        });
+      }
+      
+      res.json({ transaction, cryptoTransaction });
+    } catch (error) {
+      console.error("Error creating crypto transaction:", error);
+      res.status(500).json({ message: "Failed to create crypto transaction" });
+    }
+  });
+
+  // Get crypto transaction
+  app.get("/api/crypto-transactions/:id", async (req, res) => {
+    try {
+      const cryptoTransactionId = parseInt(req.params.id);
+      const cryptoTransaction = await storage.getCryptoTransaction(cryptoTransactionId);
+      
+      if (!cryptoTransaction) {
+        return res.status(404).json({ message: "Crypto transaction not found" });
+      }
+      
+      res.json(cryptoTransaction);
+    } catch (error) {
+      console.error("Error fetching crypto transaction:", error);
+      res.status(500).json({ message: "Failed to fetch crypto transaction" });
+    }
+  });
+
+  // Get crypto transaction by regular transaction ID
+  app.get("/api/transactions/:id/crypto", async (req, res) => {
+    try {
+      const transactionId = parseInt(req.params.id);
+      const cryptoTransaction = await storage.getCryptoTransactionByTransactionId(transactionId);
+      
+      if (!cryptoTransaction) {
+        return res.status(404).json({ message: "Crypto transaction not found" });
+      }
+      
+      res.json(cryptoTransaction);
+    } catch (error) {
+      console.error("Error fetching crypto transaction:", error);
+      res.status(500).json({ message: "Failed to fetch crypto transaction" });
+    }
+  });
+
+  // Mock crypto payment confirmation (simulates blockchain confirmation)
+  app.post("/api/crypto-transactions/:id/confirm", async (req, res) => {
+    try {
+      const cryptoTransactionId = parseInt(req.params.id);
+      const cryptoTransaction = await storage.getCryptoTransaction(cryptoTransactionId);
+      
+      if (!cryptoTransaction) {
+        return res.status(404).json({ message: "Crypto transaction not found" });
+      }
+      
+      // Update crypto transaction status
+      const updatedCryptoTx = await storage.updateCryptoTransactionStatus(
+        cryptoTransactionId,
+        "confirmed",
+        1 // confirmations
+      );
+      
+      // Update main transaction status
+      await storage.updateTransactionStatus(cryptoTransaction.transactionId, "completed");
+      
+      // Calculate platform fee (0.5% of transaction amount)
+      const platformFeeAmount = parseFloat(cryptoTransaction.fiatAmount) * 0.005;
+      
+      // Create platform fee record
+      await storage.createPlatformFee({
+        transactionId: cryptoTransaction.transactionId,
+        merchantId: cryptoTransaction.merchantId,
+        feeAmount: platformFeeAmount.toFixed(2),
+        transactionAmount: cryptoTransaction.fiatAmount,
+        status: "pending"
+      });
+      
+      // TODO: Auto-charge merchant's payment method for platform fee
+      // This would use Stripe to charge the merchant's stored card
+      // For now, we just record the fee as pending
+      
+      // Notify SSE clients
+      const connections = sseConnections.get(cryptoTransaction.merchantId);
+      if (connections) {
+        connections.forEach(conn => {
+          conn.write(`data: ${JSON.stringify({ 
+            type: 'crypto_payment_confirmed', 
+            cryptoTransaction: updatedCryptoTx 
+          })}\n\n`);
+        });
+      }
+      
+      res.json(updatedCryptoTx);
+    } catch (error) {
+      console.error("Error confirming crypto payment:", error);
+      res.status(500).json({ message: "Failed to confirm crypto payment" });
+    }
+  });
+
+  // Coinbase Commerce webhook (placeholder for future integration)
+  app.post("/api/crypto-transactions/webhook/coinbase", async (req, res) => {
+    try {
+      // TODO: Verify webhook signature
+      // TODO: Process Coinbase Commerce events
+      // For now, just acknowledge receipt
+      res.json({ received: true });
+    } catch (error) {
+      console.error("Error processing Coinbase webhook:", error);
+      res.status(500).json({ message: "Webhook processing failed" });
     }
   });
 
