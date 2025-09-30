@@ -53,6 +53,12 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Validate JWT_SECRET is set (allow development fallback)
+  if (!process.env.JWT_SECRET) {
+    console.warn('⚠️  WARNING: JWT_SECRET environment variable is not set. Using development fallback.');
+    process.env.JWT_SECRET = 'dev-secret-key-change-in-production';
+  }
+
   const server = await registerRoutes(app);
 
   // Initialize database with seed data if connected
