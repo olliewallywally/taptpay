@@ -133,24 +133,24 @@ export default function Login() {
   if (showSignup) {
     return (
       <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
-        {/* Solid Turquoise Background */}
-        <div className="absolute inset-0 bg-[#00D4D4]">
-          {/* Large Dark Blue Circle - Bottom Corner */}
-          <div className="absolute w-96 h-96 bg-[#1B2838] rounded-full bottom-[-100px] left-[-100px]" 
+        {/* Solid Dark Blue Background */}
+        <div className="absolute inset-0 bg-[#1B2838]">
+          {/* Large Turquoise Circle - Bottom Corner */}
+          <div className="absolute w-96 h-96 bg-[#00D4D4] rounded-full bottom-[-100px] left-[-100px]" 
             style={{ 
               animation: 'slowFloat1 20s ease-in-out infinite',
             }}
           />
-          {/* Smaller Dark Blue Circle - Above on Angle */}
-          <div className="absolute w-48 h-48 bg-[#1B2838] rounded-full bottom-[150px] left-[200px]" 
+          {/* Smaller Turquoise Circle - Above on Angle */}
+          <div className="absolute w-48 h-48 bg-[#00D4D4] rounded-full bottom-[150px] left-[200px]" 
             style={{ 
               animation: 'slowFloat2 25s ease-in-out infinite',
             }}
           />
         </div>
 
-        {/* Glass Morphism Container */}
-        <div className="relative z-10 w-full max-w-md">
+        {/* Glass Morphism Container - Smaller */}
+        <div className="relative z-10 w-full max-w-sm">
           <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-8 shadow-2xl">
             
             {/* Logo Section */}
@@ -316,24 +316,24 @@ export default function Login() {
 
   return (
     <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
-      {/* Solid Turquoise Background */}
-      <div className="absolute inset-0 bg-[#00D4D4]">
-        {/* Large Dark Blue Circle - Bottom Corner */}
-        <div className="absolute w-96 h-96 bg-[#1B2838] rounded-full bottom-[-100px] left-[-100px]" 
+      {/* Solid Dark Blue Background */}
+      <div className="absolute inset-0 bg-[#1B2838]">
+        {/* Large Turquoise Circle - Bottom Corner */}
+        <div className="absolute w-96 h-96 bg-[#00D4D4] rounded-full bottom-[-100px] left-[-100px]" 
           style={{ 
             animation: 'slowFloat1 20s ease-in-out infinite',
           }}
         />
-        {/* Smaller Dark Blue Circle - Above on Angle */}
-        <div className="absolute w-48 h-48 bg-[#1B2838] rounded-full bottom-[150px] left-[200px]" 
+        {/* Smaller Turquoise Circle - Above on Angle */}
+        <div className="absolute w-48 h-48 bg-[#00D4D4] rounded-full bottom-[150px] left-[200px]" 
           style={{ 
             animation: 'slowFloat2 25s ease-in-out infinite',
           }}
         />
       </div>
 
-      {/* Glass Morphism Container */}
-      <div className="relative z-10 w-full max-w-md">
+      {/* Glass Morphism Container - Smaller */}
+      <div className="relative z-10 w-full max-w-sm">
         <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-8 shadow-2xl">
           
           {/* Logo Section */}
