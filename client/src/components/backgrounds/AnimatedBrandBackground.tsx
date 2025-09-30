@@ -16,10 +16,10 @@ export const AnimatedBrandBackground = memo(({
   shapeOpacity = 0.6,
 }: AnimatedBrandBackgroundProps) => {
   return (
-    <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
-      {/* Background Layer */}
+    <div className="min-h-screen relative overflow-hidden p-4">
+      {/* Background Layer - Fixed */}
       <div 
-        className="absolute inset-0 pointer-events-none"
+        className="fixed inset-0 pointer-events-none"
         style={{ backgroundColor }}
       >
         {/* Large Blue Circle - Bottom Right Corner */}
@@ -117,7 +117,7 @@ export const AnimatedBrandBackground = memo(({
       </div>
 
       {/* Content Layer */}
-      <div className="relative z-10 flex items-center justify-center w-full">
+      <div className="relative z-10 flex min-h-screen items-center justify-center w-full">
         {children}
       </div>
     </div>
