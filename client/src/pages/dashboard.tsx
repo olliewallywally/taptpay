@@ -275,29 +275,31 @@ export default function Dashboard() {
 
           {/* Transaction Milestone Progress */}
           <div className="mb-6 sm:mb-8">
-            <div className="dashboard-card-glass rounded-3xl p-6">
-              <div className="flex flex-col space-y-4">
-                <div className="flex items-center justify-between">
+            <div className="dashboard-card-glass rounded-3xl p-4 sm:p-6">
+              <div className="flex flex-col space-y-3 sm:space-y-4">
+                {/* Mobile: Stacked layout, Desktop: Side by side */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
                   <div>
-                    <h3 className="text-lg font-semibold text-white">Transaction Milestone</h3>
-                    <p className="text-sm text-white/70">Progress toward 200,000 transactions - Gift awaits!</p>
+                    <h3 className="text-base sm:text-lg font-semibold text-white">Transaction Milestone</h3>
+                    <p className="text-xs sm:text-sm text-white/70 hidden sm:block">Progress toward 200,000 transactions - Gift awaits!</p>
+                    <p className="text-xs text-white/70 sm:hidden">Target: 200K 🎁</p>
                   </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-[#00FF66]">
+                  <div className="text-left sm:text-right">
+                    <div className="text-xl sm:text-2xl font-bold text-[#00FF66]">
                       {analytics?.totalTransactions?.toLocaleString() || "0"}
                     </div>
-                    <div className="text-sm text-white/70">
+                    <div className="text-xs sm:text-sm text-white/70">
                       / 200,000
                     </div>
                   </div>
                 </div>
                 
                 <div className="space-y-2">
-                  <div className="flex justify-between text-sm text-white/70">
+                  <div className="flex justify-between text-xs sm:text-sm text-white/70">
                     <span>Progress</span>
                     <span>{((analytics?.totalTransactions || 0) / 200000 * 100).toFixed(1)}%</span>
                   </div>
-                  <div className="w-full bg-gray-800/80 rounded-full h-6 relative overflow-hidden border border-gray-600/50">
+                  <div className="w-full bg-gray-800/80 rounded-full h-5 sm:h-6 relative overflow-hidden border border-gray-600/50">
                     <div 
                       className="h-full bg-gradient-to-r from-[#00FF66] to-[#00DD55] rounded-full transition-all duration-2000 ease-out relative shadow-[0_0_12px_#00FF66]"
                       style={{ 
@@ -310,18 +312,19 @@ export default function Dashboard() {
                     </div>
                     {/* Gift Icon at the end */}
                     <div className="absolute right-1 top-1/2 transform -translate-y-1/2">
-                      <div className="w-5 h-5 bg-yellow-400 rounded-full flex items-center justify-center text-xs shadow-lg">
+                      <div className="w-4 h-4 sm:w-5 sm:h-5 bg-yellow-400 rounded-full flex items-center justify-center text-[10px] sm:text-xs shadow-lg">
                         🎁
                       </div>
                     </div>
                   </div>
                   
-                  {/* Milestone markers */}
-                  <div className="flex justify-between text-xs text-white/50 mt-1">
+                  {/* Milestone markers - simplified on mobile */}
+                  <div className="flex justify-between text-[10px] sm:text-xs text-white/50 mt-1">
                     <span>0</span>
-                    <span>50K</span>
-                    <span>100K</span>
-                    <span>150K</span>
+                    <span className="hidden sm:inline">50K</span>
+                    <span className="sm:hidden">100K</span>
+                    <span className="hidden sm:inline">100K</span>
+                    <span className="hidden sm:inline">150K</span>
                     <span className="text-yellow-400 font-semibold">200K 🎁</span>
                   </div>
                 </div>
