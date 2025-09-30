@@ -8,6 +8,8 @@ interface AnimatedBrandBackgroundProps {
   shapeOpacity?: number;
   largeCirclePosition?: string;
   smallCirclePosition?: string;
+  extraLargeCirclePosition?: string;
+  extraSmallCirclePosition?: string;
 }
 
 export const AnimatedBrandBackground = memo(({
@@ -18,6 +20,8 @@ export const AnimatedBrandBackground = memo(({
   shapeOpacity = 0.6,
   largeCirclePosition = 'bottom-[-120px] right-[-120px]',
   smallCirclePosition = 'bottom-[200px] right-[250px]',
+  extraLargeCirclePosition,
+  extraSmallCirclePosition,
 }: AnimatedBrandBackgroundProps) => {
   return (
     <div className="min-h-screen relative overflow-hidden p-4">
@@ -43,6 +47,28 @@ export const AnimatedBrandBackground = memo(({
             willChange: 'transform',
           }}
         />
+        
+        {/* Extra Large Circle (optional) */}
+        {extraLargeCirclePosition && (
+          <div 
+            className={`absolute w-96 h-96 rounded-full animate-slow-float-1 ${extraLargeCirclePosition}`}
+            style={{ 
+              backgroundColor: circleColor,
+              willChange: 'transform',
+            }}
+          />
+        )}
+        
+        {/* Extra Small Circle (optional) */}
+        {extraSmallCirclePosition && (
+          <div 
+            className={`absolute w-48 h-48 rounded-full animate-slow-float-2 ${extraSmallCirclePosition}`}
+            style={{ 
+              backgroundColor: circleColor,
+              willChange: 'transform',
+            }}
+          />
+        )}
         
         {/* Floating Line-art Shapes */}
         {/* Triangle 1 */}
