@@ -5,6 +5,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentMerchantId } from "@/lib/auth";
+import { AnimatedBrandBackground } from "@/components/backgrounds/AnimatedBrandBackground";
 import { 
   DollarSign, 
   TrendingUp, 
@@ -140,7 +141,13 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <AnimatedBrandBackground
+      backgroundColor="#0000FF"
+      circleColor="#00D4D4"
+      largeCirclePosition="top-[-120px] right-[-120px]"
+      smallCirclePosition="top-[200px] right-[250px]"
+    >
+      <div className="container mx-auto px-4 py-8">
           {/* Analytics Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
             <div className="dashboard-card-glass rounded-3xl p-6">
@@ -351,6 +358,7 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-    </div>
+      </div>
+    </AnimatedBrandBackground>
   );
 }

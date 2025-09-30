@@ -6,6 +6,8 @@ interface AnimatedBrandBackgroundProps {
   circleColor?: string;
   shapeColor?: string;
   shapeOpacity?: number;
+  largeCirclePosition?: string;
+  smallCirclePosition?: string;
 }
 
 export const AnimatedBrandBackground = memo(({
@@ -14,6 +16,8 @@ export const AnimatedBrandBackground = memo(({
   circleColor = '#0000FF',
   shapeColor = 'white',
   shapeOpacity = 0.6,
+  largeCirclePosition = 'bottom-[-120px] right-[-120px]',
+  smallCirclePosition = 'bottom-[200px] right-[250px]',
 }: AnimatedBrandBackgroundProps) => {
   return (
     <div className="min-h-screen relative overflow-hidden p-4">
@@ -22,18 +26,18 @@ export const AnimatedBrandBackground = memo(({
         className="fixed inset-0 pointer-events-none"
         style={{ backgroundColor }}
       >
-        {/* Large Blue Circle - Bottom Right Corner */}
+        {/* Large Circle */}
         <div 
-          className="absolute w-96 h-96 rounded-full bottom-[-120px] right-[-120px] animate-slow-float-1"
+          className={`absolute w-96 h-96 rounded-full animate-slow-float-1 ${largeCirclePosition}`}
           style={{ 
             backgroundColor: circleColor,
             willChange: 'transform',
           }}
         />
         
-        {/* Smaller Blue Circle - Above on Angle */}
+        {/* Smaller Circle */}
         <div 
-          className="absolute w-48 h-48 rounded-full bottom-[200px] right-[250px] animate-slow-float-2"
+          className={`absolute w-48 h-48 rounded-full animate-slow-float-2 ${smallCirclePosition}`}
           style={{ 
             backgroundColor: circleColor,
             willChange: 'transform',
