@@ -146,6 +146,8 @@ export default function Dashboard() {
       circleColor="#00D4D4"
       largeCirclePosition="top-[-120px] right-[-120px]"
       smallCirclePosition="top-[200px] right-[250px]"
+      extraLargeCirclePosition="bottom-[-120px] right-[-120px]"
+      extraSmallCirclePosition="bottom-[200px] right-[250px]"
     >
       <div className="container mx-auto px-4 py-8">
           {/* Analytics Cards */}
