@@ -851,3 +851,52 @@
     transform: translate(25px, 10px) rotate(-8deg);
   }
 }
+
+/* Animation Utility Classes */
+@layer utilities {
+  .animate-slow-float-1 {
+    animation: slowFloat1 20s ease-in-out infinite;
+  }
+  
+  .animate-slow-float-2 {
+    animation: slowFloat2 25s ease-in-out infinite;
+  }
+  
+  .animate-float-shape-1 {
+    animation: floatShape1 15s ease-in-out infinite;
+  }
+  
+  .animate-float-shape-2 {
+    animation: floatShape2 18s ease-in-out infinite;
+  }
+  
+  .animate-float-shape-3 {
+    animation: floatShape3 20s ease-in-out infinite;
+  }
+  
+  .animate-float-shape-4 {
+    animation: floatShape4 16s ease-in-out infinite;
+  }
+  
+  .animate-float-shape-5 {
+    animation: floatShape5 14s ease-in-out infinite;
+  }
+  
+  .animate-float-shape-6 {
+    animation: floatShape6 17s ease-in-out infinite;
+  }
+}
+
+/* Respect user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .animate-slow-float-1,
+  .animate-slow-float-2,
+  .animate-float-shape-1,
+  .animate-float-shape-2,
+  .animate-float-shape-3,
+  .animate-float-shape-4,
+  .animate-float-shape-5,
+  .animate-float-shape-6 {
+    animation: none;
+  }
+}

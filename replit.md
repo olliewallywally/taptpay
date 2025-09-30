@@ -31,6 +31,7 @@ The application adopts a monorepo structure, separating client, server, and shar
 -   Custom SSE client for live transaction updates.
 -   Unified tabbed interface for payment terminal and NFC functionalities, with glass morphism design for tab buttons.
 -   Optimized customer payment page for faster loading times and minimalist NFC redesign.
+-   Reusable AnimatedBrandBackground component for consistent brand theming across pages (turquoise background, floating blue circles, line-art shapes with animations).
 
 **Backend Design & Features:**
 -   RESTful API with modular route registration.
