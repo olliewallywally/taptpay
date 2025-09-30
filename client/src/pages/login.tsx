@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useLocation, Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { LogIn, Shield, UserPlus, Store, ArrowLeft } from "lucide-react";
+import { LogIn, Shield, UserPlus, Store, ArrowLeft, ChevronDown, ChevronUp } from "lucide-react";
 import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
 import { createMerchantSchema, type CreateMerchant } from "@shared/schema";
 
@@ -28,6 +28,7 @@ export default function Login() {
   const { toast } = useToast();
   const [loginType, setLoginType] = useState<'merchant' | 'admin'>('merchant');
   const [showSignup, setShowSignup] = useState(false);
+  const [showMoreOptions, setShowMoreOptions] = useState(false);
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -318,92 +319,92 @@ export default function Login() {
     <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
       {/* Solid Turquoise Background */}
       <div className="absolute inset-0 bg-[#00D4D4]">
-        {/* Large Dark Blue Circle - Bottom Corner */}
-        <div className="absolute w-96 h-96 bg-[#1B2838] rounded-full bottom-[-100px] left-[-100px]" 
+        {/* Large Lighter Blue Circle - Bottom Corner */}
+        <div className="absolute w-96 h-96 bg-[#4DB8E8] rounded-full bottom-[-100px] left-[-100px]" 
           style={{ 
             animation: 'slowFloat1 20s ease-in-out infinite',
           }}
         />
-        {/* Smaller Dark Blue Circle - Above on Angle */}
-        <div className="absolute w-48 h-48 bg-[#1B2838] rounded-full bottom-[150px] left-[200px]" 
+        {/* Smaller Lighter Blue Circle - Above on Angle */}
+        <div className="absolute w-48 h-48 bg-[#4DB8E8] rounded-full bottom-[150px] left-[200px]" 
           style={{ 
             animation: 'slowFloat2 25s ease-in-out infinite',
           }}
         />
       </div>
 
-      {/* Glass Morphism Container - Smaller */}
-      <div className="relative z-10 w-full max-w-sm">
-        <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-8 shadow-2xl">
+      {/* Compact Glass Container */}
+      <div className="relative z-10 w-full max-w-xs">
+        <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 shadow-2xl">
           
-          {/* Logo Section */}
-          <div className="text-center mb-8">
-            <div className="flex justify-center mb-6">
+          {/* Logo Section - Compact */}
+          <div className="text-center mb-4">
+            <div className="flex justify-center mb-3">
               <img 
                 src={taptLogoPath} 
                 alt="TaptPay" 
-                className="h-12 w-auto object-contain"
+                className="h-10 w-auto object-contain"
               />
             </div>
-            <h1 className="text-2xl font-light text-white mb-2">
+            <h1 className="text-xl font-light text-white mb-1">
               Welcome back
             </h1>
-            <p className="text-white/70 text-sm">
+            <p className="text-white/70 text-xs">
               Sign in to continue
             </p>
           </div>
 
-          {/* Login Type Toggle */}
-          <div className="mb-6">
+          {/* Login Type Toggle - Compact */}
+          <div className="mb-4">
             <div className="flex backdrop-blur-xl bg-white/5 border border-white/20 rounded-2xl p-1 shadow-lg">
               <button
                 type="button"
                 onClick={() => setLoginType('merchant')}
-                className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-sm font-bold transition-all duration-300 ${
+                className={`flex-1 flex items-center justify-center space-x-1 py-2 px-3 rounded-xl text-xs font-bold transition-all duration-300 ${
                   loginType === 'merchant'
                     ? 'backdrop-blur-xl bg-white/15 text-black shadow-md border border-white/30'
                     : 'text-black/70 hover:text-black hover:bg-white/5 hover:backdrop-blur-lg'
                 }`}
               >
-                <LogIn className="w-4 h-4" />
+                <LogIn className="w-3 h-3" />
                 <span>Merchant</span>
               </button>
               <button
                 type="button"
                 onClick={() => setLoginType('admin')}
-                className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-sm font-bold transition-all duration-300 ${
+                className={`flex-1 flex items-center justify-center space-x-1 py-2 px-3 rounded-xl text-xs font-bold transition-all duration-300 ${
                   loginType === 'admin'
                     ? 'backdrop-blur-xl bg-white/15 text-black shadow-md border border-white/30'
                     : 'text-black/70 hover:text-black hover:bg-white/5 hover:backdrop-blur-lg'
                 }`}
               >
-                <Shield className="w-4 h-4" />
+                <Shield className="w-3 h-3" />
                 <span>Admin</span>
               </button>
             </div>
           </div>
 
-          {/* Login Form */}
+          {/* Login Form - Compact */}
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="space-y-5">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
+              <div className="space-y-3">
                 <FormField
                   control={form.control}
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm font-medium text-white/90">
+                      <FormLabel className="text-xs font-medium text-white/90">
                         Email
                       </FormLabel>
                       <FormControl>
                         <Input
                           type="email"
                           placeholder="demo@tapt.co.nz"
-                          className="mt-2 w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-black placeholder-gray-600 focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all duration-300"
+                          className="mt-1 w-full px-3 py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-black placeholder-gray-600 text-sm focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all duration-300"
                           {...field}
                         />
                       </FormControl>
-                      <FormMessage className="text-red-300" />
+                      <FormMessage className="text-red-300 text-xs" />
                     </FormItem>
                   )}
                 />
@@ -413,83 +414,92 @@ export default function Login() {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm font-medium text-white/90">
+                      <FormLabel className="text-xs font-medium text-white/90">
                         Password
                       </FormLabel>
                       <FormControl>
                         <Input
                           type="password"
                           placeholder="demo123"
-                          className="mt-2 w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-black placeholder-gray-600 focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all duration-300"
+                          className="mt-1 w-full px-3 py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-black placeholder-gray-600 text-sm focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all duration-300"
                           {...field}
                         />
                       </FormControl>
-                      <FormMessage className="text-red-300" />
+                      <FormMessage className="text-red-300 text-xs" />
                     </FormItem>
                   )}
                 />
               </div>
 
-              {/* Admin Credentials Info */}
+              {/* Admin Credentials Info - Compact */}
               {loginType === 'admin' && (
-                <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4">
-                  <p className="text-sm text-white/80 text-center">
+                <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-2">
+                  <p className="text-xs text-white/80 text-center">
                     <span className="font-medium">Admin credentials pre-filled</span>
                   </p>
                 </div>
               )}
 
-              {/* Login Button */}
+              {/* Login Button - Compact */}
               <Button
                 type="submit"
                 disabled={loginMutation.isPending}
-                className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white py-4 px-6 rounded-xl font-medium transition-all duration-300 disabled:opacity-50 shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
+                className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white py-2.5 px-4 rounded-xl text-sm font-medium transition-all duration-300 disabled:opacity-50 shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
               >
                 {loginMutation.isPending ? (
                   <div className="flex items-center justify-center space-x-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     <span>Signing in...</span>
                   </div>
                 ) : (
                   'Sign In'
                 )}
               </Button>
-            
-            {/* Forgot Password Link - Only show for merchant login */}
-            {loginType === 'merchant' && (
-              <div className="text-center mt-4">
-                <Link href="/forgot-password">
-                  <Button variant="ghost" className="text-sm text-white/70 hover:text-white">
-                    Forgot your password?
-                  </Button>
-                </Link>
-              </div>
-            )}
             </form>
           </Form>
 
-          {/* Signup Section - Only show for merchant login */}
+          {/* Dropdown Arrow for More Options - Only for merchant login */}
           {loginType === 'merchant' && (
-            <div className="mt-8 border-t border-white/20 pt-8">
-              <div className="text-center space-y-4">
-                <p className="text-sm text-white/70">
-                  Don't have an account yet?
-                </p>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowSignup(true)}
-                  className="w-full flex items-center justify-center space-x-2 bg-white/10 border-white/20 text-white hover:bg-white/20 hover:border-white/40 backdrop-blur-sm rounded-xl transition-all duration-300"
-                >
-                  <UserPlus className="w-4 h-4" />
-                  <span>Create New Account</span>
-                </Button>
-              </div>
+            <div className="mt-4">
+              <button
+                onClick={() => setShowMoreOptions(!showMoreOptions)}
+                className="w-full flex items-center justify-center space-x-1 text-white/70 hover:text-white transition-colors py-2"
+              >
+                <span className="text-xs">More options</span>
+                {showMoreOptions ? (
+                  <ChevronUp className="w-3 h-3" />
+                ) : (
+                  <ChevronDown className="w-3 h-3" />
+                )}
+              </button>
+
+              {/* Collapsible More Options */}
+              {showMoreOptions && (
+                <div className="mt-3 space-y-3 border-t border-white/20 pt-3">
+                  {/* Forgot Password */}
+                  <Link href="/forgot-password">
+                    <Button variant="ghost" className="w-full text-xs text-white/70 hover:text-white hover:bg-white/10 py-2">
+                      Forgot your password?
+                    </Button>
+                  </Link>
+
+                  {/* Create Account */}
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowSignup(true)}
+                    className="w-full flex items-center justify-center space-x-2 bg-white/10 border-white/20 text-white hover:bg-white/20 hover:border-white/40 backdrop-blur-sm rounded-xl transition-all duration-300 py-2 text-xs"
+                  >
+                    <UserPlus className="w-3 h-3" />
+                    <span>Create New Account</span>
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Footer */}
-          <div className="mt-8 text-center">
-            <p className="text-sm text-white/50">
+          {/* Footer - Compact */}
+          <div className="mt-4 text-center">
+            <p className="text-xs text-white/50">
               Need help?{" "}
               <a href="#" className="text-white/70 hover:text-white font-medium transition-colors">
                 Contact support
