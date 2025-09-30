@@ -133,12 +133,53 @@ export default function Login() {
   if (showSignup) {
     return (
       <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
-        {/* Gradient Background with Floating Orbs */}
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-          {/* Animated Gradient Orbs */}
-          <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse"></div>
-          <div className="absolute top-40 right-20 w-96 h-96 bg-gradient-to-r from-cyan-400 to-blue-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse delay-75"></div>
-          <div className="absolute -bottom-8 left-40 w-96 h-96 bg-gradient-to-r from-yellow-400 to-orange-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse delay-150"></div>
+        {/* Lava Lamp Background */}
+        <div className="absolute inset-0 bg-[#1B2838]">
+          {/* SVG Filter for Gooey Effect */}
+          <svg className="absolute w-0 h-0">
+            <defs>
+              <filter id="goo">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur" />
+                <feColorMatrix in="blur" mode="matrix" 
+                  values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 18 -7" result="goo" />
+                <feBlend in="SourceGraphic" in2="goo" />
+              </filter>
+            </defs>
+          </svg>
+          
+          {/* Lava Lamp Blobs */}
+          <div className="absolute inset-0" style={{ filter: 'url(#goo)' }}>
+            {/* Blob 1 */}
+            <div className="absolute w-64 h-64 bg-[#00D4D4] rounded-full opacity-80 left-[35%] bottom-[-15%]" 
+              style={{ 
+                animation: 'lavaBlob1 8s ease-in-out infinite',
+              }}
+            />
+            {/* Blob 2 */}
+            <div className="absolute w-48 h-48 bg-[#00D4D4] rounded-full opacity-80 right-[24%] bottom-[-65%]" 
+              style={{ 
+                animation: 'lavaBlob2 12s ease-in-out infinite 2s',
+              }}
+            />
+            {/* Blob 3 */}
+            <div className="absolute w-32 h-32 bg-[#00D4D4] rounded-full opacity-80 left-[20%] bottom-[-25%]" 
+              style={{ 
+                animation: 'lavaBlob3 10s ease-in-out infinite 4s',
+              }}
+            />
+            {/* Blob 4 */}
+            <div className="absolute w-40 h-40 bg-[#00D4D4] rounded-full opacity-80 right-[30%] bottom-[-35%]" 
+              style={{ 
+                animation: 'lavaBlob4 14s ease-in-out infinite 1s',
+              }}
+            />
+            {/* Blob 5 */}
+            <div className="absolute w-44 h-44 bg-[#00D4D4] rounded-full opacity-80 left-[50%] bottom-[-20%]" 
+              style={{ 
+                animation: 'lavaBlob5 9s ease-in-out infinite 3s',
+              }}
+            />
+          </div>
         </div>
 
         {/* Glass Morphism Container */}
@@ -308,29 +349,53 @@ export default function Login() {
 
   return (
     <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
-      {/* Gradient Background with Floating Orbs */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900">
-        {/* Animated Gradient Orbs with Enhanced Glow */}
-        <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse shadow-2xl" style={{
-          animation: 'glow-pulse 4s ease-in-out infinite',
-          filter: 'blur(40px)',
-        }}></div>
-        <div className="absolute top-40 right-20 w-96 h-96 bg-gradient-to-r from-green-400 to-emerald-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse delay-75 shadow-2xl" style={{
-          animation: 'glow-pulse 5s ease-in-out infinite 1.5s',
-          filter: 'blur(45px)',
-        }}></div>
-        <div className="absolute -bottom-8 left-40 w-96 h-96 bg-gradient-to-r from-lime-400 to-green-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse delay-150 shadow-2xl" style={{
-          animation: 'glow-pulse 6s ease-in-out infinite 3s',
-          filter: 'blur(50px)',
-        }}></div>
+      {/* Lava Lamp Background */}
+      <div className="absolute inset-0 bg-[#1B2838]">
+        {/* SVG Filter for Gooey Effect */}
+        <svg className="absolute w-0 h-0">
+          <defs>
+            <filter id="goo-login">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur" />
+              <feColorMatrix in="blur" mode="matrix" 
+                values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 18 -7" result="goo" />
+              <feBlend in="SourceGraphic" in2="goo" />
+            </filter>
+          </defs>
+        </svg>
         
-        {/* Additional Moving Glow Effects */}
-        <div className="absolute top-0 left-1/2 w-72 h-72 bg-gradient-to-r from-teal-300 to-emerald-300 rounded-full mix-blend-screen filter blur-3xl opacity-30" style={{
-          animation: 'float-slow 8s ease-in-out infinite, glow-pulse 3s ease-in-out infinite',
-        }}></div>
-        <div className="absolute bottom-0 right-1/3 w-80 h-80 bg-gradient-to-r from-green-300 to-lime-300 rounded-full mix-blend-screen filter blur-3xl opacity-25" style={{
-          animation: 'float-reverse 10s ease-in-out infinite, glow-pulse 4s ease-in-out infinite 2s',
-        }}></div>
+        {/* Lava Lamp Blobs */}
+        <div className="absolute inset-0" style={{ filter: 'url(#goo-login)' }}>
+          {/* Blob 1 */}
+          <div className="absolute w-64 h-64 bg-[#00D4D4] rounded-full opacity-80 left-[35%] bottom-[-15%]" 
+            style={{ 
+              animation: 'lavaBlob1 8s ease-in-out infinite',
+            }}
+          />
+          {/* Blob 2 */}
+          <div className="absolute w-48 h-48 bg-[#00D4D4] rounded-full opacity-80 right-[24%] bottom-[-65%]" 
+            style={{ 
+              animation: 'lavaBlob2 12s ease-in-out infinite 2s',
+            }}
+          />
+          {/* Blob 3 */}
+          <div className="absolute w-32 h-32 bg-[#00D4D4] rounded-full opacity-80 left-[20%] bottom-[-25%]" 
+            style={{ 
+              animation: 'lavaBlob3 10s ease-in-out infinite 4s',
+            }}
+          />
+          {/* Blob 4 */}
+          <div className="absolute w-40 h-40 bg-[#00D4D4] rounded-full opacity-80 right-[30%] bottom-[-35%]" 
+            style={{ 
+              animation: 'lavaBlob4 14s ease-in-out infinite 1s',
+            }}
+          />
+          {/* Blob 5 */}
+          <div className="absolute w-44 h-44 bg-[#00D4D4] rounded-full opacity-80 left-[50%] bottom-[-20%]" 
+            style={{ 
+              animation: 'lavaBlob5 9s ease-in-out infinite 3s',
+            }}
+          />
+        </div>
       </div>
 
       {/* Glass Morphism Container */}
