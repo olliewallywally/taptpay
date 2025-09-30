@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
+import { sseClient } from "@/lib/sse-client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -26,6 +27,7 @@ export default function CryptoTerminal() {
   const [currentCryptoTx, setCurrentCryptoTx] = useState<any>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
   const [copiedAddress, setCopiedAddress] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<string>("pending");
   
   const { toast } = useToast();
   const merchantId = getCurrentMerchantId();
@@ -34,6 +36,40 @@ export default function CryptoTerminal() {
     window.location.href = '/login';
     return <div>Redirecting to login...</div>;
   }
+
+  // Connect to SSE for real-time updates
+  useEffect(() => {
+    if (!merchantId) return;
+
+    sseClient.connect(merchantId);
+
+    const handleTransactionUpdate = (data: any) => {
+      if (data.cryptoTransaction && currentCryptoTx && data.cryptoTransaction.id === currentCryptoTx.id) {
+        setCurrentCryptoTx(data.cryptoTransaction);
+        setPaymentStatus(data.cryptoTransaction.status);
+        
+        // Show toast notification for status changes
+        if (data.cryptoTransaction.status === 'confirmed') {
+          toast({
+            title: "Payment Confirmed!",
+            description: "Crypto payment has been successfully confirmed",
+          });
+        } else if (data.cryptoTransaction.status === 'failed') {
+          toast({
+            title: "Payment Failed",
+            description: "Crypto payment failed",
+            variant: "destructive",
+          });
+        }
+      }
+    };
+
+    sseClient.subscribe('transaction_update', handleTransactionUpdate);
+
+    return () => {
+      sseClient.unsubscribe('transaction_update', handleTransactionUpdate);
+    };
+  }, [merchantId, currentCryptoTx, toast]);
 
   const form = useForm<CryptoFormData>({
     resolver: zodResolver(cryptoFormSchema),
@@ -246,9 +282,25 @@ export default function CryptoTerminal() {
                   </div>
 
                   {/* Status */}
-                  <div className="bg-blue-900/30 border border-blue-700 p-4 rounded-lg">
-                    <p className="text-blue-300 text-sm">Status: Waiting for payment...</p>
-                    <p className="text-blue-200 text-xs mt-1">Payment expires in 60 minutes</p>
+                  <div className={`p-4 rounded-lg ${
+                    paymentStatus === 'confirmed' 
+                      ? 'bg-green-900/30 border border-green-700' 
+                      : paymentStatus === 'failed' || paymentStatus === 'expired'
+                      ? 'bg-red-900/30 border border-red-700'
+                      : 'bg-blue-900/30 border border-blue-700'
+                  }`}>
+                    <p className={`text-sm font-semibold ${
+                      paymentStatus === 'confirmed' 
+                        ? 'text-green-300' 
+                        : paymentStatus === 'failed' || paymentStatus === 'expired'
+                        ? 'text-red-300'
+                        : 'text-blue-300'
+                    }`}>
+                      Status: {paymentStatus === 'confirmed' ? 'Payment Confirmed ✓' : paymentStatus === 'failed' ? 'Payment Failed' : paymentStatus === 'expired' ? 'Payment Expired' : 'Waiting for payment...'}
+                    </p>
+                    {paymentStatus === 'pending' && (
+                      <p className="text-blue-200 text-xs mt-1">Payment expires in 60 minutes</p>
+                    )}
                   </div>
 
                   {/* Payment URL */}

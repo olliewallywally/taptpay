@@ -17,6 +17,7 @@ export interface IStorage {
   updateMerchantDetails(id: number, details: { businessName: string; contactEmail: string; contactPhone: string; businessAddress: string }): Promise<Merchant | undefined>;
   updateMerchantBankAccount(id: number, bankDetails: { bankName: string; bankAccountNumber: string; bankBranch: string; accountHolderName: string }): Promise<Merchant | undefined>;
   updateMerchantTheme(id: number, themeId: string): Promise<Merchant | undefined>;
+  updateMerchantCryptoSettings(id: number, settings: any): Promise<Merchant | undefined>;
   getAllMerchants(): Promise<Merchant[]>;
   deleteMerchant(id: number): Promise<boolean>;
   
@@ -69,6 +70,7 @@ export interface IStorage {
   createCryptoTransaction(data: InsertCryptoTransaction): Promise<CryptoTransaction>;
   getCryptoTransaction(id: number): Promise<CryptoTransaction | undefined>;
   getCryptoTransactionByTransactionId(transactionId: number): Promise<CryptoTransaction | undefined>;
+  getCryptoTransactionByChargeCode(chargeCode: string): Promise<CryptoTransaction | undefined>;
   updateCryptoTransactionStatus(id: number, status: string, confirmations?: number): Promise<CryptoTransaction | undefined>;
   
   // Analytics operations
@@ -680,6 +682,18 @@ export class MemStorage implements IStorage {
     return updatedMerchant;
   }
 
+  async updateMerchantCryptoSettings(id: number, settings: any): Promise<Merchant | undefined> {
+    const merchant = this.merchants.get(id);
+    if (!merchant) return undefined;
+    
+    const updatedMerchant = {
+      ...merchant,
+      ...settings,
+    };
+    this.merchants.set(id, updatedMerchant);
+    return updatedMerchant;
+  }
+
   async getMerchantAnalytics(merchantId: number): Promise<{
     totalTransactions: number;
     completedTransactions: number;
@@ -1152,6 +1166,12 @@ export class MemStorage implements IStorage {
     );
   }
 
+  async getCryptoTransactionByChargeCode(chargeCode: string): Promise<CryptoTransaction | undefined> {
+    return Array.from(this.cryptoTransactions.values()).find(
+      (ct) => ct.coinbaseChargeCode === chargeCode
+    );
+  }
+
   async updateCryptoTransactionStatus(id: number, status: string, confirmations?: number): Promise<CryptoTransaction | undefined> {
     const cryptoTx = this.cryptoTransactions.get(id);
     if (cryptoTx) {
@@ -1237,6 +1257,16 @@ export class DatabaseStorage implements IStorage {
     const result = await this.db
       .update(merchants)
       .set({ themeId })
+      .where(eq(merchants.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async updateMerchantCryptoSettings(id: number, settings: any): Promise<Merchant | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .update(merchants)
+      .set(settings)
       .where(eq(merchants.id, id))
       .returning();
     return result[0];
@@ -2036,6 +2066,12 @@ export class DatabaseStorage implements IStorage {
   async getCryptoTransactionByTransactionId(transactionId: number): Promise<CryptoTransaction | undefined> {
     if (!this.db) throw new Error('Database not available');
     const result = await this.db.select().from(cryptoTransactions).where(eq(cryptoTransactions.transactionId, transactionId)).limit(1);
+    return result[0];
+  }
+
+  async getCryptoTransactionByChargeCode(chargeCode: string): Promise<CryptoTransaction | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db.select().from(cryptoTransactions).where(eq(cryptoTransactions.coinbaseChargeCode, chargeCode)).limit(1);
     return result[0];
   }
 

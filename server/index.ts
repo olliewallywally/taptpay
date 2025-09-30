@@ -10,7 +10,16 @@ import {
 } from "./port-manager";
 
 const app = express();
-app.use(express.json());
+
+// Skip JSON parsing for webhook routes to preserve raw body
+app.use((req, res, next) => {
+  if (req.path === '/api/crypto-transactions/webhook/coinbase') {
+    next();
+  } else {
+    express.json()(req, res, next);
+  }
+});
+
 app.use(express.urlencoded({ extended: false }));
 
 app.use((req, res, next) => {
