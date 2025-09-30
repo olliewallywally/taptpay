@@ -282,6 +282,14 @@ export const updateThemeSchema = z.object({
   themeId: z.string().min(1, "Theme selection is required"),
 });
 
+export const updateCryptoSettingsSchema = z.object({
+  coinbaseCommerceApiKey: z.string().optional(),
+  coinbaseWebhookSecret: z.string().optional(),
+  cryptoEnabled: z.boolean(),
+  enabledCryptocurrencies: z.array(z.string()).optional(),
+  minConfirmations: z.number().min(1).max(6).default(1),
+});
+
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, "Current password is required"),
   newPassword: z.string().min(6, "New password must be at least 6 characters"),

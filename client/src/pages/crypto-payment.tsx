@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { sseClient } from "@/lib/sse-client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Bitcoin, Copy, Check, Loader2, ExternalLink, Wallet } from "lucide-react";
@@ -12,6 +13,7 @@ export default function CryptoPayment() {
   const { transactionId } = useParams();
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
   const [copiedAddress, setCopiedAddress] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<string>("pending");
   const { toast } = useToast();
 
   // Get transaction details
@@ -43,8 +45,35 @@ export default function CryptoPayment() {
         width: 350,
         margin: 2,
       }).then(setQrDataUrl).catch(console.error);
+      setPaymentStatus(cryptoTx.status || "pending");
     }
   }, [cryptoTx]);
+
+  // Connect to SSE for real-time status updates
+  useEffect(() => {
+    if (!cryptoTx?.merchantId) return;
+
+    sseClient.connect(cryptoTx.merchantId);
+
+    const handleTransactionUpdate = (data: any) => {
+      if (data.cryptoTransaction && data.cryptoTransaction.id === cryptoTx.id) {
+        setPaymentStatus(data.cryptoTransaction.status);
+        
+        if (data.cryptoTransaction.status === 'confirmed') {
+          toast({
+            title: "Payment Confirmed!",
+            description: "Your crypto payment has been successfully confirmed",
+          });
+        }
+      }
+    };
+
+    sseClient.subscribe('transaction_update', handleTransactionUpdate);
+
+    return () => {
+      sseClient.unsubscribe('transaction_update', handleTransactionUpdate);
+    };
+  }, [cryptoTx?.merchantId, cryptoTx?.id, toast]);
 
   const copyAddress = () => {
     if (cryptoTx?.walletAddress) {
@@ -183,11 +212,27 @@ export default function CryptoPayment() {
 
             {/* Status */}
             <div className="mt-6 text-center">
-              <div className="flex items-center justify-center space-x-2 text-yellow-500">
-                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
-                <p className="text-sm" data-testid="text-payment-status">Waiting for payment...</p>
+              <div className={`flex items-center justify-center space-x-2 ${
+                paymentStatus === 'confirmed' 
+                  ? 'text-green-500' 
+                  : paymentStatus === 'failed' || paymentStatus === 'expired'
+                  ? 'text-red-500'
+                  : 'text-yellow-500'
+              }`}>
+                <div className={`w-2 h-2 rounded-full ${
+                  paymentStatus === 'confirmed' 
+                    ? 'bg-green-500' 
+                    : paymentStatus === 'failed' || paymentStatus === 'expired'
+                    ? 'bg-red-500'
+                    : 'bg-yellow-500 animate-pulse'
+                }`}></div>
+                <p className="text-sm font-semibold" data-testid="text-payment-status">
+                  {paymentStatus === 'confirmed' ? 'Payment Confirmed ✓' : paymentStatus === 'failed' ? 'Payment Failed' : paymentStatus === 'expired' ? 'Payment Expired' : 'Waiting for payment...'}
+                </p>
               </div>
-              <p className="text-gray-500 text-xs mt-1">Payment expires in 60 minutes</p>
+              {paymentStatus === 'pending' && (
+                <p className="text-gray-500 text-xs mt-1">Payment expires in 60 minutes</p>
+              )}
             </div>
           </CardContent>
         </Card>

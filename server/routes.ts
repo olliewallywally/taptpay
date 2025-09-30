@@ -1,7 +1,8 @@
 import type { Express } from "express";
+import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema } from "@shared/schema";
+import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema } from "@shared/schema";
 import { windcaveService } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, createUser, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
@@ -942,7 +943,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { merchantId, itemName, fiatAmount, cryptocurrency } = validation.data;
       
       // Verify the user owns this merchant
-      if (req.user.merchantId !== merchantId) {
+      if (!req.user || req.user.merchantId !== merchantId) {
         return res.status(403).json({ message: "Unauthorized to create transactions for this merchant" });
       }
       
@@ -1105,13 +1106,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Coinbase Commerce webhook (placeholder for future integration)
-  app.post("/api/crypto-transactions/webhook/coinbase", async (req, res) => {
+  // Coinbase Commerce webhook with signature verification
+  app.post("/api/crypto-transactions/webhook/coinbase", express.raw({ type: 'application/json' }), async (req, res) => {
     try {
-      // TODO: Verify webhook signature
-      // TODO: Process Coinbase Commerce events
-      // For now, just acknowledge receipt
-      res.json({ received: true });
+      const signature = req.headers['x-cc-webhook-signature'] as string;
+      const rawBody = req.body.toString();
+      
+      if (!signature) {
+        return res.status(401).json({ message: "Missing webhook signature" });
+      }
+      
+      // Parse the event
+      const event = JSON.parse(rawBody);
+      const { event: eventData } = event;
+      
+      if (!eventData || !eventData.data || !eventData.data.code) {
+        return res.status(400).json({ message: "Invalid webhook payload" });
+      }
+      
+      // Find crypto transaction by Coinbase charge code
+      const chargeCode = eventData.data.code;
+      const cryptoTx = await storage.getCryptoTransactionByChargeCode(chargeCode);
+      
+      if (!cryptoTx) {
+        return res.status(404).json({ message: "Crypto transaction not found" });
+      }
+      
+      // Get merchant to verify webhook secret
+      const merchant = await storage.getMerchant(cryptoTx.merchantId);
+      if (!merchant || !merchant.coinbaseWebhookSecret) {
+        return res.status(500).json({ message: "Merchant webhook secret not configured" });
+      }
+      
+      // Verify webhook signature using HMAC-SHA256
+      const expectedSignature = crypto
+        .createHmac('sha256', merchant.coinbaseWebhookSecret)
+        .update(rawBody)
+        .digest('hex');
+      
+      if (signature !== expectedSignature) {
+        console.error("Webhook signature verification failed");
+        return res.status(401).json({ message: "Invalid webhook signature" });
+      }
+      
+      // Process webhook event based on type
+      const eventType = eventData.type;
+      console.log(`Processing Coinbase webhook: ${eventType} for charge ${chargeCode}`);
+      
+      if (eventType === 'charge:confirmed') {
+        // Payment confirmed - update status
+        await storage.updateCryptoTransactionStatus(cryptoTx.id, 'confirmed', eventData.data.confirmations || 1);
+        await storage.updateTransactionStatus(cryptoTx.transactionId, 'completed');
+        
+        // Calculate and create platform fee (0.5%)
+        const platformFeeAmount = parseFloat(cryptoTx.fiatAmount) * 0.005;
+        await storage.createPlatformFee({
+          transactionId: cryptoTx.transactionId,
+          merchantId: cryptoTx.merchantId,
+          feeAmount: platformFeeAmount.toFixed(2),
+          transactionAmount: cryptoTx.fiatAmount,
+          status: 'pending'
+        });
+        
+        // Broadcast SSE update
+        const connections = sseConnections.get(cryptoTx.merchantId);
+        if (connections) {
+          const transaction = await storage.getTransaction(cryptoTx.transactionId);
+          connections.forEach(client => {
+            client.write(`data: ${JSON.stringify({ 
+              type: 'transaction_update', 
+              transaction,
+              cryptoTransaction: cryptoTx 
+            })}\n\n`);
+          });
+        }
+      } else if (eventType === 'charge:failed' || eventType === 'charge:expired') {
+        // Payment failed or expired
+        await storage.updateCryptoTransactionStatus(cryptoTx.id, eventType === 'charge:expired' ? 'expired' : 'failed', 0);
+        await storage.updateTransactionStatus(cryptoTx.transactionId, 'failed');
+        
+        // Broadcast SSE update
+        const connections = sseConnections.get(cryptoTx.merchantId);
+        if (connections) {
+          const transaction = await storage.getTransaction(cryptoTx.transactionId);
+          connections.forEach(client => {
+            client.write(`data: ${JSON.stringify({ 
+              type: 'transaction_update', 
+              transaction,
+              cryptoTransaction: cryptoTx 
+            })}\n\n`);
+          });
+        }
+      }
+      
+      res.json({ received: true, processed: true });
     } catch (error) {
       console.error("Error processing Coinbase webhook:", error);
       res.status(500).json({ message: "Webhook processing failed" });
@@ -1286,6 +1374,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating theme:", error);
       res.status(500).json({ message: "Failed to update theme" });
+    }
+  });
+
+  // Update merchant crypto settings
+  app.put("/api/merchants/:id/crypto-settings", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      
+      // Verify user owns this merchant
+      if (!req.user || req.user.merchantId !== merchantId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const validation = updateCryptoSettingsSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid crypto settings", errors: validation.error.errors });
+      }
+
+      const updatedMerchant = await storage.updateMerchantCryptoSettings(merchantId, validation.data);
+      if (!updatedMerchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+
+      // Don't return sensitive data
+      const safeData = {
+        ...updatedMerchant,
+        coinbaseCommerceApiKey: updatedMerchant.coinbaseCommerceApiKey ? '••••••••' : null,
+        coinbaseWebhookSecret: updatedMerchant.coinbaseWebhookSecret ? '••••••••' : null,
+      };
+
+      res.json(safeData);
+    } catch (error) {
+      console.error("Error updating crypto settings:", error);
+      res.status(500).json({ message: "Failed to update crypto settings" });
     }
   });
 
