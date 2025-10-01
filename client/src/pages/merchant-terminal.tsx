@@ -13,6 +13,7 @@ import { QRCodeDisplay } from "@/components/qr-code-display";
 import { MerchantUrlDisplay } from "@/components/merchant-url-display";
 import { EnhancedPaymentStatus } from "@/components/enhanced-payment-status";
 import { BillSplit } from "@/components/bill-split";
+import { AnimatedBrandBackground } from "@/components/backgrounds/AnimatedBrandBackground";
 import { apiRequest } from "@/lib/queryClient";
 import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
@@ -1058,10 +1059,15 @@ function PaymentStatus({ transaction }: { transaction: any }) {
 }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-black to-gray-900 text-white relative overflow-hidden">
-
-      {/* Main content container */}
-      <div className="relative z-10 min-h-screen">
+    <AnimatedBrandBackground
+      backgroundColor="#1a1a1a"
+      circleColor="#2d2d2d"
+      largeCirclePosition="top-[-120px] right-[-120px]"
+      smallCirclePosition="top-[200px] right-[250px]"
+      extraLargeCirclePosition="bottom-[-120px] right-[-120px]"
+      extraSmallCirclePosition="bottom-[200px] right-[250px]"
+    >
+      <div className="relative z-10 min-h-screen text-white">
 
         {/* Two-Pane Layout Container */}
         <div className="max-w-5xl mx-auto px-3 sm:px-6 pt-4 sm:pt-6">
@@ -1155,6 +1161,6 @@ function PaymentStatus({ transaction }: { transaction: any }) {
         </div>
       </div>
 
-    </div>
+    </AnimatedBrandBackground>
   );
 }
