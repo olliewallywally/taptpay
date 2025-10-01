@@ -300,8 +300,160 @@ export default function Login() {
   }
 
   return (
-    <AnimatedBrandBackground>
-      <div className="w-full max-w-xs">
+    <div className="min-h-screen relative overflow-hidden p-4">
+      {/* Background Layer - Fixed */}
+      <div 
+        className="fixed inset-0 pointer-events-none"
+        style={{ backgroundColor: '#00D4D4' }}
+      >
+        {/* Desktop Only: Lava Lamp Blue Balls */}
+        <div className="hidden md:block">
+          {/* Lava Lamp Ball 1 - Large */}
+          <div 
+            className="absolute w-96 h-96 rounded-full animate-lava-lamp-1 bottom-[-100px] right-[-100px]"
+            style={{ 
+              backgroundColor: '#0000FF',
+              willChange: 'transform, border-radius',
+            }}
+          />
+          
+          {/* Lava Lamp Ball 2 - Medium */}
+          <div 
+            className="absolute w-80 h-80 rounded-full animate-lava-lamp-2 top-[-80px] left-[-80px]"
+            style={{ 
+              backgroundColor: '#0000FF',
+              willChange: 'transform, border-radius',
+            }}
+          />
+          
+          {/* Lava Lamp Ball 3 - Large */}
+          <div 
+            className="absolute w-[28rem] h-[28rem] rounded-full animate-lava-lamp-3 top-[20%] right-[10%]"
+            style={{ 
+              backgroundColor: '#0000FF',
+              willChange: 'transform, border-radius',
+            }}
+          />
+          
+          {/* Lava Lamp Ball 4 - Small */}
+          <div 
+            className="absolute w-64 h-64 rounded-full animate-lava-lamp-4 bottom-[15%] left-[20%]"
+            style={{ 
+              backgroundColor: '#0000FF',
+              willChange: 'transform, border-radius',
+            }}
+          />
+          
+          {/* Lava Lamp Ball 5 - Extra Large */}
+          <div 
+            className="absolute w-[32rem] h-[32rem] rounded-full animate-lava-lamp-5 top-[40%] left-[-120px]"
+            style={{ 
+              backgroundColor: '#0000FF',
+              willChange: 'transform, border-radius',
+            }}
+          />
+          
+          {/* Lava Lamp Ball 6 - Medium */}
+          <div 
+            className="absolute w-72 h-72 rounded-full animate-lava-lamp-6 bottom-[30%] right-[25%]"
+            style={{ 
+              backgroundColor: '#0000FF',
+              willChange: 'transform, border-radius',
+            }}
+          />
+        </div>
+        
+        {/* Mobile: Simple circles (non-morphing) */}
+        <div className="block md:hidden">
+          <div 
+            className="absolute w-96 h-96 rounded-full animate-slow-float-1 bottom-[-120px] right-[-120px]"
+            style={{ 
+              backgroundColor: '#0000FF',
+              willChange: 'transform',
+            }}
+          />
+          <div 
+            className="absolute w-48 h-48 rounded-full animate-slow-float-2 bottom-[200px] right-[250px]"
+            style={{ 
+              backgroundColor: '#0000FF',
+              willChange: 'transform',
+            }}
+          />
+        </div>
+        
+        {/* Floating Line-art Shapes */}
+        <svg 
+          className="absolute top-[15%] left-[10%] w-12 h-12 animate-float-shape-1" 
+          style={{ 
+            color: 'white', 
+            opacity: 0.6,
+            willChange: 'transform',
+          }}
+        >
+          <polygon points="24,4 44,44 4,44" fill="none" stroke="currentColor" strokeWidth="2" />
+        </svg>
+        
+        <svg 
+          className="absolute top-[70%] left-[80%] w-10 h-10 animate-float-shape-2"
+          style={{ 
+            color: 'white', 
+            opacity: 0.6,
+            willChange: 'transform',
+          }}
+        >
+          <polygon points="20,4 36,36 4,36" fill="none" stroke="currentColor" strokeWidth="2" />
+        </svg>
+        
+        <svg 
+          className="absolute top-[25%] right-[15%] w-11 h-11 animate-float-shape-3"
+          style={{ 
+            color: 'white', 
+            opacity: 0.6,
+            willChange: 'transform',
+          }}
+        >
+          <rect x="4" y="4" width="36" height="36" fill="none" stroke="currentColor" strokeWidth="2" />
+        </svg>
+        
+        <svg 
+          className="absolute bottom-[30%] left-[20%] w-9 h-9 animate-float-shape-4"
+          style={{ 
+            color: 'white', 
+            opacity: 0.6,
+            willChange: 'transform',
+          }}
+        >
+          <rect x="4" y="4" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2" />
+        </svg>
+        
+        <svg 
+          className="absolute top-[60%] right-[25%] w-10 h-10 animate-float-shape-5"
+          style={{ 
+            color: 'white', 
+            opacity: 0.6,
+            willChange: 'transform',
+          }}
+        >
+          <line x1="6" y1="6" x2="34" y2="34" stroke="currentColor" strokeWidth="2" />
+          <line x1="34" y1="6" x2="6" y2="34" stroke="currentColor" strokeWidth="2" />
+        </svg>
+        
+        <svg 
+          className="absolute top-[40%] left-[15%] w-12 h-12 animate-float-shape-6"
+          style={{ 
+            color: 'white', 
+            opacity: 0.6,
+            willChange: 'transform',
+          }}
+        >
+          <line x1="8" y1="8" x2="40" y2="40" stroke="currentColor" strokeWidth="2" />
+          <line x1="40" y1="8" x2="8" y2="40" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      </div>
+
+      {/* Content Layer */}
+      <div className="relative z-10 flex min-h-screen items-center justify-center w-full">
+        <div className="w-full max-w-xs">
         <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 shadow-2xl">
           
           {/* Logo Section - Compact */}
@@ -476,7 +628,8 @@ export default function Login() {
             </p>
           </div>
         </div>
+        </div>
       </div>
-    </AnimatedBrandBackground>
+    </div>
   );
 }
