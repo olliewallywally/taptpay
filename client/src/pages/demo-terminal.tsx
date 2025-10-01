@@ -110,12 +110,17 @@ export default function DemoTerminal() {
 
   // Update current transaction when active transaction changes
   useEffect(() => {
-    if (activeTransaction && (!currentTransaction || currentTransaction.id !== activeTransaction.id || currentTransaction.status !== activeTransaction.status)) {
-      setCurrentTransaction(activeTransaction);
-    } else if (!activeTransaction && currentTransaction) {
-      setCurrentTransaction(null);
+    if (activeTransaction) {
+      setCurrentTransaction(prev => {
+        if (!prev || prev.id !== activeTransaction.id || prev.status !== activeTransaction.status) {
+          return activeTransaction;
+        }
+        return prev;
+      });
+    } else {
+      setCurrentTransaction(prev => prev ? null : prev);
     }
-  }, [activeTransaction?.id, activeTransaction?.status]);
+  }, [activeTransaction]);
 
   // SSE connection for real-time updates
   useEffect(() => {
@@ -243,7 +248,7 @@ export default function DemoTerminal() {
   // Cancel transaction mutation
   const cancelTransactionMutation = useMutation({
     mutationFn: async () => {
-      if (!currentTransaction) return;
+      if (!currentTransaction) throw new Error("No transaction to cancel");
       const response = await apiRequest("POST", `/api/transactions/${currentTransaction.id}/cancel`, {});
       return response.json();
     },
