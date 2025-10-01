@@ -371,7 +371,7 @@ export default function DemoTerminal() {
         {/* Payment Stones Button */}
         <button
           onClick={() => setShowStones(!showStones)}
-          className="w-full bg-transparent border-3 border-green-500 sm:border-0 rounded-full py-4 sm:py-6 px-6 sm:px-8 flex items-center justify-between hover:bg-green-500/10 transition-all shadow-lg"
+          className="w-full bg-[#6b6b6b] border-3 border-green-500 sm:border-0 rounded-full py-4 sm:py-6 px-6 sm:px-8 flex items-center justify-between hover:bg-green-500/10 transition-all shadow-lg"
           data-testid="button-payment-stones"
         >
           <span className="text-white font-semibold text-lg sm:text-2xl flex-1 text-center">
@@ -404,7 +404,7 @@ export default function DemoTerminal() {
           <button
             onClick={handleCancelPayment}
             disabled={cancelTransactionMutation.isPending}
-            className="w-full bg-transparent border-3 border-red-500 sm:border-0 rounded-full py-4 sm:py-6 px-6 sm:px-8 hover:bg-red-500/10 transition-all shadow-lg disabled:opacity-50"
+            className="w-full bg-[#6b6b6b] border-3 border-red-500 sm:border-0 rounded-full py-4 sm:py-6 px-6 sm:px-8 hover:bg-red-500/10 transition-all shadow-lg disabled:opacity-50"
             data-testid="button-cancel"
           >
             <span className="text-red-400 font-semibold text-lg sm:text-2xl">
