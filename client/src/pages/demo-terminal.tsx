@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Download, Camera, Moon, RefreshCw, Wifi, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AnimatedBrandBackground } from "@/components/backgrounds/AnimatedBrandBackground";
 
 interface Merchant {
   id: number;
@@ -216,8 +217,9 @@ export default function DemoTerminal() {
   const status = getStatusDisplay();
 
   return (
-    <div className="min-h-screen bg-[#3d3d3d] flex items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-6">
+    <AnimatedBrandBackground>
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="w-full max-w-md space-y-6">
         
         {/* Amount Display */}
         <div className="bg-gradient-to-br from-green-400 to-green-500 rounded-[2rem] p-8 shadow-2xl">
@@ -351,5 +353,6 @@ export default function DemoTerminal() {
 
       </div>
     </div>
+    </AnimatedBrandBackground>
   );
 }
