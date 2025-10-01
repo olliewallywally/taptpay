@@ -181,13 +181,14 @@ export default function DemoTerminal() {
         ? {
             merchantId,
             itemName: data.itemName,
-            price: parseFloat(data.price),
+            price: data.price,
             status: "pending",
           }
         : {
             merchantId,
-            amount: parseFloat(amount),
-            currency: "NZD",
+            itemName: `$${amount} Payment`,
+            price: amount,
+            status: "pending",
           };
       
       const response = await apiRequest("POST", "/api/transactions", payload);
@@ -290,7 +291,7 @@ export default function DemoTerminal() {
       });
       return;
     }
-    createTransactionMutation.mutate();
+    createTransactionMutation.mutate(undefined);
   };
 
   const handleCancelPayment = () => {
