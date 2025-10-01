@@ -368,36 +368,40 @@ export default function DemoTerminal() {
           </div>
         </div>
 
-        {/* Payment Stones Button */}
-        <button
-          onClick={() => setShowStones(!showStones)}
-          className="w-full bg-[#6b6b6b] border-3 border-green-500 sm:border-0 rounded-full py-4 sm:py-6 px-6 sm:px-8 flex items-center justify-between hover:bg-green-500/10 transition-all shadow-lg"
-          data-testid="button-payment-stones"
-        >
-          <span className="text-white font-semibold text-lg sm:text-2xl flex-1 text-center">
-            payment stones
-          </span>
-          <ChevronDown className={`w-5 h-5 sm:w-7 sm:h-7 text-green-500 transition-transform ${showStones ? 'rotate-180' : ''}`} />
-        </button>
+        {/* Payment Stones Section */}
+        <div className="w-full">
+          <button
+            onClick={() => setShowStones(!showStones)}
+            className="w-full bg-[#6b6b6b] border-3 border-green-500 sm:border-0 rounded-full py-4 sm:py-6 px-6 sm:px-8 flex items-center justify-between hover:bg-green-500/10 transition-all shadow-lg"
+            data-testid="button-payment-stones"
+          >
+            <span className="text-white font-semibold text-lg sm:text-2xl flex-1 text-center">
+              payment stones
+            </span>
+            <ChevronDown className={`w-5 h-5 sm:w-7 sm:h-7 text-green-500 transition-transform duration-300 ${showStones ? 'rotate-180' : ''}`} />
+          </button>
 
-        {/* Stones Dropdown */}
-        {showStones && taptStones.length > 0 && (
-          <div className="bg-[#505050] rounded-2xl sm:rounded-3xl p-4 sm:p-8 space-y-3 sm:space-y-4 shadow-xl animate-in fade-in slide-in-from-top-2 duration-300">
-            {taptStones.map((stone) => (
-              <button
-                key={stone.id}
-                onClick={() => {
-                  window.open(stone.paymentUrl, '_blank');
-                  setShowStones(false);
-                }}
-                className="w-full bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl sm:rounded-2xl py-3 sm:py-5 px-4 sm:px-6 text-green-400 font-medium text-base sm:text-lg transition-all"
-                data-testid={`button-stone-${stone.id}`}
-              >
-                {stone.name} - Stone {stone.stoneNumber}
-              </button>
-            ))}
+          {/* Stones Dropdown */}
+          <div className={`overflow-hidden transition-all duration-300 ${showStones ? 'max-h-96 mt-4 sm:mt-6' : 'max-h-0'}`}>
+            {taptStones.length > 0 && (
+              <div className="bg-[#505050] rounded-2xl sm:rounded-3xl p-4 sm:p-8 space-y-3 sm:space-y-4 shadow-xl">
+                {taptStones.map((stone) => (
+                  <button
+                    key={stone.id}
+                    onClick={() => {
+                      window.open(stone.paymentUrl, '_blank');
+                      setShowStones(false);
+                    }}
+                    className="w-full bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl sm:rounded-2xl py-3 sm:py-5 px-4 sm:px-6 text-green-400 font-medium text-base sm:text-lg transition-all"
+                    data-testid={`button-stone-${stone.id}`}
+                  >
+                    {stone.name} - Stone {stone.stoneNumber}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+        </div>
 
         {/* Cancel Button */}
         {currentTransaction && currentTransaction.status === 'pending' && (
