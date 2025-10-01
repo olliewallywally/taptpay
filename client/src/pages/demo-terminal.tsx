@@ -482,7 +482,7 @@ export default function DemoTerminal() {
           </div>
 
           {/* Action Buttons */}
-          <div className="relative z-10 bg-[#505050] rounded-b-2xl sm:rounded-b-3xl pt-16 sm:pt-28 pb-4 sm:pb-6 px-4 sm:px-8 -mt-6 shadow-xl">
+          <div className="relative z-10 bg-[#2a2a2a] rounded-b-2xl sm:rounded-b-3xl pt-16 sm:pt-28 pb-4 sm:pb-6 px-4 sm:px-8 -mt-6 shadow-xl">
             <div className="flex justify-around items-center gap-2 sm:gap-4">
               {/* New Payment Button */}
               <button
@@ -536,7 +536,7 @@ export default function DemoTerminal() {
           <div className="relative z-5">
             {/* New Payment Dropdown */}
             <div className={`overflow-hidden transition-all duration-300 ${activeDropdown === 'new-payment' ? 'max-h-[600px]' : 'max-h-0'}`}>
-              <div className="bg-[#505050] rounded-t-none rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 space-y-3 sm:space-y-4 -mt-2">
+              <div className="bg-[#2a2a2a] rounded-t-none rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 space-y-3 sm:space-y-4 -mt-2">
                 <h3 className="text-white font-semibold text-lg sm:text-xl mb-3">New Payment</h3>
                 
                 {!showPaymentForm ? (
@@ -681,7 +681,7 @@ export default function DemoTerminal() {
 
             {/* Split Bill Dropdown */}
             <div className={`overflow-hidden transition-all duration-300 ${activeDropdown === 'split-bill' ? 'max-h-96' : 'max-h-0'}`}>
-              <div className="bg-[#505050] rounded-t-none rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 space-y-4 -mt-2">
+              <div className="bg-[#2a2a2a] rounded-t-none rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 space-y-4 -mt-2">
                 <h3 className="text-white font-semibold text-lg sm:text-xl mb-3">Split Bill</h3>
                 
                 {currentTransaction ? (
@@ -744,7 +744,7 @@ export default function DemoTerminal() {
 
             {/* Share Link Dropdown */}
             <div className={`overflow-hidden transition-all duration-300 ${activeDropdown === 'share-link' ? 'max-h-96' : 'max-h-0'}`}>
-              <div className="bg-[#505050] rounded-t-none rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 space-y-3 sm:space-y-4 -mt-2">
+              <div className="bg-[#2a2a2a] rounded-t-none rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 space-y-3 sm:space-y-4 -mt-2">
                 <h3 className="text-white font-semibold text-lg sm:text-xl mb-3">Share Link</h3>
                 <button
                   onClick={() => {
@@ -778,7 +778,7 @@ export default function DemoTerminal() {
 
             {/* Quick Amounts Dropdown */}
             <div className={`overflow-hidden transition-all duration-300 ${activeDropdown === 'quick-amounts' ? 'max-h-96' : 'max-h-0'}`}>
-              <div className="bg-[#505050] rounded-t-none rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 -mt-2">
+              <div className="bg-[#2a2a2a] rounded-t-none rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 -mt-2">
                 <h3 className="text-white font-semibold text-lg sm:text-xl mb-3">Quick Amounts</h3>
                 <div className="grid grid-cols-3 gap-2 sm:gap-3">
                   {['5.00', '10.00', '15.00', '20.00', '25.00', '50.00', '75.00', '100.00', '150.00'].map((quickAmount) => (
@@ -828,7 +828,7 @@ export default function DemoTerminal() {
           {/* Stones Dropdown */}
           <div className={`overflow-hidden transition-all duration-300 ${showStones ? 'max-h-96 mt-4 sm:mt-6' : 'max-h-0'}`}>
             {taptStones.length > 0 && (
-              <div className="bg-[#505050] rounded-2xl sm:rounded-3xl p-4 sm:p-8 space-y-3 sm:space-y-4 shadow-xl">
+              <div className="bg-[#2a2a2a] rounded-2xl sm:rounded-3xl p-4 sm:p-8 space-y-3 sm:space-y-4 shadow-xl">
                 {taptStones.map((stone) => (
                   <button
                     key={stone.id}
