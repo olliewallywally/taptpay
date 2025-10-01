@@ -414,23 +414,12 @@ export default function DemoTerminal() {
                 <h3 className="text-white font-semibold text-lg sm:text-xl mb-3">New Payment</h3>
                 
                 {!showPaymentForm ? (
-                  <>
-                    <button
-                      onClick={() => setShowPaymentForm(true)}
-                      className="w-full bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl py-3 px-4 text-green-400 font-medium transition-all"
-                    >
-                      Create Standard Payment
-                    </button>
-                    <button
-                      onClick={() => {
-                        toast({ title: "Recurring Payment", description: "Feature coming soon" });
-                        setActiveDropdown(null);
-                      }}
-                      className="w-full bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl py-3 px-4 text-green-400 font-medium transition-all"
-                    >
-                      Create Recurring Payment
-                    </button>
-                  </>
+                  <button
+                    onClick={() => setShowPaymentForm(true)}
+                    className="w-full bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl py-3 px-4 text-green-400 font-medium transition-all"
+                  >
+                    Create Standard Payment
+                  </button>
                 ) : (
                   <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmitPaymentForm)} className="space-y-4">
