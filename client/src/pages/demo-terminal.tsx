@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Users2, Share2, Calculator, Wifi, ChevronDown, Menu, X, LogOut } from "lucide-react";
+import { Plus, Minus, Users2, Share2, Calculator, Wifi, ChevronDown, Menu, X, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AnimatedBrandBackground } from "@/components/backgrounds/AnimatedBrandBackground";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -24,10 +24,15 @@ interface Transaction {
   id: number;
   merchantId: number;
   amount: string;
+  price: string;
   currency: string;
   status: string;
   qrCodeUrl?: string;
   paymentUrl?: string;
+  isSplit?: boolean;
+  totalSplits?: number;
+  completedSplits?: number;
+  splitAmount?: string;
 }
 
 interface TaptStone {
@@ -58,6 +63,7 @@ export default function DemoTerminal() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<'new-payment' | 'split-bill' | 'share-link' | 'quick-amounts' | null>(null);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [splitCount, setSplitCount] = useState(2);
 
   const form = useForm<PaymentFormData>({
     resolver: zodResolver(paymentFormSchema),
@@ -187,6 +193,35 @@ export default function DemoTerminal() {
       toast({
         title: "Error",
         description: error.message || "Failed to create payment",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Create split bill mutation
+  const createSplitBillMutation = useMutation({
+    mutationFn: async () => {
+      if (!currentTransaction?.id) throw new Error("No active transaction");
+      
+      const response = await apiRequest("POST", `/api/transactions/${currentTransaction.id}/split`, {
+        totalSplits: splitCount,
+      });
+      return response.json();
+    },
+    onSuccess: (transaction) => {
+      setCurrentTransaction(transaction);
+      queryClient.invalidateQueries({ queryKey: [`/api/merchants/${merchantId}/active-transaction`] });
+      setActiveDropdown(null);
+      setSplitCount(2);
+      toast({
+        title: "Bill Split Created",
+        description: `Payment split ${splitCount} ways - $${(parseFloat(currentTransaction?.price || "0") / splitCount).toFixed(2)} each`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to split bill",
         variant: "destructive",
       });
     },
@@ -349,10 +384,24 @@ export default function DemoTerminal() {
           {/* Amount Display */}
           <div className="relative z-20">
             <div className="bg-gradient-to-br from-green-400 to-green-500 rounded-t-2xl sm:rounded-t-[2rem] p-6 sm:p-12 shadow-2xl">
-              <div className="flex items-center justify-center">
+              <div className="flex flex-col items-center justify-center">
                 <span className="text-4xl sm:text-7xl font-bold text-gray-900">
-                  ${currentTransaction ? currentTransaction.amount : amount}
+                  ${currentTransaction ? (
+                    currentTransaction.isSplit && currentTransaction.splitAmount
+                      ? parseFloat(currentTransaction.splitAmount).toFixed(2)
+                      : parseFloat(currentTransaction.price).toFixed(2)
+                  ) : amount}
                 </span>
+                {currentTransaction?.isSplit && (
+                  <div className="mt-3 sm:mt-4 text-center">
+                    <div className="text-lg sm:text-2xl font-semibold text-gray-900">
+                      Split {currentTransaction.completedSplits + 1} of {currentTransaction.totalSplits}
+                    </div>
+                    <div className="text-sm sm:text-base text-gray-800 mt-1">
+                      Total: ${parseFloat(currentTransaction.price).toFixed(2)} ({currentTransaction.totalSplits} people)
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -489,21 +538,64 @@ export default function DemoTerminal() {
 
             {/* Split Bill Dropdown */}
             <div className={`overflow-hidden transition-all duration-300 ${activeDropdown === 'split-bill' ? 'max-h-96' : 'max-h-0'}`}>
-              <div className="bg-[#505050] rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 space-y-3 sm:space-y-4 shadow-xl -mt-2">
+              <div className="bg-[#505050] rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 space-y-4 shadow-xl -mt-2">
                 <h3 className="text-white font-semibold text-lg sm:text-xl mb-3">Split Bill</h3>
-                {[2, 3, 4, 5].map((num) => (
-                  <button
-                    key={num}
-                    onClick={() => {
-                      const splitAmount = (parseFloat(amount) / num).toFixed(2);
-                      toast({ title: "Split Bill", description: `${num} ways: $${splitAmount} each` });
-                      setActiveDropdown(null);
-                    }}
-                    className="w-full bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl py-3 px-4 text-green-400 font-medium transition-all"
-                  >
-                    Split {num} Ways - ${(parseFloat(amount) / num).toFixed(2)} each
-                  </button>
-                ))}
+                
+                {currentTransaction ? (
+                  <>
+                    <div className="flex items-center justify-center gap-4 sm:gap-6">
+                      <button
+                        onClick={() => setSplitCount(Math.max(2, splitCount - 1))}
+                        disabled={splitCount <= 2}
+                        className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-green-500 hover:bg-green-600 disabled:bg-gray-600 disabled:cursor-not-allowed flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
+                      >
+                        <Minus className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
+                      </button>
+                      
+                      <div className="text-center">
+                        <div className="text-4xl sm:text-5xl font-bold text-green-400">{splitCount}</div>
+                        <div className="text-sm sm:text-base text-gray-300 mt-1">people</div>
+                        <div className="text-lg sm:text-xl font-semibold text-white mt-2">
+                          ${(parseFloat(currentTransaction.price) / splitCount).toFixed(2)} each
+                        </div>
+                      </div>
+                      
+                      <button
+                        onClick={() => setSplitCount(Math.min(10, splitCount + 1))}
+                        disabled={splitCount >= 10}
+                        className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-green-500 hover:bg-green-600 disabled:bg-gray-600 disabled:cursor-not-allowed flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
+                      >
+                        <Plus className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
+                      </button>
+                    </div>
+                    
+                    <div className="flex gap-3 pt-4">
+                      <Button
+                        onClick={() => createSplitBillMutation.mutate()}
+                        disabled={createSplitBillMutation.isPending}
+                        className="flex-1 bg-green-500 hover:bg-green-600 text-gray-900 font-semibold rounded-xl h-12"
+                        data-testid="button-confirm-split"
+                      >
+                        {createSplitBillMutation.isPending ? "Splitting..." : "Confirm Split"}
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setActiveDropdown(null);
+                          setSplitCount(2);
+                        }}
+                        variant="outline"
+                        className="flex-1 border-2 border-green-500 text-green-400 hover:bg-green-500/10 rounded-xl h-12"
+                        data-testid="button-cancel-split"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center text-gray-300 py-4">
+                    Create a payment first to split the bill
+                  </div>
+                )}
               </div>
             </div>
 
