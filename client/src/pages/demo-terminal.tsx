@@ -233,17 +233,8 @@ export default function DemoTerminal() {
       extraLargeCirclePosition="bottom-[-120px] right-[-120px]"
       extraSmallCirclePosition="bottom-[200px] right-[250px]"
     >
-      {/* Logo in top left corner */}
-      <div className="absolute top-6 left-6 z-10">
-        <img 
-          src={taptLogoPath} 
-          alt="Tapt Logo" 
-          className="h-12 w-auto drop-shadow-lg"
-        />
-      </div>
-
       {/* Menu icon in top right corner */}
-      <div className="absolute top-6 right-6 z-50">
+      <div className="fixed top-6 right-6 z-50">
         <button
           onClick={() => setMenuOpen(!menuOpen)}
           className="w-12 h-12 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95 shadow-lg"
@@ -292,6 +283,17 @@ export default function DemoTerminal() {
           </nav>
         </div>
       </div>
+
+      {/* Content with slide-over effect */}
+      <div className={`relative transition-transform duration-300 ${menuOpen ? '-translate-x-80' : 'translate-x-0'}`}>
+        {/* Logo - moves with content */}
+        <div className="absolute top-6 left-6 z-10">
+          <img 
+            src={taptLogoPath} 
+            alt="Tapt Logo" 
+            className="h-12 w-auto drop-shadow-lg"
+          />
+        </div>
 
       <div className="min-h-screen flex items-center justify-center p-3 sm:p-8 pt-24 sm:pt-32">
         <div className="w-full max-w-4xl space-y-4 sm:space-y-8">
@@ -429,6 +431,7 @@ export default function DemoTerminal() {
         )}
 
       </div>
+    </div>
     </div>
     </AnimatedBrandBackground>
   );
