@@ -379,16 +379,7 @@ export default function DemoTerminal() {
       extraLargeCirclePosition="bottom-[-120px] right-[-120px]"
       extraSmallCirclePosition="bottom-[200px] right-[250px]"
     >
-      {/* Logo in top left corner */}
-      <div className="fixed top-6 left-6 z-50">
-        <img 
-          src={taptLogoPath} 
-          alt="Tapt Logo" 
-          className="h-12 w-auto drop-shadow-lg"
-        />
-      </div>
-
-      {/* Menu icon in top right corner */}
+      {/* Menu icon in top right corner - fixed position */}
       <div className="fixed top-6 right-6 z-50">
         <button
           onClick={() => setMenuOpen(!menuOpen)}
@@ -441,6 +432,15 @@ export default function DemoTerminal() {
 
       {/* Content with slide-over effect */}
       <div className={`relative transition-transform duration-300 ${menuOpen ? '-translate-x-80' : 'translate-x-0'}`}>
+        {/* Logo in top left corner - slides with content */}
+        <div className="absolute top-6 left-6 z-30">
+          <img 
+            src={taptLogoPath} 
+            alt="Tapt Logo" 
+            className="h-8 w-auto filter brightness-0 invert"
+          />
+        </div>
+        
         <div className="min-h-screen flex items-center justify-center p-3 sm:p-8 pt-24 sm:pt-32">
         <div className="w-full max-w-4xl space-y-4 sm:space-y-8">
         
