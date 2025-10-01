@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Minus, Users2, Share2, Calculator, Wifi, ChevronDown, Menu, X, LogOut } from "lucide-react";
+import { Plus, Minus, Users2, Share2, Calculator, Wifi, ChevronDown, Menu, X, LogOut, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AnimatedBrandBackground } from "@/components/backgrounds/AnimatedBrandBackground";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -64,6 +64,9 @@ export default function DemoTerminal() {
   const [activeDropdown, setActiveDropdown] = useState<'new-payment' | 'split-bill' | 'share-link' | 'quick-amounts' | null>(null);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [splitCount, setSplitCount] = useState(2);
+  const [stockSearchInput, setStockSearchInput] = useState("");
+  const [filteredStockItems, setFilteredStockItems] = useState<any[]>([]);
+  const [selectedStockItems, setSelectedStockItems] = useState<any[]>([]);
 
   const form = useForm<PaymentFormData>({
     resolver: zodResolver(paymentFormSchema),
@@ -96,6 +99,12 @@ export default function DemoTerminal() {
   // Fetch tapt stones
   const { data: taptStones = [] } = useQuery<TaptStone[]>({
     queryKey: [`/api/merchants/${merchantId}/tapt-stones`],
+    enabled: !!merchantId,
+  });
+
+  // Fetch stock items
+  const { data: stockItems = [] } = useQuery<any[]>({
+    queryKey: [`/api/merchants/${merchantId}/stock-items`],
     enabled: !!merchantId,
   });
 
@@ -180,6 +189,8 @@ export default function DemoTerminal() {
         form.reset();
         setShowPaymentForm(false);
         setActiveDropdown(null);
+        setSelectedStockItems([]);
+        setStockSearchInput("");
       }
       
       toast({
@@ -282,6 +293,58 @@ export default function DemoTerminal() {
 
   const onSubmitPaymentForm = (data: PaymentFormData) => {
     createTransactionMutation.mutate(data);
+  };
+
+  // Filter stock items based on search input
+  useEffect(() => {
+    if (stockSearchInput.trim() === "") {
+      setFilteredStockItems([]);
+    } else {
+      const filtered = stockItems.filter((item: any) =>
+        item.name.toLowerCase().includes(stockSearchInput.toLowerCase()) ||
+        item.description?.toLowerCase().includes(stockSearchInput.toLowerCase())
+      );
+      setFilteredStockItems(filtered.slice(0, 5)); // Show max 5 suggestions
+    }
+  }, [stockSearchInput, stockItems]);
+
+  // Calculate total price from selected stock items
+  const calculateTotalPrice = () => {
+    return selectedStockItems.reduce((total, item) => total + parseFloat(item.cost), 0).toFixed(2);
+  };
+
+  // Add stock item
+  const addStockItem = (stockItem: any) => {
+    if (!selectedStockItems.find(item => item.id === stockItem.id)) {
+      setSelectedStockItems(prev => [...prev, stockItem]);
+      setStockSearchInput("");
+      setFilteredStockItems([]);
+      
+      // Update form values
+      const newTotal = calculateTotalPrice();
+      form.setValue("price", (parseFloat(newTotal) + parseFloat(stockItem.cost)).toFixed(2));
+      
+      // Update item name with all selected items
+      const allItemNames = [...selectedStockItems, stockItem].map(item => item.name).join(", ");
+      form.setValue("itemName", allItemNames);
+    }
+  };
+
+  // Remove stock item
+  const removeStockItem = (stockItemId: number) => {
+    setSelectedStockItems(prev => {
+      const newItems = prev.filter(item => item.id !== stockItemId);
+      
+      // Update form values
+      const newTotal = newItems.reduce((total, item) => total + parseFloat(item.cost), 0).toFixed(2);
+      form.setValue("price", newTotal);
+      
+      // Update item name
+      const allItemNames = newItems.map(item => item.name).join(", ");
+      form.setValue("itemName", allItemNames || "");
+      
+      return newItems;
+    });
   };
 
   const getStatusDisplay = () => {
@@ -416,6 +479,8 @@ export default function DemoTerminal() {
                     setActiveDropdown(null);
                     setShowPaymentForm(false);
                     form.reset();
+                    setSelectedStockItems([]);
+                    setStockSearchInput("");
                   } else {
                     setActiveDropdown('new-payment');
                   }
@@ -472,6 +537,69 @@ export default function DemoTerminal() {
                 ) : (
                   <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmitPaymentForm)} className="space-y-4">
+                      {/* Stock Items Search */}
+                      <div className="space-y-2">
+                        <label className="text-green-400 font-medium text-sm">Search Stock Items</label>
+                        <div className="relative">
+                          <Input
+                            placeholder="Type to search stock items..."
+                            value={stockSearchInput}
+                            onChange={(e) => setStockSearchInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && filteredStockItems.length > 0) {
+                                e.preventDefault();
+                                addStockItem(filteredStockItems[0]);
+                              }
+                            }}
+                            className="bg-[#1a1a1a] border-2 border-green-500 text-white rounded-xl h-12 focus:ring-2 focus:ring-green-400"
+                            data-testid="stock-search-input"
+                          />
+                          
+                          {filteredStockItems.length > 0 && (
+                            <div className="absolute z-50 w-full bg-[#2a2a2a] border-2 border-green-500 rounded-xl mt-2 max-h-48 overflow-y-auto shadow-xl" data-testid="stock-suggestions">
+                              {filteredStockItems.map((item: any) => (
+                                <div
+                                  key={item.id}
+                                  onClick={() => addStockItem(item)}
+                                  className="p-3 cursor-pointer text-white border-b border-gray-700 last:border-b-0 hover:bg-green-500/10 transition-colors"
+                                  data-testid={`stock-suggestion-${item.id}`}
+                                >
+                                  <div className="font-semibold text-green-400">{item.name}</div>
+                                  <div className="text-gray-400 text-sm">${parseFloat(item.cost).toFixed(2)}</div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {selectedStockItems.length > 0 && (
+                          <div className="space-y-2">
+                            <label className="text-green-400 font-medium text-sm">Selected Items</label>
+                            <div className="flex flex-wrap gap-2" data-testid="selected-stock-items">
+                              {selectedStockItems.map((item) => (
+                                <div
+                                  key={item.id}
+                                  className="flex items-center gap-2 bg-green-500/20 border-2 border-green-500 rounded-full px-3 py-2 text-sm text-white"
+                                  data-testid={`selected-stock-item-${item.id}`}
+                                >
+                                  <Tag size={14} className="text-green-400" />
+                                  <span className="font-medium">{item.name}</span>
+                                  <span className="text-green-400">${parseFloat(item.cost).toFixed(2)}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => removeStockItem(item.id)}
+                                    className="ml-1 text-gray-400 hover:text-white transition-colors"
+                                    data-testid={`remove-stock-item-${item.id}`}
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
                       <FormField
                         control={form.control}
                         name="itemName"
@@ -482,6 +610,7 @@ export default function DemoTerminal() {
                               <Input
                                 placeholder="Enter item name"
                                 {...field}
+                                readOnly={selectedStockItems.length > 0}
                                 className="bg-[#1a1a1a] border-2 border-green-500 text-white rounded-xl h-12 focus:ring-2 focus:ring-green-400"
                                 data-testid="input-item-name"
                               />
@@ -523,6 +652,8 @@ export default function DemoTerminal() {
                           onClick={() => {
                             setShowPaymentForm(false);
                             form.reset();
+                            setSelectedStockItems([]);
+                            setStockSearchInput("");
                           }}
                           variant="outline"
                           className="flex-1 border-2 border-green-500 text-green-400 hover:bg-green-500/10 rounded-xl h-12"
