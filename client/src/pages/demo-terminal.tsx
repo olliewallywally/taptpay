@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Download, Camera, Moon, RefreshCw, Wifi, ChevronDown, Menu, X, LogOut } from "lucide-react";
+import { Plus, Users2, Share2, Calculator, Wifi, ChevronDown, Menu, X, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AnimatedBrandBackground } from "@/components/backgrounds/AnimatedBrandBackground";
 import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
@@ -42,6 +42,7 @@ export default function DemoTerminal() {
   const [currentTransaction, setCurrentTransaction] = useState<Transaction | null>(null);
   const [showStones, setShowStones] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [activeDropdown, setActiveDropdown] = useState<'new-payment' | 'split-bill' | 'share-link' | 'quick-amounts' | null>(null);
   
   // Get current user/merchant
   const { data: user } = useQuery<{ user: { merchantId: number } }>({
@@ -313,52 +314,148 @@ export default function DemoTerminal() {
 
           {/* Action Buttons */}
           <div className="relative z-10 bg-[#505050] rounded-b-2xl sm:rounded-b-3xl pt-16 sm:pt-28 pb-4 sm:pb-6 px-4 sm:px-8 -mt-2 shadow-xl">
-          <div className="flex justify-around items-center gap-2 sm:gap-4">
-            <button
-              onClick={() => {
-                if (currentTransaction?.qrCodeUrl) {
-                  window.open(currentTransaction.qrCodeUrl, '_blank');
-                }
-              }}
-              className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
-              data-testid="button-download-qr"
-            >
-              <Download className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
-            </button>
+            <div className="flex justify-around items-center gap-2 sm:gap-4">
+              {/* New Payment Button */}
+              <button
+                onClick={() => setActiveDropdown(activeDropdown === 'new-payment' ? null : 'new-payment')}
+                className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
+                data-testid="button-new-payment"
+              >
+                <Plus className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
+              </button>
 
-            <button
-              onClick={() => {
-                toast({
-                  title: "Camera",
-                  description: "Scan QR code feature",
-                });
-              }}
-              className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
-              data-testid="button-camera"
-            >
-              <Camera className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
-            </button>
+              {/* Split Bill Button */}
+              <button
+                onClick={() => setActiveDropdown(activeDropdown === 'split-bill' ? null : 'split-bill')}
+                className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
+                data-testid="button-split-bill"
+              >
+                <Users2 className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
+              </button>
 
-            <button
-              onClick={() => {
-                document.documentElement.classList.toggle('dark');
-              }}
-              className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
-              data-testid="button-theme"
-            >
-              <Moon className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
-            </button>
+              {/* Share Link Button */}
+              <button
+                onClick={() => setActiveDropdown(activeDropdown === 'share-link' ? null : 'share-link')}
+                className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
+                data-testid="button-share-link"
+              >
+                <Share2 className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
+              </button>
 
-            <button
-              onClick={() => handleCreatePayment()}
-              disabled={!!currentTransaction && ['pending', 'processing'].includes(currentTransaction.status)}
-              className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-              data-testid="button-refresh"
-            >
-              <RefreshCw className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
-            </button>
+              {/* Quick Amounts Button */}
+              <button
+                onClick={() => setActiveDropdown(activeDropdown === 'quick-amounts' ? null : 'quick-amounts')}
+                className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
+                data-testid="button-quick-amounts"
+              >
+                <Calculator className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
+              </button>
+            </div>
           </div>
-        </div>
+
+          {/* Dropdowns */}
+          <div className="relative z-5">
+            {/* New Payment Dropdown */}
+            <div className={`overflow-hidden transition-all duration-300 ${activeDropdown === 'new-payment' ? 'max-h-96' : 'max-h-0'}`}>
+              <div className="bg-[#505050] rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 space-y-3 sm:space-y-4 shadow-xl -mt-2">
+                <h3 className="text-white font-semibold text-lg sm:text-xl mb-3">New Payment</h3>
+                <button
+                  onClick={() => {
+                    handleCreatePayment();
+                    setActiveDropdown(null);
+                  }}
+                  className="w-full bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl py-3 px-4 text-green-400 font-medium transition-all"
+                >
+                  Create Standard Payment
+                </button>
+                <button
+                  onClick={() => {
+                    toast({ title: "Recurring Payment", description: "Feature coming soon" });
+                    setActiveDropdown(null);
+                  }}
+                  className="w-full bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl py-3 px-4 text-green-400 font-medium transition-all"
+                >
+                  Create Recurring Payment
+                </button>
+              </div>
+            </div>
+
+            {/* Split Bill Dropdown */}
+            <div className={`overflow-hidden transition-all duration-300 ${activeDropdown === 'split-bill' ? 'max-h-96' : 'max-h-0'}`}>
+              <div className="bg-[#505050] rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 space-y-3 sm:space-y-4 shadow-xl -mt-2">
+                <h3 className="text-white font-semibold text-lg sm:text-xl mb-3">Split Bill</h3>
+                {[2, 3, 4, 5].map((num) => (
+                  <button
+                    key={num}
+                    onClick={() => {
+                      const splitAmount = (parseFloat(amount) / num).toFixed(2);
+                      toast({ title: "Split Bill", description: `${num} ways: $${splitAmount} each` });
+                      setActiveDropdown(null);
+                    }}
+                    className="w-full bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl py-3 px-4 text-green-400 font-medium transition-all"
+                  >
+                    Split {num} Ways - ${(parseFloat(amount) / num).toFixed(2)} each
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Share Link Dropdown */}
+            <div className={`overflow-hidden transition-all duration-300 ${activeDropdown === 'share-link' ? 'max-h-96' : 'max-h-0'}`}>
+              <div className="bg-[#505050] rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 space-y-3 sm:space-y-4 shadow-xl -mt-2">
+                <h3 className="text-white font-semibold text-lg sm:text-xl mb-3">Share Link</h3>
+                <button
+                  onClick={() => {
+                    if (currentTransaction?.paymentUrl) {
+                      navigator.clipboard.writeText(currentTransaction.paymentUrl);
+                      toast({ title: "Link Copied!", description: "Payment link copied to clipboard" });
+                    } else {
+                      toast({ title: "No Active Payment", description: "Create a payment first" });
+                    }
+                    setActiveDropdown(null);
+                  }}
+                  className="w-full bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl py-3 px-4 text-green-400 font-medium transition-all"
+                >
+                  Copy Payment Link
+                </button>
+                <button
+                  onClick={() => {
+                    if (currentTransaction?.qrCodeUrl) {
+                      window.open(currentTransaction.qrCodeUrl, '_blank');
+                    } else {
+                      toast({ title: "No Active Payment", description: "Create a payment first" });
+                    }
+                    setActiveDropdown(null);
+                  }}
+                  className="w-full bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl py-3 px-4 text-green-400 font-medium transition-all"
+                >
+                  Download QR Code
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Amounts Dropdown */}
+            <div className={`overflow-hidden transition-all duration-300 ${activeDropdown === 'quick-amounts' ? 'max-h-96' : 'max-h-0'}`}>
+              <div className="bg-[#505050] rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 shadow-xl -mt-2">
+                <h3 className="text-white font-semibold text-lg sm:text-xl mb-3">Quick Amounts</h3>
+                <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                  {['5.00', '10.00', '15.00', '20.00', '25.00', '50.00', '75.00', '100.00', '150.00'].map((quickAmount) => (
+                    <button
+                      key={quickAmount}
+                      onClick={() => {
+                        setAmount(quickAmount);
+                        toast({ title: "Amount Set", description: `$${quickAmount}` });
+                        setActiveDropdown(null);
+                      }}
+                      className="bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl py-3 px-2 text-green-400 font-medium transition-all text-sm sm:text-base"
+                    >
+                      ${quickAmount}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Status Display */}
