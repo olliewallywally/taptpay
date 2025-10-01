@@ -440,6 +440,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Cancel transaction
+  app.post("/api/transactions/:id/cancel", async (req, res) => {
+    try {
+      const transactionId = parseInt(req.params.id);
+      const transaction = await storage.getTransaction(transactionId);
+      
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+
+      // Only allow canceling pending or processing transactions
+      if (!['pending', 'processing'].includes(transaction.status)) {
+        return res.status(400).json({ message: `Cannot cancel transaction with status: ${transaction.status}` });
+      }
+
+      // Update transaction status to cancelled
+      await storage.updateTransactionStatus(transactionId, "cancelled");
+      const updatedTransaction = await storage.getTransaction(transactionId);
+
+      // Notify connected clients about the cancellation
+      const connections = sseConnections.get(transaction.merchantId);
+      if (connections) {
+        connections.forEach(conn => {
+          conn.write(`data: ${JSON.stringify({ type: 'transaction_update', transaction: updatedTransaction })}\n\n`);
+        });
+      }
+
+      res.json(updatedTransaction);
+    } catch (error) {
+      console.error("Error canceling transaction:", error);
+      res.status(500).json({ message: "Failed to cancel transaction" });
+    }
+  });
+
   // NFC Tap to Phone Payment API
   app.post("/api/merchants/:merchantId/nfc-pay", async (req, res) => {
     try {
