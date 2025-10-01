@@ -299,61 +299,63 @@ export default function DemoTerminal() {
         <div className="w-full max-w-4xl space-y-4 sm:space-y-8">
         
         {/* Amount Display */}
-        <div className="bg-gradient-to-br from-green-400 to-green-500 rounded-2xl sm:rounded-[2rem] p-6 sm:p-12 shadow-2xl relative z-10">
-          <div className="flex items-center justify-center">
-            <span className="text-4xl sm:text-7xl font-bold text-gray-900">
-              ${currentTransaction ? currentTransaction.amount : amount}
-            </span>
+        <div className="relative z-20">
+          <div className="bg-gradient-to-br from-green-400 to-green-500 rounded-t-2xl sm:rounded-t-[2rem] p-6 sm:p-12 shadow-2xl">
+            <div className="flex items-center justify-center">
+              <span className="text-4xl sm:text-7xl font-bold text-gray-900">
+                ${currentTransaction ? currentTransaction.amount : amount}
+              </span>
+            </div>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="bg-[#505050] rounded-2xl sm:rounded-3xl pt-16 sm:pt-28 pb-4 sm:pb-6 px-4 sm:px-8 -mt-20 sm:-mt-36 shadow-xl">
+        <div className="relative z-10 bg-[#505050] rounded-b-2xl sm:rounded-b-3xl pt-16 sm:pt-28 pb-4 sm:pb-6 px-4 sm:px-8 -mt-2 shadow-xl">
           <div className="flex justify-around items-center gap-2 sm:gap-4">
-          <button
-            onClick={() => {
-              if (currentTransaction?.qrCodeUrl) {
-                window.open(currentTransaction.qrCodeUrl, '_blank');
-              }
-            }}
-            className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
-            data-testid="button-download-qr"
-          >
-            <Download className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
-          </button>
-          
-          <button
-            onClick={() => {
-              toast({
-                title: "Camera",
-                description: "Scan QR code feature",
-              });
-            }}
-            className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
-            data-testid="button-camera"
-          >
-            <Camera className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
-          </button>
-          
-          <button
-            onClick={() => {
-              document.documentElement.classList.toggle('dark');
-            }}
-            className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
-            data-testid="button-theme"
-          >
-            <Moon className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
-          </button>
-          
-          <button
-            onClick={() => handleCreatePayment()}
-            disabled={!!currentTransaction && ['pending', 'processing'].includes(currentTransaction.status)}
-            className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-            data-testid="button-refresh"
-          >
-            <RefreshCw className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
-          </button>
-        </div>
+            <button
+              onClick={() => {
+                if (currentTransaction?.qrCodeUrl) {
+                  window.open(currentTransaction.qrCodeUrl, '_blank');
+                }
+              }}
+              className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
+              data-testid="button-download-qr"
+            >
+              <Download className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
+            </button>
+
+            <button
+              onClick={() => {
+                toast({
+                  title: "Camera",
+                  description: "Scan QR code feature",
+                });
+              }}
+              className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
+              data-testid="button-camera"
+            >
+              <Camera className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
+            </button>
+
+            <button
+              onClick={() => {
+                document.documentElement.classList.toggle('dark');
+              }}
+              className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
+              data-testid="button-theme"
+            >
+              <Moon className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
+            </button>
+
+            <button
+              onClick={() => handleCreatePayment()}
+              disabled={!!currentTransaction && ['pending', 'processing'].includes(currentTransaction.status)}
+              className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              data-testid="button-refresh"
+            >
+              <RefreshCw className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
+            </button>
+          </div>
         </div>
 
         {/* Status Display */}
