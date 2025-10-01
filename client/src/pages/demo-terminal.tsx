@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Download, Camera, Moon, RefreshCw, Wifi, ChevronDown } from "lucide-react";
+import { Download, Camera, Moon, RefreshCw, Wifi, ChevronDown, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AnimatedBrandBackground } from "@/components/backgrounds/AnimatedBrandBackground";
 import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
@@ -233,6 +233,22 @@ export default function DemoTerminal() {
           alt="Tapt Logo" 
           className="h-12 w-auto drop-shadow-lg"
         />
+      </div>
+
+      {/* Menu icon in top right corner */}
+      <div className="absolute top-6 right-6 z-10">
+        <button
+          onClick={() => {
+            toast({
+              title: "Menu",
+              description: "Menu options",
+            });
+          }}
+          className="w-12 h-12 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95 shadow-lg"
+          data-testid="button-menu"
+        >
+          <Menu className="w-6 h-6 text-gray-900" />
+        </button>
       </div>
 
       <div className="min-h-screen flex items-center justify-center p-4 sm:p-8">
