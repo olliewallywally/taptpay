@@ -494,16 +494,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update transaction status to cancelled
       await storage.updateTransactionStatus(transactionId, "cancelled");
       const updatedTransaction = await storage.getTransaction(transactionId);
+      
+      // Add payment URL and QR code URL
+      const paymentUrl = generatePaymentUrl(transaction.merchantId, undefined, req);
+      const qrCodeUrl = generateQrCodeUrl(transaction.merchantId, undefined, req);
+      
+      const transactionWithUrls = {
+        ...updatedTransaction,
+        paymentUrl,
+        qrCodeUrl,
+      };
 
       // Notify connected clients about the cancellation
       const connections = sseConnections.get(transaction.merchantId);
       if (connections) {
         connections.forEach(conn => {
-          conn.write(`data: ${JSON.stringify({ type: 'transaction_update', transaction: updatedTransaction })}\n\n`);
+          conn.write(`data: ${JSON.stringify({ type: 'transaction_update', transaction: transactionWithUrls })}\n\n`);
         });
       }
 
-      res.json(updatedTransaction);
+      res.json(transactionWithUrls);
     } catch (error) {
       console.error("Error canceling transaction:", error);
       res.status(500).json({ message: "Failed to cancel transaction" });
