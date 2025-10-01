@@ -142,8 +142,8 @@ export default function Dashboard() {
 
   return (
     <AnimatedBrandBackground
-      backgroundColor="#0000FF"
-      circleColor="#00D4D4"
+      backgroundColor="#1a1a1a"
+      circleColor="#2d2d2d"
       largeCirclePosition="top-[-120px] right-[-120px]"
       smallCirclePosition="top-[200px] right-[250px]"
       extraLargeCirclePosition="bottom-[-120px] right-[-120px]"
