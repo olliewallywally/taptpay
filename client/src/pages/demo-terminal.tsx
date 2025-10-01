@@ -110,10 +110,12 @@ export default function DemoTerminal() {
 
   // Update current transaction when active transaction changes
   useEffect(() => {
-    if (activeTransaction) {
+    if (activeTransaction && (!currentTransaction || currentTransaction.id !== activeTransaction.id || currentTransaction.status !== activeTransaction.status)) {
       setCurrentTransaction(activeTransaction);
+    } else if (!activeTransaction && currentTransaction) {
+      setCurrentTransaction(null);
     }
-  }, [activeTransaction]);
+  }, [activeTransaction?.id, activeTransaction?.status]);
 
   // SSE connection for real-time updates
   useEffect(() => {
