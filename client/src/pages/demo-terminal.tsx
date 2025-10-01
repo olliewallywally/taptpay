@@ -6,6 +6,11 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Plus, Users2, Share2, Calculator, Wifi, ChevronDown, Menu, X, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AnimatedBrandBackground } from "@/components/backgrounds/AnimatedBrandBackground";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
 
 interface Merchant {
@@ -35,6 +40,15 @@ interface TaptStone {
   isActive: boolean;
 }
 
+const paymentFormSchema = z.object({
+  itemName: z.string().min(1, "Item name is required"),
+  price: z.string().min(1, "Price is required").refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
+    message: "Price must be a positive number",
+  }),
+});
+
+type PaymentFormData = z.infer<typeof paymentFormSchema>;
+
 export default function DemoTerminal() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -43,6 +57,15 @@ export default function DemoTerminal() {
   const [showStones, setShowStones] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<'new-payment' | 'split-bill' | 'share-link' | 'quick-amounts' | null>(null);
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+
+  const form = useForm<PaymentFormData>({
+    resolver: zodResolver(paymentFormSchema),
+    defaultValues: {
+      itemName: "",
+      price: "",
+    },
+  });
   
   // Get current user/merchant
   const { data: user } = useQuery<{ user: { merchantId: number } }>({
@@ -124,22 +147,40 @@ export default function DemoTerminal() {
 
   // Create transaction mutation
   const createTransactionMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (data?: PaymentFormData) => {
       if (!merchantId) throw new Error("No merchant ID");
       
-      const response = await apiRequest("POST", "/api/transactions", {
-        merchantId,
-        amount: parseFloat(amount),
-        currency: "NZD",
-      });
+      const payload = data 
+        ? {
+            merchantId,
+            itemName: data.itemName,
+            price: parseFloat(data.price),
+            status: "pending",
+          }
+        : {
+            merchantId,
+            amount: parseFloat(amount),
+            currency: "NZD",
+          };
+      
+      const response = await apiRequest("POST", "/api/transactions", payload);
       return response.json();
     },
-    onSuccess: (transaction) => {
+    onSuccess: (transaction, data) => {
       setCurrentTransaction(transaction);
       queryClient.invalidateQueries({ queryKey: [`/api/merchants/${merchantId}/active-transaction`] });
+      
+      if (data) {
+        form.reset();
+        setShowPaymentForm(false);
+        setActiveDropdown(null);
+      }
+      
       toast({
         title: "Payment Created",
-        description: `Awaiting payment of $${amount}`,
+        description: data 
+          ? `Awaiting payment for ${data.itemName} - $${data.price}`
+          : `Awaiting payment of $${amount}`,
       });
     },
     onError: (error: Error) => {
@@ -202,6 +243,10 @@ export default function DemoTerminal() {
     localStorage.removeItem("authToken");
     localStorage.removeItem("user");
     setLocation("/login");
+  };
+
+  const onSubmitPaymentForm = (data: PaymentFormData) => {
+    createTransactionMutation.mutate(data);
   };
 
   const getStatusDisplay = () => {
@@ -317,7 +362,15 @@ export default function DemoTerminal() {
             <div className="flex justify-around items-center gap-2 sm:gap-4">
               {/* New Payment Button */}
               <button
-                onClick={() => setActiveDropdown(activeDropdown === 'new-payment' ? null : 'new-payment')}
+                onClick={() => {
+                  if (activeDropdown === 'new-payment') {
+                    setActiveDropdown(null);
+                    setShowPaymentForm(false);
+                    form.reset();
+                  } else {
+                    setActiveDropdown('new-payment');
+                  }
+                }}
                 className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
                 data-testid="button-new-payment"
               >
@@ -356,27 +409,92 @@ export default function DemoTerminal() {
           {/* Dropdowns */}
           <div className="relative z-5">
             {/* New Payment Dropdown */}
-            <div className={`overflow-hidden transition-all duration-300 ${activeDropdown === 'new-payment' ? 'max-h-96' : 'max-h-0'}`}>
+            <div className={`overflow-hidden transition-all duration-300 ${activeDropdown === 'new-payment' ? 'max-h-[600px]' : 'max-h-0'}`}>
               <div className="bg-[#505050] rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 space-y-3 sm:space-y-4 shadow-xl -mt-2">
                 <h3 className="text-white font-semibold text-lg sm:text-xl mb-3">New Payment</h3>
-                <button
-                  onClick={() => {
-                    handleCreatePayment();
-                    setActiveDropdown(null);
-                  }}
-                  className="w-full bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl py-3 px-4 text-green-400 font-medium transition-all"
-                >
-                  Create Standard Payment
-                </button>
-                <button
-                  onClick={() => {
-                    toast({ title: "Recurring Payment", description: "Feature coming soon" });
-                    setActiveDropdown(null);
-                  }}
-                  className="w-full bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl py-3 px-4 text-green-400 font-medium transition-all"
-                >
-                  Create Recurring Payment
-                </button>
+                
+                {!showPaymentForm ? (
+                  <>
+                    <button
+                      onClick={() => setShowPaymentForm(true)}
+                      className="w-full bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl py-3 px-4 text-green-400 font-medium transition-all"
+                    >
+                      Create Standard Payment
+                    </button>
+                    <button
+                      onClick={() => {
+                        toast({ title: "Recurring Payment", description: "Feature coming soon" });
+                        setActiveDropdown(null);
+                      }}
+                      className="w-full bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl py-3 px-4 text-green-400 font-medium transition-all"
+                    >
+                      Create Recurring Payment
+                    </button>
+                  </>
+                ) : (
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmitPaymentForm)} className="space-y-4">
+                      <FormField
+                        control={form.control}
+                        name="itemName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-green-400 font-medium">Item Name</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="Enter item name"
+                                {...field}
+                                className="bg-[#1a1a1a] border-2 border-green-500 text-white rounded-xl h-12 focus:ring-2 focus:ring-green-400"
+                                data-testid="input-item-name"
+                              />
+                            </FormControl>
+                            <FormMessage className="text-red-400" />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="price"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-green-400 font-medium">Price ($)</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="0.00"
+                                {...field}
+                                className="bg-[#1a1a1a] border-2 border-green-500 text-white rounded-xl h-12 focus:ring-2 focus:ring-green-400"
+                                data-testid="input-price"
+                              />
+                            </FormControl>
+                            <FormMessage className="text-red-400" />
+                          </FormItem>
+                        )}
+                      />
+
+                      <div className="flex gap-3 pt-2">
+                        <Button
+                          type="submit"
+                          disabled={createTransactionMutation.isPending}
+                          className="flex-1 bg-green-500 hover:bg-green-600 text-gray-900 font-semibold rounded-xl h-12"
+                        >
+                          {createTransactionMutation.isPending ? "Creating..." : "Create Payment"}
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            setShowPaymentForm(false);
+                            form.reset();
+                          }}
+                          variant="outline"
+                          className="flex-1 border-2 border-green-500 text-green-400 hover:bg-green-500/10 rounded-xl h-12"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </form>
+                  </Form>
+                )}
               </div>
             </div>
 
