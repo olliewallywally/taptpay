@@ -6,6 +6,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Download, Camera, Moon, RefreshCw, Wifi, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AnimatedBrandBackground } from "@/components/backgrounds/AnimatedBrandBackground";
+import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
 
 interface Merchant {
   id: number;
@@ -225,6 +226,15 @@ export default function DemoTerminal() {
       extraLargeCirclePosition="bottom-[-120px] right-[-120px]"
       extraSmallCirclePosition="bottom-[200px] right-[250px]"
     >
+      {/* Logo in top left corner */}
+      <div className="absolute top-6 left-6 z-10">
+        <img 
+          src={taptLogoPath} 
+          alt="Tapt Logo" 
+          className="h-12 w-auto drop-shadow-lg"
+        />
+      </div>
+
       <div className="min-h-screen flex items-center justify-center p-4 sm:p-8">
         <div className="w-full max-w-2xl space-y-6">
         
