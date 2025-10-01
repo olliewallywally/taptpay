@@ -293,31 +293,31 @@ export default function DemoTerminal() {
         </div>
       </div>
 
-      <div className="min-h-screen flex items-center justify-center p-4 sm:p-8">
-        <div className="w-full max-w-4xl space-y-8">
+      <div className="min-h-screen flex items-center justify-center p-3 sm:p-8">
+        <div className="w-full max-w-4xl space-y-4 sm:space-y-8">
         
         {/* Amount Display */}
-        <div className="bg-gradient-to-br from-green-400 to-green-500 rounded-[2rem] p-10 sm:p-12 shadow-2xl relative z-10 mb-0">
+        <div className="bg-gradient-to-br from-green-400 to-green-500 rounded-2xl sm:rounded-[2rem] p-6 sm:p-12 shadow-2xl relative z-10 mb-0">
           <div className="flex items-center justify-center">
-            <span className="text-6xl sm:text-7xl font-bold text-gray-900">
+            <span className="text-4xl sm:text-7xl font-bold text-gray-900">
               ${currentTransaction ? currentTransaction.amount : amount}
             </span>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="bg-[#505050] rounded-3xl pt-28 pb-6 px-6 sm:px-8 -mt-32 shadow-xl">
-          <div className="flex justify-around items-center gap-4">
+        <div className="bg-[#505050] rounded-2xl sm:rounded-3xl pt-16 sm:pt-28 pb-4 sm:pb-6 px-4 sm:px-8 -mt-20 sm:-mt-32 shadow-xl">
+          <div className="flex justify-around items-center gap-2 sm:gap-4">
           <button
             onClick={() => {
               if (currentTransaction?.qrCodeUrl) {
                 window.open(currentTransaction.qrCodeUrl, '_blank');
               }
             }}
-            className="w-20 h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
+            className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
             data-testid="button-download-qr"
           >
-            <Download className="w-8 h-8 text-gray-900" />
+            <Download className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
           </button>
           
           <button
@@ -327,41 +327,41 @@ export default function DemoTerminal() {
                 description: "Scan QR code feature",
               });
             }}
-            className="w-20 h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
+            className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
             data-testid="button-camera"
           >
-            <Camera className="w-8 h-8 text-gray-900" />
+            <Camera className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
           </button>
           
           <button
             onClick={() => {
               document.documentElement.classList.toggle('dark');
             }}
-            className="w-20 h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
+            className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
             data-testid="button-theme"
           >
-            <Moon className="w-8 h-8 text-gray-900" />
+            <Moon className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
           </button>
           
           <button
             onClick={() => handleCreatePayment()}
             disabled={!!currentTransaction && ['pending', 'processing'].includes(currentTransaction.status)}
-            className="w-20 h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="button-refresh"
           >
-            <RefreshCw className="w-8 h-8 text-gray-900" />
+            <RefreshCw className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
           </button>
         </div>
         </div>
 
         {/* Status Display */}
-        <div className="bg-[#1a1a1a] rounded-3xl p-10 sm:p-12 shadow-xl">
-          <div className="flex flex-col items-center space-y-6">
-            <span className={`text-2xl sm:text-3xl font-semibold ${status.color}`}>
+        <div className="bg-[#1a1a1a] rounded-2xl sm:rounded-3xl p-6 sm:p-12 shadow-xl">
+          <div className="flex flex-col items-center space-y-3 sm:space-y-6">
+            <span className={`text-lg sm:text-3xl font-semibold ${status.color}`}>
               {status.text}
             </span>
-            <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center">
-              <Wifi className="w-10 h-10 text-green-400 animate-pulse" />
+            <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500/20 flex items-center justify-center">
+              <Wifi className="w-7 h-7 sm:w-10 sm:h-10 text-green-400 animate-pulse" />
             </div>
           </div>
         </div>
@@ -369,18 +369,18 @@ export default function DemoTerminal() {
         {/* Payment Stones Button */}
         <button
           onClick={() => setShowStones(!showStones)}
-          className="w-full bg-transparent border-4 border-green-500 rounded-full py-6 px-8 flex items-center justify-between hover:bg-green-500/10 transition-all shadow-lg"
+          className="w-full bg-transparent border-3 sm:border-4 border-green-500 rounded-full py-4 sm:py-6 px-6 sm:px-8 flex items-center justify-between hover:bg-green-500/10 transition-all shadow-lg"
           data-testid="button-payment-stones"
         >
-          <span className="text-white font-semibold text-xl sm:text-2xl flex-1 text-center">
+          <span className="text-white font-semibold text-lg sm:text-2xl flex-1 text-center">
             payment stones
           </span>
-          <ChevronDown className={`w-7 h-7 text-green-500 transition-transform ${showStones ? 'rotate-180' : ''}`} />
+          <ChevronDown className={`w-5 h-5 sm:w-7 sm:h-7 text-green-500 transition-transform ${showStones ? 'rotate-180' : ''}`} />
         </button>
 
         {/* Stones Dropdown */}
         {showStones && taptStones.length > 0 && (
-          <div className="bg-[#505050] rounded-3xl p-6 sm:p-8 space-y-4 shadow-xl animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="bg-[#505050] rounded-2xl sm:rounded-3xl p-4 sm:p-8 space-y-3 sm:space-y-4 shadow-xl animate-in fade-in slide-in-from-top-2 duration-300">
             {taptStones.map((stone) => (
               <button
                 key={stone.id}
@@ -388,7 +388,7 @@ export default function DemoTerminal() {
                   window.open(stone.paymentUrl, '_blank');
                   setShowStones(false);
                 }}
-                className="w-full bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-2xl py-5 px-6 text-green-400 font-medium text-lg transition-all"
+                className="w-full bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl sm:rounded-2xl py-3 sm:py-5 px-4 sm:px-6 text-green-400 font-medium text-base sm:text-lg transition-all"
                 data-testid={`button-stone-${stone.id}`}
               >
                 {stone.name} - Stone {stone.stoneNumber}
@@ -402,10 +402,10 @@ export default function DemoTerminal() {
           <button
             onClick={handleCancelPayment}
             disabled={cancelTransactionMutation.isPending}
-            className="w-full bg-transparent border-4 border-red-500 rounded-full py-6 px-8 hover:bg-red-500/10 transition-all shadow-lg disabled:opacity-50"
+            className="w-full bg-transparent border-3 sm:border-4 border-red-500 rounded-full py-4 sm:py-6 px-6 sm:px-8 hover:bg-red-500/10 transition-all shadow-lg disabled:opacity-50"
             data-testid="button-cancel"
           >
-            <span className="text-red-400 font-semibold text-xl sm:text-2xl">
+            <span className="text-red-400 font-semibold text-lg sm:text-2xl">
               cancel payment
             </span>
           </button>
@@ -413,15 +413,15 @@ export default function DemoTerminal() {
 
         {/* Amount Input (hidden only when transaction is pending/processing) */}
         {(!currentTransaction || !['pending', 'processing'].includes(currentTransaction.status)) && (
-          <div className="bg-[#505050] rounded-3xl p-8 sm:p-10 shadow-xl">
-            <label className="block text-green-400 text-lg font-semibold mb-4">
+          <div className="bg-[#505050] rounded-2xl sm:rounded-3xl p-5 sm:p-10 shadow-xl">
+            <label className="block text-green-400 text-base sm:text-lg font-semibold mb-3 sm:mb-4">
               Enter Amount
             </label>
             <input
               type="text"
               value={amount}
               onChange={handleAmountChange}
-              className="w-full bg-[#1a1a1a] border-2 border-green-500 rounded-2xl py-5 px-6 text-white text-2xl font-semibold focus:outline-none focus:ring-2 focus:ring-green-400"
+              className="w-full bg-[#1a1a1a] border-2 border-green-500 rounded-xl sm:rounded-2xl py-3 sm:py-5 px-4 sm:px-6 text-white text-xl sm:text-2xl font-semibold focus:outline-none focus:ring-2 focus:ring-green-400"
               placeholder="0.00"
               data-testid="input-amount"
             />
