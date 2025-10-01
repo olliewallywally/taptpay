@@ -308,7 +308,7 @@ export default function DemoTerminal() {
         </div>
 
         {/* Action Buttons */}
-        <div className="bg-[#505050] rounded-2xl sm:rounded-3xl pt-16 sm:pt-28 pb-4 sm:pb-6 px-4 sm:px-8 -mt-12 sm:-mt-20 shadow-xl">
+        <div className="bg-[#505050] rounded-2xl sm:rounded-3xl pt-16 sm:pt-28 pb-4 sm:pb-6 px-4 sm:px-8 -mt-16 sm:-mt-28 shadow-xl">
           <div className="flex justify-around items-center gap-2 sm:gap-4">
           <button
             onClick={() => {
