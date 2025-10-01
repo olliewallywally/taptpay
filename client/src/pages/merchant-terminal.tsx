@@ -8,6 +8,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { QRCodeDisplay } from "@/components/qr-code-display";
 import { MerchantUrlDisplay } from "@/components/merchant-url-display";
 import { EnhancedPaymentStatus } from "@/components/enhanced-payment-status";
@@ -799,22 +800,30 @@ function ItemForm({
           Select Tapt Stone:
         </label>
         {taptStones && Array.isArray(taptStones) && taptStones.length > 0 ? (
-          <select 
-            value={selectedStoneId || ""} 
-            onChange={(e) => {
-              const value = e.target.value;
+          <Select
+            value={selectedStoneId?.toString() || ""}
+            onValueChange={(value) => {
               setSelectedStoneId(value ? parseInt(value, 10) : null);
             }}
-            className="w-full bg-gray-700 border-gray-600 text-white rounded-md px-3 py-2 border focus:outline-none focus:ring-2 focus:ring-green-500"
-            data-testid="stone-selector"
           >
-            <option value="">Choose a stone</option>
-            {taptStones.map((stone: any) => (
-              <option key={`stone-${stone.id}`} value={stone.id}>
-                Stone {stone.stoneNumber} - {stone.name}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger 
+              className="w-full bg-gray-700 border-gray-600 text-white rounded-lg h-10 focus:ring-2 focus:ring-green-500 transition-all duration-200"
+              data-testid="stone-selector"
+            >
+              <SelectValue placeholder="Choose a stone" />
+            </SelectTrigger>
+            <SelectContent className="bg-gray-800 border-gray-700 rounded-lg">
+              {taptStones.map((stone: any) => (
+                <SelectItem 
+                  key={`stone-${stone.id}`} 
+                  value={stone.id.toString()}
+                  className="text-white hover:bg-gray-700 focus:bg-gray-700 cursor-pointer transition-colors duration-150 rounded-md"
+                >
+                  Stone {stone.stoneNumber} - {stone.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         ) : (
           <div className="text-center py-2">
             <p className="text-gray-400 text-xs">No Tapt Stones available</p>
