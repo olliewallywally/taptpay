@@ -367,7 +367,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     try {
       const transaction = await storage.getActiveTransactionByMerchant(merchantId);
-      res.json(transaction || null);
+      
+      if (!transaction) {
+        return res.json(null);
+      }
+      
+      // Add payment URL and QR code URL
+      const paymentUrl = generatePaymentUrl(merchantId, undefined, req);
+      const qrCodeUrl = generateQrCodeUrl(merchantId, undefined, req);
+      
+      const transactionWithUrls = {
+        ...transaction,
+        paymentUrl,
+        qrCodeUrl,
+      };
+      
+      res.json(transactionWithUrls);
     } catch (error) {
       res.status(500).json({ message: "Failed to get active transaction" });
     }
@@ -395,15 +410,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Generate payment URL and QR code URL for the transaction
+      const paymentUrl = generatePaymentUrl(transaction.merchantId, selectedStoneId, req);
+      const qrCodeUrl = generateQrCodeUrl(transaction.merchantId, selectedStoneId, req);
+      
+      // Add URLs to transaction object
+      const transactionWithUrls = {
+        ...transaction,
+        paymentUrl,
+        qrCodeUrl,
+      };
+      
       // Notify all connected clients for this merchant
       const connections = sseConnections.get(transaction.merchantId);
       if (connections) {
         connections.forEach(conn => {
-          conn.write(`data: ${JSON.stringify({ type: 'transaction_updated', transaction })}\n\n`);
+          conn.write(`data: ${JSON.stringify({ type: 'transaction_updated', transaction: transactionWithUrls })}\n\n`);
         });
       }
 
-      res.json(transaction);
+      res.json(transactionWithUrls);
     } catch (error) {
       res.status(500).json({ message: "Failed to create transaction" });
     }
@@ -425,15 +451,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Transaction not found" });
       }
 
+      // Add payment URL and QR code URL
+      const paymentUrl = generatePaymentUrl(updatedTransaction.merchantId, undefined, req);
+      const qrCodeUrl = generateQrCodeUrl(updatedTransaction.merchantId, undefined, req);
+      
+      const transactionWithUrls = {
+        ...updatedTransaction,
+        paymentUrl,
+        qrCodeUrl,
+      };
+
       // Notify connected clients about the split
       const connections = sseConnections.get(updatedTransaction.merchantId);
       if (connections) {
         connections.forEach(conn => {
-          conn.write(`data: ${JSON.stringify({ type: 'transaction_updated', transaction: updatedTransaction })}\n\n`);
+          conn.write(`data: ${JSON.stringify({ type: 'transaction_updated', transaction: transactionWithUrls })}\n\n`);
         });
       }
 
-      res.json(updatedTransaction);
+      res.json(transactionWithUrls);
     } catch (error) {
       console.error("Error creating bill split:", error);
       res.status(500).json({ message: "Failed to create bill split" });
