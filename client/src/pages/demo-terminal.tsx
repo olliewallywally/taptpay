@@ -293,7 +293,7 @@ export default function DemoTerminal() {
         </div>
       </div>
 
-      <div className="min-h-screen flex items-center justify-center p-3 sm:p-8">
+      <div className="min-h-screen flex items-center justify-center p-3 sm:p-8 pt-24 sm:pt-32">
         <div className="w-full max-w-4xl space-y-4 sm:space-y-8">
         
         {/* Amount Display */}
