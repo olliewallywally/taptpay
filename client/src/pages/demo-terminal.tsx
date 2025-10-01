@@ -357,7 +357,7 @@ export default function DemoTerminal() {
         </div>
 
         {/* Status Display */}
-        <div className="bg-[#1a1a1a] rounded-2xl sm:rounded-3xl p-6 sm:p-12 shadow-xl">
+        <div className="bg-[#0f0f0f] rounded-2xl sm:rounded-3xl p-6 sm:p-12 shadow-xl">
           <div className="flex flex-col items-center space-y-3 sm:space-y-6">
             <span className={`text-lg sm:text-3xl font-semibold ${status.color}`}>
               {status.text}
