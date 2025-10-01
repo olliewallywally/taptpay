@@ -448,7 +448,7 @@ export default function DemoTerminal() {
         <div>
           {/* Amount Display */}
           <div className="relative z-20">
-            <div className="bg-gradient-to-br from-green-400 to-green-500 rounded-t-2xl sm:rounded-t-[2rem] p-6 sm:p-12 shadow-2xl">
+            <div className="bg-gradient-to-br from-green-400 to-green-500 rounded-[2rem] sm:rounded-[4rem] p-6 sm:p-12 shadow-2xl">
               <div className="flex flex-col items-center justify-center">
                 <span className="text-4xl sm:text-7xl font-bold text-gray-900">
                   ${currentTransaction ? (
