@@ -217,9 +217,16 @@ export default function DemoTerminal() {
   const status = getStatusDisplay();
 
   return (
-    <AnimatedBrandBackground>
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="w-full max-w-md space-y-6">
+    <AnimatedBrandBackground
+      backgroundColor="#1a1a1a"
+      circleColor="#2d2d2d"
+      largeCirclePosition="top-[-120px] right-[-120px]"
+      smallCirclePosition="top-[200px] right-[250px]"
+      extraLargeCirclePosition="bottom-[-120px] right-[-120px]"
+      extraSmallCirclePosition="bottom-[200px] right-[250px]"
+    >
+      <div className="min-h-screen flex items-center justify-center p-4 sm:p-8">
+        <div className="w-full max-w-2xl space-y-6">
         
         {/* Amount Display */}
         <div className="bg-gradient-to-br from-green-400 to-green-500 rounded-[2rem] p-8 shadow-2xl">
