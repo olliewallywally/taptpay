@@ -8,6 +8,7 @@ import { NotificationProvider } from "@/components/notification-system";
 import NotFound from "@/pages/not-found";
 import MerchantTerminalMobile from "@/pages/merchant-terminal-mobile";
 import MerchantTerminal from "@/pages/merchant-terminal";
+import DemoTerminal from "@/pages/demo-terminal";
 import CustomerPayment from "@/pages/customer-payment";
 import Receipt from "@/pages/receipt";
 import Dashboard from "@/pages/dashboard";
@@ -209,6 +210,11 @@ function Router() {
             <Layout>
               <CryptoTerminal />
             </Layout>
+          </ProtectedRoute>
+        </Route>
+        <Route path="/demo-terminal">
+          <ProtectedRoute>
+            <DemoTerminal />
           </ProtectedRoute>
         </Route>
 
