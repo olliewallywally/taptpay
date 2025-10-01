@@ -114,14 +114,20 @@ export default function DemoTerminal() {
 
   // Update current transaction when active transaction changes
   useEffect(() => {
-    if (activeTransaction) {
-      // Only process if this transaction hasn't been processed or if status changed
-      const lastProcessed = lastProcessedTxRef.current;
-      if (lastProcessed.id !== activeTransaction.id || lastProcessed.status !== activeTransaction.status) {
-        lastProcessedTxRef.current = { id: activeTransaction.id, status: activeTransaction.status };
-        setCurrentTransaction(activeTransaction);
+    const txId = activeTransaction?.id;
+    const txStatus = activeTransaction?.status;
+    const lastProcessed = lastProcessedTxRef.current;
+    
+    if (txId !== undefined && txStatus) {
+      // Only update if this is a new transaction or status changed
+      if (lastProcessed.id !== txId || lastProcessed.status !== txStatus) {
+        lastProcessedTxRef.current = { id: txId, status: txStatus };
+        // Use the current activeTransaction from closure
+        if (activeTransaction) {
+          setCurrentTransaction(activeTransaction);
+        }
       }
-    } else if (lastProcessedTxRef.current.id !== undefined) {
+    } else if (txId === undefined && lastProcessed.id !== undefined) {
       // Clear when activeTransaction becomes null
       lastProcessedTxRef.current = {};
       setCurrentTransaction(null);
