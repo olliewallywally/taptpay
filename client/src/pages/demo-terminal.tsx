@@ -126,7 +126,7 @@ export default function DemoTerminal() {
       lastProcessedTxRef.current = {};
       setCurrentTransaction(null);
     }
-  }, [activeTransaction]);
+  }, [activeTransaction?.id, activeTransaction?.status]);
 
   // SSE connection for real-time updates
   useEffect(() => {
