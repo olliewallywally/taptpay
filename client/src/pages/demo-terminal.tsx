@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -68,6 +68,9 @@ export default function DemoTerminal() {
   const [filteredStockItems, setFilteredStockItems] = useState<any[]>([]);
   const [selectedStockItems, setSelectedStockItems] = useState<any[]>([]);
 
+  // Track last processed transaction to prevent infinite updates
+  const lastProcessedTxRef = useRef<{ id?: number; status?: string }>({});
+
   const form = useForm<PaymentFormData>({
     resolver: zodResolver(paymentFormSchema),
     defaultValues: {
@@ -111,14 +114,16 @@ export default function DemoTerminal() {
   // Update current transaction when active transaction changes
   useEffect(() => {
     if (activeTransaction) {
-      setCurrentTransaction(prev => {
-        if (!prev || prev.id !== activeTransaction.id || prev.status !== activeTransaction.status) {
-          return activeTransaction;
-        }
-        return prev;
-      });
-    } else {
-      setCurrentTransaction(prev => prev ? null : prev);
+      // Only process if this transaction hasn't been processed or if status changed
+      const lastProcessed = lastProcessedTxRef.current;
+      if (lastProcessed.id !== activeTransaction.id || lastProcessed.status !== activeTransaction.status) {
+        lastProcessedTxRef.current = { id: activeTransaction.id, status: activeTransaction.status };
+        setCurrentTransaction(activeTransaction);
+      }
+    } else if (lastProcessedTxRef.current.id !== undefined) {
+      // Clear when activeTransaction becomes null
+      lastProcessedTxRef.current = {};
+      setCurrentTransaction(null);
     }
   }, [activeTransaction]);
 
@@ -465,10 +470,10 @@ export default function DemoTerminal() {
                 {currentTransaction?.isSplit && (
                   <div className="mt-3 sm:mt-4 text-center">
                     <div className="text-lg sm:text-2xl font-semibold text-gray-900">
-                      Split {currentTransaction.completedSplits + 1} of {currentTransaction.totalSplits}
+                      Split {(currentTransaction.completedSplits ?? 0) + 1} of {currentTransaction.totalSplits ?? 0}
                     </div>
                     <div className="text-sm sm:text-base text-gray-800 mt-1">
-                      Total: ${parseFloat(currentTransaction.price).toFixed(2)} ({currentTransaction.totalSplits} people)
+                      Total: ${parseFloat(currentTransaction.price).toFixed(2)} ({currentTransaction.totalSplits ?? 0} people)
                     </div>
                   </div>
                 )}

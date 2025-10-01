@@ -1,0 +1,68 @@
+{/* Connected Amount Display and Action Buttons */}
+<div>
+  {/* Green Amount Display Box */}
+  <div className="relative z-20">
+    <div className="bg-gradient-to-br from-green-400 to-green-500 rounded-[2rem] sm:rounded-[4rem] p-6 sm:p-12 shadow-2xl">
+      <div className="flex flex-col items-center justify-center">
+        <span className="text-4xl sm:text-7xl font-bold text-gray-900">
+          ${currentTransaction ? (
+            currentTransaction.isSplit && currentTransaction.splitAmount
+              ? parseFloat(currentTransaction.splitAmount).toFixed(2)
+              : parseFloat(currentTransaction.price).toFixed(2)
+          ) : amount}
+        </span>
+        {currentTransaction?.isSplit && (
+          <div className="mt-3 sm:mt-4 text-center">
+            <div className="text-lg sm:text-2xl font-semibold text-gray-900">
+              Split {currentTransaction.completedSplits + 1} of {currentTransaction.totalSplits}
+            </div>
+            <div className="text-sm sm:text-base text-gray-800 mt-1">
+              Total: ${parseFloat(currentTransaction.price).toFixed(2)} ({currentTransaction.totalSplits} people)
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+
+  {/* Grey Action Buttons Box */}
+  <div className="relative z-10 bg-[#505050] rounded-b-2xl sm:rounded-b-3xl pt-16 sm:pt-28 pb-4 sm:pb-6 px-4 sm:px-8 -mt-2 shadow-xl">
+    <div className="flex justify-around items-center gap-2 sm:gap-4">
+      {/* New Payment Button (Plus Icon) */}
+      <button
+        onClick={() => setActiveDropdown(activeDropdown === 'new-payment' ? null : 'new-payment')}
+        className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
+        data-testid="button-new-payment"
+      >
+        <Plus className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
+      </button>
+
+      {/* Split Bill Button (Users2 Icon) */}
+      <button
+        onClick={() => setActiveDropdown(activeDropdown === 'split-bill' ? null : 'split-bill')}
+        className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
+        data-testid="button-split-bill"
+      >
+        <Users2 className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
+      </button>
+
+      {/* Share Link Button (Share2 Icon) */}
+      <button
+        onClick={() => setActiveDropdown(activeDropdown === 'share-link' ? null : 'share-link')}
+        className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
+        data-testid="button-share-link"
+      >
+        <Share2 className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
+      </button>
+
+      {/* Quick Amounts Button (Calculator Icon) */}
+      <button
+        onClick={() => setActiveDropdown(activeDropdown === 'quick-amounts' ? null : 'quick-amounts')}
+        className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
+        data-testid="button-quick-amounts"
+      >
+        <Calculator className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
+      </button>
+    </div>
+  </div>
+</div>
