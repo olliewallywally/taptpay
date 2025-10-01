@@ -861,8 +861,8 @@ export default function DemoTerminal() {
           </button>
         )}
 
-        {/* Amount Input (hidden only when transaction is pending/processing) */}
-        {(!currentTransaction || !['pending', 'processing'].includes(currentTransaction.status)) && (
+        {/* Amount Input (only show when there's no transaction) */}
+        {!currentTransaction && (
           <div className="bg-[#505050] rounded-2xl sm:rounded-3xl p-5 sm:p-10 shadow-xl">
             <label className="block text-green-400 text-base sm:text-lg font-semibold mb-3 sm:mb-4">
               Enter Amount
