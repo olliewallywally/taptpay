@@ -743,36 +743,67 @@ export default function DemoTerminal() {
             </div>
 
             {/* Share Link Dropdown */}
-            <div className={`overflow-hidden transition-all duration-300 ${activeDropdown === 'share-link' ? 'max-h-96' : 'max-h-0'}`}>
+            <div className={`overflow-hidden transition-all duration-300 ${activeDropdown === 'share-link' ? 'max-h-[500px]' : 'max-h-0'}`}>
               <div className="bg-[#353535] rounded-t-[29px] rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 space-y-3 sm:space-y-4 -mt-2">
-                <h3 className="text-white font-semibold text-lg sm:text-xl mb-3">Share Link</h3>
-                <button
-                  onClick={() => {
-                    if (currentTransaction?.paymentUrl) {
-                      navigator.clipboard.writeText(currentTransaction.paymentUrl);
-                      toast({ title: "Link Copied!", description: "Payment link copied to clipboard" });
-                    } else {
-                      toast({ title: "No Active Payment", description: "Create a payment first" });
-                    }
-                    setActiveDropdown(null);
-                  }}
-                  className="w-full bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl py-3 px-4 text-green-400 font-medium transition-all"
-                >
-                  Copy Payment Link
-                </button>
-                <button
-                  onClick={() => {
-                    if (currentTransaction?.qrCodeUrl) {
-                      window.open(currentTransaction.qrCodeUrl, '_blank');
-                    } else {
-                      toast({ title: "No Active Payment", description: "Create a payment first" });
-                    }
-                    setActiveDropdown(null);
-                  }}
-                  className="w-full bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl py-3 px-4 text-green-400 font-medium transition-all"
-                >
-                  Download QR Code
-                </button>
+                <h3 className="text-white font-semibold text-lg sm:text-xl mb-3">Share Payment Link</h3>
+                {currentTransaction?.paymentUrl ? (
+                  <div className="space-y-3">
+                    {/* Payment URL Display */}
+                    <div className="bg-[#1a1a1a] rounded-xl p-3">
+                      <p className="text-xs text-gray-400 mb-2">Payment Link:</p>
+                      <div className="bg-[#0f0f0f] rounded-lg p-2 text-xs text-white break-all">
+                        {currentTransaction.paymentUrl}
+                      </div>
+                    </div>
+
+                    {/* Copy Link Button */}
+                    <Button
+                      onClick={() => {
+                        navigator.clipboard.writeText(currentTransaction.paymentUrl!);
+                        toast({ title: "Link Copied!", description: "Payment link copied to clipboard" });
+                      }}
+                      className="w-full bg-green-500 hover:bg-green-600 text-gray-900 font-semibold rounded-xl h-12"
+                    >
+                      Copy Payment Link
+                    </Button>
+
+                    {/* Share Options */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        onClick={() => {
+                          const emailSubject = encodeURIComponent('Payment Request');
+                          const emailBody = encodeURIComponent(`Please complete your payment: ${currentTransaction.paymentUrl}`);
+                          window.open(`mailto:?subject=${emailSubject}&body=${emailBody}`, '_blank');
+                        }}
+                        className="bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl py-2 px-2 text-green-400 font-medium transition-all text-xs flex flex-col items-center gap-1"
+                      >
+                        <span className="text-lg">📧</span>
+                        <span>Email</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          const smsBody = encodeURIComponent(`Payment link: ${currentTransaction.paymentUrl}`);
+                          window.open(`sms:?body=${smsBody}`, '_blank');
+                        }}
+                        className="bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl py-2 px-2 text-green-400 font-medium transition-all text-xs flex flex-col items-center gap-1"
+                      >
+                        <span className="text-lg">💬</span>
+                        <span>SMS</span>
+                      </button>
+                      <button
+                        onClick={() => window.open(currentTransaction.qrCodeUrl, '_blank')}
+                        className="bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl py-2 px-2 text-green-400 font-medium transition-all text-xs flex flex-col items-center gap-1"
+                      >
+                        <span className="text-lg">📱</span>
+                        <span>QR Code</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center text-gray-300 py-4">
+                    Create a payment first to share
+                  </div>
+                )}
               </div>
             </div>
 
