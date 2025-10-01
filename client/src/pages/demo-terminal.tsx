@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Minus, Users2, Share2, Calculator, Wifi, ChevronDown, Menu, X, LogOut, Tag } from "lucide-react";
+import { Plus, Minus, Users2, Share2, Calculator, Wifi, ChevronDown, Menu, X, LogOut, Tag, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AnimatedBrandBackground } from "@/components/backgrounds/AnimatedBrandBackground";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -67,6 +67,7 @@ export default function DemoTerminal() {
   const [stockSearchInput, setStockSearchInput] = useState("");
   const [filteredStockItems, setFilteredStockItems] = useState<any[]>([]);
   const [selectedStockItems, setSelectedStockItems] = useState<any[]>([]);
+  const [copiedPaymentLink, setCopiedPaymentLink] = useState(false);
 
   // Track last processed transaction to prevent infinite updates
   const lastProcessedTxRef = useRef<{ id?: number; status?: string }>({});
@@ -744,9 +745,10 @@ export default function DemoTerminal() {
             </div>
 
             {/* Share Link Dropdown */}
-            <div className={`overflow-hidden transition-all duration-300 ${activeDropdown === 'share-link' ? 'max-h-[500px]' : 'max-h-0'}`}>
+            <div className={`overflow-hidden transition-all duration-300 ${activeDropdown === 'share-link' ? 'max-h-[600px]' : 'max-h-0'}`}>
               <div className="bg-[#353535] rounded-t-[29px] rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 space-y-3 sm:space-y-4 -mt-2">
                 <h3 className="text-white font-semibold text-lg sm:text-xl mb-3">Share Payment Link</h3>
+                <p className="text-sm text-gray-400 mb-3">Send payment link to customer via email or SMS</p>
                 {currentTransaction?.paymentUrl ? (
                   <div className="space-y-3">
                     {/* Payment URL Display */}
@@ -759,26 +761,46 @@ export default function DemoTerminal() {
 
                     {/* Copy Link Button */}
                     <Button
-                      onClick={() => {
-                        navigator.clipboard.writeText(currentTransaction.paymentUrl!);
-                        toast({ title: "Link Copied!", description: "Payment link copied to clipboard" });
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(currentTransaction.paymentUrl!);
+                          setCopiedPaymentLink(true);
+                          toast({ title: "Link Copied!", description: "Payment link copied to clipboard" });
+                          setTimeout(() => setCopiedPaymentLink(false), 2000);
+                        } catch (error) {
+                          toast({ 
+                            title: "Copy Failed", 
+                            description: "Unable to copy payment link",
+                            variant: "destructive"
+                          });
+                        }
                       }}
-                      className="w-full bg-green-500 hover:bg-green-600 text-gray-900 font-semibold rounded-xl h-12"
+                      className="w-full bg-green-500 hover:bg-green-600 text-gray-900 font-semibold rounded-xl h-12 flex items-center justify-center gap-2"
                     >
-                      Copy Payment Link
+                      {copiedPaymentLink ? (
+                        <>
+                          <Check className="w-4 h-4" />
+                          Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-4 h-4" />
+                          Copy Link
+                        </>
+                      )}
                     </Button>
 
                     {/* Share Options */}
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-3 gap-2 sm:gap-3">
                       <button
                         onClick={() => {
                           const emailSubject = encodeURIComponent('Payment Request');
                           const emailBody = encodeURIComponent(`Please complete your payment: ${currentTransaction.paymentUrl}`);
                           window.open(`mailto:?subject=${emailSubject}&body=${emailBody}`, '_blank');
                         }}
-                        className="bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl py-2 px-2 text-green-400 font-medium transition-all text-xs flex flex-col items-center gap-1"
+                        className="bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl py-3 px-2 text-green-400 font-medium transition-all text-xs sm:text-sm flex flex-col items-center gap-1"
                       >
-                        <span className="text-lg">📧</span>
+                        <span className="text-xl">📧</span>
                         <span>Email</span>
                       </button>
                       <button
@@ -786,23 +808,33 @@ export default function DemoTerminal() {
                           const smsBody = encodeURIComponent(`Payment link: ${currentTransaction.paymentUrl}`);
                           window.open(`sms:?body=${smsBody}`, '_blank');
                         }}
-                        className="bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl py-2 px-2 text-green-400 font-medium transition-all text-xs flex flex-col items-center gap-1"
+                        className="bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl py-3 px-2 text-green-400 font-medium transition-all text-xs sm:text-sm flex flex-col items-center gap-1"
                       >
-                        <span className="text-lg">💬</span>
+                        <span className="text-xl">💬</span>
                         <span>SMS</span>
                       </button>
                       <button
-                        onClick={() => window.open(currentTransaction.qrCodeUrl, '_blank')}
-                        className="bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl py-2 px-2 text-green-400 font-medium transition-all text-xs flex flex-col items-center gap-1"
+                        onClick={() => {
+                          if (currentTransaction.qrCodeUrl) {
+                            window.open(currentTransaction.qrCodeUrl, '_blank');
+                          } else {
+                            toast({
+                              title: "QR Code Unavailable",
+                              description: "QR code not generated yet",
+                              variant: "destructive"
+                            });
+                          }
+                        }}
+                        className="bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl py-3 px-2 text-green-400 font-medium transition-all text-xs sm:text-sm flex flex-col items-center gap-1"
                       >
-                        <span className="text-lg">📱</span>
+                        <span className="text-xl">📱</span>
                         <span>QR Code</span>
                       </button>
                     </div>
                   </div>
                 ) : (
                   <div className="text-center text-gray-300 py-4">
-                    Create a payment first to share
+                    Create a payment first to share the link
                   </div>
                 )}
               </div>
