@@ -473,7 +473,7 @@ export default function DemoTerminal() {
                     currentTransaction.isSplit && currentTransaction.splitAmount
                       ? parseFloat(currentTransaction.splitAmount).toFixed(2)
                       : parseFloat(currentTransaction.price).toFixed(2)
-                  ) : amount}
+                  ) : "0.00"}
                 </span>
                 {currentTransaction?.isSplit && (
                   <div className="mt-3 sm:mt-4 text-center">
