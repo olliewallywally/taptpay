@@ -298,19 +298,21 @@ export default function DemoTerminal() {
         <div className="min-h-screen flex items-center justify-center p-3 sm:p-8 pt-24 sm:pt-32">
         <div className="w-full max-w-4xl space-y-4 sm:space-y-8">
         
-        {/* Amount Display */}
-        <div className="relative z-20">
-          <div className="bg-gradient-to-br from-green-400 to-green-500 rounded-t-2xl sm:rounded-t-[2rem] p-6 sm:p-12 shadow-2xl">
-            <div className="flex items-center justify-center">
-              <span className="text-4xl sm:text-7xl font-bold text-gray-900">
-                ${currentTransaction ? currentTransaction.amount : amount}
-              </span>
+        {/* Connected Amount Display and Action Buttons */}
+        <div>
+          {/* Amount Display */}
+          <div className="relative z-20">
+            <div className="bg-gradient-to-br from-green-400 to-green-500 rounded-t-2xl sm:rounded-t-[2rem] p-6 sm:p-12 shadow-2xl">
+              <div className="flex items-center justify-center">
+                <span className="text-4xl sm:text-7xl font-bold text-gray-900">
+                  ${currentTransaction ? currentTransaction.amount : amount}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Action Buttons */}
-        <div className="relative z-10 bg-[#505050] rounded-b-2xl sm:rounded-b-3xl pt-16 sm:pt-28 pb-4 sm:pb-6 px-4 sm:px-8 -mt-2 shadow-xl">
+          {/* Action Buttons */}
+          <div className="relative z-10 bg-[#505050] rounded-b-2xl sm:rounded-b-3xl pt-16 sm:pt-28 pb-4 sm:pb-6 px-4 sm:px-8 -mt-2 shadow-xl">
           <div className="flex justify-around items-center gap-2 sm:gap-4">
             <button
               onClick={() => {
@@ -356,6 +358,7 @@ export default function DemoTerminal() {
               <RefreshCw className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
             </button>
           </div>
+        </div>
         </div>
 
         {/* Status Display */}
