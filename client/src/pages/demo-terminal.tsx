@@ -255,7 +255,7 @@ export default function DemoTerminal() {
         <div className="w-full max-w-4xl space-y-8">
         
         {/* Amount Display */}
-        <div className="bg-gradient-to-br from-green-400 to-green-500 rounded-[2rem] p-10 sm:p-12 shadow-2xl relative z-10 mb-[30px]">
+        <div className="bg-gradient-to-br from-green-400 to-green-500 rounded-[2rem] p-10 sm:p-12 shadow-2xl relative z-10 mb-0">
           <div className="flex items-center justify-center">
             <span className="text-6xl sm:text-7xl font-bold text-gray-900">
               ${currentTransaction ? currentTransaction.amount : amount}
@@ -264,7 +264,7 @@ export default function DemoTerminal() {
         </div>
 
         {/* Action Buttons */}
-        <div className="bg-[#505050] rounded-3xl pt-28 pb-6 px-6 sm:px-8 -mt-24 shadow-xl">
+        <div className="bg-[#505050] rounded-3xl pt-28 pb-6 px-6 sm:px-8 -mt-32 shadow-xl">
           <div className="flex justify-around items-center gap-4">
           <button
             onClick={() => {
