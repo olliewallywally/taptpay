@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Download, Camera, Moon, RefreshCw, Wifi, ChevronDown, Menu } from "lucide-react";
+import { Download, Camera, Moon, RefreshCw, Wifi, ChevronDown, Menu, X, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AnimatedBrandBackground } from "@/components/backgrounds/AnimatedBrandBackground";
 import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
@@ -41,6 +41,7 @@ export default function DemoTerminal() {
   const [amount, setAmount] = useState<string>("15.99");
   const [currentTransaction, setCurrentTransaction] = useState<Transaction | null>(null);
   const [showStones, setShowStones] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   
   // Get current user/merchant
   const { data: user } = useQuery<{ user: { merchantId: number } }>({
@@ -196,6 +197,12 @@ export default function DemoTerminal() {
     cancelTransactionMutation.mutate();
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("user");
+    setLocation("/login");
+  };
+
   const getStatusDisplay = () => {
     if (!currentTransaction) return { text: "ready", color: "text-green-400" };
     
@@ -236,19 +243,54 @@ export default function DemoTerminal() {
       </div>
 
       {/* Menu icon in top right corner */}
-      <div className="absolute top-6 right-6 z-10">
+      <div className="absolute top-6 right-6 z-50">
         <button
-          onClick={() => {
-            toast({
-              title: "Menu",
-              description: "Menu options",
-            });
-          }}
+          onClick={() => setMenuOpen(!menuOpen)}
           className="w-12 h-12 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95 shadow-lg"
           data-testid="button-menu"
         >
-          <Menu className="w-6 h-6 text-gray-900" />
+          {menuOpen ? <X className="w-6 h-6 text-gray-900" /> : <Menu className="w-6 h-6 text-gray-900" />}
         </button>
+      </div>
+
+      {/* Slide-over Menu */}
+      <div className={`fixed top-0 right-0 h-full w-80 bg-gray-900 border-l border-white/20 shadow-xl transform transition-transform duration-300 z-40 ${
+        menuOpen ? 'translate-x-0' : 'translate-x-full'
+      }`}>
+        <div className="p-6 pt-20">
+          <nav className="space-y-4">
+            <Link href="/merchant" onClick={() => setMenuOpen(false)} className="block py-3 px-4 text-white rounded-xl hover:bg-white/10 transition-colors font-medium">
+              Terminal
+            </Link>
+            <Link href="/crypto-terminal" onClick={() => setMenuOpen(false)} className="block py-3 px-4 text-orange-400 rounded-xl hover:bg-orange-950/30 transition-colors font-medium">
+              Crypto Terminal
+            </Link>
+            <Link href="/demo-terminal" onClick={() => setMenuOpen(false)} className="block py-3 px-4 text-green-400 rounded-xl hover:bg-green-950/30 transition-colors font-medium">
+              Demo Terminal
+            </Link>
+            <Link href="/dashboard" onClick={() => setMenuOpen(false)} className="block py-3 px-4 text-white rounded-xl hover:bg-white/10 transition-colors font-medium">
+              Dashboard
+            </Link>
+            <Link href="/transactions" onClick={() => setMenuOpen(false)} className="block py-3 px-4 text-white rounded-xl hover:bg-white/10 transition-colors font-medium">
+              Transactions
+            </Link>
+            <Link href="/stock" onClick={() => setMenuOpen(false)} className="block py-3 px-4 text-white rounded-xl hover:bg-white/10 transition-colors font-medium">
+              Stock
+            </Link>
+            <Link href="/settings" onClick={() => setMenuOpen(false)} className="block py-3 px-4 text-white rounded-xl hover:bg-white/10 transition-colors font-medium">
+              Settings
+            </Link>
+            <div className="pt-4 mt-4 border-t border-white/20">
+              <button 
+                onClick={handleLogout}
+                className="flex items-center w-full text-left py-3 px-4 text-red-400 hover:bg-red-950/30 rounded-xl transition-colors font-medium"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Logout
+              </button>
+            </div>
+          </nav>
+        </div>
       </div>
 
       <div className="min-h-screen flex items-center justify-center p-4 sm:p-8">
