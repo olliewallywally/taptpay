@@ -861,23 +861,6 @@ export default function DemoTerminal() {
           </button>
         )}
 
-        {/* Amount Input (only show when there's no transaction) */}
-        {!currentTransaction && (
-          <div className="bg-[#505050] rounded-2xl sm:rounded-3xl p-5 sm:p-10 shadow-xl">
-            <label className="block text-green-400 text-base sm:text-lg font-semibold mb-3 sm:mb-4">
-              Enter Amount
-            </label>
-            <input
-              type="text"
-              value={amount}
-              onChange={handleAmountChange}
-              className="w-full bg-[#1a1a1a] border-2 border-green-500 rounded-xl sm:rounded-2xl py-3 sm:py-5 px-4 sm:px-6 text-white text-xl sm:text-2xl font-semibold focus:outline-none focus:ring-2 focus:ring-green-400"
-              placeholder="0.00"
-              data-testid="input-amount"
-            />
-          </div>
-        )}
-
       </div>
     </div>
     </div>
