@@ -448,16 +448,17 @@ export default function DemoTerminal() {
         </div>
       </div>
 
+      {/* Logo in top left corner - fixed position */}
+      <div className="fixed top-4 left-4 sm:top-6 sm:left-6 z-30">
+        <img 
+          src={taptLogoPath} 
+          alt="Tapt Logo" 
+          className="h-6 sm:h-8 w-auto filter brightness-0 invert"
+        />
+      </div>
+
       {/* Content with slide-over effect */}
       <div className={`relative transition-transform duration-300 ${menuOpen ? '-translate-x-80' : 'translate-x-0'}`}>
-        {/* Logo in top left corner - slides with content */}
-        <div className="absolute top-4 left-4 sm:top-6 sm:left-6 z-30">
-          <img 
-            src={taptLogoPath} 
-            alt="Tapt Logo" 
-            className="h-6 sm:h-8 w-auto filter brightness-0 invert"
-          />
-        </div>
         
         <div className="min-h-screen flex items-center justify-center p-3 sm:p-8 pt-24 sm:pt-32">
         <div className="w-full max-w-4xl space-y-4 sm:space-y-8">
