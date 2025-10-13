@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { AnimatedBrandBackground } from "@/components/backgrounds/AnimatedBrandBackground";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -50,6 +51,7 @@ const paymentFormSchema = z.object({
   price: z.string().min(1, "Price is required").refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
     message: "Price must be a positive number",
   }),
+  taptStoneId: z.string().min(1, "Please select a stone"),
 });
 
 type PaymentFormData = z.infer<typeof paymentFormSchema>;
@@ -68,6 +70,7 @@ export default function DemoTerminal() {
   const [filteredStockItems, setFilteredStockItems] = useState<any[]>([]);
   const [selectedStockItems, setSelectedStockItems] = useState<any[]>([]);
   const [copiedPaymentLink, setCopiedPaymentLink] = useState(false);
+  const [selectedStoneId, setSelectedStoneId] = useState<number | undefined>();
 
   // Track last processed transaction to prevent infinite updates
   const lastProcessedTxRef = useRef<{ id?: number; status?: string }>({});
@@ -77,8 +80,16 @@ export default function DemoTerminal() {
     defaultValues: {
       itemName: "",
       price: "",
+      taptStoneId: "",
     },
   });
+
+  // Auto-populate stone in form when selected stone changes
+  useEffect(() => {
+    if (selectedStoneId) {
+      form.setValue("taptStoneId", selectedStoneId.toString());
+    }
+  }, [selectedStoneId, form]);
   
   // Get current user/merchant
   const { data: user } = useQuery<{ user: { merchantId: number } }>({
@@ -93,9 +104,9 @@ export default function DemoTerminal() {
     enabled: !!merchantId,
   });
 
-  // Fetch active transaction
+  // Fetch active transaction (filtered by selected stone)
   const { data: activeTransaction } = useQuery<Transaction>({
-    queryKey: [`/api/merchants/${merchantId}/active-transaction`],
+    queryKey: [`/api/merchants/${merchantId}/active-transaction`, { stoneId: selectedStoneId }],
     enabled: !!merchantId,
     refetchInterval: 5000,
   });
@@ -105,6 +116,13 @@ export default function DemoTerminal() {
     queryKey: [`/api/merchants/${merchantId}/tapt-stones`],
     enabled: !!merchantId,
   });
+
+  // Auto-select first stone when stones load
+  useEffect(() => {
+    if (taptStones.length > 0 && !selectedStoneId) {
+      setSelectedStoneId(taptStones[0].id);
+    }
+  }, [taptStones, selectedStoneId]);
 
   // Fetch stock items
   const { data: stockItems = [] } = useQuery<any[]>({
@@ -189,6 +207,7 @@ export default function DemoTerminal() {
             merchantId,
             itemName: data.itemName,
             price: data.price,
+            taptStoneId: parseInt(data.taptStoneId),
             status: "pending",
           }
         : {
@@ -660,6 +679,31 @@ export default function DemoTerminal() {
                         )}
                       />
 
+                      <FormField
+                        control={form.control}
+                        name="taptStoneId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-green-400 font-medium">Select Stone</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger className="bg-[#1a1a1a] border-2 border-green-500 text-white rounded-xl h-12 focus:ring-2 focus:ring-green-400" data-testid="select-stone">
+                                  <SelectValue placeholder="Select a stone" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent className="bg-[#2a2a2a] border-green-500">
+                                {taptStones.map((stone) => (
+                                  <SelectItem key={stone.id} value={stone.id.toString()} className="text-white hover:bg-green-500/20" data-testid={`stone-option-${stone.id}`}>
+                                    {stone.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage className="text-red-400" />
+                          </FormItem>
+                        )}
+                      />
+
                       <div className="flex gap-3 pt-2">
                         <Button
                           type="submit"
@@ -904,10 +948,18 @@ export default function DemoTerminal() {
                   <button
                     key={stone.id}
                     onClick={() => {
-                      window.open(stone.paymentUrl, '_blank');
+                      setSelectedStoneId(stone.id);
                       setShowStones(false);
+                      toast({
+                        title: "Stone Selected",
+                        description: `Now viewing ${stone.name}`,
+                      });
                     }}
-                    className="w-full bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl sm:rounded-2xl py-3 sm:py-5 px-4 sm:px-6 text-green-400 font-medium text-base sm:text-lg transition-all"
+                    className={`w-full border-2 rounded-xl sm:rounded-2xl py-3 sm:py-5 px-4 sm:px-6 font-medium text-base sm:text-lg transition-all ${
+                      selectedStoneId === stone.id
+                        ? 'bg-green-500 text-gray-900 border-green-500'
+                        : 'bg-green-500/20 hover:bg-green-500/30 border-green-500 text-green-400'
+                    }`}
                     data-testid={`button-stone-${stone.id}`}
                   >
                     {stone.name} - Stone {stone.stoneNumber}
