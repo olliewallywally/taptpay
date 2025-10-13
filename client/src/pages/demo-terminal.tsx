@@ -107,6 +107,14 @@ export default function DemoTerminal() {
   // Fetch active transaction (filtered by selected stone)
   const { data: activeTransaction } = useQuery<Transaction>({
     queryKey: [`/api/merchants/${merchantId}/active-transaction`, { stoneId: selectedStoneId }],
+    queryFn: async () => {
+      const url = selectedStoneId 
+        ? `/api/merchants/${merchantId}/active-transaction?stoneId=${selectedStoneId}`
+        : `/api/merchants/${merchantId}/active-transaction`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch active transaction');
+      return response.json();
+    },
     enabled: !!merchantId,
     refetchInterval: 5000,
   });
@@ -172,14 +180,17 @@ export default function DemoTerminal() {
         const data = JSON.parse(event.data);
         
         if (data.type === "transaction_update" && data.transaction) {
-          setCurrentTransaction(data.transaction);
-          queryClient.invalidateQueries({ queryKey: [`/api/merchants/${merchantId}/active-transaction`] });
-          
-          // Clear transaction if it's completed/failed/cancelled
-          if (['completed', 'failed', 'cancelled'].includes(data.transaction.status)) {
-            setTimeout(() => {
-              setCurrentTransaction(null);
-            }, 3000);
+          // Only update if transaction belongs to the currently selected stone
+          if (!selectedStoneId || data.transaction.taptStoneId === selectedStoneId) {
+            setCurrentTransaction(data.transaction);
+            queryClient.invalidateQueries({ queryKey: [`/api/merchants/${merchantId}/active-transaction`] });
+            
+            // Clear transaction if it's completed/failed/cancelled
+            if (['completed', 'failed', 'cancelled'].includes(data.transaction.status)) {
+              setTimeout(() => {
+                setCurrentTransaction(null);
+              }, 3000);
+            }
           }
         }
       } catch (error) {
@@ -195,7 +206,7 @@ export default function DemoTerminal() {
     return () => {
       eventSource.close();
     };
-  }, [merchantId]);
+  }, [merchantId, selectedStoneId, queryClient]);
 
   // Create transaction mutation
   const createTransactionMutation = useMutation({
