@@ -23,7 +23,7 @@ export interface IStorage {
   
   // Transaction operations
   getTransaction(id: number): Promise<Transaction | undefined>;
-  getActiveTransactionByMerchant(merchantId: number): Promise<Transaction | undefined>;
+  getActiveTransactionByMerchant(merchantId: number, taptStoneId?: number): Promise<Transaction | undefined>;
   getTransactionByNfcSession(nfcSessionId: string): Promise<Transaction | undefined>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   updateTransactionStatus(id: number, status: string, windcaveTransactionId?: string): Promise<Transaction | undefined>;
@@ -331,10 +331,13 @@ export class MemStorage implements IStorage {
     return this.transactions.get(id);
   }
 
-  async getActiveTransactionByMerchant(merchantId: number): Promise<Transaction | undefined> {
+  async getActiveTransactionByMerchant(merchantId: number, taptStoneId?: number): Promise<Transaction | undefined> {
+    // Create cache key including stone ID if provided
+    const cacheKey = taptStoneId ? `${merchantId}-${taptStoneId}` : `${merchantId}`;
+    
     // Check cache first for instant response
-    if (this.activeTransactionCache.has(merchantId)) {
-      return this.activeTransactionCache.get(merchantId) || undefined;
+    if (this.activeTransactionCache.has(cacheKey)) {
+      return this.activeTransactionCache.get(cacheKey) || undefined;
     }
     
     // Optimized search - convert to array first for faster iteration
@@ -342,14 +345,18 @@ export class MemStorage implements IStorage {
     const transactionArray = Array.from(this.transactions.values());
     for (let i = 0; i < transactionArray.length; i++) {
       const transaction = transactionArray[i];
-      if (transaction.merchantId === merchantId && transaction.status === "pending") {
+      const matchesMerchant = transaction.merchantId === merchantId;
+      const matchesStone = taptStoneId === undefined || transaction.taptStoneId === taptStoneId;
+      const isPending = transaction.status === "pending";
+      
+      if (matchesMerchant && matchesStone && isPending) {
         activeTransaction = transaction;
         break; // Exit immediately when found
       }
     }
     
     // Cache for immediate future lookups
-    this.activeTransactionCache.set(merchantId, activeTransaction || null);
+    this.activeTransactionCache.set(cacheKey, activeTransaction || null);
     return activeTransaction;
   }
 
@@ -1354,12 +1361,23 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async getActiveTransactionByMerchant(merchantId: number): Promise<Transaction | undefined> {
+  async getActiveTransactionByMerchant(merchantId: number, taptStoneId?: number): Promise<Transaction | undefined> {
     if (!this.db) throw new Error('Database not available');
+    
+    const conditions = [
+      eq(transactions.merchantId, merchantId),
+      eq(transactions.status, 'pending')
+    ];
+    
+    // Add stone filter if provided
+    if (taptStoneId !== undefined) {
+      conditions.push(eq(transactions.taptStoneId, taptStoneId));
+    }
+    
     const result = await this.db
       .select()
       .from(transactions)
-      .where(and(eq(transactions.merchantId, merchantId), eq(transactions.status, 'pending')))
+      .where(and(...conditions))
       .orderBy(desc(transactions.createdAt))
       .limit(1);
     return result[0];
