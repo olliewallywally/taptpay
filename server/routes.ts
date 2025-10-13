@@ -15,8 +15,25 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import bcrypt from "bcrypt";
 
-// Store SSE connections for real-time updates
-const sseConnections = new Map<number, Set<any>>();
+// Store SSE connections for real-time updates (merchantId -> stoneId -> Set of connections)
+// stoneId can be null for merchant-level connections
+const sseConnections = new Map<number, Map<number | null, Set<any>>>();
+
+// Helper function to broadcast to stone-specific connections
+function broadcastToStone(merchantId: number, stoneId: number | null | undefined, data: any) {
+  const merchantConnections = sseConnections.get(merchantId);
+  if (!merchantConnections) return;
+
+  // Broadcast to the specific stone's connections
+  const targetStoneId = stoneId === undefined ? null : stoneId;
+  const stoneConnections = merchantConnections.get(targetStoneId);
+  
+  if (stoneConnections) {
+    stoneConnections.forEach(conn => {
+      conn.write(`data: ${JSON.stringify(data)}\n\n`);
+    });
+  }
+}
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -410,13 +427,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         qrCodeUrl,
       };
       
-      // Notify all connected clients for this merchant
-      const connections = sseConnections.get(transaction.merchantId);
-      if (connections) {
-        connections.forEach(conn => {
-          conn.write(`data: ${JSON.stringify({ type: 'transaction_updated', transaction: transactionWithUrls })}\n\n`);
-        });
-      }
+      // Notify all connected clients for this merchant and stone
+      broadcastToStone(transaction.merchantId, transaction.taptStoneId, { 
+        type: 'transaction_updated', 
+        transaction: transactionWithUrls 
+      });
 
       res.json(transactionWithUrls);
     } catch (error) {
@@ -451,12 +466,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Notify connected clients about the split
-      const connections = sseConnections.get(updatedTransaction.merchantId);
-      if (connections) {
-        connections.forEach(conn => {
-          conn.write(`data: ${JSON.stringify({ type: 'transaction_updated', transaction: transactionWithUrls })}\n\n`);
-        });
-      }
+      broadcastToStone(updatedTransaction.merchantId, updatedTransaction.taptStoneId, { 
+        type: 'transaction_updated', 
+        transaction: transactionWithUrls 
+      });
 
       res.json(transactionWithUrls);
     } catch (error) {
@@ -495,12 +508,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Notify connected clients about the cancellation
-      const connections = sseConnections.get(transaction.merchantId);
-      if (connections) {
-        connections.forEach(conn => {
-          conn.write(`data: ${JSON.stringify({ type: 'transaction_update', transaction: transactionWithUrls })}\n\n`);
-        });
-      }
+      broadcastToStone(transaction.merchantId, transaction.taptStoneId, { 
+        type: 'transaction_update', 
+        transaction: transactionWithUrls 
+      });
 
       res.json(transactionWithUrls);
     } catch (error) {
@@ -553,21 +564,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       
       // Notify connected clients about new NFC transaction
-      const connections = sseConnections.get(merchantId);
-      if (connections) {
-        connections.forEach(conn => {
-          conn.write(`data: ${JSON.stringify({ 
-            type: 'nfc_transaction_created', 
-            transaction: { ...transaction, nfcSessionId },
-            nfcSession: {
-              sessionId: nfcSessionId,
-              amount: amount,
-              merchantName: merchant.businessName || merchant.name,
-              paymentMethods: ['apple_pay', 'google_pay', 'contactless_card']
-            }
-          })}\n\n`);
-        });
-      }
+      broadcastToStone(merchantId, transaction.taptStoneId, { 
+        type: 'nfc_transaction_created', 
+        transaction: { ...transaction, nfcSessionId },
+        nfcSession: {
+          sessionId: nfcSessionId,
+          amount: amount,
+          merchantName: merchant.businessName || merchant.name,
+          paymentMethods: ['apple_pay', 'google_pay', 'contactless_card']
+        }
+      });
       
       res.json({
         success: true,
@@ -634,16 +640,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         // Notify clients of completion
-        const connections = sseConnections.get(transaction.merchantId);
-        if (connections) {
-          connections.forEach(conn => {
-            conn.write(`data: ${JSON.stringify({ 
-              type: 'nfc_payment_completed', 
-              transaction: updatedTransaction,
-              paymentMethod: paymentMethod || 'contactless_card'
-            })}\n\n`);
-          });
-        }
+        broadcastToStone(transaction.merchantId, transaction.taptStoneId, { 
+          type: 'nfc_payment_completed', 
+          transaction: updatedTransaction,
+          paymentMethod: paymentMethod || 'contactless_card'
+        });
         
         res.json({ 
           message: "NFC payment completed successfully", 
@@ -724,11 +725,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Notify clients
-      const connections = sseConnections.get(transaction.merchantId);
-      if (connections) {
-        const updatedTransaction = await storage.getTransaction(transactionId);
-        connections.forEach(conn => {
-          conn.write(`data: ${JSON.stringify({ type: 'transaction_updated', transaction: updatedTransaction })}\n\n`);
+      const updatedTransaction = await storage.getTransaction(transactionId);
+      if (updatedTransaction) {
+        broadcastToStone(transaction.merchantId, transaction.taptStoneId, { 
+          type: 'transaction_updated', 
+          transaction: updatedTransaction 
         });
       }
 
@@ -2336,6 +2337,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Server-Sent Events for real-time updates
   app.get("/api/merchants/:id/events", (req, res) => {
     const merchantId = parseInt(req.params.id);
+    const stoneId = req.query.stoneId ? parseInt(req.query.stoneId as string) : null;
     
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -2345,22 +2347,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       'Access-Control-Allow-Headers': 'Cache-Control'
     });
 
-    // Add connection to merchant's set
+    // Add connection to merchant's stone-specific set
     if (!sseConnections.has(merchantId)) {
-      sseConnections.set(merchantId, new Set());
+      sseConnections.set(merchantId, new Map());
     }
-    sseConnections.get(merchantId)!.add(res);
+    const merchantConnections = sseConnections.get(merchantId)!;
+    
+    if (!merchantConnections.has(stoneId)) {
+      merchantConnections.set(stoneId, new Set());
+    }
+    merchantConnections.get(stoneId)!.add(res);
 
     // Send initial connection confirmation
-    res.write(`data: ${JSON.stringify({ type: 'connected' })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: 'connected', stoneId })}\n\n`);
 
     // Handle client disconnect
     req.on('close', () => {
-      const connections = sseConnections.get(merchantId);
-      if (connections) {
-        connections.delete(res);
-        if (connections.size === 0) {
-          sseConnections.delete(merchantId);
+      const merchantConnections = sseConnections.get(merchantId);
+      if (merchantConnections) {
+        const stoneConnections = merchantConnections.get(stoneId);
+        if (stoneConnections) {
+          stoneConnections.delete(res);
+          if (stoneConnections.size === 0) {
+            merchantConnections.delete(stoneId);
+            if (merchantConnections.size === 0) {
+              sseConnections.delete(merchantId);
+            }
+          }
         }
       }
     });
@@ -2457,16 +2470,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateRefundStatus(refund.id, "completed", windcaveRefundId);
         
         // Notify connected clients about the refund
-        const connections = sseConnections.get(merchantId);
-        if (connections) {
-          connections.forEach(conn => {
-            conn.write(`data: ${JSON.stringify({ 
-              type: 'refund_completed', 
-              refund: { ...refund, status: "completed", windcaveRefundId },
-              transactionId
-            })}\n\n`);
-          });
-        }
+        broadcastToStone(merchantId, transaction.taptStoneId, { 
+          type: 'refund_completed', 
+          refund: { ...refund, status: "completed", windcaveRefundId },
+          transactionId
+        });
 
         res.json({ 
           success: true,
@@ -3033,15 +3041,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         // Notify connected clients
-        const connections = sseConnections.get(transaction.merchantId);
-        if (connections) {
-          connections.forEach(conn => {
-            conn.write(`data: ${JSON.stringify({ 
-              type: 'transaction_updated', 
-              transaction: updatedTransaction 
-            })}\n\n`);
-          });
-        }
+        broadcastToStone(transaction.merchantId, transaction.taptStoneId, { 
+          type: 'transaction_updated', 
+          transaction: updatedTransaction 
+        });
 
         res.json(paymentResult);
       } else {
@@ -3105,15 +3108,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         // Notify connected clients
-        const connections = sseConnections.get(transaction.merchantId);
-        if (connections) {
-          connections.forEach(conn => {
-            conn.write(`data: ${JSON.stringify({ 
-              type: 'transaction_updated', 
-              transaction: updatedTransaction 
-            })}\n\n`);
-          });
-        }
+        broadcastToStone(transaction.merchantId, transaction.taptStoneId, { 
+          type: 'transaction_updated', 
+          transaction: updatedTransaction 
+        });
 
         res.json(paymentResult);
       } else {
