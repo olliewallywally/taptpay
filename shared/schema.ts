@@ -67,6 +67,7 @@ export const merchants = pgTable("merchants", {
 export const transactions = pgTable("transactions", {
   id: serial("id").primaryKey(),
   merchantId: integer("merchant_id").references(() => merchants.id),
+  taptStoneId: integer("tapt_stone_id").references(() => taptStones.id), // Link to specific tapt stone
   itemName: text("item_name").notNull(),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   status: text("status").notNull().default("pending"), // pending, processing, completed, failed, refunded, partially_refunded
