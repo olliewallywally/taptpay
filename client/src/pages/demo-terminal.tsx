@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Minus, Users2, Share2, Calculator, Wifi, ChevronDown, Menu, X, LogOut, Tag, Copy, Check } from "lucide-react";
+import { Plus, Minus, Users2, Share2, Calculator, Wifi, ChevronDown, Menu, X, LogOut, Tag, Copy, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AnimatedBrandBackground } from "@/components/backgrounds/AnimatedBrandBackground";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -400,21 +400,56 @@ export default function DemoTerminal() {
   };
 
   const getStatusDisplay = () => {
-    if (!currentTransaction) return { text: "ready", color: "text-green-400" };
+    if (!currentTransaction) return { 
+      text: "ready", 
+      color: "text-green-400",
+      icon: "wifi",
+      bgColor: "bg-green-500/20"
+    };
     
     switch (currentTransaction.status) {
       case "pending":
-        return { text: "awaiting payment", color: "text-green-400" };
+        return { 
+          text: "awaiting payment", 
+          color: "text-green-400",
+          icon: "spinner",
+          bgColor: "bg-green-500/20"
+        };
       case "processing":
-        return { text: "processing", color: "text-yellow-400" };
+        return { 
+          text: "processing", 
+          color: "text-yellow-400",
+          icon: "spinner",
+          bgColor: "bg-yellow-500/20"
+        };
       case "completed":
-        return { text: "payment successful", color: "text-green-400" };
+        return { 
+          text: "payment successful", 
+          color: "text-green-400",
+          icon: "check",
+          bgColor: "bg-green-500/20"
+        };
       case "failed":
-        return { text: "payment failed", color: "text-red-400" };
+        return { 
+          text: "failed", 
+          color: "text-red-400",
+          icon: "x",
+          bgColor: "bg-red-500/20"
+        };
       case "cancelled":
-        return { text: "cancelled", color: "text-gray-400" };
+        return { 
+          text: "cancelled", 
+          color: "text-gray-400",
+          icon: "x",
+          bgColor: "bg-gray-500/20"
+        };
       default:
-        return { text: currentTransaction.status, color: "text-green-400" };
+        return { 
+          text: currentTransaction.status, 
+          color: "text-green-400",
+          icon: "wifi",
+          bgColor: "bg-green-500/20"
+        };
     }
   };
 
@@ -931,11 +966,22 @@ export default function DemoTerminal() {
         {/* Status Display */}
         <div className="bg-[#0f0f0f] rounded-2xl sm:rounded-3xl p-6 sm:p-12 shadow-xl">
           <div className="flex flex-col items-center space-y-3 sm:space-y-6">
-            <span className={`text-lg sm:text-3xl font-semibold ${status.color}`}>
+            <span className={`text-lg sm:text-3xl font-semibold ${status.color} transition-colors duration-300`}>
               {status.text}
             </span>
-            <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500/20 flex items-center justify-center">
-              <Wifi className="w-7 h-7 sm:w-10 sm:h-10 text-green-400 animate-pulse" />
+            <div className={`w-14 h-14 sm:w-20 sm:h-20 rounded-full ${status.bgColor} flex items-center justify-center transition-all duration-300`}>
+              {status.icon === "wifi" && (
+                <Wifi className="w-7 h-7 sm:w-10 sm:h-10 text-green-400 animate-pulse" />
+              )}
+              {status.icon === "spinner" && (
+                <Loader2 className={`w-7 h-7 sm:w-10 sm:h-10 ${status.color} animate-spin`} />
+              )}
+              {status.icon === "check" && (
+                <Check className="w-7 h-7 sm:w-10 sm:h-10 text-green-400 animate-in zoom-in-50 duration-500" />
+              )}
+              {status.icon === "x" && (
+                <X className="w-7 h-7 sm:w-10 sm:h-10 text-red-400 animate-in zoom-in-50 duration-500" />
+              )}
             </div>
           </div>
         </div>
