@@ -317,6 +317,25 @@ export default function DemoTerminal() {
     },
   });
 
+  // Delete stone mutation
+  const deleteStoneMutation = useMutation({
+    mutationFn: async (stoneId: number) => {
+      const response = await apiRequest("DELETE", `/api/merchants/${merchantId}/tapt-stones/${stoneId}`, {});
+      return response.json();
+    },
+    onSuccess: (_, deletedStoneId) => {
+      // If deleted stone was selected, clear selection (auto-select will pick first)
+      if (selectedStoneId === deletedStoneId) {
+        setSelectedStoneId(undefined);
+      }
+      queryClient.invalidateQueries({ queryKey: [`/api/merchants/${merchantId}/tapt-stones`] });
+      toast({
+        title: "Stone Deleted",
+        description: "The stone has been deleted successfully",
+      });
+    },
+  });
+
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/[^0-9.]/g, '');
     setAmount(value);
@@ -1002,11 +1021,10 @@ export default function DemoTerminal() {
 
           {/* Stones Dropdown */}
           <div className={`overflow-hidden transition-all duration-300 ${showStones ? 'max-h-96 mt-4 sm:mt-6' : 'max-h-0'}`}>
-            {taptStones.length > 0 && (
-              <div className="bg-[#2a2a2a] rounded-2xl sm:rounded-3xl p-4 sm:p-8 space-y-3 sm:space-y-4 shadow-xl">
-                {taptStones.map((stone) => (
+            <div className="bg-[#2a2a2a] rounded-2xl sm:rounded-3xl p-4 sm:p-8 space-y-3 sm:space-y-4 shadow-xl">
+              {taptStones.length > 0 && taptStones.map((stone) => (
+                <div key={stone.id} className="relative">
                   <button
-                    key={stone.id}
                     onClick={() => {
                       setSelectedStoneId(stone.id);
                       setShowStones(false);
@@ -1015,7 +1033,7 @@ export default function DemoTerminal() {
                         description: `Now viewing ${stone.name}`,
                       });
                     }}
-                    className={`w-full border-2 rounded-xl sm:rounded-2xl py-3 sm:py-5 px-4 sm:px-6 font-medium text-base sm:text-lg transition-all ${
+                    className={`w-full border-2 rounded-xl sm:rounded-2xl py-3 sm:py-5 pl-4 sm:pl-6 pr-12 sm:pr-16 font-medium text-base sm:text-lg transition-all ${
                       selectedStoneId === stone.id
                         ? 'bg-green-500 text-gray-900 border-green-500'
                         : 'bg-green-500/20 hover:bg-green-500/30 border-green-500 text-green-400'
@@ -1024,9 +1042,34 @@ export default function DemoTerminal() {
                   >
                     {stone.name} - Stone {stone.stoneNumber}
                   </button>
-                ))}
-              </div>
-            )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (window.confirm(`Are you sure you want to delete ${stone.name}?`)) {
+                        deleteStoneMutation.mutate(stone.id);
+                      }
+                    }}
+                    className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-red-500/20 hover:bg-red-500/40 flex items-center justify-center transition-all"
+                    data-testid={`button-delete-stone-${stone.id}`}
+                  >
+                    <X className="w-4 h-4 sm:w-5 sm:h-5 text-red-400" />
+                  </button>
+                </div>
+              ))}
+              
+              {/* Create Stone Button */}
+              <button
+                onClick={() => {
+                  setShowStones(false);
+                  setLocation("/merchant/stones");
+                }}
+                className="w-full bg-green-500/10 hover:bg-green-500/20 border-2 border-dashed border-green-500 rounded-xl sm:rounded-2xl py-3 sm:py-5 px-4 sm:px-6 text-green-400 font-medium text-base sm:text-lg transition-all flex items-center justify-center gap-2"
+                data-testid="button-create-stone"
+              >
+                <Plus className="w-5 h-5" />
+                Create Stone
+              </button>
+            </div>
           </div>
         </div>
 
