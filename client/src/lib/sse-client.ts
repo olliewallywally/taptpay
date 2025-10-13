@@ -7,13 +7,14 @@ export class SSEClient {
   private eventSource: EventSource | null = null;
   private listeners: Map<string, ((data: any) => void)[]> = new Map();
 
-  connect(merchantId: number) {
+  connect(merchantId: number, stoneId?: number | null) {
     if (this.eventSource) {
       this.eventSource.close();
     }
 
-    console.log(`Connecting to SSE for merchant ${merchantId}`);
-    this.eventSource = new EventSource(`/api/merchants/${merchantId}/events`);
+    const stoneParam = stoneId ? `?stoneId=${stoneId}` : '';
+    console.log(`Connecting to SSE for merchant ${merchantId}${stoneId ? ` and stone ${stoneId}` : ''}`);
+    this.eventSource = new EventSource(`/api/merchants/${merchantId}/events${stoneParam}`);
     
     this.eventSource.onopen = () => {
       console.log(`SSE connection opened for merchant ${merchantId}`);
