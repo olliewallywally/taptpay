@@ -20,7 +20,7 @@ export function getBaseUrl(req?: any): string {
   return 'http://localhost:5000';
 }
 
-export function generatePaymentUrl(merchantId: number, stoneId?: number, req?: any): string {
+export function generatePaymentUrl(merchantId: number, stoneId?: number | null, req?: any): string {
   const baseUrl = getBaseUrl(req);
   if (stoneId) {
     // Ensure stoneId is converted to number to prevent [object Object] in URL
@@ -30,7 +30,7 @@ export function generatePaymentUrl(merchantId: number, stoneId?: number, req?: a
   return `${baseUrl}/pay/${merchantId}`;
 }
 
-export function generateQrCodeUrl(merchantId: number, stoneId?: number, req?: any): string {
+export function generateQrCodeUrl(merchantId: number, stoneId?: number | null, req?: any): string {
   const baseUrl = getBaseUrl(req);
   if (stoneId) {
     // Ensure stoneId is converted to number to prevent [object Object] in URL

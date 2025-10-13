@@ -356,6 +356,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get active transaction for merchant - ultra-fast optimized
   app.get("/api/merchants/:id/active-transaction", async (req, res) => {
     const merchantId = parseInt(req.params.id);
+    const stoneId = req.query.stoneId ? parseInt(req.query.stoneId as string) : undefined;
     
     // Ultra-fast headers for immediate response
     res.set({
@@ -366,15 +367,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
     
     try {
-      const transaction = await storage.getActiveTransactionByMerchant(merchantId);
+      const transaction = await storage.getActiveTransactionByMerchant(merchantId, stoneId);
       
       if (!transaction) {
         return res.json(null);
       }
       
-      // Add payment URL and QR code URL
-      const paymentUrl = generatePaymentUrl(merchantId, undefined, req);
-      const qrCodeUrl = generateQrCodeUrl(merchantId, undefined, req);
+      // Add payment URL and QR code URL using transaction's stone ID
+      const paymentUrl = generatePaymentUrl(merchantId, transaction.taptStoneId, req);
+      const qrCodeUrl = generateQrCodeUrl(merchantId, transaction.taptStoneId, req);
       
       const transactionWithUrls = {
         ...transaction,
@@ -396,23 +397,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid transaction data", errors: validation.error.errors });
       }
 
-      // Create transaction data without selectedStoneId for database
-      const { selectedStoneId, ...transactionData } = validation.data;
-      const transaction = await storage.createTransaction(transactionData);
-      
-      // If a specific stone was selected, associate the transaction with it
-      if (selectedStoneId) {
-        try {
-          await storage.associateTransactionWithStone(transaction.id, selectedStoneId);
-        } catch (error) {
-          console.error("Failed to associate transaction with stone:", error);
-          // Continue anyway, transaction is still valid
-        }
-      }
+      const transaction = await storage.createTransaction(validation.data);
       
       // Generate payment URL and QR code URL for the transaction
-      const paymentUrl = generatePaymentUrl(transaction.merchantId, selectedStoneId, req);
-      const qrCodeUrl = generateQrCodeUrl(transaction.merchantId, selectedStoneId, req);
+      const paymentUrl = generatePaymentUrl(transaction.merchantId, transaction.taptStoneId, req);
+      const qrCodeUrl = generateQrCodeUrl(transaction.merchantId, transaction.taptStoneId, req);
       
       // Add URLs to transaction object
       const transactionWithUrls = {
