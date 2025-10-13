@@ -131,7 +131,8 @@ export default function DemoTerminal() {
     if (taptStones.length > 0 && !selectedStoneId) {
       setSelectedStoneId(taptStones[0].id);
     }
-  }, [taptStones, selectedStoneId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taptStones]);
 
   // Fetch stock items
   const { data: stockItems = [] } = useQuery<any[]>({
@@ -611,8 +612,8 @@ export default function DemoTerminal() {
           {/* Dropdowns */}
           <div className="relative z-5">
             {/* New Payment Dropdown */}
-            <div className={`overflow-hidden transition-all duration-300 ${activeDropdown === 'new-payment' ? 'max-h-[600px]' : 'max-h-0'}`}>
-              <div className="bg-[#353535] rounded-t-[29px] rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 space-y-3 sm:space-y-4 -mt-2">
+            <div className={`overflow-hidden transition-all duration-300 ${activeDropdown === 'new-payment' ? 'max-h-[800px]' : 'max-h-0'}`}>
+              <div className="bg-[#353535] rounded-t-[29px] rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 space-y-3 sm:space-y-4 -mt-2 max-h-[750px] overflow-y-auto">
                 <h3 className="text-white font-semibold text-lg sm:text-xl mb-3">New Payment</h3>
                 
                 {!showPaymentForm ? (
