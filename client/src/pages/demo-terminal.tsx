@@ -168,8 +168,9 @@ export default function DemoTerminal() {
     const token = localStorage.getItem('authToken');
     if (!token) return;
 
+    const stoneParam = selectedStoneId ? `&stoneId=${selectedStoneId}` : '';
     const eventSource = new EventSource(
-      `/api/merchants/${merchantId}/events?token=${encodeURIComponent(token)}`
+      `/api/merchants/${merchantId}/events?token=${encodeURIComponent(token)}${stoneParam}`
     );
 
     eventSource.onopen = () => {
