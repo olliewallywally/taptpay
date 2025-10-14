@@ -313,7 +313,7 @@ export default function Login() {
             className="absolute w-96 h-96 rounded-full animate-lava-lamp-1 bottom-[-100px] right-[-100px]"
             style={{ 
               backgroundColor: '#0000FF',
-              willChange: 'transform, border-radius',
+              willChange: 'transform',
             }}
           />
           
@@ -322,7 +322,7 @@ export default function Login() {
             className="absolute w-80 h-80 rounded-full animate-lava-lamp-2 top-[-80px] left-[-80px]"
             style={{ 
               backgroundColor: '#0000FF',
-              willChange: 'transform, border-radius',
+              willChange: 'transform',
             }}
           />
           
@@ -331,7 +331,7 @@ export default function Login() {
             className="absolute w-[28rem] h-[28rem] rounded-full animate-lava-lamp-3 top-[20%] right-[10%]"
             style={{ 
               backgroundColor: '#0000FF',
-              willChange: 'transform, border-radius',
+              willChange: 'transform',
             }}
           />
           
@@ -340,7 +340,7 @@ export default function Login() {
             className="absolute w-64 h-64 rounded-full animate-lava-lamp-4 bottom-[15%] left-[20%]"
             style={{ 
               backgroundColor: '#0000FF',
-              willChange: 'transform, border-radius',
+              willChange: 'transform',
             }}
           />
           
@@ -349,7 +349,7 @@ export default function Login() {
             className="absolute w-[32rem] h-[32rem] rounded-full animate-lava-lamp-5 top-[40%] left-[-120px]"
             style={{ 
               backgroundColor: '#0000FF',
-              willChange: 'transform, border-radius',
+              willChange: 'transform',
             }}
           />
           
@@ -358,7 +358,7 @@ export default function Login() {
             className="absolute w-72 h-72 rounded-full animate-lava-lamp-6 bottom-[30%] right-[25%]"
             style={{ 
               backgroundColor: '#0000FF',
-              willChange: 'transform, border-radius',
+              willChange: 'transform',
             }}
           />
         </div>
