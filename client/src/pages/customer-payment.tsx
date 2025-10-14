@@ -184,15 +184,15 @@ export default function CustomerPayment() {
         {/* Background Layer - Fixed */}
         <div 
           className="absolute inset-0 pointer-events-none"
-          style={{ backgroundColor: '#00D4D4' }}
+          style={{ backgroundColor: '#0000FF' }}
         >
-          {/* Desktop Only: Lava Lamp Blue Balls */}
+          {/* Desktop Only: Lava Lamp Turquoise Balls */}
           <div className="hidden md:block">
             {/* Lava Lamp Ball 1 - Large */}
             <div 
               className="absolute w-96 h-96 rounded-full animate-lava-lamp-1 bottom-[-100px] right-[-100px]"
               style={{ 
-                backgroundColor: '#0000FF',
+                backgroundColor: '#00D4D4',
                 willChange: 'transform',
               }}
             />
@@ -201,7 +201,7 @@ export default function CustomerPayment() {
             <div 
               className="absolute w-80 h-80 rounded-full animate-lava-lamp-2 top-[-80px] left-[-80px]"
               style={{ 
-                backgroundColor: '#0000FF',
+                backgroundColor: '#00D4D4',
                 willChange: 'transform',
               }}
             />
@@ -210,7 +210,7 @@ export default function CustomerPayment() {
             <div 
               className="absolute w-[28rem] h-[28rem] rounded-full animate-lava-lamp-3 top-[20%] right-[10%]"
               style={{ 
-                backgroundColor: '#0000FF',
+                backgroundColor: '#00D4D4',
                 willChange: 'transform',
               }}
             />
@@ -219,7 +219,7 @@ export default function CustomerPayment() {
             <div 
               className="absolute w-64 h-64 rounded-full animate-lava-lamp-4 bottom-[15%] left-[20%]"
               style={{ 
-                backgroundColor: '#0000FF',
+                backgroundColor: '#00D4D4',
                 willChange: 'transform',
               }}
             />
@@ -228,7 +228,7 @@ export default function CustomerPayment() {
             <div 
               className="absolute w-[32rem] h-[32rem] rounded-full animate-lava-lamp-5 top-[40%] left-[-120px]"
               style={{ 
-                backgroundColor: '#0000FF',
+                backgroundColor: '#00D4D4',
                 willChange: 'transform',
               }}
             />
@@ -237,7 +237,7 @@ export default function CustomerPayment() {
             <div 
               className="absolute w-72 h-72 rounded-full animate-lava-lamp-6 bottom-[30%] right-[25%]"
               style={{ 
-                backgroundColor: '#0000FF',
+                backgroundColor: '#00D4D4',
                 willChange: 'transform',
               }}
             />
@@ -248,14 +248,14 @@ export default function CustomerPayment() {
             <div 
               className="absolute w-96 h-96 rounded-full animate-slow-float-1 bottom-[-120px] right-[-120px]"
               style={{ 
-                backgroundColor: '#0000FF',
+                backgroundColor: '#00D4D4',
                 willChange: 'transform',
               }}
             />
             <div 
               className="absolute w-48 h-48 rounded-full animate-slow-float-2 bottom-[200px] right-[250px]"
               style={{ 
-                backgroundColor: '#0000FF',
+                backgroundColor: '#00D4D4',
                 willChange: 'transform',
               }}
             />
@@ -371,15 +371,15 @@ export default function CustomerPayment() {
       {/* Background Layer - Fixed */}
       <div 
         className="absolute inset-0 pointer-events-none"
-        style={{ backgroundColor: '#00D4D4' }}
+        style={{ backgroundColor: '#0000FF' }}
       >
-        {/* Desktop Only: Lava Lamp Blue Balls */}
+        {/* Desktop Only: Lava Lamp Turquoise Balls */}
         <div className="hidden md:block">
           {/* Lava Lamp Ball 1 - Large */}
           <div 
             className="absolute w-96 h-96 rounded-full animate-lava-lamp-1 bottom-[-100px] right-[-100px]"
             style={{ 
-              backgroundColor: '#0000FF',
+              backgroundColor: '#00D4D4',
               willChange: 'transform',
             }}
           />
@@ -388,7 +388,7 @@ export default function CustomerPayment() {
           <div 
             className="absolute w-80 h-80 rounded-full animate-lava-lamp-2 top-[-80px] left-[-80px]"
             style={{ 
-              backgroundColor: '#0000FF',
+              backgroundColor: '#00D4D4',
               willChange: 'transform',
             }}
           />
@@ -397,7 +397,7 @@ export default function CustomerPayment() {
           <div 
             className="absolute w-[28rem] h-[28rem] rounded-full animate-lava-lamp-3 top-[20%] right-[10%]"
             style={{ 
-              backgroundColor: '#0000FF',
+              backgroundColor: '#00D4D4',
               willChange: 'transform',
             }}
           />
@@ -406,7 +406,7 @@ export default function CustomerPayment() {
           <div 
             className="absolute w-64 h-64 rounded-full animate-lava-lamp-4 bottom-[15%] left-[20%]"
             style={{ 
-              backgroundColor: '#0000FF',
+              backgroundColor: '#00D4D4',
               willChange: 'transform',
             }}
           />
@@ -415,7 +415,7 @@ export default function CustomerPayment() {
           <div 
             className="absolute w-[32rem] h-[32rem] rounded-full animate-lava-lamp-5 top-[40%] left-[-120px]"
             style={{ 
-              backgroundColor: '#0000FF',
+              backgroundColor: '#00D4D4',
               willChange: 'transform',
             }}
           />
@@ -424,7 +424,7 @@ export default function CustomerPayment() {
           <div 
             className="absolute w-72 h-72 rounded-full animate-lava-lamp-6 bottom-[30%] right-[25%]"
             style={{ 
-              backgroundColor: '#0000FF',
+              backgroundColor: '#00D4D4',
               willChange: 'transform',
             }}
           />
@@ -435,14 +435,14 @@ export default function CustomerPayment() {
           <div 
             className="absolute w-96 h-96 rounded-full animate-slow-float-1 bottom-[-120px] right-[-120px]"
             style={{ 
-              backgroundColor: '#0000FF',
+              backgroundColor: '#00D4D4',
               willChange: 'transform',
             }}
           />
           <div 
             className="absolute w-48 h-48 rounded-full animate-slow-float-2 bottom-[200px] right-[250px]"
             style={{ 
-              backgroundColor: '#0000FF',
+              backgroundColor: '#00D4D4',
               willChange: 'transform',
             }}
           />
