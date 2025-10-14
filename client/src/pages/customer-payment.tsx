@@ -241,6 +241,15 @@ export default function CustomerPayment() {
                 willChange: 'transform',
               }}
             />
+            
+            {/* Lava Lamp Ball 7 - Large Top Right */}
+            <div 
+              className="absolute w-[28rem] h-[28rem] rounded-full animate-lava-lamp-1 top-[-100px] right-[-100px]"
+              style={{ 
+                backgroundColor: '#00D4D4',
+                willChange: 'transform',
+              }}
+            />
           </div>
           
           {/* Mobile: Simple circles (non-morphing) */}
@@ -423,6 +432,15 @@ export default function CustomerPayment() {
           {/* Lava Lamp Ball 6 - Medium */}
           <div 
             className="absolute w-72 h-72 rounded-full animate-lava-lamp-6 bottom-[30%] right-[25%]"
+            style={{ 
+              backgroundColor: '#00D4D4',
+              willChange: 'transform',
+            }}
+          />
+          
+          {/* Lava Lamp Ball 7 - Large Top Right */}
+          <div 
+            className="absolute w-[28rem] h-[28rem] rounded-full animate-lava-lamp-1 top-[-100px] right-[-100px]"
             style={{ 
               backgroundColor: '#00D4D4',
               willChange: 'transform',
