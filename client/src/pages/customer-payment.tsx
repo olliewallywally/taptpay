@@ -181,29 +181,154 @@ export default function CustomerPayment() {
   if (isLoading || !currentTransaction) {
     return (
       <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
-        {/* Gradient Background with Floating Orbs */}
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900">
-          {/* Animated Gradient Orbs with Enhanced Glow */}
-          <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse shadow-2xl" style={{
-            animation: 'glow-pulse 4s ease-in-out infinite',
-            filter: 'blur(40px)',
-          }}></div>
-          <div className="absolute top-40 right-20 w-96 h-96 bg-gradient-to-r from-green-400 to-emerald-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse delay-75 shadow-2xl" style={{
-            animation: 'glow-pulse 5s ease-in-out infinite 1.5s',
-            filter: 'blur(45px)',
-          }}></div>
-          <div className="absolute -bottom-8 left-40 w-96 h-96 bg-gradient-to-r from-lime-400 to-green-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse delay-150 shadow-2xl" style={{
-            animation: 'glow-pulse 6s ease-in-out infinite 3s',
-            filter: 'blur(50px)',
-          }}></div>
+        {/* Background Layer - Fixed */}
+        <div 
+          className="absolute inset-0 pointer-events-none"
+          style={{ backgroundColor: '#00D4D4' }}
+        >
+          {/* Desktop Only: Lava Lamp Blue Balls */}
+          <div className="hidden md:block">
+            {/* Lava Lamp Ball 1 - Large */}
+            <div 
+              className="absolute w-96 h-96 rounded-full animate-lava-lamp-1 bottom-[-100px] right-[-100px]"
+              style={{ 
+                backgroundColor: '#0000FF',
+                willChange: 'transform',
+              }}
+            />
+            
+            {/* Lava Lamp Ball 2 - Medium */}
+            <div 
+              className="absolute w-80 h-80 rounded-full animate-lava-lamp-2 top-[-80px] left-[-80px]"
+              style={{ 
+                backgroundColor: '#0000FF',
+                willChange: 'transform',
+              }}
+            />
+            
+            {/* Lava Lamp Ball 3 - Large */}
+            <div 
+              className="absolute w-[28rem] h-[28rem] rounded-full animate-lava-lamp-3 top-[20%] right-[10%]"
+              style={{ 
+                backgroundColor: '#0000FF',
+                willChange: 'transform',
+              }}
+            />
+            
+            {/* Lava Lamp Ball 4 - Small */}
+            <div 
+              className="absolute w-64 h-64 rounded-full animate-lava-lamp-4 bottom-[15%] left-[20%]"
+              style={{ 
+                backgroundColor: '#0000FF',
+                willChange: 'transform',
+              }}
+            />
+            
+            {/* Lava Lamp Ball 5 - Extra Large */}
+            <div 
+              className="absolute w-[32rem] h-[32rem] rounded-full animate-lava-lamp-5 top-[40%] left-[-120px]"
+              style={{ 
+                backgroundColor: '#0000FF',
+                willChange: 'transform',
+              }}
+            />
+            
+            {/* Lava Lamp Ball 6 - Medium */}
+            <div 
+              className="absolute w-72 h-72 rounded-full animate-lava-lamp-6 bottom-[30%] right-[25%]"
+              style={{ 
+                backgroundColor: '#0000FF',
+                willChange: 'transform',
+              }}
+            />
+          </div>
           
-          {/* Additional Moving Glow Effects */}
-          <div className="absolute top-0 left-1/2 w-72 h-72 bg-gradient-to-r from-teal-300 to-emerald-300 rounded-full mix-blend-screen filter blur-3xl opacity-30" style={{
-            animation: 'float-slow 8s ease-in-out infinite, glow-pulse 3s ease-in-out infinite',
-          }}></div>
-          <div className="absolute bottom-0 right-1/3 w-80 h-80 bg-gradient-to-r from-green-300 to-lime-300 rounded-full mix-blend-screen filter blur-3xl opacity-25" style={{
-            animation: 'float-reverse 10s ease-in-out infinite, glow-pulse 4s ease-in-out infinite 2s',
-          }}></div>
+          {/* Mobile: Simple circles (non-morphing) */}
+          <div className="block md:hidden">
+            <div 
+              className="absolute w-96 h-96 rounded-full animate-slow-float-1 bottom-[-120px] right-[-120px]"
+              style={{ 
+                backgroundColor: '#0000FF',
+                willChange: 'transform',
+              }}
+            />
+            <div 
+              className="absolute w-48 h-48 rounded-full animate-slow-float-2 bottom-[200px] right-[250px]"
+              style={{ 
+                backgroundColor: '#0000FF',
+                willChange: 'transform',
+              }}
+            />
+          </div>
+          
+          {/* Floating Line-art Shapes */}
+          <svg 
+            className="absolute top-[15%] left-[10%] w-12 h-12 animate-float-shape-1" 
+            style={{ 
+              color: 'white', 
+              opacity: 0.6,
+              willChange: 'transform',
+            }}
+          >
+            <polygon points="24,4 44,44 4,44" fill="none" stroke="currentColor" strokeWidth="2" />
+          </svg>
+          
+          <svg 
+            className="absolute top-[70%] left-[80%] w-10 h-10 animate-float-shape-2"
+            style={{ 
+              color: 'white', 
+              opacity: 0.6,
+              willChange: 'transform',
+            }}
+          >
+            <polygon points="20,4 36,36 4,36" fill="none" stroke="currentColor" strokeWidth="2" />
+          </svg>
+          
+          <svg 
+            className="absolute top-[25%] right-[15%] w-11 h-11 animate-float-shape-3"
+            style={{ 
+              color: 'white', 
+              opacity: 0.6,
+              willChange: 'transform',
+            }}
+          >
+            <rect x="4" y="4" width="36" height="36" fill="none" stroke="currentColor" strokeWidth="2" />
+          </svg>
+          
+          <svg 
+            className="absolute bottom-[30%] left-[20%] w-9 h-9 animate-float-shape-4"
+            style={{ 
+              color: 'white', 
+              opacity: 0.6,
+              willChange: 'transform',
+            }}
+          >
+            <rect x="4" y="4" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2" />
+          </svg>
+          
+          <svg 
+            className="absolute top-[60%] right-[25%] w-10 h-10 animate-float-shape-5"
+            style={{ 
+              color: 'white', 
+              opacity: 0.6,
+              willChange: 'transform',
+            }}
+          >
+            <line x1="6" y1="6" x2="34" y2="34" stroke="currentColor" strokeWidth="2" />
+            <line x1="34" y1="6" x2="6" y2="34" stroke="currentColor" strokeWidth="2" />
+          </svg>
+          
+          <svg 
+            className="absolute top-[40%] left-[15%] w-12 h-12 animate-float-shape-6"
+            style={{ 
+              color: 'white', 
+              opacity: 0.6,
+              willChange: 'transform',
+            }}
+          >
+            <line x1="8" y1="8" x2="40" y2="40" stroke="currentColor" strokeWidth="2" />
+            <line x1="40" y1="8" x2="8" y2="40" stroke="currentColor" strokeWidth="2" />
+          </svg>
         </div>
 
         {/* Glass Morphism Container */}
@@ -243,29 +368,154 @@ export default function CustomerPayment() {
 
   return (
     <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
-      {/* Gradient Background with Floating Orbs */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900">
-        {/* Animated Gradient Orbs with Enhanced Glow */}
-        <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse shadow-2xl" style={{
-          animation: 'glow-pulse 4s ease-in-out infinite',
-          filter: 'blur(40px)',
-        }}></div>
-        <div className="absolute top-40 right-20 w-96 h-96 bg-gradient-to-r from-green-400 to-emerald-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse delay-75 shadow-2xl" style={{
-          animation: 'glow-pulse 5s ease-in-out infinite 1.5s',
-          filter: 'blur(45px)',
-        }}></div>
-        <div className="absolute -bottom-8 left-40 w-96 h-96 bg-gradient-to-r from-lime-400 to-green-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse delay-150 shadow-2xl" style={{
-          animation: 'glow-pulse 6s ease-in-out infinite 3s',
-          filter: 'blur(50px)',
-        }}></div>
+      {/* Background Layer - Fixed */}
+      <div 
+        className="absolute inset-0 pointer-events-none"
+        style={{ backgroundColor: '#00D4D4' }}
+      >
+        {/* Desktop Only: Lava Lamp Blue Balls */}
+        <div className="hidden md:block">
+          {/* Lava Lamp Ball 1 - Large */}
+          <div 
+            className="absolute w-96 h-96 rounded-full animate-lava-lamp-1 bottom-[-100px] right-[-100px]"
+            style={{ 
+              backgroundColor: '#0000FF',
+              willChange: 'transform',
+            }}
+          />
+          
+          {/* Lava Lamp Ball 2 - Medium */}
+          <div 
+            className="absolute w-80 h-80 rounded-full animate-lava-lamp-2 top-[-80px] left-[-80px]"
+            style={{ 
+              backgroundColor: '#0000FF',
+              willChange: 'transform',
+            }}
+          />
+          
+          {/* Lava Lamp Ball 3 - Large */}
+          <div 
+            className="absolute w-[28rem] h-[28rem] rounded-full animate-lava-lamp-3 top-[20%] right-[10%]"
+            style={{ 
+              backgroundColor: '#0000FF',
+              willChange: 'transform',
+            }}
+          />
+          
+          {/* Lava Lamp Ball 4 - Small */}
+          <div 
+            className="absolute w-64 h-64 rounded-full animate-lava-lamp-4 bottom-[15%] left-[20%]"
+            style={{ 
+              backgroundColor: '#0000FF',
+              willChange: 'transform',
+            }}
+          />
+          
+          {/* Lava Lamp Ball 5 - Extra Large */}
+          <div 
+            className="absolute w-[32rem] h-[32rem] rounded-full animate-lava-lamp-5 top-[40%] left-[-120px]"
+            style={{ 
+              backgroundColor: '#0000FF',
+              willChange: 'transform',
+            }}
+          />
+          
+          {/* Lava Lamp Ball 6 - Medium */}
+          <div 
+            className="absolute w-72 h-72 rounded-full animate-lava-lamp-6 bottom-[30%] right-[25%]"
+            style={{ 
+              backgroundColor: '#0000FF',
+              willChange: 'transform',
+            }}
+          />
+        </div>
         
-        {/* Additional Moving Glow Effects */}
-        <div className="absolute top-0 left-1/2 w-72 h-72 bg-gradient-to-r from-teal-300 to-emerald-300 rounded-full mix-blend-screen filter blur-3xl opacity-30" style={{
-          animation: 'float-slow 8s ease-in-out infinite, glow-pulse 3s ease-in-out infinite',
-        }}></div>
-        <div className="absolute bottom-0 right-1/3 w-80 h-80 bg-gradient-to-r from-green-300 to-lime-300 rounded-full mix-blend-screen filter blur-3xl opacity-25" style={{
-          animation: 'float-reverse 10s ease-in-out infinite, glow-pulse 4s ease-in-out infinite 2s',
-        }}></div>
+        {/* Mobile: Simple circles (non-morphing) */}
+        <div className="block md:hidden">
+          <div 
+            className="absolute w-96 h-96 rounded-full animate-slow-float-1 bottom-[-120px] right-[-120px]"
+            style={{ 
+              backgroundColor: '#0000FF',
+              willChange: 'transform',
+            }}
+          />
+          <div 
+            className="absolute w-48 h-48 rounded-full animate-slow-float-2 bottom-[200px] right-[250px]"
+            style={{ 
+              backgroundColor: '#0000FF',
+              willChange: 'transform',
+            }}
+          />
+        </div>
+        
+        {/* Floating Line-art Shapes */}
+        <svg 
+          className="absolute top-[15%] left-[10%] w-12 h-12 animate-float-shape-1" 
+          style={{ 
+            color: 'white', 
+            opacity: 0.6,
+            willChange: 'transform',
+          }}
+        >
+          <polygon points="24,4 44,44 4,44" fill="none" stroke="currentColor" strokeWidth="2" />
+        </svg>
+        
+        <svg 
+          className="absolute top-[70%] left-[80%] w-10 h-10 animate-float-shape-2"
+          style={{ 
+            color: 'white', 
+            opacity: 0.6,
+            willChange: 'transform',
+          }}
+        >
+          <polygon points="20,4 36,36 4,36" fill="none" stroke="currentColor" strokeWidth="2" />
+        </svg>
+        
+        <svg 
+          className="absolute top-[25%] right-[15%] w-11 h-11 animate-float-shape-3"
+          style={{ 
+            color: 'white', 
+            opacity: 0.6,
+            willChange: 'transform',
+          }}
+        >
+          <rect x="4" y="4" width="36" height="36" fill="none" stroke="currentColor" strokeWidth="2" />
+        </svg>
+        
+        <svg 
+          className="absolute bottom-[30%] left-[20%] w-9 h-9 animate-float-shape-4"
+          style={{ 
+            color: 'white', 
+            opacity: 0.6,
+            willChange: 'transform',
+          }}
+        >
+          <rect x="4" y="4" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2" />
+        </svg>
+        
+        <svg 
+          className="absolute top-[60%] right-[25%] w-10 h-10 animate-float-shape-5"
+          style={{ 
+            color: 'white', 
+            opacity: 0.6,
+            willChange: 'transform',
+          }}
+        >
+          <line x1="6" y1="6" x2="34" y2="34" stroke="currentColor" strokeWidth="2" />
+          <line x1="34" y1="6" x2="6" y2="34" stroke="currentColor" strokeWidth="2" />
+        </svg>
+        
+        <svg 
+          className="absolute top-[40%] left-[15%] w-12 h-12 animate-float-shape-6"
+          style={{ 
+            color: 'white', 
+            opacity: 0.6,
+            willChange: 'transform',
+          }}
+        >
+          <line x1="8" y1="8" x2="40" y2="40" stroke="currentColor" strokeWidth="2" />
+          <line x1="40" y1="8" x2="8" y2="40" stroke="currentColor" strokeWidth="2" />
+        </svg>
       </div>
 
       <div className="relative z-10 w-full max-w-sm">
