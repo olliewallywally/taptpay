@@ -268,6 +268,13 @@ export default function CustomerPayment() {
                 willChange: 'transform',
               }}
             />
+            <div 
+              className="absolute w-80 h-80 rounded-full animate-slow-float-1 top-[-80px] right-[-80px]"
+              style={{ 
+                backgroundColor: '#00D4D4',
+                willChange: 'transform',
+              }}
+            />
           </div>
           
           {/* Floating Line-art Shapes */}
@@ -459,6 +466,13 @@ export default function CustomerPayment() {
           />
           <div 
             className="absolute w-48 h-48 rounded-full animate-slow-float-2 bottom-[200px] right-[250px]"
+            style={{ 
+              backgroundColor: '#00D4D4',
+              willChange: 'transform',
+            }}
+          />
+          <div 
+            className="absolute w-80 h-80 rounded-full animate-slow-float-1 top-[-80px] right-[-80px]"
             style={{ 
               backgroundColor: '#00D4D4',
               willChange: 'transform',
