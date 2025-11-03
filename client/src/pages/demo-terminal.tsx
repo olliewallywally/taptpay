@@ -545,7 +545,7 @@ export default function DemoTerminal() {
       <div className={`relative transition-transform duration-300 ${menuOpen ? '-translate-x-80' : 'translate-x-0'}`}>
         
         <div className="min-h-screen flex items-center justify-center p-3 sm:p-8 pt-24 sm:pt-32">
-        <div className="w-full max-w-4xl space-y-4 sm:space-y-8">
+        <div className="w-full max-w-2xl space-y-4 sm:space-y-8">
         
         {/* Connected Amount Display and Action Buttons */}
         <div>
