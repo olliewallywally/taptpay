@@ -545,7 +545,7 @@ export default function DemoTerminal() {
       <div className={`relative transition-transform duration-300 ${menuOpen ? '-translate-x-80' : 'translate-x-0'}`}>
         
         <div className="min-h-screen flex items-center justify-center p-3 sm:p-8 pt-24 sm:pt-32">
-        <div className="w-full max-w-[90vw] sm:max-w-xl md:max-w-2xl mx-auto space-y-4 sm:space-y-8">
+        <div className="w-full max-w-[90vw] sm:max-w-[600px] md:w-[672px] mx-auto space-y-4 sm:space-y-8">
         
         {/* Connected Amount Display and Action Buttons */}
         <div className="overflow-x-hidden">
