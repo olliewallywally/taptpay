@@ -544,8 +544,8 @@ export default function DemoTerminal() {
       {/* Content with slide-over effect */}
       <div className={`relative transition-transform duration-300 ${menuOpen ? '-translate-x-80' : 'translate-x-0'}`}>
         
-        <div className="min-h-screen flex items-center justify-center p-3 sm:p-8 pt-24 sm:pt-32 overflow-x-hidden">
-        <div className="w-full max-w-2xl mx-auto space-y-4 sm:space-y-8 overflow-x-hidden">
+        <div className="min-h-screen flex items-center justify-center p-3 sm:p-8 pt-24 sm:pt-32">
+        <div className="w-full max-w-[90vw] sm:max-w-xl md:max-w-2xl mx-auto space-y-4 sm:space-y-8">
         
         {/* Connected Amount Display and Action Buttons */}
         <div className="overflow-x-hidden">
@@ -626,10 +626,10 @@ export default function DemoTerminal() {
           </div>
 
           {/* Dropdowns */}
-          <div className="relative z-5">
+          <div className="relative z-5 w-full overflow-x-hidden">
             {/* New Payment Dropdown */}
-            <div className={`overflow-hidden transition-all duration-300 ${activeDropdown === 'new-payment' ? 'max-h-[800px]' : 'max-h-0'}`}>
-              <div className="bg-[#353535] rounded-t-[29px] rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 space-y-3 sm:space-y-4 -mt-2 max-h-[750px] overflow-y-auto">
+            <div className={`w-full overflow-hidden transition-all duration-300 ${activeDropdown === 'new-payment' ? 'max-h-[800px]' : 'max-h-0'}`}>
+              <div className="w-full bg-[#353535] rounded-t-[29px] rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 space-y-3 sm:space-y-4 -mt-2 max-h-[750px] overflow-y-auto overflow-x-hidden">
                 <h3 className="text-white font-semibold text-lg sm:text-xl mb-3">New Payment</h3>
                 
                 {!showPaymentForm ? (
@@ -798,8 +798,8 @@ export default function DemoTerminal() {
             </div>
 
             {/* Split Bill Dropdown */}
-            <div className={`overflow-hidden transition-all duration-300 ${activeDropdown === 'split-bill' ? 'max-h-96' : 'max-h-0'}`}>
-              <div className="bg-[#353535] rounded-t-[29px] rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 space-y-4 -mt-2">
+            <div className={`w-full overflow-hidden transition-all duration-300 ${activeDropdown === 'split-bill' ? 'max-h-96' : 'max-h-0'}`}>
+              <div className="w-full bg-[#353535] rounded-t-[29px] rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 space-y-4 -mt-2 overflow-x-hidden">
                 <h3 className="text-white font-semibold text-lg sm:text-xl mb-3">Split Bill</h3>
                 
                 {currentTransaction ? (
@@ -861,8 +861,8 @@ export default function DemoTerminal() {
             </div>
 
             {/* Share Link Dropdown */}
-            <div className={`overflow-hidden transition-all duration-300 ${activeDropdown === 'share-link' ? 'max-h-[600px]' : 'max-h-0'}`}>
-              <div className="bg-[#353535] rounded-t-[29px] rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 space-y-3 sm:space-y-4 -mt-2">
+            <div className={`w-full overflow-hidden transition-all duration-300 ${activeDropdown === 'share-link' ? 'max-h-[600px]' : 'max-h-0'}`}>
+              <div className="w-full bg-[#353535] rounded-t-[29px] rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 space-y-3 sm:space-y-4 -mt-2 overflow-x-hidden">
                 <h3 className="text-white font-semibold text-lg sm:text-xl mb-3">Share Payment Link</h3>
                 <p className="text-sm text-gray-400 mb-3">Send payment link to customer via email or SMS</p>
                 {currentTransaction?.paymentUrl ? (
@@ -957,8 +957,8 @@ export default function DemoTerminal() {
             </div>
 
             {/* Quick Amounts Dropdown */}
-            <div className={`overflow-hidden transition-all duration-300 ${activeDropdown === 'quick-amounts' ? 'max-h-96' : 'max-h-0'}`}>
-              <div className="bg-[#353535] rounded-t-[29px] rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 -mt-2">
+            <div className={`w-full overflow-hidden transition-all duration-300 ${activeDropdown === 'quick-amounts' ? 'max-h-96' : 'max-h-0'}`}>
+              <div className="w-full bg-[#353535] rounded-t-[29px] rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 -mt-2 overflow-x-hidden">
                 <h3 className="text-white font-semibold text-lg sm:text-xl mb-3">Quick Amounts</h3>
                 <div className="grid grid-cols-3 gap-2 sm:gap-3">
                   {['5.00', '10.00', '15.00', '20.00', '25.00', '50.00', '75.00', '100.00', '150.00'].map((quickAmount) => (
