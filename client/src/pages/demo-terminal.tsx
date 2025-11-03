@@ -544,11 +544,11 @@ export default function DemoTerminal() {
       {/* Content with slide-over effect */}
       <div className={`relative transition-transform duration-300 ${menuOpen ? '-translate-x-80' : 'translate-x-0'}`}>
         
-        <div className="min-h-screen flex items-center justify-center p-3 sm:p-8 pt-24 sm:pt-32">
-        <div className="w-full max-w-2xl space-y-4 sm:space-y-8">
+        <div className="min-h-screen flex items-center justify-center p-3 sm:p-8 pt-24 sm:pt-32 overflow-x-hidden">
+        <div className="w-full max-w-2xl mx-auto space-y-4 sm:space-y-8 overflow-x-hidden">
         
         {/* Connected Amount Display and Action Buttons */}
-        <div>
+        <div className="overflow-x-hidden">
           {/* Amount Display */}
           <div className="relative z-20">
             <div className="bg-gradient-to-br from-green-400 to-green-500 rounded-[2rem] sm:rounded-[4rem] p-6 sm:p-12 shadow-2xl">
