@@ -575,7 +575,7 @@ export default function DemoTerminal() {
           </div>
 
           {/* Action Buttons */}
-          <div className="relative z-10 bg-[#1a1a1a] rounded-b-2xl sm:rounded-b-3xl pt-16 sm:pt-28 pb-4 sm:pb-6 px-4 sm:px-8 -mt-6 shadow-xl">
+          <div className="relative z-10 bg-[#0f0f0f] rounded-b-2xl sm:rounded-b-3xl pt-16 sm:pt-28 pb-4 sm:pb-6 px-4 sm:px-8 -mt-6 shadow-xl">
             <div className="flex justify-around items-center gap-2 sm:gap-4">
               {/* New Payment Button */}
               <button
