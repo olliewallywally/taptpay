@@ -3,19 +3,11 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useLocation, Link } from "wouter";
+import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { LogIn, Shield, UserPlus, Store, ArrowLeft, ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
-import { createMerchantSchema, type CreateMerchant } from "@shared/schema";
-import { AnimatedBrandBackground } from "@/components/backgrounds/AnimatedBrandBackground";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -28,41 +20,17 @@ export default function Login() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [loginType, setLoginType] = useState<'merchant' | 'admin'>('merchant');
-  const [showSignup, setShowSignup] = useState(false);
-  const [showMoreOptions, setShowMoreOptions] = useState(false);
+  const [showMore, setShowMore] = useState(false);
+  const [isSignup, setIsSignup] = useState(false);
+  const [name, setName] = useState("");
 
-  const form = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: {
-      email: "",
-      password: "",
-    },
-  });
-
-  // Simple signup form state
-  const [signupData, setSignupData] = useState({
-    name: "",
-    businessName: "",
-    businessType: "",
+  const [formData, setFormData] = useState<LoginFormData>({
     email: "",
-    phone: "",
-    address: "",
     password: "",
-    confirmPassword: "",
   });
 
-  const signupForm = useForm<CreateMerchant>({
-    resolver: zodResolver(createMerchantSchema),
-    mode: "onSubmit",
-  });
-
-
-
-  // Update form defaults when login type changes
-  useEffect(() => {
-    form.setValue("email", "");
-    form.setValue("password", "");
-  }, [loginType, form]);
+  const [errors, setErrors] = useState<{ email?: string; password?: string; general?: string }>({});
+  const [successMessage, setSuccessMessage] = useState("");
 
   const loginMutation = useMutation({
     mutationFn: async (data: LoginFormData) => {
@@ -94,540 +62,269 @@ export default function Login() {
       }
     },
     onError: (error: any) => {
-      toast({
-        title: loginType === 'merchant' ? "Login Failed" : "Access Denied",
-        description: error.message || `Invalid ${loginType} credentials. Please try again.`,
-        variant: "destructive",
-      });
+      setErrors({ general: error.message || "Invalid credentials. Please try again." });
     },
   });
 
-  const signupMutation = useMutation({
-    mutationFn: async (data: CreateMerchant) => {
-      const response = await apiRequest("POST", "/api/merchants/signup", data);
-      return response.json();
-    },
-    onSuccess: (result) => {
-      toast({
-        title: "Account Created Successfully!",
-        description: "Please check your email to verify your account before logging in.",
-      });
-      setShowSignup(false);
-      signupForm.reset();
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Signup Failed",
-        description: error.message || "Failed to create account. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
+  const validateForm = () => {
+    const newErrors: { email?: string; password?: string; general?: string } = {};
 
-  const onSubmit = (data: LoginFormData) => {
-    loginMutation.mutate(data);
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!formData.email) {
+      newErrors.email = 'Email is required';
+    } else if (!emailRegex.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email';
+    }
+
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  const onSignupSubmit = (data: CreateMerchant) => {
-    signupMutation.mutate(data);
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrors({});
+    setSuccessMessage('');
+
+    if (!validateForm()) return;
+
+    loginMutation.mutate(formData);
   };
 
-  if (showSignup) {
-    return (
-      <AnimatedBrandBackground>
-        <div className="w-full max-w-sm">
-          <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-8 shadow-2xl">
-            
-            {/* Logo Section */}
-            <div className="text-center mb-8">
-              <div className="flex justify-center mb-6">
-                <img 
-                  src={taptLogoPath} 
-                  alt="TaptPay" 
-                  className="h-12 w-auto object-contain"
-                />
-              </div>
-              <h1 className="text-2xl font-light text-white mb-2">
-                Create Your Account
-              </h1>
-              <p className="text-white/70 text-sm">
-                Join Tapt and start accepting payments
-              </p>
-            </div>
+  const handleGoogleLogin = () => {
+    // Placeholder for Google OAuth - will implement backend next
+    toast({
+      title: "Google Sign In",
+      description: "Google OAuth integration coming soon!",
+    });
+  };
 
-            {/* Back to Login Button */}
-            <div className="mb-6">
-              <Button
-                variant="ghost"
-                onClick={() => setShowSignup(false)}
-                className="flex items-center space-x-2 text-white/70 hover:text-white hover:bg-white/10 rounded-xl"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Back to Login</span>
-              </Button>
-            </div>
-
-            {/* Simple Signup Form */}
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              onSignupSubmit(signupData);
-            }} className="space-y-4">
-              
-              {/* Full Name */}
-              <div>
-                <Label className="text-sm font-medium text-white/90">Full Name</Label>
-                <Input
-                  placeholder="John Smith"
-                  value={signupData.name}
-                  onChange={(e) => setSignupData(prev => ({...prev, name: e.target.value}))}
-                  className="mt-2 px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all duration-300"
-                />
-              </div>
-
-              {/* Business Name */}
-              <div>
-                <Label className="text-sm font-medium text-white/90">Business Name</Label>
-                <Input
-                  placeholder="My Business Ltd"
-                  value={signupData.businessName}
-                  onChange={(e) => setSignupData(prev => ({...prev, businessName: e.target.value}))}
-                  className="mt-2 px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all duration-300"
-                />
-              </div>
-
-              {/* Business Type */}
-              <div>
-                <Label className="text-sm font-medium text-white/90">Business Type</Label>
-                <select
-                  value={signupData.businessType}
-                  onChange={(e) => setSignupData(prev => ({...prev, businessType: e.target.value}))}
-                  className="mt-2 w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all duration-300"
-                >
-                  <option value="" className="bg-slate-800 text-white">Select business type</option>
-                  <option value="retail" className="bg-slate-800 text-white">Retail</option>
-                  <option value="restaurant" className="bg-slate-800 text-white">Restaurant</option>
-                  <option value="cafe" className="bg-slate-800 text-white">Cafe</option>
-                  <option value="service" className="bg-slate-800 text-white">Service</option>
-                  <option value="online" className="bg-slate-800 text-white">Online</option>
-                  <option value="other" className="bg-slate-800 text-white">Other</option>
-                </select>
-              </div>
-
-              {/* Email */}
-              <div>
-                <Label className="text-sm font-medium text-white/90">Email Address</Label>
-                <Input
-                  type="email"
-                  placeholder="you@business.com"
-                  value={signupData.email}
-                  onChange={(e) => setSignupData(prev => ({...prev, email: e.target.value}))}
-                  className="mt-2 px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all duration-300"
-                />
-              </div>
-
-              {/* Phone */}
-              <div>
-                <Label className="text-sm font-medium text-white/90">Phone Number</Label>
-                <Input
-                  placeholder="+64 21 123 456"
-                  value={signupData.phone}
-                  onChange={(e) => setSignupData(prev => ({...prev, phone: e.target.value}))}
-                  className="mt-2 px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all duration-300"
-                />
-              </div>
-
-              {/* Address */}
-              <div>
-                <Label className="text-sm font-medium text-white/90">Business Address</Label>
-                <Input
-                  placeholder="123 Queen St, Auckland"
-                  value={signupData.address}
-                  onChange={(e) => setSignupData(prev => ({...prev, address: e.target.value}))}
-                  className="mt-2 px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all duration-300"
-                />
-              </div>
-
-              {/* Password Fields */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm font-medium text-white/90">Password</Label>
-                  <Input
-                    type="password"
-                    placeholder="••••••••"
-                    value={signupData.password}
-                    onChange={(e) => setSignupData(prev => ({...prev, password: e.target.value}))}
-                    className="mt-2 px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all duration-300"
-                  />
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-white/90">Confirm Password</Label>
-                  <Input
-                    type="password"
-                    placeholder="••••••••"
-                    value={signupData.confirmPassword}
-                    onChange={(e) => setSignupData(prev => ({...prev, confirmPassword: e.target.value}))}
-                    className="mt-2 px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all duration-300"
-                  />
-                </div>
-              </div>
-
-              <Button
-                type="submit"
-                disabled={signupMutation.isPending}
-                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white py-4 px-6 rounded-xl font-medium transition-all duration-300 disabled:opacity-50 shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
-              >
-                {signupMutation.isPending ? (
-                  <div className="flex items-center justify-center space-x-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Creating Account...</span>
-                  </div>
-                ) : (
-                  'Create Account'
-                )}
-              </Button>
-            </form>
-
-            {/* Footer */}
-            <div className="mt-6 text-center">
-              <p className="text-sm text-white/50">
-                By creating an account, you agree to our terms of service
-              </p>
-            </div>
-          </div>
-        </div>
-      </AnimatedBrandBackground>
-    );
-  }
+  const handleAppleLogin = () => {
+    toast({
+      title: "Apple Sign In",
+      description: "Apple OAuth integration coming soon!",
+    });
+  };
 
   return (
-    <div className="min-h-screen relative overflow-hidden p-4">
-      {/* Background Layer - Fixed */}
-      <div 
-        className="fixed inset-0 pointer-events-none"
-        style={{ backgroundColor: '#00D4D4' }}
-      >
-        {/* Desktop Only: Lava Lamp Blue Balls */}
-        <div className="hidden md:block">
-          {/* Lava Lamp Ball 1 - Large */}
-          <div 
-            className="absolute w-96 h-96 rounded-full animate-lava-lamp-1 bottom-[-100px] right-[-100px]"
-            style={{ 
-              backgroundColor: '#0000FF',
-              willChange: 'transform',
-            }}
-          />
-          
-          {/* Lava Lamp Ball 2 - Medium */}
-          <div 
-            className="absolute w-80 h-80 rounded-full animate-lava-lamp-2 top-[-80px] left-[-80px]"
-            style={{ 
-              backgroundColor: '#0000FF',
-              willChange: 'transform',
-            }}
-          />
-          
-          {/* Lava Lamp Ball 3 - Large */}
-          <div 
-            className="absolute w-[28rem] h-[28rem] rounded-full animate-lava-lamp-3 top-[20%] right-[10%]"
-            style={{ 
-              backgroundColor: '#0000FF',
-              willChange: 'transform',
-            }}
-          />
-          
-          {/* Lava Lamp Ball 4 - Small */}
-          <div 
-            className="absolute w-64 h-64 rounded-full animate-lava-lamp-4 bottom-[15%] left-[20%]"
-            style={{ 
-              backgroundColor: '#0000FF',
-              willChange: 'transform',
-            }}
-          />
-          
-          {/* Lava Lamp Ball 5 - Extra Large */}
-          <div 
-            className="absolute w-[32rem] h-[32rem] rounded-full animate-lava-lamp-5 top-[40%] left-[-120px]"
-            style={{ 
-              backgroundColor: '#0000FF',
-              willChange: 'transform',
-            }}
-          />
-          
-          {/* Lava Lamp Ball 6 - Medium */}
-          <div 
-            className="absolute w-72 h-72 rounded-full animate-lava-lamp-6 bottom-[30%] right-[25%]"
-            style={{ 
-              backgroundColor: '#0000FF',
-              willChange: 'transform',
-            }}
-          />
-        </div>
-        
-        {/* Mobile: Simple circles (non-morphing) */}
-        <div className="block md:hidden">
-          <div 
-            className="absolute w-96 h-96 rounded-full animate-slow-float-1 bottom-[-120px] right-[-120px]"
-            style={{ 
-              backgroundColor: '#0000FF',
-              willChange: 'transform',
-            }}
-          />
-          <div 
-            className="absolute w-48 h-48 rounded-full animate-slow-float-2 bottom-[200px] right-[250px]"
-            style={{ 
-              backgroundColor: '#0000FF',
-              willChange: 'transform',
-            }}
-          />
-        </div>
-        
-        {/* Floating Line-art Shapes */}
-        <svg 
-          className="absolute top-[15%] left-[10%] w-12 h-12 animate-float-shape-1" 
-          style={{ 
-            color: 'white', 
-            opacity: 0.6,
-            willChange: 'transform',
-          }}
-        >
-          <polygon points="24,4 44,44 4,44" fill="none" stroke="currentColor" strokeWidth="2" />
-        </svg>
-        
-        <svg 
-          className="absolute top-[70%] left-[80%] w-10 h-10 animate-float-shape-2"
-          style={{ 
-            color: 'white', 
-            opacity: 0.6,
-            willChange: 'transform',
-          }}
-        >
-          <polygon points="20,4 36,36 4,36" fill="none" stroke="currentColor" strokeWidth="2" />
-        </svg>
-        
-        <svg 
-          className="absolute top-[25%] right-[15%] w-11 h-11 animate-float-shape-3"
-          style={{ 
-            color: 'white', 
-            opacity: 0.6,
-            willChange: 'transform',
-          }}
-        >
-          <rect x="4" y="4" width="36" height="36" fill="none" stroke="currentColor" strokeWidth="2" />
-        </svg>
-        
-        <svg 
-          className="absolute bottom-[30%] left-[20%] w-9 h-9 animate-float-shape-4"
-          style={{ 
-            color: 'white', 
-            opacity: 0.6,
-            willChange: 'transform',
-          }}
-        >
-          <rect x="4" y="4" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2" />
-        </svg>
-        
-        <svg 
-          className="absolute top-[60%] right-[25%] w-10 h-10 animate-float-shape-5"
-          style={{ 
-            color: 'white', 
-            opacity: 0.6,
-            willChange: 'transform',
-          }}
-        >
-          <line x1="6" y1="6" x2="34" y2="34" stroke="currentColor" strokeWidth="2" />
-          <line x1="34" y1="6" x2="6" y2="34" stroke="currentColor" strokeWidth="2" />
-        </svg>
-        
-        <svg 
-          className="absolute top-[40%] left-[15%] w-12 h-12 animate-float-shape-6"
-          style={{ 
-            color: 'white', 
-            opacity: 0.6,
-            willChange: 'transform',
-          }}
-        >
-          <line x1="8" y1="8" x2="40" y2="40" stroke="currentColor" strokeWidth="2" />
-          <line x1="40" y1="8" x2="8" y2="40" stroke="currentColor" strokeWidth="2" />
-        </svg>
-      </div>
-
-      {/* Content Layer */}
-      <div className="relative z-10 flex min-h-screen items-center justify-center w-full">
-        <div className="w-full max-w-xs">
-        <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 shadow-2xl">
-          
-          {/* Logo Section - Compact */}
-          <div className="text-center mb-4">
-            <div className="flex justify-center mb-3">
-              <img 
-                src={taptLogoPath} 
-                alt="TaptPay" 
-                className="h-10 w-auto object-contain"
-              />
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-sm md:max-w-md lg:max-w-lg">
+        {/* Main login card */}
+        <div className="rounded-[48px] md:rounded-[60px] overflow-hidden shadow-2xl">
+          {/* Blue section with form */}
+          <div className="bg-[#0055FF] px-8 md:px-12 pt-12 md:pt-16 pb-8 md:pb-12 rounded-b-[48px] md:rounded-b-[60px] relative z-10">
+            {/* Logo */}
+            <div className="text-center mb-12 md:mb-16">
+              <img src={taptLogoPath} alt="taptpay" className="h-20 md:h-24 mx-auto" />
             </div>
-            <h1 className="text-xl font-light text-white mb-1">
-              Welcome back
-            </h1>
-            <p className="text-white/70 text-xs">
-              Sign in to continue
-            </p>
-          </div>
 
-          {/* Login Type Toggle - Compact */}
-          <div className="mb-4">
-            <div className="flex backdrop-blur-xl bg-white/5 border border-white/20 rounded-2xl p-1 shadow-lg">
-              <button
-                type="button"
-                onClick={() => setLoginType('merchant')}
-                className={`flex-1 flex items-center justify-center space-x-1 py-2 px-3 rounded-xl text-xs font-bold transition-all duration-300 ${
-                  loginType === 'merchant'
-                    ? 'backdrop-blur-xl bg-white/15 text-black shadow-md border border-white/30'
-                    : 'text-black/70 hover:text-black hover:bg-white/5 hover:backdrop-blur-lg'
-                }`}
-              >
-                <LogIn className="w-3 h-3" />
-                <span>Merchant</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setLoginType('admin')}
-                className={`flex-1 flex items-center justify-center space-x-1 py-2 px-3 rounded-xl text-xs font-bold transition-all duration-300 ${
-                  loginType === 'admin'
-                    ? 'backdrop-blur-xl bg-white/15 text-black shadow-md border border-white/30'
-                    : 'text-black/70 hover:text-black hover:bg-white/5 hover:backdrop-blur-lg'
-                }`}
-              >
-                <Shield className="w-3 h-3" />
-                <span>Admin</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Login Form - Compact */}
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
-              <div className="space-y-3">
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs font-medium text-white/90">
-                        Email
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          type="email"
-                          placeholder="demo@tapt.co.nz"
-                          className="mt-1 w-full px-3 py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-black placeholder-gray-600 text-sm focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all duration-300"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage className="text-red-300 text-xs" />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs font-medium text-white/90">
-                        Password
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          type="password"
-                          placeholder="demo123"
-                          className="mt-1 w-full px-3 py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-black placeholder-gray-600 text-sm focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all duration-300"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage className="text-red-300 text-xs" />
-                    </FormItem>
-                  )}
-                />
+            {/* Success message */}
+            {successMessage && (
+              <div className="mb-4 p-3 md:p-4 bg-[#00E5CC] text-[#0055FF] rounded-full text-center font-medium">
+                {successMessage}
               </div>
+            )}
 
-              {/* Admin Credentials Info - Compact */}
-              {loginType === 'admin' && (
-                <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-2">
-                  <p className="text-xs text-white/80 text-center">
-                    <span className="font-medium">Admin credentials pre-filled</span>
-                  </p>
+            {/* General error message */}
+            {errors.general && (
+              <div className="mb-4 p-3 md:p-4 bg-red-500 text-white rounded-full text-center font-medium">
+                {errors.general}
+              </div>
+            )}
+
+            {/* Login Type Toggle (subtle) */}
+            {!isSignup && (
+              <div className="mb-6 flex justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setLoginType('merchant')}
+                  className={`px-4 py-1 rounded-full text-xs transition-all ${
+                    loginType === 'merchant'
+                      ? 'bg-[#00E5CC] text-[#0055FF] font-medium'
+                      : 'text-[#00E5CC] hover:text-white'
+                  }`}
+                >
+                  Merchant
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLoginType('admin')}
+                  className={`px-4 py-1 rounded-full text-xs transition-all ${
+                    loginType === 'admin'
+                      ? 'bg-[#00E5CC] text-[#0055FF] font-medium'
+                      : 'text-[#00E5CC] hover:text-white'
+                  }`}
+                >
+                  Admin
+                </button>
+              </div>
+            )}
+
+            {/* Form */}
+            <form onSubmit={handleLogin} className="space-y-6 md:space-y-8">
+              {/* Name field (signup only) */}
+              {isSignup && (
+                <div>
+                  <label htmlFor="name" className="block text-[#00E5CC] mb-2 ml-3 md:ml-4 text-sm md:text-base">
+                    name
+                  </label>
+                  <input
+                    type="text"
+                    id="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full bg-transparent border-2 border-[#00E5CC] rounded-full px-6 md:px-8 py-4 md:py-5 text-white placeholder-blue-300 focus:outline-none focus:border-[#00FFE5] transition-colors"
+                    placeholder=""
+                  />
                 </div>
               )}
 
-              {/* Login Button - Compact */}
-              <Button
+              {/* Email field */}
+              <div>
+                <label htmlFor="email" className="block text-[#00E5CC] mb-2 ml-3 md:ml-4 text-sm md:text-base">
+                  email
+                </label>
+                <input
+                  type="email"
+                  id="email"
+                  value={formData.email}
+                  onChange={(e) => {
+                    setFormData({ ...formData, email: e.target.value });
+                    if (errors.email) setErrors({ ...errors, email: undefined });
+                  }}
+                  className={`w-full bg-transparent border-2 ${
+                    errors.email ? 'border-red-500' : 'border-[#00E5CC]'
+                  } rounded-full px-6 md:px-8 py-4 md:py-5 text-white placeholder-blue-300 focus:outline-none focus:border-[#00FFE5] transition-colors`}
+                  placeholder=""
+                  data-testid="input-email"
+                />
+                {errors.email && (
+                  <p className="text-red-400 mt-2 ml-3 md:ml-4 text-sm">{errors.email}</p>
+                )}
+              </div>
+
+              {/* Password field */}
+              <div>
+                <label htmlFor="password" className="block text-[#00E5CC] mb-2 ml-3 md:ml-4 text-sm md:text-base">
+                  password
+                </label>
+                <input
+                  type="password"
+                  id="password"
+                  value={formData.password}
+                  onChange={(e) => {
+                    setFormData({ ...formData, password: e.target.value });
+                    if (errors.password) setErrors({ ...errors, password: undefined });
+                  }}
+                  className={`w-full bg-transparent border-2 ${
+                    errors.password ? 'border-red-500' : 'border-[#00E5CC]'
+                  } rounded-full px-6 md:px-8 py-4 md:py-5 text-white placeholder-blue-300 focus:outline-none focus:border-[#00FFE5] transition-colors`}
+                  placeholder=""
+                  data-testid="input-password"
+                />
+                {errors.password && (
+                  <p className="text-red-400 mt-2 ml-3 md:ml-4 text-sm">{errors.password}</p>
+                )}
+              </div>
+
+              {/* Submit button */}
+              <button
                 type="submit"
                 disabled={loginMutation.isPending}
-                className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white py-2.5 px-4 rounded-xl text-sm font-medium transition-all duration-300 disabled:opacity-50 shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
+                className="w-full bg-[#00E5CC] text-[#0055FF] rounded-full py-4 md:py-5 mt-8 md:mt-10 hover:bg-[#00FFE5] transition-colors text-center font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="button-login"
               >
-                {loginMutation.isPending ? (
-                  <div className="flex items-center justify-center space-x-2">
-                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Signing in...</span>
-                  </div>
-                ) : (
-                  'Sign In'
-                )}
-              </Button>
+                {loginMutation.isPending ? 'loading...' : isSignup ? 'sign up' : 'login'}
+              </button>
             </form>
-          </Form>
 
-          {/* Dropdown Arrow for More Options - Only for merchant login */}
-          {loginType === 'merchant' && (
-            <div className="mt-4">
+            {/* Social login buttons */}
+            <div className="mt-6 md:mt-8 space-y-3 md:space-y-4">
+              <div className="text-center text-[#00E5CC] mb-3 md:mb-4 text-sm md:text-base">or continue with</div>
+              
               <button
-                onClick={() => setShowMoreOptions(!showMoreOptions)}
-                className="w-full flex items-center justify-center space-x-1 text-white/70 hover:text-white transition-colors duration-200 py-2 active:scale-95"
+                onClick={handleGoogleLogin}
+                className="w-full bg-white text-[#0055FF] rounded-full py-3 md:py-4 hover:bg-gray-100 transition-colors text-center flex items-center justify-center gap-2 font-medium"
+                data-testid="button-google-login"
               >
-                <span className="text-xs">More options</span>
-                <div className={`transition-transform duration-300 ${showMoreOptions ? 'rotate-180' : 'rotate-0'}`}>
-                  <ChevronDown className="w-3 h-3" />
-                </div>
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                Google
               </button>
 
-              {/* Collapsible More Options with Smooth Animation */}
-              <div 
-                className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                  showMoreOptions ? 'max-h-32 opacity-100 mt-3' : 'max-h-0 opacity-0 mt-0'
-                }`}
+              <button
+                onClick={handleAppleLogin}
+                className="w-full bg-black text-white rounded-full py-3 md:py-4 hover:bg-gray-900 transition-colors text-center flex items-center justify-center gap-2 font-medium"
+                data-testid="button-apple-login"
               >
-                <div className="space-y-3 border-t border-white/20 pt-3">
-                  {/* Forgot Password */}
-                  <Link href="/forgot-password">
-                    <Button variant="ghost" className="w-full text-xs text-white/70 hover:text-white hover:bg-white/10 py-2">
-                      Forgot your password?
-                    </Button>
-                  </Link>
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+                </svg>
+                Apple
+              </button>
+            </div>
+          </div>
 
-                  {/* Create Account */}
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowSignup(true)}
-                    className="w-full flex items-center justify-center space-x-2 bg-white/10 border-white/20 text-white hover:bg-white/20 hover:border-white/40 backdrop-blur-sm rounded-xl transition-all duration-300 py-2 text-xs"
-                  >
-                    <UserPlus className="w-3 h-3" />
-                    <span>Create New Account</span>
-                  </Button>
-                </div>
-              </div>
+          {/* Cyan bottom section */}
+          <div 
+            className="bg-[#00E5CC] px-8 md:px-12 py-4 md:py-5 flex items-center justify-center cursor-pointer hover:bg-[#00FFE5] transition-colors -mt-12 md:-mt-14 pt-16 md:pt-20"
+            onClick={() => setShowMore(!showMore)}
+            data-testid="button-show-more"
+          >
+            <span className="text-[#0055FF] text-center font-medium">more</span>
+            <ChevronDown 
+              className="text-[#0055FF] transition-transform duration-300 ml-2" 
+              style={{ transform: showMore ? 'rotate(180deg)' : 'rotate(0deg)' }}
+            />
+          </div>
+
+          {/* Expandable more section */}
+          {showMore && (
+            <div className="bg-[#00E5CC] px-8 md:px-12 pb-6 md:pb-8 space-y-3 md:space-y-4">
+              <button 
+                onClick={() => {
+                  toast({
+                    title: "Password Reset",
+                    description: "Password reset functionality coming soon!",
+                  });
+                }}
+                className="w-full text-left text-[#0055FF] hover:underline font-medium"
+              >
+                Forgot password?
+              </button>
+              <button 
+                onClick={() => {
+                  setIsSignup(!isSignup);
+                  setErrors({});
+                  setSuccessMessage('');
+                }}
+                className="w-full text-left text-[#0055FF] hover:underline font-medium"
+                data-testid="button-toggle-signup"
+              >
+                {isSignup ? 'Already have an account? Login' : 'Create account'}
+              </button>
+              <button 
+                onClick={() => {
+                  toast({
+                    title: "Help & Support",
+                    description: "Contact support@tapt.co.nz for assistance",
+                  });
+                }}
+                className="w-full text-left text-[#0055FF] hover:underline font-medium"
+              >
+                Help & Support
+              </button>
             </div>
           )}
-
-          {/* Footer - Compact */}
-          <div className="mt-4 text-center">
-            <p className="text-xs text-white/50">
-              Need help?{" "}
-              <a href="#" className="text-white/70 hover:text-white font-medium transition-colors">
-                Contact support
-              </a>
-            </p>
-          </div>
-        </div>
         </div>
       </div>
     </div>
