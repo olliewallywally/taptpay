@@ -36,7 +36,12 @@ export default function StockManagement() {
   const { data: stockItems = [], isLoading } = useQuery({
     queryKey: ["/api/merchants", merchantId, "stock-items"],
     queryFn: async () => {
-      const response = await fetch(`/api/merchants/${merchantId}/stock-items`);
+      const token = localStorage.getItem("authToken");
+      const response = await fetch(`/api/merchants/${merchantId}/stock-items`, {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+        },
+      });
       if (!response.ok) throw new Error("Failed to fetch stock items");
       return response.json();
     },
@@ -44,9 +49,13 @@ export default function StockManagement() {
 
   const addItemMutation = useMutation({
     mutationFn: async (item: typeof newItem) => {
+      const token = localStorage.getItem("authToken");
       const response = await fetch(`/api/merchants/${merchantId}/stock-items`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
         body: JSON.stringify(item),
       });
       if (!response.ok) throw new Error("Failed to add stock item");
@@ -65,9 +74,13 @@ export default function StockManagement() {
 
   const updateItemMutation = useMutation({
     mutationFn: async (item: StockItem) => {
+      const token = localStorage.getItem("authToken");
       const response = await fetch(`/api/merchants/${merchantId}/stock-items/${item.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
         body: JSON.stringify({ name: item.name, price: item.price, description: item.description }),
       });
       if (!response.ok) throw new Error("Failed to update stock item");
@@ -86,8 +99,12 @@ export default function StockManagement() {
 
   const deleteItemMutation = useMutation({
     mutationFn: async (itemId: number) => {
+      const token = localStorage.getItem("authToken");
       const response = await fetch(`/api/merchants/${merchantId}/stock-items/${itemId}`, {
         method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+        },
       });
       if (!response.ok) throw new Error("Failed to delete stock item");
       return response.json();
