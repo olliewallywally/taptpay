@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 interface StockItem {
   id: number;
   name: string;
-  price: string;
+  cost: string;
   description?: string;
 }
 
@@ -22,7 +22,7 @@ export default function StockManagement() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<StockItem | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [newItem, setNewItem] = useState({ name: "", price: "", description: "" });
+  const [newItem, setNewItem] = useState({ name: "", cost: "", description: "" });
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -63,7 +63,7 @@ export default function StockManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "stock-items"] });
-      setNewItem({ name: "", price: "", description: "" });
+      setNewItem({ name: "", cost: "", description: "" });
       setIsDialogOpen(false);
       toast({ title: "Product added successfully" });
     },
@@ -81,7 +81,7 @@ export default function StockManagement() {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`,
         },
-        body: JSON.stringify({ name: item.name, price: item.price, description: item.description }),
+        body: JSON.stringify({ name: item.name, cost: item.cost, description: item.description }),
       });
       if (!response.ok) throw new Error("Failed to update stock item");
       return response.json();
@@ -121,7 +121,7 @@ export default function StockManagement() {
   });
 
   const handleAddStock = () => {
-    if (!newItem.name || !newItem.price) {
+    if (!newItem.name || !newItem.cost) {
       toast({ title: "Please fill in all required fields", variant: "destructive" });
       return;
     }
@@ -129,7 +129,7 @@ export default function StockManagement() {
   };
 
   const handleUpdateStock = () => {
-    if (!editingItem || !editingItem.name || !editingItem.price) {
+    if (!editingItem || !editingItem.name || !editingItem.cost) {
       toast({ title: "Please fill in all required fields", variant: "destructive" });
       return;
     }
@@ -181,7 +181,7 @@ export default function StockManagement() {
                 <div className="text-[#00E5CC]/70 text-xs sm:text-sm mt-1">Total Items</div>
               </div>
               <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-4 text-center">
-                <div className="text-yellow-400 text-2xl sm:text-3xl">${stockItems.reduce((sum: number, item: StockItem) => sum + parseFloat(item.price || '0'), 0).toFixed(2)}</div>
+                <div className="text-yellow-400 text-2xl sm:text-3xl">${stockItems.reduce((sum: number, item: StockItem) => sum + parseFloat(item.cost || '0'), 0).toFixed(2)}</div>
                 <div className="text-[#00E5CC]/70 text-xs sm:text-sm mt-1">Total Value</div>
               </div>
               <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-4 text-center">
@@ -228,7 +228,7 @@ export default function StockManagement() {
                       <div className="text-[#161A41]/50 text-sm mb-2">{item.description}</div>
                     )}
                     <div className="flex items-center gap-4">
-                      <div className="text-[#0055FF] text-lg sm:text-xl font-semibold">${parseFloat(item.price).toFixed(2)}</div>
+                      <div className="text-[#0055FF] text-lg sm:text-xl font-semibold">${parseFloat(item.cost).toFixed(2)}</div>
                     </div>
                   </div>
                   <button className="text-[#0055FF] hover:text-[#0044DD] transition-colors">
@@ -265,14 +265,14 @@ export default function StockManagement() {
             </div>
 
             <div>
-              <Label htmlFor="price" className="text-gray-700">Price ($) *</Label>
+              <Label htmlFor="cost" className="text-gray-700">Price ($) *</Label>
               <Input
-                id="price"
+                id="cost"
                 type="number"
                 min="0"
                 step="0.01"
-                value={newItem.price}
-                onChange={(e) => setNewItem({ ...newItem, price: e.target.value })}
+                value={newItem.cost}
+                onChange={(e) => setNewItem({ ...newItem, cost: e.target.value })}
                 placeholder="0.00"
                 className="border-[#0055FF]/30 focus:border-[#00E5CC] focus:ring-[#00E5CC] mt-1"
                 data-testid="input-price"
@@ -296,7 +296,7 @@ export default function StockManagement() {
                 variant="outline"
                 onClick={() => {
                   setIsDialogOpen(false);
-                  setNewItem({ name: "", price: "", description: "" });
+                  setNewItem({ name: "", cost: "", description: "" });
                 }}
                 className="flex-1 border-[#0055FF]/30 text-[#0055FF] hover:bg-[#0055FF]/10"
                 data-testid="button-cancel-add"
@@ -341,14 +341,14 @@ export default function StockManagement() {
               </div>
 
               <div>
-                <Label htmlFor="editPrice" className="text-gray-700">Price ($) *</Label>
+                <Label htmlFor="editCost" className="text-gray-700">Price ($) *</Label>
                 <Input
-                  id="editPrice"
+                  id="editCost"
                   type="number"
                   min="0"
                   step="0.01"
-                  value={editingItem.price}
-                  onChange={(e) => setEditingItem({ ...editingItem, price: e.target.value })}
+                  value={editingItem.cost}
+                  onChange={(e) => setEditingItem({ ...editingItem, cost: e.target.value })}
                   placeholder="0.00"
                   className="border-[#0055FF]/30 focus:border-[#00E5CC] focus:ring-[#00E5CC] mt-1"
                   data-testid="input-edit-price"
