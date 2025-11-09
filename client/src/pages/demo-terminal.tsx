@@ -3,16 +3,14 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Minus, Users2, Share2, Calculator, Wifi, ChevronDown, Menu, X, LogOut, Tag, Copy, Check, Loader2 } from "lucide-react";
+import { Plus, Minus, Users2, Share2, Calculator, QrCode, Grid3x3, ChevronDown, Menu, X, LogOut, Tag, Copy, Check, Loader2, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { AnimatedBrandBackground } from "@/components/backgrounds/AnimatedBrandBackground";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
 
 interface Merchant {
   id: number;
@@ -89,8 +87,7 @@ export default function DemoTerminal() {
     if (selectedStoneId) {
       form.setValue("taptStoneId", selectedStoneId.toString());
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedStoneId]);
+  }, [selectedStoneId, form]);
   
   // Get current user/merchant
   const { data: user } = useQuery<{ user: { merchantId: number } }>({
@@ -131,8 +128,7 @@ export default function DemoTerminal() {
     if (taptStones.length > 0 && !selectedStoneId) {
       setSelectedStoneId(taptStones[0].id);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [taptStones]);
+  }, [taptStones, selectedStoneId]);
 
   // Fetch stock items
   const { data: stockItems = [] } = useQuery<any[]>({
@@ -150,7 +146,6 @@ export default function DemoTerminal() {
       // Only update if this is a new transaction or status changed
       if (lastProcessed.id !== txId || lastProcessed.status !== txStatus) {
         lastProcessedTxRef.current = { id: txId, status: txStatus };
-        // Use the current activeTransaction from closure
         if (activeTransaction) {
           setCurrentTransaction(activeTransaction);
         }
@@ -160,7 +155,7 @@ export default function DemoTerminal() {
       lastProcessedTxRef.current = {};
       setCurrentTransaction(null);
     }
-  }, [activeTransaction?.id, activeTransaction?.status]);
+  }, [activeTransaction]);
 
   // SSE connection for real-time updates
   useEffect(() => {
@@ -209,7 +204,7 @@ export default function DemoTerminal() {
     return () => {
       eventSource.close();
     };
-  }, [merchantId, selectedStoneId, queryClient]);
+  }, [merchantId, selectedStoneId]);
 
   // Create transaction mutation
   const createTransactionMutation = useMutation({
@@ -250,7 +245,7 @@ export default function DemoTerminal() {
         title: "Payment Created",
         description: data 
           ? `Awaiting payment for ${data.itemName} - $${data.price}`
-          : `Awaiting payment of $${amount}`,
+          : `Payment created`,
       });
     },
     onError: (error: Error) => {
@@ -336,27 +331,6 @@ export default function DemoTerminal() {
     },
   });
 
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/[^0-9.]/g, '');
-    setAmount(value);
-  };
-
-  const handleCreatePayment = () => {
-    if (!amount || parseFloat(amount) <= 0) {
-      toast({
-        title: "Invalid Amount",
-        description: "Please enter a valid amount",
-        variant: "destructive",
-      });
-      return;
-    }
-    createTransactionMutation.mutate(undefined);
-  };
-
-  const handleCancelPayment = () => {
-    cancelTransactionMutation.mutate();
-  };
-
   const handleLogout = () => {
     localStorage.removeItem("authToken");
     localStorage.removeItem("user");
@@ -422,53 +396,42 @@ export default function DemoTerminal() {
   const getStatusDisplay = () => {
     if (!currentTransaction) return { 
       text: "ready", 
-      color: "text-green-400",
-      icon: "wifi",
-      bgColor: "bg-green-500/20"
+      color: "bg-[#00E5CC] text-[#0055FF]",
+      icon: <CheckCircle2 size={28} />
     };
     
     switch (currentTransaction.status) {
       case "pending":
-        return { 
-          text: "awaiting payment", 
-          color: "text-green-400",
-          icon: "spinner",
-          bgColor: "bg-green-500/20"
-        };
       case "processing":
         return { 
-          text: "processing", 
-          color: "text-yellow-400",
-          icon: "spinner",
-          bgColor: "bg-yellow-500/20"
+          text: "processing payment", 
+          color: "bg-[#00E5CC] text-[#0055FF]",
+          icon: <Loader2 size={28} className="animate-spin" />
         };
       case "completed":
         return { 
-          text: "payment successful", 
-          color: "text-green-400",
-          icon: "check",
-          bgColor: "bg-green-500/20"
+          text: "payment accepted", 
+          color: "bg-green-400 text-white",
+          icon: <Check size={28} />
         };
       case "failed":
+      case "declined":
         return { 
-          text: "failed", 
-          color: "text-red-400",
-          icon: "x",
-          bgColor: "bg-red-500/20"
+          text: currentTransaction.status === "failed" ? "payment failed" : "payment declined",
+          color: "bg-red-400 text-white",
+          icon: <X size={28} />
         };
       case "cancelled":
         return { 
-          text: "cancelled", 
-          color: "text-gray-400",
-          icon: "x",
-          bgColor: "bg-gray-500/20"
+          text: "payment cancelled", 
+          color: "bg-gray-400 text-white",
+          icon: <X size={28} />
         };
       default:
         return { 
-          text: currentTransaction.status, 
-          color: "text-green-400",
-          icon: "wifi",
-          bgColor: "bg-green-500/20"
+          text: "ready", 
+          color: "bg-[#00E5CC] text-[#0055FF]",
+          icon: <CheckCircle2 size={28} />
         };
     }
   };
@@ -476,109 +439,38 @@ export default function DemoTerminal() {
   const status = getStatusDisplay();
 
   return (
-    <AnimatedBrandBackground
-      backgroundColor="#1a1a1a"
-      circleColor="#2d2d2d"
-      largeCirclePosition="top-[-120px] right-[-120px]"
-      smallCirclePosition="top-[200px] right-[250px]"
-      extraLargeCirclePosition="bottom-[-120px] right-[-120px]"
-      extraSmallCirclePosition="bottom-[200px] right-[250px]"
-    >
-      {/* Menu icon in top right corner - fixed position */}
-      <div className="fixed top-6 right-6 z-50">
-        <button
-          onClick={() => setMenuOpen(!menuOpen)}
-          className="w-12 h-12 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95 shadow-lg"
-          data-testid="button-menu"
-        >
-          {menuOpen ? <X className="w-6 h-6 text-gray-900" /> : <Menu className="w-6 h-6 text-gray-900" />}
-        </button>
-      </div>
-
-      {/* Slide-over Menu */}
-      <div className={`fixed top-0 right-0 h-full w-80 bg-gray-900 border-l border-white/20 shadow-xl transform transition-transform duration-300 z-40 ${
-        menuOpen ? 'translate-x-0' : 'translate-x-full'
-      }`}>
-        <div className="p-6 pt-20">
-          <nav className="space-y-4">
-            <Link href="/dashboard" onClick={() => setMenuOpen(false)} className="block py-3 px-4 text-white rounded-xl hover:bg-white/10 transition-colors font-medium">
-              Dashboard
-            </Link>
-            <Link href="/merchant" onClick={() => setMenuOpen(false)} className="block py-3 px-4 text-white rounded-xl hover:bg-white/10 transition-colors font-medium">
-              Terminal
-            </Link>
-            <Link href="/crypto-terminal" onClick={() => setMenuOpen(false)} className="block py-3 px-4 text-orange-400 rounded-xl hover:bg-orange-950/30 transition-colors font-medium">
-              Crypto Terminal
-            </Link>
-            <Link href="/transactions" onClick={() => setMenuOpen(false)} className="block py-3 px-4 text-white rounded-xl hover:bg-white/10 transition-colors font-medium">
-              Transactions
-            </Link>
-            <Link href="/stock" onClick={() => setMenuOpen(false)} className="block py-3 px-4 text-white rounded-xl hover:bg-white/10 transition-colors font-medium">
-              Stock
-            </Link>
-            <Link href="/settings" onClick={() => setMenuOpen(false)} className="block py-3 px-4 text-white rounded-xl hover:bg-white/10 transition-colors font-medium">
-              Settings
-            </Link>
-            <div className="pt-4 mt-4 border-t border-white/20">
-              <button 
-                onClick={handleLogout}
-                className="flex items-center w-full text-left py-3 px-4 text-red-400 hover:bg-red-950/30 rounded-xl transition-colors font-medium"
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                Logout
-              </button>
-            </div>
-          </nav>
-        </div>
-      </div>
-
-      {/* Logo in top left corner - fixed position */}
-      <div className="fixed top-4 left-4 sm:top-6 sm:left-6 z-30">
-        <img 
-          src={taptLogoPath} 
-          alt="Tapt Logo" 
-          className="h-6 sm:h-8 w-auto filter brightness-0 invert"
-        />
-      </div>
-
-      {/* Content with slide-over effect */}
-      <div className={`relative transition-transform duration-300 ${menuOpen ? '-translate-x-80' : 'translate-x-0'}`}>
+    <div className="min-h-screen bg-[#0055FF] pb-24 px-6 md:px-10">
+      <div className="max-w-md md:max-w-2xl mx-auto pt-8 md:pt-12">
         
-        <div className="min-h-screen flex items-center justify-center p-3 sm:p-8 pt-24 sm:pt-32">
-        <div className="w-full max-w-[90vw] sm:max-w-[600px] md:w-[672px] mx-auto space-y-4 sm:space-y-8">
-        
-        {/* Connected Amount Display and Action Buttons */}
-        <div className="overflow-x-hidden">
+        {/* Payment Card */}
+        <div className="bg-[#00E5CC] rounded-[48px] md:rounded-[60px] mb-8 md:mb-12 overflow-visible">
           {/* Amount Display */}
-          <div className="relative z-20">
-            <div className="bg-gradient-to-br from-green-400 to-green-500 rounded-[2rem] sm:rounded-[4rem] p-6 sm:p-12 shadow-2xl">
-              <div className="flex flex-col items-center justify-center">
-                <span className="text-4xl sm:text-7xl font-bold text-gray-900">
-                  ${currentTransaction ? (
-                    currentTransaction.isSplit && currentTransaction.splitAmount
-                      ? parseFloat(currentTransaction.splitAmount).toFixed(2)
-                      : parseFloat(currentTransaction.price).toFixed(2)
-                  ) : "0.00"}
-                </span>
-                {currentTransaction?.isSplit && (
-                  <div className="mt-3 sm:mt-4 text-center">
-                    <div className="text-lg sm:text-2xl font-semibold text-gray-900">
-                      Split {(currentTransaction.completedSplits ?? 0) + 1} of {currentTransaction.totalSplits ?? 0}
-                    </div>
-                    <div className="text-sm sm:text-base text-gray-800 mt-1">
-                      Total: ${parseFloat(currentTransaction.price).toFixed(2)} ({currentTransaction.totalSplits ?? 0} people)
-                    </div>
-                  </div>
-                )}
-              </div>
+          <div className="px-12 md:px-16 py-16 md:py-24 flex flex-col items-center justify-center">
+            <div className="text-[#0055FF] text-7xl md:text-8xl font-bold">
+              ${currentTransaction ? (
+                currentTransaction.isSplit && currentTransaction.splitAmount
+                  ? parseFloat(currentTransaction.splitAmount).toFixed(2)
+                  : parseFloat(currentTransaction.price).toFixed(2)
+              ) : "0.00"}
             </div>
+            {currentTransaction?.isSplit && (
+              <div className="mt-4 text-center">
+                <div className="text-xl md:text-2xl font-semibold text-[#0055FF]">
+                  Split {(currentTransaction.completedSplits ?? 0) + 1} of {currentTransaction.totalSplits ?? 0}
+                </div>
+                <div className="text-base md:text-lg text-[#0055FF]/80 mt-1">
+                  Total: ${parseFloat(currentTransaction.price).toFixed(2)}
+                </div>
+              </div>
+            )}
           </div>
-
-          {/* Action Buttons */}
-          <div className="relative z-10 bg-[#151515] rounded-b-2xl sm:rounded-b-3xl pt-16 sm:pt-28 pb-4 sm:pb-6 px-4 sm:px-8 -mt-6 shadow-xl">
-            <div className="flex justify-around items-center gap-2 sm:gap-4">
-              {/* New Payment Button */}
-              <button
+          
+          {/* Action Buttons Section */}
+          <div className={`bg-[#E8E5E0] rounded-t-[48px] md:rounded-t-[60px] px-8 md:px-12 pt-8 md:pt-12 pb-6 md:pb-10 relative transition-all duration-500 ${
+            !activeDropdown ? 'rounded-b-[48px] md:rounded-b-[60px]' : ''
+          }`}>
+            <div className="flex items-center justify-between gap-4 md:gap-6 relative z-20">
+              <button 
                 onClick={() => {
                   if (activeDropdown === 'new-payment') {
                     setActiveDropdown(null);
@@ -590,64 +482,61 @@ export default function DemoTerminal() {
                     setActiveDropdown('new-payment');
                   }
                 }}
-                className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
+                className="w-16 h-16 md:w-20 md:h-20 bg-[#0055FF] rounded-full flex items-center justify-center hover:opacity-90 transition-opacity relative z-30"
                 data-testid="button-new-payment"
               >
-                <Plus className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
+                <Plus className="text-white" size={28} />
               </button>
-
-              {/* Split Bill Button */}
-              <button
+              <button 
                 onClick={() => setActiveDropdown(activeDropdown === 'split-bill' ? null : 'split-bill')}
-                className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
+                className="w-16 h-16 md:w-20 md:h-20 bg-[#0055FF] rounded-full flex items-center justify-center hover:opacity-90 transition-opacity"
                 data-testid="button-split-bill"
               >
-                <Users2 className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
+                <Users2 className="text-white" size={28} />
               </button>
-
-              {/* Share Link Button */}
-              <button
+              <button 
                 onClick={() => setActiveDropdown(activeDropdown === 'share-link' ? null : 'share-link')}
-                className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
+                className="w-16 h-16 md:w-20 md:h-20 bg-[#0055FF] rounded-full flex items-center justify-center hover:opacity-90 transition-opacity"
                 data-testid="button-share-link"
               >
-                <Share2 className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
+                <QrCode className="text-white" size={28} />
               </button>
-
-              {/* Quick Amounts Button */}
-              <button
+              <button 
                 onClick={() => setActiveDropdown(activeDropdown === 'quick-amounts' ? null : 'quick-amounts')}
-                className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
+                className="w-16 h-16 md:w-20 md:h-20 bg-[#0055FF] rounded-full flex items-center justify-center hover:opacity-90 transition-opacity"
                 data-testid="button-quick-amounts"
               >
-                <Calculator className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
+                <Grid3x3 className="text-white" size={28} />
               </button>
             </div>
-          </div>
 
-          {/* Dropdowns */}
-          <div className="relative z-5 w-full overflow-x-hidden">
             {/* New Payment Dropdown */}
-            <div className={`w-full overflow-hidden transition-all duration-300 ${activeDropdown === 'new-payment' ? 'max-h-[800px]' : 'max-h-0'}`}>
-              <div className="w-full bg-[#353535] rounded-t-[29px] rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 space-y-3 sm:space-y-4 -mt-2 max-h-[750px] overflow-y-auto overflow-x-hidden">
-                <h3 className="text-white font-semibold text-lg sm:text-xl mb-3">New Payment</h3>
+            <div 
+              className="transition-all duration-500 ease-in-out overflow-hidden"
+              style={{
+                maxHeight: activeDropdown === 'new-payment' ? '800px' : '0px',
+                opacity: activeDropdown === 'new-payment' ? 1 : 0,
+              }}
+            >
+              <div className="bg-white rounded-[32px] mt-4 px-6 md:px-8 pt-8 pb-6 md:pb-8 shadow-lg relative overflow-y-auto max-h-[700px]">
+                <h3 className="text-[#0055FF] font-semibold text-xl md:text-2xl mb-6">New Payment</h3>
                 
                 {!showPaymentForm ? (
                   <button
                     onClick={() => setShowPaymentForm(true)}
-                    className="w-full bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl py-3 px-4 text-green-400 font-medium transition-all"
+                    className="w-full bg-[#00E5CC] text-[#0055FF] rounded-full py-3 md:py-4 hover:opacity-90 transition-opacity text-center font-medium"
                   >
-                    Create Standard Payment
+                    Create Payment
                   </button>
                 ) : (
                   <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmitPaymentForm)} className="space-y-4">
+                    <form onSubmit={form.handleSubmit(onSubmitPaymentForm)} className="space-y-3 md:space-y-4">
                       {/* Stock Items Search */}
                       <div className="space-y-2">
-                        <label className="text-green-400 font-medium text-sm">Search Stock Items</label>
+                        <label className="text-[#0055FF] font-medium text-sm">Search Stock Items</label>
                         <div className="relative">
                           <Input
-                            placeholder="Type to search stock items..."
+                            placeholder="Type to search..."
                             value={stockSearchInput}
                             onChange={(e) => setStockSearchInput(e.target.value)}
                             onKeyDown={(e) => {
@@ -656,21 +545,21 @@ export default function DemoTerminal() {
                                 addStockItem(filteredStockItems[0]);
                               }
                             }}
-                            className="bg-[#1a1a1a] border-2 border-green-500 text-white rounded-xl h-12 focus:ring-2 focus:ring-green-400"
+                            className="bg-[#0055FF] text-white placeholder:text-white/70 border-0 rounded-full h-12 md:h-14 px-6 md:px-8"
                             data-testid="stock-search-input"
                           />
                           
                           {filteredStockItems.length > 0 && (
-                            <div className="absolute z-50 w-full bg-[#2a2a2a] border-2 border-green-500 rounded-xl mt-2 max-h-48 overflow-y-auto shadow-xl" data-testid="stock-suggestions">
+                            <div className="absolute z-50 w-full bg-white border-2 border-[#0055FF] rounded-2xl mt-2 max-h-48 overflow-y-auto shadow-xl" data-testid="stock-suggestions">
                               {filteredStockItems.map((item: any) => (
                                 <div
                                   key={item.id}
                                   onClick={() => addStockItem(item)}
-                                  className="p-3 cursor-pointer text-white border-b border-gray-700 last:border-b-0 hover:bg-green-500/10 transition-colors"
+                                  className="p-3 cursor-pointer text-[#0055FF] border-b border-gray-200 last:border-b-0 hover:bg-[#00E5CC]/10 transition-colors"
                                   data-testid={`stock-suggestion-${item.id}`}
                                 >
-                                  <div className="font-semibold text-green-400">{item.name}</div>
-                                  <div className="text-gray-400 text-sm">${parseFloat(item.cost).toFixed(2)}</div>
+                                  <div className="font-semibold">{item.name}</div>
+                                  <div className="text-sm opacity-70">${parseFloat(item.cost).toFixed(2)}</div>
                                 </div>
                               ))}
                             </div>
@@ -679,21 +568,21 @@ export default function DemoTerminal() {
 
                         {selectedStockItems.length > 0 && (
                           <div className="space-y-2">
-                            <label className="text-green-400 font-medium text-sm">Selected Items</label>
+                            <label className="text-[#0055FF] font-medium text-sm">Selected Items</label>
                             <div className="flex flex-wrap gap-2" data-testid="selected-stock-items">
                               {selectedStockItems.map((item) => (
                                 <div
                                   key={item.id}
-                                  className="flex items-center gap-2 bg-green-500/20 border-2 border-green-500 rounded-full px-3 py-2 text-sm text-white"
+                                  className="flex items-center gap-2 bg-[#00E5CC]/20 border-2 border-[#00E5CC] rounded-full px-3 py-2 text-sm text-[#0055FF]"
                                   data-testid={`selected-stock-item-${item.id}`}
                                 >
-                                  <Tag size={14} className="text-green-400" />
+                                  <Tag size={14} />
                                   <span className="font-medium">{item.name}</span>
-                                  <span className="text-green-400">${parseFloat(item.cost).toFixed(2)}</span>
+                                  <span>${parseFloat(item.cost).toFixed(2)}</span>
                                   <button
                                     type="button"
                                     onClick={() => removeStockItem(item.id)}
-                                    className="ml-1 text-gray-400 hover:text-white transition-colors"
+                                    className="ml-1 hover:opacity-70 transition-opacity"
                                     data-testid={`remove-stock-item-${item.id}`}
                                   >
                                     <X size={14} />
@@ -710,17 +599,16 @@ export default function DemoTerminal() {
                         name="itemName"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-green-400 font-medium">Item Name</FormLabel>
                             <FormControl>
                               <Input
-                                placeholder="Enter item name"
+                                placeholder="item name"
                                 {...field}
                                 readOnly={selectedStockItems.length > 0}
-                                className="bg-[#1a1a1a] border-2 border-green-500 text-white rounded-xl h-12 focus:ring-2 focus:ring-green-400"
+                                className="bg-[#0055FF] text-white placeholder:text-white/70 border-0 rounded-full h-12 md:h-14 px-6 md:px-8"
                                 data-testid="input-item-name"
                               />
                             </FormControl>
-                            <FormMessage className="text-red-400" />
+                            <FormMessage className="text-red-500" />
                           </FormItem>
                         )}
                       />
@@ -730,16 +618,17 @@ export default function DemoTerminal() {
                         name="price"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-green-400 font-medium">Price ($)</FormLabel>
                             <FormControl>
                               <Input
-                                placeholder="0.00"
+                                placeholder="price"
+                                type="number"
+                                step="0.01"
                                 {...field}
-                                className="bg-[#1a1a1a] border-2 border-green-500 text-white rounded-xl h-12 focus:ring-2 focus:ring-green-400"
+                                className="bg-[#0055FF] text-white placeholder:text-white/70 border-0 rounded-full h-12 md:h-14 px-6 md:px-8"
                                 data-testid="input-price"
                               />
                             </FormControl>
-                            <FormMessage className="text-red-400" />
+                            <FormMessage className="text-red-500" />
                           </FormItem>
                         )}
                       />
@@ -749,35 +638,27 @@ export default function DemoTerminal() {
                         name="taptStoneId"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-green-400 font-medium">Select Stone</FormLabel>
                             <Select onValueChange={field.onChange} value={field.value}>
                               <FormControl>
-                                <SelectTrigger className="bg-[#1a1a1a] border-2 border-green-500 text-white rounded-xl h-12 focus:ring-2 focus:ring-green-400" data-testid="select-stone">
-                                  <SelectValue placeholder="Select a stone" />
+                                <SelectTrigger className="bg-[#0055FF] text-white border-0 rounded-full h-12 md:h-14 px-6 md:px-8" data-testid="select-stone">
+                                  <SelectValue placeholder="select stone" />
                                 </SelectTrigger>
                               </FormControl>
-                              <SelectContent className="bg-[#2a2a2a] border-green-500">
+                              <SelectContent className="bg-white border-[#0055FF]">
                                 {taptStones.map((stone) => (
-                                  <SelectItem key={stone.id} value={stone.id.toString()} className="text-white hover:bg-green-500/20" data-testid={`stone-option-${stone.id}`}>
+                                  <SelectItem key={stone.id} value={stone.id.toString()} className="text-[#0055FF] hover:bg-[#00E5CC]/20" data-testid={`stone-option-${stone.id}`}>
                                     {stone.name}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
-                            <FormMessage className="text-red-400" />
+                            <FormMessage className="text-red-500" />
                           </FormItem>
                         )}
                       />
 
-                      <div className="flex gap-3 pt-2">
-                        <Button
-                          type="submit"
-                          disabled={createTransactionMutation.isPending}
-                          className="flex-1 bg-green-500 hover:bg-green-600 text-gray-900 font-semibold rounded-xl h-12"
-                        >
-                          {createTransactionMutation.isPending ? "Creating..." : "Create Payment"}
-                        </Button>
-                        <Button
+                      <div className="flex gap-3 md:gap-4 pt-2 md:pt-4">
+                        <button
                           type="button"
                           onClick={() => {
                             setShowPaymentForm(false);
@@ -785,11 +666,17 @@ export default function DemoTerminal() {
                             setSelectedStockItems([]);
                             setStockSearchInput("");
                           }}
-                          variant="outline"
-                          className="flex-1 border-2 border-green-500 text-green-400 hover:bg-green-500/10 rounded-xl h-12"
+                          className="flex-1 bg-[#E8E5E0] text-[#0055FF] rounded-full py-3 md:py-4 hover:opacity-90 transition-opacity text-center text-sm"
                         >
-                          Cancel
-                        </Button>
+                          cancel payment
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={createTransactionMutation.isPending}
+                          className="flex-1 bg-[#00E5CC] text-[#0055FF] rounded-full py-3 md:py-4 hover:opacity-90 transition-opacity text-center text-sm"
+                        >
+                          {createTransactionMutation.isPending ? "creating..." : "create"}
+                        </button>
                       </div>
                     </form>
                   </Form>
@@ -798,25 +685,31 @@ export default function DemoTerminal() {
             </div>
 
             {/* Split Bill Dropdown */}
-            <div className={`w-full overflow-hidden transition-all duration-300 ${activeDropdown === 'split-bill' ? 'max-h-96' : 'max-h-0'}`}>
-              <div className="w-full bg-[#353535] rounded-t-[29px] rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 space-y-4 -mt-2 overflow-x-hidden">
-                <h3 className="text-white font-semibold text-lg sm:text-xl mb-3">Split Bill</h3>
+            <div 
+              className="transition-all duration-500 ease-in-out overflow-hidden"
+              style={{
+                maxHeight: activeDropdown === 'split-bill' ? '500px' : '0px',
+                opacity: activeDropdown === 'split-bill' ? 1 : 0,
+              }}
+            >
+              <div className="bg-white rounded-[32px] mt-4 px-6 md:px-8 pt-8 pb-6 md:pb-8 shadow-lg relative">
+                <h3 className="text-[#0055FF] font-semibold text-xl md:text-2xl mb-6">Split Bill</h3>
                 
                 {currentTransaction ? (
                   <>
-                    <div className="flex items-center justify-center gap-4 sm:gap-6">
+                    <div className="flex items-center justify-center gap-6 md:gap-8 mb-6">
                       <button
                         onClick={() => setSplitCount(Math.max(2, splitCount - 1))}
                         disabled={splitCount <= 2}
-                        className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-green-500 hover:bg-green-600 disabled:bg-gray-600 disabled:cursor-not-allowed flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
+                        className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-[#0055FF] hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-opacity"
                       >
-                        <Minus className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
+                        <Minus className="text-white" size={24} />
                       </button>
                       
                       <div className="text-center">
-                        <div className="text-4xl sm:text-5xl font-bold text-green-400">{splitCount}</div>
-                        <div className="text-sm sm:text-base text-gray-300 mt-1">people</div>
-                        <div className="text-lg sm:text-xl font-semibold text-white mt-2">
+                        <div className="text-5xl md:text-6xl font-bold text-[#0055FF]">{splitCount}</div>
+                        <div className="text-sm md:text-base text-[#0055FF]/70 mt-1">people</div>
+                        <div className="text-lg md:text-xl font-semibold text-[#0055FF] mt-2">
                           ${(parseFloat(currentTransaction.price) / splitCount).toFixed(2)} each
                         </div>
                       </div>
@@ -824,57 +717,54 @@ export default function DemoTerminal() {
                       <button
                         onClick={() => setSplitCount(Math.min(10, splitCount + 1))}
                         disabled={splitCount >= 10}
-                        className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-green-500 hover:bg-green-600 disabled:bg-gray-600 disabled:cursor-not-allowed flex items-center justify-center transition-all transform hover:scale-105 active:scale-95"
+                        className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-[#0055FF] hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-opacity"
                       >
-                        <Plus className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
+                        <Plus className="text-white" size={24} />
                       </button>
                     </div>
                     
-                    <div className="flex gap-3 pt-4">
-                      <Button
-                        onClick={() => createSplitBillMutation.mutate()}
-                        disabled={createSplitBillMutation.isPending}
-                        className="flex-1 bg-green-500 hover:bg-green-600 text-gray-900 font-semibold rounded-xl h-12"
-                        data-testid="button-confirm-split"
-                      >
-                        {createSplitBillMutation.isPending ? "Splitting..." : "Confirm Split"}
-                      </Button>
-                      <Button
+                    <div className="flex gap-3 md:gap-4">
+                      <button
                         onClick={() => {
                           setActiveDropdown(null);
                           setSplitCount(2);
                         }}
-                        variant="outline"
-                        className="flex-1 border-2 border-green-500 text-green-400 hover:bg-green-500/10 rounded-xl h-12"
+                        className="flex-1 bg-[#E8E5E0] text-[#0055FF] rounded-full py-3 md:py-4 hover:opacity-90 transition-opacity text-center text-sm"
                         data-testid="button-cancel-split"
                       >
-                        Cancel
-                      </Button>
+                        cancel
+                      </button>
+                      <button
+                        onClick={() => createSplitBillMutation.mutate()}
+                        disabled={createSplitBillMutation.isPending}
+                        className="flex-1 bg-[#00E5CC] text-[#0055FF] rounded-full py-3 md:py-4 hover:opacity-90 transition-opacity text-center text-sm"
+                        data-testid="button-confirm-split"
+                      >
+                        {createSplitBillMutation.isPending ? "splitting..." : "confirm split"}
+                      </button>
                     </div>
                   </>
                 ) : (
-                  <div className="text-center text-gray-300 py-4">
+                  <div className="text-center text-[#0055FF]/60 py-4">
                     Create a payment first to split the bill
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Share Link Dropdown */}
-            <div className={`w-full overflow-hidden transition-all duration-300 ${activeDropdown === 'share-link' ? 'max-h-[600px]' : 'max-h-0'}`}>
-              <div className="w-full bg-[#353535] rounded-t-[29px] rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 space-y-3 sm:space-y-4 -mt-2 overflow-x-hidden">
-                <h3 className="text-white font-semibold text-lg sm:text-xl mb-3">Share Payment Link</h3>
-                <p className="text-sm text-gray-400 mb-3">Send payment link to customer via email or SMS</p>
+            {/* Share Link / QR Code Dropdown */}
+            <div 
+              className="transition-all duration-500 ease-in-out overflow-hidden"
+              style={{
+                maxHeight: activeDropdown === 'share-link' ? '600px' : '0px',
+                opacity: activeDropdown === 'share-link' ? 1 : 0,
+              }}
+            >
+              <div className="bg-white rounded-[32px] mt-4 px-6 md:px-8 pt-8 pb-6 md:pb-8 shadow-lg relative">
+                <h3 className="text-[#0055FF] font-semibold text-xl md:text-2xl mb-6">Share Payment</h3>
+                
                 {currentTransaction?.paymentUrl ? (
-                  <div className="space-y-3">
-                    {/* Payment URL Display */}
-                    <div className="bg-[#1a1a1a] rounded-xl p-3">
-                      <p className="text-xs text-gray-400 mb-2">Payment Link:</p>
-                      <div className="bg-[#0f0f0f] rounded-lg p-2 text-xs text-white break-all">
-                        {currentTransaction.paymentUrl}
-                      </div>
-                    </div>
-
+                  <div className="space-y-4">
                     {/* Copy Link Button */}
                     <Button
                       onClick={async () => {
@@ -891,7 +781,7 @@ export default function DemoTerminal() {
                           });
                         }
                       }}
-                      className="w-full bg-green-500 hover:bg-green-600 text-gray-900 font-semibold rounded-xl h-12 flex items-center justify-center gap-2"
+                      className="w-full bg-[#00E5CC] hover:opacity-90 text-[#0055FF] rounded-full h-12 md:h-14 flex items-center justify-center gap-2 font-medium"
                     >
                       {copiedPaymentLink ? (
                         <>
@@ -907,16 +797,16 @@ export default function DemoTerminal() {
                     </Button>
 
                     {/* Share Options */}
-                    <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                    <div className="grid grid-cols-3 gap-3 md:gap-4">
                       <button
                         onClick={() => {
                           const emailSubject = encodeURIComponent('Payment Request');
                           const emailBody = encodeURIComponent(`Please complete your payment: ${currentTransaction.paymentUrl}`);
                           window.open(`mailto:?subject=${emailSubject}&body=${emailBody}`, '_blank');
                         }}
-                        className="bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl py-3 px-2 text-green-400 font-medium transition-all text-xs sm:text-sm flex flex-col items-center gap-1"
+                        className="bg-[#0055FF] hover:opacity-90 rounded-2xl md:rounded-3xl py-4 md:py-6 text-white font-medium transition-opacity text-xs md:text-sm flex flex-col items-center gap-1 md:gap-2"
                       >
-                        <span className="text-xl">📧</span>
+                        <span className="text-2xl md:text-3xl">📧</span>
                         <span>Email</span>
                       </button>
                       <button
@@ -924,9 +814,9 @@ export default function DemoTerminal() {
                           const smsBody = encodeURIComponent(`Payment link: ${currentTransaction.paymentUrl}`);
                           window.open(`sms:?body=${smsBody}`, '_blank');
                         }}
-                        className="bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl py-3 px-2 text-green-400 font-medium transition-all text-xs sm:text-sm flex flex-col items-center gap-1"
+                        className="bg-[#0055FF] hover:opacity-90 rounded-2xl md:rounded-3xl py-4 md:py-6 text-white font-medium transition-opacity text-xs md:text-sm flex flex-col items-center gap-1 md:gap-2"
                       >
-                        <span className="text-xl">💬</span>
+                        <span className="text-2xl md:text-3xl">💬</span>
                         <span>SMS</span>
                       </button>
                       <button
@@ -941,15 +831,15 @@ export default function DemoTerminal() {
                             });
                           }
                         }}
-                        className="bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl py-3 px-2 text-green-400 font-medium transition-all text-xs sm:text-sm flex flex-col items-center gap-1"
+                        className="bg-[#0055FF] hover:opacity-90 rounded-2xl md:rounded-3xl py-4 md:py-6 text-white font-medium transition-opacity text-xs md:text-sm flex flex-col items-center gap-1 md:gap-2"
                       >
-                        <span className="text-xl">📱</span>
+                        <span className="text-2xl md:text-3xl">📱</span>
                         <span>QR Code</span>
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center text-gray-300 py-4">
+                  <div className="text-center text-[#0055FF]/60 py-4">
                     Create a payment first to share the link
                   </div>
                 )}
@@ -957,19 +847,27 @@ export default function DemoTerminal() {
             </div>
 
             {/* Quick Amounts Dropdown */}
-            <div className={`w-full overflow-hidden transition-all duration-300 ${activeDropdown === 'quick-amounts' ? 'max-h-96' : 'max-h-0'}`}>
-              <div className="w-full bg-[#353535] rounded-t-[29px] rounded-b-2xl sm:rounded-b-3xl p-4 sm:p-8 -mt-2 overflow-x-hidden">
-                <h3 className="text-white font-semibold text-lg sm:text-xl mb-3">Quick Amounts</h3>
-                <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            <div 
+              className="transition-all duration-500 ease-in-out overflow-hidden"
+              style={{
+                maxHeight: activeDropdown === 'quick-amounts' ? '500px' : '0px',
+                opacity: activeDropdown === 'quick-amounts' ? 1 : 0,
+              }}
+            >
+              <div className="bg-white rounded-[32px] mt-4 px-6 md:px-8 pt-8 pb-6 md:pb-8 shadow-lg relative">
+                <h3 className="text-[#0055FF] font-semibold text-xl md:text-2xl mb-6">Quick Amounts</h3>
+                <div className="grid grid-cols-3 gap-2 md:gap-3">
                   {['5.00', '10.00', '15.00', '20.00', '25.00', '50.00', '75.00', '100.00', '150.00'].map((quickAmount) => (
                     <button
                       key={quickAmount}
                       onClick={() => {
                         setAmount(quickAmount);
+                        form.setValue("price", quickAmount);
+                        form.setValue("itemName", `$${quickAmount} Payment`);
                         toast({ title: "Amount Set", description: `$${quickAmount}` });
                         setActiveDropdown(null);
                       }}
-                      className="bg-green-500/20 hover:bg-green-500/30 border-2 border-green-500 rounded-xl py-3 px-2 text-green-400 font-medium transition-all text-sm sm:text-base"
+                      className="bg-[#0055FF] hover:opacity-90 rounded-2xl py-3 md:py-4 text-white font-medium transition-opacity text-sm md:text-base"
                     >
                       ${quickAmount}
                     </button>
@@ -980,111 +878,85 @@ export default function DemoTerminal() {
           </div>
         </div>
 
-        {/* Status Display */}
-        <div className="bg-[#0f0f0f] rounded-2xl sm:rounded-3xl p-6 sm:p-12 shadow-xl">
-          <div className="flex flex-col items-center space-y-3 sm:space-y-6">
-            <span className={`text-lg sm:text-3xl font-semibold ${status.color} transition-colors duration-300`}>
-              {status.text}
-            </span>
-            <div className={`w-14 h-14 sm:w-20 sm:h-20 rounded-full ${status.bgColor} flex items-center justify-center transition-all duration-300`}>
-              {status.icon === "wifi" && (
-                <Wifi className="w-7 h-7 sm:w-10 sm:h-10 text-green-400 animate-pulse" />
-              )}
-              {status.icon === "spinner" && (
-                <Loader2 className={`w-7 h-7 sm:w-10 sm:h-10 ${status.color} animate-spin`} />
-              )}
-              {status.icon === "check" && (
-                <Check className="w-7 h-7 sm:w-10 sm:h-10 text-green-400 animate-in zoom-in-50 duration-500" />
-              )}
-              {status.icon === "x" && (
-                <X className="w-7 h-7 sm:w-10 sm:h-10 text-red-400 animate-in zoom-in-50 duration-500" />
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Payment Stones Section */}
-        <div className="w-full">
-          <button
-            onClick={() => setShowStones(!showStones)}
-            className="w-full bg-[#6b6b6b] border-3 border-green-500 sm:border-0 rounded-full py-4 sm:py-6 px-6 sm:px-8 flex items-center justify-between hover:bg-green-500/10 transition-all shadow-lg"
-            data-testid="button-payment-stones"
-          >
-            <span className="text-white font-semibold text-lg sm:text-2xl flex-1 text-center">
-              payment stones
-            </span>
-            <ChevronDown className={`w-5 h-5 sm:w-7 sm:h-7 text-green-500 transition-transform duration-300 ${showStones ? 'rotate-180' : ''}`} />
-          </button>
-
-          {/* Stones Dropdown */}
-          <div className={`overflow-hidden transition-all duration-300 ${showStones ? 'max-h-96 mt-4 sm:mt-6' : 'max-h-0'}`}>
-            <div className="bg-[#2a2a2a] rounded-2xl sm:rounded-3xl p-4 sm:p-8 space-y-3 sm:space-y-4 shadow-xl">
-              {taptStones.length > 0 && taptStones.map((stone) => (
-                <div key={stone.id} className="relative">
-                  <button
-                    onClick={() => {
-                      setSelectedStoneId(stone.id);
-                      setShowStones(false);
-                      toast({
-                        title: "Stone Selected",
-                        description: `Now viewing ${stone.name}`,
-                      });
-                    }}
-                    className={`w-full border-2 rounded-xl sm:rounded-2xl py-3 sm:py-5 pl-4 sm:pl-6 pr-12 sm:pr-16 font-medium text-base sm:text-lg transition-all ${
-                      selectedStoneId === stone.id
-                        ? 'bg-green-500 text-gray-900 border-green-500'
-                        : 'bg-green-500/20 hover:bg-green-500/30 border-green-500 text-green-400'
-                    }`}
-                    data-testid={`button-stone-${stone.id}`}
-                  >
-                    {stone.name} - Stone {stone.stoneNumber}
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (window.confirm(`Are you sure you want to delete ${stone.name}?`)) {
-                        deleteStoneMutation.mutate(stone.id);
-                      }
-                    }}
-                    className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-red-500/20 hover:bg-red-500/40 flex items-center justify-center transition-all"
-                    data-testid={`button-delete-stone-${stone.id}`}
-                  >
-                    <X className="w-4 h-4 sm:w-5 sm:h-5 text-red-400" />
-                  </button>
-                </div>
-              ))}
-              
-              {/* Create Stone Button */}
-              <button
-                onClick={() => {
-                  setShowStones(false);
-                  setLocation("/merchant/stones");
-                }}
-                className="w-full bg-green-500/10 hover:bg-green-500/20 border-2 border-dashed border-green-500 rounded-xl sm:rounded-2xl py-3 sm:py-5 px-4 sm:px-6 text-green-400 font-medium text-base sm:text-lg transition-all flex items-center justify-center gap-2"
-                data-testid="button-create-stone"
-              >
-                <Plus className="w-5 h-5" />
-                Create Stone
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Cancel Button */}
-        <button
-          onClick={handleCancelPayment}
-          disabled={!currentTransaction || currentTransaction.status !== 'pending' || cancelTransactionMutation.isPending}
-          className="w-full bg-[#6b6b6b] border-3 border-red-500 sm:border-0 rounded-full py-4 sm:py-6 px-6 sm:px-8 hover:bg-red-500/10 transition-all shadow-lg disabled:opacity-50"
-          data-testid="button-cancel"
-        >
-          <span className="text-red-400 font-semibold text-lg sm:text-2xl">
-            cancel payment
-          </span>
+        {/* Processing Payment Button */}
+        <button className={`w-full rounded-full py-6 mb-4 flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-300 ${status.color}`}>
+          <span className="text-xl">{status.text}</span>
+          {status.icon}
         </button>
 
+        {/* Payment Stones Button */}
+        <button 
+          onClick={() => setShowStones(!showStones)}
+          className="w-full bg-[#00E5CC] text-[#0055FF] rounded-full py-6 mb-4 flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+          data-testid="button-payment-stones"
+        >
+          <span className="text-xl">payment stones</span>
+          <ChevronDown size={28} className={`transition-transform duration-300 ${showStones ? 'rotate-180' : ''}`} />
+        </button>
+
+        {/* Stones Dropdown */}
+        <div className={`overflow-hidden transition-all duration-300 ${showStones ? 'max-h-96 mb-4' : 'max-h-0'}`}>
+          <div className="bg-white rounded-3xl p-6 md:p-8 space-y-3 shadow-xl">
+            {taptStones.length > 0 && taptStones.map((stone) => (
+              <div key={stone.id} className="relative">
+                <button
+                  onClick={() => {
+                    setSelectedStoneId(stone.id);
+                    setShowStones(false);
+                    toast({
+                      title: "Stone Selected",
+                      description: `Now viewing ${stone.name}`,
+                    });
+                  }}
+                  className={`w-full border-2 rounded-2xl py-4 md:py-5 pl-4 md:pl-6 pr-12 md:pr-16 font-medium text-base md:text-lg transition-all ${
+                    selectedStoneId === stone.id
+                      ? 'bg-[#0055FF] text-white border-[#0055FF]'
+                      : 'bg-[#00E5CC]/20 hover:bg-[#00E5CC]/30 border-[#00E5CC] text-[#0055FF]'
+                  }`}
+                  data-testid={`button-stone-${stone.id}`}
+                >
+                  {stone.name} - Stone {stone.stoneNumber}
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (window.confirm(`Are you sure you want to delete ${stone.name}?`)) {
+                      deleteStoneMutation.mutate(stone.id);
+                    }
+                  }}
+                  className="absolute right-2 md:right-4 top-1/2 -translate-y-1/2 w-8 h-8 md:w-10 md:h-10 rounded-full bg-red-500/20 hover:bg-red-500/40 flex items-center justify-center transition-all"
+                  data-testid={`button-delete-stone-${stone.id}`}
+                >
+                  <X className="w-4 h-4 md:w-5 md:h-5 text-red-500" />
+                </button>
+              </div>
+            ))}
+            
+            {/* Create Stone Button */}
+            <button
+              onClick={() => {
+                setShowStones(false);
+                setLocation("/merchant/stones");
+              }}
+              className="w-full bg-[#0055FF]/10 hover:bg-[#0055FF]/20 border-2 border-dashed border-[#0055FF] rounded-2xl py-4 md:py-5 px-4 md:px-6 text-[#0055FF] font-medium text-base md:text-lg transition-all flex items-center justify-center gap-2"
+              data-testid="button-create-stone"
+            >
+              <Plus className="w-5 h-5" />
+              Create Stone
+            </button>
+          </div>
+        </div>
+
+        {/* Cancel Payment Button */}
+        <button
+          onClick={() => cancelTransactionMutation.mutate()}
+          disabled={!currentTransaction || currentTransaction.status !== 'pending' || cancelTransactionMutation.isPending}
+          className="w-full bg-[#E8E5E0] text-[#0055FF] rounded-full py-6 flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-50"
+          data-testid="button-cancel"
+        >
+          <span className="text-xl">cancel payment</span>
+        </button>
       </div>
     </div>
-    </div>
-    </AnimatedBrandBackground>
   );
 }
