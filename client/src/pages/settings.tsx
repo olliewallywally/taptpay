@@ -207,7 +207,7 @@ export default function Settings() {
         {/* Customer Payment Page Button */}
         <div className="mb-5">
           <Button
-            onClick={() => setLocation('/customer-payment')}
+            onClick={() => setLocation(`/pay/${merchantId}`)}
             className="w-full bg-[#0055FF] hover:bg-[#0044dd] text-[#00E5CC] py-6 rounded-2xl text-lg"
             data-testid="button-customer-page"
           >
