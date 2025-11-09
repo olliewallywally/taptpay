@@ -30,6 +30,7 @@ import VerifyMerchant from "@/pages/verify-merchant";
 import StockManagement from "@/pages/stock-management";
 
 import { PageTransition } from "@/components/page-transition";
+import { BottomNavigation } from "@/components/bottom-navigation";
 
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -222,6 +223,7 @@ function App() {
         <NotificationProvider>
           <Toaster />
           <Router />
+          <BottomNavigation />
         </NotificationProvider>
       </TooltipProvider>
     </QueryClientProvider>

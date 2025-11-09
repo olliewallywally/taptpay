@@ -227,46 +227,6 @@ export default function Settings() {
           </Button>
         </div>
       </div>
-
-      {/* Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-[#2C2C2E] rounded-t-[24px] sm:rounded-t-[32px] md:rounded-t-[40px] px-4 sm:px-8 md:px-12 py-4 sm:py-6 md:py-8 z-50">
-        <div className="max-w-md md:max-w-2xl mx-auto flex items-center justify-between gap-2 md:gap-4">
-          <button 
-            onClick={() => setLocation('/dashboard')}
-            className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 hover:bg-gray-700 rounded-xl sm:rounded-2xl md:rounded-3xl transition-colors"
-            data-testid="nav-dashboard"
-          >
-            <Home className="text-white" size={20} />
-          </button>
-          <button 
-            onClick={() => setLocation('/stock')}
-            className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 hover:bg-gray-700 rounded-xl sm:rounded-2xl md:rounded-3xl transition-colors"
-            data-testid="nav-inventory"
-          >
-            <Package className="text-white" size={20} />
-          </button>
-          <button 
-            onClick={() => setLocation('/demo-terminal')}
-            className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 hover:bg-gray-700 rounded-xl sm:rounded-2xl md:rounded-3xl transition-colors"
-            data-testid="nav-terminal"
-          >
-            <Terminal className="text-white" size={20} />
-          </button>
-          <button 
-            onClick={() => setLocation('/transactions')}
-            className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 hover:bg-gray-700 rounded-xl sm:rounded-2xl md:rounded-3xl transition-colors"
-            data-testid="nav-analytics"
-          >
-            <BarChart3 className="text-white" size={20} />
-          </button>
-          <button 
-            className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 bg-[#0055FF] rounded-xl sm:rounded-2xl md:rounded-3xl"
-            data-testid="nav-settings"
-          >
-            <SlidersHorizontal className="text-white" size={20} />
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
