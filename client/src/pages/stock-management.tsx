@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 interface StockItem {
   id: number;
   name: string;
-  cost: string;
+  cost: string | number;
   description?: string;
 }
 
@@ -142,7 +142,10 @@ export default function StockManagement() {
   };
 
   const handleEditClick = (item: StockItem) => {
-    setEditingItem(item);
+    setEditingItem({
+      ...item,
+      cost: typeof item.cost === 'number' ? item.cost.toString() : item.cost
+    });
     setIsEditDialogOpen(true);
   };
 
@@ -181,7 +184,7 @@ export default function StockManagement() {
                 <div className="text-[#00E5CC]/70 text-xs sm:text-sm mt-1">Total Items</div>
               </div>
               <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-4 text-center">
-                <div className="text-yellow-400 text-2xl sm:text-3xl">${stockItems.reduce((sum: number, item: StockItem) => sum + parseFloat(item.cost || '0'), 0).toFixed(2)}</div>
+                <div className="text-yellow-400 text-2xl sm:text-3xl">${stockItems.reduce((sum: number, item: StockItem) => sum + parseFloat(String(item.cost || '0')), 0).toFixed(2)}</div>
                 <div className="text-[#00E5CC]/70 text-xs sm:text-sm mt-1">Total Value</div>
               </div>
               <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-4 text-center">
@@ -228,7 +231,7 @@ export default function StockManagement() {
                       <div className="text-[#161A41]/50 text-sm mb-2">{item.description}</div>
                     )}
                     <div className="flex items-center gap-4">
-                      <div className="text-[#0055FF] text-lg sm:text-xl font-semibold">${parseFloat(item.cost).toFixed(2)}</div>
+                      <div className="text-[#0055FF] text-lg sm:text-xl font-semibold">${parseFloat(String(item.cost)).toFixed(2)}</div>
                     </div>
                   </div>
                   <button className="text-[#0055FF] hover:text-[#0044DD] transition-colors">
