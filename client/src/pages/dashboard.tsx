@@ -338,7 +338,7 @@ export default function Dashboard() {
             <Home className="text-white" size={20} />
           </button>
           <button 
-            onClick={() => setLocation('/stock-items')}
+            onClick={() => setLocation('/stock')}
             className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 hover:bg-gray-700 rounded-xl sm:rounded-2xl md:rounded-3xl transition-colors"
             data-testid="nav-inventory"
           >
