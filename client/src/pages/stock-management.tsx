@@ -76,7 +76,7 @@ export default function StockManagement() {
     mutationFn: async (item: StockItem) => {
       const token = localStorage.getItem("authToken");
       const response = await fetch(`/api/merchants/${merchantId}/stock-items/${item.id}`, {
-        method: "PATCH",
+        method: "PUT",
         headers: { 
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`,
