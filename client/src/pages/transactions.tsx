@@ -1,946 +1,442 @@
-import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { getCurrentMerchantId } from "@/lib/auth";
-import { apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
 import { 
-  Download, 
-  CreditCard, 
-  CheckCircle, 
-  AlertCircle, 
-  Clock,
-  ArrowUpRight,
-  ArrowDownRight,
-  RotateCcw,
-  DollarSign,
-  Eye,
-  EyeOff,
-  RotateCw,
-  Calendar,
-  Hash,
-  Smartphone,
-  QrCode,
-  CreditCard as Card
+  Home, Package, BarChart3, SlidersHorizontal, Terminal, 
+  Download, Calendar, TrendingUp, DollarSign, CreditCard, ArrowUpDown 
 } from "lucide-react";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { format } from "date-fns";
+import { Button } from "@/components/ui/button";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 
-// Header component with title and export functionality
-function TransactionsHeader({ transactions, exportToCSV, isMobile }: {
-  transactions: any[],
-  exportToCSV: () => void,
-  isMobile: boolean
-}) {
-  return (
-    <div className={`flex ${isMobile ? 'flex-col' : 'flex-row'} justify-between items-start ${isMobile ? '' : 'sm:items-center'} ${isMobile ? 'mb-4' : 'mb-6'} ${isMobile ? 'gap-3' : 'gap-4'}`}>
-      <h1 className={`${isMobile ? 'text-xl' : 'text-3xl'} font-bold text-white`}>Transactions</h1>
-      {transactions && transactions.length > 0 && (
-        <button
-          onClick={exportToCSV}
-          data-testid="button-export"
-          className={`flex items-center gap-2 ${isMobile ? 'px-4 py-3 text-sm' : 'px-4 py-2'} backdrop-blur-xl bg-black/40 border border-white/20 rounded-xl text-white hover:bg-black/60 transition-colors ${isMobile ? 'w-full justify-center' : ''}`}
-        >
-          <Download className="h-4 w-4" />
-          Export CSV
-        </button>
-      )}
-    </div>
-  );
+interface Transaction {
+  id: number;
+  amount: string;
+  status: string;
+  itemName: string;
+  paymentMethod: string;
+  createdAt: string;
 }
 
-// Search and filtering component
-function TransactionFilters({ searchTerm, setSearchTerm, isMobile }: {
-  searchTerm: string,
-  setSearchTerm: (term: string) => void,
-  isMobile: boolean
-}) {
-  return (
-    <div className={`${isMobile ? 'mb-4' : 'mb-6'}`}>
-      <input
-        type="text"
-        placeholder="Search transactions..."
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        data-testid="input-search"
-        className={`w-full ${isMobile ? 'px-4 py-4 text-base rounded-2xl' : 'px-4 py-3 rounded-xl'} backdrop-blur-xl bg-black/40 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-[#00FF66]/50 transition-colors`}
-      />
-    </div>
-  );
-}
-
-// Loading state component
-function LoadingState({ isMobile }: { isMobile: boolean }) {
-  return (
-    <div className={`flex flex-col items-center justify-center ${isMobile ? 'py-16' : 'py-12'}`}>
-      <div className={`animate-spin rounded-full ${isMobile ? 'h-10 w-10' : 'h-8 w-8'} border-b-2 border-[#00FF66] mb-4`}></div>
-      <p className={`text-white/70 ${isMobile ? 'text-sm' : 'text-base'}`}>Loading transactions...</p>
-    </div>
-  );
-}
-
-// Empty state component
-function EmptyState({ isMobile }: { isMobile: boolean }) {
-  return (
-    <div className={`text-center ${isMobile ? 'py-8' : 'py-12'}`}>
-      <div className={`dashboard-card-glass ${isMobile ? 'rounded-2xl p-8' : 'rounded-3xl p-12'} mx-auto max-w-md`}>
-        <CreditCard className={`mx-auto ${isMobile ? 'h-10 w-10' : 'h-12 w-12'} text-white/40 mb-4`} />
-        <h3 className={`${isMobile ? 'text-lg' : 'text-xl'} font-medium text-white mb-2`}>No transactions yet</h3>
-        <p className={`text-white/70 ${isMobile ? 'text-sm' : ''}`}>
-          Transactions will appear here once you start processing payments
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// Mobile transaction card front view
-function MobileCardFront({ 
-  transaction, 
-  getStatusIcon, 
-  getPaymentIcon, 
-  toggleCardFlip, 
-  handleRefund 
-}: {
-  transaction: any,
-  getStatusIcon: (status: string) => JSX.Element,
-  getPaymentIcon: (method: string) => JSX.Element,
-  toggleCardFlip: (id: number) => void,
-  handleRefund: (transaction: any) => void
-}) {
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {getStatusIcon(transaction.status)}
-          <h3 className="text-xl font-semibold text-white">
-            {transaction.itemName}
-          </h3>
-        </div>
-        <button
-          onClick={() => toggleCardFlip(transaction.id)}
-          data-testid={`button-flip-${transaction.id}`}
-          className="p-2 text-white/50 hover:text-white transition-colors"
-        >
-          <Eye className="h-5 w-5" />
-        </button>
-      </div>
-      
-      <div className="text-white/70 text-base">
-        {transaction.createdAt 
-          ? format(new Date(transaction.createdAt), "MMM dd, yyyy 'at' HH:mm")
-          : "Date not available"
-        }
-      </div>
-      
-      <div className="bg-black/20 p-4 rounded-xl text-center">
-        <div className="text-3xl font-bold text-white mb-3">
-          ${parseFloat(transaction.price).toFixed(2)}
-        </div>
-        <div className={`inline-flex px-4 py-2 rounded-xl text-sm font-medium ${
-          transaction.status === 'completed' 
-            ? 'bg-green-500/20 text-green-300 border border-green-500/30' 
-            : transaction.status === 'failed'
-            ? 'bg-red-500/20 text-red-300 border border-red-500/30'
-            : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
-        }`}>
-          {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
-        </div>
-      </div>
-      
-      <div className="space-y-3">
-        <div className="bg-black/20 p-3 rounded-xl">
-          <span className="text-white/50 text-sm">
-            ID: {transaction.windcaveTransactionId || `TXN-${transaction.id}`}
-          </span>
-        </div>
-        
-        <div className="flex items-center gap-3 bg-black/20 p-3 rounded-xl">
-          {getPaymentIcon(transaction.paymentMethod)}
-          <span className="text-white/50 text-sm">
-            {transaction.paymentMethod === 'nfc_tap' ? 'NFC Tap' :
-             transaction.paymentMethod === 'qr_code' ? 'QR Code' :
-             transaction.paymentMethod === 'card_reader' ? 'Card Reader' :
-             'Card Payment'}
-          </span>
-        </div>
-      </div>
-      
-      {transaction.status === 'completed' && (
-        <button
-          onClick={() => handleRefund(transaction)}
-          data-testid={`button-refund-${transaction.id}`}
-          className="w-full flex items-center justify-center gap-2 px-6 py-4 text-base rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 transition-colors"
-        >
-          <RotateCcw className="h-5 w-5" />
-          Process Refund
-        </button>
-      )}
-    </div>
-  );
-}
-
-// Mobile transaction card back view
-function MobileCardBack({ 
-  transaction, 
-  getStatusIcon, 
-  getPaymentIcon, 
-  toggleCardFlip, 
-  handleRefund 
-}: {
-  transaction: any,
-  getStatusIcon: (status: string) => JSX.Element,
-  getPaymentIcon: (method: string) => JSX.Element,
-  toggleCardFlip: (id: number) => void,
-  handleRefund: (transaction: any) => void
-}) {
-  return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <h3 className="text-xl font-bold text-white">Transaction Details</h3>
-        <button
-          onClick={() => toggleCardFlip(transaction.id)}
-          data-testid={`button-flip-back-${transaction.id}`}
-          className="p-3 text-white/50 hover:text-white transition-colors"
-        >
-          <EyeOff className="h-5 w-5" />
-        </button>
-      </div>
-
-      <div className="space-y-4">
-        <div className="bg-black/20 p-4 rounded-xl">
-          <div className="flex items-center gap-2 text-white/70 text-sm mb-2">
-            <Hash className="h-4 w-4" />
-            Transaction ID
-          </div>
-          <p className="text-white text-sm font-mono break-all">
-            {transaction.windcaveTransactionId || `TXN-${transaction.id}`}
-          </p>
-        </div>
-        
-        <div className="bg-black/20 p-4 rounded-xl">
-          <div className="flex items-center gap-2 text-white/70 text-sm mb-2">
-            <Calendar className="h-4 w-4" />
-            Date & Time
-          </div>
-          <p className="text-white text-sm">
-            {transaction.createdAt 
-              ? format(new Date(transaction.createdAt), "dd/MM/yyyy HH:mm")
-              : "N/A"
-            }
-          </p>
-        </div>
-
-        <div className="bg-black/20 p-4 rounded-xl">
-          <div className="flex items-center gap-2 text-white/70 text-sm mb-2">
-            {getPaymentIcon(transaction.paymentMethod)}
-            Payment Method
-          </div>
-          <div className="flex items-center gap-2 px-3 py-2 backdrop-blur-xl bg-black/40 border border-white/20 rounded-xl">
-            {transaction.paymentMethod === 'nfc_tap' && <Smartphone className="h-4 w-4 text-blue-400" />}
-            {transaction.paymentMethod === 'qr_code' && <QrCode className="h-4 w-4 text-green-400" />}
-            {transaction.paymentMethod === 'card_reader' && <Card className="h-4 w-4 text-yellow-400" />}
-            <span className="text-white text-sm">
-              {transaction.paymentMethod === 'nfc_tap' ? 'NFC Tap Payment' :
-               transaction.paymentMethod === 'qr_code' ? 'QR Code Payment' :
-               transaction.paymentMethod === 'card_reader' ? 'Card Reader Payment' :
-               'Card Payment'}
-            </span>
-          </div>
-        </div>
-
-        <div className="bg-black/20 p-4 rounded-xl">
-          <div className="flex items-center gap-2 text-white/70 text-sm mb-2">
-            <DollarSign className="h-4 w-4" />
-            Amount Details
-          </div>
-          <div className="px-3 py-3 backdrop-blur-xl bg-black/40 border border-white/20 rounded-xl">
-            <div className="flex justify-between items-center">
-              <span className="text-white/70 text-sm">Total Amount:</span>
-              <span className="text-white font-bold text-lg">
-                ${parseFloat(transaction.price).toFixed(2)}
-              </span>
-            </div>
-            {transaction.fee && (
-              <div className="flex justify-between items-center mt-1 text-sm">
-                <span className="text-white/50">Processing Fee:</span>
-                <span className="text-white/70">${transaction.fee.toFixed(2)}</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="bg-black/20 p-4 rounded-xl">
-          <div className="text-white/70 text-sm mb-2">Status</div>
-          <div className={`flex items-center gap-2 px-3 py-3 rounded-xl ${
-            transaction.status === 'completed' 
-              ? 'bg-green-500/20 border border-green-500/30' 
-              : transaction.status === 'failed'
-              ? 'bg-red-500/20 border border-red-500/30'
-              : 'bg-yellow-500/20 border border-yellow-500/30'
-          }`}>
-            {getStatusIcon(transaction.status)}
-            <span className={`font-medium text-sm ${
-              transaction.status === 'completed' ? 'text-green-300' :
-              transaction.status === 'failed' ? 'text-red-300' : 'text-yellow-300'
-            }`}>
-              {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {transaction.status === 'completed' && (
-        <div className="pt-4 border-t border-white/10">
-          <button
-            onClick={() => handleRefund(transaction)}
-            data-testid={`button-refund-back-${transaction.id}`}
-            className="w-full flex items-center justify-center gap-2 px-4 py-4 text-base rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 transition-colors"
-          >
-            <RotateCcw className="h-5 w-5" />
-            Process Refund
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Desktop transaction card front view
-function DesktopCardFront({ 
-  transaction, 
-  getStatusIcon, 
-  getPaymentIcon, 
-  toggleCardFlip, 
-  handleRefund 
-}: {
-  transaction: any,
-  getStatusIcon: (status: string) => JSX.Element,
-  getPaymentIcon: (method: string) => JSX.Element,
-  toggleCardFlip: (id: number) => void,
-  handleRefund: (transaction: any) => void
-}) {
-  return (
-    <div className="absolute inset-0 dashboard-card-glass rounded-3xl p-6 hover:bg-white/10 transition-all duration-200 backface-hidden">
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
-            {getStatusIcon(transaction.status)}
-            <h3 className="text-lg font-medium text-white">
-              {transaction.itemName}
-            </h3>
-            <button
-              onClick={() => toggleCardFlip(transaction.id)}
-              data-testid={`button-flip-desktop-${transaction.id}`}
-              className="ml-auto p-1 text-white/50 hover:text-white transition-colors"
-            >
-              <Eye className="h-4 w-4" />
-            </button>
-          </div>
-          
-          <p className="text-white/70 text-sm mb-3">
-            {transaction.createdAt 
-              ? format(new Date(transaction.createdAt), "MMM dd, yyyy 'at' HH:mm")
-              : "Date not available"
-            }
-          </p>
-          
-          <div className="flex items-center gap-4 text-sm">
-            <span className="text-white/50 text-xs">
-              ID: {transaction.windcaveTransactionId || `TXN-${transaction.id}`}
-            </span>
-            
-            <div className="flex items-center gap-1">
-              {getPaymentIcon(transaction.paymentMethod)}
-              <span className="text-white/50 text-xs">
-                {transaction.paymentMethod === 'nfc_tap' ? 'NFC Tap' :
-                 transaction.paymentMethod === 'qr_code' ? 'QR Code' :
-                 transaction.paymentMethod === 'card_reader' ? 'Card Reader' :
-                 'Card Payment'}
-              </span>
-            </div>
-            
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-              transaction.status === 'completed' 
-                ? 'bg-green-500/20 text-green-300 border border-green-500/30' 
-                : transaction.status === 'failed'
-                ? 'bg-red-500/20 text-red-300 border border-red-500/30'
-                : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
-            }`}>
-              {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
-            </span>
-          </div>
-        </div>
-        
-        <div className="text-right">
-          <div className="text-2xl font-bold text-white">
-            ${parseFloat(transaction.price).toFixed(2)}
-          </div>
-          
-          {transaction.status === 'completed' && (
-            <button
-              onClick={() => handleRefund(transaction)}
-              data-testid={`button-refund-desktop-${transaction.id}`}
-              className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 transition-colors"
-            >
-              <RotateCcw className="h-4 w-4" />
-              Process Refund
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Desktop transaction card back view
-function DesktopCardBack({ 
-  transaction, 
-  getStatusIcon, 
-  getPaymentIcon, 
-  toggleCardFlip, 
-  handleRefund 
-}: {
-  transaction: any,
-  getStatusIcon: (status: string) => JSX.Element,
-  getPaymentIcon: (method: string) => JSX.Element,
-  toggleCardFlip: (id: number) => void,
-  handleRefund: (transaction: any) => void
-}) {
-  return (
-    <div className="absolute inset-0 dashboard-card-glass rounded-3xl p-6 backface-hidden rotate-y-180 overflow-y-auto">
-      <div className="h-full flex flex-col">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-bold text-white">Transaction Details</h3>
-          <button
-            onClick={() => toggleCardFlip(transaction.id)}
-            data-testid={`button-flip-back-desktop-${transaction.id}`}
-            className="p-1 text-white/50 hover:text-white transition-colors"
-          >
-            <EyeOff className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="space-y-4 flex-1">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 text-white/70 text-sm">
-                <Hash className="h-4 w-4" />
-                Transaction ID
-              </div>
-              <p className="text-white text-sm font-mono break-all">
-                {transaction.windcaveTransactionId || `TXN-${transaction.id}`}
-              </p>
-            </div>
-            
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 text-white/70 text-sm">
-                <Calendar className="h-4 w-4" />
-                Date & Time
-              </div>
-              <p className="text-white text-sm">
-                {transaction.createdAt 
-                  ? format(new Date(transaction.createdAt), "dd/MM/yyyy HH:mm")
-                  : "N/A"
-                }
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-white/70 text-sm">
-              {getPaymentIcon(transaction.paymentMethod)}
-              Payment Method
-            </div>
-            <div className="flex items-center gap-2 px-3 py-2 backdrop-blur-xl bg-black/40 border border-white/20 rounded-lg">
-              {transaction.paymentMethod === 'nfc_tap' && <Smartphone className="h-4 w-4 text-blue-400" />}
-              {transaction.paymentMethod === 'qr_code' && <QrCode className="h-4 w-4 text-green-400" />}
-              {transaction.paymentMethod === 'card_reader' && <Card className="h-4 w-4 text-yellow-400" />}
-              <span className="text-white text-sm">
-                {transaction.paymentMethod === 'nfc_tap' ? 'NFC Tap Payment' :
-                 transaction.paymentMethod === 'qr_code' ? 'QR Code Payment' :
-                 transaction.paymentMethod === 'card_reader' ? 'Card Reader Payment' :
-                 'Card Payment'}
-              </span>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-white/70 text-sm">
-              <DollarSign className="h-4 w-4" />
-              Amount Details
-            </div>
-            <div className="px-3 py-2 backdrop-blur-xl bg-black/40 border border-white/20 rounded-lg">
-              <div className="flex justify-between items-center">
-                <span className="text-white/70 text-sm">Total Amount:</span>
-                <span className="text-white font-bold text-lg">
-                  ${parseFloat(transaction.price).toFixed(2)}
-                </span>
-              </div>
-              {transaction.fee && (
-                <div className="flex justify-between items-center mt-1 text-sm">
-                  <span className="text-white/50">Processing Fee:</span>
-                  <span className="text-white/70">${transaction.fee.toFixed(2)}</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="text-white/70 text-sm">Status</div>
-            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
-              transaction.status === 'completed' 
-                ? 'bg-green-500/20 border border-green-500/30' 
-                : transaction.status === 'failed'
-                ? 'bg-red-500/20 border border-red-500/30'
-                : 'bg-yellow-500/20 border border-yellow-500/30'
-            }`}>
-              {getStatusIcon(transaction.status)}
-              <span className={`font-medium text-sm ${
-                transaction.status === 'completed' ? 'text-green-300' :
-                transaction.status === 'failed' ? 'text-red-300' : 'text-yellow-300'
-              }`}>
-                {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {transaction.status === 'completed' && (
-          <div className="mt-4 pt-4 border-t border-white/10">
-            <button
-              onClick={() => handleRefund(transaction)}
-              data-testid={`button-refund-desktop-back-${transaction.id}`}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-lg bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 transition-colors"
-            >
-              <RotateCcw className="h-4 w-4" />
-              Process Refund
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Main transaction card component
-function TransactionCard({ 
-  transaction, 
-  flippedCards, 
-  isMobile, 
-  toggleCardFlip, 
-  handleRefund, 
-  getStatusIcon, 
-  getPaymentIcon 
-}: {
-  transaction: any,
-  flippedCards: Set<number>,
-  isMobile: boolean,
-  toggleCardFlip: (id: number) => void,
-  handleRefund: (transaction: any) => void,
-  getStatusIcon: (status: string) => JSX.Element,
-  getPaymentIcon: (method: string) => JSX.Element
-}) {
-  const isFlipped = flippedCards.has(transaction.id);
-  
-  if (isMobile) {
+const CustomTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
     return (
-      <div key={transaction.id} className="dashboard-card-glass rounded-2xl p-5">
-        {!isFlipped ? (
-          <MobileCardFront
-            transaction={transaction}
-            getStatusIcon={getStatusIcon}
-            getPaymentIcon={getPaymentIcon}
-            toggleCardFlip={toggleCardFlip}
-            handleRefund={handleRefund}
-          />
-        ) : (
-          <MobileCardBack
-            transaction={transaction}
-            getStatusIcon={getStatusIcon}
-            getPaymentIcon={getPaymentIcon}
-            toggleCardFlip={toggleCardFlip}
-            handleRefund={handleRefund}
-          />
-        )}
+      <div className="bg-[#1F1A5F] rounded-lg px-4 py-2 shadow-lg opacity-90">
+        <p className="text-white text-sm font-medium">${payload[0].value}k</p>
       </div>
     );
   }
-  
+  return null;
+};
+
+const CustomDot = (props: any) => {
+  const { cx, cy } = props;
   return (
-    <div 
-      key={transaction.id} 
-      className="relative perspective-1000 min-h-[180px]"
-    >
-      <div className={`relative w-full h-full transform transition-transform duration-700 preserve-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
-        <DesktopCardFront
-          transaction={transaction}
-          getStatusIcon={getStatusIcon}
-          getPaymentIcon={getPaymentIcon}
-          toggleCardFlip={toggleCardFlip}
-          handleRefund={handleRefund}
-        />
-        <DesktopCardBack
-          transaction={transaction}
-          getStatusIcon={getStatusIcon}
-          getPaymentIcon={getPaymentIcon}
-          toggleCardFlip={toggleCardFlip}
-          handleRefund={handleRefund}
-        />
-      </div>
-    </div>
+    <g>
+      <circle cx={cx} cy={cy} r={5} fill="#6976EB" stroke="#fff" strokeWidth={2} />
+    </g>
   );
-}
-
-// Refund modal component
-function RefundModal({ 
-  refundModal, 
-  refundAmount, 
-  refundReason, 
-  isMobile, 
-  setRefundModal, 
-  setRefundAmount, 
-  setRefundReason, 
-  processRefund, 
-  refundMutation 
-}: {
-  refundModal: any,
-  refundAmount: string,
-  refundReason: string,
-  isMobile: boolean,
-  setRefundModal: (modal: any) => void,
-  setRefundAmount: (amount: string) => void,
-  setRefundReason: (reason: string) => void,
-  processRefund: () => void,
-  refundMutation: any
-}) {
-  if (!refundModal) return null;
-  
-  return (
-    <div className="fixed inset-0 bg-black/80 z-60 flex items-center justify-center p-4">
-      <div className={`dashboard-card-glass ${isMobile ? 'rounded-2xl w-full max-w-sm' : 'rounded-3xl w-full max-w-md'} max-h-[90vh] overflow-y-auto`}>
-        <div className={`${isMobile ? 'p-5' : 'p-6'}`}>
-          <div className="flex items-center justify-between mb-6">
-            <h3 className={`${isMobile ? 'text-lg' : 'text-xl'} font-bold text-white`}>Process Refund</h3>
-            <button
-              onClick={() => setRefundModal(null)}
-              data-testid="button-close-refund"
-              className="text-white/70 hover:text-white"
-            >
-              ✕
-            </button>
-          </div>
-
-          <div className="space-y-4 mb-6">
-            <div>
-              <label className="block text-white/90 text-sm font-medium mb-2">
-                Transaction Details
-              </label>
-              <div className="backdrop-blur-xl bg-black/40 border border-white/20 rounded-xl p-4">
-                <p className="text-white font-medium">{refundModal.itemName}</p>
-                <p className="text-white/70 text-sm">
-                  {refundModal.createdAt 
-                    ? format(new Date(refundModal.createdAt), "MMM dd, yyyy 'at' HH:mm")
-                    : "Date not available"
-                  }
-                </p>
-                <p className="text-white/70 text-sm">
-                  ID: {refundModal.windcaveTransactionId || `TXN-${refundModal.id}`}
-                </p>
-                <p className="text-white font-bold text-lg mt-2">
-                  Original Amount: ${parseFloat(refundModal.price).toFixed(2)}
-                </p>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-white/90 text-sm font-medium mb-2">
-                Refund Amount
-              </label>
-              <div className="relative">
-                <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/50" />
-                <input
-                  type="number"
-                  value={refundAmount}
-                  onChange={(e) => setRefundAmount(e.target.value)}
-                  max={refundModal.price}
-                  min="0.01"
-                  step="0.01"
-                  data-testid="input-refund-amount"
-                  className={`w-full pl-10 pr-4 ${isMobile ? 'py-4 text-base' : 'py-3'} backdrop-blur-xl bg-black/40 border border-white/20 ${isMobile ? 'rounded-2xl' : 'rounded-xl'} text-white placeholder-white/50 focus:outline-none focus:border-[#00FF66]/50 transition-colors`}
-                  placeholder="0.00"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-white/90 text-sm font-medium mb-2">
-                Refund Reason
-              </label>
-              <textarea
-                value={refundReason}
-                onChange={(e) => setRefundReason(e.target.value)}
-                rows={isMobile ? 4 : 3}
-                data-testid="input-refund-reason"
-                className={`w-full px-4 ${isMobile ? 'py-4 text-base' : 'py-3'} backdrop-blur-xl bg-black/40 border border-white/20 ${isMobile ? 'rounded-2xl' : 'rounded-xl'} text-white placeholder-white/50 focus:outline-none focus:border-[#00FF66]/50 transition-colors resize-none`}
-                placeholder="Enter reason for refund..."
-              />
-            </div>
-          </div>
-
-          <div className={`flex ${isMobile ? 'flex-col gap-4' : 'flex-row gap-3'}`}>
-            <button
-              onClick={() => setRefundModal(null)}
-              data-testid="button-cancel-refund"
-              className={`${isMobile ? 'w-full py-4' : 'flex-1 py-3'} px-4 backdrop-blur-xl bg-black/40 border border-white/20 ${isMobile ? 'rounded-2xl' : 'rounded-xl'} text-white hover:bg-black/60 transition-colors`}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={processRefund}
-              disabled={refundMutation.isPending}
-              data-testid="button-process-refund"
-              className={`${isMobile ? 'w-full py-4' : 'flex-1 py-3'} px-4 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 ${isMobile ? 'rounded-2xl' : 'rounded-xl'} transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
-            >
-              {refundMutation.isPending ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-300"></div>
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <RotateCcw className="h-4 w-4" />
-                  Process Refund
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+};
 
 export default function Transactions() {
-  const isMobile = useIsMobile();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [refundModal, setRefundModal] = useState<any>(null);
-  const [refundAmount, setRefundAmount] = useState("");
-  const [refundReason, setRefundReason] = useState("");
-  const [flippedCards, setFlippedCards] = useState<Set<number>>(new Set());
-  
-  const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
+  const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedMetric, setSelectedMetric] = useState('revenue');
   const { toast } = useToast();
-
-  // Function to toggle card flip
-  const toggleCardFlip = (transactionId: number) => {
-    setFlippedCards(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(transactionId)) {
-        newSet.delete(transactionId);
-      } else {
-        newSet.add(transactionId);
-      }
-      return newSet;
-    });
-  };
-  
-
   const merchantId = getCurrentMerchantId();
-  
+
   if (!merchantId) {
-    window.location.href = '/login';
-    return <div>Redirecting to login...</div>;
+    setLocation('/login');
+    return null;
   }
 
-  const { data: transactions, isLoading } = useQuery({
+  const { data: transactions = [], isLoading } = useQuery({
     queryKey: ["/api/merchants", merchantId, "transactions"],
     queryFn: async () => {
-      const response = await fetch(`/api/merchants/${merchantId}/transactions`);
+      const token = localStorage.getItem("authToken");
+      const response = await fetch(`/api/merchants/${merchantId}/transactions`, {
+        headers: { "Authorization": `Bearer ${token}` },
+      });
       if (!response.ok) throw new Error("Failed to fetch transactions");
       return response.json();
     },
   });
 
-  const filteredTransactions = transactions?.filter((transaction: any) =>
-    transaction.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    transaction.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (transaction.windcaveTransactionId && transaction.windcaveTransactionId.toLowerCase().includes(searchTerm.toLowerCase()))
-  ) || [];
-
-  // Refund mutation
-  const refundMutation = useMutation({
-    mutationFn: async ({ transactionId, amount, reason }: { transactionId: number, amount: number, reason: string }) => {
-      return apiRequest("POST", `/api/transactions/${transactionId}/refunds`, { 
-        refundAmount: amount.toString(), 
-        refundReason: reason,
-        refundMethod: "original_payment_method"
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "transactions"] });
-      toast({
-        title: "Refund processed",
-        description: "The refund has been processed successfully.",
-      });
-      setRefundModal(null);
-      setRefundAmount("");
-      setRefundReason("");
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Refund failed",
-        description: error.message || "Failed to process refund. Please try again.",
-        variant: "destructive",
-      });
-    },
+  const filteredTransactions = transactions.filter((tx: Transaction) => {
+    if (!dateRange.from && !dateRange.to) return true;
+    const txDate = new Date(tx.createdAt);
+    txDate.setHours(0, 0, 0, 0);
+    if (dateRange.from) {
+      const fromDate = new Date(dateRange.from);
+      fromDate.setHours(0, 0, 0, 0);
+      if (txDate < fromDate) return false;
+    }
+    if (dateRange.to) {
+      const toDate = new Date(dateRange.to);
+      toDate.setHours(23, 59, 59, 999);
+      if (txDate > toDate) return false;
+    }
+    return true;
   });
 
-  const handleRefund = (transaction: any) => {
-    setRefundModal(transaction);
-    setRefundAmount(transaction.price.toString());
-    setRefundReason("");
-  };
+  const totalRevenue = filteredTransactions
+    .filter((tx: Transaction) => tx.status === 'completed')
+    .reduce((sum: number, tx: Transaction) => sum + parseFloat(tx.amount), 0);
 
-  const processRefund = () => {
-    if (!refundModal || !refundAmount || !refundReason) {
-      toast({
-        title: "Missing information",
-        description: "Please enter both refund amount and reason.",
-        variant: "destructive",
-      });
-      return;
-    }
+  const totalTransactions = filteredTransactions.filter((tx: Transaction) => tx.status === 'completed').length;
+  const avgTransaction = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
+  const successRate = transactions.length > 0 
+    ? (transactions.filter((tx: Transaction) => tx.status === 'completed').length / transactions.length) * 100 
+    : 0;
 
-    const amount = parseFloat(refundAmount);
-    if (amount <= 0 || amount > parseFloat(refundModal.price)) {
-      toast({
-        title: "Invalid amount",
-        description: "Refund amount must be between $0.01 and the transaction amount.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    refundMutation.mutate({
-      transactionId: refundModal.id,
-      amount,
-      reason: refundReason
+  // Generate monthly data for chart
+  const monthlyData = Array.from({ length: 12 }, (_, i) => {
+    const month = new Date(2025, i, 1).toLocaleString('default', { month: 'short' });
+    const monthTransactions = transactions.filter((tx: Transaction) => {
+      const txMonth = new Date(tx.createdAt).getMonth();
+      return txMonth === i && tx.status === 'completed';
     });
-  };
+    const value = monthTransactions.reduce((sum: number, tx: Transaction) => 
+      sum + parseFloat(tx.amount), 0
+    ) / 1000; // Convert to thousands
+    return { month, value: Math.round(value) };
+  });
 
-  const exportToCSV = () => {
-    if (!transactions || transactions.length === 0) {
-      toast({
-        title: "No data to export",
-        description: "There are no transactions to export.",
-        variant: "destructive",
-      });
-      return;
-    }
+  const handleDownloadCSV = () => {
+    const headers = ['ID', 'Date', 'Time', 'Item', 'Amount', 'Method', 'Status'];
+    const rows = filteredTransactions.map((tx: Transaction) => {
+      const date = new Date(tx.createdAt);
+      return [
+        tx.id,
+        date.toLocaleDateString(),
+        date.toLocaleTimeString(),
+        tx.itemName,
+        parseFloat(tx.amount).toFixed(2),
+        tx.paymentMethod,
+        tx.status,
+      ];
+    });
 
-    const headers = ["Date", "Time", "Transaction ID", "Item", "Amount", "Status", "Payment Method"];
     const csvContent = [
-      headers.join(","),
-      ...transactions.map((t: any) => {
-        const date = t.createdAt ? new Date(t.createdAt) : new Date();
-        return [
-          format(date, "yyyy-MM-dd"),
-          format(date, "HH:mm:ss"),
-          t.windcaveTransactionId || `TXN-${t.id}`,
-          `"${t.itemName}"`,
-          t.price,
-          t.status,
-          t.paymentMethod === 'nfc_tap' ? 'NFC Tap' :
-          t.paymentMethod === 'qr_code' ? 'QR Code' :
-          t.paymentMethod === 'card_reader' ? 'Card Reader' : 'Card Payment'
-        ].join(",");
-      })
-    ].join("\n");
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(',')),
+    ].join('\n');
 
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
     a.href = url;
-    a.download = `transactions-${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.download = `transactions-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
-    URL.revokeObjectURL(url);
-    
-    toast({
-      title: "Export successful",
-      description: "Transaction data has been downloaded as CSV.",
-    });
+    toast({ title: "CSV file downloaded successfully" });
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return <CheckCircle className="h-5 w-5 text-green-400" />;
-      case 'failed':
-        return <AlertCircle className="h-5 w-5 text-red-400" />;
-      default:
-        return <Clock className="h-5 w-5 text-yellow-400" />;
+  const handleDownloadPDF = async () => {
+    try {
+      const token = localStorage.getItem("authToken");
+      const response = await fetch(`/api/merchants/${merchantId}/export/pdf`, {
+        headers: { "Authorization": `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `business-report-${new Date().toISOString().split('T')[0]}.pdf`;
+        a.click();
+        toast({ title: "Business report downloaded successfully" });
+      } else {
+        toast({ title: "Failed to download report", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Failed to download report", variant: "destructive" });
     }
   };
 
-  const getPaymentIcon = (paymentMethod: string) => {
-    switch (paymentMethod) {
-      case 'nfc_tap':
-        return <ArrowUpRight className="h-4 w-4 text-blue-400" />;
-      case 'qr_code':
-        return <CreditCard className="h-4 w-4 text-purple-400" />;
-      default:
-        return <ArrowDownRight className="h-4 w-4 text-gray-400" />;
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed': return 'text-[#00E5CC]';
+      case 'pending': return 'text-yellow-500';
+      case 'failed': return 'text-red-500';
+      default: return 'text-gray-500';
+    }
+  };
+
+  const getStatusBg = (status: string) => {
+    switch (status) {
+      case 'completed': return 'bg-[#00E5CC]/10';
+      case 'pending': return 'bg-yellow-500/10';
+      case 'failed': return 'bg-red-500/10';
+      default: return 'bg-gray-500/10';
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-black to-gray-900">
-      <div className={`container mx-auto ${isMobile ? 'px-3' : 'px-4'} ${isMobile ? 'pt-6' : 'pt-8'} ${isMobile ? 'pb-4' : 'pb-8'}`}>
-        <TransactionsHeader 
-          transactions={transactions} 
-          exportToCSV={exportToCSV} 
-          isMobile={isMobile} 
-        />
+    <div className="min-h-screen bg-gray-200 pb-24">
+      {/* Header Section */}
+      <div className="relative">
+        <div className="absolute left-0 right-0 h-[80px] sm:h-[106px] bg-[#00E5CC] rounded-b-[60px] sm:rounded-b-[100px] z-0" style={{ bottom: '-20px' }}></div>
         
-        <TransactionFilters 
-          searchTerm={searchTerm} 
-          setSearchTerm={setSearchTerm} 
-          isMobile={isMobile} 
-        />
-
-        {isLoading ? (
-          <LoadingState isMobile={isMobile} />
-        ) : !transactions || transactions.length === 0 ? (
-          <EmptyState isMobile={isMobile} />
-        ) : (
-          <div className={`${isMobile ? 'space-y-4' : 'space-y-4'}`}>
-            {filteredTransactions.map((transaction: any) => (
-              <TransactionCard
-                key={transaction.id}
-                transaction={transaction}
-                flippedCards={flippedCards}
-                isMobile={isMobile}
-                toggleCardFlip={toggleCardFlip}
-                handleRefund={handleRefund}
-                getStatusIcon={getStatusIcon}
-                getPaymentIcon={getPaymentIcon}
-              />
-            ))}
+        <div className="bg-[#0055FF] pt-6 sm:pt-8 pb-10 sm:pb-12 rounded-b-[60px] sm:rounded-b-[100px] relative z-10">
+          <div className="max-w-4xl mx-auto px-3 sm:px-6">
+            <h1 className="text-[#00E5CC] text-center text-xl sm:text-2xl md:text-3xl mb-6 sm:mb-8">analytics & reports</h1>
+            
+            {/* Stats Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 max-w-full">
+              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg sm:rounded-xl p-2 sm:p-2.5 md:p-3 min-w-0">
+                <div className="flex items-center gap-1 sm:gap-1.5 mb-0.5 sm:mb-1">
+                  <DollarSign className="text-[#00E5CC] flex-shrink-0" size={12} />
+                  <div className="text-[#00E5CC]/70 text-[9px] sm:text-[10px] md:text-xs truncate">Revenue</div>
+                </div>
+                <div className="text-white text-xs sm:text-sm md:text-base truncate" data-testid="stat-revenue">${totalRevenue.toFixed(2)}</div>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg sm:rounded-xl p-2 sm:p-2.5 md:p-3 min-w-0">
+                <div className="flex items-center gap-1 sm:gap-1.5 mb-0.5 sm:mb-1">
+                  <CreditCard className="text-[#00E5CC] flex-shrink-0" size={12} />
+                  <div className="text-[#00E5CC]/70 text-[9px] sm:text-[10px] md:text-xs truncate">Transactions</div>
+                </div>
+                <div className="text-white text-xs sm:text-sm md:text-base truncate" data-testid="stat-transactions">{totalTransactions}</div>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg sm:rounded-xl p-2 sm:p-2.5 md:p-3 min-w-0">
+                <div className="flex items-center gap-1 sm:gap-1.5 mb-0.5 sm:mb-1">
+                  <TrendingUp className="text-[#00E5CC] flex-shrink-0" size={12} />
+                  <div className="text-[#00E5CC]/70 text-[9px] sm:text-[10px] md:text-xs truncate">Avg. Sale</div>
+                </div>
+                <div className="text-white text-xs sm:text-sm md:text-base truncate" data-testid="stat-avg">${avgTransaction.toFixed(2)}</div>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg sm:rounded-xl p-2 sm:p-2.5 md:p-3 min-w-0">
+                <div className="flex items-center gap-1 sm:gap-1.5 mb-0.5 sm:mb-1">
+                  <ArrowUpDown className="text-[#00E5CC] flex-shrink-0" size={12} />
+                  <div className="text-[#00E5CC]/70 text-[9px] sm:text-[10px] md:text-xs truncate">Success Rate</div>
+                </div>
+                <div className="text-white text-xs sm:text-sm md:text-base truncate" data-testid="stat-success">{successRate.toFixed(1)}%</div>
+              </div>
+            </div>
           </div>
-        )}
+        </div>
       </div>
 
-      <RefundModal
-        refundModal={refundModal}
-        refundAmount={refundAmount}
-        refundReason={refundReason}
-        isMobile={isMobile}
-        setRefundModal={setRefundModal}
-        setRefundAmount={setRefundAmount}
-        setRefundReason={setRefundReason}
-        processRefund={processRefund}
-        refundMutation={refundMutation}
-      />
+      {/* Main Content */}
+      <div className="max-w-6xl mx-auto px-3 sm:px-6 mt-[40px] sm:mt-[50px] relative z-10 space-y-4 sm:space-y-6">
+        {/* Chart Section */}
+        <div className="bg-white rounded-[15px] p-4 sm:p-8 shadow-[0px_23px_28.6px_rgba(0,0,0,0.03)]">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 mb-6 sm:mb-8">
+            <h2 className="text-[#808080] text-base sm:text-lg">Revenue performance</h2>
+            <Select value={selectedMetric} onValueChange={setSelectedMetric}>
+              <SelectTrigger className="w-full sm:w-[170px] border-b border-black/[0.11] rounded-none">
+                <SelectValue placeholder="Select metric" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="revenue">Revenue</SelectItem>
+                <SelectItem value="sales">Sales</SelectItem>
+                <SelectItem value="profit">Profit</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="w-full h-[300px] sm:h-[350px] md:h-[400px]">
+            {isLoading ? (
+              <div className="h-full flex items-center justify-center text-[#3B3D53]">Loading chart...</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={monthlyData} margin={{ top: 20, right: 20, left: 0, bottom: 20 }}>
+                  <defs>
+                    <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6976EB" stopOpacity={0.1}/>
+                      <stop offset="95%" stopColor="#6976EB" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="0" stroke="rgba(0, 0, 0, 0.06)" vertical={false} />
+                  <XAxis 
+                    dataKey="month" 
+                    stroke="rgba(128, 128, 128, 0.69)"
+                    tick={{ fill: 'rgba(128, 128, 128, 0.69)', fontSize: 12 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis 
+                    stroke="rgba(128, 128, 128, 0.69)"
+                    tick={{ fill: 'rgba(128, 128, 128, 0.69)', fontSize: 12 }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(value) => value.toString()}
+                  />
+                  <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#6976EB', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                  <Area 
+                    type="monotone" 
+                    dataKey="value" 
+                    stroke="#6976EB" 
+                    strokeWidth={3}
+                    fill="url(#colorValue)"
+                    dot={<CustomDot />}
+                    activeDot={{ r: 8, fill: '#6976EB', stroke: '#fff', strokeWidth: 2 }}
+                    animationDuration={800}
+                    animationEasing="ease-in-out"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+
+        {/* Reports Section */}
+        <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-md">
+          <h2 className="text-[#3B3D53] text-base sm:text-lg mb-4">Download Reports</h2>
+          
+          <div className="flex flex-col sm:flex-row gap-4 mb-4">
+            <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="flex-1 justify-start border-[#0055FF]/30 text-left" data-testid="button-date-range">
+                  <Calendar className="mr-2 h-4 w-4 text-[#0055FF] flex-shrink-0" />
+                  <span className="truncate">
+                    {dateRange.from ? (
+                      dateRange.to ? (
+                        `${dateRange.from.toLocaleDateString()} - ${dateRange.to.toLocaleDateString()}`
+                      ) : (
+                        dateRange.from.toLocaleDateString()
+                      )
+                    ) : (
+                      'Select date range'
+                    )}
+                  </span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <CalendarComponent
+                  mode="range"
+                  defaultMonth={dateRange.from}
+                  selected={dateRange.from && dateRange.to ? { from: dateRange.from, to: dateRange.to } : undefined}
+                  onSelect={(range: any) => {
+                    if (range?.from) {
+                      setDateRange({ from: range.from, to: range.to });
+                      if (range.to) {
+                        setShowDatePicker(false);
+                        toast({ title: `Date range: ${range.from.toLocaleDateString()} - ${range.to.toLocaleDateString()}` });
+                      }
+                    } else {
+                      setDateRange({});
+                    }
+                  }}
+                  numberOfMonths={2}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+
+            {dateRange.from && (
+              <Button 
+                variant="outline" 
+                onClick={() => setDateRange({})}
+                className="border-[#0055FF]/30 text-[#0055FF]"
+                data-testid="button-clear-date"
+              >
+                Clear
+              </Button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Button onClick={handleDownloadPDF} className="bg-[#0055FF] hover:bg-[#0044DD] text-white" data-testid="button-pdf">
+              <Download className="mr-2 h-4 w-4" />
+              Business Report (PDF)
+            </Button>
+            <Button onClick={handleDownloadCSV} className="bg-[#00E5CC] hover:bg-[#00D4BC] text-white" data-testid="button-csv">
+              <Download className="mr-2 h-4 w-4" />
+              Raw Data (CSV)
+            </Button>
+          </div>
+        </div>
+
+        {/* Transactions List */}
+        <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-md">
+          <h2 className="text-[#3B3D53] text-base sm:text-lg mb-4">Transaction History</h2>
+          
+          {isLoading ? (
+            <div className="text-center py-12 text-[#3B3D53]">Loading transactions...</div>
+          ) : filteredTransactions.length === 0 ? (
+            <div className="text-center py-12 text-[#3B3D53]">No transactions found</div>
+          ) : (
+            <div className="space-y-2 sm:space-y-3 max-h-96 overflow-y-auto">
+              {filteredTransactions.map((tx: Transaction) => (
+                <div
+                  key={tx.id}
+                  className="border border-gray-200 rounded-xl p-3 sm:p-4 hover:border-[#0055FF]/30 transition-colors"
+                  data-testid={`transaction-${tx.id}`}
+                >
+                  <div className="flex items-start justify-between gap-2 sm:gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <h3 className="text-[#3B3D53] text-sm sm:text-base truncate">{tx.itemName}</h3>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusBg(tx.status)} ${getStatusColor(tx.status)}`}>
+                          {tx.status}
+                        </span>
+                      </div>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs sm:text-sm">
+                        <div className="text-[#161A41]/70">
+                          {new Date(tx.createdAt).toLocaleString()}
+                        </div>
+                        <div className="text-[#161A41]/70 capitalize">
+                          {tx.paymentMethod.replace('_', ' ')}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                      <div className="text-sm sm:text-base text-[#0055FF]">
+                        ${parseFloat(tx.amount).toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Bottom Navigation */}
+      <div className="fixed bottom-0 left-0 right-0 bg-[#2C2C2E] rounded-t-[24px] sm:rounded-t-[32px] md:rounded-t-[40px] px-4 sm:px-8 md:px-12 py-4 sm:py-6 md:py-8 z-50">
+        <div className="max-w-md md:max-w-2xl mx-auto flex items-center justify-between gap-2 md:gap-4">
+          <button 
+            onClick={() => setLocation('/dashboard')}
+            className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 hover:bg-gray-700 rounded-xl sm:rounded-2xl md:rounded-3xl transition-colors"
+            data-testid="nav-dashboard"
+          >
+            <Home className="text-white" size={20} />
+          </button>
+          <button 
+            onClick={() => setLocation('/stock')}
+            className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 hover:bg-gray-700 rounded-xl sm:rounded-2xl md:rounded-3xl transition-colors"
+            data-testid="nav-inventory"
+          >
+            <Package className="text-white" size={20} />
+          </button>
+          <button 
+            onClick={() => setLocation('/demo-terminal')}
+            className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 hover:bg-gray-700 rounded-xl sm:rounded-2xl md:rounded-3xl transition-colors"
+            data-testid="nav-terminal"
+          >
+            <Terminal className="text-white" size={20} />
+          </button>
+          <button 
+            className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 bg-[#0055FF] rounded-xl sm:rounded-2xl md:rounded-3xl"
+            data-testid="nav-analytics"
+          >
+            <BarChart3 className="text-white" size={20} />
+          </button>
+          <button 
+            onClick={() => setLocation('/settings')}
+            className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 hover:bg-gray-700 rounded-xl sm:rounded-2xl md:rounded-3xl transition-colors"
+            data-testid="nav-settings"
+          >
+            <SlidersHorizontal className="text-white" size={20} />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
