@@ -15,8 +15,6 @@ import Dashboard from "@/pages/dashboard";
 import Settings from "@/pages/settings";
 import Transactions from "@/pages/transactions";
 import NFCPayment from "@/pages/nfc-payment";
-import CryptoTerminal from "@/pages/crypto-terminal";
-import CryptoPayment from "@/pages/crypto-payment";
 
 import Login from "@/pages/login";
 import MerchantSignup from "@/pages/merchant-signup";
@@ -31,7 +29,6 @@ import CreateMerchant from "@/pages/create-merchant";
 import VerifyMerchant from "@/pages/verify-merchant";
 import StockManagement from "@/pages/stock-management";
 
-import { Layout } from "@/components/layout";
 import { PageTransition } from "@/components/page-transition";
 
 
@@ -151,42 +148,27 @@ function Router() {
         </Route>
         <Route path="/dashboard">
           <ProtectedRoute>
-            <Layout>
-              <Dashboard />
-            </Layout>
+            <Dashboard />
           </ProtectedRoute>
         </Route>
         <Route path="/settings">
           <ProtectedRoute>
-            <Layout>
-              <Settings />
-            </Layout>
+            <Settings />
           </ProtectedRoute>
         </Route>
         <Route path="/transactions">
           <ProtectedRoute>
-            <Layout>
-              <Transactions />
-            </Layout>
+            <Transactions />
           </ProtectedRoute>
         </Route>
         <Route path="/stock">
           <ProtectedRoute>
-            <Layout>
-              <StockManagement />
-            </Layout>
+            <StockManagement />
           </ProtectedRoute>
         </Route>
         <Route path="/nfc">
           <ProtectedRoute>
             <NFCPayment />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/crypto-terminal">
-          <ProtectedRoute>
-            <Layout>
-              <CryptoTerminal />
-            </Layout>
           </ProtectedRoute>
         </Route>
 
@@ -224,7 +206,6 @@ function Router() {
         <Route path="/verify-merchant" component={VerifyMerchant} />
         <Route path="/pay/:merchantId" component={CustomerPayment} />
         <Route path="/pay/:merchantId/stone/:stoneId" component={CustomerPayment} />
-        <Route path="/crypto-pay/:transactionId" component={CryptoPayment} />
         <Route path="/receipt/:transactionId" component={Receipt} />
         <Route component={NotFound} />
       </Switch>
