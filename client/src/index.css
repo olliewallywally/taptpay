@@ -215,6 +215,7 @@
     position: relative;
     width: 100%;
     min-height: 100vh;
+    transform: none;
     will-change: transform, opacity;
     transform-origin: center;
     backface-visibility: hidden;
