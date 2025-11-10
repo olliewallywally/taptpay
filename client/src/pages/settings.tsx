@@ -67,12 +67,15 @@ export default function Settings() {
       });
       setWindcaveApi(data.windcaveApiKey || '');
       setApiActive(!!data.windcaveApiKey);
+      if (data.customLogoUrl) {
+        setLogoPreview(data.customLogoUrl);
+      }
       return data;
     },
   });
 
   const updateMerchantMutation = useMutation({
-    mutationFn: async (details: MerchantDetails) => {
+    mutationFn: async (details: MerchantDetails & { windcaveApiKey?: string }) => {
       const token = localStorage.getItem("authToken");
       const response = await fetch(`/api/merchants/${merchantId}`, {
         method: "PUT",
@@ -91,6 +94,55 @@ export default function Settings() {
     },
     onError: () => {
       toast({ title: "Failed to save business details", variant: "destructive" });
+    },
+  });
+
+  const uploadLogoMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const token = localStorage.getItem("authToken");
+      const formData = new FormData();
+      formData.append('logo', file);
+      
+      const response = await fetch(`/api/merchants/${merchantId}/logo`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+        },
+        body: formData,
+      });
+      if (!response.ok) throw new Error("Failed to upload logo");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId] });
+      setLogoFile(null);
+      setLogoPreview(null);
+      toast({ title: "Logo uploaded successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to upload logo", variant: "destructive" });
+    },
+  });
+
+  const deleteLogoMutation = useMutation({
+    mutationFn: async () => {
+      const token = localStorage.getItem("authToken");
+      const response = await fetch(`/api/merchants/${merchantId}/logo`, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) throw new Error("Failed to delete logo");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId] });
+      setLogoPreview(null);
+      toast({ title: "Logo deleted successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete logo", variant: "destructive" });
     },
   });
 
@@ -124,9 +176,21 @@ export default function Settings() {
 
   const handleApiSave = () => {
     if (windcaveApi.trim()) {
+      updateMerchantMutation.mutate({ ...businessDetails, windcaveApiKey: windcaveApi });
       setApiActive(true);
-      toast({ title: "Windcave API key saved successfully" });
+    } else {
+      toast({ title: "Please enter an API key", variant: "destructive" });
     }
+  };
+
+  const handleUploadLogo = () => {
+    if (logoFile) {
+      uploadLogoMutation.mutate(logoFile);
+    }
+  };
+
+  const handleDeleteLogo = () => {
+    deleteLogoMutation.mutate();
   };
 
   const handleLogout = () => {
@@ -301,17 +365,39 @@ export default function Settings() {
                 {logoPreview ? (
                   <div className="space-y-3">
                     <img src={logoPreview} alt="Logo preview" className="max-h-32 mx-auto" />
-                    <p className="text-sm text-gray-600">{logoFile?.name}</p>
-                    <Button
-                      onClick={() => {
-                        setLogoFile(null);
-                        setLogoPreview(null);
-                      }}
-                      variant="outline"
-                      className="border-[#0055FF] text-[#0055FF]"
-                    >
-                      Remove
-                    </Button>
+                    {logoFile && <p className="text-sm text-gray-600">{logoFile.name}</p>}
+                    <div className="flex gap-2 justify-center">
+                      {logoFile ? (
+                        <>
+                          <Button
+                            onClick={handleUploadLogo}
+                            disabled={uploadLogoMutation.isPending}
+                            className="bg-[#00E5CC] hover:bg-[#00c9b3] text-[#0055FF]"
+                          >
+                            {uploadLogoMutation.isPending ? "Uploading..." : "Upload"}
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              setLogoFile(null);
+                              setLogoPreview(merchant?.customLogoUrl || null);
+                            }}
+                            variant="outline"
+                            className="border-[#0055FF] text-[#0055FF]"
+                          >
+                            Cancel
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          onClick={handleDeleteLogo}
+                          disabled={deleteLogoMutation.isPending}
+                          variant="outline"
+                          className="border-red-500 text-red-500 hover:bg-red-50"
+                        >
+                          {deleteLogoMutation.isPending ? "Deleting..." : "Delete Logo"}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-3">

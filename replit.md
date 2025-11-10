@@ -43,7 +43,7 @@ The application adopts a monorepo structure, separating client, server, and shar
 -   Comprehensive refund system with dedicated API routes, database schema, and real-time SSE notifications.
 
 **Database Schema Highlights:**
--   `Merchants` table: Stores merchant details, including business name, email, and QR/payment URLs.
+-   `Merchants` table: Stores merchant details, including business name, email, director, address, NZBN, phone, GST number, Windcave API key, custom logo URL, and QR/payment URLs.
 -   `Transactions` table: Records transaction details, status, external processor IDs, and fee breakdowns (Windcave, Platform, Merchant net).
 -   `Platform Fees` table: Tracks platform fee collection per transaction.
 
@@ -56,6 +56,8 @@ The application adopts a monorepo structure, separating client, server, and shar
 -   Authentication: JWT-based, protected routes, session management.
 -   Hybrid Database: PostgreSQL for production, in-memory for development.
 -   API Security: Bearer tokens, Zod validation, error handling, CORS.
+-   Merchant Update Security: PUT /api/merchants/:id endpoint validates and restricts updatable fields to prevent privilege escalation (allowlist: businessName, director, address, nzbn, phone, email, gstNumber, windcaveApiKey).
+-   File Upload Security: Logo uploads restricted to PNG format, 20MB max, with automatic file cleanup on errors/deletions.
 -   Deployment: `npm run dev` for development, `npm run build` for production, Drizzle Kit for database migrations.
 
 ## External Dependencies
