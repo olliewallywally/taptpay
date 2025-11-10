@@ -1112,9 +1112,33 @@ export default function DemoTerminal() {
             
             {/* Create Stone Button */}
             <button
-              onClick={() => {
-                setShowStones(false);
-                setLocation("/merchant/stones");
+              onClick={async () => {
+                try {
+                  const stoneNumber = (taptStones?.length || 0) + 1;
+                  const response = await apiRequest('POST', `/api/merchants/${merchantId}/tapt-stones`, {
+                    name: `Stone ${stoneNumber}`,
+                    stoneNumber: stoneNumber
+                  });
+                  
+                  if (response.ok) {
+                    const newStone = await response.json();
+                    queryClient.invalidateQueries({ queryKey: [`/api/merchants/${merchantId}/tapt-stones`] });
+                    setShowStones(false);
+                    toast({
+                      title: "Stone Created",
+                      description: `Stone ${stoneNumber} has been created successfully`,
+                    });
+                  } else {
+                    throw new Error('Failed to create stone');
+                  }
+                } catch (error) {
+                  console.error("Failed to create stone:", error);
+                  toast({
+                    title: "Creation Failed",
+                    description: "Could not create new stone",
+                    variant: "destructive",
+                  });
+                }
               }}
               className="w-full bg-[#0055FF]/10 hover:bg-[#0055FF]/20 border-2 border-dashed border-[#0055FF] rounded-2xl py-4 md:py-5 px-4 md:px-6 text-[#0055FF] font-medium text-base md:text-lg transition-all flex items-center justify-center gap-2"
               data-testid="button-create-stone"

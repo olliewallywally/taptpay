@@ -1730,7 +1730,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update a tapt stone name
+  app.put("/api/merchants/:merchantId/tapt-stones/:stoneId", async (req, res) => {
+    try {
+      const stoneId = parseInt(req.params.stoneId);
+      const { name } = req.body;
+      
+      if (!name || typeof name !== 'string' || name.trim().length === 0) {
+        return res.status(400).json({ message: "Valid stone name is required" });
+      }
+      
+      const updatedStone = await storage.updateTaptStone(stoneId, { name: name.trim() });
+      
+      if (!updatedStone) {
+        return res.status(404).json({ message: "Tapt stone not found" });
+      }
+      
+      res.json(updatedStone);
+    } catch (error) {
+      console.error("Error updating tapt stone:", error);
+      res.status(500).json({ message: "Failed to update tapt stone" });
+    }
+  });
+
   // Delete a tapt stone
+  app.delete("/api/merchants/:merchantId/tapt-stones/:stoneId", async (req, res) => {
+    try {
+      const stoneId = parseInt(req.params.stoneId);
+      const success = await storage.deleteTaptStone(stoneId);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Tapt stone not found" });
+      }
+      
+      res.json({ message: "Tapt stone deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting tapt stone:", error);
+      res.status(500).json({ message: "Failed to delete tapt stone" });
+    }
+  });
+
+  // Legacy endpoint for backwards compatibility
   app.delete("/api/tapt-stones/:id", async (req, res) => {
     try {
       const stoneId = parseInt(req.params.id);
