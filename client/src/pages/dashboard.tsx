@@ -95,7 +95,7 @@ export default function Dashboard() {
     return txDate.getTime() === today.getTime() && tx.status === 'completed';
   });
 
-  const todayRevenue = todayTransactions.reduce((sum: number, tx: any) => sum + parseFloat(tx.amount), 0);
+  const todayRevenue = todayTransactions.reduce((sum: number, tx: any) => sum + parseFloat(tx.price), 0);
   const todayTransactionCount = todayTransactions.length;
   
   const dailyGoal = 500;
@@ -104,7 +104,7 @@ export default function Dashboard() {
   // Calculate revenue split (online vs in-store)
   const onlineRevenue = transactions.filter((tx: any) => 
     tx.paymentMethod !== 'cash' && tx.status === 'completed'
-  ).reduce((sum: number, tx: any) => sum + parseFloat(tx.amount), 0);
+  ).reduce((sum: number, tx: any) => sum + parseFloat(tx.price), 0);
   
   const totalRevenue = analytics?.totalRevenue || 0;
   const onlinePercentage = totalRevenue > 0 ? Math.round((onlineRevenue / totalRevenue) * 100) : 65;
@@ -125,7 +125,7 @@ export default function Dashboard() {
         return txTime >= startTime && txTime < endTime && tx.status === 'completed';
       });
       
-      const revenue = segmentTransactions.reduce((sum: number, tx: any) => sum + parseFloat(tx.amount), 0);
+      const revenue = segmentTransactions.reduce((sum: number, tx: any) => sum + parseFloat(tx.price), 0);
       hours.push(revenue);
     }
     return hours;
@@ -147,7 +147,7 @@ export default function Dashboard() {
       });
       
       const avgTrans = segmentTransactions.length > 0
-        ? segmentTransactions.reduce((sum: number, tx: any) => sum + parseFloat(tx.amount), 0) / segmentTransactions.length
+        ? segmentTransactions.reduce((sum: number, tx: any) => sum + parseFloat(tx.price), 0) / segmentTransactions.length
         : 0;
       
       segments.push(avgTrans);
