@@ -30,6 +30,8 @@ export const merchants = pgTable("merchants", {
   ourRate: decimal("our_rate", { precision: 5, scale: 4 }).default("0.0020"), // Our 0.20%
   
   // Additional business details
+  director: text("director"),
+  nzbn: text("nzbn"), // New Zealand Business Number
   contactEmail: text("contact_email"),
   contactPhone: text("contact_phone"),
   businessAddress: text("business_address"),
@@ -42,6 +44,12 @@ export const merchants = pgTable("merchants", {
   
   // Tax information
   gstNumber: text("gst_number"),
+  
+  // Branding customization
+  customLogoUrl: text("custom_logo_url"), // Custom merchant logo for customer payment page
+  
+  // Payment integration
+  windcaveApiKey: text("windcave_api_key"), // Encrypted Windcave API key
   
   // Theme customization
   themeId: text("theme_id").default("classic"),
