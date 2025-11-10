@@ -303,7 +303,7 @@ export default function CustomerPayment() {
           >
             {/* Logo - Always visible */}
             <div className="text-center mb-8 md:mb-10">
-              <img src={taptLogo} alt="taptpay" className="h-24 sm:h-28 md:h-32 mx-auto" />
+              <img src={taptLogo} alt="taptpay" className="h-12 sm:h-14 md:h-16 mx-auto" style={{ filter: 'brightness(0) saturate(100%) invert(78%) sepia(96%) saturate(2453%) hue-rotate(131deg) brightness(97%) contrast(101%)' }} />
             </div>
 
             {/* Payment options - Hidden when card details shown */}
