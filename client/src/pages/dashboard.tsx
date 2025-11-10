@@ -206,9 +206,56 @@ export default function Dashboard() {
       {/* Stats Cards */}
       <div className="max-w-md md:max-w-2xl mx-auto px-3 sm:px-6 md:px-8 mt-[40px] sm:mt-[50px] md:mt-[60px] relative z-10">
         <div className="grid grid-cols-2 gap-3 sm:gap-5 md:gap-6 mb-4 sm:mb-6 md:mb-8">
-          {/* Monthly Stats Widget */}
-          <div className="bg-white rounded-2xl sm:rounded-3xl md:rounded-[28px] p-3 sm:p-6 md:p-8 col-span-1 row-span-2 flex flex-col justify-center min-h-[320px] sm:min-h-[420px] md:min-h-[480px] shadow-lg transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] cursor-pointer" data-testid="card-monthly-stats">
-            <div className="w-full mb-8 sm:mb-12 md:mb-16">
+          {/* Monthly Stats Widget with Circle Graph */}
+          <div className="bg-white rounded-2xl sm:rounded-3xl md:rounded-[28px] p-3 sm:p-6 md:p-8 col-span-1 row-span-2 flex flex-col min-h-[320px] sm:min-h-[420px] md:min-h-[480px] shadow-lg transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] cursor-pointer" data-testid="card-monthly-stats">
+            <div className="relative flex items-center justify-center mb-6 sm:mb-8 md:mb-10">
+              <svg 
+                width="174" 
+                height="174" 
+                viewBox="0 0 174 174" 
+                className="transform -rotate-90 w-[140px] h-[140px] sm:w-[160px] sm:h-[160px] md:w-[174px] md:h-[174px]"
+              >
+                <circle
+                  cx="87"
+                  cy="87"
+                  r="78.87"
+                  stroke="#E6E6EC"
+                  strokeWidth="16.26"
+                  fill="none"
+                />
+                <circle
+                  cx="87"
+                  cy="87"
+                  r="78.87"
+                  stroke="#0055FF"
+                  strokeWidth="16.26"
+                  fill="none"
+                  strokeDasharray={`${2 * Math.PI * 78.87}`}
+                  strokeDashoffset={`${2 * Math.PI * 78.87 * 0.35}`}
+                />
+                
+                <circle
+                  cx="87"
+                  cy="87"
+                  r="55"
+                  stroke="#E6E6EC"
+                  strokeWidth="16"
+                  fill="none"
+                />
+                <circle
+                  cx="87"
+                  cy="87"
+                  r="55"
+                  stroke="#00E5CC"
+                  strokeWidth="16"
+                  fill="none"
+                  strokeDasharray={`${2 * Math.PI * 55}`}
+                  strokeDashoffset={`${2 * Math.PI * 55 * 0.35}`}
+                />
+              </svg>
+            </div>
+
+            <div className="w-full mb-6 sm:mb-8 md:mb-10">
               <div className="flex items-center justify-between mb-1 sm:mb-2">
                 <div className="text-[#3B3D53] text-xl sm:text-2xl md:text-3xl">${monthlyRevenue.toFixed(2)}</div>
               </div>
