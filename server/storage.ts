@@ -87,6 +87,7 @@ export interface IStorage {
     ourRate: number;
     weeklyTransactions: number;
     weeklyRevenue: number;
+    averageTransaction: number;
   }>;
   
   // Export operations
@@ -740,12 +741,16 @@ export class MemStorage implements IStorage {
     ourRate: number;
     weeklyTransactions: number;
     weeklyRevenue: number;
+    averageTransaction: number;
   }> {
     const merchant = this.merchants.get(merchantId);
     const transactions = await this.getTransactionsByMerchant(merchantId);
     
     const completedTransactions = transactions.filter(t => t.status === "completed");
     const totalRevenue = completedTransactions.reduce((sum, t) => sum + parseFloat(t.price), 0);
+    const averageTransaction = completedTransactions.length > 0 
+      ? totalRevenue / completedTransactions.length 
+      : 0;
     
     // Calculate weekly metrics (last 7 days)
     const now = new Date();
@@ -777,6 +782,7 @@ export class MemStorage implements IStorage {
       ourRate: ourRate * 100, // Convert to percentage
       weeklyTransactions: weeklyTransactionsList.length,
       weeklyRevenue,
+      averageTransaction,
     };
   }
 
@@ -1510,6 +1516,7 @@ export class DatabaseStorage implements IStorage {
     ourRate: number;
     weeklyTransactions: number;
     weeklyRevenue: number;
+    averageTransaction: number;
   }> {
     if (!this.db) throw new Error('Database not available');
     
@@ -1517,10 +1524,12 @@ export class DatabaseStorage implements IStorage {
     const merchant = await this.getMerchant(merchantId);
     
     const totalTransactions = merchantTransactions.length;
-    const completedTransactions = merchantTransactions.filter(t => t.status === 'completed').length;
-    const totalRevenue = merchantTransactions
-      .filter(t => t.status === 'completed')
-      .reduce((sum, t) => sum + parseFloat(t.price), 0);
+    const completedTxs = merchantTransactions.filter(t => t.status === 'completed');
+    const completedTransactions = completedTxs.length;
+    const totalRevenue = completedTxs.reduce((sum, t) => sum + parseFloat(t.price), 0);
+    const averageTransaction = completedTransactions > 0 
+      ? totalRevenue / completedTransactions 
+      : 0;
     
     // Calculate weekly metrics (last 7 days)
     const now = new Date();
@@ -1554,6 +1563,7 @@ export class DatabaseStorage implements IStorage {
       ourRate,
       weeklyTransactions: weeklyTransactionsList.length,
       weeklyRevenue,
+      averageTransaction,
     };
   }
 
