@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Minus, Users2, Share2, Calculator, QrCode, Grid3x3, ChevronDown, Menu, X, LogOut, Tag, Copy, Check, Loader2, CheckCircle2, Smartphone } from "lucide-react";
+import { Plus, Minus, Users2, Share2, Calculator, QrCode, Grid3x3, ChevronDown, Menu, X, LogOut, Tag, Copy, Check, Loader2, CheckCircle2, Smartphone, Pencil, Trash2 } from "lucide-react";
 import waveIconPath from "@assets/wave_1762733987203.png";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -72,6 +72,8 @@ export default function DemoTerminal() {
   const [selectedStoneId, setSelectedStoneId] = useState<number | undefined>();
   const [isNfcMode, setIsNfcMode] = useState(false);
   const [isNfcOverlayActive, setIsNfcOverlayActive] = useState(false);
+  const [editingStoneId, setEditingStoneId] = useState<number | null>(null);
+  const [editStoneName, setEditStoneName] = useState("");
 
   // Track last processed transaction to prevent infinite updates
   const lastProcessedTxRef = useRef<{ id?: number; status?: string }>({});
@@ -389,6 +391,30 @@ export default function DemoTerminal() {
     },
   });
 
+  // Update stone mutation
+  const updateStoneMutation = useMutation({
+    mutationFn: async ({ stoneId, name }: { stoneId: number; name: string }) => {
+      const response = await apiRequest("PUT", `/api/merchants/${merchantId}/tapt-stones/${stoneId}`, { name });
+      return response.json();
+    },
+    onSuccess: () => {
+      setEditingStoneId(null);
+      setEditStoneName("");
+      queryClient.invalidateQueries({ queryKey: [`/api/merchants/${merchantId}/tapt-stones`] });
+      toast({
+        title: "Stone Updated",
+        description: "The stone name has been updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update stone",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Delete stone mutation
   const deleteStoneMutation = useMutation({
     mutationFn: async (stoneId: number) => {
@@ -400,6 +426,8 @@ export default function DemoTerminal() {
       if (selectedStoneId === deletedStoneId) {
         setSelectedStoneId(undefined);
       }
+      setEditingStoneId(null);
+      setEditStoneName("");
       queryClient.invalidateQueries({ queryKey: [`/api/merchants/${merchantId}/tapt-stones`] });
       toast({
         title: "Stone Deleted",
@@ -995,40 +1023,90 @@ export default function DemoTerminal() {
         </button>
 
         {/* Stones Dropdown */}
-        <div className={`overflow-hidden transition-all duration-300 ${showStones ? 'max-h-96 mb-4' : 'max-h-0'}`}>
-          <div className="bg-white rounded-3xl p-6 md:p-8 space-y-3 shadow-xl">
+        <div className={`overflow-hidden transition-all duration-300 ${showStones ? 'max-h-[600px] mb-4' : 'max-h-0'}`}>
+          <div className="bg-white rounded-3xl p-6 md:p-8 space-y-3 shadow-xl overflow-y-auto max-h-[550px]">
             {taptStones.length > 0 && taptStones.map((stone) => (
               <div key={stone.id} className="relative">
-                <button
-                  onClick={() => {
-                    setSelectedStoneId(stone.id);
-                    setShowStones(false);
-                    toast({
-                      title: "Stone Selected",
-                      description: `Now viewing ${stone.name}`,
-                    });
-                  }}
-                  className={`w-full border-2 rounded-2xl py-4 md:py-5 pl-4 md:pl-6 pr-12 md:pr-16 font-medium text-base md:text-lg transition-all ${
-                    selectedStoneId === stone.id
-                      ? 'bg-[#0055FF] text-white border-[#0055FF]'
-                      : 'bg-[#00E5CC]/20 hover:bg-[#00E5CC]/30 border-[#00E5CC] text-[#0055FF]'
-                  }`}
-                  data-testid={`button-stone-${stone.id}`}
-                >
-                  {stone.name} - Stone {stone.stoneNumber}
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (window.confirm(`Are you sure you want to delete ${stone.name}?`)) {
-                      deleteStoneMutation.mutate(stone.id);
-                    }
-                  }}
-                  className="absolute right-2 md:right-4 top-1/2 -translate-y-1/2 w-8 h-8 md:w-10 md:h-10 rounded-full bg-red-500/20 hover:bg-red-500/40 flex items-center justify-center transition-all"
-                  data-testid={`button-delete-stone-${stone.id}`}
-                >
-                  <X className="w-4 h-4 md:w-5 md:h-5 text-red-500" />
-                </button>
+                {editingStoneId === stone.id ? (
+                  <div className="space-y-3 p-4 border-2 border-[#0055FF] rounded-2xl bg-[#0055FF]/5">
+                    <Input
+                      value={editStoneName}
+                      onChange={(e) => setEditStoneName(e.target.value)}
+                      placeholder="Stone name"
+                      className="bg-white text-[#0055FF] border-2 border-[#00E5CC] rounded-xl h-12 px-4"
+                      data-testid={`input-edit-stone-${stone.id}`}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          if (editStoneName.trim()) {
+                            updateStoneMutation.mutate({ stoneId: stone.id, name: editStoneName.trim() });
+                          }
+                        }}
+                        disabled={!editStoneName.trim() || updateStoneMutation.isPending}
+                        className="flex-1 bg-[#00E5CC] text-[#0055FF] rounded-xl py-2 px-4 hover:opacity-90 transition-opacity disabled:opacity-50 font-medium text-sm"
+                        data-testid={`button-save-stone-${stone.id}`}
+                      >
+                        {updateStoneMutation.isPending ? "Saving..." : "Save"}
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Are you sure you want to delete ${stone.name}?`)) {
+                            deleteStoneMutation.mutate(stone.id);
+                          }
+                        }}
+                        disabled={deleteStoneMutation.isPending}
+                        className="flex-1 bg-red-500/20 text-red-500 rounded-xl py-2 px-4 hover:bg-red-500/30 transition-colors disabled:opacity-50 font-medium text-sm flex items-center justify-center gap-2"
+                        data-testid={`button-delete-stone-${stone.id}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingStoneId(null);
+                          setEditStoneName("");
+                        }}
+                        className="bg-[#E8E5E0] text-[#0055FF] rounded-xl py-2 px-4 hover:opacity-90 transition-opacity font-medium text-sm"
+                        data-testid={`button-cancel-edit-stone-${stone.id}`}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => {
+                        setSelectedStoneId(stone.id);
+                        setShowStones(false);
+                        toast({
+                          title: "Stone Selected",
+                          description: `Now viewing ${stone.name}`,
+                        });
+                      }}
+                      className={`w-full border-2 rounded-2xl py-4 md:py-5 pl-4 md:pl-6 pr-12 md:pr-16 font-medium text-base md:text-lg transition-all ${
+                        selectedStoneId === stone.id
+                          ? 'bg-[#0055FF] text-white border-[#0055FF]'
+                          : 'bg-[#00E5CC]/20 hover:bg-[#00E5CC]/30 border-[#00E5CC] text-[#0055FF]'
+                      }`}
+                      data-testid={`button-stone-${stone.id}`}
+                    >
+                      {stone.name} - Stone {stone.stoneNumber}
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingStoneId(stone.id);
+                        setEditStoneName(stone.name);
+                      }}
+                      className="absolute right-2 md:right-4 top-1/2 -translate-y-1/2 w-8 h-8 md:w-10 md:h-10 rounded-full bg-[#0055FF]/20 hover:bg-[#0055FF]/40 flex items-center justify-center transition-all"
+                      data-testid={`button-edit-stone-${stone.id}`}
+                    >
+                      <Pencil className="w-4 h-4 md:w-5 md:h-5 text-[#0055FF]" />
+                    </button>
+                  </>
+                )}
               </div>
             ))}
             
