@@ -440,7 +440,7 @@ export default function DemoTerminal() {
 
   return (
     <div className="min-h-screen bg-[#0055FF] pb-24 md:pb-32 lg:pb-36 px-6 md:px-10">
-      <div className="max-w-md md:max-w-2xl mx-auto pt-8 md:pt-12">
+      <div className="max-w-md md:max-w-2xl mx-auto pt-18 md:pt-22">
         
         {/* Payment Card */}
         <div className="bg-[#00E5CC] rounded-[48px] md:rounded-[60px] mb-8 md:mb-12 overflow-visible">
