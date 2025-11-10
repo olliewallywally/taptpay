@@ -120,7 +120,7 @@ export default function Login() {
           <div className="bg-[#0055FF] px-8 md:px-12 pt-12 md:pt-16 pb-8 md:pb-12 rounded-b-[48px] md:rounded-b-[60px] relative z-10">
             {/* Logo */}
             <div className="text-center mb-12 md:mb-16">
-              <img src={taptLogoPath} alt="taptpay" className="h-20 md:h-24 mx-auto" />
+              <img src={taptLogoPath} alt="taptpay" className="h-10 md:h-12 mx-auto" style={{ filter: 'brightness(0) saturate(100%) invert(78%) sepia(96%) saturate(2453%) hue-rotate(131deg) brightness(97%) contrast(101%)' }} />
             </div>
 
             {/* Success message */}
