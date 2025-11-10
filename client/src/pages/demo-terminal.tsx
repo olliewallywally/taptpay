@@ -449,7 +449,7 @@ export default function DemoTerminal() {
 
   return (
     <div className="min-h-screen bg-[#0055FF] pb-24 md:pb-32 lg:pb-36 px-6 md:px-10 relative">
-      <div className="max-w-md md:max-w-2xl mx-auto pt-32 md:pt-40">
+      <div className="max-w-md md:max-w-2xl mx-auto pt-24 md:pt-32">
         
         {/* NFC Toggle */}
         <div className="flex justify-center mb-12 md:mb-16">
@@ -990,7 +990,7 @@ export default function DemoTerminal() {
         className="fixed left-0 right-0 bg-[#00E5CC] z-40 transition-all duration-700 ease-in-out overflow-hidden rounded-b-[90px]"
         style={{
           top: isNfcOverlayActive ? '0' : '-100%',
-          bottom: isNfcOverlayActive ? '150px' : '100%',
+          bottom: isNfcOverlayActive ? '180px' : '100%',
         }}
       >
         <div className="h-full flex flex-col items-center justify-center px-6">
