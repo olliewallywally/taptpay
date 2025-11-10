@@ -162,6 +162,7 @@ export default function Dashboard() {
   const maxAvgTrans = Math.max(...last30DaysAvg, 1);
 
   const averageTransaction = analytics?.averageTransaction || 0;
+  const totalRevenue = analytics?.totalRevenue || 0;
 
   if (analyticsLoading) {
     return (
