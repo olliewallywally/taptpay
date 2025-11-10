@@ -439,7 +439,7 @@ export default function DemoTerminal() {
   const status = getStatusDisplay();
 
   return (
-    <div className="min-h-screen bg-[#0055FF] pb-24 px-6 md:px-10">
+    <div className="min-h-screen bg-[#0055FF] pb-24 md:pb-32 lg:pb-36 px-6 md:px-10">
       <div className="max-w-md md:max-w-2xl mx-auto pt-8 md:pt-12">
         
         {/* Payment Card */}
