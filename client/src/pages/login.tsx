@@ -289,7 +289,7 @@ export default function Login() {
 
           {/* Expandable more section */}
           {showMore && (
-            <div className="bg-[#00E5CC] px-8 md:px-12 pb-6 md:pb-8 space-y-3 md:space-y-4">
+            <div className="bg-[#00E5CC] px-8 md:px-12 pb-6 md:pb-8 space-y-3 md:space-y-4 relative z-20">
               <button 
                 onClick={() => {
                   toast({
