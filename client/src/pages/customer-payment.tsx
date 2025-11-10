@@ -2,13 +2,101 @@ import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { DigitalWalletButtons } from "@/components/digital-wallet-buttons";
-import { BillSplit } from "@/components/bill-split";
 import { sseClient } from "@/lib/sse-client";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CheckCircle, XCircle, ChevronDown, ChevronUp, Minus, Plus, CreditCard } from "lucide-react";
 import taptLogo from "@assets/IMG_6592_1755070818452.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
+interface SplitBillContentProps {
+  transactionId: number;
+  totalAmount: number;
+  merchantId: string;
+  onSplitCreated: () => void;
+}
+
+function SplitBillContent({ transactionId, totalAmount, merchantId, onSplitCreated }: SplitBillContentProps) {
+  const [splitCount, setSplitCount] = useState(2);
+
+  const createSplitMutation = useMutation({
+    mutationFn: async (totalSplits: number) => {
+      const response = await apiRequest("POST", `/api/transactions/${transactionId}/split`, {
+        totalSplits
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data && data.transaction) {
+        queryClient.setQueryData(
+          ["/api/merchants", parseInt(merchantId), "active-transaction"], 
+          data.transaction
+        );
+      }
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/merchants", parseInt(merchantId), "active-transaction"] 
+      });
+      onSplitCreated();
+    },
+  });
+
+  const handleConfirmSplit = () => {
+    createSplitMutation.mutate(splitCount);
+  };
+
+  const splitAmount = (totalAmount / splitCount).toFixed(2);
+
+  return (
+    <div>
+      {/* Counter Controls */}
+      <div className="flex items-center justify-center gap-8 mb-4">
+        {/* Minus Button */}
+        <button
+          onClick={() => setSplitCount(Math.max(2, splitCount - 1))}
+          className="w-14 h-14 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors"
+          disabled={splitCount <= 2 || createSplitMutation.isPending}
+          data-testid="button-decrease-split"
+        >
+          <Minus size={24} className="text-white" />
+        </button>
+
+        {/* Count Display */}
+        <div className="text-[#0055FF] text-5xl font-bold" data-testid="text-split-count">
+          {splitCount}
+        </div>
+
+        {/* Plus Button */}
+        <button
+          onClick={() => setSplitCount(splitCount + 1)}
+          className="w-14 h-14 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors"
+          disabled={createSplitMutation.isPending}
+          data-testid="button-increase-split"
+        >
+          <Plus size={24} className="text-white" />
+        </button>
+      </div>
+
+      {/* Split Amount */}
+      <div className="text-center mb-6">
+        <p className="text-[#0055FF] text-3xl font-bold" data-testid="text-split-amount">${splitAmount}</p>
+      </div>
+
+      {/* Confirm Button */}
+      <div className="flex justify-center">
+        <button 
+          onClick={handleConfirmSplit}
+          disabled={createSplitMutation.isPending}
+          className="w-1/2 bg-[#00E5CC] hover:bg-[#00c9b3] text-[#0055FF] rounded-[20px] py-4 transition-colors text-center disabled:opacity-50"
+          data-testid="button-confirm-split"
+        >
+          <span className="text-base sm:text-lg font-medium">
+            {createSplitMutation.isPending ? "Creating..." : "confirm"}
+          </span>
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function CustomerPayment() {
   const { merchantId, stoneId } = useParams<{ merchantId: string; stoneId?: string }>();
@@ -283,6 +371,7 @@ export default function CustomerPayment() {
                           borderBottomLeftRadius: showSplitBill ? '0' : '',
                           borderBottomRightRadius: showSplitBill ? '0' : ''
                         }}
+                        data-testid="button-split-bill"
                       >
                         <span className="text-base sm:text-lg md:text-xl">split the bill</span>
                         {showSplitBill ? (
@@ -301,9 +390,10 @@ export default function CustomerPayment() {
                         }}
                       >
                         <div className="bg-white rounded-b-[48px] px-6 py-8">
-                          <BillSplit
+                          <SplitBillContent
                             transactionId={currentTransaction.id}
-                            originalAmount={parseFloat(currentTransaction.price)}
+                            totalAmount={parseFloat(currentTransaction.price)}
+                            merchantId={id.toString()}
                             onSplitCreated={() => setShowSplitBill(false)}
                           />
                         </div>
