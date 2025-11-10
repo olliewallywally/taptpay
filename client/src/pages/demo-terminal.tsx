@@ -3,7 +3,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Minus, Users2, Share2, Calculator, QrCode, Grid3x3, ChevronDown, Menu, X, LogOut, Tag, Copy, Check, Loader2, CheckCircle2 } from "lucide-react";
+import { Plus, Minus, Users2, Share2, Calculator, QrCode, Grid3x3, ChevronDown, Menu, X, LogOut, Tag, Copy, Check, Loader2, CheckCircle2, Smartphone } from "lucide-react";
+import waveIconPath from "@assets/wave_1762733987203.png";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -69,6 +70,8 @@ export default function DemoTerminal() {
   const [selectedStockItems, setSelectedStockItems] = useState<any[]>([]);
   const [copiedPaymentLink, setCopiedPaymentLink] = useState(false);
   const [selectedStoneId, setSelectedStoneId] = useState<number | undefined>();
+  const [isNfcMode, setIsNfcMode] = useState(false);
+  const [isNfcOverlayActive, setIsNfcOverlayActive] = useState(false);
 
   // Track last processed transaction to prevent infinite updates
   const lastProcessedTxRef = useRef<{ id?: number; status?: string }>({});
@@ -241,6 +244,11 @@ export default function DemoTerminal() {
         setStockSearchInput("");
       }
       
+      // If NFC mode is active, show the overlay
+      if (isNfcMode) {
+        setIsNfcOverlayActive(true);
+      }
+      
       toast({
         title: "Payment Created",
         description: data 
@@ -297,6 +305,7 @@ export default function DemoTerminal() {
       setTimeout(() => {
         setCurrentTransaction(null);
       }, 2000);
+      setIsNfcOverlayActive(false);
       queryClient.invalidateQueries({ queryKey: [`/api/merchants/${merchantId}/active-transaction`] });
       toast({
         title: "Payment Cancelled",
@@ -439,9 +448,22 @@ export default function DemoTerminal() {
   const status = getStatusDisplay();
 
   return (
-    <div className="min-h-screen bg-[#0055FF] pb-24 md:pb-32 lg:pb-36 px-6 md:px-10">
+    <div className="min-h-screen bg-[#0055FF] pb-24 md:pb-32 lg:pb-36 px-6 md:px-10 relative">
       <div className="max-w-md md:max-w-2xl mx-auto pt-40 md:pt-48">
         
+        {/* NFC Toggle */}
+        <div className="flex justify-center mb-12 md:mb-16">
+          <button 
+            onClick={() => setIsNfcMode(!isNfcMode)}
+            className="bg-[#00E5CC] rounded-full px-6 md:px-8 py-3 md:py-4 flex items-center gap-3 md:gap-4 hover:opacity-90 transition-opacity"
+          >
+            <span className="text-[#0055FF] text-lg md:text-xl">nfc</span>
+            <div className={`rounded-lg md:rounded-xl p-2 md:p-3 transition-colors ${isNfcMode ? 'bg-[#0055FF]' : 'bg-white'}`}>
+              <Smartphone className={`w-5 h-5 md:w-6 md:h-6 ${isNfcMode ? 'text-white' : 'text-[#0055FF]'}`} />
+            </div>
+          </button>
+        </div>
+
         {/* Payment Card */}
         <div className="bg-[#00E5CC] rounded-[48px] md:rounded-[60px] mb-8 md:mb-12 overflow-visible">
           {/* Amount Display */}
@@ -949,13 +971,34 @@ export default function DemoTerminal() {
 
         {/* Cancel Payment Button */}
         <button
-          onClick={() => cancelTransactionMutation.mutate()}
+          onClick={() => {
+            setIsNfcOverlayActive(false);
+            if (currentTransaction) {
+              cancelTransactionMutation.mutate();
+            }
+          }}
           disabled={!currentTransaction || currentTransaction.status !== 'pending' || cancelTransactionMutation.isPending}
-          className="w-full bg-[#E8E5E0] text-[#0055FF] rounded-full py-6 flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-50"
+          className="w-full bg-[#E8E5E0] text-[#0055FF] rounded-full py-6 flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-50 relative z-50"
           data-testid="button-cancel"
         >
           <span className="text-xl">cancel payment</span>
         </button>
+      </div>
+
+      {/* NFC Overlay */}
+      <div 
+        className="fixed left-0 right-0 bg-[#00E5CC] z-40 transition-all duration-700 ease-in-out overflow-hidden rounded-b-[90px]"
+        style={{
+          top: isNfcOverlayActive ? '0' : '-100%',
+          bottom: isNfcOverlayActive ? '200px' : '100%',
+        }}
+      >
+        <div className="h-full flex flex-col items-center justify-center px-6">
+          <div className="flex flex-col items-center gap-12 md:gap-16">
+            <h2 className="text-[#0055FF] text-3xl md:text-4xl font-semibold">tap card</h2>
+            <img src={waveIconPath} alt="NFC" className="w-64 h-64 md:w-80 md:h-80 object-contain" />
+          </div>
+        </div>
       </div>
     </div>
   );
