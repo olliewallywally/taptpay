@@ -85,40 +85,40 @@ export default function Dashboard() {
     return () => window.removeEventListener('resize', updateChartSize);
   }, []);
 
-  // Calculate today's revenue
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // Calculate last 7 days revenue
+  const now = new Date();
+  const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
   
-  const todayTransactions = transactions.filter((tx: any) => {
+  const last7DaysTransactions = transactions.filter((tx: any) => {
     const txDate = new Date(tx.createdAt);
-    txDate.setHours(0, 0, 0, 0);
-    return txDate.getTime() === today.getTime() && tx.status === 'completed';
+    return txDate >= sevenDaysAgo && tx.status === 'completed';
   });
 
-  const todayRevenue = todayTransactions.reduce((sum: number, tx: any) => sum + parseFloat(tx.price), 0);
-  const todayTransactionCount = todayTransactions.length;
+  const last7DaysRevenue = last7DaysTransactions.reduce((sum: number, tx: any) => sum + parseFloat(tx.price), 0);
+  const last7DaysTransactionCount = last7DaysTransactions.length;
   
-  const dailyGoal = 500;
-  const todayPercentage = Math.min(100, (todayRevenue / dailyGoal) * 100);
+  const weeklyGoal = 3500; // 7 days * $500/day
+  const weeklyPercentage = Math.min(100, (last7DaysRevenue / weeklyGoal) * 100);
 
-  // Calculate revenue split (online vs in-store)
-  const onlineRevenue = transactions.filter((tx: any) => 
-    tx.paymentMethod !== 'cash' && tx.status === 'completed'
-  ).reduce((sum: number, tx: any) => sum + parseFloat(tx.price), 0);
+  // Calculate monthly metrics
+  const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
   
-  const totalRevenue = analytics?.totalRevenue || 0;
-  const onlinePercentage = totalRevenue > 0 ? Math.round((onlineRevenue / totalRevenue) * 100) : 65;
-  const inStorePercentage = 100 - onlinePercentage;
+  const monthlyTransactions = transactions.filter((tx: any) => {
+    const txDate = new Date(tx.createdAt);
+    return txDate >= thirtyDaysAgo && tx.status === 'completed';
+  });
+  
+  const monthlyRevenue = monthlyTransactions.reduce((sum: number, tx: any) => sum + parseFloat(tx.price), 0);
+  const monthlyTransactionCount = monthlyTransactions.length;
 
-  // Calculate hourly revenue for today
-  const getHourlyRevenueData = () => {
-    const hours = [];
-    const now = Date.now();
+  // Calculate daily revenue for last 7 days
+  const getLast7DaysRevenueData = () => {
+    const days = [];
+    const nowTime = Date.now();
     
     for (let i = 6; i >= 0; i--) {
-      const hoursAgo = i * 3;
-      const startTime = now - (hoursAgo + 3) * 60 * 60 * 1000;
-      const endTime = now - hoursAgo * 60 * 60 * 1000;
+      const startTime = nowTime - (i + 1) * 24 * 60 * 60 * 1000;
+      const endTime = nowTime - i * 24 * 60 * 60 * 1000;
       
       const segmentTransactions = transactions.filter((tx: any) => {
         const txTime = new Date(tx.createdAt).getTime();
@@ -126,9 +126,9 @@ export default function Dashboard() {
       });
       
       const revenue = segmentTransactions.reduce((sum: number, tx: any) => sum + parseFloat(tx.price), 0);
-      hours.push(revenue);
+      days.push(revenue);
     }
-    return hours;
+    return days;
   };
 
   // Calculate last 30 days average transaction
@@ -155,10 +155,10 @@ export default function Dashboard() {
     return segments;
   };
 
-  const hourlyRevenue = getHourlyRevenueData();
+  const last7DaysRevenueData = getLast7DaysRevenueData();
   const last30DaysAvg = getLast30DaysAvgData();
   
-  const maxHourlyRevenue = Math.max(...hourlyRevenue, 1);
+  const maxLast7DaysRevenue = Math.max(...last7DaysRevenueData, 1);
   const maxAvgTrans = Math.max(...last30DaysAvg, 1);
 
   const averageTransaction = analytics?.averageTransaction || 0;
@@ -183,7 +183,7 @@ export default function Dashboard() {
             
             <div className="relative flex items-center justify-center mb-6 sm:mb-8 md:mb-10">
               <SemiCircularProgress 
-                percentage={todayPercentage} 
+                percentage={weeklyPercentage} 
                 size={chartSize} 
                 strokeWidth={16} 
                 color="#00E5CC"
@@ -191,10 +191,10 @@ export default function Dashboard() {
               />
               <div className="absolute text-center" style={{ bottom: '10px' }}>
                 <div className="text-[#00E5CC] text-4xl sm:text-5xl md:text-6xl mb-1">
-                  ${todayRevenue.toFixed(2)}
+                  ${last7DaysRevenue.toFixed(2)}
                 </div>
                 <div className="text-[#00E5CC] text-sm sm:text-lg md:text-xl">
-                  {todayTransactionCount} transaction{todayTransactionCount !== 1 ? 's' : ''}
+                  {last7DaysTransactionCount} transaction{last7DaysTransactionCount !== 1 ? 's' : ''}
                 </div>
               </div>
             </div>
@@ -205,68 +205,21 @@ export default function Dashboard() {
       {/* Stats Cards */}
       <div className="max-w-md md:max-w-2xl mx-auto px-3 sm:px-6 md:px-8 mt-[40px] sm:mt-[50px] md:mt-[60px] relative z-10">
         <div className="grid grid-cols-2 gap-3 sm:gap-5 md:gap-6 mb-4 sm:mb-6 md:mb-8">
-          {/* Revenue Progress Widget - Pie Chart */}
-          <div className="bg-white rounded-2xl sm:rounded-3xl md:rounded-[28px] p-3 sm:p-6 md:p-8 col-span-1 row-span-2 flex flex-col min-h-[320px] sm:min-h-[420px] md:min-h-[480px] shadow-lg transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] cursor-pointer" data-testid="card-revenue-split">
-            <div className="relative flex items-center justify-center mb-6 sm:mb-8 md:mb-10">
-              <svg 
-                width="174" 
-                height="174" 
-                viewBox="0 0 174 174" 
-                className="transform -rotate-90 w-[140px] h-[140px] sm:w-[160px] sm:h-[160px] md:w-[174px] md:h-[174px]"
-              >
-                <circle
-                  cx="87"
-                  cy="87"
-                  r="78.87"
-                  stroke="#E6E6EC"
-                  strokeWidth="16.26"
-                  fill="none"
-                />
-                <circle
-                  cx="87"
-                  cy="87"
-                  r="78.87"
-                  stroke="#0055FF"
-                  strokeWidth="16.26"
-                  fill="none"
-                  strokeDasharray={`${2 * Math.PI * 78.87}`}
-                  strokeDashoffset={`${2 * Math.PI * 78.87 * (1 - onlinePercentage / 100)}`}
-                />
-                
-                <circle
-                  cx="87"
-                  cy="87"
-                  r="55"
-                  stroke="#E6E6EC"
-                  strokeWidth="16"
-                  fill="none"
-                />
-                <circle
-                  cx="87"
-                  cy="87"
-                  r="55"
-                  stroke="#00E5CC"
-                  strokeWidth="16"
-                  fill="none"
-                  strokeDasharray={`${2 * Math.PI * 55}`}
-                  strokeDashoffset={`${2 * Math.PI * 55 * (1 - inStorePercentage / 100)}`}
-                />
-              </svg>
-            </div>
-
-            <div className="w-full mb-6 sm:mb-8 md:mb-10">
+          {/* Monthly Stats Widget */}
+          <div className="bg-white rounded-2xl sm:rounded-3xl md:rounded-[28px] p-3 sm:p-6 md:p-8 col-span-1 row-span-2 flex flex-col justify-center min-h-[320px] sm:min-h-[420px] md:min-h-[480px] shadow-lg transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] cursor-pointer" data-testid="card-monthly-stats">
+            <div className="w-full mb-8 sm:mb-12 md:mb-16">
               <div className="flex items-center justify-between mb-1 sm:mb-2">
-                <div className="text-[#3B3D53] text-xl sm:text-2xl md:text-3xl">{onlinePercentage}%</div>
+                <div className="text-[#3B3D53] text-xl sm:text-2xl md:text-3xl">${monthlyRevenue.toFixed(2)}</div>
               </div>
-              <div className="text-[#161A41] opacity-44 text-xs sm:text-base md:text-lg mb-2 sm:mb-3">Online Sales</div>
+              <div className="text-[#161A41] opacity-44 text-xs sm:text-base md:text-lg mb-2 sm:mb-3">Monthly Revenue</div>
               <div className="w-20 sm:w-24 md:w-28 h-[3px] bg-[#0055FF]"></div>
             </div>
 
             <div className="w-full">
               <div className="flex items-center justify-between mb-1 sm:mb-2">
-                <div className="text-[#3B3D53] text-xl sm:text-2xl md:text-3xl">{inStorePercentage}%</div>
+                <div className="text-[#3B3D53] text-xl sm:text-2xl md:text-3xl">{monthlyTransactionCount}</div>
               </div>
-              <div className="text-[#161A41] opacity-44 text-xs sm:text-base md:text-lg mb-2 sm:mb-3">In-Store Sales</div>
+              <div className="text-[#161A41] opacity-44 text-xs sm:text-base md:text-lg mb-2 sm:mb-3">Monthly Transactions</div>
               <div className="w-20 sm:w-24 md:w-28 h-[3px] bg-[#00E5CC]"></div>
             </div>
           </div>
@@ -292,13 +245,13 @@ export default function Dashboard() {
             <div className="text-[#00E5CC] text-xl sm:text-3xl md:text-4xl">${averageTransaction.toFixed(2)}</div>
           </div>
 
-          {/* Daily Revenue Card */}
-          <div className="bg-[#00E5CC] rounded-2xl sm:rounded-3xl md:rounded-[28px] p-3 sm:p-7 md:p-8 flex flex-col justify-between min-h-[90px] sm:min-h-[115px] md:min-h-[135px] transition-all duration-300 hover:shadow-2xl hover:scale-[1.05] cursor-pointer" data-testid="card-daily-revenue">
-            <h3 className="text-[#0055FF] text-[10px] sm:text-sm md:text-base">Daily Revenue</h3>
+          {/* Last 7 Days Revenue Card */}
+          <div className="bg-[#00E5CC] rounded-2xl sm:rounded-3xl md:rounded-[28px] p-3 sm:p-7 md:p-8 flex flex-col justify-between min-h-[90px] sm:min-h-[115px] md:min-h-[135px] transition-all duration-300 hover:shadow-2xl hover:scale-[1.05] cursor-pointer" data-testid="card-weekly-revenue">
+            <h3 className="text-[#0055FF] text-[10px] sm:text-sm md:text-base">Last 7 Days Revenue</h3>
             
             <div className="w-[100px] h-[45px] sm:w-[140px] sm:h-[60px] flex items-end justify-between gap-[4px] sm:gap-[6px] mx-auto my-1 sm:my-2">
-              {hourlyRevenue.map((revenue, index) => {
-                const height = maxHourlyRevenue > 0 ? (revenue / maxHourlyRevenue) * 100 : 15;
+              {last7DaysRevenueData.map((revenue, index) => {
+                const height = maxLast7DaysRevenue > 0 ? (revenue / maxLast7DaysRevenue) * 100 : 15;
                 const isMostRecent = index === 6;
                 return (
                   <div 
@@ -310,7 +263,7 @@ export default function Dashboard() {
               })}
             </div>
             
-            <div className="text-[#0055FF] text-xl sm:text-3xl md:text-4xl">${todayRevenue.toFixed(2)}</div>
+            <div className="text-[#0055FF] text-xl sm:text-3xl md:text-4xl">${last7DaysRevenue.toFixed(2)}</div>
           </div>
         </div>
 
