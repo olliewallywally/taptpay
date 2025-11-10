@@ -203,235 +203,214 @@ export default function CustomerPayment() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm md:max-w-md lg:max-w-lg relative">
+      <div className="w-full max-w-sm md:max-w-md lg:max-w-lg">
         <div className="rounded-[48px] md:rounded-[60px] overflow-hidden shadow-2xl">
           {/* Blue section with payment content */}
           <div 
             className="bg-[#0055FF] px-8 md:px-12 rounded-b-[48px] md:rounded-b-[60px] relative z-10 transition-all duration-500 ease-in-out"
             style={{
-              paddingTop: '2rem',
-              paddingBottom: showSplitBill ? '20rem' : '6rem'
+              paddingTop: showCardDetails ? '2rem' : '2rem',
+              paddingBottom: showCardDetails ? '1.5rem' : showSplitBill ? '20rem' : '6rem'
             }}
           >
-            {/* Logo */}
+            {/* Logo - Always visible */}
             <div className="text-center mb-8 md:mb-10">
               <img src={taptLogo} alt="taptpay" className="h-24 sm:h-28 md:h-32 mx-auto" />
             </div>
 
-            {/* Payment Status or Content */}
-            {paymentStatus !== "idle" ? (
-              <div className="mb-8">
-                {renderPaymentStatus()}
-              </div>
-            ) : (
-              <div>
-                {/* Item Name */}
-                <div className="text-center mb-3 sm:mb-4 md:mb-5">
-                  <p className="text-white/60 text-lg sm:text-xl md:text-2xl">{currentTransaction.itemName}</p>
+            {/* Payment options - Hidden when card details shown */}
+            <div 
+              className="transition-all duration-500 ease-in-out"
+              style={{
+                maxHeight: showCardDetails ? '0px' : '800px',
+                opacity: showCardDetails ? 0 : 1,
+                overflow: showCardDetails ? 'hidden' : 'visible'
+              }}
+            >
+              {/* Payment Status or Content */}
+              {paymentStatus !== "idle" ? (
+                <div className="mb-8">
+                  {renderPaymentStatus()}
                 </div>
+              ) : (
+                <div>
+                  {/* Item Name */}
+                  <div className="text-center mb-3 sm:mb-4 md:mb-5">
+                    <p className="text-white/60 text-lg sm:text-xl md:text-2xl">{currentTransaction.itemName}</p>
+                  </div>
 
-                {/* Amount */}
-                <div className="text-center mb-8 sm:mb-10 md:mb-12">
-                  <p className="text-[#00E5CC] text-5xl sm:text-6xl md:text-7xl font-bold">${displayAmount}</p>
-                  {currentTransaction.isSplit && (
-                    <p className="text-white/70 text-sm mt-2">
-                      Split {currentTransaction.completedSplits + 1}/{currentTransaction.totalSplits}
-                    </p>
-                  )}
-                </div>
+                  {/* Amount */}
+                  <div className="text-center mb-8 sm:mb-10 md:mb-12">
+                    <p className="text-[#00E5CC] text-5xl sm:text-6xl md:text-7xl font-bold">${displayAmount}</p>
+                    {currentTransaction.isSplit && (
+                      <p className="text-white/70 text-sm mt-2">
+                        Split {currentTransaction.completedSplits + 1}/{currentTransaction.totalSplits}
+                      </p>
+                    )}
+                  </div>
 
-                {/* Digital Wallet Payment Options */}
-                <div className="mb-4 sm:mb-5">
-                  <DigitalWalletButtons 
-                    amount={currentTransaction.isSplit ? parseFloat(currentTransaction.splitAmount) : parseFloat(currentTransaction.price)}
-                    currency="NZD"
-                    merchantName="Tapt Payment"
-                    itemName={currentTransaction.itemName}
-                    transactionId={currentTransaction.id}
-                    onPaymentStart={() => setPaymentStatus("processing")}
-                    onPaymentSuccess={(paymentData) => {
-                      console.log("Payment successful:", paymentData);
-                      setPaymentStatus("success");
-                    }}
-                    onPaymentError={(error) => {
-                      console.error("Payment error:", error);
-                      setPaymentStatus("error");
-                    }}
-                    disabled={paymentStatus !== "idle"}
-                  />
-                </div>
-
-                {/* Split the Bill Button - Only if not already split */}
-                {!currentTransaction.isSplit && (
-                  <div className="relative mb-4 md:mb-6">
-                    <button 
-                      onClick={() => {
-                        setShowSplitBill(!showSplitBill);
-                        setShowCardDetails(false);
+                  {/* Digital Wallet Payment Options */}
+                  <div className="mb-4 sm:mb-5">
+                    <DigitalWalletButtons 
+                      amount={currentTransaction.isSplit ? parseFloat(currentTransaction.splitAmount) : parseFloat(currentTransaction.price)}
+                      currency="NZD"
+                      merchantName="Tapt Payment"
+                      itemName={currentTransaction.itemName}
+                      transactionId={currentTransaction.id}
+                      onPaymentStart={() => setPaymentStatus("processing")}
+                      onPaymentSuccess={(paymentData) => {
+                        console.log("Payment successful:", paymentData);
+                        setPaymentStatus("success");
                       }}
-                      className="w-full bg-[#00E5CC] hover:bg-[#00c9b3] text-[#0055FF] rounded-[20px] sm:rounded-[24px] md:rounded-[28px] py-4 sm:py-5 md:py-6 flex items-center justify-center gap-2 transition-colors relative z-10"
-                      style={{
-                        borderBottomLeftRadius: showSplitBill ? '0' : '',
-                        borderBottomRightRadius: showSplitBill ? '0' : ''
+                      onPaymentError={(error) => {
+                        console.error("Payment error:", error);
+                        setPaymentStatus("error");
                       }}
-                    >
-                      <span className="text-base sm:text-lg md:text-xl">split the bill</span>
-                      {showSplitBill ? (
-                        <ChevronUp size={20} className="text-[#0055FF]" />
-                      ) : (
-                        <ChevronDown size={20} className="text-[#0055FF]" />
-                      )}
-                    </button>
+                      disabled={paymentStatus !== "idle"}
+                    />
+                  </div>
 
-                    {/* Split Bill Dropdown */}
-                    <div 
-                      className="transition-all duration-500 ease-in-out overflow-hidden absolute top-full left-0 right-0 z-0"
-                      style={{
-                        maxHeight: showSplitBill ? '300px' : '0px',
-                        opacity: showSplitBill ? 1 : 0
-                      }}
-                    >
-                      <div className="bg-white rounded-b-[48px] px-6 py-8">
-                        <BillSplit
-                          transactionId={currentTransaction.id}
-                          originalAmount={parseFloat(currentTransaction.price)}
-                          onSplitCreated={() => setShowSplitBill(false)}
-                        />
+                  {/* Split the Bill Button - Only if not already split */}
+                  {!currentTransaction.isSplit && (
+                    <div className="relative mb-4 md:mb-6">
+                      <button 
+                        onClick={() => {
+                          setShowSplitBill(!showSplitBill);
+                          setShowCardDetails(false);
+                        }}
+                        className="w-full bg-[#00E5CC] hover:bg-[#00c9b3] text-[#0055FF] rounded-[20px] sm:rounded-[24px] md:rounded-[28px] py-4 sm:py-5 md:py-6 flex items-center justify-center gap-2 transition-colors relative z-10"
+                        style={{
+                          borderBottomLeftRadius: showSplitBill ? '0' : '',
+                          borderBottomRightRadius: showSplitBill ? '0' : ''
+                        }}
+                      >
+                        <span className="text-base sm:text-lg md:text-xl">split the bill</span>
+                        {showSplitBill ? (
+                          <ChevronUp size={20} className="text-[#0055FF]" />
+                        ) : (
+                          <ChevronDown size={20} className="text-[#0055FF]" />
+                        )}
+                      </button>
+
+                      {/* Split Bill Dropdown */}
+                      <div 
+                        className="transition-all duration-500 ease-in-out overflow-hidden absolute top-full left-0 right-0 z-0"
+                        style={{
+                          maxHeight: showSplitBill ? '300px' : '0px',
+                          opacity: showSplitBill ? 1 : 0
+                        }}
+                      >
+                        <div className="bg-white rounded-b-[48px] px-6 py-8">
+                          <BillSplit
+                            transactionId={currentTransaction.id}
+                            originalAmount={parseFloat(currentTransaction.price)}
+                            onSplitCreated={() => setShowSplitBill(false)}
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            )}
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Cyan section */}
+          {/* Cyan section - Card Details Form */}
           <div 
             className="bg-[#00E5CC] px-8 relative z-0 transition-all duration-500 ease-in-out" 
             style={{ 
-              paddingTop: '5rem',
-              paddingBottom: '2rem',
+              paddingTop: showCardDetails ? '5rem' : '4rem',
+              paddingBottom: showCardDetails ? '2rem' : '0.75rem',
               marginTop: '-4rem'
             }}
           >
-            {/* Enter Card Details Button */}
-            <button 
-              onClick={() => {
-                setShowCardDetails(true);
-                setShowSplitBill(false);
+            {/* Card Details Form - Hidden by default */}
+            <div 
+              className="transition-all duration-500 ease-in-out overflow-hidden"
+              style={{
+                maxHeight: showCardDetails ? '600px' : '0px',
+                opacity: showCardDetails ? 1 : 0
               }}
-              className="w-full bg-[#0055FF] hover:opacity-90 text-white rounded-[20px] sm:rounded-[24px] md:rounded-[28px] py-4 sm:py-5 md:py-6 flex items-center justify-center gap-2 transition-opacity"
             >
-              <CreditCard size={20} />
-              <span className="text-base sm:text-lg md:text-xl">enter card details</span>
-              <ChevronDown size={20} />
-            </button>
-          </div>
-        </div>
+              <div className="space-y-4 mb-6">
+                {/* Card Number */}
+                <Input
+                  type="text"
+                  placeholder="Card Number"
+                  value={cardNumber}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\s/g, '').replace(/\D/g, '');
+                    const formatted = value.match(/.{1,4}/g)?.join(' ') || value;
+                    setCardNumber(formatted);
+                  }}
+                  maxLength={19}
+                  className="bg-gray-100 border-0 rounded-[16px] py-6 text-[#0055FF] placeholder:text-gray-400"
+                  data-testid="input-card-number"
+                />
 
-        {/* Card Details Overlay - Animated from bottom */}
-        <div 
-          className="fixed inset-0 z-50 transition-transform duration-500 ease-in-out"
-          style={{
-            transform: showCardDetails ? 'translateY(0)' : 'translateY(100%)',
-            pointerEvents: showCardDetails ? 'auto' : 'none'
-          }}
-        >
-          <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-            <div className="w-full max-w-sm md:max-w-md lg:max-w-lg">
-              <div className="rounded-[48px] md:rounded-[60px] overflow-hidden shadow-2xl bg-[#0055FF]">
-                {/* Logo */}
-                <div className="text-center pt-8 pb-6">
-                  <img src={taptLogo} alt="taptpay" className="h-24 sm:h-28 md:h-32 mx-auto" />
+                {/* Card Name */}
+                <Input
+                  type="text"
+                  placeholder="Name on Card"
+                  value={cardName}
+                  onChange={(e) => setCardName(e.target.value)}
+                  className="bg-gray-100 border-0 rounded-[16px] py-6 text-[#0055FF] placeholder:text-gray-400"
+                  data-testid="input-card-name"
+                />
+
+                {/* Expiry and CVV */}
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    type="text"
+                    placeholder="MM/YY"
+                    value={cardExpiry}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, '');
+                      let formatted = value;
+                      if (value.length >= 2) {
+                        formatted = value.slice(0, 2) + '/' + value.slice(2, 4);
+                      }
+                      setCardExpiry(formatted);
+                    }}
+                    maxLength={5}
+                    className="bg-gray-100 border-0 rounded-[16px] py-6 text-[#0055FF] placeholder:text-gray-400"
+                    data-testid="input-card-expiry"
+                  />
+                  <Input
+                    type="text"
+                    placeholder="CVV"
+                    value={cardCvc}
+                    onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                    maxLength={4}
+                    className="bg-gray-100 border-0 rounded-[16px] py-6 text-[#0055FF] placeholder:text-gray-400"
+                    data-testid="input-card-cvc"
+                  />
                 </div>
+              </div>
 
-                {/* Card Details Form */}
-                <div className="px-8 md:px-12 pb-8">
-                  <div className="bg-white rounded-[28px] md:rounded-[32px] px-6 py-8 space-y-4">
-                    <h3 className="text-[#0055FF] font-semibold text-xl mb-4 text-center">Enter Card Details</h3>
-                    
-                    <div>
-                      <label className="text-[#0055FF] text-sm font-medium mb-1 block">Card Number</label>
-                      <Input
-                        type="text"
-                        placeholder="1234 5678 9012 3456"
-                        value={cardNumber}
-                        onChange={(e) => {
-                          const value = e.target.value.replace(/\s/g, '').replace(/\D/g, '');
-                          const formatted = value.match(/.{1,4}/g)?.join(' ') || value;
-                          setCardNumber(formatted);
-                        }}
-                        maxLength={19}
-                        className="bg-[#0055FF]/10 border-2 border-[#00E5CC] text-[#0055FF] rounded-xl h-12 px-4"
-                        data-testid="input-card-number"
-                      />
-                    </div>
+              {/* Pay Now Button */}
+              <Button 
+                className="w-full bg-[#0055FF] hover:bg-[#0044dd] text-[#00E5CC] rounded-[20px] py-6 text-lg mb-6"
+                onClick={() => processCardPaymentMutation.mutate()}
+                disabled={!cardNumber || !cardExpiry || !cardCvc || !cardName || processCardPaymentMutation.isPending}
+                data-testid="button-pay-now"
+              >
+                {processCardPaymentMutation.isPending ? "Processing..." : "pay now."}
+              </Button>
+            </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[#0055FF] text-sm font-medium mb-1 block">Expiry</label>
-                        <Input
-                          type="text"
-                          placeholder="MM/YY"
-                          value={cardExpiry}
-                          onChange={(e) => {
-                            const value = e.target.value.replace(/\D/g, '');
-                            let formatted = value;
-                            if (value.length >= 2) {
-                              formatted = value.slice(0, 2) + '/' + value.slice(2, 4);
-                            }
-                            setCardExpiry(formatted);
-                          }}
-                          maxLength={5}
-                          className="bg-[#0055FF]/10 border-2 border-[#00E5CC] text-[#0055FF] rounded-xl h-12 px-4"
-                          data-testid="input-card-expiry"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[#0055FF] text-sm font-medium mb-1 block">CVC</label>
-                        <Input
-                          type="text"
-                          placeholder="123"
-                          value={cardCvc}
-                          onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                          maxLength={4}
-                          className="bg-[#0055FF]/10 border-2 border-[#00E5CC] text-[#0055FF] rounded-xl h-12 px-4"
-                          data-testid="input-card-cvc"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="text-[#0055FF] text-sm font-medium mb-1 block">Cardholder Name</label>
-                      <Input
-                        type="text"
-                        placeholder="John Smith"
-                        value={cardName}
-                        onChange={(e) => setCardName(e.target.value)}
-                        className="bg-[#0055FF]/10 border-2 border-[#00E5CC] text-[#0055FF] rounded-xl h-12 px-4"
-                        data-testid="input-card-name"
-                      />
-                    </div>
-
-                    <div className="flex gap-3 pt-4">
-                      <button
-                        onClick={() => setShowCardDetails(false)}
-                        className="flex-1 bg-[#E8E5E0] text-[#0055FF] rounded-xl py-4 hover:opacity-90 transition-opacity font-semibold text-lg"
-                        data-testid="button-cancel-card-payment"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => processCardPaymentMutation.mutate()}
-                        disabled={!cardNumber || !cardExpiry || !cardCvc || !cardName || processCardPaymentMutation.isPending}
-                        className="flex-1 bg-[#00E5CC] text-[#0055FF] rounded-xl py-4 hover:opacity-90 transition-opacity disabled:opacity-50 font-semibold text-lg"
-                        data-testid="button-pay-now"
-                      >
-                        {processCardPaymentMutation.isPending ? "Processing..." : "Pay Now"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
+            {/* Enter Card Details Toggle */}
+            <div 
+              className="cursor-pointer hover:opacity-80 transition-all duration-500 py-2"
+              onClick={() => setShowCardDetails(!showCardDetails)}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-[#0055FF] text-base sm:text-lg">enter card details</span>
+                {showCardDetails ? (
+                  <ChevronUp size={20} className="text-[#0055FF]" />
+                ) : (
+                  <ChevronDown size={20} className="text-[#0055FF]" />
+                )}
               </div>
             </div>
           </div>
