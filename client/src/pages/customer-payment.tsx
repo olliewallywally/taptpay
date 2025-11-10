@@ -112,6 +112,17 @@ export default function CustomerPayment() {
 
   const id = merchantId ? parseInt(merchantId) : null;
   const stoneNumber = stoneId ? parseInt(stoneId) : null;
+
+  // Fetch merchant data for custom logo
+  const { data: merchant } = useQuery({
+    queryKey: ["/api/merchants", id],
+    queryFn: async () => {
+      const response = await fetch(`/api/merchants/${id}`);
+      if (!response.ok) throw new Error("Failed to fetch merchant");
+      return response.json();
+    },
+    enabled: !!id,
+  });
   
   if (!id) {
     return (
@@ -264,7 +275,11 @@ export default function CustomerPayment() {
           <div className="rounded-[48px] md:rounded-[60px] overflow-hidden shadow-2xl">
             <div className="bg-[#0055FF] px-8 md:px-12 pt-8 pb-16 rounded-b-[48px] md:rounded-b-[60px]">
               <div className="text-center mb-8 md:mb-10">
-                <img src={taptLogo} alt="taptpay" className="h-24 sm:h-28 md:h-32 mx-auto" />
+                <img 
+                  src={merchant?.customLogoUrl || taptLogo} 
+                  alt="merchant logo" 
+                  className="h-24 sm:h-28 md:h-32 mx-auto" 
+                />
               </div>
               {isLoading ? (
                 <div className="animate-pulse text-center">
@@ -303,7 +318,12 @@ export default function CustomerPayment() {
           >
             {/* Logo - Always visible */}
             <div className="text-center mb-8 md:mb-10">
-              <img src={taptLogo} alt="taptpay" className="h-12 sm:h-14 md:h-16 mx-auto" style={{ filter: 'brightness(0) saturate(100%) invert(78%) sepia(96%) saturate(2453%) hue-rotate(131deg) brightness(97%) contrast(101%)' }} />
+              <img 
+                src={merchant?.customLogoUrl || taptLogo} 
+                alt="merchant logo" 
+                className="h-12 sm:h-14 md:h-16 mx-auto object-contain" 
+                style={merchant?.customLogoUrl ? {} : { filter: 'brightness(0) saturate(100%) invert(78%) sepia(96%) saturate(2453%) hue-rotate(131deg) brightness(97%) contrast(101%)' }} 
+              />
             </div>
 
             {/* Payment options - Hidden when card details shown */}

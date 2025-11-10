@@ -14,10 +14,12 @@ export interface IStorage {
   verifyMerchant(token: string, passwordHash: string): Promise<Merchant | undefined>;
   updateMerchantStatus(id: number, status: string): Promise<Merchant | undefined>;
   updateMerchantRates(id: number, currentProviderRate: string): Promise<Merchant | undefined>;
+  updateMerchant(id: number, updates: Partial<Merchant>): Promise<Merchant | undefined>;
   updateMerchantDetails(id: number, details: { businessName: string; contactEmail: string; contactPhone: string; businessAddress: string }): Promise<Merchant | undefined>;
   updateMerchantBankAccount(id: number, bankDetails: { bankName: string; bankAccountNumber: string; bankBranch: string; accountHolderName: string }): Promise<Merchant | undefined>;
   updateMerchantTheme(id: number, themeId: string): Promise<Merchant | undefined>;
   updateMerchantCryptoSettings(id: number, settings: any): Promise<Merchant | undefined>;
+  updateMerchantLogoUrl(id: number, logoUrl: string | null): Promise<Merchant | undefined>;
   getAllMerchants(): Promise<Merchant[]>;
   deleteMerchant(id: number): Promise<boolean>;
   
@@ -647,6 +649,32 @@ export class MemStorage implements IStorage {
     return updatedMerchant;
   }
 
+  async updateMerchant(id: number, updates: Partial<Merchant>): Promise<Merchant | undefined> {
+    const merchant = this.merchants.get(id);
+    if (!merchant) return undefined;
+    
+    const updatedMerchant = {
+      ...merchant,
+      ...updates,
+      updatedAt: new Date(),
+    };
+    this.merchants.set(id, updatedMerchant);
+    return updatedMerchant;
+  }
+
+  async updateMerchantLogoUrl(id: number, logoUrl: string | null): Promise<Merchant | undefined> {
+    const merchant = this.merchants.get(id);
+    if (!merchant) return undefined;
+    
+    const updatedMerchant = {
+      ...merchant,
+      customLogoUrl: logoUrl,
+      updatedAt: new Date(),
+    };
+    this.merchants.set(id, updatedMerchant);
+    return updatedMerchant;
+  }
+
   async updateMerchantDetails(id: number, details: { businessName: string; contactEmail: string; contactPhone: string; businessAddress: string }): Promise<Merchant | undefined> {
     const merchant = this.merchants.get(id);
     if (!merchant) return undefined;
@@ -1234,6 +1262,26 @@ export class DatabaseStorage implements IStorage {
     const result = await this.db
       .update(merchants)
       .set({ currentProviderRate })
+      .where(eq(merchants.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async updateMerchant(id: number, updates: Partial<Merchant>): Promise<Merchant | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .update(merchants)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(merchants.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async updateMerchantLogoUrl(id: number, logoUrl: string | null): Promise<Merchant | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .update(merchants)
+      .set({ customLogoUrl: logoUrl, updatedAt: new Date() })
       .where(eq(merchants.id, id))
       .returning();
     return result[0];

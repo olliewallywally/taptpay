@@ -14,6 +14,9 @@ import { z } from "zod";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import bcrypt from "bcrypt";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 
 // Store SSE connections for real-time updates (merchantId -> stoneId -> Set of connections)
 // stoneId can be null for merchant-level connections
@@ -46,6 +49,46 @@ const createCryptoTransactionSchema = z.object({
   fiatAmount: z.string().regex(/^\d+(\.\d{1,2})?$/),
   cryptocurrency: z.enum(["BTC", "ETH", "USDC", "USDT", "LTC", "BCH"]),
 });
+
+// Multer configuration for logo uploads
+const uploadsDir = path.join(process.cwd(), 'uploads', 'logos');
+
+// Ensure uploads directory exists
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+const logoStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    const merchantId = req.params.id;
+    const ext = path.extname(file.originalname);
+    cb(null, `merchant-${merchantId}${ext}`);
+  }
+});
+
+const logoUpload = multer({
+  storage: logoStorage,
+  limits: {
+    fileSize: 20 * 1024 * 1024, // 20MB max
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'image/png') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PNG files are allowed'));
+    }
+  }
+});
+
+// Utility to remove undefined keys
+function removeUndefined<T extends Record<string, any>>(obj: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([_, v]) => v !== undefined)
+  ) as Partial<T>;
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -1444,6 +1487,136 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating theme:", error);
       res.status(500).json({ message: "Failed to update theme" });
+    }
+  });
+
+  // Update merchant (general purpose endpoint for merchant-editable fields only)
+  app.put("/api/merchants/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      
+      // Verify user owns this merchant
+      if (!req.user || req.user.merchantId !== merchantId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      // Validation schema for allowed merchant updates
+      const updateSchema = z.object({
+        businessName: z.string().optional(),
+        director: z.string().optional(),
+        address: z.string().optional(),
+        nzbn: z.string().optional(),
+        phone: z.string().optional(),
+        email: z.string().email().optional(),
+        gstNumber: z.string().optional(),
+        windcaveApiKey: z.string().optional(),
+        contactEmail: z.string().email().optional(),
+        contactPhone: z.string().optional(),
+        businessAddress: z.string().optional(),
+      }).strict(); // Reject any fields not in the schema
+
+      // Validate and parse request body
+      const parseResult = updateSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid fields", 
+          errors: parseResult.error.errors 
+        });
+      }
+
+      const updates = parseResult.data;
+
+      // Remove undefined fields
+      const filteredUpdates = Object.fromEntries(
+        Object.entries(updates).filter(([_, value]) => value !== undefined)
+      );
+
+      if (Object.keys(filteredUpdates).length === 0) {
+        return res.status(400).json({ message: "No valid fields to update" });
+      }
+
+      const updatedMerchant = await storage.updateMerchant(merchantId, filteredUpdates);
+      if (!updatedMerchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+
+      res.json(updatedMerchant);
+    } catch (error) {
+      console.error("Update merchant error:", error);
+      res.status(500).json({ message: "Failed to update merchant" });
+    }
+  });
+
+  // Upload merchant logo
+  app.post("/api/merchants/:id/logo", authenticateToken, logoUpload.single('logo'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      
+      // Verify user owns this merchant
+      if (!req.user || req.user.merchantId !== merchantId) {
+        // Clean up uploaded file if unauthorized
+        if (req.file) {
+          fs.unlinkSync(req.file.path);
+        }
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      // Generate URL path for the logo
+      const logoUrl = `/uploads/logos/${req.file.filename}`;
+      
+      // Update merchant with new logo URL
+      const updatedMerchant = await storage.updateMerchantLogoUrl(merchantId, logoUrl);
+      if (!updatedMerchant) {
+        // Clean up uploaded file if merchant not found
+        fs.unlinkSync(req.file.path);
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+
+      res.json({ logoUrl, message: "Logo uploaded successfully" });
+    } catch (error) {
+      console.error("Logo upload error:", error);
+      // Clean up uploaded file on error
+      if (req.file) {
+        fs.unlinkSync(req.file.path);
+      }
+      res.status(500).json({ message: "Failed to upload logo" });
+    }
+  });
+
+  // Delete merchant logo
+  app.delete("/api/merchants/:id/logo", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      
+      // Verify user owns this merchant
+      if (!req.user || req.user.merchantId !== merchantId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+
+      // Delete the file from disk if it exists
+      if (merchant.customLogoUrl) {
+        const filepath = path.join(process.cwd(), merchant.customLogoUrl);
+        if (fs.existsSync(filepath)) {
+          fs.unlinkSync(filepath);
+        }
+      }
+
+      // Remove logo URL from database
+      const updatedMerchant = await storage.updateMerchantLogoUrl(merchantId, null);
+      
+      res.json({ message: "Logo deleted successfully" });
+    } catch (error) {
+      console.error("Logo deletion error:", error);
+      res.status(500).json({ message: "Failed to delete logo" });
     }
   });
 
@@ -3157,6 +3330,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to get digital wallet configuration" });
     }
   });
+
+  // Serve static uploads
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
   const httpServer = createServer(app);
   return httpServer;
