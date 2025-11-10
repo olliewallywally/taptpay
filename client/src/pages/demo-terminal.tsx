@@ -488,9 +488,7 @@ export default function DemoTerminal() {
           </div>
           
           {/* Action Buttons Section */}
-          <div className={`bg-[#E8E5E0] rounded-t-[48px] md:rounded-t-[60px] px-8 md:px-12 pt-8 md:pt-12 pb-6 md:pb-10 relative transition-all duration-500 ${
-            !activeDropdown ? 'rounded-b-[48px] md:rounded-b-[60px]' : ''
-          }`}>
+          <div className="bg-[#E8E5E0] rounded-t-[48px] md:rounded-t-[60px] rounded-b-[48px] md:rounded-b-[60px] px-8 md:px-12 pt-8 md:pt-12 pb-6 md:pb-10 relative transition-all duration-500">
             <div className="flex items-center justify-between gap-4 md:gap-6 relative z-20">
               <button 
                 onClick={() => {
