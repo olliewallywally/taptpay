@@ -1143,10 +1143,10 @@ export default function DemoTerminal() {
 
       {/* NFC Overlay */}
       <div 
-        className="fixed left-0 right-0 bg-[#00E5CC] z-40 transition-all duration-700 ease-in-out overflow-hidden rounded-b-[90px]"
+        className="fixed left-0 right-0 bg-[#00E5CC] z-40 transition-all duration-700 ease-in-out overflow-hidden rounded-b-[85px]"
         style={{
           top: isNfcOverlayActive ? '0' : '-100%',
-          bottom: isNfcOverlayActive ? '185px' : '100%',
+          bottom: isNfcOverlayActive ? '180px' : '100%',
         }}
       >
         <div className="h-full flex flex-col items-center justify-center px-6">
