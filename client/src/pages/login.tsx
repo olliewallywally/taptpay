@@ -276,7 +276,7 @@ export default function Login() {
 
           {/* Cyan bottom section */}
           <div 
-            className="bg-[#00E5CC] px-8 md:px-12 py-4 md:py-5 flex items-center justify-center cursor-pointer hover:bg-[#00FFE5] transition-colors -mt-12 md:-mt-14 pt-16 md:pt-20 relative z-30 rounded-b-[48px] md:rounded-b-[60px]"
+            className="bg-[#00E5CC] px-8 md:px-12 py-4 md:py-5 flex items-center justify-center cursor-pointer hover:bg-[#00FFE5] transition-colors mt-2 md:mt-3 relative z-10 rounded-[48px] md:rounded-[60px]"
             onClick={() => setShowMore(!showMore)}
             data-testid="button-show-more"
           >
