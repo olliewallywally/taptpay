@@ -5,9 +5,10 @@ import { DigitalWalletButtons } from "@/components/digital-wallet-buttons";
 import { BillSplit } from "@/components/bill-split";
 import { sseClient } from "@/lib/sse-client";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { CheckCircle, XCircle, ChevronDown, ChevronUp, Minus, Plus } from "lucide-react";
+import { CheckCircle, XCircle, ChevronDown, ChevronUp, Minus, Plus, CreditCard } from "lucide-react";
 import taptLogo from "@assets/IMG_6592_1755070818452.png";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export default function CustomerPayment() {
   const { merchantId, stoneId } = useParams<{ merchantId: string; stoneId?: string }>();
@@ -15,6 +16,11 @@ export default function CustomerPayment() {
   const [currentTransaction, setCurrentTransaction] = useState<any>(null);
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
   const [showSplitBill, setShowSplitBill] = useState(false);
+  const [showCardDetails, setShowCardDetails] = useState(false);
+  const [cardNumber, setCardNumber] = useState("");
+  const [cardExpiry, setCardExpiry] = useState("");
+  const [cardCvc, setCardCvc] = useState("");
+  const [cardName, setCardName] = useState("");
 
   const id = merchantId ? parseInt(merchantId) : null;
   const stoneNumber = stoneId ? parseInt(stoneId) : null;
@@ -64,6 +70,29 @@ export default function CustomerPayment() {
       return response.json();
     },
     onSuccess: () => setPaymentStatus("processing"),
+    onError: () => setPaymentStatus("error"),
+  });
+
+  const processCardPaymentMutation = useMutation({
+    mutationFn: async () => {
+      if (!currentTransaction) throw new Error("No transaction");
+      // In a real implementation, this would send card details to a payment processor
+      // For now, we'll simulate the payment process
+      const response = await apiRequest("POST", `/api/transactions/${currentTransaction.id}/pay`, {
+        paymentMethod: "card",
+        cardLast4: cardNumber.slice(-4)
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      setPaymentStatus("processing");
+      setShowCardDetails(false);
+      // Reset card form
+      setCardNumber("");
+      setCardExpiry("");
+      setCardCvc("");
+      setCardName("");
+    },
     onError: () => setPaymentStatus("error"),
   });
 
@@ -181,7 +210,7 @@ export default function CustomerPayment() {
             className="bg-[#0055FF] px-8 md:px-12 rounded-b-[48px] md:rounded-b-[60px] relative z-10 transition-all duration-500 ease-in-out"
             style={{
               paddingTop: '2rem',
-              paddingBottom: showSplitBill ? '20rem' : '6rem'
+              paddingBottom: showSplitBill ? '20rem' : showCardDetails ? '32rem' : '6rem'
             }}
           >
             {/* Logo */}
@@ -232,11 +261,125 @@ export default function CustomerPayment() {
                   />
                 </div>
 
+                {/* Enter Card Details Button */}
+                <div className="relative mb-4">
+                  <button 
+                    onClick={() => {
+                      setShowCardDetails(!showCardDetails);
+                      setShowSplitBill(false);
+                    }}
+                    className="w-full bg-white/10 hover:bg-white/20 border-2 border-white/30 text-white rounded-[20px] sm:rounded-[24px] md:rounded-[28px] py-4 sm:py-5 md:py-6 flex items-center justify-center gap-2 transition-colors relative z-10"
+                    style={{
+                      borderBottomLeftRadius: showCardDetails ? '0' : '',
+                      borderBottomRightRadius: showCardDetails ? '0' : ''
+                    }}
+                  >
+                    <CreditCard size={20} />
+                    <span className="text-base sm:text-lg md:text-xl">enter card details</span>
+                    {showCardDetails ? (
+                      <ChevronUp size={20} />
+                    ) : (
+                      <ChevronDown size={20} />
+                    )}
+                  </button>
+
+                  {/* Card Details Dropdown */}
+                  <div 
+                    className="transition-all duration-500 ease-in-out overflow-hidden absolute top-full left-0 right-0 z-0"
+                    style={{
+                      maxHeight: showCardDetails ? '500px' : '0px',
+                      opacity: showCardDetails ? 1 : 0
+                    }}
+                  >
+                    <div className="bg-white rounded-b-[28px] md:rounded-b-[32px] px-6 py-8 space-y-4">
+                      <h3 className="text-[#0055FF] font-semibold text-lg mb-4">Card Details</h3>
+                      
+                      <div>
+                        <label className="text-[#0055FF] text-sm font-medium mb-1 block">Card Number</label>
+                        <Input
+                          type="text"
+                          placeholder="1234 5678 9012 3456"
+                          value={cardNumber}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/\s/g, '').replace(/\D/g, '');
+                            const formatted = value.match(/.{1,4}/g)?.join(' ') || value;
+                            setCardNumber(formatted);
+                          }}
+                          maxLength={19}
+                          className="bg-[#0055FF]/10 border-2 border-[#00E5CC] text-[#0055FF] rounded-xl h-12 px-4"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[#0055FF] text-sm font-medium mb-1 block">Expiry</label>
+                          <Input
+                            type="text"
+                            placeholder="MM/YY"
+                            value={cardExpiry}
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/\D/g, '');
+                              let formatted = value;
+                              if (value.length >= 2) {
+                                formatted = value.slice(0, 2) + '/' + value.slice(2, 4);
+                              }
+                              setCardExpiry(formatted);
+                            }}
+                            maxLength={5}
+                            className="bg-[#0055FF]/10 border-2 border-[#00E5CC] text-[#0055FF] rounded-xl h-12 px-4"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[#0055FF] text-sm font-medium mb-1 block">CVC</label>
+                          <Input
+                            type="text"
+                            placeholder="123"
+                            value={cardCvc}
+                            onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                            maxLength={4}
+                            className="bg-[#0055FF]/10 border-2 border-[#00E5CC] text-[#0055FF] rounded-xl h-12 px-4"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[#0055FF] text-sm font-medium mb-1 block">Cardholder Name</label>
+                        <Input
+                          type="text"
+                          placeholder="John Smith"
+                          value={cardName}
+                          onChange={(e) => setCardName(e.target.value)}
+                          className="bg-[#0055FF]/10 border-2 border-[#00E5CC] text-[#0055FF] rounded-xl h-12 px-4"
+                        />
+                      </div>
+
+                      <div className="flex gap-3 pt-2">
+                        <button
+                          onClick={() => setShowCardDetails(false)}
+                          className="flex-1 bg-[#E8E5E0] text-[#0055FF] rounded-xl py-3 hover:opacity-90 transition-opacity font-medium"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => processCardPaymentMutation.mutate()}
+                          disabled={!cardNumber || !cardExpiry || !cardCvc || !cardName || processCardPaymentMutation.isPending}
+                          className="flex-1 bg-[#00E5CC] text-[#0055FF] rounded-xl py-3 hover:opacity-90 transition-opacity disabled:opacity-50 font-medium"
+                        >
+                          {processCardPaymentMutation.isPending ? "Processing..." : "Pay Now"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Split the Bill Button - Only if not already split */}
                 {!currentTransaction.isSplit && (
                   <div className="relative mb-4 md:mb-6">
                     <button 
-                      onClick={() => setShowSplitBill(!showSplitBill)}
+                      onClick={() => {
+                        setShowSplitBill(!showSplitBill);
+                        setShowCardDetails(false);
+                      }}
                       className="w-full bg-[#00E5CC] hover:bg-[#00c9b3] text-[#0055FF] rounded-[20px] sm:rounded-[24px] md:rounded-[28px] py-4 sm:py-5 md:py-6 flex items-center justify-center gap-2 transition-colors relative z-10"
                       style={{
                         borderBottomLeftRadius: showSplitBill ? '0' : '',
