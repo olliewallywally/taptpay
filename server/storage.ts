@@ -57,6 +57,7 @@ export interface IStorage {
   createTaptStone(data: InsertTaptStone): Promise<TaptStone>;
   getTaptStone(id: number): Promise<TaptStone | undefined>;
   getTaptStonesByMerchant(merchantId: number): Promise<TaptStone[]>;
+  updateTaptStone(id: number, data: Partial<{ name: string }>): Promise<TaptStone | undefined>;
   updateTaptStoneUrls(id: number, qrCodeUrl: string, paymentUrl: string): Promise<TaptStone | undefined>;
   deleteTaptStone(id: number): Promise<boolean>;
   associateTransactionWithStone(transactionId: number, stoneId: number): Promise<void>;
@@ -1103,6 +1104,19 @@ export class MemStorage implements IStorage {
     );
   }
 
+  async updateTaptStone(id: number, data: Partial<{ name: string }>): Promise<TaptStone | undefined> {
+    const stone = this.taptStones.get(id);
+    if (stone) {
+      if (data.name !== undefined) {
+        stone.name = data.name;
+      }
+      stone.updatedAt = new Date();
+      this.taptStones.set(id, stone);
+      return stone;
+    }
+    return undefined;
+  }
+
   async updateTaptStoneUrls(id: number, qrCodeUrl: string, paymentUrl: string): Promise<TaptStone | undefined> {
     const stone = this.taptStones.get(id);
     if (stone) {
@@ -2043,6 +2057,19 @@ export class DatabaseStorage implements IStorage {
       .from(taptStones)
       .where(and(eq(taptStones.merchantId, merchantId), eq(taptStones.isActive, true)))
       .orderBy(taptStones.stoneNumber);
+  }
+
+  async updateTaptStone(id: number, data: Partial<{ name: string }>): Promise<TaptStone | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .update(taptStones)
+      .set({ 
+        ...data,
+        updatedAt: new Date() 
+      })
+      .where(eq(taptStones.id, id))
+      .returning();
+    return result[0];
   }
 
   async updateTaptStoneUrls(id: number, qrCodeUrl: string, paymentUrl: string): Promise<TaptStone | undefined> {
