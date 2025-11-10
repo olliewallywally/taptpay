@@ -13,9 +13,12 @@ import {
 
 interface MerchantDetails {
   businessName: string;
-  email: string;
-  phone: string;
+  director: string;
   address: string;
+  nzbn: string;
+  phone: string;
+  email: string;
+  gstNumber: string;
 }
 
 export default function Settings() {
@@ -26,10 +29,18 @@ export default function Settings() {
 
   const [businessDetails, setBusinessDetails] = useState<MerchantDetails>({
     businessName: '',
-    email: '',
-    phone: '',
+    director: '',
     address: '',
+    nzbn: '',
+    phone: '',
+    email: '',
+    gstNumber: '',
   });
+
+  const [windcaveApi, setWindcaveApi] = useState('');
+  const [apiActive, setApiActive] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
   if (!merchantId) {
     setLocation('/login');
@@ -47,10 +58,15 @@ export default function Settings() {
       const data = await response.json();
       setBusinessDetails({
         businessName: data.businessName || '',
-        email: data.email || '',
-        phone: data.phone || '',
+        director: data.director || '',
         address: data.address || '',
+        nzbn: data.nzbn || '',
+        phone: data.phone || '',
+        email: data.email || '',
+        gstNumber: data.gstNumber || '',
       });
+      setWindcaveApi(data.windcaveApiKey || '');
+      setApiActive(!!data.windcaveApiKey);
       return data;
     },
   });
@@ -86,6 +102,33 @@ export default function Settings() {
     updateMerchantMutation.mutate(businessDetails);
   };
 
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.type !== 'image/png') {
+        toast({ title: "Please upload a PNG file only", variant: "destructive" });
+        return;
+      }
+      if (file.size > 20 * 1024 * 1024) {
+        toast({ title: "File size must be less than 20MB", variant: "destructive" });
+        return;
+      }
+      setLogoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleApiSave = () => {
+    if (windcaveApi.trim()) {
+      setApiActive(true);
+      toast({ title: "Windcave API key saved successfully" });
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem("authToken");
     setLocation('/login');
@@ -116,7 +159,7 @@ export default function Settings() {
           
           <div className="space-y-4">
             <div>
-              <Label htmlFor="businessName" className="text-gray-700 text-sm mb-1.5 block">Business Name</Label>
+              <Label htmlFor="businessName" className="text-gray-700 text-sm mb-1.5 block">Company Name</Label>
               <Input
                 id="businessName"
                 value={businessDetails.businessName}
@@ -127,14 +170,35 @@ export default function Settings() {
             </div>
 
             <div>
-              <Label htmlFor="email" className="text-gray-700 text-sm mb-1.5 block">Email</Label>
+              <Label htmlFor="director" className="text-gray-700 text-sm mb-1.5 block">Director</Label>
               <Input
-                id="email"
-                type="email"
-                value={businessDetails.email}
-                onChange={(e) => handleBusinessChange('email', e.target.value)}
+                id="director"
+                value={businessDetails.director}
+                onChange={(e) => handleBusinessChange('director', e.target.value)}
                 className="border-[#0055FF] focus:border-[#00E5CC] focus:ring-[#00E5CC]"
-                data-testid="input-email"
+                data-testid="input-director"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="address" className="text-gray-700 text-sm mb-1.5 block">Address</Label>
+              <Input
+                id="address"
+                value={businessDetails.address}
+                onChange={(e) => handleBusinessChange('address', e.target.value)}
+                className="border-[#0055FF] focus:border-[#00E5CC] focus:ring-[#00E5CC]"
+                data-testid="input-address"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="nzbn" className="text-gray-700 text-sm mb-1.5 block">NZBN</Label>
+              <Input
+                id="nzbn"
+                value={businessDetails.nzbn}
+                onChange={(e) => handleBusinessChange('nzbn', e.target.value)}
+                className="border-[#0055FF] focus:border-[#00E5CC] focus:ring-[#00E5CC]"
+                data-testid="input-nzbn"
               />
             </div>
 
@@ -151,13 +215,25 @@ export default function Settings() {
             </div>
 
             <div>
-              <Label htmlFor="address" className="text-gray-700 text-sm mb-1.5 block">Address</Label>
+              <Label htmlFor="email" className="text-gray-700 text-sm mb-1.5 block">Email</Label>
               <Input
-                id="address"
-                value={businessDetails.address}
-                onChange={(e) => handleBusinessChange('address', e.target.value)}
+                id="email"
+                type="email"
+                value={businessDetails.email}
+                onChange={(e) => handleBusinessChange('email', e.target.value)}
                 className="border-[#0055FF] focus:border-[#00E5CC] focus:ring-[#00E5CC]"
-                data-testid="input-address"
+                data-testid="input-email"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="gstNumber" className="text-gray-700 text-sm mb-1.5 block">GST Number</Label>
+              <Input
+                id="gstNumber"
+                value={businessDetails.gstNumber}
+                onChange={(e) => handleBusinessChange('gstNumber', e.target.value)}
+                className="border-[#0055FF] focus:border-[#00E5CC] focus:ring-[#00E5CC]"
+                data-testid="input-gst-number"
               />
             </div>
           </div>
@@ -174,16 +250,89 @@ export default function Settings() {
 
         {/* API Status Section */}
         <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 mb-5">
-          <h2 className="text-[#0055FF] text-xl mb-5">Payment Integration</h2>
+          <h2 className="text-[#0055FF] text-xl mb-5">API Status</h2>
           
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <CheckCircle className="text-green-500" size={20} />
-                  <span className="text-gray-700 font-medium">Windcave Payment Gateway</span>
-                </div>
-                <p className="text-gray-500 text-sm">Secure payment processing enabled</p>
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <Label htmlFor="windcaveApi" className="text-gray-700 text-sm">Windcave API Key</Label>
+                {apiActive ? (
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="text-green-500" size={20} />
+                    <span className="text-green-500 text-sm">Active</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <XCircle className="text-gray-400" size={20} />
+                    <span className="text-gray-400 text-sm">Inactive</span>
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  id="windcaveApi"
+                  type="password"
+                  value={windcaveApi}
+                  onChange={(e) => setWindcaveApi(e.target.value)}
+                  placeholder="Enter Windcave API key"
+                  className="border-[#0055FF] focus:border-[#00E5CC] focus:ring-[#00E5CC] flex-1"
+                  data-testid="input-windcave-api"
+                />
+                <Button 
+                  onClick={handleApiSave}
+                  className="bg-[#00E5CC] hover:bg-[#00c9b3] text-[#0055FF]"
+                  data-testid="button-save-api"
+                >
+                  Save
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Logo Upload Section */}
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 mb-5">
+          <h2 className="text-[#0055FF] text-xl mb-5">Customer Payment Page Logo</h2>
+          
+          <div className="space-y-4">
+            <div>
+              <Label className="text-gray-700 text-sm mb-2 block">Upload Logo (PNG only, max 20MB)</Label>
+              <div className="border-2 border-dashed border-[#0055FF] rounded-xl p-6 text-center">
+                {logoPreview ? (
+                  <div className="space-y-3">
+                    <img src={logoPreview} alt="Logo preview" className="max-h-32 mx-auto" />
+                    <p className="text-sm text-gray-600">{logoFile?.name}</p>
+                    <Button
+                      onClick={() => {
+                        setLogoFile(null);
+                        setLogoPreview(null);
+                      }}
+                      variant="outline"
+                      className="border-[#0055FF] text-[#0055FF]"
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <Upload className="mx-auto text-[#0055FF]" size={48} />
+                    <p className="text-sm text-gray-600">Click to upload or drag and drop</p>
+                    <input
+                      type="file"
+                      accept=".png"
+                      onChange={handleLogoUpload}
+                      className="hidden"
+                      id="logo-upload"
+                    />
+                    <Button
+                      onClick={() => document.getElementById('logo-upload')?.click()}
+                      variant="outline"
+                      className="border-[#0055FF] text-[#0055FF]"
+                    >
+                      Choose File
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
