@@ -15,7 +15,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 interface Transaction {
   id: number;
-  amount: string;
+  price: string;
   status: string;
   itemName: string;
   paymentMethod: string;
@@ -86,7 +86,7 @@ export default function Transactions() {
 
   const totalRevenue = filteredTransactions
     .filter((tx: Transaction) => tx.status === 'completed')
-    .reduce((sum: number, tx: Transaction) => sum + parseFloat(tx.amount), 0);
+    .reduce((sum: number, tx: Transaction) => sum + parseFloat(tx.price), 0);
 
   const totalTransactions = filteredTransactions.filter((tx: Transaction) => tx.status === 'completed').length;
   const avgTransaction = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
@@ -102,7 +102,7 @@ export default function Transactions() {
       return txMonth === i && tx.status === 'completed';
     });
     const value = monthTransactions.reduce((sum: number, tx: Transaction) => 
-      sum + parseFloat(tx.amount), 0
+      sum + parseFloat(tx.price), 0
     ) / 1000; // Convert to thousands
     return { month, value: Math.round(value) };
   });
@@ -116,7 +116,7 @@ export default function Transactions() {
         date.toLocaleDateString(),
         date.toLocaleTimeString(),
         tx.itemName,
-        parseFloat(tx.amount).toFixed(2),
+        parseFloat(tx.price).toFixed(2),
         tx.paymentMethod,
         tx.status,
       ];
@@ -124,7 +124,7 @@ export default function Transactions() {
 
     const csvContent = [
       headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(',')),
+      ...rows.map((row: any[]) => row.map((cell: any) => `"${cell}"`).join(',')),
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -387,7 +387,7 @@ export default function Transactions() {
                     </div>
                     <div className="flex flex-col items-end gap-1 flex-shrink-0">
                       <div className="text-sm sm:text-base text-[#0055FF]">
-                        ${parseFloat(tx.amount).toFixed(2)}
+                        ${parseFloat(tx.price).toFixed(2)}
                       </div>
                     </div>
                   </div>
