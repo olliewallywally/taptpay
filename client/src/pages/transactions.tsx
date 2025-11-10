@@ -26,7 +26,7 @@ const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-[#1F1A5F] rounded-lg px-4 py-2 shadow-lg opacity-90">
-        <p className="text-white text-sm font-medium">${payload[0].value}k</p>
+        <p className="text-white text-sm font-medium">${payload[0].value.toFixed(2)}</p>
       </div>
     );
   }
@@ -94,17 +94,20 @@ export default function Transactions() {
     ? (transactions.filter((tx: Transaction) => tx.status === 'completed').length / transactions.length) * 100 
     : 0;
 
-  // Generate monthly data for chart
+  // Generate monthly data for chart (current year)
+  const currentYear = new Date().getFullYear();
   const monthlyData = Array.from({ length: 12 }, (_, i) => {
-    const month = new Date(2025, i, 1).toLocaleString('default', { month: 'short' });
+    const month = new Date(currentYear, i, 1).toLocaleString('default', { month: 'short' });
     const monthTransactions = transactions.filter((tx: Transaction) => {
-      const txMonth = new Date(tx.createdAt).getMonth();
-      return txMonth === i && tx.status === 'completed';
+      const txDate = new Date(tx.createdAt);
+      const txMonth = txDate.getMonth();
+      const txYear = txDate.getFullYear();
+      return txMonth === i && txYear === currentYear && tx.status === 'completed';
     });
     const value = monthTransactions.reduce((sum: number, tx: Transaction) => 
       sum + parseFloat(tx.price), 0
-    ) / 1000; // Convert to thousands
-    return { month, value: Math.round(value) };
+    );
+    return { month, value: parseFloat(value.toFixed(2)) };
   });
 
   const handleDownloadCSV = () => {
