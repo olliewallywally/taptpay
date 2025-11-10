@@ -115,9 +115,9 @@ export default function Login() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-sm md:max-w-md lg:max-w-lg">
         {/* Main login card */}
-        <div className="rounded-[48px] md:rounded-[60px] overflow-hidden shadow-2xl">
+        <div className="rounded-[48px] md:rounded-[60px] overflow-visible shadow-2xl">
           {/* Blue section with form */}
-          <div className="bg-[#0055FF] px-8 md:px-12 pt-12 md:pt-16 pb-8 md:pb-12 rounded-b-[48px] md:rounded-b-[60px] relative z-10">
+          <div className="bg-[#0055FF] px-8 md:px-12 pt-12 md:pt-16 pb-8 md:pb-12 rounded-b-[48px] md:rounded-b-[60px] relative">
             {/* Logo */}
             <div className="text-center mb-12 md:mb-16">
               <img src={taptLogoPath} alt="taptpay" className="h-10 md:h-12 mx-auto" style={{ filter: 'brightness(0) saturate(100%) invert(78%) sepia(96%) saturate(2453%) hue-rotate(131deg) brightness(97%) contrast(101%)' }} />
@@ -276,7 +276,7 @@ export default function Login() {
 
           {/* Cyan bottom section */}
           <div 
-            className="bg-[#00E5CC] px-8 md:px-12 py-4 md:py-5 flex items-center justify-center cursor-pointer hover:bg-[#00FFE5] transition-colors -mt-12 md:-mt-14 pt-16 md:pt-20"
+            className="bg-[#00E5CC] px-8 md:px-12 py-4 md:py-5 flex items-center justify-center cursor-pointer hover:bg-[#00FFE5] transition-colors -mt-12 md:-mt-14 pt-16 md:pt-20 relative z-10"
             onClick={() => setShowMore(!showMore)}
             data-testid="button-show-more"
           >
@@ -289,7 +289,7 @@ export default function Login() {
 
           {/* Expandable more section */}
           {showMore && (
-            <div className="bg-[#00E5CC] px-8 md:px-12 pb-6 md:pb-8 space-y-3 md:space-y-4 relative z-20">
+            <div className="bg-[#00E5CC] px-8 md:px-12 pb-6 md:pb-8 space-y-3 md:space-y-4 relative z-10">
               <button 
                 onClick={() => {
                   toast({
