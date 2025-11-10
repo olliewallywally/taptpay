@@ -76,6 +76,74 @@ export default function DemoTerminal() {
   // Track last processed transaction to prevent infinite updates
   const lastProcessedTxRef = useRef<{ id?: number; status?: string }>({});
 
+  // Activate NFC payment when overlay is active
+  useEffect(() => {
+    if (isNfcOverlayActive && currentTransaction) {
+      activateNfcPayment();
+    }
+  }, [isNfcOverlayActive, currentTransaction]);
+
+  const activateNfcPayment = async () => {
+    if (!currentTransaction) return;
+
+    // Check if Payment Request API is supported
+    if (!window.PaymentRequest) {
+      toast({
+        title: "NFC Not Supported",
+        description: "Contactless payments are not supported on this device",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const supportedInstruments = [
+        {
+          supportedMethods: 'basic-card',
+          data: {
+            supportedNetworks: ['visa', 'mastercard', 'amex'],
+            supportedTypes: ['debit', 'credit']
+          }
+        }
+      ];
+
+      const details = {
+        total: {
+          label: 'Total',
+          amount: {
+            currency: 'USD',
+            value: currentTransaction.price
+          }
+        }
+      };
+
+      const request = new PaymentRequest(supportedInstruments, details);
+
+      // Show the payment UI
+      const paymentResponse = await request.show();
+
+      // Process the payment
+      await paymentResponse.complete('success');
+
+      // Update transaction status
+      toast({
+        title: "Payment Accepted",
+        description: "Contactless payment successful",
+      });
+
+      setIsNfcOverlayActive(false);
+    } catch (error: any) {
+      console.error('NFC Payment error:', error);
+      if (error.name !== 'AbortError') {
+        toast({
+          title: "Payment Failed",
+          description: "Please try again or use another payment method",
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
   const form = useForm<PaymentFormData>({
     resolver: zodResolver(paymentFormSchema),
     defaultValues: {
@@ -658,20 +726,32 @@ export default function DemoTerminal() {
                         name="taptStoneId"
                         render={({ field }) => (
                           <FormItem>
-                            <Select onValueChange={field.onChange} value={field.value}>
+                            {isNfcMode ? (
                               <FormControl>
-                                <SelectTrigger className="bg-[#0055FF] text-white border-0 rounded-full h-12 md:h-14 px-6 md:px-8" data-testid="select-stone">
-                                  <SelectValue placeholder="select stone" />
-                                </SelectTrigger>
+                                <Input
+                                  value="paywave"
+                                  readOnly
+                                  disabled
+                                  className="bg-[#0055FF] text-white border-0 rounded-full h-12 md:h-14 px-6 md:px-8 opacity-100"
+                                  data-testid="input-paywave"
+                                />
                               </FormControl>
-                              <SelectContent className="bg-white border-[#0055FF]">
-                                {taptStones.map((stone) => (
-                                  <SelectItem key={stone.id} value={stone.id.toString()} className="text-[#0055FF] hover:bg-[#00E5CC]/20" data-testid={`stone-option-${stone.id}`}>
-                                    {stone.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            ) : (
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger className="bg-[#0055FF] text-white border-0 rounded-full h-12 md:h-14 px-6 md:px-8" data-testid="select-stone">
+                                    <SelectValue placeholder="select stone" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent className="bg-white border-[#0055FF]">
+                                  {taptStones.map((stone) => (
+                                    <SelectItem key={stone.id} value={stone.id.toString()} className="text-[#0055FF] hover:bg-[#00E5CC]/20" data-testid={`stone-option-${stone.id}`}>
+                                      {stone.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )}
                             <FormMessage className="text-red-500" />
                           </FormItem>
                         )}
