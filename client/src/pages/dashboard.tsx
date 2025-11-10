@@ -274,7 +274,7 @@ export default function Dashboard() {
 
           {/* Average Trans Card */}
           <div className="bg-[#0055FF] rounded-2xl sm:rounded-3xl md:rounded-[28px] p-3 sm:p-7 md:p-8 flex flex-col justify-between min-h-[90px] sm:min-h-[115px] md:min-h-[135px] transition-all duration-300 hover:shadow-2xl hover:scale-[1.05] cursor-pointer" data-testid="card-avg-transaction">
-            <h3 className="text-[#00E5CC] text-[10px] sm:text-sm md:text-base">Average Trans</h3>
+            <h3 className="text-[#00E5CC] text-[10px] sm:text-sm md:text-base">Average Transaction</h3>
             
             <div className="w-[100px] h-[45px] sm:w-[140px] sm:h-[60px] flex items-end justify-between gap-[4px] sm:gap-[6px] mx-auto my-1 sm:my-2">
               {last30DaysAvg.map((avg, index) => {
