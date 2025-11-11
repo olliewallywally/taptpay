@@ -18,6 +18,8 @@ interface SplitBillContentProps {
 
 function SplitBillContent({ transactionId, totalAmount, merchantId, onSplitCreated }: SplitBillContentProps) {
   const [splitCount, setSplitCount] = useState(2);
+  const { stoneId } = useParams<{ merchantId: string; stoneId?: string }>();
+  const stoneNumber = stoneId ? parseInt(stoneId) : null;
 
   const createSplitMutation = useMutation({
     mutationFn: async (totalSplits: number) => {
@@ -29,12 +31,12 @@ function SplitBillContent({ transactionId, totalAmount, merchantId, onSplitCreat
     onSuccess: (data) => {
       if (data && data.transaction) {
         queryClient.setQueryData(
-          ["/api/merchants", parseInt(merchantId), "active-transaction"], 
+          ["/api/merchants", parseInt(merchantId), "active-transaction", stoneNumber], 
           data.transaction
         );
       }
       queryClient.invalidateQueries({ 
-        queryKey: ["/api/merchants", parseInt(merchantId), "active-transaction"] 
+        queryKey: ["/api/merchants", parseInt(merchantId), "active-transaction", stoneNumber] 
       });
       onSplitCreated();
     },
@@ -136,13 +138,17 @@ export default function CustomerPayment() {
   }
 
   const { data: activeTransaction, isLoading } = useQuery({
-    queryKey: ["/api/merchants", id, "active-transaction"],
+    queryKey: ["/api/merchants", id, "active-transaction", stoneNumber],
     queryFn: async () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
       
       try {
-        const response = await fetch(`/api/merchants/${id}/active-transaction`, {
+        const url = stoneNumber 
+          ? `/api/merchants/${id}/active-transaction?stoneId=${stoneNumber}`
+          : `/api/merchants/${id}/active-transaction`;
+        
+        const response = await fetch(url, {
           signal: controller.signal,
           headers: { 'Cache-Control': 'no-cache' }
         });
@@ -165,7 +171,11 @@ export default function CustomerPayment() {
 
   const processPaymentMutation = useMutation({
     mutationFn: async (transactionId: number) => {
-      const response = await apiRequest("POST", `/api/transactions/${transactionId}/pay`, {});
+      // SECURITY: Include merchant and stone context for verification
+      const response = await apiRequest("POST", `/api/transactions/${transactionId}/pay`, {
+        merchantId: id,
+        stoneId: stoneNumber
+      });
       return response.json();
     },
     onSuccess: () => setPaymentStatus("processing"),
@@ -178,6 +188,8 @@ export default function CustomerPayment() {
       // In a real implementation, this would send card details to a payment processor
       // For now, we'll simulate the payment process
       const response = await apiRequest("POST", `/api/transactions/${currentTransaction.id}/pay`, {
+        merchantId: id,
+        stoneId: stoneNumber,
         paymentMethod: "card",
         cardLast4: cardNumber.slice(-4)
       });
@@ -198,11 +210,18 @@ export default function CustomerPayment() {
   useEffect(() => {
     if (!id) return;
     
-    sseClient.connect(id);
+    // Connect to SSE with stone-specific filtering
+    sseClient.connect(id, stoneNumber);
     
     const handleTransactionUpdate = (message: any) => {
+      // SECURITY: Verify transaction is for this stone (if stone-specific page)
+      if (stoneNumber && message.transaction.taptStoneId !== stoneNumber) {
+        console.warn('Received transaction for different stone, ignoring');
+        return;
+      }
+      
       setCurrentTransaction(message.transaction);
-      queryClient.setQueryData(["/api/merchants", id, "active-transaction"], message.transaction);
+      queryClient.setQueryData(["/api/merchants", id, "active-transaction", stoneNumber], message.transaction);
       
       const statusMap = {
         "pending": "idle",
@@ -227,7 +246,7 @@ export default function CustomerPayment() {
       sseClient.unsubscribe("transaction_updated", handleTransactionUpdate);
       sseClient.disconnect();
     };
-  }, [id]);
+  }, [id, stoneNumber]);
 
   useEffect(() => {
     if (activeTransaction) {
