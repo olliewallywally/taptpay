@@ -58,6 +58,14 @@ The application adopts a monorepo structure, separating client, server, and shar
 -   API Security: Bearer tokens, Zod validation, error handling, CORS.
 -   Merchant Update Security: PUT /api/merchants/:id endpoint validates and restricts updatable fields to prevent privilege escalation (allowlist: businessName, director, address, nzbn, phone, email, gstNumber, windcaveApiKey).
 -   File Upload Security: Logo uploads restricted to PNG format, 20MB max, with automatic file cleanup on errors/deletions.
+-   **Payment Stone Isolation Security (Production-Ready):**
+    -   Server-side validation: Verifies stoneId belongs to merchantId before returning transactions, preventing URL tampering.
+    -   Payment endpoint verification: Triple verification (transaction→merchant, transaction→stone, stone→merchant) with Zod schema validation blocks cross-stone and cross-merchant payment tampering.
+    -   Transaction ownership: Payments require merchantId and stoneId in request body; rejected with 403 Forbidden if relationships don't match.
+    -   SSE filtering: Real-time updates filtered by specific stoneId, ensuring each stone only receives its own transaction events.
+    -   Rate limiting: 100 requests per minute per IP across all payment endpoints with automatic cleanup, returns 429 on limit exceeded.
+    -   Audit logging: All payment page accesses and payment attempts logged with IP addresses; security violations logged with SECURITY prefix.
+    -   Multi-stone support: Supports unlimited payment stones per merchant with complete isolation; stone renaming safe (uses immutable IDs).
 -   Deployment: `npm run dev` for development, `npm run build` for production, Drizzle Kit for database migrations.
 
 ## External Dependencies
