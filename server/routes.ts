@@ -966,11 +966,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
             }
             
-            // Notify clients of final result
-            const connections = sseConnections.get(transaction.merchantId);
-            if (connections) {
-              connections.forEach(conn => {
-                conn.write(`data: ${JSON.stringify({ type: 'transaction_updated', transaction: finalTransaction })}\n\n`);
+            // Notify clients of final result with payment URLs
+            if (finalTransaction) {
+              const paymentUrl = generatePaymentUrl(finalTransaction.merchantId, finalTransaction.taptStoneId, req);
+              const qrCodeUrl = generateQrCodeUrl(finalTransaction.merchantId, finalTransaction.taptStoneId, req);
+              
+              const transactionWithUrls = {
+                ...finalTransaction,
+                paymentUrl,
+                qrCodeUrl,
+              };
+              
+              broadcastToStone(finalTransaction.merchantId, finalTransaction.taptStoneId ?? transaction.taptStoneId ?? null, { 
+                type: 'transaction_updated', 
+                transaction: transactionWithUrls 
               });
             }
           }, 2000);
