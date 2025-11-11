@@ -22,6 +22,38 @@ import fs from "fs";
 // stoneId can be null for merchant-level connections
 const sseConnections = new Map<number, Map<number | null, Set<any>>>();
 
+// Rate limiting: Track requests per IP
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT_WINDOW = 60000; // 1 minute
+const MAX_REQUESTS_PER_WINDOW = 100; // 100 requests per minute per IP
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const record = rateLimitMap.get(ip);
+  
+  if (!record || now > record.resetTime) {
+    rateLimitMap.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+    return true;
+  }
+  
+  if (record.count >= MAX_REQUESTS_PER_WINDOW) {
+    return false;
+  }
+  
+  record.count++;
+  return true;
+}
+
+// Cleanup old rate limit records periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, record] of rateLimitMap.entries()) {
+    if (now > record.resetTime) {
+      rateLimitMap.delete(ip);
+    }
+  }
+}, RATE_LIMIT_WINDOW);
+
 // Helper function to broadcast to stone-specific connections
 function broadcastToStone(merchantId: number, stoneId: number | null | undefined, data: any) {
   const merchantConnections = sseConnections.get(merchantId);
@@ -418,6 +450,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const merchantId = parseInt(req.params.id);
     const stoneId = req.query.stoneId ? parseInt(req.query.stoneId as string) : undefined;
     
+    // SECURITY: Rate limiting
+    const clientIp = req.ip || 'unknown';
+    if (!checkRateLimit(clientIp)) {
+      console.warn(`SECURITY: Rate limit exceeded for IP ${clientIp} on active-transaction endpoint`);
+      return res.status(429).json({ message: "Too many requests. Please try again later." });
+    }
+    
     // Ultra-fast headers for immediate response
     res.set({
       'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -427,10 +466,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
     
     try {
+      // AUDIT: Log access to payment page
+      console.log(`Active transaction requested: merchant ${merchantId}, stone ${stoneId || 'none'}, IP ${clientIp}`);
+      
+      // SECURITY: If stoneId is provided, verify it belongs to this merchant
+      if (stoneId !== undefined) {
+        const stone = await storage.getTaptStone(stoneId);
+        if (!stone || stone.merchantId !== merchantId) {
+          return res.status(403).json({ 
+            message: "Invalid stone access - stone does not belong to this merchant" 
+          });
+        }
+      }
+      
       const transaction = await storage.getActiveTransactionByMerchant(merchantId, stoneId);
       
       if (!transaction) {
         return res.json(null);
+      }
+      
+      // SECURITY: Verify transaction belongs to the correct merchant
+      if (transaction.merchantId !== merchantId) {
+        return res.status(403).json({ 
+          message: "Transaction access denied" 
+        });
+      }
+      
+      // SECURITY: If stoneId specified, verify transaction is for that stone
+      if (stoneId !== undefined && transaction.taptStoneId !== stoneId) {
+        return res.json(null); // Return null instead of wrong stone's transaction
       }
       
       // Add payment URL and QR code URL using transaction's stone ID
@@ -739,12 +803,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Process payment with Windcave
   app.post("/api/transactions/:id/pay", async (req, res) => {
     try {
+      // SECURITY: Rate limiting for payment attempts
+      const clientIp = req.ip || 'unknown';
+      if (!checkRateLimit(clientIp)) {
+        console.warn(`SECURITY: Rate limit exceeded for IP ${clientIp} on payment endpoint`);
+        return res.status(429).json({ message: "Too many payment attempts. Please try again later." });
+      }
+      
+      // SECURITY: Validate request body schema
+      const paymentRequestSchema = z.object({
+        merchantId: z.number().int().positive().optional(),
+        stoneId: z.number().int().positive().optional().nullable(),
+        paymentMethod: z.string().optional(),
+        cardLast4: z.string().optional()
+      });
+      
+      const validation = paymentRequestSchema.safeParse(req.body);
+      if (!validation.success) {
+        console.warn(`SECURITY: Invalid payment request body from IP ${clientIp}:`, validation.error.errors);
+        return res.status(400).json({ 
+          message: "Invalid payment request data",
+          errors: validation.error.errors 
+        });
+      }
+      
       const transactionId = parseInt(req.params.id);
+      const { merchantId: requestMerchantId, stoneId: requestStoneId } = validation.data;
+      
       const transaction = await storage.getTransaction(transactionId);
       
       if (!transaction) {
+        console.warn(`SECURITY: Payment attempt for non-existent transaction ${transactionId} from IP ${clientIp}`);
         return res.status(404).json({ message: "Transaction not found" });
       }
+      
+      // SECURITY: Verify the transaction belongs to the claimed merchant
+      if (requestMerchantId && transaction.merchantId !== requestMerchantId) {
+        console.warn(`SECURITY: Cross-merchant payment attempt! Transaction ${transactionId} belongs to merchant ${transaction.merchantId} but request claimed merchant ${requestMerchantId}, IP ${clientIp}`);
+        return res.status(403).json({ message: "Transaction verification failed" });
+      }
+      
+      // SECURITY: Verify the transaction belongs to the claimed stone (if stone-specific)
+      if (requestStoneId !== undefined && transaction.taptStoneId !== requestStoneId) {
+        console.warn(`SECURITY: Cross-stone payment attempt! Transaction ${transactionId} belongs to stone ${transaction.taptStoneId} but request claimed stone ${requestStoneId}, IP ${clientIp}`);
+        return res.status(403).json({ message: "Transaction verification failed" });
+      }
+      
+      // SECURITY: If stone is specified in request, verify it exists and belongs to merchant
+      if (requestStoneId !== undefined && requestStoneId !== null) {
+        const stone = await storage.getTaptStone(requestStoneId);
+        if (!stone || stone.merchantId !== transaction.merchantId) {
+          console.warn(`SECURITY: Invalid stone ${requestStoneId} for merchant ${transaction.merchantId}, IP ${clientIp}`);
+          return res.status(403).json({ message: "Invalid stone verification" });
+        }
+      }
+      
+      // SECURITY: Verify transaction is in a valid state for payment
+      if (transaction.status === "completed") {
+        console.warn(`SECURITY: Payment attempt on already completed transaction ${transactionId} from IP ${clientIp}`);
+        return res.status(400).json({ message: "Transaction already completed" });
+      }
+      
+      if (transaction.status === "failed") {
+        console.warn(`SECURITY: Payment attempt on failed transaction ${transactionId} from IP ${clientIp}`);
+        return res.status(400).json({ message: "Transaction has failed and cannot be paid" });
+      }
+      
+      // AUDIT: Log payment attempt
+      console.log(`Payment initiated for transaction ${transactionId}, merchant ${transaction.merchantId}, stone ${transaction.taptStoneId || 'none'}, requested stone ${requestStoneId || 'none'}, IP ${clientIp}`);
 
       let paymentAmount = transaction.price;
       let currentSplit = null;
