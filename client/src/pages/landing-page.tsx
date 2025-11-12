@@ -8,7 +8,7 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
-import { Check } from "lucide-react";
+import { Check, ArrowRight } from "lucide-react";
 
 import logoImage from "@assets/logo_1762915255857.png";
 import dashboardImage from "@assets/d_1762915045324.png";
@@ -47,37 +47,36 @@ export function LandingPage() {
 
   return (
     <div className="min-h-screen bg-white" style={{ fontFamily: 'Outfit, sans-serif' }}>
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-[#0055FF]">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 left-20 w-64 h-64 rounded-full border-2 border-white animate-pulse" />
-          <div className="absolute bottom-40 right-32 w-96 h-96 rounded-full border-2 border-white animate-pulse" style={{ animationDelay: '1s' }} />
-          <div className="absolute top-1/2 left-1/3 w-48 h-48 rounded-full border-2 border-white animate-pulse" style={{ animationDelay: '2s' }} />
-        </div>
+      <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-[#0055FF] px-6">
+        <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center max-w-4xl mx-auto w-full">
+          <ImageWithFallback
+            src={logoImage}
+            alt="TaptPay Logo"
+            className="h-24 md:h-32 mb-16"
+          />
 
-        <div className="relative z-10 max-w-6xl mx-auto px-6 py-20 text-center">
-          <div className="mb-12">
-            <ImageWithFallback
-              src={logoImage}
-              alt="TaptPay Logo"
-              className="h-16 mx-auto mb-8"
-            />
-          </div>
-
-          <h1 className="text-5xl md:text-7xl font-bold text-white mb-6">
-            Accept Payments<br />Anywhere, Anytime
+          <h1 className="text-4xl md:text-6xl lg:text-7xl font-light text-white mb-6 leading-tight">
+            a pos system that isn't one
           </h1>
           
-          <p className="text-xl md:text-2xl text-white/90 mb-12 max-w-3xl mx-auto">
-            The modern payment terminal for businesses of all sizes. Get paid instantly with QR codes, NFC, and digital wallets.
+          <p className="text-lg md:text-xl text-white/80 mb-12 font-light">
+            100% digital point of sale system
           </p>
 
           <button
             onClick={() => setLocation("/login")}
-            className="bg-[#00E5CC] hover:bg-[#00d4bc] text-[#0055FF] font-semibold px-12 py-4 rounded-full text-lg transition-all transform hover:scale-105 shadow-lg"
+            className="bg-[#00E5CC] hover:bg-[#00d4bc] text-[#0055FF] font-medium px-10 py-3.5 rounded-full text-base md:text-lg transition-all transform hover:scale-105 shadow-lg flex items-center gap-2 lowercase"
             data-testid="button-get-started"
           >
-            Get Started
+            get started
+            <ArrowRight className="w-5 h-5" />
           </button>
+        </div>
+
+        <div className="relative z-10 pb-8">
+          <p className="text-white/60 text-xs md:text-sm tracking-wider uppercase font-light">
+            100% KIWI OWNED AND OPERATED
+          </p>
         </div>
       </section>
 
