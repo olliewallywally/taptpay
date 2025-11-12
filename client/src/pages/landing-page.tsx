@@ -2,6 +2,7 @@ import { useLocation } from "wouter";
 import { ImageWithFallback } from "@/components/ImageWithFallback";
 import { HowItWorksSection } from "@/components/HowItWorksSection";
 import { CustomerExperienceSection } from "@/components/CustomerExperienceSection";
+import { FeaturesSection } from "@/components/FeaturesSection";
 import {
   Carousel,
   CarouselContent,
@@ -81,76 +82,7 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section className="py-20 px-6 bg-white">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-4xl md:text-5xl lg:text-6xl font-light text-center mb-4 text-[#0055FF] lowercase">
-            everything you need. nothing you don't.
-          </h2>
-          <p className="text-base md:text-lg text-[#0055FF]/70 text-center mb-16">
-            A complete payment solution designed for modern businesses
-          </p>
-
-          <div className="grid md:grid-cols-2 gap-16 items-center">
-            <div className="flex justify-center">
-              <ImageWithFallback
-                src={dashboardImage}
-                alt="TaptPay Dashboard"
-                className="w-full max-w-md"
-              />
-            </div>
-
-            <div className="space-y-10">
-              <div className="border-b border-[#00E5CC]/30 pb-8">
-                <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-full bg-[#00E5CC] flex items-center justify-center flex-shrink-0">
-                    <Check className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-medium mb-2 text-[#0055FF]">Real-Time Dashboard</h3>
-                    <p className="text-[#0055FF]/70">Track active transactions, sales performance, and inventory all in one beautiful interface.</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-b border-[#00E5CC]/30 pb-8">
-                <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-full bg-[#00E5CC] flex items-center justify-center flex-shrink-0">
-                    <Check className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-medium mb-2 text-[#0055FF]">Visual Analytics</h3>
-                    <p className="text-[#0055FF]/70">Understand your business at a glance with intuitive charts and progress indicators.</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-b border-[#00E5CC]/30 pb-8">
-                <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-full bg-[#00E5CC] flex items-center justify-center flex-shrink-0">
-                    <Check className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-medium mb-2 text-[#0055FF]">Mobile-First Design</h3>
-                    <p className="text-[#0055FF]/70">Manage your entire business from your phone with our optimized mobile experience.</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-b border-[#00E5CC]/30 pb-8">
-                <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-full bg-[#00E5CC] flex items-center justify-center flex-shrink-0">
-                    <Check className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-medium mb-2 text-[#0055FF]">NFC Payments</h3>
-                    <p className="text-[#0055FF]/70">Accept contactless payments instantly with secure NFC technology.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <FeaturesSection />
 
       <section className="py-20 px-6 bg-[#0055FF]">
         <div className="max-w-6xl mx-auto">
