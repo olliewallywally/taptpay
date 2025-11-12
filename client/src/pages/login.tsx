@@ -125,7 +125,7 @@ export default function Login() {
 
       <div className="w-full max-w-sm md:max-w-md lg:max-w-lg">
         {/* Main login card */}
-        <div className="rounded-[48px] md:rounded-[60px] overflow-hidden shadow-2xl">
+        <div className="shadow-2xl">
           {/* Blue section with form */}
           <div className="bg-[#0055FF] px-8 md:px-12 pt-12 md:pt-16 pb-8 md:pb-12 rounded-b-[48px] md:rounded-b-[60px] relative z-10">
             {/* Logo */}
@@ -286,7 +286,7 @@ export default function Login() {
 
           {/* Cyan bottom section */}
           <div 
-            className="bg-[#00E5CC] px-8 md:px-12 py-4 md:py-5 flex items-center justify-center cursor-pointer hover:bg-[#00FFE5] transition-colors -mt-12 md:-mt-14 pt-16 md:pt-20"
+            className={`bg-[#00E5CC] px-8 md:px-12 py-4 md:py-5 flex items-center justify-center cursor-pointer hover:bg-[#00FFE5] transition-colors -mt-12 md:-mt-14 pt-16 md:pt-20 ${!showMore ? 'rounded-b-[48px] md:rounded-b-[60px]' : ''}`}
             onClick={() => setShowMore(!showMore)}
             data-testid="button-show-more"
           >
@@ -299,7 +299,7 @@ export default function Login() {
 
           {/* Expandable more section */}
           {showMore && (
-            <div className="bg-[#00E5CC] px-8 md:px-12 pb-6 md:pb-8 space-y-3 md:space-y-4">
+            <div className="bg-[#00E5CC] px-8 md:px-12 pb-6 md:pb-8 space-y-3 md:space-y-4 rounded-b-[48px] md:rounded-b-[60px]">
               <button 
                 onClick={() => {
                   toast({
