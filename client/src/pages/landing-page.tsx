@@ -151,13 +151,13 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section className="py-20 px-6 bg-gray-50">
+      <section className="py-20 px-6 bg-[#0055FF]">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-4xl md:text-5xl font-bold text-center mb-4 text-gray-900">
-            How It Works
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-light text-center mb-4 text-[#00E5CC] lowercase">
+            how it works
           </h2>
-          <p className="text-xl text-gray-600 text-center mb-16 max-w-2xl mx-auto">
-            Get up and running in three simple steps
+          <p className="text-base md:text-lg text-white/80 text-center mb-16">
+            Get started with taptpay in 4 simple steps
           </p>
 
           <HowItWorksSection />
