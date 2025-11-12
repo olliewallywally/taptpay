@@ -3,49 +3,13 @@ import { ImageWithFallback } from "@/components/ImageWithFallback";
 import { HowItWorksSection } from "@/components/HowItWorksSection";
 import { CustomerExperienceSection } from "@/components/CustomerExperienceSection";
 import { FeaturesSection } from "@/components/FeaturesSection";
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel";
+import { TerminalFeaturesSection } from "@/components/TerminalFeaturesSection";
 import { Check, ArrowRight } from "lucide-react";
 
 import logoImage from "@assets/logo_1762915255857.png";
-import dashboardImage from "@assets/d_1762915045324.png";
-import customerPhoneImage from "@assets/pay_1762915045325.png";
-import paymentStonesImage from "@assets/pay stone_1762915255862.png";
-import terminalReadyImage from "@assets/t_1762915045327.png";
-import terminalSplitBillImage from "@assets/sp_1762915045326.png";
-import terminalShareImage from "@assets/share_1762915045326.png";
-import terminalNfcImage from "@assets/1a013ffb-caa2-4aaf-afd5-e618144eec2a_1762915475067.png";
 
 export function LandingPage() {
   const [, setLocation] = useLocation();
-
-  const carouselSlides = [
-    {
-      image: terminalReadyImage,
-      title: "Ready for Payment",
-      description: "Enter amount and generate QR code instantly",
-    },
-    {
-      image: terminalSplitBillImage,
-      title: "Split the Bill",
-      description: "Easily divide payments among multiple customers",
-    },
-    {
-      image: terminalShareImage,
-      title: "Share Payment Link",
-      description: "Send payment requests via QR or URL",
-    },
-    {
-      image: terminalNfcImage,
-      title: "Tap to Pay",
-      description: "Accept contactless NFC payments",
-    },
-  ];
 
   return (
     <div className="min-h-screen bg-white" style={{ fontFamily: 'Outfit, sans-serif' }}>
@@ -99,48 +63,7 @@ export function LandingPage() {
 
       <CustomerExperienceSection />
 
-      <section className="py-20 px-6 bg-gray-50">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-4xl md:text-5xl font-bold text-center mb-4 text-gray-900">
-            Powerful Terminal Features
-          </h2>
-          <p className="text-xl text-gray-600 text-center mb-16 max-w-2xl mx-auto">
-            Built for modern businesses with advanced capabilities
-          </p>
-
-          <div className="relative max-w-4xl mx-auto">
-            <Carousel
-              opts={{
-                align: "start",
-                loop: true,
-              }}
-              className="w-full"
-            >
-              <CarouselContent>
-                {carouselSlides.map((slide, index) => (
-                  <CarouselItem key={index}>
-                    <div className="p-4">
-                      <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-                        <ImageWithFallback
-                          src={slide.image}
-                          alt={slide.title}
-                          className="w-full h-96 object-contain bg-gray-50"
-                        />
-                        <div className="p-8 text-center">
-                          <h3 className="text-2xl font-bold mb-3 text-gray-900">{slide.title}</h3>
-                          <p className="text-gray-600 text-lg">{slide.description}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-              <CarouselPrevious className="left-4" />
-              <CarouselNext className="right-4" />
-            </Carousel>
-          </div>
-        </div>
-      </section>
+      <TerminalFeaturesSection />
 
       <section className="py-20 px-6 bg-white">
         <div className="max-w-4xl mx-auto">
