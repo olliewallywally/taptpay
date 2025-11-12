@@ -125,9 +125,9 @@ export default function Login() {
 
       <div className="w-full max-w-sm md:max-w-md lg:max-w-lg">
         {/* Main login card */}
-        <div className="shadow-2xl">
+        <div className="shadow-2xl overflow-visible">
           {/* Blue section with form */}
-          <div className="bg-[#0055FF] px-8 md:px-12 pt-12 md:pt-16 pb-8 md:pb-12 rounded-b-[48px] md:rounded-b-[60px] relative z-10">
+          <div className="bg-[#0055FF] px-8 md:px-12 pt-12 md:pt-16 pb-8 md:pb-12 rounded-t-[48px] md:rounded-t-[60px] rounded-b-[48px] md:rounded-b-[60px] relative z-10">
             {/* Logo */}
             <div className="text-center mb-12 md:mb-16">
               <img src={taptLogoPath} alt="taptpay" className="h-10 md:h-12 mx-auto" style={{ filter: 'brightness(0) saturate(100%) invert(78%) sepia(96%) saturate(2453%) hue-rotate(131deg) brightness(97%) contrast(101%)' }} />
