@@ -4,6 +4,7 @@ import { HowItWorksSection } from "@/components/HowItWorksSection";
 import { CustomerExperienceSection } from "@/components/CustomerExperienceSection";
 import { FeaturesSection } from "@/components/FeaturesSection";
 import { TerminalFeaturesSection } from "@/components/TerminalFeaturesSection";
+import { PricingSection } from "@/components/PricingSection";
 import { Check, ArrowRight } from "lucide-react";
 
 import logoImage from "@assets/logo_1762915255857.png";
@@ -65,52 +66,7 @@ export function LandingPage() {
 
       <TerminalFeaturesSection />
 
-      <section className="py-20 px-6 bg-white">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-4xl md:text-5xl font-bold text-center mb-4 text-gray-900">
-            Simple, Transparent Pricing
-          </h2>
-          <p className="text-xl text-gray-600 text-center mb-16">
-            Pay only for what you use, no hidden fees
-          </p>
-
-          <div className="bg-gradient-to-br from-[#0055FF] to-[#0044CC] rounded-3xl p-12 text-white shadow-2xl">
-            <div className="text-center mb-8">
-              <div className="text-6xl font-bold mb-4">$0.50</div>
-              <div className="text-2xl opacity-90">per transaction</div>
-            </div>
-
-            <div className="space-y-4 max-w-md mx-auto">
-              <div className="flex items-center gap-3">
-                <Check className="w-6 h-6 flex-shrink-0" />
-                <span className="text-lg">No monthly fees</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Check className="w-6 h-6 flex-shrink-0" />
-                <span className="text-lg">No setup costs</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Check className="w-6 h-6 flex-shrink-0" />
-                <span className="text-lg">Unlimited payment stones</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Check className="w-6 h-6 flex-shrink-0" />
-                <span className="text-lg">24/7 support</span>
-              </div>
-            </div>
-
-            <div className="text-center mt-10">
-              <button
-                onClick={() => setLocation("/login")}
-                className="bg-[#00E5CC] hover:bg-[#00d4bc] text-[#0055FF] font-semibold px-12 py-4 rounded-full text-lg transition-all transform hover:scale-105"
-                data-testid="button-pricing-get-started"
-              >
-                Get Started Now
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
+      <PricingSection />
 
       <section className="py-20 px-6 bg-[#E8E5E0]">
         <div className="max-w-4xl mx-auto text-center">
