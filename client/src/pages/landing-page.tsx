@@ -24,7 +24,7 @@ export function LandingPage() {
           />
 
           <h1 className="text-3xl md:text-5xl lg:text-6xl font-light text-white mb-6 leading-tight">
-            a <span className="font-bold">pos</span> system that isn't one
+            a <span className="font-semibold">pos</span> system that isn't one
           </h1>
           
           <p className="text-lg md:text-xl text-white/80 mb-12 font-light">
