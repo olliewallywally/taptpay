@@ -23,8 +23,8 @@ export function LandingPage() {
             className="h-24 md:h-32 mb-16"
           />
 
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-light text-white mb-6 leading-tight">
-            a pos system that isn't one
+          <h1 className="text-3xl md:text-5xl lg:text-6xl font-light text-white mb-6 leading-tight">
+            a <span className="font-bold">pos</span> system that isn't one
           </h1>
           
           <p className="text-lg md:text-xl text-white/80 mb-12 font-light">
