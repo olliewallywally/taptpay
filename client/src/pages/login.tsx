@@ -6,7 +6,7 @@ import { z } from "zod";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ArrowLeft } from "lucide-react";
 import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
 
 const loginSchema = z.object({
@@ -112,7 +112,17 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 relative">
+      {/* Back to Landing Page Button */}
+      <button
+        onClick={() => setLocation("/")}
+        className="absolute top-6 left-6 flex items-center gap-2 text-gray-600 hover:text-[#0055FF] transition-colors group"
+        data-testid="button-back-to-landing"
+      >
+        <ArrowLeft className="w-6 h-6 group-hover:-translate-x-1 transition-transform" />
+        <span className="font-medium">Back</span>
+      </button>
+
       <div className="w-full max-w-sm md:max-w-md lg:max-w-lg">
         {/* Main login card */}
         <div className="rounded-[48px] md:rounded-[60px] overflow-hidden shadow-2xl">
