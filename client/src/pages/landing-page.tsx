@@ -164,56 +164,64 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section className="py-20 px-6 bg-white">
+      <section className="py-20 px-6 bg-gray-100">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-4xl md:text-5xl font-bold text-center mb-4 text-gray-900">
-            Seamless Customer Experience
-          </h2>
-          <p className="text-xl text-gray-600 text-center mb-16 max-w-2xl mx-auto">
-            Your customers will love how easy it is to pay
-          </p>
-
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div>
+          <div className="grid md:grid-cols-2 gap-12 items-start">
+            <div className="flex justify-center items-center">
               <ImageWithFallback
                 src={paymentStonesImage}
                 alt="Payment Stones"
-                className="rounded-2xl shadow-2xl w-full"
+                className="w-full max-w-lg"
               />
             </div>
 
             <div>
-              <ImageWithFallback
-                src={customerPhoneImage}
-                alt="Customer Payment Interface"
-                className="rounded-2xl shadow-2xl w-full"
-              />
-            </div>
-          </div>
+              <h2 className="text-4xl md:text-5xl lg:text-6xl font-light mb-4 text-[#0055FF] lowercase">
+                seamless for your customers
+              </h2>
+              <p className="text-base md:text-lg text-gray-600 mb-8">
+                Give your customers multiple ways to pay with a beautiful, intuitive interface.
+              </p>
 
-          <div className="mt-12 grid md:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-[#0055FF] text-white flex items-center justify-center text-2xl font-bold mx-auto mb-4">
-                1
+              <div className="mb-8">
+                <ImageWithFallback
+                  src={customerPhoneImage}
+                  alt="Customer Payment Interface"
+                  className="w-full max-w-xs mx-auto md:mx-0"
+                />
               </div>
-              <h3 className="text-xl font-semibold mb-2">Scan QR Code</h3>
-              <p className="text-gray-600">Customer scans the QR code with their phone camera</p>
-            </div>
 
-            <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-[#0055FF] text-white flex items-center justify-center text-2xl font-bold mx-auto mb-4">
-                2
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Choose Payment Method</h3>
-              <p className="text-gray-600">Select from Apple Pay, Google Pay, or card payment</p>
-            </div>
+              <div className="space-y-6">
+                <div className="flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-full bg-[#00E5CC] flex items-center justify-center flex-shrink-0 text-white font-semibold">
+                    1
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold mb-1 text-[#0055FF]">Scan Or Tap the QR or NFC Tag</h3>
+                    <p className="text-gray-600 text-sm">Customers can scan the QR code with their phone or tap their device on your NFC tag.</p>
+                  </div>
+                </div>
 
-            <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-[#0055FF] text-white flex items-center justify-center text-2xl font-bold mx-auto mb-4">
-                3
+                <div className="flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-full bg-[#00E5CC] flex items-center justify-center flex-shrink-0 text-white font-semibold">
+                    2
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold mb-1 text-[#0055FF]">Digital Wallet to Pay</h3>
+                    <p className="text-gray-600 text-sm">Customer is taken to the payment web page and pays with their Apple or Google Pay.</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-full bg-[#00E5CC] flex items-center justify-center flex-shrink-0 text-white font-semibold">
+                    3
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold mb-1 text-[#0055FF]">Done in Seconds</h3>
+                    <p className="text-gray-600 text-sm">Payment processed instantly with confirmation.</p>
+                  </div>
+                </div>
               </div>
-              <h3 className="text-xl font-semibold mb-2">Instant Confirmation</h3>
-              <p className="text-gray-600">Both merchant and customer get real-time payment confirmation</p>
             </div>
           </div>
         </div>
