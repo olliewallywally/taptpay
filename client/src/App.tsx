@@ -28,6 +28,7 @@ import AdminApi from "@/pages/admin-api";
 import CreateMerchant from "@/pages/create-merchant";
 import VerifyMerchant from "@/pages/verify-merchant";
 import StockManagement from "@/pages/stock-management";
+import { LandingPage } from "@/pages/landing-page";
 
 import { PageTransition } from "@/components/page-transition";
 import { BottomNavigation } from "@/components/bottom-navigation";
@@ -137,7 +138,7 @@ function Router() {
   return (
     <PageTransition>
       <Switch>
-        <Route path="/" component={Login} />
+        <Route path="/" component={LandingPage} />
         <Route path="/login" component={Login} />
         <Route path="/signup" component={MerchantSignup} />
         <Route path="/forgot-password" component={ForgotPassword} />
