@@ -5,7 +5,8 @@ import { CustomerExperienceSection } from "@/components/CustomerExperienceSectio
 import { FeaturesSection } from "@/components/FeaturesSection";
 import { TerminalFeaturesSection } from "@/components/TerminalFeaturesSection";
 import { PricingSection } from "@/components/PricingSection";
-import { Check, ArrowRight } from "lucide-react";
+import { FinalCTASection } from "@/components/FinalCTASection";
+import { ArrowRight } from "lucide-react";
 
 import logoImage from "@assets/logo_1762915255857.png";
 
@@ -68,28 +69,7 @@ export function LandingPage() {
 
       <PricingSection />
 
-      <section className="py-20 px-6 bg-[#E8E5E0]">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-4xl md:text-5xl font-bold mb-6 text-gray-900">
-            Ready to Transform Your Payment Experience?
-          </h2>
-          <p className="text-xl text-gray-700 mb-10 max-w-2xl mx-auto">
-            Join thousands of businesses already using TaptPay to accept payments faster and easier.
-          </p>
-
-          <button
-            onClick={() => setLocation("/login")}
-            className="bg-[#0055FF] hover:bg-[#0044CC] text-white font-semibold px-12 py-4 rounded-full text-lg transition-all transform hover:scale-105 shadow-lg"
-            data-testid="button-cta-get-started"
-          >
-            Get Started Free
-          </button>
-
-          <p className="text-gray-600 mt-6">
-            No credit card required • Set up in minutes
-          </p>
-        </div>
-      </section>
+      <FinalCTASection onGetStarted={() => setLocation("/login")} />
 
       <footer className="bg-gray-900 text-white py-12 px-6">
         <div className="max-w-6xl mx-auto text-center">
