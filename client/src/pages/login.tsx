@@ -6,6 +6,7 @@ import { z } from "zod";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { SEOHead } from "@/components/SEOHead";
 import { ChevronDown, ArrowLeft } from "lucide-react";
 import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
 
@@ -113,6 +114,13 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 relative">
+      <SEOHead
+        title="Login - TapTpay Payment Terminal"
+        description="Access your TapTpay merchant account to manage payments, view transactions, track revenue, and configure your payment settings."
+        keywords="merchant login, payment dashboard, taptpay login, business account, payment terminal login"
+        ogTitle="Login to TapTpay"
+        ogDescription="Sign in to your merchant dashboard to manage payments and track your business."
+      />
       {/* Back to Landing Page Button */}
       <button
         onClick={() => setLocation("/")}
