@@ -6,6 +6,7 @@ import { FeaturesSection } from "@/components/FeaturesSection";
 import { TerminalFeaturesSection } from "@/components/TerminalFeaturesSection";
 import { PricingSection } from "@/components/PricingSection";
 import { FinalCTASection } from "@/components/FinalCTASection";
+import { SEOHead } from "@/components/SEOHead";
 import { ArrowRight } from "lucide-react";
 
 import logoImage from "@assets/logo_1762915255857.png";
@@ -15,6 +16,13 @@ export function LandingPage() {
 
   return (
     <div className="min-h-screen bg-white" style={{ fontFamily: 'Outfit, sans-serif' }}>
+      <SEOHead
+        title="TapTpay - Modern Payment Terminal | QR & NFC Payments"
+        description="Accept payments anywhere with TapTpay. Simple QR code and NFC payment terminal for modern businesses. Fast, secure, and easy to use. Get started in minutes."
+        keywords="payment terminal, QR payments, NFC payments, mobile payments, contactless payments, business payments, digital wallet, tap to pay, point of sale"
+        ogTitle="TapTpay - Modern Payment Terminal for Your Business"
+        ogDescription="Revolutionary payment solution with QR codes and NFC. Accept payments instantly with no hardware required."
+      />
       <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-[#0055FF] px-6">
         <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center max-w-4xl mx-auto w-full">
           <ImageWithFallback
