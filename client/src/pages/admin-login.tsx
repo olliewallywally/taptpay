@@ -48,7 +48,7 @@ export default function AdminLogin() {
         description: "Welcome to the Tapt Admin Dashboard",
       });
       
-      setLocation("/admin/dashboard");
+      setLocation("/admin");
     },
     onError: (error: any) => {
       toast({
