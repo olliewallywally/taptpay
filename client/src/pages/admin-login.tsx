@@ -29,8 +29,8 @@ export default function AdminLogin() {
   const form = useForm<AdminLoginFormData>({
     resolver: zodResolver(adminLoginSchema),
     defaultValues: {
-      email: "admin@tapt.co.nz",
-      password: "admin123",
+      email: "oliverleonard.professional@gmail.com",
+      password: "TAPTpay",
     },
   });
 
@@ -125,7 +125,7 @@ export default function AdminLogin() {
                       <FormControl>
                         <Input
                           type="email"
-                          placeholder="admin@tapt.co.nz"
+                          placeholder="oliverleonard.professional@gmail.com"
                           className={`w-full ${isMobile ? 'px-3 py-2 text-sm' : 'px-4 py-3'} backdrop-blur-sm bg-white/5 border border-white/15 text-white placeholder:text-white/60 focus:bg-white/8 focus:border-white/20 rounded-xl`}
                           {...field}
                         />
