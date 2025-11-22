@@ -59,7 +59,7 @@ export default function Login() {
           description: "Welcome to the Tapt Admin Dashboard",
         });
         
-        setLocation("/admin/dashboard");
+        setLocation("/admin");
       }
     },
     onError: (error: any) => {

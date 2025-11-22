@@ -20,7 +20,6 @@ import Login from "@/pages/login";
 import MerchantSignup from "@/pages/merchant-signup";
 import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
-import AdminLogin from "@/pages/admin-login";
 import NewAdminDashboard from "@/pages/admin/AdminDashboard";
 import CreateMerchant from "@/pages/create-merchant";
 import VerifyMerchant from "@/pages/verify-merchant";
@@ -94,7 +93,7 @@ function AdminProtectedRoute({ children }: { children: React.ReactNode }) {
       if (!token) {
         setIsAuthenticated(false);
         setIsChecking(false);
-        setLocation("/admin/login");
+        setLocation("/login");
         return;
       }
 
@@ -109,13 +108,13 @@ function AdminProtectedRoute({ children }: { children: React.ReactNode }) {
           localStorage.removeItem("adminAuthToken");
           localStorage.removeItem("adminUser");
           setIsAuthenticated(false);
-          setLocation("/admin/login");
+          setLocation("/login");
         }
       } catch (error) {
         localStorage.removeItem("adminAuthToken");
         localStorage.removeItem("adminUser");
         setIsAuthenticated(false);
-        setLocation("/admin/login");
+        setLocation("/login");
       }
       
       setIsChecking(false);
@@ -170,8 +169,6 @@ function Router() {
             <NFCPayment />
           </ProtectedRoute>
         </Route>
-
-        <Route path="/admin/login" component={AdminLogin} />
         
         {/* New Admin Portal with sub-routing */}
         <Route path="/admin/:rest*">
