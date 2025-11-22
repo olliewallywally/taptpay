@@ -24,7 +24,7 @@ const users: Map<number, User> = new Map();
 let currentUserId = 1;
 
 // Create admin user
-const adminHashedPassword = bcrypt.hashSync('TAPTpay', 10);
+const adminHashedPassword = bcrypt.hashSync('123456', 10);
 users.set(1, {
   id: 1,
   email: 'oliverleonard.professional@gmail.com',

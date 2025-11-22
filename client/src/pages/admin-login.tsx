@@ -30,7 +30,7 @@ export default function AdminLogin() {
     resolver: zodResolver(adminLoginSchema),
     defaultValues: {
       email: "oliverleonard.professional@gmail.com",
-      password: "TAPTpay",
+      password: "123456",
     },
   });
 
