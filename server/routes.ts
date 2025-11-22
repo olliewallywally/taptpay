@@ -4,7 +4,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema } from "@shared/schema";
 import { windcaveService } from "./windcave";
-import { authenticateUser, generateToken, authenticateToken, createUser, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest } from "./auth";
+import { authenticateUser, generateToken, authenticateToken, createUser, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
 import { generateBusinessReportPdf } from "./report-generator";
 import { getBaseUrl, generatePaymentUrl, generateQrCodeUrl, generateStonePaymentUrl } from "./url-utils";
@@ -311,7 +311,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-change-in-production') as any;
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      console.log('Admin auth token decoded:', decoded);
       
       // For admin users, we verify directly from the token since they're not stored in the users Map
       if (decoded.role === 'admin' && decoded.email === 'oliverleonard.professional@gmail.com') {
@@ -324,9 +325,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
         });
       } else {
+        console.log('Admin access denied. Role:', decoded.role, 'Email:', decoded.email);
         return res.status(403).json({ message: "Admin access required" });
       }
     } catch (error) {
+      console.error('Admin token verification error:', error);
       return res.status(403).json({ message: "Invalid or expired token" });
     }
   });
