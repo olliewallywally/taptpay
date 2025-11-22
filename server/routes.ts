@@ -134,7 +134,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-change-in-production') as any;
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      console.log('Admin middleware token decoded:', decoded);
       
       // For admin users, we verify directly from the token
       if (decoded.role === 'admin' && decoded.email === 'oliverleonard.professional@gmail.com') {
@@ -150,9 +151,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
         next();
       } else {
+        console.log('Admin access denied in middleware. Role:', decoded.role, 'Email:', decoded.email);
         return res.status(403).json({ message: "Admin access required" });
       }
     } catch (error) {
+      console.error('Admin middleware token error:', error);
       return res.status(403).json({ message: "Invalid or expired token" });
     }
   };
