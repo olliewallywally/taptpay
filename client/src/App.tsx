@@ -171,6 +171,11 @@ function Router() {
         </Route>
         
         {/* New Admin Portal with sub-routing */}
+        <Route path="/admin">
+          <AdminProtectedRoute>
+            <NewAdminDashboard />
+          </AdminProtectedRoute>
+        </Route>
         <Route path="/admin/:rest*">
           <AdminProtectedRoute>
             <NewAdminDashboard />
