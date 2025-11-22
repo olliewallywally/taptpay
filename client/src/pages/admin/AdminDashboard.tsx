@@ -176,6 +176,9 @@ export default function AdminDashboard() {
               </div>
             </div>
           </Route>
+          <Route>
+            <GridDashboard />
+          </Route>
         </Switch>
       </main>
     </div>
