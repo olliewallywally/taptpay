@@ -260,11 +260,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { email, password } = validation.data;
       
       // Check for admin credentials
-      if (email === "oliverleonard.professional@gmail.com" && password === "TAPTpay") {
+      if (email === "oliverleonard.professional@gmail.com" && password === "123456") {
         const adminUser = {
           id: 1,
           email: "oliverleonard.professional@gmail.com",
-          password: "TAPTpay",
+          password: "123456",
           merchantId: 0,
           role: "admin" as const,
           createdAt: new Date(),
