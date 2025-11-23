@@ -62,12 +62,6 @@ export const merchants = pgTable("merchants", {
   autoConvertToFiat: boolean("auto_convert_to_fiat").default(false),
   minConfirmations: integer("min_confirmations").default(1),
   
-  // Payment method for platform fees
-  stripeCustomerId: text("stripe_customer_id"),
-  stripePaymentMethodId: text("stripe_payment_method_id"),
-  paymentMethodLast4: text("payment_method_last4"),
-  paymentMethodBrand: text("payment_method_brand"),
-  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
