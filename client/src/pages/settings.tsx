@@ -328,7 +328,7 @@ export default function Settings() {
                 id="businessName"
                 value={businessDetails.businessName}
                 onChange={(e) => handleBusinessChange('businessName', e.target.value)}
-                className="border-[#0055FF] focus:border-[#00E5CC] focus:ring-[#00E5CC]"
+                className="border-2 border-[#0055FF] focus:border-[#00E5CC] focus:ring-[#00E5CC]"
                 data-testid="input-business-name"
               />
             </div>
@@ -339,7 +339,7 @@ export default function Settings() {
                 id="director"
                 value={businessDetails.director}
                 onChange={(e) => handleBusinessChange('director', e.target.value)}
-                className="border-[#0055FF] focus:border-[#00E5CC] focus:ring-[#00E5CC]"
+                className="border-2 border-[#0055FF] focus:border-[#00E5CC] focus:ring-[#00E5CC]"
                 data-testid="input-director"
               />
             </div>
@@ -350,7 +350,7 @@ export default function Settings() {
                 id="address"
                 value={businessDetails.address}
                 onChange={(e) => handleBusinessChange('address', e.target.value)}
-                className="border-[#0055FF] focus:border-[#00E5CC] focus:ring-[#00E5CC]"
+                className="border-2 border-[#0055FF] focus:border-[#00E5CC] focus:ring-[#00E5CC]"
                 data-testid="input-address"
               />
             </div>
@@ -361,7 +361,7 @@ export default function Settings() {
                 id="nzbn"
                 value={businessDetails.nzbn}
                 onChange={(e) => handleBusinessChange('nzbn', e.target.value)}
-                className="border-[#0055FF] focus:border-[#00E5CC] focus:ring-[#00E5CC]"
+                className="border-2 border-[#0055FF] focus:border-[#00E5CC] focus:ring-[#00E5CC]"
                 data-testid="input-nzbn"
               />
             </div>
@@ -373,7 +373,7 @@ export default function Settings() {
                 type="tel"
                 value={businessDetails.phone}
                 onChange={(e) => handleBusinessChange('phone', e.target.value)}
-                className="border-[#0055FF] focus:border-[#00E5CC] focus:ring-[#00E5CC]"
+                className="border-2 border-[#0055FF] focus:border-[#00E5CC] focus:ring-[#00E5CC]"
                 data-testid="input-phone"
               />
             </div>
@@ -385,7 +385,7 @@ export default function Settings() {
                 type="email"
                 value={businessDetails.email}
                 onChange={(e) => handleBusinessChange('email', e.target.value)}
-                className="border-[#0055FF] focus:border-[#00E5CC] focus:ring-[#00E5CC]"
+                className="border-2 border-[#0055FF] focus:border-[#00E5CC] focus:ring-[#00E5CC]"
                 data-testid="input-email"
               />
             </div>
@@ -396,7 +396,7 @@ export default function Settings() {
                 id="gstNumber"
                 value={businessDetails.gstNumber}
                 onChange={(e) => handleBusinessChange('gstNumber', e.target.value)}
-                className="border-[#0055FF] focus:border-[#00E5CC] focus:ring-[#00E5CC]"
+                className="border-2 border-[#0055FF] focus:border-[#00E5CC] focus:ring-[#00E5CC]"
                 data-testid="input-gst-number"
               />
             </div>
