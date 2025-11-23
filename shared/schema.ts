@@ -418,6 +418,62 @@ export const webhookDeliveries = pgTable("webhook_deliveries", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Merchant Subscriptions table - tracks subscription tier and transaction counts
+export const merchantSubscriptions = pgTable("merchant_subscriptions", {
+  id: serial("id").primaryKey(),
+  merchantId: integer("merchant_id").references(() => merchants.id).notNull().unique(),
+  tier: text("tier").notNull().default("free"), // free, paid
+  status: text("status").notNull().default("active"), // active, cancelled, past_due, suspended
+  
+  // Transaction tracking
+  currentMonthTransactions: integer("current_month_transactions").default(0),
+  totalLifetimeTransactions: integer("total_lifetime_transactions").default(0),
+  monthStartDate: timestamp("month_start_date").defaultNow(), // When current month started (resets monthly)
+  
+  // Billing configuration
+  billingFrequency: text("billing_frequency").default("monthly"), // weekly, bi_weekly, monthly
+  nextBillingDate: timestamp("next_billing_date"),
+  unbilledTransactionCount: integer("unbilled_transaction_count").default(0), // Transactions not yet billed
+  unbilledAmount: decimal("unbilled_amount", { precision: 10, scale: 2 }).default("0.00"), // Total unbilled fees
+  
+  // Cancellation tracking
+  cancellationRequestedAt: timestamp("cancellation_requested_at"),
+  cancellationEffectiveDate: timestamp("cancellation_effective_date"), // 30 days after request
+  cancellationReason: text("cancellation_reason"),
+  
+  // Stripe subscription ID (for paid tier)
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Subscription Billing History table - tracks all billing events
+export const subscriptionBillingHistory = pgTable("subscription_billing_history", {
+  id: serial("id").primaryKey(),
+  merchantId: integer("merchant_id").references(() => merchants.id).notNull(),
+  subscriptionId: integer("subscription_id").references(() => merchantSubscriptions.id),
+  
+  // Billing details
+  billingType: text("billing_type").notNull(), // tier_upgrade, transaction_fees, monthly_subscription
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  transactionCount: integer("transaction_count").default(0), // Number of transactions billed
+  billingPeriodStart: timestamp("billing_period_start"),
+  billingPeriodEnd: timestamp("billing_period_end"),
+  
+  // Stripe payment details
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  stripeChargeId: text("stripe_charge_id"),
+  status: text("status").notNull().default("pending"), // pending, succeeded, failed, refunded
+  
+  // Details
+  description: text("description"), // e.g., "Transaction fees: 150 transactions @ $0.10 each"
+  failureReason: text("failure_reason"),
+  
+  paidAt: timestamp("paid_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // API Key schemas
 export const createApiKeySchema = z.object({
   keyName: z.string().min(1, "Key name is required").max(100, "Key name too long"),
@@ -504,6 +560,28 @@ export const updateMerchantPaymentMethodSchema = z.object({
   paymentMethodBrand: z.string().min(1, "Card brand is required"),
 });
 
+// Subscription schemas
+export const insertMerchantSubscriptionSchema = createInsertSchema(merchantSubscriptions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateSubscriptionSchema = z.object({
+  tier: z.enum(["free", "paid"]).optional(),
+  billingFrequency: z.enum(["weekly", "bi_weekly", "monthly"]).optional(),
+});
+
+export const cancelSubscriptionSchema = z.object({
+  cancellationReason: z.string().min(1, "Cancellation reason is required").max(500, "Reason too long"),
+});
+
+export const insertBillingHistorySchema = createInsertSchema(subscriptionBillingHistory).omit({
+  id: true,
+  createdAt: true,
+  paidAt: true,
+});
+
 // Type exports - consolidated to avoid duplicates
 export type Merchant = typeof merchants.$inferSelect;
 export type InsertMerchant = z.infer<typeof createMerchantSchema>;
@@ -536,3 +614,13 @@ export type CreateStockItem = z.infer<typeof createStockItemSchema>;
 export type CryptoTransaction = typeof cryptoTransactions.$inferSelect;
 export type InsertCryptoTransaction = z.infer<typeof insertCryptoTransactionSchema>;
 export type CreateCryptoTransaction = z.infer<typeof createCryptoTransactionSchema>;
+
+// Subscription types
+export type MerchantSubscription = typeof merchantSubscriptions.$inferSelect;
+export type InsertMerchantSubscription = z.infer<typeof insertMerchantSubscriptionSchema>;
+export type UpdateSubscription = z.infer<typeof updateSubscriptionSchema>;
+export type CancelSubscription = z.infer<typeof cancelSubscriptionSchema>;
+
+// Billing History types
+export type SubscriptionBillingHistory = typeof subscriptionBillingHistory.$inferSelect;
+export type InsertBillingHistory = z.infer<typeof insertBillingHistorySchema>;
