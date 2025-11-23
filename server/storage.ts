@@ -129,6 +129,7 @@ export interface IStorage {
   getSubscription(merchantId: number): Promise<any | undefined>;
   updateSubscriptionTier(merchantId: number, tier: string): Promise<any>;
   updateSubscriptionBillingFrequency(merchantId: number, frequency: string): Promise<any>;
+  updateSubscriptionPaymentMethod(merchantId: number, stripeCustomerId: string, stripePaymentMethodId: string): Promise<any>;
   incrementTransactionCount(merchantId: number): Promise<void>;
   cancelSubscription(merchantId: number, reason: string): Promise<any>;
   getBillingHistory(merchantId: number, limit?: number): Promise<any[]>;
@@ -1273,6 +1274,10 @@ export class MemStorage implements IStorage {
     throw new Error('Subscriptions not supported in memory storage');
   }
 
+  async updateSubscriptionPaymentMethod(merchantId: number, stripeCustomerId: string, stripePaymentMethodId: string): Promise<any> {
+    throw new Error('Subscriptions not supported in memory storage');
+  }
+
   async incrementTransactionCount(merchantId: number): Promise<void> {
     // No-op in memory storage
   }
@@ -2341,6 +2346,21 @@ export class DatabaseStorage implements IStorage {
       .set({ 
         billingFrequency: frequency,
         nextBillingDate,
+        updatedAt: new Date() 
+      })
+      .where(eq(merchantSubscriptions.merchantId, merchantId))
+      .returning();
+    return result[0];
+  }
+
+  async updateSubscriptionPaymentMethod(merchantId: number, stripeCustomerId: string, stripePaymentMethodId: string): Promise<MerchantSubscription> {
+    if (!this.db) throw new Error('Database not available');
+    
+    const result = await this.db
+      .update(merchantSubscriptions)
+      .set({ 
+        stripeCustomerId,
+        stripePaymentMethodId,
         updatedAt: new Date() 
       })
       .where(eq(merchantSubscriptions.merchantId, merchantId))
