@@ -1,8 +1,45 @@
 import { useLocation } from 'wouter';
 import { TrendingUp, DollarSign, Activity, Users, ArrowRight } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+
+interface AnalyticsData {
+  totalMerchants: number;
+  activeMerchants: number;
+  totalRevenue: number;
+  totalTransactions: number;
+  completedTransactions: number;
+  transactionFeeRevenue: number;
+}
 
 export function Analytics() {
   const [, setLocation] = useLocation();
+
+  const { data: analytics, isLoading } = useQuery<AnalyticsData>({
+    queryKey: ['/api/admin/analytics'],
+  });
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-NZ', {
+      style: 'currency',
+      currency: 'NZD',
+    }).format(amount);
+  };
+
+  const formatNumber = (num: number) => {
+    return new Intl.NumberFormat('en-NZ').format(num);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#1a1b2e] flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-[#0055FF] border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  const avgTransaction = analytics?.totalRevenue && analytics?.completedTransactions 
+    ? analytics.totalRevenue / analytics.completedTransactions 
+    : 0;
 
   return (
     <div className="min-h-screen bg-[#1a1b2e] p-4 md:p-6">
@@ -31,10 +68,12 @@ export function Analytics() {
               </div>
               <div>
                 <p className="text-[#dbdfea]/60 text-xs">Total Revenue</p>
-                <p className="text-[#dbdfea] text-xl">$287,450</p>
+                <p className="text-[#dbdfea] text-xl" data-testid="text-total-revenue">
+                  {analytics ? formatCurrency(analytics.totalRevenue) : '$0.00'}
+                </p>
               </div>
             </div>
-            <p className="text-[#4ade80] text-xs">↑ 12.5% from last month</p>
+            <p className="text-[#dbdfea]/40 text-xs">All completed transactions</p>
           </div>
 
           <div className="bg-[#24263a] rounded-lg p-6">
@@ -44,10 +83,14 @@ export function Analytics() {
               </div>
               <div>
                 <p className="text-[#dbdfea]/60 text-xs">Transactions</p>
-                <p className="text-[#dbdfea] text-xl">12,847</p>
+                <p className="text-[#dbdfea] text-xl" data-testid="text-total-transactions">
+                  {analytics ? formatNumber(analytics.totalTransactions) : '0'}
+                </p>
               </div>
             </div>
-            <p className="text-[#4ade80] text-xs">↑ 8.2% from last month</p>
+            <p className="text-[#dbdfea]/40 text-xs">
+              {analytics ? formatNumber(analytics.completedTransactions) : '0'} completed
+            </p>
           </div>
 
           <div className="bg-[#24263a] rounded-lg p-6">
@@ -57,10 +100,14 @@ export function Analytics() {
               </div>
               <div>
                 <p className="text-[#dbdfea]/60 text-xs">Active Merchants</p>
-                <p className="text-[#dbdfea] text-xl">42</p>
+                <p className="text-[#dbdfea] text-xl" data-testid="text-active-merchants">
+                  {analytics ? formatNumber(analytics.activeMerchants) : '0'}
+                </p>
               </div>
             </div>
-            <p className="text-[#4ade80] text-xs">+3 new this month</p>
+            <p className="text-[#dbdfea]/40 text-xs">
+              of {analytics ? formatNumber(analytics.totalMerchants) : '0'} total merchants
+            </p>
           </div>
 
           <div className="bg-[#24263a] rounded-lg p-6">
@@ -70,10 +117,29 @@ export function Analytics() {
               </div>
               <div>
                 <p className="text-[#dbdfea]/60 text-xs">Avg Transaction</p>
-                <p className="text-[#dbdfea] text-xl">$22.37</p>
+                <p className="text-[#dbdfea] text-xl" data-testid="text-avg-transaction">
+                  {formatCurrency(avgTransaction)}
+                </p>
               </div>
             </div>
-            <p className="text-[#fbbf24] text-xs">↓ 2.1% from last month</p>
+            <p className="text-[#dbdfea]/40 text-xs">Platform average</p>
+          </div>
+        </div>
+
+        {/* Platform Fee Revenue */}
+        <div className="bg-[#24263a] rounded-lg p-6 mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[#dbdfea]/60 text-sm mb-1">Transaction Fee Revenue</p>
+              <p className="text-[#dbdfea] text-2xl font-semibold" data-testid="text-fee-revenue">
+                {analytics ? formatCurrency(analytics.transactionFeeRevenue) : '$0.00'}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-[#dbdfea]/60 text-xs">
+                {analytics ? formatNumber(analytics.completedTransactions) : '0'} transactions × $0.20
+              </p>
+            </div>
           </div>
         </div>
 

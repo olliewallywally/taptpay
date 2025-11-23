@@ -3555,14 +3555,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const subscription = await storage.getOrCreateSubscription(merchantId);
-      const merchant = await storage.getMerchant(merchantId);
+      
+      // Get payment method info from Stripe if payment method ID exists
+      let paymentMethod = null;
+      if (subscription.stripePaymentMethodId) {
+        try {
+          const stripe = (await import('stripe')).default;
+          const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+            apiVersion: '2025-11-17.clover',
+          });
+          const pm = await stripeClient.paymentMethods.retrieve(subscription.stripePaymentMethodId);
+          paymentMethod = {
+            last4: pm.card?.last4 || '',
+            brand: pm.card?.brand || ''
+          };
+        } catch (stripeError) {
+          console.error("Failed to fetch payment method from Stripe:", stripeError);
+        }
+      }
       
       res.json({
         subscription,
-        paymentMethod: merchant?.stripePaymentMethodId ? {
-          last4: merchant.paymentMethodLast4,
-          brand: merchant.paymentMethodBrand
-        } : null
+        paymentMethod
       });
     } catch (error) {
       console.error("Get subscription error:", error);
@@ -3602,22 +3616,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // This endpoint should receive payment method ID from Stripe Elements on frontend
-      const { paymentMethodId, last4, brand } = req.body;
+      const { paymentMethodId } = req.body;
 
-      if (!paymentMethodId || !last4 || !brand) {
-        return res.status(400).json({ message: "Payment method details required" });
+      if (!paymentMethodId) {
+        return res.status(400).json({ message: "Payment method ID required" });
       }
 
-      // Update merchant with payment method
-      await storage.updateMerchant(merchantId, {
-        stripePaymentMethodId: paymentMethodId,
-        paymentMethodLast4: last4,
-        paymentMethodBrand: brand,
+      // Get or create Stripe customer for this merchant
+      const stripe = (await import('stripe')).default;
+      const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+        apiVersion: '2025-11-17.clover',
       });
+
+      const subscription = await storage.getOrCreateSubscription(merchantId);
+      let stripeCustomerId = subscription.stripeCustomerId;
+
+      // Create Stripe customer if doesn't exist
+      if (!stripeCustomerId) {
+        const merchant = await storage.getMerchant(merchantId);
+        const customer = await stripeClient.customers.create({
+          email: merchant?.email,
+          metadata: {
+            merchantId: merchantId.toString()
+          }
+        });
+        stripeCustomerId = customer.id;
+      }
+
+      // Attach payment method to customer
+      await stripeClient.paymentMethods.attach(paymentMethodId, {
+        customer: stripeCustomerId,
+      });
+
+      // Set as default payment method
+      await stripeClient.customers.update(stripeCustomerId, {
+        invoice_settings: {
+          default_payment_method: paymentMethodId,
+        },
+      });
+
+      // Update subscription with payment method
+      await storage.updateSubscriptionPaymentMethod(merchantId, stripeCustomerId, paymentMethodId);
+
+      // Get payment method details for response
+      const pm = await stripeClient.paymentMethods.retrieve(paymentMethodId);
 
       res.json({ 
         success: true,
-        paymentMethod: { last4, brand }
+        paymentMethod: { 
+          last4: pm.card?.last4 || '', 
+          brand: pm.card?.brand || '' 
+        }
       });
     } catch (error) {
       console.error("Add payment method error:", error);
