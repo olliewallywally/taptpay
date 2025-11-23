@@ -85,8 +85,22 @@ export default function Dashboard() {
     return () => window.removeEventListener('resize', updateChartSize);
   }, []);
 
-  // Calculate last 7 days revenue
+  // Calculate today's transactions (resets at midnight)
   const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+  
+  const todayTransactions = transactions.filter((tx: any) => {
+    const txDate = new Date(tx.createdAt);
+    return txDate >= todayStart && tx.status === 'completed';
+  });
+
+  const todayRevenue = todayTransactions.reduce((sum: number, tx: any) => sum + parseFloat(tx.price), 0);
+  const todayTransactionCount = todayTransactions.length;
+  
+  const dailyGoal = 500; // $500/day goal
+  const dailyPercentage = Math.min(100, (todayRevenue / dailyGoal) * 100);
+
+  // Calculate last 7 days revenue (for the 7 Days Revenue card)
   const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
   
   const last7DaysTransactions = transactions.filter((tx: any) => {
@@ -95,10 +109,6 @@ export default function Dashboard() {
   });
 
   const last7DaysRevenue = last7DaysTransactions.reduce((sum: number, tx: any) => sum + parseFloat(tx.price), 0);
-  const last7DaysTransactionCount = last7DaysTransactions.length;
-  
-  const weeklyGoal = 3500; // 7 days * $500/day
-  const weeklyPercentage = Math.min(100, (last7DaysRevenue / weeklyGoal) * 100);
 
   // Calculate monthly metrics
   const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
@@ -184,7 +194,7 @@ export default function Dashboard() {
             
             <div className="relative flex items-center justify-center mb-6 sm:mb-8 md:mb-10">
               <SemiCircularProgress 
-                percentage={weeklyPercentage} 
+                percentage={dailyPercentage} 
                 size={chartSize} 
                 strokeWidth={16} 
                 color="#00E5CC"
@@ -192,10 +202,10 @@ export default function Dashboard() {
               />
               <div className="absolute text-center" style={{ bottom: '10px' }}>
                 <div className="text-[#00E5CC] text-4xl sm:text-5xl md:text-6xl mb-1">
-                  ${last7DaysRevenue.toFixed(2)}
+                  ${todayRevenue.toFixed(2)}
                 </div>
                 <div className="text-[#00E5CC] text-sm sm:text-lg md:text-xl">
-                  {last7DaysTransactionCount} transaction{last7DaysTransactionCount !== 1 ? 's' : ''}
+                  {todayTransactionCount} transaction{todayTransactionCount !== 1 ? 's' : ''} today
                 </div>
               </div>
             </div>
