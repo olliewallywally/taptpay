@@ -62,6 +62,9 @@ export const merchants = pgTable("merchants", {
   autoConvertToFiat: boolean("auto_convert_to_fiat").default(false),
   minConfirmations: integer("min_confirmations").default(1),
   
+  // Dashboard preferences
+  dailyGoal: decimal("daily_goal", { precision: 10, scale: 2 }).default("500.00"), // Daily revenue goal in dollars
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -283,6 +286,10 @@ export const updateBankAccountSchema = z.object({
 
 export const updateThemeSchema = z.object({
   themeId: z.string().min(1, "Theme selection is required"),
+});
+
+export const updateDailyGoalSchema = z.object({
+  dailyGoal: z.string().regex(/^\d+(\.\d{1,2})?$/, "Daily goal must be a valid amount"),
 });
 
 export const updateCryptoSettingsSchema = z.object({
