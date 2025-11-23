@@ -50,6 +50,18 @@ export default function Dashboard() {
     return null;
   }
 
+  const { data: merchant } = useQuery({
+    queryKey: ["/api/merchants", merchantId],
+    queryFn: async () => {
+      const token = localStorage.getItem("authToken");
+      const response = await fetch(`/api/merchants/${merchantId}`, {
+        headers: { "Authorization": `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error("Failed to fetch merchant");
+      return response.json();
+    },
+  });
+
   const { data: analytics, isLoading: analyticsLoading } = useQuery({
     queryKey: ["/api/merchants", merchantId, "analytics"],
     queryFn: async () => {
@@ -97,7 +109,8 @@ export default function Dashboard() {
   const todayRevenue = todayTransactions.reduce((sum: number, tx: any) => sum + parseFloat(tx.price), 0);
   const todayTransactionCount = todayTransactions.length;
   
-  const dailyGoal = 500; // $500/day goal
+  // Use merchant's custom daily goal or default to $500
+  const dailyGoal = merchant?.dailyGoal ? parseFloat(merchant.dailyGoal) : 500;
   const dailyPercentage = Math.min(100, (todayRevenue / dailyGoal) * 100);
 
   // Calculate last 7 days revenue (for the 7 Days Revenue card)

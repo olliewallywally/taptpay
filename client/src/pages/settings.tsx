@@ -45,6 +45,7 @@ export default function Settings() {
   const [apiActive, setApiActive] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [dailyGoal, setDailyGoal] = useState('500');
   
   // Subscription state
   const [billingFrequency, setBillingFrequency] = useState('monthly');
@@ -76,6 +77,7 @@ export default function Settings() {
       });
       setWindcaveApi(data.windcaveApiKey || '');
       setApiActive(!!data.windcaveApiKey);
+      setDailyGoal(data.dailyGoal || '500.00');
       if (data.customLogoUrl) {
         setLogoPreview(data.customLogoUrl);
       }
@@ -103,6 +105,29 @@ export default function Settings() {
     },
     onError: () => {
       toast({ title: "Failed to save business details", variant: "destructive" });
+    },
+  });
+
+  const updateDailyGoalMutation = useMutation({
+    mutationFn: async (goalAmount: string) => {
+      const token = localStorage.getItem("authToken");
+      const response = await fetch(`/api/merchants/${merchantId}/daily-goal`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({ dailyGoal: goalAmount }),
+      });
+      if (!response.ok) throw new Error("Failed to update daily goal");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId] });
+      toast({ title: "Daily goal updated successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update daily goal", variant: "destructive" });
     },
   });
 
@@ -494,6 +519,43 @@ export default function Settings() {
                     </Button>
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Dashboard Preferences Section */}
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 mb-5">
+          <h2 className="text-[#0055FF] text-xl mb-5">Dashboard Preferences</h2>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="dailyGoal" className="text-gray-700 text-sm mb-1.5 block">
+                Daily Revenue Goal ($)
+              </Label>
+              <p className="text-xs text-gray-500 mb-2">
+                Set your daily revenue target. This is used in the "active transactions" section on your dashboard.
+              </p>
+              <div className="flex gap-3">
+                <Input
+                  id="dailyGoal"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={dailyGoal}
+                  onChange={(e) => setDailyGoal(e.target.value)}
+                  className="flex-1"
+                  placeholder="500.00"
+                  data-testid="input-daily-goal"
+                />
+                <Button
+                  onClick={() => updateDailyGoalMutation.mutate(dailyGoal)}
+                  disabled={updateDailyGoalMutation.isPending}
+                  className="bg-[#0055FF] hover:bg-[#0055FF]/90"
+                  data-testid="button-save-daily-goal"
+                >
+                  {updateDailyGoalMutation.isPending ? "Saving..." : "Save"}
+                </Button>
               </div>
             </div>
           </div>
