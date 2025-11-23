@@ -323,7 +323,7 @@ export default function Settings() {
           
           <div className="space-y-4">
             <div>
-              <Label htmlFor="businessName" className="text-gray-700 text-sm mb-1.5 block">Company Name</Label>
+              <Label htmlFor="businessName" className="!text-[#0055FF] font-semibold text-base mb-2 block">Company Name</Label>
               <Input
                 id="businessName"
                 value={businessDetails.businessName}
@@ -334,7 +334,7 @@ export default function Settings() {
             </div>
 
             <div>
-              <Label htmlFor="director" className="text-gray-700 text-sm mb-1.5 block">Director</Label>
+              <Label htmlFor="director" className="!text-[#0055FF] font-semibold text-base mb-2 block">Director</Label>
               <Input
                 id="director"
                 value={businessDetails.director}
@@ -345,7 +345,7 @@ export default function Settings() {
             </div>
 
             <div>
-              <Label htmlFor="address" className="text-gray-700 text-sm mb-1.5 block">Address</Label>
+              <Label htmlFor="address" className="!text-[#0055FF] font-semibold text-base mb-2 block">Address</Label>
               <Input
                 id="address"
                 value={businessDetails.address}
@@ -356,7 +356,7 @@ export default function Settings() {
             </div>
 
             <div>
-              <Label htmlFor="nzbn" className="text-gray-700 text-sm mb-1.5 block">NZBN</Label>
+              <Label htmlFor="nzbn" className="!text-[#0055FF] font-semibold text-base mb-2 block">NZBN</Label>
               <Input
                 id="nzbn"
                 value={businessDetails.nzbn}
@@ -367,7 +367,7 @@ export default function Settings() {
             </div>
 
             <div>
-              <Label htmlFor="phone" className="text-gray-700 text-sm mb-1.5 block">Phone Number</Label>
+              <Label htmlFor="phone" className="!text-[#0055FF] font-semibold text-base mb-2 block">Phone Number</Label>
               <Input
                 id="phone"
                 type="tel"
@@ -379,7 +379,7 @@ export default function Settings() {
             </div>
 
             <div>
-              <Label htmlFor="email" className="text-gray-700 text-sm mb-1.5 block">Email</Label>
+              <Label htmlFor="email" className="!text-[#0055FF] font-semibold text-base mb-2 block">Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -391,7 +391,7 @@ export default function Settings() {
             </div>
 
             <div>
-              <Label htmlFor="gstNumber" className="text-gray-700 text-sm mb-1.5 block">GST Number</Label>
+              <Label htmlFor="gstNumber" className="!text-[#0055FF] font-semibold text-base mb-2 block">GST Number</Label>
               <Input
                 id="gstNumber"
                 value={businessDetails.gstNumber}
