@@ -441,8 +441,11 @@ export const merchantSubscriptions = pgTable("merchant_subscriptions", {
   cancellationEffectiveDate: timestamp("cancellation_effective_date"), // 30 days after request
   cancellationReason: text("cancellation_reason"),
   
-  // Stripe subscription ID (for paid tier)
+  // Stripe integration
+  stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
+  stripePaymentMethodId: text("stripe_payment_method_id"),
+  lastBillingDate: text("last_billing_date"), // ISO string of last successful billing
   
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

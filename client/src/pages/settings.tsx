@@ -1,14 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
 import { getCurrentMerchantId } from "@/lib/auth";
+import { apiRequest } from "@/lib/queryClient";
 import { 
   Home, Package, BarChart3, SlidersHorizontal, Terminal,
-  Upload, CheckCircle, XCircle, LogOut
+  Upload, CheckCircle, XCircle, LogOut, CreditCard, AlertCircle
 } from "lucide-react";
 
 interface MerchantDetails {
@@ -41,6 +45,11 @@ export default function Settings() {
   const [apiActive, setApiActive] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  
+  // Subscription state
+  const [billingFrequency, setBillingFrequency] = useState('monthly');
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancellationReason, setCancellationReason] = useState('');
 
   if (!merchantId) {
     setLocation('/login');
@@ -146,6 +155,54 @@ export default function Settings() {
     },
   });
 
+  // Fetch subscription data
+  const { data: subscriptionData } = useQuery({
+    queryKey: ["/api/subscription"],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/subscription');
+      if (!response.ok) throw new Error("Failed to fetch subscription");
+      return response.json();
+    },
+  });
+
+  useEffect(() => {
+    if (subscriptionData?.subscription) {
+      setBillingFrequency(subscriptionData.subscription.billingFrequency || 'monthly');
+    }
+  }, [subscriptionData]);
+
+  const updateBillingFrequencyMutation = useMutation({
+    mutationFn: async (frequency: string) => {
+      const response = await apiRequest('PUT', '/api/subscription/billing-frequency', { frequency });
+      if (!response.ok) throw new Error("Failed to update billing frequency");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
+      toast({ title: "Billing frequency updated successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update billing frequency", variant: "destructive" });
+    },
+  });
+
+  const cancelSubscriptionMutation = useMutation({
+    mutationFn: async (reason: string) => {
+      const response = await apiRequest('POST', '/api/subscription/cancel', { reason });
+      if (!response.ok) throw new Error("Failed to cancel subscription");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
+      setShowCancelDialog(false);
+      setCancellationReason('');
+      toast({ title: "Subscription cancellation requested. Will be effective in 30 days." });
+    },
+    onError: () => {
+      toast({ title: "Failed to cancel subscription", variant: "destructive" });
+    },
+  });
+
   const handleBusinessChange = (field: keyof MerchantDetails, value: string) => {
     setBusinessDetails(prev => ({ ...prev, [field]: value }));
   };
@@ -197,6 +254,24 @@ export default function Settings() {
     localStorage.removeItem("authToken");
     setLocation('/login');
   };
+
+  const handleBillingFrequencyChange = (frequency: string) => {
+    setBillingFrequency(frequency);
+    updateBillingFrequencyMutation.mutate(frequency);
+  };
+
+  const handleCancelSubscription = () => {
+    if (!cancellationReason.trim()) {
+      toast({ title: "Please provide a reason for cancellation", variant: "destructive" });
+      return;
+    }
+    cancelSubscriptionMutation.mutate(cancellationReason);
+  };
+
+  const subscription = subscriptionData?.subscription;
+  const transactionProgress = subscription ? Math.min((subscription.currentMonthTransactions / 1000) * 100, 100) : 0;
+  const isFreeTier = subscription?.tier === 'free';
+  const isCancelled = subscription?.status === 'cancelled';
 
   if (isLoading) {
     return (
@@ -421,6 +496,173 @@ export default function Settings() {
                 )}
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Subscription & Billing Section */}
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 mb-5">
+          <h2 className="text-[#0055FF] text-xl mb-5">Subscription & Billing</h2>
+          
+          <div className="space-y-5">
+            {/* Current Tier */}
+            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-[#0055FF]/10 to-[#00E5CC]/10 rounded-xl">
+              <div>
+                <p className="text-gray-700 font-medium">Current Plan</p>
+                <p className="text-2xl font-bold text-[#0055FF] mt-1">
+                  {isFreeTier ? 'Free Tier' : 'Paid ($19.99/month)'}
+                </p>
+              </div>
+              {isCancelled && (
+                <AlertCircle className="text-orange-500" size={24} />
+              )}
+            </div>
+
+            {/* Transaction Counter */}
+            <div className="p-4 bg-gray-50 rounded-xl">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-gray-700 font-medium">Monthly Transaction Usage</p>
+                <p className="text-sm font-medium text-gray-600">
+                  {subscription?.currentMonthTransactions || 0} / 1000
+                </p>
+              </div>
+              <Progress value={transactionProgress} className="h-3 mb-2" />
+              <p className="text-xs text-gray-500">
+                {isFreeTier 
+                  ? 'Free tier includes up to 1,000 transactions per month. Additional charges apply after that.'
+                  : 'You will be charged 10 cents per transaction at your selected billing frequency.'}
+              </p>
+              {isFreeTier && subscription && subscription.currentMonthTransactions >= 1000 && (
+                <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-xs text-red-600 font-medium">
+                    ⚠️ You've reached your free tier limit. Your card will be charged 10 cents per additional transaction.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Billing Frequency */}
+            <div>
+              <Label className="text-gray-700 text-sm mb-2 block">
+                Transaction Fee Billing Frequency
+              </Label>
+              <p className="text-xs text-gray-500 mb-3">
+                Choose how often you want to be charged for transaction fees (10 cents per transaction)
+              </p>
+              <Select value={billingFrequency} onValueChange={handleBillingFrequencyChange}>
+                <SelectTrigger className="border-[#0055FF] focus:border-[#00E5CC]" data-testid="select-billing-frequency">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="weekly">Weekly</SelectItem>
+                  <SelectItem value="bi_weekly">Bi-Weekly</SelectItem>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Payment Method */}
+            <div className="p-4 bg-gray-50 rounded-xl">
+              <div className="flex items-center gap-3 mb-2">
+                <CreditCard className="text-[#0055FF]" size={20} />
+                <p className="text-gray-700 font-medium">Payment Method</p>
+              </div>
+              {subscriptionData?.paymentMethod ? (
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-gray-600">
+                    {subscriptionData.paymentMethod.brand} ending in {subscriptionData.paymentMethod.last4}
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-[#0055FF] text-[#0055FF]"
+                  >
+                    Update
+                  </Button>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-sm text-gray-500 mb-2">No payment method on file</p>
+                  <Button
+                    variant="outline"
+                    className="border-[#0055FF] text-[#0055FF]"
+                    data-testid="button-add-payment"
+                  >
+                    Add Credit Card
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Unbilled Transactions */}
+            {subscription && subscription.unbilledTransactionCount > 0 && (
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                <p className="text-sm font-medium text-blue-900 mb-1">
+                  Unbilled Transactions
+                </p>
+                <p className="text-xs text-blue-700">
+                  {subscription.unbilledTransactionCount} transactions totaling ${Number(subscription.unbilledAmount).toFixed(2)} will be charged on your next billing date
+                </p>
+              </div>
+            )}
+
+            {/* Cancellation Section */}
+            {!isCancelled ? (
+              !showCancelDialog ? (
+                <Button
+                  variant="outline"
+                  className="w-full border-red-500 text-red-500 hover:bg-red-50"
+                  onClick={() => setShowCancelDialog(true)}
+                  data-testid="button-cancel-subscription"
+                >
+                  Cancel Subscription
+                </Button>
+              ) : (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-xl space-y-3">
+                  <p className="text-sm font-medium text-red-900">
+                    Cancel Subscription (30-day notice required)
+                  </p>
+                  <p className="text-xs text-red-700">
+                    Your subscription will remain active for 30 days after cancellation request. Please provide a reason:
+                  </p>
+                  <Textarea
+                    value={cancellationReason}
+                    onChange={(e) => setCancellationReason(e.target.value)}
+                    placeholder="Please tell us why you're cancelling..."
+                    className="border-red-300 focus:border-red-500"
+                    data-testid="textarea-cancel-reason"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setShowCancelDialog(false);
+                        setCancellationReason('');
+                      }}
+                      className="flex-1"
+                    >
+                      Keep Subscription
+                    </Button>
+                    <Button
+                      onClick={handleCancelSubscription}
+                      disabled={cancelSubscriptionMutation.isPending || !cancellationReason.trim()}
+                      className="flex-1 bg-red-500 hover:bg-red-600 text-white"
+                      data-testid="button-confirm-cancel"
+                    >
+                      {cancelSubscriptionMutation.isPending ? "Processing..." : "Confirm Cancellation"}
+                    </Button>
+                  </div>
+                </div>
+              )
+            ) : (
+              <div className="p-4 bg-orange-50 border border-orange-200 rounded-xl">
+                <p className="text-sm font-medium text-orange-900 mb-1">
+                  Subscription Cancelled
+                </p>
+                <p className="text-xs text-orange-700">
+                  Your subscription will end on {subscription?.cancellationEffectiveDate ? new Date(subscription.cancellationEffectiveDate).toLocaleDateString() : 'N/A'}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 

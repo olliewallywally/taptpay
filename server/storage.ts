@@ -1,4 +1,4 @@
-import { merchants, transactions, merchantSettlements, platformFees, refunds, splitPayments, taptStones, stockItems, cryptoTransactions, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type CryptoTransaction, type InsertCryptoTransaction } from "@shared/schema";
+import { merchants, transactions, merchantSettlements, platformFees, refunds, splitPayments, taptStones, stockItems, cryptoTransactions, merchantSubscriptions, subscriptionBillingHistory, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type CryptoTransaction, type InsertCryptoTransaction, type MerchantSubscription, type SubscriptionBillingHistory } from "@shared/schema";
 import { getDb, isDatabaseConnected } from "./database";
 import { eq, desc, and } from "drizzle-orm";
 
@@ -123,6 +123,20 @@ export interface IStorage {
   logApiRequest(data: any): Promise<any>;
   getApiMetrics(merchantId?: number): Promise<any>;
   getApiUsageData(merchantId?: number): Promise<any[]>;
+  
+  // Subscription operations
+  getOrCreateSubscription(merchantId: number): Promise<any>;
+  getSubscription(merchantId: number): Promise<any | undefined>;
+  updateSubscriptionTier(merchantId: number, tier: string): Promise<any>;
+  updateSubscriptionBillingFrequency(merchantId: number, frequency: string): Promise<any>;
+  incrementTransactionCount(merchantId: number): Promise<void>;
+  cancelSubscription(merchantId: number, reason: string): Promise<any>;
+  getBillingHistory(merchantId: number, limit?: number): Promise<any[]>;
+  createBillingHistory(data: any): Promise<any>;
+  resetMonthlyTransactionCount(merchantId: number): Promise<void>;
+  getUnbilledTransactions(merchantId: number): Promise<{ count: number; amount: number }>;
+  resetUnbilledTransactions(merchantId: number): Promise<void>;
+  getAllActiveSubscriptions(billingFrequency?: string): Promise<any[]>;
   
   // Webhook delivery tracking
   createWebhookDelivery(data: any): Promise<any>;
@@ -1241,6 +1255,55 @@ export class MemStorage implements IStorage {
     }
     return undefined;
   }
+
+  // Subscription stub methods (not used in production)
+  async getOrCreateSubscription(merchantId: number): Promise<any> {
+    throw new Error('Subscriptions not supported in memory storage');
+  }
+
+  async getSubscription(merchantId: number): Promise<any | undefined> {
+    return undefined;
+  }
+
+  async updateSubscriptionTier(merchantId: number, tier: string): Promise<any> {
+    throw new Error('Subscriptions not supported in memory storage');
+  }
+
+  async updateSubscriptionBillingFrequency(merchantId: number, frequency: string): Promise<any> {
+    throw new Error('Subscriptions not supported in memory storage');
+  }
+
+  async incrementTransactionCount(merchantId: number): Promise<void> {
+    // No-op in memory storage
+  }
+
+  async cancelSubscription(merchantId: number, reason: string): Promise<any> {
+    throw new Error('Subscriptions not supported in memory storage');
+  }
+
+  async getBillingHistory(merchantId: number, limit?: number): Promise<any[]> {
+    return [];
+  }
+
+  async createBillingHistory(data: any): Promise<any> {
+    throw new Error('Subscriptions not supported in memory storage');
+  }
+
+  async resetMonthlyTransactionCount(merchantId: number): Promise<void> {
+    // No-op in memory storage
+  }
+
+  async getUnbilledTransactions(merchantId: number): Promise<{ count: number; amount: number }> {
+    return { count: 0, amount: 0 };
+  }
+
+  async resetUnbilledTransactions(merchantId: number): Promise<void> {
+    // No-op in memory storage
+  }
+
+  async getAllActiveSubscriptions(billingFrequency?: string): Promise<any[]> {
+    return [];
+  }
 }
 
 // Database Storage Implementation
@@ -2193,6 +2256,246 @@ export class DatabaseStorage implements IStorage {
       .where(eq(cryptoTransactions.id, id))
       .returning();
     return result[0];
+  }
+
+  // Subscription methods for DatabaseStorage
+  async getOrCreateSubscription(merchantId: number): Promise<MerchantSubscription> {
+    if (!this.db) throw new Error('Database not available');
+    
+    // Try to get existing subscription
+    const existing = await this.db
+      .select()
+      .from(merchantSubscriptions)
+      .where(eq(merchantSubscriptions.merchantId, merchantId))
+      .limit(1);
+    
+    if (existing[0]) {
+      return existing[0];
+    }
+    
+    // Create new subscription with free tier
+    const nextMonth = new Date();
+    nextMonth.setMonth(nextMonth.getMonth() + 1);
+    
+    const result = await this.db
+      .insert(merchantSubscriptions)
+      .values({
+        merchantId,
+        tier: 'free',
+        status: 'active',
+        currentMonthTransactions: 0,
+        totalLifetimeTransactions: 0,
+        monthStartDate: new Date(),
+        billingFrequency: 'monthly',
+        nextBillingDate: nextMonth,
+        unbilledTransactionCount: 0,
+        unbilledAmount: '0.00',
+      })
+      .returning();
+    
+    return result[0];
+  }
+
+  async getSubscription(merchantId: number): Promise<MerchantSubscription | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .select()
+      .from(merchantSubscriptions)
+      .where(eq(merchantSubscriptions.merchantId, merchantId))
+      .limit(1);
+    return result[0];
+  }
+
+  async updateSubscriptionTier(merchantId: number, tier: string): Promise<MerchantSubscription> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .update(merchantSubscriptions)
+      .set({ tier, updatedAt: new Date() })
+      .where(eq(merchantSubscriptions.merchantId, merchantId))
+      .returning();
+    return result[0];
+  }
+
+  async updateSubscriptionBillingFrequency(merchantId: number, frequency: string): Promise<MerchantSubscription> {
+    if (!this.db) throw new Error('Database not available');
+    
+    // Calculate next billing date based on frequency
+    const now = new Date();
+    let nextBillingDate = new Date(now);
+    
+    switch (frequency) {
+      case 'weekly':
+        nextBillingDate.setDate(now.getDate() + 7);
+        break;
+      case 'bi_weekly':
+        nextBillingDate.setDate(now.getDate() + 14);
+        break;
+      case 'monthly':
+      default:
+        nextBillingDate.setMonth(now.getMonth() + 1);
+        break;
+    }
+    
+    const result = await this.db
+      .update(merchantSubscriptions)
+      .set({ 
+        billingFrequency: frequency,
+        nextBillingDate,
+        updatedAt: new Date() 
+      })
+      .where(eq(merchantSubscriptions.merchantId, merchantId))
+      .returning();
+    return result[0];
+  }
+
+  async incrementTransactionCount(merchantId: number): Promise<void> {
+    if (!this.db) throw new Error('Database not available');
+    
+    // Get or create subscription
+    const subscription = await this.getOrCreateSubscription(merchantId);
+    
+    // Check if we need to reset monthly counter (new month started)
+    const now = new Date();
+    const monthStart = new Date(subscription.monthStartDate || now);
+    const monthsElapsed = (now.getFullYear() - monthStart.getFullYear()) * 12 + 
+                         (now.getMonth() - monthStart.getMonth());
+    
+    // Reset monthly counter if new month started
+    if (monthsElapsed >= 1) {
+      await this.db
+        .update(merchantSubscriptions)
+        .set({
+          currentMonthTransactions: 0,
+          monthStartDate: now,
+          updatedAt: now
+        })
+        .where(eq(merchantSubscriptions.merchantId, merchantId));
+      
+      // Refresh subscription after reset
+      const refreshed = await this.getSubscription(merchantId);
+      if (!refreshed) throw new Error('Failed to refresh subscription');
+      subscription.currentMonthTransactions = 0;
+    }
+    
+    const currentCount = subscription.currentMonthTransactions || 0;
+    const isFreeTier = subscription.tier === 'free';
+    
+    // For free tier: only charge beyond 1000 transactions
+    // For paid tier: charge every transaction
+    const shouldCharge = !isFreeTier || currentCount >= 1000;
+    
+    // Increment counters
+    const updates: any = {
+      currentMonthTransactions: currentCount + 1,
+      totalLifetimeTransactions: (subscription.totalLifetimeTransactions || 0) + 1,
+      updatedAt: now
+    };
+    
+    // Add billing charges only if appropriate
+    if (shouldCharge) {
+      updates.unbilledTransactionCount = (subscription.unbilledTransactionCount || 0) + 1;
+      updates.unbilledAmount = String(parseFloat(subscription.unbilledAmount || '0') + 0.10);
+    }
+    
+    await this.db
+      .update(merchantSubscriptions)
+      .set(updates)
+      .where(eq(merchantSubscriptions.merchantId, merchantId));
+  }
+
+  async cancelSubscription(merchantId: number, reason: string): Promise<MerchantSubscription> {
+    if (!this.db) throw new Error('Database not available');
+    
+    const now = new Date();
+    const effectiveDate = new Date(now);
+    effectiveDate.setDate(now.getDate() + 30); // 30 days notice
+    
+    const result = await this.db
+      .update(merchantSubscriptions)
+      .set({
+        status: 'cancelled',
+        cancellationRequestedAt: now,
+        cancellationEffectiveDate: effectiveDate,
+        cancellationReason: reason,
+        updatedAt: now
+      })
+      .where(eq(merchantSubscriptions.merchantId, merchantId))
+      .returning();
+    return result[0];
+  }
+
+  async getBillingHistory(merchantId: number, limit: number = 50): Promise<SubscriptionBillingHistory[]> {
+    if (!this.db) throw new Error('Database not available');
+    return await this.db
+      .select()
+      .from(subscriptionBillingHistory)
+      .where(eq(subscriptionBillingHistory.merchantId, merchantId))
+      .orderBy(desc(subscriptionBillingHistory.createdAt))
+      .limit(limit);
+  }
+
+  async createBillingHistory(data: any): Promise<SubscriptionBillingHistory> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .insert(subscriptionBillingHistory)
+      .values(data)
+      .returning();
+    return result[0];
+  }
+
+  async resetMonthlyTransactionCount(merchantId: number): Promise<void> {
+    if (!this.db) throw new Error('Database not available');
+    await this.db
+      .update(merchantSubscriptions)
+      .set({
+        currentMonthTransactions: 0,
+        monthStartDate: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(merchantSubscriptions.merchantId, merchantId));
+  }
+
+  async getUnbilledTransactions(merchantId: number): Promise<{ count: number; amount: number }> {
+    if (!this.db) throw new Error('Database not available');
+    const subscription = await this.getSubscription(merchantId);
+    
+    if (!subscription) {
+      return { count: 0, amount: 0 };
+    }
+    
+    return {
+      count: subscription.unbilledTransactionCount || 0,
+      amount: parseFloat(subscription.unbilledAmount || '0')
+    };
+  }
+
+  async resetUnbilledTransactions(merchantId: number): Promise<void> {
+    if (!this.db) throw new Error('Database not available');
+    await this.db
+      .update(merchantSubscriptions)
+      .set({
+        unbilledTransactionCount: 0,
+        unbilledAmount: '0.00',
+        lastBillingDate: new Date().toISOString(),
+        updatedAt: new Date()
+      })
+      .where(eq(merchantSubscriptions.merchantId, merchantId));
+  }
+
+  async getAllActiveSubscriptions(billingFrequency?: string): Promise<MerchantSubscription[]> {
+    if (!this.db) throw new Error('Database not available');
+    
+    let query = this.db
+      .select()
+      .from(merchantSubscriptions)
+      .where(eq(merchantSubscriptions.status, 'active'));
+    
+    // Filter by billing frequency if provided
+    if (billingFrequency) {
+      query = query.where(eq(merchantSubscriptions.billingFrequency, billingFrequency));
+    }
+    
+    return await query;
   }
 }
 

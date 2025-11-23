@@ -955,6 +955,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   transactionAmount: currentSplit.amount,
                   status: 'collected',
                 });
+                
+                // Track transaction for subscription billing
+                if (transaction.merchantId) {
+                  await storage.incrementTransactionCount(transaction.merchantId);
+                }
               }
             } else {
               // Regular transaction processing
@@ -969,6 +974,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   transactionAmount: transaction.price,
                   status: 'collected',
                 });
+                
+                // Track transaction for subscription billing
+                if (transaction.merchantId) {
+                  await storage.incrementTransactionCount(transaction.merchantId);
+                }
               }
             }
             
@@ -1338,6 +1348,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "pending"
       });
       
+      // Track transaction for subscription billing
+      if (cryptoTransaction.merchantId) {
+        await storage.incrementTransactionCount(cryptoTransaction.merchantId);
+      }
+      
       // TODO: Auto-charge merchant's payment method for platform fee
       // This would use Stripe to charge the merchant's stored card
       // For now, we just record the fee as pending
@@ -1421,6 +1436,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           transactionAmount: cryptoTx.fiatAmount,
           status: 'pending'
         });
+        
+        // Track transaction for subscription billing
+        if (cryptoTx.merchantId) {
+          await storage.incrementTransactionCount(cryptoTx.merchantId);
+        }
         
         // Broadcast SSE update
         const connections = sseConnections.get(cryptoTx.merchantId);
@@ -3394,6 +3414,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: 'collected',
         });
 
+        // Track transaction for subscription billing
+        if (transaction.merchantId) {
+          await storage.incrementTransactionCount(transaction.merchantId);
+        }
+
         // Notify connected clients
         broadcastToStone(transaction.merchantId, transaction.taptStoneId, { 
           type: 'transaction_updated', 
@@ -3461,6 +3486,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: 'collected',
         });
 
+        // Track transaction for subscription billing
+        if (transaction.merchantId) {
+          await storage.incrementTransactionCount(transaction.merchantId);
+        }
+
         // Notify connected clients
         broadcastToStone(transaction.merchantId, transaction.taptStoneId, { 
           type: 'transaction_updated', 
@@ -3509,6 +3539,182 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Digital wallet config error:", error);
       res.status(500).json({ error: "Failed to get digital wallet configuration" });
+    }
+  });
+
+  // ============================================================================
+  // SUBSCRIPTION ROUTES
+  // ============================================================================
+
+  // Get subscription status for current merchant
+  app.get("/api/subscription", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) {
+        return res.status(400).json({ message: "Merchant ID required" });
+      }
+
+      const subscription = await storage.getOrCreateSubscription(merchantId);
+      const merchant = await storage.getMerchant(merchantId);
+      
+      res.json({
+        subscription,
+        paymentMethod: merchant?.stripePaymentMethodId ? {
+          last4: merchant.paymentMethodLast4,
+          brand: merchant.paymentMethodBrand
+        } : null
+      });
+    } catch (error) {
+      console.error("Get subscription error:", error);
+      res.status(500).json({ message: "Failed to get subscription" });
+    }
+  });
+
+  // Update billing frequency
+  app.put("/api/subscription/billing-frequency", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) {
+        return res.status(400).json({ message: "Merchant ID required" });
+      }
+
+      const { frequency } = req.body;
+      
+      if (!['weekly', 'bi_weekly', 'monthly'].includes(frequency)) {
+        return res.status(400).json({ message: "Invalid billing frequency" });
+      }
+
+      const subscription = await storage.updateSubscriptionBillingFrequency(merchantId, frequency);
+      
+      res.json({ subscription });
+    } catch (error) {
+      console.error("Update billing frequency error:", error);
+      res.status(500).json({ message: "Failed to update billing frequency" });
+    }
+  });
+
+  // Add or update payment method (Stripe setup intent)
+  app.post("/api/subscription/payment-method", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) {
+        return res.status(400).json({ message: "Merchant ID required" });
+      }
+
+      // This endpoint should receive payment method ID from Stripe Elements on frontend
+      const { paymentMethodId, last4, brand } = req.body;
+
+      if (!paymentMethodId || !last4 || !brand) {
+        return res.status(400).json({ message: "Payment method details required" });
+      }
+
+      // Update merchant with payment method
+      await storage.updateMerchant(merchantId, {
+        stripePaymentMethodId: paymentMethodId,
+        paymentMethodLast4: last4,
+        paymentMethodBrand: brand,
+      });
+
+      res.json({ 
+        success: true,
+        paymentMethod: { last4, brand }
+      });
+    } catch (error) {
+      console.error("Add payment method error:", error);
+      res.status(500).json({ message: "Failed to add payment method" });
+    }
+  });
+
+  // Cancel subscription (30-day notice)
+  app.post("/api/subscription/cancel", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) {
+        return res.status(400).json({ message: "Merchant ID required" });
+      }
+
+      const { reason } = req.body;
+      
+      if (!reason || reason.trim().length === 0) {
+        return res.status(400).json({ message: "Cancellation reason required" });
+      }
+
+      const subscription = await storage.cancelSubscription(merchantId, reason);
+      
+      res.json({ 
+        subscription,
+        message: "Subscription will be cancelled after 30 days"
+      });
+    } catch (error) {
+      console.error("Cancel subscription error:", error);
+      res.status(500).json({ message: "Failed to cancel subscription" });
+    }
+  });
+
+  // Get billing history
+  app.get("/api/subscription/billing-history", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) {
+        return res.status(400).json({ message: "Merchant ID required" });
+      }
+
+      const limit = parseInt(req.query.limit as string) || 50;
+      const history = await storage.getBillingHistory(merchantId, limit);
+      
+      res.json({ history });
+    } catch (error) {
+      console.error("Get billing history error:", error);
+      res.status(500).json({ message: "Failed to get billing history" });
+    }
+  });
+
+  // Process billing for current merchant
+  app.post("/api/billing/process", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) {
+        return res.status(400).json({ message: "Merchant ID required" });
+      }
+
+      const { processMerchantBilling } = await import('./billingService');
+      const result = await processMerchantBilling(merchantId, storage);
+      
+      res.json({ result });
+    } catch (error) {
+      console.error("Process billing error:", error);
+      res.status(500).json({ message: "Failed to process billing" });
+    }
+  });
+
+  // Process billing for all merchants (admin only)
+  app.post("/api/admin/billing/process-all", authenticateAdmin, async (req, res) => {
+    try {
+      const { billingFrequency } = req.body;
+      const { processBillingForAllMerchants } = await import('./billingService');
+      const results = await processBillingForAllMerchants(storage, billingFrequency);
+      
+      res.json({ 
+        results,
+        totalProcessed: results.length,
+        successful: results.filter(r => r.success).length,
+        failed: results.filter(r => !r.success).length
+      });
+    } catch (error) {
+      console.error("Process all billing error:", error);
+      res.status(500).json({ message: "Failed to process billing for all merchants" });
+    }
+  });
+
+  // Get Stripe publishable key for frontend
+  app.get("/api/stripe/publishable-key", async (req, res) => {
+    try {
+      const { getStripePublishableKey } = await import('./stripeClient');
+      const publishableKey = await getStripePublishableKey();
+      res.json({ publishableKey });
+    } catch (error) {
+      console.error("Get Stripe key error:", error);
+      res.status(500).json({ message: "Failed to get Stripe key" });
     }
   });
 
