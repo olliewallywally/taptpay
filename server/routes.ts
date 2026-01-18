@@ -527,21 +527,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid transaction data", errors: validation.error.errors });
       }
 
-      const { offlineId } = req.body;
-      if (offlineId) {
-        const existingTransaction = await storage.getTransactionByOfflineId(offlineId);
-        if (existingTransaction) {
-          const paymentUrl = generatePaymentUrl(existingTransaction.merchantId, existingTransaction.taptStoneId, req);
-          const qrCodeUrl = generateQrCodeUrl(existingTransaction.merchantId, existingTransaction.taptStoneId, req);
-          return res.json({ ...existingTransaction, paymentUrl, qrCodeUrl, alreadySynced: true });
-        }
-      }
-
-      const transactionData = offlineId 
-        ? { ...validation.data, offlineId }
-        : validation.data;
-      
-      const transaction = await storage.createTransaction(transactionData);
+      const transaction = await storage.createTransaction(validation.data);
       
       // Generate payment URL and QR code URL for the transaction
       const paymentUrl = generatePaymentUrl(transaction.merchantId, transaction.taptStoneId, req);
