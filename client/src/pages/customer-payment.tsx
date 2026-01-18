@@ -2,13 +2,13 @@ import { useState, useEffect, lazy, Suspense } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { sseClient } from "@/lib/sse-client";
-
-const DigitalWalletButtons = lazy(() => import("@/components/digital-wallet-buttons").then(m => ({ default: m.DigitalWalletButtons })));
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CheckCircle, XCircle, ChevronDown, ChevronUp, Minus, Plus } from "lucide-react";
 import taptLogo from "@assets/IMG_6592_1755070818452.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
+const DigitalWalletButtons = lazy(() => import("@/components/digital-wallet-buttons").then(m => ({ default: m.DigitalWalletButtons })));
 
 interface SplitBillContentProps {
   transactionId: number;
