@@ -117,8 +117,10 @@ class OfflineStorage {
         const transaction = getRequest.result;
         if (transaction) {
           transaction.status = status;
-          transaction.syncAttempts += 1;
           transaction.lastSyncAttempt = new Date().toISOString();
+          if (status === 'failed') {
+            transaction.syncAttempts += 1;
+          }
           if (errorMessage) {
             transaction.errorMessage = errorMessage;
           }

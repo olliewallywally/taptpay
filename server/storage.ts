@@ -27,6 +27,7 @@ export interface IStorage {
   getTransaction(id: number): Promise<Transaction | undefined>;
   getActiveTransactionByMerchant(merchantId: number, taptStoneId?: number): Promise<Transaction | undefined>;
   getTransactionByNfcSession(nfcSessionId: string): Promise<Transaction | undefined>;
+  getTransactionByOfflineId(offlineId: string): Promise<Transaction | undefined>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   updateTransactionStatus(id: number, status: string, windcaveTransactionId?: string): Promise<Transaction | undefined>;
   updateTransactionNfcSession(id: number, nfcSessionId: string): Promise<Transaction | undefined>;
