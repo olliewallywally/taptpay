@@ -4,7 +4,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema } from "@shared/schema";
 import { windcaveService } from "./windcave";
-import { authenticateUser, generateToken, authenticateToken, createUser, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest } from "./auth";
+import { authenticateUser, generateToken, authenticateToken, createUser, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
 import { generateBusinessReportPdf } from "./report-generator";
 import { getBaseUrl, generatePaymentUrl, generateQrCodeUrl, generateStonePaymentUrl } from "./url-utils";
@@ -47,7 +47,8 @@ function checkRateLimit(ip: string): boolean {
 // Cleanup old rate limit records periodically
 setInterval(() => {
   const now = Date.now();
-  for (const [ip, record] of rateLimitMap.entries()) {
+  const entries = Array.from(rateLimitMap.entries());
+  for (const [ip, record] of entries) {
     if (now > record.resetTime) {
       rateLimitMap.delete(ip);
     }
@@ -135,7 +136,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as any;
-      console.log('Admin middleware token decoded:', decoded);
+      // Token decoded for admin middleware - details omitted for security
       
       // For admin users, we verify directly from the token
       if (decoded.role === 'admin' && decoded.email === 'oliverleonard.professional@gmail.com') {
@@ -151,7 +152,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
         next();
       } else {
-        console.log('Admin access denied in middleware. Role:', decoded.role, 'Email:', decoded.email);
+        logSecurityEvent('ADMIN_ACCESS_DENIED', { role: decoded.role });
         return res.status(403).json({ message: "Admin access required" });
       }
     } catch (error) {
@@ -169,11 +170,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { email, password } = validation.data;
+      const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
+      
+      // Check if IP is rate limited (distributed attack protection)
+      const ipStatus = isIPRateLimited(clientIp);
+      if (ipStatus.limited) {
+        logSecurityEvent('LOGIN_BLOCKED_IP_LIMIT', { ip: clientIp });
+        return res.status(429).json({ 
+          message: `Too many login attempts. Please try again in ${ipStatus.remainingTime} minutes.`,
+          rateLimited: true,
+          remainingTime: ipStatus.remainingTime 
+        });
+      }
+      
+      // Check if account is locked (per-email protection)
+      const lockStatus = isAccountLocked(email);
+      if (lockStatus.locked) {
+        logSecurityEvent('LOGIN_BLOCKED_LOCKOUT', { email, ip: clientIp });
+        return res.status(429).json({ 
+          message: `Account temporarily locked. Please try again in ${lockStatus.remainingTime} minutes.`,
+          locked: true,
+          remainingTime: lockStatus.remainingTime 
+        });
+      }
+
       const user = await authenticateUser(email, password);
       
       if (!user) {
-        return res.status(401).json({ message: "Invalid email or password" });
+        const result = recordFailedLogin(email, clientIp);
+        if (result.ipLimited) {
+          return res.status(429).json({ 
+            message: "Too many login attempts from your location. Please try again in 30 minutes.",
+            rateLimited: true 
+          });
+        }
+        if (result.locked) {
+          return res.status(429).json({ 
+            message: "Too many failed attempts. Account locked for 15 minutes.",
+            locked: true 
+          });
+        }
+        return res.status(401).json({ 
+          message: "Invalid email or password",
+          attemptsRemaining: result.attemptsRemaining 
+        });
       }
+
+      // Clear failed attempts on successful login
+      clearFailedAttempts(email);
+      logSecurityEvent('LOGIN_SUCCESS', { email, ip: clientIp, userId: user.id });
 
       const token = generateToken(user);
       
@@ -187,7 +232,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       });
     } catch (error) {
-      console.error("Login error:", error);
+      logSecurityEvent('LOGIN_ERROR', { error: String(error) });
       res.status(500).json({ message: "Login failed" });
     }
   });
@@ -261,9 +306,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { email, password } = validation.data;
+      const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
+      
+      // Check if IP is rate limited (distributed attack protection)
+      const ipStatus = isIPRateLimited(clientIp);
+      if (ipStatus.limited) {
+        logSecurityEvent('ADMIN_LOGIN_BLOCKED_IP_LIMIT', { ip: clientIp });
+        return res.status(429).json({ 
+          message: `Too many login attempts. Please try again in ${ipStatus.remainingTime} minutes.`,
+          rateLimited: true,
+          remainingTime: ipStatus.remainingTime 
+        });
+      }
+      
+      // Check if account is locked (per-email protection)
+      const lockStatus = isAccountLocked(email);
+      if (lockStatus.locked) {
+        logSecurityEvent('ADMIN_LOGIN_BLOCKED_LOCKOUT', { email, ip: clientIp });
+        return res.status(429).json({ 
+          message: `Account temporarily locked. Please try again in ${lockStatus.remainingTime} minutes.`,
+          locked: true,
+          remainingTime: lockStatus.remainingTime 
+        });
+      }
       
       // Check for admin credentials
       if (email === "oliverleonard.professional@gmail.com" && password === "123456") {
+        clearFailedAttempts(email);
+        logSecurityEvent('ADMIN_LOGIN_SUCCESS', { email, ip: clientIp });
+        
         const adminUser = {
           id: 1,
           email: "oliverleonard.professional@gmail.com",
@@ -285,10 +356,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
         });
       } else {
-        return res.status(401).json({ message: "Invalid admin credentials" });
+        const result = recordFailedLogin(email, clientIp);
+        if (result.ipLimited) {
+          return res.status(429).json({ 
+            message: "Too many login attempts from your location. Please try again in 30 minutes.",
+            rateLimited: true 
+          });
+        }
+        if (result.locked) {
+          return res.status(429).json({ 
+            message: "Too many failed attempts. Account locked for 15 minutes.",
+            locked: true 
+          });
+        }
+        return res.status(401).json({ 
+          message: "Invalid admin credentials",
+          attemptsRemaining: result.attemptsRemaining 
+        });
       }
     } catch (error) {
-      console.error("Admin login error:", error);
+      logSecurityEvent('ADMIN_LOGIN_ERROR', { error: String(error) });
       res.status(500).json({ message: "Admin login failed" });
     }
   });
@@ -315,7 +402,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as any;
-      console.log('Admin auth token decoded:', decoded);
+      // Token decoded for admin auth - details omitted for security
       
       // For admin users, we verify directly from the token since they're not stored in the users Map
       if (decoded.role === 'admin' && decoded.email === 'oliverleonard.professional@gmail.com') {
@@ -328,7 +415,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
         });
       } else {
-        console.log('Admin access denied. Role:', decoded.role, 'Email:', decoded.email);
+        logSecurityEvent('ADMIN_AUTH_DENIED', { role: decoded.role });
         return res.status(403).json({ message: "Admin access required" });
       }
     } catch (error) {

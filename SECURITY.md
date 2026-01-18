@@ -41,9 +41,27 @@ The Tapt Payment Terminal has been implemented with comprehensive security measu
 
 ### API Security ✅
 - **CORS**: Configured for same-origin requests
-- **Rate Limiting**: Ready for implementation if needed
-- **Input Validation**: All endpoints validate request data
+- **Rate Limiting**: Implemented with dual-layer protection
+  - IP-based: 20 requests per hour, 30-minute lockout
+  - Email-based: 5 attempts per hour, 15-minute lockout
+- **Input Validation**: All endpoints validate request data via Zod schemas
 - **Error Messages**: Generic responses to prevent information leakage
+- **Security Headers**: Full Helmet.js configuration including:
+  - Content Security Policy (CSP) with Stripe/Windcave/Google Pay domains
+  - HSTS with 1-year max-age and preload
+  - X-Frame-Options: DENY (clickjacking protection)
+  - X-Content-Type-Options: nosniff
+  - Referrer-Policy: strict-origin-when-cross-origin
+  - X-XSS-Protection (legacy browser support)
+
+### Security Audit Logging ✅
+- **Dedicated Log File**: Security events written to logs/security-audit.log
+- **PII Redaction**: Email addresses masked in logs (e.g., ol***@gmail.com)
+- **Events Tracked**:
+  - LOGIN_SUCCESS / FAILED_LOGIN
+  - ACCOUNT_LOCKED / IP_RATE_LIMITED
+  - ADMIN_LOGIN_SUCCESS / ADMIN_ACCESS_DENIED
+  - All authentication-related security events
 
 ## Infrastructure Security
 
