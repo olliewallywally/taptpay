@@ -80,9 +80,77 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+      .instant-loader {
+        min-height: 100vh;
+        background: #f9fafb;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        font-family: 'Outfit', system-ui, sans-serif;
+      }
+      .instant-loader-card {
+        width: 100%;
+        max-width: 24rem;
+        border-radius: 48px;
+        overflow: hidden;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      }
+      .instant-loader-blue {
+        background: #0055FF;
+        padding: 2rem 2rem 6rem;
+        border-bottom-left-radius: 48px;
+        border-bottom-right-radius: 48px;
+      }
+      .instant-loader-logo {
+        height: 3rem;
+        width: 8rem;
+        margin: 0 auto 2rem;
+        background: rgba(255,255,255,0.2);
+        border-radius: 8px;
+        animation: pulse 1.5s infinite;
+      }
+      .instant-loader-amount {
+        height: 4rem;
+        width: 10rem;
+        margin: 0 auto 1.5rem;
+        background: rgba(0,229,204,0.3);
+        border-radius: 8px;
+        animation: pulse 1.5s infinite;
+      }
+      .instant-loader-button {
+        height: 3.5rem;
+        width: 100%;
+        background: #00E5CC;
+        border-radius: 20px;
+        animation: pulse 1.5s infinite;
+      }
+      .instant-loader-cyan {
+        background: #00E5CC;
+        padding: 3rem 2rem 1rem;
+        margin-top: -3rem;
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="instant-loader">
+        <div class="instant-loader-card">
+          <div class="instant-loader-blue">
+            <div class="instant-loader-logo"></div>
+            <div class="instant-loader-amount"></div>
+            <div class="instant-loader-button"></div>
+          </div>
+          <div class="instant-loader-cyan"></div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
     <!-- This is a replit script which adds a banner on the top of the page when opened in development mode outside the replit environment -->
     <script type="text/javascript" src="https://replit.com/public/js/replit-dev-banner.js"></script>

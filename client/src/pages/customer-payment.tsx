@@ -1,13 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { DigitalWalletButtons } from "@/components/digital-wallet-buttons";
 import { sseClient } from "@/lib/sse-client";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { CheckCircle, XCircle, ChevronDown, ChevronUp, Minus, Plus, CreditCard } from "lucide-react";
+import { CheckCircle, XCircle, ChevronDown, ChevronUp, Minus, Plus } from "lucide-react";
 import taptLogo from "@assets/IMG_6592_1755070818452.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
+const DigitalWalletButtons = lazy(() => 
+  import("@/components/digital-wallet-buttons").then(m => ({ default: m.DigitalWalletButtons }))
+);
 
 interface SplitBillContentProps {
   transactionId: number;
@@ -378,23 +381,30 @@ export default function CustomerPayment() {
 
                   {/* Digital Wallet Payment Options */}
                   <div className="mb-4 sm:mb-5">
-                    <DigitalWalletButtons 
-                      amount={currentTransaction.isSplit ? parseFloat(currentTransaction.splitAmount) : parseFloat(currentTransaction.price)}
-                      currency="NZD"
-                      merchantName="Tapt Payment"
-                      itemName={currentTransaction.itemName}
-                      transactionId={currentTransaction.id}
-                      onPaymentStart={() => setPaymentStatus("processing")}
-                      onPaymentSuccess={(paymentData) => {
-                        console.log("Payment successful:", paymentData);
-                        setPaymentStatus("success");
-                      }}
-                      onPaymentError={(error) => {
-                        console.error("Payment error:", error);
-                        setPaymentStatus("error");
-                      }}
-                      disabled={paymentStatus !== "idle"}
-                    />
+                    <Suspense fallback={
+                      <div className="space-y-3">
+                        <div className="h-12 bg-black/90 rounded-lg animate-pulse"></div>
+                        <div className="h-12 bg-white rounded-lg animate-pulse"></div>
+                      </div>
+                    }>
+                      <DigitalWalletButtons 
+                        amount={currentTransaction.isSplit ? parseFloat(currentTransaction.splitAmount) : parseFloat(currentTransaction.price)}
+                        currency="NZD"
+                        merchantName="Tapt Payment"
+                        itemName={currentTransaction.itemName}
+                        transactionId={currentTransaction.id}
+                        onPaymentStart={() => setPaymentStatus("processing")}
+                        onPaymentSuccess={(paymentData) => {
+                          console.log("Payment successful:", paymentData);
+                          setPaymentStatus("success");
+                        }}
+                        onPaymentError={(error) => {
+                          console.error("Payment error:", error);
+                          setPaymentStatus("error");
+                        }}
+                        disabled={paymentStatus !== "idle"}
+                      />
+                    </Suspense>
                   </div>
 
                   {/* Split the Bill Button - Only if not already split */}
