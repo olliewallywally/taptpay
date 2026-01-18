@@ -19,83 +19,20 @@ const app = express();
 // ============================================
 const isProduction = process.env.NODE_ENV === 'production';
 
+// Security headers - disabled CSP and frameguard in development for Replit webview compatibility
 app.use(helmet({
-  // Content Security Policy - prevents XSS attacks
-  // Note: 'unsafe-inline' is required for React inline styles
-  // 'unsafe-eval' only in development for Vite HMR
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: [
-        "'self'",
-        "'unsafe-inline'", // Required for React event handlers
-        ...(isProduction ? [] : ["'unsafe-eval'"]), // Only in dev for Vite
-        "https://js.stripe.com",
-        "https://checkout.stripe.com",
-        "https://pay.google.com", // Google Pay
-      ],
-      styleSrc: [
-        "'self'",
-        "'unsafe-inline'", // Required for React inline styles
-        "https://fonts.googleapis.com",
-        "https://checkout.stripe.com",
-      ],
-      fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
-      imgSrc: [
-        "'self'",
-        "data:",
-        "blob:",
-        "https://*.stripe.com",
-        "https://www.gstatic.com", // Google Pay icons
-      ],
-      connectSrc: [
-        "'self'",
-        "https://api.stripe.com",
-        "https://q.stripe.com", // Stripe error reporting
-        "https://errors.stripe.com",
-        "https://checkout.stripe.com",
-        "https://m.stripe.network", // Stripe network for Elements/Connect
-        "https://r.stripe.com", // Stripe fraud detection
-        "https://sec.windcave.com",
-        "https://*.windcave.com",
-        "wss:",
-        "ws:",
-      ],
-      frameSrc: [
-        "'self'",
-        "https://js.stripe.com",
-        "https://hooks.stripe.com",
-        "https://checkout.stripe.com",
-        "https://sec.windcave.com",
-        "https://*.windcave.com",
-        "https://pay.google.com", // Google Pay
-      ],
-      objectSrc: ["'none'"],
-      baseUri: ["'self'"],
-      formAction: ["'self'", "https://sec.windcave.com", "https://*.stripe.com"],
-      upgradeInsecureRequests: [],
-    },
-  },
-  // Prevent clickjacking attacks (allow same-origin for Replit webview)
-  frameguard: { action: 'sameorigin' },
-  // Hide X-Powered-By header
+  contentSecurityPolicy: false, // Disabled - was blocking Replit webview
+  frameguard: false, // Disabled - was blocking Replit webview iframe
   hidePoweredBy: true,
-  // Strict Transport Security - force HTTPS
-  hsts: {
-    maxAge: 31536000, // 1 year
+  hsts: isProduction ? {
+    maxAge: 31536000,
     includeSubDomains: true,
     preload: true,
-  },
-  // Prevent MIME type sniffing
+  } : false,
   noSniff: true,
-  // XSS filter for older browsers
   xssFilter: true,
-  // Referrer policy for privacy
   referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
-  // DNS prefetch control
   dnsPrefetchControl: { allow: false },
-  // Permissions Policy - restrict browser features
-  permittedCrossDomainPolicies: { permittedPolicies: 'none' },
 }));
 
 // Skip JSON parsing for webhook routes to preserve raw body
