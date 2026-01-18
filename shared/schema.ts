@@ -100,6 +100,10 @@ export const transactions = pgTable("transactions", {
   totalRefunded: decimal("total_refunded", { precision: 10, scale: 2 }).default("0.00"), // Total amount refunded
   refundableAmount: decimal("refundable_amount", { precision: 10, scale: 2 }), // Amount still available for refund
   
+  // Offline sync support
+  offlineId: text("offline_id").unique(), // Client-generated ID for offline transactions to ensure idempotency
+  createdOfflineAt: text("created_offline_at"), // When the transaction was created offline
+  
   createdAt: timestamp("created_at").defaultNow(),
 });
 

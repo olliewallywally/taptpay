@@ -13,6 +13,7 @@ interface SyncEvent {
 class SyncService {
   private isOnline: boolean = navigator.onLine;
   private isSyncing: boolean = false;
+  private syncLock: boolean = false;
   private listeners: Set<SyncListener> = new Set();
   private syncInterval: number | null = null;
 
@@ -94,8 +95,9 @@ class SyncService {
   }
 
   async syncPendingTransactions(): Promise<void> {
-    if (this.isSyncing || !this.isOnline) return;
+    if (this.isSyncing || !this.isOnline || this.syncLock) return;
 
+    this.syncLock = true;
     this.isSyncing = true;
     this.emit({ type: 'sync_started' });
 
@@ -187,6 +189,7 @@ class SyncService {
       });
     } finally {
       this.isSyncing = false;
+      this.syncLock = false;
     }
   }
 
