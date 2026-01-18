@@ -76,8 +76,8 @@ app.use(helmet({
       upgradeInsecureRequests: [],
     },
   },
-  // Prevent clickjacking attacks
-  frameguard: { action: 'deny' },
+  // Prevent clickjacking attacks (allow same-origin for Replit webview)
+  frameguard: { action: 'sameorigin' },
   // Hide X-Powered-By header
   hidePoweredBy: true,
   // Strict Transport Security - force HTTPS
