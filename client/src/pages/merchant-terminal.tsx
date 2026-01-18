@@ -19,7 +19,10 @@ import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
 import { useDeviceStatusMonitoring, useSSEConnectionMonitoring } from "@/components/notification-system";
 import { getCurrentMerchantId } from "@/lib/auth";
-import { Send, Loader2, CheckCircle, Clock, XCircle, Eye, Copy, Check, QrCode, Smartphone, Waves, CreditCard, X, Edit, Split, MoreHorizontal, ChevronDown, Tag, Share, Link2, Mail, MessageCircle } from "lucide-react";
+import { Send, Loader2, CheckCircle, Clock, XCircle, Eye, Copy, Check, QrCode, Smartphone, Waves, CreditCard, X, Edit, Split, MoreHorizontal, ChevronDown, Tag, Share, Link2, Mail, MessageCircle, WifiOff } from "lucide-react";
+import { OfflineStatusIndicator, OfflineStatusBadge, PendingTransactionsList } from "@/components/offline-status-indicator";
+import { syncService } from "@/lib/sync-service";
+import { offlineStorage } from "@/lib/offline-storage";
 import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
 import { Link } from "wouter";
 
@@ -48,6 +51,8 @@ export default function MerchantTerminal() {
   const [nfcPaymentStatus, setNfcPaymentStatus] = useState<"idle" | "creating" | "ready" | "processing" | "completed" | "failed">("idle");
   const [nfcSession, setNfcSession] = useState<any>(null);
   const [showNfcOverlay, setShowNfcOverlay] = useState(false);
+  
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   
   // Split payments state
   const [splitPayments, setSplitPayments] = useState<any[]>([]);
@@ -128,9 +133,38 @@ export default function MerchantTerminal() {
     enabled: !!activeTransaction?.id && activeTransaction?.isSplit,
   });
 
-  // Create transaction mutation
+  // Online/offline status
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Create transaction mutation (with offline support)
   const createTransactionMutation = useMutation({
     mutationFn: async (data: TransactionFormData) => {
+      if (!navigator.onLine && merchantId) {
+        const offlineTransaction = await syncService.createOfflineTransaction(
+          merchantId,
+          data.itemName,
+          data.price
+        );
+        return { 
+          ...offlineTransaction, 
+          isOffline: true,
+          price: data.price,
+          itemName: data.itemName,
+          status: 'pending_sync'
+        };
+      }
+      
       const response = await apiRequest("POST", "/api/transactions", {
         merchantId,
         itemName: data.itemName,
@@ -139,20 +173,45 @@ export default function MerchantTerminal() {
       });
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
-      form.reset();
-      toast({
-        title: "Transaction Created",
-        description: "Customer can now proceed with payment",
-      });
+    onSuccess: (result) => {
+      if (result.isOffline) {
+        form.reset();
+        toast({
+          title: "Payment Saved Offline",
+          description: "Will sync automatically when back online",
+        });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
+        form.reset();
+        toast({
+          title: "Transaction Created",
+          description: "Customer can now proceed with payment",
+        });
+      }
     },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to create transaction",
-        variant: "destructive",
-      });
+    onError: async (error, data) => {
+      if (!navigator.onLine && merchantId) {
+        try {
+          await syncService.createOfflineTransaction(merchantId, data.itemName, data.price);
+          form.reset();
+          toast({
+            title: "Payment Saved Offline",
+            description: "Will sync automatically when back online",
+          });
+        } catch (e) {
+          toast({
+            title: "Error",
+            description: "Failed to save transaction",
+            variant: "destructive",
+          });
+        }
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to create transaction",
+          variant: "destructive",
+        });
+      }
     },
   });
 
@@ -1067,10 +1126,15 @@ function PaymentStatus({ transaction }: { transaction: any }) {
       extraLargeCirclePosition="bottom-[-120px] right-[-120px]"
       extraSmallCirclePosition="bottom-[200px] right-[250px]"
     >
+      <OfflineStatusBadge />
       <div className="relative z-10 min-h-screen text-white">
 
         {/* Two-Pane Layout Container */}
         <div className="max-w-5xl mx-auto px-3 sm:px-6 pt-4 sm:pt-6">
+          {/* Offline Status Indicator */}
+          <div className="mb-4">
+            <OfflineStatusIndicator />
+          </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-12">
             
             {/* Left Pane: Amount & Actions */}
@@ -1142,6 +1206,9 @@ function PaymentStatus({ transaction }: { transaction: any }) {
 
             {/* Right Pane: QR Code & Payment Status */}
             <div className="space-y-4 sm:space-y-6 w-full max-w-2xl mx-auto lg:mx-0">
+              {/* Pending Offline Transactions */}
+              <PendingTransactionsList />
+
               {/* Payment Status */}
               {(currentTransaction || activeTransaction) && (
                 <PaymentStatus transaction={currentTransaction || activeTransaction} />
