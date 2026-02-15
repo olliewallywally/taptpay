@@ -37,3 +37,8 @@ waitForPort = 5000
 
 [agent]
 integrations = ["stripe:1.0.0"]
+
+[userenv]
+
+[userenv.shared]
+JWT_SECRET = "6e49bbb919ec21744436c9962c399fd40612d75af731e5e52cc37f6313bb679c8edca4d38371e20ae71d75adced9ab26b392e475f8f98176d1ed71b059894bfa"
