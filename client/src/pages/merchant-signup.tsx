@@ -54,11 +54,38 @@ export default function MerchantSignup() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Basic validation
     if (!formData.businessType) {
       toast({
         title: "Validation Error",
         description: "Please select a business type",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(formData.email)) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a valid email address",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (formData.password.length < 8) {
+      toast({
+        title: "Validation Error",
+        description: "Password must be at least 8 characters",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!/[A-Z]/.test(formData.password) || !/[a-z]/.test(formData.password) || !/[0-9]/.test(formData.password)) {
+      toast({
+        title: "Validation Error",
+        description: "Password must contain at least one uppercase letter, one lowercase letter, and one number",
         variant: "destructive",
       });
       return;
@@ -73,7 +100,6 @@ export default function MerchantSignup() {
       return;
     }
     
-    console.log("Form submitted:", formData);
     signupMutation.mutate(formData);
   };
 

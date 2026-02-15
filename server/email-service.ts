@@ -61,7 +61,7 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
 }
 
 export async function sendPasswordResetEmail(email: string, resetToken: string, baseUrl?: string): Promise<boolean> {
-  const safeBaseUrl = baseUrl || 'https://tapt-payment.replit.app';
+  const safeBaseUrl = baseUrl || 'https://taptpay.co.nz';
   const resetUrl = `${safeBaseUrl}/reset-password?token=${resetToken}`;
   
   const htmlContent = `

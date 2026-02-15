@@ -2646,9 +2646,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Public merchant signup (no admin required)
+  // Public merchant signup (no admin required) - with rate limiting
   app.post("/api/merchants/signup", async (req, res) => {
     try {
+      const ip = req.ip || req.socket.remoteAddress || 'unknown';
+      if (!checkRateLimit(ip)) {
+        logSecurityEvent('SIGNUP_RATE_LIMITED', { ip });
+        return res.status(429).json({ message: "Too many signup attempts. Please try again later." });
+      }
+
       const validation = createMerchantSchema.safeParse(req.body);
       if (!validation.success) {
         return res.status(400).json({ 

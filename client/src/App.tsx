@@ -25,6 +25,7 @@ import CreateMerchant from "@/pages/create-merchant";
 import VerifyMerchant from "@/pages/verify-merchant";
 import StockManagement from "@/pages/stock-management";
 import { LandingPage } from "@/pages/landing-page";
+import LegalPage from "@/pages/legal";
 
 import { PageTransition } from "@/components/page-transition";
 import { BottomNavigation } from "@/components/bottom-navigation";
@@ -182,6 +183,8 @@ function Router() {
           </AdminProtectedRoute>
         </Route>
         
+        <Route path="/terms" component={LegalPage} />
+        <Route path="/privacy" component={LegalPage} />
         <Route path="/verify-merchant" component={VerifyMerchant} />
         <Route path="/pay/:merchantId" component={CustomerPayment} />
         <Route path="/pay/:merchantId/stone/:stoneId" component={CustomerPayment} />
