@@ -193,6 +193,12 @@ export default function Receipt() {
                 {merchant.contactPhone && (
                   <p className="text-sm text-gray-600">{merchant.contactPhone}</p>
                 )}
+                {merchant.gstNumber && (
+                  <p className="text-sm text-gray-600 mt-1">GST No: {merchant.gstNumber}</p>
+                )}
+                {merchant.nzbn && (
+                  <p className="text-sm text-gray-600">NZBN: {merchant.nzbn}</p>
+                )}
               </div>
             )}
 

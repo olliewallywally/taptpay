@@ -89,8 +89,13 @@ export function LandingPage() {
             />
           </div>
           <p className="text-gray-400">
-            © 2025 TaptPay. All rights reserved.
+            © 2026 TaptPay. All rights reserved.
           </p>
+          <div className="mt-3 flex justify-center space-x-4 text-sm text-gray-500">
+            <a href="/terms" className="hover:text-gray-300 transition-colors">Terms of Service</a>
+            <span>·</span>
+            <a href="/privacy" className="hover:text-gray-300 transition-colors">Privacy Policy</a>
+          </div>
         </div>
       </footer>
     </div>
