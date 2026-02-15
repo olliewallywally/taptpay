@@ -375,21 +375,35 @@ export function generateResetToken(): string {
 }
 
 export async function requestPasswordReset(email: string, baseUrl?: string): Promise<boolean> {
-  const user = getUserByEmail(email);
-  if (!user) {
-    // Don't reveal if email exists or not for security
-    return true;
-  }
-
   const resetToken = generateResetToken();
   const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
 
-  // Update user with reset token
-  user.resetToken = resetToken;
-  user.resetTokenExpiry = resetTokenExpiry;
-  users.set(user.id, user);
+  // Look up merchant in database (single source of truth)
+  try {
+    const { storage } = await import('./storage');
+    const merchant = await storage.getMerchantByEmail(email);
+    
+    if (!merchant) {
+      return true; // Don't reveal if email exists
+    }
 
-  // Send reset email
+    await storage.updateMerchant(merchant.id, {
+      resetToken,
+      resetTokenExpiry,
+    } as any);
+
+    // Also update in-memory user if exists
+    const memUser = getUserByEmail(email);
+    if (memUser) {
+      memUser.resetToken = resetToken;
+      memUser.resetTokenExpiry = resetTokenExpiry;
+      users.set(memUser.id, memUser);
+    }
+  } catch (error) {
+    console.error('Failed to store reset token in database:', error);
+    return false;
+  }
+
   try {
     await sendPasswordResetEmail(email, resetToken, baseUrl);
     return true;
@@ -400,25 +414,47 @@ export async function requestPasswordReset(email: string, baseUrl?: string): Pro
 }
 
 export async function resetPassword(token: string, newPassword: string): Promise<boolean> {
-  const user = Array.from(users.values()).find(u => u.resetToken === token);
-  
-  if (!user || !user.resetTokenExpiry || user.resetTokenExpiry < new Date()) {
-    return false; // Invalid or expired token
+  try {
+    const { storage } = await import('./storage');
+    const merchant = await storage.getMerchantByResetToken(token);
+    
+    if (!merchant || !merchant.resetTokenExpiry || new Date(merchant.resetTokenExpiry) < new Date()) {
+      return false;
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    
+    await storage.updateMerchant(merchant.id, {
+      passwordHash: hashedPassword,
+      resetToken: null,
+      resetTokenExpiry: null,
+    } as any);
+
+    // Also update in-memory user if exists
+    const memUser = getUserByEmail(merchant.email);
+    if (memUser) {
+      memUser.password = hashedPassword;
+      memUser.resetToken = undefined;
+      memUser.resetTokenExpiry = undefined;
+      users.set(memUser.id, memUser);
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Failed to reset password:', error);
+    return false;
   }
-
-  // Hash new password
-  const hashedPassword = await bcrypt.hash(newPassword, 10);
-  
-  // Update user
-  user.password = hashedPassword;
-  user.resetToken = undefined;
-  user.resetTokenExpiry = undefined;
-  users.set(user.id, user);
-
-  return true;
 }
 
-export function validateResetToken(token: string): boolean {
-  const user = Array.from(users.values()).find(u => u.resetToken === token);
-  return user ? (user.resetTokenExpiry ? user.resetTokenExpiry > new Date() : false) : false;
+export async function validateResetToken(token: string): Promise<boolean> {
+  try {
+    const { storage } = await import('./storage');
+    const merchant = await storage.getMerchantByResetToken(token);
+    if (merchant && merchant.resetTokenExpiry && new Date(merchant.resetTokenExpiry) > new Date()) {
+      return true;
+    }
+  } catch (error) {
+    console.error('Failed to validate reset token:', error);
+  }
+  return false;
 }

@@ -65,6 +65,10 @@ export const merchants = pgTable("merchants", {
   // Dashboard preferences
   dailyGoal: decimal("daily_goal", { precision: 10, scale: 2 }).default("500.00"), // Daily revenue goal in dollars
   
+  // Password reset tokens (persisted in DB)
+  resetToken: text("reset_token"),
+  resetTokenExpiry: timestamp("reset_token_expiry"),
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

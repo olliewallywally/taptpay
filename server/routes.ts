@@ -290,9 +290,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/auth/validate-reset-token/:token", (req, res) => {
+  app.get("/api/auth/validate-reset-token/:token", async (req, res) => {
     const { token } = req.params;
-    const isValid = validateResetToken(token);
+    const isValid = await validateResetToken(token);
     
     res.json({ valid: isValid });
   });

@@ -8,6 +8,7 @@ export interface IStorage {
   getMerchantByName(name: string): Promise<Merchant | undefined>;
   getMerchantByEmail(email: string): Promise<Merchant | undefined>;
   getMerchantByToken(token: string): Promise<Merchant | undefined>;
+  getMerchantByResetToken(resetToken: string): Promise<Merchant | undefined>;
   createMerchant(merchant: InsertMerchant): Promise<Merchant>;
   createMerchantWithPassword(merchantData: any, passwordHash: string): Promise<Merchant>;
   createMerchantWithSignup(data: CreateMerchant & { verificationToken: string }): Promise<Merchant>;
@@ -217,6 +218,12 @@ export class MemStorage implements IStorage {
   async getMerchantByToken(token: string): Promise<Merchant | undefined> {
     return Array.from(this.merchants.values()).find(
       (merchant) => merchant.verificationToken === token,
+    );
+  }
+
+  async getMerchantByResetToken(resetToken: string): Promise<Merchant | undefined> {
+    return Array.from(this.merchants.values()).find(
+      (merchant) => merchant.resetToken === resetToken,
     );
   }
 
@@ -1424,6 +1431,12 @@ export class DatabaseStorage implements IStorage {
   async getMerchantByToken(token: string): Promise<Merchant | undefined> {
     if (!this.db) throw new Error('Database not available');
     const result = await this.db.select().from(merchants).where(eq(merchants.verificationToken, token)).limit(1);
+    return result[0];
+  }
+
+  async getMerchantByResetToken(resetToken: string): Promise<Merchant | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db.select().from(merchants).where(eq(merchants.resetToken, resetToken)).limit(1);
     return result[0];
   }
 
