@@ -54,6 +54,8 @@ The application adopts a monorepo structure, separating client, server, and shar
 
 **Security & Production Features:**
 -   Authentication: JWT-based, protected routes, session management.
+-   Admin Authentication: Configurable via ADMIN_EMAIL and ADMIN_PASSWORD_HASH env vars. Admin login disabled if ADMIN_PASSWORD_HASH not set. Uses bcrypt for password verification.
+-   Merchant Route Authorization: All merchant data routes enforce ownership checks via `checkMerchantOwnership()` helper - admins can access all merchants, regular users can only access their own merchant data.
 -   Hybrid Database: PostgreSQL for production, in-memory for development.
 -   API Security: Bearer tokens, Zod validation, error handling, CORS.
 -   Merchant Update Security: PUT /api/merchants/:id endpoint validates and restricts updatable fields to prevent privilege escalation (allowlist: businessName, director, address, nzbn, phone, email, gstNumber, windcaveApiKey).
