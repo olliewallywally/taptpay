@@ -3,6 +3,11 @@
  */
 
 export function getBaseUrl(req?: any): string {
+  // In production, use the configured production domain for stable callback URLs
+  if (process.env.PRODUCTION_DOMAIN) {
+    return `https://${process.env.PRODUCTION_DOMAIN}`;
+  }
+
   // In production (Replit), use the REPLIT_DOMAINS environment variable
   if (process.env.REPLIT_DOMAINS) {
     const domain = process.env.REPLIT_DOMAINS.split(',')[0];

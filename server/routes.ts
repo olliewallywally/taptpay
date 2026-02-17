@@ -754,7 +754,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.updateTransactionNfcSession(transaction.id, nfcSessionId);
       
       // Create Windcave payment session for NFC/contactless
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const baseUrl = getBaseUrl(req);
       const merchantReference = `NFC_${transaction.id}_${Date.now()}`;
       
       const session = await windcaveService.createPaymentSession(
@@ -951,15 +951,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // SECURITY: Verify transaction is in a valid state for payment
+      // SECURITY + IDEMPOTENCY: Verify transaction is in a valid state for payment
       if (transaction.status === "completed") {
         console.warn(`SECURITY: Payment attempt on already completed transaction ${transactionId} from IP ${clientIp}`);
-        return res.status(400).json({ message: "Transaction already completed" });
+        return res.status(409).json({ message: "Transaction already completed", idempotent: true });
       }
       
       if (transaction.status === "failed") {
         console.warn(`SECURITY: Payment attempt on failed transaction ${transactionId} from IP ${clientIp}`);
         return res.status(400).json({ message: "Transaction has failed and cannot be paid" });
+      }
+
+      if (transaction.status === "processing") {
+        console.warn(`IDEMPOTENCY: Payment already processing for transaction ${transactionId} from IP ${clientIp}`);
+        return res.status(409).json({ message: "Payment is already being processed", idempotent: true });
       }
       
       // AUDIT: Log payment attempt
@@ -996,7 +1001,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create Windcave payment session
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const baseUrl = getBaseUrl(req);
       const merchantReference = transaction.isSplit 
         ? `SPLIT_${currentSplit.id}_${Date.now()}`
         : `TXN_${transactionId}_${Date.now()}`;
@@ -2094,31 +2099,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Windcave webhook notification handler
-  app.post("/api/windcave/notification", async (req, res) => {
+  // Windcave webhook notification handler - with signature verification
+  app.post("/api/windcave/notification", express.text({ type: '*/*' }), async (req, res) => {
     try {
-      // This would receive notifications from Windcave about payment status changes
-      const { sessionId, status, merchantReference } = req.body;
+      const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+      const signature = req.headers['x-windcave-signature'] as string || '';
+
+      if (windcaveService.isConfigured() && !windcaveService.verifyWebhookSignature(rawBody, signature)) {
+        console.error("SECURITY: Windcave webhook signature verification failed");
+        return res.status(401).json({ message: "Invalid webhook signature" });
+      }
+
+      const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+      const { sessionId, status, merchantReference } = body;
       
       console.log("Windcave notification received:", { sessionId, status, merchantReference });
       
-      // Extract transaction ID from merchant reference
       const transactionId = parseInt(merchantReference.split('_')[1]);
       
       if (transactionId) {
+        const existingTransaction = await storage.getTransaction(transactionId);
+        if (existingTransaction && (existingTransaction.status === 'completed' || existingTransaction.status === 'failed')) {
+          console.log(`Windcave webhook: Transaction ${transactionId} already in terminal state '${existingTransaction.status}', ignoring duplicate`);
+          return res.status(200).send("OK");
+        }
+
         const finalStatus = status === "approved" ? "completed" : "failed";
         const windcaveTransactionId = sessionId;
         
         const transaction = await storage.updateTransactionStatus(transactionId, finalStatus, windcaveTransactionId);
         
         if (transaction) {
-          // Notify connected clients
-          const connections = sseConnections.get(transaction.merchantId);
-          if (connections) {
-            connections.forEach(conn => {
-              conn.write(`data: ${JSON.stringify({ type: 'transaction_updated', transaction })}\n\n`);
-            });
-          }
+          broadcastToStone(transaction.merchantId, transaction.taptStoneId, {
+            type: 'transaction_updated',
+            transaction
+          });
         }
       }
       
