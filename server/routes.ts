@@ -139,7 +139,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Token decoded for admin middleware - details omitted for security
       
       // For admin users, we verify directly from the token
-      if (decoded.role === 'admin' && decoded.email === 'oliverleonard.professional@gmail.com') {
+      const adminEmail = process.env.ADMIN_EMAIL || 'oliverleonard.professional@gmail.com';
+      if (decoded.role === 'admin' && decoded.email === adminEmail) {
         req.user = {
           id: decoded.userId,
           email: decoded.email,
@@ -161,6 +162,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   };
   
+  function checkMerchantOwnership(req: AuthenticatedRequest, merchantId: number): boolean {
+    if (!req.user) return false;
+    if (req.user.role === 'admin') return true;
+    return req.user.merchantId === merchantId;
+  }
+
   // Authentication routes
   app.post("/api/auth/login", async (req, res) => {
     try {
@@ -331,31 +338,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Check for admin credentials
-      if (email === "oliverleonard.professional@gmail.com" && password === "123456") {
-        clearFailedAttempts(email);
-        logSecurityEvent('ADMIN_LOGIN_SUCCESS', { email, ip: clientIp });
-        
-        const adminUser = {
-          id: 1,
-          email: "oliverleonard.professional@gmail.com",
-          password: "123456",
-          merchantId: 0,
-          role: "admin" as const,
-          createdAt: new Date(),
-        };
+      const adminEmail = process.env.ADMIN_EMAIL || "oliverleonard.professional@gmail.com";
+      const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
 
-        const token = generateToken(adminUser);
-        
-        res.json({
-          token,
-          user: {
-            id: adminUser.id,
-            email: adminUser.email,
-            merchantId: adminUser.merchantId,
-            role: adminUser.role,
-          },
-        });
-      } else {
+      if (email === adminEmail) {
+        let passwordValid = false;
+        if (adminPasswordHash) {
+          passwordValid = await bcrypt.compare(password, adminPasswordHash);
+        } else {
+          console.error("CRITICAL: ADMIN_PASSWORD_HASH env var not set. Admin login disabled.");
+          return res.status(500).json({ message: "Admin login unavailable - contact system administrator" });
+        }
+
+        if (passwordValid) {
+          clearFailedAttempts(email);
+          logSecurityEvent('ADMIN_LOGIN_SUCCESS', { email, ip: clientIp });
+          
+          const adminUser = {
+            id: 1,
+            email: adminEmail,
+            password: "",
+            merchantId: 0,
+            role: "admin" as const,
+            createdAt: new Date(),
+          };
+
+          const token = generateToken(adminUser);
+          
+          return res.json({
+            token,
+            user: {
+              id: adminUser.id,
+              email: adminUser.email,
+              merchantId: adminUser.merchantId,
+              role: adminUser.role,
+            },
+          });
+        }
+      }
+
+      {
         const result = recordFailedLogin(email, clientIp);
         if (result.ipLimited) {
           return res.status(429).json({ 
@@ -405,7 +427,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Token decoded for admin auth - details omitted for security
       
       // For admin users, we verify directly from the token since they're not stored in the users Map
-      if (decoded.role === 'admin' && decoded.email === 'oliverleonard.professional@gmail.com') {
+      const adminEmail = process.env.ADMIN_EMAIL || 'oliverleonard.professional@gmail.com';
+      if (decoded.role === 'admin' && decoded.email === adminEmail) {
         res.json({
           user: {
             id: decoded.userId,
@@ -607,11 +630,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create new transaction
-  app.post("/api/transactions", async (req, res) => {
+  app.post("/api/transactions", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const validation = insertTransactionSchema.safeParse(req.body);
       if (!validation.success) {
         return res.status(400).json({ message: "Invalid transaction data", errors: validation.error.errors });
+      }
+
+      if (!checkMerchantOwnership(req, validation.data.merchantId)) {
+        return res.status(403).json({ message: "Access denied" });
       }
 
       const transaction = await storage.createTransaction(validation.data);
@@ -1157,9 +1184,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get merchant analytics
-  app.get("/api/merchants/:id/analytics", async (req, res) => {
+  app.get("/api/merchants/:id/analytics", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = parseInt(req.params.id);
+      if (!checkMerchantOwnership(req, merchantId)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       const analytics = await storage.getMerchantAnalytics(merchantId);
       res.json(analytics);
     } catch (error) {
@@ -1168,9 +1198,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get revenue over time data
-  app.get("/api/merchants/:id/revenue-over-time", async (req, res) => {
+  app.get("/api/merchants/:id/revenue-over-time", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = parseInt(req.params.id);
+      if (!checkMerchantOwnership(req, merchantId)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       const days = parseInt(req.query.days as string) || 30;
       const revenueData = await storage.getRevenueOverTime(merchantId, days);
       res.json(revenueData);
@@ -1181,9 +1214,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get merchant analytics with date range
-  app.get("/api/merchants/:id/analytics/export", async (req, res) => {
+  app.get("/api/merchants/:id/analytics/export", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = parseInt(req.params.id);
+      if (!checkMerchantOwnership(req, merchantId)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       const { startDate, endDate } = req.query;
       
       const start = startDate ? new Date(startDate as string) : undefined;
@@ -1198,9 +1234,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Export transactions as CSV
-  app.get("/api/merchants/:id/export/csv", async (req, res) => {
+  app.get("/api/merchants/:id/export/csv", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = parseInt(req.params.id);
+      if (!checkMerchantOwnership(req, merchantId)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       const { startDate, endDate } = req.query;
       
       const start = startDate ? new Date(startDate as string) : undefined;
@@ -1250,9 +1289,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Export business report as PDF
-  app.get("/api/merchants/:id/export/pdf", async (req, res) => {
+  app.get("/api/merchants/:id/export/pdf", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = parseInt(req.params.id);
+      if (!checkMerchantOwnership(req, merchantId)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       const { startDate, endDate } = req.query;
       
       const start = startDate ? new Date(startDate as string) : undefined;
@@ -1617,9 +1659,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update merchant rates
-  app.put("/api/merchants/:id/rates", async (req, res) => {
+  app.put("/api/merchants/:id/rates", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = parseInt(req.params.id);
+      if (!checkMerchantOwnership(req, merchantId)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       const validation = updateMerchantRatesSchema.safeParse(req.body);
       
       if (!validation.success) {
@@ -1722,9 +1767,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/merchants/:id/theme", async (req, res) => {
+  app.put("/api/merchants/:id/theme", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = parseInt(req.params.id);
+      if (!checkMerchantOwnership(req, merchantId)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       const validation = updateThemeSchema.safeParse(req.body);
       
       if (!validation.success) {
@@ -1939,9 +1987,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all transactions for merchant (for dashboard)
-  app.get("/api/merchants/:id/transactions", async (req, res) => {
+  app.get("/api/merchants/:id/transactions", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = parseInt(req.params.id);
+      if (!checkMerchantOwnership(req, merchantId)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       const transactions = await storage.getTransactionsByMerchant(merchantId);
       res.json(transactions);
     } catch (error) {
@@ -1952,9 +2003,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Tapt Stone API routes
   
   // Get all tapt stones for a merchant
-  app.get("/api/merchants/:id/tapt-stones", async (req, res) => {
+  app.get("/api/merchants/:id/tapt-stones", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = parseInt(req.params.id);
+      if (!checkMerchantOwnership(req, merchantId)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       const stones = await storage.getTaptStonesByMerchant(merchantId);
       res.json(stones);
     } catch (error) {
@@ -1964,9 +2018,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create a new tapt stone
-  app.post("/api/merchants/:id/tapt-stones", async (req, res) => {
+  app.post("/api/merchants/:id/tapt-stones", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = parseInt(req.params.id);
+      if (!checkMerchantOwnership(req, merchantId)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       
       // Check if merchant exists
       const merchant = await storage.getMerchant(merchantId);
@@ -2015,8 +2072,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update a tapt stone name
-  app.put("/api/merchants/:merchantId/tapt-stones/:stoneId", async (req, res) => {
+  app.put("/api/merchants/:merchantId/tapt-stones/:stoneId", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
+      const merchantId = parseInt(req.params.merchantId);
+      if (!checkMerchantOwnership(req, merchantId)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       const stoneId = parseInt(req.params.stoneId);
       const { name } = req.body;
       
@@ -2038,8 +2099,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete a tapt stone
-  app.delete("/api/merchants/:merchantId/tapt-stones/:stoneId", async (req, res) => {
+  app.delete("/api/merchants/:merchantId/tapt-stones/:stoneId", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
+      const merchantId = parseInt(req.params.merchantId);
+      if (!checkMerchantOwnership(req, merchantId)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       const stoneId = parseInt(req.params.stoneId);
       const success = await storage.deleteTaptStone(stoneId);
       
