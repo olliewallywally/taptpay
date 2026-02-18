@@ -493,6 +493,23 @@ export const subscriptionBillingHistory = pgTable("subscription_billing_history"
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Push notification subscriptions table
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: serial("id").primaryKey(),
+  merchantId: integer("merchant_id").references(() => merchants.id).notNull(),
+  endpoint: text("endpoint").notNull(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  userAgent: text("user_agent"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions).omit({
+  id: true,
+  createdAt: true,
+});
+
 // API Key schemas
 export const createApiKeySchema = z.object({
   keyName: z.string().min(1, "Key name is required").max(100, "Key name too long"),
@@ -643,3 +660,7 @@ export type CancelSubscription = z.infer<typeof cancelSubscriptionSchema>;
 // Billing History types
 export type SubscriptionBillingHistory = typeof subscriptionBillingHistory.$inferSelect;
 export type InsertBillingHistory = z.infer<typeof insertBillingHistorySchema>;
+
+// Push Subscription types
+export type PushSubscription = typeof pushSubscriptions.$inferSelect;
+export type InsertPushSubscription = z.infer<typeof insertPushSubscriptionSchema>;
