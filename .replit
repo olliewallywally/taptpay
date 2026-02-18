@@ -44,6 +44,9 @@ integrations = ["stripe:1.0.0"]
 JWT_SECRET = "6e49bbb919ec21744436c9962c399fd40612d75af731e5e52cc37f6313bb679c8edca4d38371e20ae71d75adced9ab26b392e475f8f98176d1ed71b059894bfa"
 ADMIN_EMAIL = "oliverleonard.professional@gmail.com"
 ADMIN_PASSWORD_HASH = "$2b$12$LlYdsm3pH/0O8EpBcLeHmeb.wgHI8jsV/GTlVOjgil2s8mZvECEt."
+VAPID_PUBLIC_KEY = "BHspXz-fLtWNjI9LFP__P3l8-FKi4kKUvKEB4zYAOoUMUOCHVlpqJtNU-woQPCMnNBORrrE9wLbLkhlknd6X2yI"
+VAPID_PRIVATE_KEY = "f-H3KJK8cvpMkO3gQdvEFFtimdYj8q-u-cBCM2mbx48"
+VITE_VAPID_PUBLIC_KEY = "BHspXz-fLtWNjI9LFP__P3l8-FKi4kKUvKEB4zYAOoUMUOCHVlpqJtNU-woQPCMnNBORrrE9wLbLkhlknd6X2yI"
 
 [userenv.production]
 PRODUCTION_DOMAIN = "taptpay.co.nz"

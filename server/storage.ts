@@ -1,4 +1,4 @@
-import { merchants, transactions, merchantSettlements, platformFees, refunds, splitPayments, taptStones, stockItems, cryptoTransactions, merchantSubscriptions, subscriptionBillingHistory, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type CryptoTransaction, type InsertCryptoTransaction, type MerchantSubscription, type SubscriptionBillingHistory } from "@shared/schema";
+import { merchants, transactions, merchantSettlements, platformFees, refunds, splitPayments, taptStones, stockItems, cryptoTransactions, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type CryptoTransaction, type InsertCryptoTransaction, type MerchantSubscription, type SubscriptionBillingHistory } from "@shared/schema";
 import { getDb, isDatabaseConnected } from "./database";
 import { eq, desc, and } from "drizzle-orm";
 
@@ -140,6 +140,12 @@ export interface IStorage {
   resetUnbilledTransactions(merchantId: number): Promise<void>;
   getAllActiveSubscriptions(billingFrequency?: string): Promise<any[]>;
   
+  // Push subscription operations
+  createPushSubscription(data: { merchantId: number; endpoint: string; p256dh: string; auth: string; userAgent?: string }): Promise<any>;
+  getPushSubscriptionsByMerchant(merchantId: number): Promise<any[]>;
+  deactivatePushSubscription(id: number): Promise<void>;
+  deactivatePushSubscriptionByEndpoint(endpoint: string): Promise<void>;
+
   // Webhook delivery tracking
   createWebhookDelivery(data: any): Promise<any>;
   updateWebhookDelivery(id: number, data: any): Promise<any>;
@@ -177,7 +183,8 @@ export class MemStorage implements IStorage {
   private currentSplitPaymentId: number;
   private currentTaptStoneId: number;
   private currentStockItemId: number;
-  private activeTransactionCache: Map<string, Transaction | null>; // Cache for active transactions by merchant
+  private activeTransactionCache: Map<string, Transaction | null>;
+  private pushSubs: any[];
 
   constructor() {
     this.merchants = new Map();
@@ -188,6 +195,7 @@ export class MemStorage implements IStorage {
     this.taptStones = new Map();
     this.stockItems = new Map();
     this.cryptoTransactions = new Map();
+    this.pushSubs = [];
     this.currentMerchantId = 1;
     this.currentTransactionId = 1;
     this.currentPlatformFeeId = 1;
@@ -1161,6 +1169,34 @@ export class MemStorage implements IStorage {
     return [];
   }
 
+  async createPushSubscription(data: { merchantId: number; endpoint: string; p256dh: string; auth: string; userAgent?: string }): Promise<any> {
+    const existing = this.pushSubs.find(s => s.endpoint === data.endpoint);
+    if (existing) {
+      existing.isActive = true;
+      existing.merchantId = data.merchantId;
+      existing.p256dh = data.p256dh;
+      existing.auth = data.auth;
+      return existing;
+    }
+    const sub = { id: this.pushSubs.length + 1, ...data, isActive: true, createdAt: new Date() };
+    this.pushSubs.push(sub);
+    return sub;
+  }
+
+  async getPushSubscriptionsByMerchant(merchantId: number): Promise<any[]> {
+    return this.pushSubs.filter(s => s.merchantId === merchantId && s.isActive);
+  }
+
+  async deactivatePushSubscription(id: number): Promise<void> {
+    const sub = this.pushSubs.find(s => s.id === id);
+    if (sub) sub.isActive = false;
+  }
+
+  async deactivatePushSubscriptionByEndpoint(endpoint: string): Promise<void> {
+    const sub = this.pushSubs.find(s => s.endpoint === endpoint);
+    if (sub) sub.isActive = false;
+  }
+
   async createWebhookDelivery(data: any): Promise<any> {
     return { ...data, id: Date.now(), createdAt: new Date() };
   }
@@ -2057,6 +2093,74 @@ export class DatabaseStorage implements IStorage {
 
   async getWebhookDeliveries(apiKeyId: number): Promise<any[]> {
     return [];
+  }
+
+  async createPushSubscription(data: { merchantId: number; endpoint: string; p256dh: string; auth: string; userAgent?: string }): Promise<any> {
+    try {
+      const existing = await this.db!
+        .select()
+        .from(pushSubscriptions)
+        .where(eq(pushSubscriptions.endpoint, data.endpoint));
+      
+      if (existing.length > 0) {
+        const [updated] = await this.db!
+          .update(pushSubscriptions)
+          .set({ merchantId: data.merchantId, p256dh: data.p256dh, auth: data.auth, isActive: true })
+          .where(eq(pushSubscriptions.endpoint, data.endpoint))
+          .returning();
+        return updated;
+      }
+
+      const [sub] = await this.db!
+        .insert(pushSubscriptions)
+        .values({
+          merchantId: data.merchantId,
+          endpoint: data.endpoint,
+          p256dh: data.p256dh,
+          auth: data.auth,
+          userAgent: data.userAgent || null,
+          isActive: true,
+        })
+        .returning();
+      return sub;
+    } catch (error) {
+      console.error("Database error in createPushSubscription:", error);
+      return null;
+    }
+  }
+
+  async getPushSubscriptionsByMerchant(merchantId: number): Promise<any[]> {
+    try {
+      return await this.db!
+        .select()
+        .from(pushSubscriptions)
+        .where(and(eq(pushSubscriptions.merchantId, merchantId), eq(pushSubscriptions.isActive, true)));
+    } catch (error) {
+      console.error("Database error in getPushSubscriptionsByMerchant:", error);
+      return [];
+    }
+  }
+
+  async deactivatePushSubscription(id: number): Promise<void> {
+    try {
+      await this.db!
+        .update(pushSubscriptions)
+        .set({ isActive: false })
+        .where(eq(pushSubscriptions.id, id));
+    } catch (error) {
+      console.error("Database error in deactivatePushSubscription:", error);
+    }
+  }
+
+  async deactivatePushSubscriptionByEndpoint(endpoint: string): Promise<void> {
+    try {
+      await this.db!
+        .update(pushSubscriptions)
+        .set({ isActive: false })
+        .where(eq(pushSubscriptions.endpoint, endpoint));
+    } catch (error) {
+      console.error("Database error in deactivatePushSubscriptionByEndpoint:", error);
+    }
   }
 
   // Bill splitting operations

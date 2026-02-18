@@ -26,6 +26,54 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+
+  let payload;
+  try {
+    payload = event.data.json();
+  } catch (e) {
+    payload = { title: 'TaptPay', body: event.data.text() };
+  }
+
+  const options = {
+    body: payload.body || '',
+    icon: payload.icon || '/favicon.ico',
+    badge: payload.badge || '/favicon.ico',
+    tag: payload.tag || 'taptpay-notification',
+    data: payload.data || {},
+    vibrate: [100, 50, 100],
+    actions: [
+      { action: 'view', title: 'View' },
+      { action: 'dismiss', title: 'Dismiss' }
+    ]
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(payload.title || 'TaptPay', options)
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  if (event.action === 'dismiss') return;
+
+  const urlToOpen = event.notification.data?.url || '/';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        for (const client of clientList) {
+          if (client.url.includes(self.location.origin) && 'focus' in client) {
+            return client.focus();
+          }
+        }
+        return clients.openWindow(urlToOpen);
+      })
+  );
+});
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
