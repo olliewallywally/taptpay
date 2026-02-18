@@ -17,6 +17,7 @@ import bcrypt from "bcrypt";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { sendPushToMerchant } from "./push";
 
 // Store SSE connections for real-time updates (merchantId -> stoneId -> Set of connections)
 // stoneId can be null for merchant-level connections
@@ -654,11 +655,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         qrCodeUrl,
       };
       
-      // Notify all connected clients for this merchant and stone
       broadcastToStone(transaction.merchantId!, transaction.taptStoneId, { 
         type: 'transaction_updated', 
         transaction: transactionWithUrls 
       });
+
+      sendPushToMerchant(transaction.merchantId!, "pending", transaction.itemName, transaction.price, transaction.id).catch(() => {});
 
       res.json(transactionWithUrls);
     } catch (error) {
@@ -872,6 +874,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           transaction: updatedTransaction,
           paymentMethod: paymentMethod || 'contactless_card'
         });
+
+        if (updatedTransaction) {
+          sendPushToMerchant(transaction.merchantId!, "completed", transaction.itemName, transaction.price, transaction.id).catch(() => {});
+        }
         
         res.json({ 
           message: "NFC payment completed successfully", 
@@ -1116,6 +1122,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 type: 'transaction_updated', 
                 transaction: transactionWithUrls 
               });
+
+              const pushStatus = finalTransaction.status || "completed";
+              sendPushToMerchant(finalTransaction.merchantId!, pushStatus, finalTransaction.itemName, finalTransaction.price, finalTransaction.id).catch(() => {});
             }
           }, 2000);
 
@@ -2207,6 +2216,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             type: 'transaction_updated',
             transaction
           });
+          sendPushToMerchant(transaction.merchantId!, finalStatus, transaction.itemName, transaction.price, transaction.id).catch(() => {});
         }
       }
       
@@ -2965,6 +2975,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Get VAPID public key for push notification subscription
+  app.get("/api/push/vapid-key", (req, res) => {
+    const vapidKey = process.env.VAPID_PUBLIC_KEY || "";
+    if (!vapidKey) {
+      return res.status(503).json({ message: "Push notifications not configured" });
+    }
+    res.json({ publicKey: vapidKey });
+  });
+
+  // Subscribe to push notifications
+  app.post("/api/push/subscribe", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { subscription } = req.body;
+      if (!subscription || !subscription.endpoint || !subscription.keys?.p256dh || !subscription.keys?.auth) {
+        return res.status(400).json({ message: "Invalid push subscription" });
+      }
+
+      const merchantId = req.merchantId;
+      if (!merchantId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const pushSub = await storage.createPushSubscription({
+        merchantId,
+        endpoint: subscription.endpoint,
+        p256dh: subscription.keys.p256dh,
+        auth: subscription.keys.auth,
+        userAgent: req.headers["user-agent"] || undefined,
+      });
+
+      res.json({ success: true, subscription: pushSub });
+    } catch (error) {
+      console.error("Push subscribe error:", error);
+      res.status(500).json({ message: "Failed to save push subscription" });
+    }
+  });
+
+  // Unsubscribe from push notifications
+  app.post("/api/push/unsubscribe", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { endpoint } = req.body;
+      if (!endpoint) {
+        return res.status(400).json({ message: "Endpoint required" });
+      }
+
+      await storage.deactivatePushSubscriptionByEndpoint(endpoint);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Push unsubscribe error:", error);
+      res.status(500).json({ message: "Failed to unsubscribe" });
+    }
+  });
+
+  // Get push notification status for current merchant
+  app.get("/api/push/status", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.merchantId;
+      if (!merchantId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const subs = await storage.getPushSubscriptionsByMerchant(merchantId);
+      res.json({ subscribed: subs.length > 0, deviceCount: subs.length });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to check push status" });
+    }
+  });
+
   // Clear transactions for a merchant
   app.post("/api/merchants/:id/clear-transactions", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
@@ -3061,6 +3139,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           refund: { ...refund, status: "completed", windcaveRefundId },
           transactionId
         });
+
+        sendPushToMerchant(merchantId, "refunded", transaction.itemName, refund.amount, transaction.id).catch(() => {});
 
         res.json({ 
           success: true,
