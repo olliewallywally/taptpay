@@ -177,7 +177,7 @@ export class MemStorage implements IStorage {
   private currentSplitPaymentId: number;
   private currentTaptStoneId: number;
   private currentStockItemId: number;
-  private activeTransactionCache: Map<number, Transaction | null>; // Cache for active transactions by merchant
+  private activeTransactionCache: Map<string, Transaction | null>; // Cache for active transactions by merchant
 
   constructor() {
     this.merchants = new Map();
@@ -244,19 +244,32 @@ export class MemStorage implements IStorage {
       status: "pending",
       verificationToken: null,
       passwordHash: null,
-      qrCodeUrl: insertMerchant.qrCodeUrl || null,
-      paymentUrl: insertMerchant.paymentUrl || null,
-      themeId: insertMerchant.themeId || "classic",
-      currentProviderRate: insertMerchant.currentProviderRate || "0.0290",
-      ourRate: insertMerchant.ourRate || "0.0020",
-      contactEmail: insertMerchant.contactEmail || null,
-      contactPhone: insertMerchant.contactPhone || null,
-      businessAddress: insertMerchant.businessAddress || null,
-      bankName: insertMerchant.bankName || null,
-      bankAccountNumber: insertMerchant.bankAccountNumber || null,
-      bankBranch: insertMerchant.bankBranch || null,
-      accountHolderName: insertMerchant.accountHolderName || null,
-      gstNumber: insertMerchant.gstNumber || null,
+      qrCodeUrl: (insertMerchant as any).qrCodeUrl || null,
+      paymentUrl: (insertMerchant as any).paymentUrl || null,
+      themeId: (insertMerchant as any).themeId || "classic",
+      currentProviderRate: (insertMerchant as any).currentProviderRate || "0.0290",
+      ourRate: (insertMerchant as any).ourRate || "0.0020",
+      contactEmail: (insertMerchant as any).contactEmail || null,
+      contactPhone: (insertMerchant as any).contactPhone || null,
+      businessAddress: (insertMerchant as any).businessAddress || null,
+      bankName: (insertMerchant as any).bankName || null,
+      bankAccountNumber: (insertMerchant as any).bankAccountNumber || null,
+      bankBranch: (insertMerchant as any).bankBranch || null,
+      accountHolderName: (insertMerchant as any).accountHolderName || null,
+      gstNumber: (insertMerchant as any).gstNumber || null,
+      director: null,
+      nzbn: null,
+      customLogoUrl: null,
+      windcaveApiKey: null,
+      coinbaseCommerceApiKey: null,
+      coinbaseWebhookSecret: null,
+      cryptoEnabled: false,
+      enabledCryptocurrencies: null,
+      autoConvertToFiat: false,
+      minConfirmations: 1,
+      dailyGoal: "500.00",
+      resetToken: null,
+      resetTokenExpiry: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -290,6 +303,19 @@ export class MemStorage implements IStorage {
       bankBranch: merchantData.bankBranch || null,
       accountHolderName: merchantData.accountHolderName || null,
       gstNumber: merchantData.gstNumber || null,
+      director: merchantData.director || null,
+      nzbn: merchantData.nzbn || null,
+      customLogoUrl: merchantData.customLogoUrl || null,
+      windcaveApiKey: merchantData.windcaveApiKey || null,
+      coinbaseCommerceApiKey: merchantData.coinbaseCommerceApiKey || null,
+      coinbaseWebhookSecret: merchantData.coinbaseWebhookSecret || null,
+      cryptoEnabled: merchantData.cryptoEnabled || false,
+      enabledCryptocurrencies: merchantData.enabledCryptocurrencies || null,
+      autoConvertToFiat: merchantData.autoConvertToFiat || false,
+      minConfirmations: merchantData.minConfirmations || 1,
+      dailyGoal: merchantData.dailyGoal || "500.00",
+      resetToken: null,
+      resetTokenExpiry: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -323,6 +349,19 @@ export class MemStorage implements IStorage {
       bankBranch: null,
       accountHolderName: null,
       gstNumber: null,
+      director: null,
+      nzbn: null,
+      customLogoUrl: null,
+      windcaveApiKey: null,
+      coinbaseCommerceApiKey: null,
+      coinbaseWebhookSecret: null,
+      cryptoEnabled: false,
+      enabledCryptocurrencies: null,
+      autoConvertToFiat: false,
+      minConfirmations: 1,
+      dailyGoal: "500.00",
+      resetToken: null,
+      resetTokenExpiry: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -402,12 +441,18 @@ export class MemStorage implements IStorage {
 
     const transaction: Transaction = {
       ...insertTransaction,
+      merchantId: insertTransaction.merchantId ?? null,
+      taptStoneId: (insertTransaction as any).taptStoneId ?? insertTransaction.selectedStoneId ?? null,
+      isSplit: insertTransaction.isSplit ?? false,
+      totalSplits: insertTransaction.totalSplits ?? 1,
+      completedSplits: insertTransaction.completedSplits ?? 0,
+      splitAmount: insertTransaction.splitAmount ?? null,
       id,
       createdAt: new Date(),
       windcaveTransactionId: null,
-      windcaveFeeRate: "0.0000", // Not percentage-based
+      windcaveFeeRate: "0.0000",
       windcaveFeeAmount: windcaveFeeAmount.toString(),
-      platformFeeRate: "0.0000", // Not percentage-based
+      platformFeeRate: "0.0000",
       platformFeeAmount: platformFeeAmount.toString(),
       merchantNet: merchantNet.toString(),
       totalRefunded: "0.00",
@@ -420,7 +465,7 @@ export class MemStorage implements IStorage {
     
     // Update cache if this is a pending transaction
     if (transaction.status === "pending") {
-      this.activeTransactionCache.set(transaction.merchantId, transaction);
+      this.activeTransactionCache.set(String(transaction.merchantId), transaction);
     }
     
     return transaction;
@@ -430,6 +475,9 @@ export class MemStorage implements IStorage {
     const id = this.currentPlatformFeeId++;
     const platformFee: PlatformFee = {
       ...insertPlatformFee,
+      merchantId: insertPlatformFee.merchantId ?? null,
+      transactionId: insertPlatformFee.transactionId ?? null,
+      status: insertPlatformFee.status ?? "pending",
       id,
       createdAt: new Date(),
       collectedAt: null,
@@ -478,6 +526,16 @@ export class MemStorage implements IStorage {
     const id = this.currentRefundId++;
     const refund: Refund = {
       ...insertRefund,
+      transactionId: insertRefund.transactionId ?? null,
+      merchantId: insertRefund.merchantId ?? null,
+      refundReason: insertRefund.refundReason ?? null,
+      refundMethod: insertRefund.refundMethod ?? "original_payment_method",
+      status: insertRefund.status ?? "pending",
+      windcaveRefundId: insertRefund.windcaveRefundId ?? null,
+      windcaveFeeRefunded: insertRefund.windcaveFeeRefunded ?? "0.00",
+      platformFeeRefunded: insertRefund.platformFeeRefunded ?? "0.00",
+      initiatedBy: insertRefund.initiatedBy ?? null,
+      customerNotified: insertRefund.customerNotified ?? false,
       id,
       createdAt: new Date(),
       completedAt: null,
@@ -529,10 +587,10 @@ export class MemStorage implements IStorage {
     
     // Update cache based on new status
     if (status === "pending") {
-      this.activeTransactionCache.set(transaction.merchantId, updatedTransaction);
+      this.activeTransactionCache.set(String(transaction.merchantId), updatedTransaction);
     } else {
       // Transaction is no longer pending, remove from cache
-      this.activeTransactionCache.delete(transaction.merchantId);
+      this.activeTransactionCache.delete(String(transaction.merchantId));
     }
     
     return updatedTransaction;
@@ -594,7 +652,7 @@ export class MemStorage implements IStorage {
     }
 
     // Update active transaction cache
-    this.activeTransactionCache.set(transaction.merchantId, updatedTransaction);
+    this.activeTransactionCache.set(String(transaction.merchantId), updatedTransaction);
 
     return updatedTransaction;
   }
@@ -639,16 +697,16 @@ export class MemStorage implements IStorage {
         const updatedTransaction = {
           ...transaction,
           completedSplits: completedSplits,
-          status: completedSplits >= transaction.totalSplits ? "completed" : "pending"
+          status: completedSplits >= (transaction.totalSplits ?? 1) ? "completed" : "pending"
         };
         
         this.transactions.set(splitPayment.transactionId, updatedTransaction);
         
         // Update cache
         if (updatedTransaction.status === "completed") {
-          this.activeTransactionCache.delete(transaction.merchantId);
+          this.activeTransactionCache.delete(String(transaction.merchantId));
         } else {
-          this.activeTransactionCache.set(transaction.merchantId, updatedTransaction);
+          this.activeTransactionCache.set(String(transaction.merchantId), updatedTransaction);
         }
       }
     }
@@ -918,7 +976,7 @@ export class MemStorage implements IStorage {
     });
     
     // Clear the active transaction cache for this merchant
-    this.activeTransactionCache.delete(merchantId);
+    this.activeTransactionCache.delete(String(merchantId));
     
     console.log(`Cleared ${transactionsToDelete.length} transactions for merchant ${merchantId}`);
     return true;
@@ -1020,10 +1078,25 @@ export class MemStorage implements IStorage {
       const newTransaction: Transaction = {
         id,
         merchantId: this.currentMerchantId,
+        taptStoneId: null,
         itemName: transaction.itemName,
         price: transaction.price,
         status: transaction.status,
         windcaveTransactionId: `WC_${Date.now() + Math.random()}`,
+        paymentMethod: "qr_code",
+        nfcSessionId: null,
+        deviceId: null,
+        isSplit: false,
+        totalSplits: 1,
+        completedSplits: 0,
+        splitAmount: null,
+        windcaveFeeRate: "0.0000",
+        windcaveFeeAmount: "0.20",
+        platformFeeRate: "0.0000",
+        platformFeeAmount: "0.05",
+        merchantNet: (parseFloat(transaction.price) - 0.25).toFixed(2),
+        totalRefunded: "0.00",
+        refundableAmount: transaction.price,
         createdAt: createdDate,
       };
       this.transactions.set(id, newTransaction);
@@ -1105,6 +1178,7 @@ export class MemStorage implements IStorage {
     const id = this.currentTaptStoneId++;
     const taptStone: TaptStone = {
       ...data,
+      merchantId: data.merchantId ?? null,
       id,
       qrCodeUrl: null,
       paymentUrl: null,
@@ -1173,6 +1247,8 @@ export class MemStorage implements IStorage {
     const id = this.currentStockItemId++;
     const stockItem: StockItem = {
       ...data,
+      merchantId: data.merchantId ?? null,
+      description: data.description ?? null,
       id,
       isActive: true,
       createdAt: new Date(),
@@ -1221,6 +1297,14 @@ export class MemStorage implements IStorage {
     const id = this.currentCryptoTransactionId++;
     const cryptoTransaction: CryptoTransaction = {
       ...data,
+      merchantId: data.merchantId ?? null,
+      transactionId: data.transactionId ?? null,
+      status: data.status ?? "pending",
+      expiresAt: data.expiresAt ?? null,
+      coinbaseChargeId: data.coinbaseChargeId ?? null,
+      coinbaseChargeCode: data.coinbaseChargeCode ?? null,
+      hostedUrl: data.hostedUrl ?? null,
+      requiredConfirmations: data.requiredConfirmations ?? 1,
       id,
       confirmations: 0,
       createdAt: new Date(),
@@ -1979,7 +2063,7 @@ export class DatabaseStorage implements IStorage {
   async createBillSplit(transactionId: number, totalSplits: number): Promise<Transaction | undefined> {
     try {
       // Get the transaction first
-      const [transaction] = await this.db
+      const [transaction] = await this.db!
         .select()
         .from(transactions)
         .where(eq(transactions.id, transactionId));
@@ -1989,7 +2073,7 @@ export class DatabaseStorage implements IStorage {
       const splitAmount = parseFloat(transaction.price) / totalSplits;
       
       // Update the transaction with split information
-      const [updatedTransaction] = await this.db
+      const [updatedTransaction] = await this.db!
         .update(transactions)
         .set({
           isSplit: true,
@@ -2002,7 +2086,7 @@ export class DatabaseStorage implements IStorage {
 
       // Create split payment records
       for (let i = 1; i <= totalSplits; i++) {
-        await this.db
+        await this.db!
           .insert(splitPayments)
           .values({
             transactionId: transactionId,
@@ -2028,7 +2112,7 @@ export class DatabaseStorage implements IStorage {
 
   async createSplitPayment(data: any): Promise<any> {
     try {
-      const [splitPayment] = await this.db
+      const [splitPayment] = await this.db!
         .insert(splitPayments)
         .values(data)
         .returning();
@@ -2041,7 +2125,7 @@ export class DatabaseStorage implements IStorage {
 
   async getSplitPaymentsByTransaction(transactionId: number): Promise<any[]> {
     try {
-      return await this.db
+      return await this.db!
         .select()
         .from(splitPayments)
         .where(eq(splitPayments.transactionId, transactionId))
@@ -2055,7 +2139,7 @@ export class DatabaseStorage implements IStorage {
   async updateSplitPaymentStatus(id: number, status: string, windcaveTransactionId?: string): Promise<any> {
     try {
       // Update the split payment
-      const [updatedSplit] = await this.db
+      const [updatedSplit] = await this.db!
         .update(splitPayments)
         .set({
           status,
@@ -2067,26 +2151,26 @@ export class DatabaseStorage implements IStorage {
 
       if (status === "completed" && updatedSplit) {
         // Get all splits for this transaction to check if all are completed
-        const allSplits = await this.getSplitPaymentsByTransaction(updatedSplit.transactionId);
+        const allSplits = await this.getSplitPaymentsByTransaction(updatedSplit.transactionId!);
         const completedSplits = allSplits.filter(s => s.status === "completed").length;
         
         // Get the transaction to check total splits
-        const [transaction] = await this.db
+        const [transaction] = await this.db!
           .select()
           .from(transactions)
-          .where(eq(transactions.id, updatedSplit.transactionId));
+          .where(eq(transactions.id, updatedSplit.transactionId!));
         
         if (transaction) {
-          const finalStatus = completedSplits >= transaction.totalSplits ? "completed" : "pending";
+          const finalStatus = completedSplits >= (transaction.totalSplits ?? 1) ? "completed" : "pending";
           
           // Update the main transaction
-          await this.db
+          await this.db!
             .update(transactions)
             .set({
               completedSplits: completedSplits,
               status: finalStatus
             })
-            .where(eq(transactions.id, updatedSplit.transactionId));
+            .where(eq(transactions.id, updatedSplit.transactionId!));
         }
       }
 
@@ -2099,7 +2183,7 @@ export class DatabaseStorage implements IStorage {
 
   async getNextPendingSplit(transactionId: number): Promise<any | undefined> {
     try {
-      const [split] = await this.db
+      const [split] = await this.db!
         .select()
         .from(splitPayments)
         .where(
@@ -2518,17 +2602,17 @@ export class DatabaseStorage implements IStorage {
   async getAllActiveSubscriptions(billingFrequency?: string): Promise<MerchantSubscription[]> {
     if (!this.db) throw new Error('Database not available');
     
-    let query = this.db
-      .select()
-      .from(merchantSubscriptions)
-      .where(eq(merchantSubscriptions.status, 'active'));
+    const conditions = [eq(merchantSubscriptions.status, 'active')];
     
     // Filter by billing frequency if provided
     if (billingFrequency) {
-      query = query.where(eq(merchantSubscriptions.billingFrequency, billingFrequency));
+      conditions.push(eq(merchantSubscriptions.billingFrequency, billingFrequency));
     }
     
-    return await query;
+    return await this.db
+      .select()
+      .from(merchantSubscriptions)
+      .where(and(...conditions));
   }
 }
 

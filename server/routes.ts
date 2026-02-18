@@ -644,8 +644,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const transaction = await storage.createTransaction(validation.data);
       
       // Generate payment URL and QR code URL for the transaction
-      const paymentUrl = generatePaymentUrl(transaction.merchantId, transaction.taptStoneId, req);
-      const qrCodeUrl = generateQrCodeUrl(transaction.merchantId, transaction.taptStoneId, req);
+      const paymentUrl = generatePaymentUrl(transaction.merchantId!, transaction.taptStoneId, req);
+      const qrCodeUrl = generateQrCodeUrl(transaction.merchantId!, transaction.taptStoneId, req);
       
       // Add URLs to transaction object
       const transactionWithUrls = {
@@ -655,7 +655,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       // Notify all connected clients for this merchant and stone
-      broadcastToStone(transaction.merchantId, transaction.taptStoneId, { 
+      broadcastToStone(transaction.merchantId!, transaction.taptStoneId, { 
         type: 'transaction_updated', 
         transaction: transactionWithUrls 
       });
@@ -683,8 +683,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Add payment URL and QR code URL
-      const paymentUrl = generatePaymentUrl(updatedTransaction.merchantId, undefined, req);
-      const qrCodeUrl = generateQrCodeUrl(updatedTransaction.merchantId, undefined, req);
+      const paymentUrl = generatePaymentUrl(updatedTransaction.merchantId!, undefined, req);
+      const qrCodeUrl = generateQrCodeUrl(updatedTransaction.merchantId!, undefined, req);
       
       const transactionWithUrls = {
         ...updatedTransaction,
@@ -693,7 +693,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Notify connected clients about the split
-      broadcastToStone(updatedTransaction.merchantId, updatedTransaction.taptStoneId, { 
+      broadcastToStone(updatedTransaction.merchantId!, updatedTransaction.taptStoneId, { 
         type: 'transaction_updated', 
         transaction: transactionWithUrls 
       });
@@ -725,8 +725,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedTransaction = await storage.getTransaction(transactionId);
       
       // Add payment URL and QR code URL
-      const paymentUrl = generatePaymentUrl(transaction.merchantId, undefined, req);
-      const qrCodeUrl = generateQrCodeUrl(transaction.merchantId, undefined, req);
+      const paymentUrl = generatePaymentUrl(transaction.merchantId!, undefined, req);
+      const qrCodeUrl = generateQrCodeUrl(transaction.merchantId!, undefined, req);
       
       const transactionWithUrls = {
         ...updatedTransaction,
@@ -735,7 +735,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Notify connected clients about the cancellation
-      broadcastToStone(transaction.merchantId, transaction.taptStoneId, { 
+      broadcastToStone(transaction.merchantId!, transaction.taptStoneId, { 
         type: 'transaction_update', 
         transaction: transactionWithUrls 
       });
@@ -867,7 +867,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         // Notify clients of completion
-        broadcastToStone(transaction.merchantId, transaction.taptStoneId, { 
+        broadcastToStone(transaction.merchantId!, transaction.taptStoneId, { 
           type: 'nfc_payment_completed', 
           transaction: updatedTransaction,
           paymentMethod: paymentMethod || 'contactless_card'
@@ -1021,7 +1021,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Notify clients
       const updatedTransaction = await storage.getTransaction(transactionId);
       if (updatedTransaction) {
-        broadcastToStone(transaction.merchantId, transaction.taptStoneId, { 
+        broadcastToStone(transaction.merchantId!, transaction.taptStoneId, { 
           type: 'transaction_updated', 
           transaction: updatedTransaction 
         });
@@ -1103,8 +1103,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             // Notify clients of final result with payment URLs
             if (finalTransaction) {
-              const paymentUrl = generatePaymentUrl(finalTransaction.merchantId, finalTransaction.taptStoneId, req);
-              const qrCodeUrl = generateQrCodeUrl(finalTransaction.merchantId, finalTransaction.taptStoneId, req);
+              const paymentUrl = generatePaymentUrl(finalTransaction.merchantId!, finalTransaction.taptStoneId, req);
+              const qrCodeUrl = generateQrCodeUrl(finalTransaction.merchantId!, finalTransaction.taptStoneId, req);
               
               const transactionWithUrls = {
                 ...finalTransaction,
@@ -1112,7 +1112,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 qrCodeUrl,
               };
               
-              broadcastToStone(finalTransaction.merchantId, finalTransaction.taptStoneId ?? transaction.taptStoneId ?? null, { 
+              broadcastToStone(finalTransaction.merchantId!, finalTransaction.taptStoneId ?? transaction.taptStoneId ?? null, { 
                 type: 'transaction_updated', 
                 transaction: transactionWithUrls 
               });
@@ -1166,7 +1166,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get merchant details for receipt
-      const merchant = await storage.getMerchant(transaction.merchantId);
+      const merchant = await storage.getMerchant(transaction.merchantId!);
       if (!merchant) {
         return res.status(404).json({ message: "Merchant not found" });
       }
@@ -1400,12 +1400,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Notify SSE clients
       const connections = sseConnections.get(merchantId);
       if (connections) {
-        connections.forEach(conn => {
-          conn.write(`data: ${JSON.stringify({ 
-            type: 'crypto_transaction_created', 
-            transaction,
-            cryptoTransaction 
-          })}\n\n`);
+        connections.forEach((connSet) => {
+          connSet.forEach(conn => {
+            conn.write(`data: ${JSON.stringify({ 
+              type: 'crypto_transaction_created', 
+              transaction,
+              cryptoTransaction 
+            })}\n\n`);
+          });
         });
       }
       
@@ -1468,7 +1470,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       
       // Update main transaction status
-      await storage.updateTransactionStatus(cryptoTransaction.transactionId, "completed");
+      await storage.updateTransactionStatus(cryptoTransaction.transactionId!, "completed");
       
       // Calculate platform fee (0.5% of transaction amount)
       const platformFeeAmount = parseFloat(cryptoTransaction.fiatAmount) * 0.005;
@@ -1492,13 +1494,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // For now, we just record the fee as pending
       
       // Notify SSE clients
-      const connections = sseConnections.get(cryptoTransaction.merchantId);
+      const connections = sseConnections.get(cryptoTransaction.merchantId!);
       if (connections) {
-        connections.forEach(conn => {
-          conn.write(`data: ${JSON.stringify({ 
-            type: 'crypto_payment_confirmed', 
-            cryptoTransaction: updatedCryptoTx 
-          })}\n\n`);
+        connections.forEach((connSet) => {
+          connSet.forEach(conn => {
+            conn.write(`data: ${JSON.stringify({ 
+              type: 'crypto_payment_confirmed', 
+              cryptoTransaction: updatedCryptoTx 
+            })}\n\n`);
+          });
         });
       }
       
@@ -1536,7 +1540,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Get merchant to verify webhook secret
-      const merchant = await storage.getMerchant(cryptoTx.merchantId);
+      const merchant = await storage.getMerchant(cryptoTx.merchantId!);
       if (!merchant || !merchant.coinbaseWebhookSecret) {
         return res.status(500).json({ message: "Merchant webhook secret not configured" });
       }
@@ -1559,7 +1563,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (eventType === 'charge:confirmed') {
         // Payment confirmed - update status
         await storage.updateCryptoTransactionStatus(cryptoTx.id, 'confirmed', eventData.data.confirmations || 1);
-        await storage.updateTransactionStatus(cryptoTx.transactionId, 'completed');
+        await storage.updateTransactionStatus(cryptoTx.transactionId!, 'completed');
         
         // Calculate and create platform fee (0.5%)
         const platformFeeAmount = parseFloat(cryptoTx.fiatAmount) * 0.005;
@@ -1577,32 +1581,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Broadcast SSE update
-        const connections = sseConnections.get(cryptoTx.merchantId);
+        const connections = sseConnections.get(cryptoTx.merchantId!);
         if (connections) {
-          const transaction = await storage.getTransaction(cryptoTx.transactionId);
-          connections.forEach(client => {
-            client.write(`data: ${JSON.stringify({ 
-              type: 'transaction_update', 
-              transaction,
-              cryptoTransaction: cryptoTx 
-            })}\n\n`);
+          const transaction = await storage.getTransaction(cryptoTx.transactionId!);
+          connections.forEach((connSet) => {
+            connSet.forEach(client => {
+              client.write(`data: ${JSON.stringify({ 
+                type: 'transaction_update', 
+                transaction,
+                cryptoTransaction: cryptoTx 
+              })}\n\n`);
+            });
           });
         }
       } else if (eventType === 'charge:failed' || eventType === 'charge:expired') {
         // Payment failed or expired
         await storage.updateCryptoTransactionStatus(cryptoTx.id, eventType === 'charge:expired' ? 'expired' : 'failed', 0);
-        await storage.updateTransactionStatus(cryptoTx.transactionId, 'failed');
+        await storage.updateTransactionStatus(cryptoTx.transactionId!, 'failed');
         
         // Broadcast SSE update
-        const connections = sseConnections.get(cryptoTx.merchantId);
+        const connections = sseConnections.get(cryptoTx.merchantId!);
         if (connections) {
-          const transaction = await storage.getTransaction(cryptoTx.transactionId);
-          connections.forEach(client => {
-            client.write(`data: ${JSON.stringify({ 
-              type: 'transaction_update', 
-              transaction,
-              cryptoTransaction: cryptoTx 
-            })}\n\n`);
+          const transaction = await storage.getTransaction(cryptoTx.transactionId!);
+          connections.forEach((connSet) => {
+            connSet.forEach(client => {
+              client.write(`data: ${JSON.stringify({ 
+                type: 'transaction_update', 
+                transaction,
+                cryptoTransaction: cryptoTx 
+              })}\n\n`);
+            });
           });
         }
       }
@@ -2195,7 +2203,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const transaction = await storage.updateTransactionStatus(transactionId, finalStatus, windcaveTransactionId);
         
         if (transaction) {
-          broadcastToStone(transaction.merchantId, transaction.taptStoneId, {
+          broadcastToStone(transaction.merchantId!, transaction.taptStoneId, {
             type: 'transaction_updated',
             transaction
           });
@@ -3624,7 +3632,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Notify connected clients
-        broadcastToStone(transaction.merchantId, transaction.taptStoneId, { 
+        broadcastToStone(transaction.merchantId!, transaction.taptStoneId, { 
           type: 'transaction_updated', 
           transaction: updatedTransaction 
         });
@@ -3696,7 +3704,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Notify connected clients
-        broadcastToStone(transaction.merchantId, transaction.taptStoneId, { 
+        broadcastToStone(transaction.merchantId!, transaction.taptStoneId, { 
           type: 'transaction_updated', 
           transaction: updatedTransaction 
         });
@@ -3765,7 +3773,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (subscription.stripePaymentMethodId) {
         try {
           const stripe = (await import('stripe')).default;
-          const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+          const stripeClient = new stripe(process.env.STRIPE_SECRET_KEY || '', {
             apiVersion: '2025-11-17.clover',
           });
           const pm = await stripeClient.paymentMethods.retrieve(subscription.stripePaymentMethodId);
@@ -3828,7 +3836,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get or create Stripe customer for this merchant
       const stripe = (await import('stripe')).default;
-      const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+      const stripeClient = new stripe(process.env.STRIPE_SECRET_KEY || '', {
         apiVersion: '2025-11-17.clover',
       });
 
