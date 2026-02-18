@@ -97,11 +97,16 @@ export default function Settings() {
         });
 
         const token = localStorage.getItem("authToken");
-        await fetch('/api/push/subscribe', {
+        const response = await fetch('/api/push/subscribe', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify({ subscription: subscription.toJSON() }),
         });
+
+        if (!response.ok) {
+          await subscription.unsubscribe();
+          throw new Error("Server rejected subscription");
+        }
 
         setPushEnabled(true);
         toast({ title: "Notifications enabled", description: "You'll receive alerts for transaction updates" });

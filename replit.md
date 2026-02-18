@@ -41,16 +41,19 @@ The application adopts a monorepo structure, separating client, server, and shar
 -   JWT-based authentication with bcrypt hashing, supporting protected routes and session management.
 -   API security includes bearer token authentication, Zod schema validation, and proper error handling.
 -   Comprehensive refund system with dedicated API routes, database schema, and real-time SSE notifications.
+-   Web Push notifications for real-time transaction alerts (created, completed, failed, refunded) using VAPID/Web Push API.
 
 **Database Schema Highlights:**
 -   `Merchants` table: Stores merchant details, including business name, email, director, address, NZBN, phone, GST number, Windcave API key, custom logo URL, and QR/payment URLs.
 -   `Transactions` table: Records transaction details, status, external processor IDs, and fee breakdowns (Windcave, Platform, Merchant net).
 -   `Platform Fees` table: Tracks platform fee collection per transaction.
+-   `Push Subscriptions` table: Stores Web Push subscription endpoints per merchant (endpoint, VAPID keys, active status).
 
 **Key Data Flows:**
 -   **Transaction Creation:** Merchant input via terminal -> Frontend validation -> Backend creates transaction in DB -> QR code generation -> SSE notification.
 -   **Payment Processing:** Customer scans QR/uses URL -> Payment details display -> Payment initiation updates status to "processing" -> SSE broadcasts status -> External processor handles payment -> Final status update.
 -   **Real-time Updates:** SSE connections per merchant for immediate transaction status broadcasts to both merchant and customer interfaces.
+-   **Push Notifications:** On transaction status changes (created, completed, failed, refunded), push notifications sent to all active subscriptions for the merchant via Web Push API. Merchants enable/disable in Settings page.
 
 **Security & Production Features:**
 -   Authentication: JWT-based, protected routes, session management.
