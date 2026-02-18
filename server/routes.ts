@@ -2987,6 +2987,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Subscribe to push notifications
   app.post("/api/push/subscribe", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
+      if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+        return res.status(503).json({ message: "Push notifications not configured on server" });
+      }
+
       const { subscription } = req.body;
       if (!subscription || !subscription.endpoint || !subscription.keys?.p256dh || !subscription.keys?.auth) {
         return res.status(400).json({ message: "Invalid push subscription" });
@@ -3018,6 +3022,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { endpoint } = req.body;
       if (!endpoint) {
         return res.status(400).json({ message: "Endpoint required" });
+      }
+
+      const merchantId = req.merchantId;
+      if (!merchantId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const subs = await storage.getPushSubscriptionsByMerchant(merchantId);
+      const ownsSub = subs.some((s: any) => s.endpoint === endpoint);
+      if (!ownsSub) {
+        return res.status(403).json({ message: "Not authorized to unsubscribe this endpoint" });
       }
 
       await storage.deactivatePushSubscriptionByEndpoint(endpoint);
