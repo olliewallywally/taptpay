@@ -10,9 +10,10 @@ import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
+import { Switch } from "@/components/ui/switch";
 import { 
   Home, Package, BarChart3, SlidersHorizontal, Terminal,
-  Upload, CheckCircle, XCircle, LogOut, CreditCard, AlertCircle
+  Upload, CheckCircle, XCircle, LogOut, CreditCard, AlertCircle, Bell, BellOff
 } from "lucide-react";
 
 interface MerchantDetails {
@@ -51,6 +52,94 @@ export default function Settings() {
   const [billingFrequency, setBillingFrequency] = useState('monthly');
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancellationReason, setCancellationReason] = useState('');
+
+  // Push notification state
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
+  const [pushSupported, setPushSupported] = useState(false);
+
+  useEffect(() => {
+    const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+    setPushSupported(supported);
+    if (supported) {
+      checkPushStatus();
+    }
+  }, []);
+
+  async function checkPushStatus() {
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+      setPushEnabled(!!subscription);
+    } catch {
+      setPushEnabled(false);
+    }
+  }
+
+  async function togglePushNotifications(enable: boolean) {
+    setPushLoading(true);
+    try {
+      if (enable) {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          toast({ title: "Notification permission denied", description: "Please enable notifications in your browser settings", variant: "destructive" });
+          setPushLoading(false);
+          return;
+        }
+
+        const registration = await navigator.serviceWorker.ready;
+        const vapidResponse = await fetch('/api/push/vapid-key');
+        const { publicKey } = await vapidResponse.json();
+
+        const subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey),
+        });
+
+        const token = localStorage.getItem("authToken");
+        await fetch('/api/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ subscription: subscription.toJSON() }),
+        });
+
+        setPushEnabled(true);
+        toast({ title: "Notifications enabled", description: "You'll receive alerts for transaction updates" });
+      } else {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+        if (subscription) {
+          const endpoint = subscription.endpoint;
+          await subscription.unsubscribe();
+
+          const token = localStorage.getItem("authToken");
+          await fetch('/api/push/unsubscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ endpoint }),
+          });
+        }
+
+        setPushEnabled(false);
+        toast({ title: "Notifications disabled" });
+      }
+    } catch (error) {
+      console.error("Push notification toggle error:", error);
+      toast({ title: "Failed to update notification settings", variant: "destructive" });
+    }
+    setPushLoading(false);
+  }
+
+  function urlBase64ToUint8Array(base64String: string): Uint8Array {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  }
 
   if (!merchantId) {
     setLocation('/login');
@@ -741,6 +830,33 @@ export default function Settings() {
               <CheckCircle className="text-green-500" size={24} />
             </div>
           </div>
+        </div>
+
+        {/* Push Notifications */}
+        <div className="bg-white rounded-2xl p-5 mb-5 shadow-sm">
+          <h3 className="text-lg font-bold mb-3 flex items-center gap-2">
+            {pushEnabled ? <Bell size={20} className="text-[#0055FF]" /> : <BellOff size={20} className="text-gray-400" />}
+            Transaction Notifications
+          </h3>
+          {pushSupported ? (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">
+                  {pushEnabled 
+                    ? "You'll receive alerts when payments are received, failed, or refunded" 
+                    : "Enable to get real-time alerts for transaction updates"}
+                </p>
+              </div>
+              <Switch
+                checked={pushEnabled}
+                onCheckedChange={togglePushNotifications}
+                disabled={pushLoading}
+                className="ml-4"
+              />
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">Push notifications are not supported in this browser.</p>
+          )}
         </div>
 
         {/* Customer Payment Page Button */}
