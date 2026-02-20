@@ -12,11 +12,11 @@ interface DashboardStats {
 export function GridDashboard() {
   const [, setLocation] = useLocation();
 
-  const { data: merchants, isLoading: merchantsLoading } = useQuery({
+  const { data: merchants, isLoading: merchantsLoading } = useQuery<any[]>({
     queryKey: ['/api/admin/merchants'],
   });
 
-  const { data: transactions, isLoading: transactionsLoading } = useQuery({
+  const { data: transactions, isLoading: transactionsLoading } = useQuery<any[]>({
     queryKey: ['/api/transactions'],
   });
 
@@ -180,7 +180,7 @@ export function GridDashboard() {
                     <p className="text-[#dbdfea]/60 text-xs">{merchant.email}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    {merchant.verified ? (
+                    {merchant.status === 'verified' ? (
                       <span className="text-[#4ade80] text-xs">✓ Verified</span>
                     ) : (
                       <span className="text-[#fbbf24] text-xs">Pending</span>

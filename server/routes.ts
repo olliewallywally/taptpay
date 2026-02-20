@@ -4,7 +4,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema } from "@shared/schema";
 import { windcaveService } from "./windcave";
-import { authenticateUser, generateToken, authenticateToken, createUser, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent } from "./auth";
+import { authenticateUser, generateToken, authenticateToken, createUser, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
 import { generateBusinessReportPdf } from "./report-generator";
 import { getBaseUrl, generatePaymentUrl, generateQrCodeUrl, generateStonePaymentUrl } from "./url-utils";
@@ -1631,7 +1631,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin manual merchant activation (bypass email verification)
+  // Admin manual merchant verification (mark as verified directly)
+  app.post("/api/admin/merchants/:id/verify", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+
+      if (merchant.status === 'verified') {
+        return res.status(400).json({ message: "Merchant is already verified" });
+      }
+
+      if (!merchant.passwordHash) {
+        return res.status(400).json({ message: "Merchant has not set a password yet. Resend the verification email first, or use the activate endpoint with a password." });
+      }
+
+      const updatedMerchant = await storage.updateMerchantStatus(merchantId, 'verified');
+
+      if (!updatedMerchant) {
+        return res.status(500).json({ message: "Failed to verify merchant" });
+      }
+
+      // Sync auth users so the merchant can log in immediately
+      await syncVerifiedMerchants();
+
+      res.json({
+        message: "Merchant verified successfully",
+        merchant: {
+          id: updatedMerchant.id,
+          name: updatedMerchant.name,
+          businessName: updatedMerchant.businessName,
+          email: updatedMerchant.email,
+          status: updatedMerchant.status
+        }
+      });
+
+    } catch (error) {
+      console.error("Admin verification error:", error);
+      res.status(500).json({ message: "Failed to verify merchant" });
+    }
+  });
+
+  // Admin manual merchant activation with password (bypass email verification)
   app.post("/api/admin/merchants/:id/activate", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = parseInt(req.params.id);
@@ -1650,7 +1694,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Merchant already verified" });
       }
 
-      // Hash the password and activate merchant
       const passwordHash = await bcrypt.hash(password, 10);
       const updatedMerchant = await storage.verifyMerchant(merchant.verificationToken || '', passwordHash);
 
@@ -2470,6 +2513,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/admin/merchants/:id", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+      res.json(merchant);
+    } catch (error) {
+      console.error("Error fetching merchant:", error);
+      res.status(500).json({ message: "Failed to fetch merchant" });
+    }
+  });
+
   // Delete merchant (admin only)
   app.delete("/api/admin/merchants/:id", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {
@@ -2775,13 +2832,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate verification token
       const verificationToken = crypto.randomBytes(32).toString('hex');
 
-      // Create merchant with pending status and password
+      // Create merchant with pending status and password hash
       const merchant = await storage.createMerchantWithSignup({
         ...merchantData,
         password,
         confirmPassword,
         verificationToken,
       });
+
+      // Store the password hash on the merchant so they can log in after verification
+      if (merchant) {
+        await storage.updateMerchantPasswordHash(merchant.id, passwordHash);
+      }
 
       // Send verification email using the new email service
       const { sendMerchantVerificationEmail } = await import('./email-service-multi');

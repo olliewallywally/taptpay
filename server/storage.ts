@@ -14,6 +14,7 @@ export interface IStorage {
   createMerchantWithSignup(data: CreateMerchant & { verificationToken: string }): Promise<Merchant>;
   verifyMerchant(token: string, passwordHash: string): Promise<Merchant | undefined>;
   updateMerchantStatus(id: number, status: string): Promise<Merchant | undefined>;
+  updateMerchantPasswordHash(id: number, passwordHash: string): Promise<Merchant | undefined>;
   updateMerchantRates(id: number, currentProviderRate: string): Promise<Merchant | undefined>;
   updateMerchant(id: number, updates: Partial<Merchant>): Promise<Merchant | undefined>;
   updateMerchantDetails(id: number, details: { businessName: string; contactEmail: string; contactPhone: string; businessAddress: string }): Promise<Merchant | undefined>;
@@ -395,6 +396,16 @@ export class MemStorage implements IStorage {
     if (!merchant) return undefined;
     
     merchant.status = status;
+    merchant.updatedAt = new Date();
+    this.merchants.set(id, merchant);
+    return merchant;
+  }
+
+  async updateMerchantPasswordHash(id: number, passwordHash: string): Promise<Merchant | undefined> {
+    const merchant = this.merchants.get(id);
+    if (!merchant) return undefined;
+    
+    merchant.passwordHash = passwordHash;
     merchant.updatedAt = new Date();
     this.merchants.set(id, merchant);
     return merchant;
@@ -1619,6 +1630,16 @@ export class DatabaseStorage implements IStorage {
     const result = await this.db
       .update(merchants)
       .set({ status, updatedAt: new Date() })
+      .where(eq(merchants.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async updateMerchantPasswordHash(id: number, passwordHash: string): Promise<Merchant | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .update(merchants)
+      .set({ passwordHash, updatedAt: new Date() })
       .where(eq(merchants.id, id))
       .returning();
     return result[0];
