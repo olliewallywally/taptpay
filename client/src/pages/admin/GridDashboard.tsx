@@ -124,7 +124,7 @@ export function GridDashboard() {
         {/* Quick Actions Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <button
-            onClick={() => setLocation('/admin/merchants')}
+            onClick={() => setLocation('/merchants')}
             className="bg-[#24263a] hover:bg-[#2a2c3e] rounded-2xl p-6 text-left transition-all group"
             data-testid="quick-action-merchants"
           >
@@ -134,7 +134,7 @@ export function GridDashboard() {
           </button>
 
           <button
-            onClick={() => setLocation('/admin/api')}
+            onClick={() => setLocation('/api')}
             className="bg-[#24263a] hover:bg-[#2a2c3e] rounded-2xl p-6 text-left transition-all group"
             data-testid="quick-action-api"
           >
@@ -144,7 +144,7 @@ export function GridDashboard() {
           </button>
 
           <button
-            onClick={() => setLocation('/admin/analytics')}
+            onClick={() => setLocation('/analytics')}
             className="bg-[#24263a] hover:bg-[#2a2c3e] rounded-2xl p-6 text-left transition-all group"
             data-testid="quick-action-analytics"
           >
@@ -160,7 +160,7 @@ export function GridDashboard() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-[#dbdfea] text-lg font-medium">Recent Merchants</h2>
               <button
-                onClick={() => setLocation('/admin/merchants')}
+                onClick={() => setLocation('/merchants')}
                 className="text-[#0055FF] text-sm hover:text-[#00E5CC] transition-colors"
                 data-testid="link-view-all-merchants"
               >
@@ -171,7 +171,7 @@ export function GridDashboard() {
               {merchants.slice(0, 5).map((merchant: any) => (
                 <button
                   key={merchant.id}
-                  onClick={() => setLocation(`/admin/merchants/${merchant.id}`)}
+                  onClick={() => setLocation(`/merchants/${merchant.id}`)}
                   className="w-full flex items-center justify-between p-3 bg-[#1d1e2c] hover:bg-[#2a2c3e] rounded-lg transition-all text-left"
                   data-testid={`merchant-item-${merchant.id}`}
                 >

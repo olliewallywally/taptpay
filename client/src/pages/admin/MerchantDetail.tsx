@@ -103,7 +103,7 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
         <div className="text-center">
           <p className="text-[#dbdfea]">Merchant not found</p>
           <button
-            onClick={() => setLocation('/admin/merchants')}
+            onClick={() => setLocation('/merchants')}
             className="mt-4 text-[#0055FF] hover:text-[#00E5CC] transition-colors"
           >
             Back to Merchants
@@ -121,7 +121,7 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
     <div className="min-h-screen bg-[#1a1b2e] p-4 md:p-6">
       <div className="mb-6">
         <button
-          onClick={() => setLocation('/admin/merchants')}
+          onClick={() => setLocation('/merchants')}
           className="flex items-center gap-2 text-[#dbdfea] mb-4 hover:text-[#0055FF] transition-colors"
           data-testid="button-back-to-merchants"
         >

@@ -94,7 +94,7 @@ export function MerchantsPage() {
                 {filteredMerchants.map((merchant: any) => (
                   <tr
                     key={merchant.id}
-                    onClick={() => setLocation(`/admin/merchants/${merchant.id}`)}
+                    onClick={() => setLocation(`/merchants/${merchant.id}`)}
                     className="border-b border-[#1d1e2c] hover:bg-[#1d1e2c] cursor-pointer transition-colors"
                     data-testid={`merchant-row-${merchant.id}`}
                   >

@@ -16,12 +16,12 @@ export default function AdminDashboard() {
   const handleLogout = () => {
     localStorage.removeItem('adminAuthToken');
     localStorage.removeItem('adminUser');
-    setLocation('/login');
+    window.location.href = '/login';
   };
 
   const isActive = (path: string) => {
-    if (path === '/admin' && location === '/admin') return true;
-    if (path !== '/admin' && location.startsWith(path)) return true;
+    if (path === '/' && location === '/') return true;
+    if (path !== '/' && location.startsWith(path)) return true;
     return false;
   };
 
@@ -31,9 +31,9 @@ export default function AdminDashboard() {
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#24263a] border-t border-[#1d1e2c] z-50 pb-safe">
         <div className="grid grid-cols-5 h-16">
           <button
-            onClick={() => setLocation('/admin')}
+            onClick={() => setLocation('/')}
             className={`flex flex-col items-center justify-center gap-1 ${
-              isActive('/admin') ? 'text-[#0055FF]' : 'text-[#dbdfea]'
+              isActive('/') ? 'text-[#0055FF]' : 'text-[#dbdfea]'
             }`}
             data-testid="nav-admin-home"
           >
@@ -41,9 +41,9 @@ export default function AdminDashboard() {
             <span className="text-[10px]">Home</span>
           </button>
           <button
-            onClick={() => setLocation('/admin/merchants')}
+            onClick={() => setLocation('/merchants')}
             className={`flex flex-col items-center justify-center gap-1 ${
-              isActive('/admin/merchants') ? 'text-[#0055FF]' : 'text-[#dbdfea]'
+              isActive('/merchants') ? 'text-[#0055FF]' : 'text-[#dbdfea]'
             }`}
             data-testid="nav-admin-merchants"
           >
@@ -51,9 +51,9 @@ export default function AdminDashboard() {
             <span className="text-[10px]">Merchants</span>
           </button>
           <button
-            onClick={() => setLocation('/admin/analytics')}
+            onClick={() => setLocation('/analytics')}
             className={`flex flex-col items-center justify-center gap-1 ${
-              isActive('/admin/analytics') ? 'text-[#0055FF]' : 'text-[#dbdfea]'
+              isActive('/analytics') ? 'text-[#0055FF]' : 'text-[#dbdfea]'
             }`}
             data-testid="nav-admin-analytics"
           >
@@ -61,9 +61,9 @@ export default function AdminDashboard() {
             <span className="text-[10px]">Analytics</span>
           </button>
           <button
-            onClick={() => setLocation('/admin/api')}
+            onClick={() => setLocation('/api')}
             className={`flex flex-col items-center justify-center gap-1 ${
-              isActive('/admin/api') ? 'text-[#0055FF]' : 'text-[#dbdfea]'
+              isActive('/api') ? 'text-[#0055FF]' : 'text-[#dbdfea]'
             }`}
             data-testid="nav-admin-api"
           >
@@ -71,9 +71,9 @@ export default function AdminDashboard() {
             <span className="text-[10px]">API</span>
           </button>
           <button
-            onClick={() => setLocation('/admin/settings')}
+            onClick={() => setLocation('/settings')}
             className={`flex flex-col items-center justify-center gap-1 ${
-              isActive('/admin/settings') ? 'text-[#0055FF]' : 'text-[#dbdfea]'
+              isActive('/settings') ? 'text-[#0055FF]' : 'text-[#dbdfea]'
             }`}
             data-testid="nav-admin-settings"
           >
@@ -92,9 +92,9 @@ export default function AdminDashboard() {
 
           <nav className="flex-1 py-4">
             <button
-              onClick={() => setLocation('/admin')}
+              onClick={() => setLocation('/')}
               className={`w-full flex items-center gap-3 px-6 py-3 text-[#dbdfea] text-[10px] transition-colors ${
-                isActive('/admin') ? 'bg-[#1d1e2c]' : 'hover:bg-[#1d1e2c]'
+                isActive('/') ? 'bg-[#1d1e2c]' : 'hover:bg-[#1d1e2c]'
               }`}
               data-testid="sidebar-admin-dashboard"
             >
@@ -102,9 +102,9 @@ export default function AdminDashboard() {
               Dashboard
             </button>
             <button
-              onClick={() => setLocation('/admin/merchants')}
+              onClick={() => setLocation('/merchants')}
               className={`w-full flex items-center gap-3 px-6 py-3 text-[#dbdfea] text-[10px] transition-colors ${
-                isActive('/admin/merchants') ? 'bg-[#1d1e2c]' : 'hover:bg-[#1d1e2c]'
+                isActive('/merchants') ? 'bg-[#1d1e2c]' : 'hover:bg-[#1d1e2c]'
               }`}
               data-testid="sidebar-admin-merchants"
             >
@@ -112,9 +112,9 @@ export default function AdminDashboard() {
               Merchants
             </button>
             <button
-              onClick={() => setLocation('/admin/api')}
+              onClick={() => setLocation('/api')}
               className={`w-full flex items-center gap-3 px-6 py-3 text-[#dbdfea] text-[10px] transition-colors ${
-                isActive('/admin/api') ? 'bg-[#1d1e2c]' : 'hover:bg-[#1d1e2c]'
+                isActive('/api') ? 'bg-[#1d1e2c]' : 'hover:bg-[#1d1e2c]'
               }`}
               data-testid="sidebar-admin-api"
             >
@@ -122,9 +122,9 @@ export default function AdminDashboard() {
               API Management
             </button>
             <button
-              onClick={() => setLocation('/admin/analytics')}
+              onClick={() => setLocation('/analytics')}
               className={`w-full flex items-center gap-3 px-6 py-3 text-[#dbdfea] text-[10px] transition-colors ${
-                isActive('/admin/analytics') ? 'bg-[#1d1e2c]' : 'hover:bg-[#1d1e2c]'
+                isActive('/analytics') ? 'bg-[#1d1e2c]' : 'hover:bg-[#1d1e2c]'
               }`}
               data-testid="sidebar-admin-analytics"
             >
@@ -132,9 +132,9 @@ export default function AdminDashboard() {
               Analytics
             </button>
             <button
-              onClick={() => setLocation('/admin/settings')}
+              onClick={() => setLocation('/settings')}
               className={`w-full flex items-center gap-3 px-6 py-3 text-[#dbdfea] text-[10px] transition-colors ${
-                isActive('/admin/settings') ? 'bg-[#1d1e2c]' : 'hover:bg-[#1d1e2c]'
+                isActive('/settings') ? 'bg-[#1d1e2c]' : 'hover:bg-[#1d1e2c]'
               }`}
               data-testid="sidebar-admin-settings"
             >
@@ -159,15 +159,15 @@ export default function AdminDashboard() {
       {/* Main Content */}
       <main className="md:ml-[180px] pb-20 md:pb-0">
         <Switch>
-          <Route path="/admin" component={GridDashboard} />
-          <Route path="/admin/merchants" component={MerchantsPage} />
-          <Route path="/admin/merchants/:id">
+          <Route path="/" component={GridDashboard} />
+          <Route path="/merchants" component={MerchantsPage} />
+          <Route path="/merchants/:id">
             {(params) => <MerchantDetail merchantId={params.id} />}
           </Route>
-          <Route path="/admin/api" component={APIManagement} />
-          <Route path="/admin/analytics" component={Analytics} />
-          <Route path="/admin/web-analytics" component={WebsiteAnalytics} />
-          <Route path="/admin/settings">
+          <Route path="/api" component={APIManagement} />
+          <Route path="/analytics" component={Analytics} />
+          <Route path="/web-analytics" component={WebsiteAnalytics} />
+          <Route path="/settings">
             <div className="flex items-center justify-center h-screen text-[#dbdfea]">
               <div className="text-center">
                 <Settings className="size-12 mx-auto mb-4 opacity-50" />
