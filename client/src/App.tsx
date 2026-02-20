@@ -84,7 +84,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AdminProtectedRoute({ children }: { children: React.ReactNode }) {
-  const [, setLocation] = useLocation();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
 
@@ -94,7 +93,7 @@ function AdminProtectedRoute({ children }: { children: React.ReactNode }) {
       if (!token) {
         setIsAuthenticated(false);
         setIsChecking(false);
-        setLocation("/login");
+        window.location.href = "/login";
         return;
       }
 
@@ -109,20 +108,20 @@ function AdminProtectedRoute({ children }: { children: React.ReactNode }) {
           localStorage.removeItem("adminAuthToken");
           localStorage.removeItem("adminUser");
           setIsAuthenticated(false);
-          setLocation("/login");
+          window.location.href = "/login";
         }
       } catch (error) {
         localStorage.removeItem("adminAuthToken");
         localStorage.removeItem("adminUser");
         setIsAuthenticated(false);
-        setLocation("/login");
+        window.location.href = "/login";
       }
       
       setIsChecking(false);
     };
 
     checkAdminAuth();
-  }, [setLocation]);
+  }, []);
 
   if (isChecking) {
     return <div>Loading...</div>;
@@ -172,12 +171,7 @@ function Router() {
         </Route>
         
         {/* New Admin Portal with sub-routing */}
-        <Route path="/admin">
-          <AdminProtectedRoute>
-            <NewAdminDashboard />
-          </AdminProtectedRoute>
-        </Route>
-        <Route path="/admin/:rest*">
+        <Route path="/admin" nest>
           <AdminProtectedRoute>
             <NewAdminDashboard />
           </AdminProtectedRoute>

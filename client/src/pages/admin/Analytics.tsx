@@ -50,7 +50,7 @@ export function Analytics() {
             <p className="text-sm text-[#dbdfea]/60">Platform performance and revenue insights</p>
           </div>
           <button
-            onClick={() => setLocation('/admin/web-analytics')}
+            onClick={() => setLocation('/web-analytics')}
             className="flex items-center gap-2 text-[#0055FF] hover:text-[#00E5CC] transition-colors"
             data-testid="button-switch-to-web"
           >
