@@ -7,7 +7,7 @@ export function MerchantsPage() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
 
-  const { data: merchants, isLoading } = useQuery({
+  const { data: merchants, isLoading } = useQuery<any[]>({
     queryKey: ['/api/admin/merchants'],
   });
 
@@ -18,8 +18,9 @@ export function MerchantsPage() {
         merchant.email?.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-  const getStatusColor = (verified: boolean) => {
-    return verified ? 'text-[#4ade80]' : 'text-[#f59e0b]';
+  const isVerified = (merchant: any) => merchant.status === 'verified';
+  const getStatusColor = (merchant: any) => {
+    return isVerified(merchant) ? 'text-[#4ade80]' : 'text-[#f59e0b]';
   };
 
   return (
@@ -51,13 +52,13 @@ export function MerchantsPage() {
         <div className="bg-[#24263a] rounded-lg p-4">
           <p className="text-[#dbdfea] text-xs opacity-60 mb-1">Verified</p>
           <p className="text-[#4ade80] text-2xl">
-            {merchants?.filter((m: any) => m.verified).length || 0}
+            {merchants?.filter((m: any) => m.status === 'verified').length || 0}
           </p>
         </div>
         <div className="bg-[#24263a] rounded-lg p-4">
           <p className="text-[#dbdfea] text-xs opacity-60 mb-1">Pending</p>
           <p className="text-[#fbbf24] text-2xl">
-            {merchants?.filter((m: any) => !m.verified).length || 0}
+            {merchants?.filter((m: any) => m.status !== 'verified').length || 0}
           </p>
         </div>
         <div className="bg-[#24263a] rounded-lg p-4">
@@ -108,15 +109,15 @@ export function MerchantsPage() {
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
-                        {merchant.verified ? (
+                        {isVerified(merchant) ? (
                           <>
                             <CheckCircle className="size-4 text-[#4ade80]" />
-                            <span className={getStatusColor(merchant.verified)}>Verified</span>
+                            <span className={getStatusColor(merchant)}>Verified</span>
                           </>
                         ) : (
                           <>
                             <AlertCircle className="size-4 text-[#fbbf24]" />
-                            <span className={getStatusColor(merchant.verified)}>Pending</span>
+                            <span className={getStatusColor(merchant)}>Pending</span>
                           </>
                         )}
                       </div>
