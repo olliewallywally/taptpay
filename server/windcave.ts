@@ -1,322 +1,289 @@
-// Windcave API Integration
-import { z } from "zod";
+// Windcave RESTful API Integration
+// Following pseudo code v1.5 - HPP Purchase flow
 import crypto from "crypto";
 
-export interface WindcaveConfig {
-  apiEndpoint: string;
-  username: string;
-  apiKey: string;
-  webhookSecret: string;
-}
+const SESSION_URL = `${process.env.WINDCAVE_ENDPOINT || "https://uat.windcave.com/api/v1"}/sessions`;
+const TRANSACTION_URL = `${process.env.WINDCAVE_ENDPOINT || "https://uat.windcave.com/api/v1"}/transactions`;
+const REQUEST_TIMEOUT = 15000;
+const RETRY_LIMIT = 5;
 
-export interface CreateSessionRequest {
-  type: "purchase";
-  amount: string;
-  currency: string;
-  merchantReference: string;
-  language: string;
-  callbackUrls: {
-    approved: string;
-    declined: string;
-    cancelled: string;
-  };
-  notificationUrl: string;
-}
-
-export interface WindcaveSession {
-  id: string;
-  state: string;
-  links: Array<{
-    rel: string;
-    href: string;
-  }>;
-}
-
-export interface PaymentResult {
-  id: string;
-  type: string;
-  amount: string;
-  currency: string;
-  merchantReference: string;
-  status: "approved" | "declined" | "cancelled";
-  responseText: string;
-  dpsTxnRef: string;
-  cardName?: string;
-  cardNumber?: string;
-}
-
-const API_TIMEOUT_MS = 15000;
-const MAX_RETRIES = 3;
-const RETRY_BASE_DELAY_MS = 1000;
-
-function logWindcaveAudit(action: string, details: Record<string, any>) {
-  const timestamp = new Date().toISOString();
+function logAudit(action: string, details: Record<string, any>) {
   const sanitized = { ...details };
-  if (sanitized.apiKey) sanitized.apiKey = '***REDACTED***';
-  if (sanitized.cardNumber) sanitized.cardNumber = sanitized.cardNumber.replace(/\d(?=\d{4})/g, '*');
-  console.log(`[WINDCAVE_AUDIT] [${timestamp}] ${action}:`, JSON.stringify(sanitized));
+  if (sanitized.apiKey) sanitized.apiKey = "***";
+  if (sanitized.authorization) sanitized.authorization = "***";
+  console.log(`[WINDCAVE] [${new Date().toISOString()}] ${action}:`, JSON.stringify(sanitized));
 }
 
-async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number = API_TIMEOUT_MS): Promise<Response> {
+function buildAuthHeader(): string {
+  const username = process.env.WINDCAVE_USERNAME || "";
+  const apiKey = process.env.WINDCAVE_API_KEY || "";
+  return `Basic ${Buffer.from(`${username}:${apiKey}`).toString("base64")}`;
+}
+
+async function fetchWithTimeout(url: string, options: RequestInit): Promise<Response> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const id = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(id);
+  }
+}
+
+export interface CreateSessionResult {
+  success: boolean;
+  hppUrl?: string;
+  sessionId?: string;
+  alreadyComplete?: boolean;
+  approved?: boolean;
+  windcaveTransactionId?: string;
+  error?: string;
+}
+
+export interface QuerySessionResult {
+  success: boolean;
+  approved?: boolean;
+  windcaveTransactionId?: string;
+  error?: string;
+}
+
+export interface RefundResult {
+  success: boolean;
+  refundTransactionId?: string;
+  error?: string;
+}
+
+// Create a Windcave payment session (HPP flow)
+export async function createWindcaveSession(
+  xId: string,
+  amount: string,
+  merchantReference: string,
+  customerEmail: string,
+  baseUrl: string,
+  retries = 0
+): Promise<CreateSessionResult> {
+  const body = {
+    type: "purchase",
+    amount,
+    currency: "NZD",
+    merchantReference,
+    customer: {
+      email: customerEmail,
+    },
+    callbackUrls: {
+      approved: `${baseUrl}/api/windcave/callback?result=approved&sessionid={id}`,
+      declined: `${baseUrl}/api/windcave/callback?result=declined&sessionid={id}`,
+      cancelled: `${baseUrl}/api/windcave/callback?result=cancelled&sessionid={id}`,
+    },
+    notificationUrl: `${baseUrl}/api/windcave/notification`,
+  };
+
+  logAudit("CREATE_SESSION_REQUEST", { xId, merchantReference, amount, retries });
+
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(SESSION_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: buildAuthHeader(),
+        "X-ID": xId,
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (err: any) {
+    const isTimeout = err.name === "AbortError";
+    logAudit("CREATE_SESSION_NETWORK_ERROR", { xId, error: err.message, isTimeout });
+    if (retries < RETRY_LIMIT) {
+      await delay(5000);
+      return createWindcaveSession(xId, amount, merchantReference, customerEmail, baseUrl, retries + 1);
+    }
+    return { success: false, error: err.message };
+  }
+
+  if (response.status === 200) {
+    // Duplicate X-ID — session already complete
+    const data = await response.json();
+    const tx = data.transactions?.[0];
+    const approved = tx?.authorised === true;
+    logAudit("CREATE_SESSION_DUPLICATE_XID", { xId, approved, txId: tx?.id });
+    return {
+      success: true,
+      sessionId: data.id,
+      alreadyComplete: true,
+      approved,
+      windcaveTransactionId: approved ? tx?.id : undefined,
+    };
+  }
+
+  if (response.status === 202) {
+    // Session created and pending — extract HPP link
+    const data = await response.json();
+    const hppLink = data.links?.find(
+      (l: any) => l.rel === "hpp" || l.method === "REDIRECT" || l.rel === "redirect"
+    );
+    const hppUrl = hppLink?.href;
+    logAudit("CREATE_SESSION_PENDING", { xId, sessionId: data.id, hppUrl });
+    return {
+      success: true,
+      sessionId: data.id,
+      hppUrl,
+      alreadyComplete: false,
+    };
+  }
+
+  if (response.status >= 400 && response.status < 500) {
+    const errorBody = await response.text().catch(() => "");
+    logAudit("CREATE_SESSION_4XX", { xId, status: response.status, errorBody });
+    return { success: false, error: `Windcave ${response.status}: ${errorBody}` };
+  }
+
+  if (response.status >= 500) {
+    logAudit("CREATE_SESSION_5XX", { xId, status: response.status, retries });
+    if (retries < RETRY_LIMIT) {
+      await delay(5000);
+      return createWindcaveSession(xId, amount, merchantReference, customerEmail, baseUrl, retries + 1);
+    }
+    return { success: false, error: `Windcave server error ${response.status}` };
+  }
+
+  return { success: false, error: `Unexpected status ${response.status}` };
+}
+
+// Query a session to determine the payment outcome
+export async function queryWindcaveSession(
+  sessionId: string,
+  retries = 0
+): Promise<QuerySessionResult> {
+  logAudit("QUERY_SESSION", { sessionId, retries });
+
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(`${SESSION_URL}/${sessionId}`, {
+      method: "GET",
+      headers: { Authorization: buildAuthHeader() },
+    });
+  } catch (err: any) {
+    logAudit("QUERY_SESSION_NETWORK_ERROR", { sessionId, error: err.message });
+    if (retries < RETRY_LIMIT) {
+      await delay(5000);
+      return queryWindcaveSession(sessionId, retries + 1);
+    }
+    return { success: false, error: err.message };
+  }
+
+  if (response.status === 200) {
+    const data = await response.json();
+    const tx = data.transactions?.[0];
+    const approved = tx?.authorised === true;
+    logAudit("QUERY_SESSION_RESULT", { sessionId, approved, txId: tx?.id });
+    return {
+      success: true,
+      approved,
+      windcaveTransactionId: approved ? tx?.id : undefined,
+    };
+  }
+
+  if (response.status === 202) {
+    // Still processing — retry
+    if (retries < RETRY_LIMIT) {
+      await delay(5000);
+      return queryWindcaveSession(sessionId, retries + 1);
+    }
+    return { success: false, error: "Session still processing after max retries" };
+  }
+
+  if (response.status >= 400 && response.status < 500) {
+    const errorBody = await response.text().catch(() => "");
+    logAudit("QUERY_SESSION_4XX", { sessionId, status: response.status, errorBody });
+    return { success: false, error: `Windcave ${response.status}: ${errorBody}` };
+  }
+
+  if (response.status >= 500) {
+    if (retries < RETRY_LIMIT) {
+      await delay(5000);
+      return queryWindcaveSession(sessionId, retries + 1);
+    }
+    return { success: false, error: `Windcave server error ${response.status}` };
+  }
+
+  return { success: false, error: `Unexpected status ${response.status}` };
+}
+
+// Process a refund against an approved transaction
+export async function createWindcaveRefund(
+  originalTransactionId: string,
+  amount: string,
+  merchantReference: string
+): Promise<RefundResult> {
+  const xId = crypto.randomBytes(8).toString("hex");
+  logAudit("REFUND_REQUEST", { originalTransactionId, amount, merchantReference });
+
+  const body = {
+    type: "refund",
+    amount,
+    currency: "NZD",
+    merchantReference,
+    transaction2Id: originalTransactionId,
+  };
 
   try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal,
+    const response = await fetchWithTimeout(TRANSACTION_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: buildAuthHeader(),
+        "X-ID": xId,
+      },
+      body: JSON.stringify(body),
     });
-    return response;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
 
-async function fetchWithRetry(
-  url: string,
-  options: RequestInit,
-  maxRetries: number = MAX_RETRIES,
-  timeoutMs: number = API_TIMEOUT_MS
-): Promise<Response> {
-  let lastError: Error | null = null;
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      const response = await fetchWithTimeout(url, options, timeoutMs);
-
-      if (response.status >= 500) {
-        lastError = new Error(`Windcave server error: ${response.status} ${response.statusText}`);
-        logWindcaveAudit('RETRY_SERVER_ERROR', { attempt, status: response.status, url });
-        if (attempt < maxRetries) {
-          const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          continue;
-        }
-        return response;
-      }
-
-      return response;
-    } catch (error: any) {
-      lastError = error;
-      const isTimeout = error.name === 'AbortError';
-      const isNetworkError = error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT';
-
-      logWindcaveAudit('RETRY_ERROR', {
-        attempt,
-        error: error.message,
-        isTimeout,
-        isNetworkError,
-        url,
-      });
-
-      if (attempt < maxRetries && (isTimeout || isNetworkError)) {
-        const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        continue;
-      }
-
-      throw error;
+    if (response.ok) {
+      const data = await response.json();
+      logAudit("REFUND_SUCCESS", { refundTxId: data.id });
+      return { success: true, refundTransactionId: data.id };
     }
-  }
 
-  throw lastError || new Error('Windcave API request failed after retries');
+    const errorBody = await response.text().catch(() => "");
+    logAudit("REFUND_FAILED", { status: response.status, errorBody });
+    return { success: false, error: `Refund failed: ${response.status} ${errorBody}` };
+  } catch (err: any) {
+    logAudit("REFUND_ERROR", { error: err.message });
+    return { success: false, error: err.message };
+  }
 }
 
+export function isWindcaveConfigured(): boolean {
+  return !!(process.env.WINDCAVE_USERNAME && process.env.WINDCAVE_API_KEY);
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// ── Simulation mode (used when credentials are not set) ──────────────────────
+
+export function simulateCreateSession(merchantReference: string, baseUrl: string): CreateSessionResult {
+  const sessionId = `sim_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  logAudit("SIMULATE_SESSION", { sessionId, merchantReference });
+  // In simulation, return a fake HPP URL pointing to our own success callback
+  const hppUrl = `${baseUrl}/api/windcave/callback?result=approved&sessionid=${sessionId}&sim=1`;
+  return { success: true, sessionId, hppUrl, alreadyComplete: false };
+}
+
+export function simulateQuerySession(sessionId: string): QuerySessionResult {
+  const approved = !sessionId.includes("decline");
+  return {
+    success: true,
+    approved,
+    windcaveTransactionId: approved ? `SIMTXN_${Date.now()}` : undefined,
+  };
+}
+
+// Legacy service wrapper kept for backward compatibility with NFC routes
 export class WindcaveService {
-  private config: WindcaveConfig;
-
-  constructor() {
-    this.config = {
-      apiEndpoint: process.env.WINDCAVE_ENDPOINT || "https://uat.windcave.com/api/v1",
-      username: process.env.WINDCAVE_USERNAME || "",
-      apiKey: process.env.WINDCAVE_API_KEY || "",
-      webhookSecret: process.env.WINDCAVE_WEBHOOK_SECRET || "",
-    };
-
-    if (!this.config.username || !this.config.apiKey) {
-      console.warn("Windcave credentials not configured. Using simulation mode.");
-    }
-  }
-
-  async createPaymentSession(
-    amount: string,
-    merchantReference: string,
-    baseUrl: string
-  ): Promise<WindcaveSession | null> {
-    if (!this.config.username || !this.config.apiKey) {
-      return this.simulateSession(merchantReference);
-    }
-
-    const requestId = `req_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
-    logWindcaveAudit('CREATE_SESSION_REQUEST', {
-      requestId,
-      amount,
-      merchantReference,
-      baseUrl,
-      endpoint: this.config.apiEndpoint,
-    });
-
-    try {
-      const sessionData: CreateSessionRequest = {
-        type: "purchase",
-        amount: amount,
-        currency: "NZD",
-        merchantReference: merchantReference,
-        language: "en",
-        callbackUrls: {
-          approved: `${baseUrl}/payment/success`,
-          declined: `${baseUrl}/payment/declined`,
-          cancelled: `${baseUrl}/payment/cancelled`,
-        },
-        notificationUrl: `${baseUrl}/api/windcave/notification`,
-      };
-
-      const response = await fetchWithRetry(`${this.config.apiEndpoint}/sessions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Basic ${Buffer.from(`${this.config.username}:${this.config.apiKey}`).toString('base64')}`,
-        },
-        body: JSON.stringify(sessionData),
-      });
-
-      if (!response.ok) {
-        const errorBody = await response.text().catch(() => 'Unable to read error body');
-        logWindcaveAudit('CREATE_SESSION_ERROR', {
-          requestId,
-          status: response.status,
-          statusText: response.statusText,
-          errorBody,
-        });
-        throw new Error(`Windcave API error: ${response.status} ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      logWindcaveAudit('CREATE_SESSION_SUCCESS', {
-        requestId,
-        sessionId: result.id,
-        state: result.state,
-      });
-      return result;
-    } catch (error: any) {
-      logWindcaveAudit('CREATE_SESSION_FAILURE', {
-        requestId,
-        error: error.message,
-      });
-      console.error("Error creating Windcave session:", error);
-      return null;
-    }
-  }
-
-  async getSessionResult(sessionId: string): Promise<PaymentResult | null> {
-    if (!this.config.username || !this.config.apiKey) {
-      return this.simulatePaymentResult(sessionId);
-    }
-
-    const requestId = `req_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
-    logWindcaveAudit('GET_SESSION_REQUEST', {
-      requestId,
-      sessionId,
-    });
-
-    try {
-      const response = await fetchWithRetry(`${this.config.apiEndpoint}/sessions/${sessionId}`, {
-        method: "GET",
-        headers: {
-          "Authorization": `Basic ${Buffer.from(`${this.config.username}:${this.config.apiKey}`).toString('base64')}`,
-        },
-      });
-
-      if (!response.ok) {
-        const errorBody = await response.text().catch(() => 'Unable to read error body');
-        logWindcaveAudit('GET_SESSION_ERROR', {
-          requestId,
-          sessionId,
-          status: response.status,
-          errorBody,
-        });
-        throw new Error(`Windcave API error: ${response.status} ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      logWindcaveAudit('GET_SESSION_SUCCESS', {
-        requestId,
-        sessionId,
-        status: result.status,
-        dpsTxnRef: result.dpsTxnRef,
-      });
-      return result;
-    } catch (error: any) {
-      logWindcaveAudit('GET_SESSION_FAILURE', {
-        requestId,
-        sessionId,
-        error: error.message,
-      });
-      console.error("Error getting Windcave session result:", error);
-      return null;
-    }
-  }
-
-  verifyWebhookSignature(rawBody: string, signature: string): boolean {
-    if (!this.config.webhookSecret) {
-      logWindcaveAudit('WEBHOOK_VERIFY_SKIP', { reason: 'No webhook secret configured' });
-      return true;
-    }
-
-    try {
-      const expectedSignature = crypto
-        .createHmac('sha256', this.config.webhookSecret)
-        .update(rawBody)
-        .digest('hex');
-
-      const isValid = crypto.timingSafeEqual(
-        Buffer.from(signature, 'hex'),
-        Buffer.from(expectedSignature, 'hex')
-      );
-
-      logWindcaveAudit('WEBHOOK_VERIFY', { isValid });
-      return isValid;
-    } catch (error: any) {
-      logWindcaveAudit('WEBHOOK_VERIFY_ERROR', { error: error.message });
-      return false;
-    }
-  }
-
-  private simulateSession(merchantReference: string): WindcaveSession {
-    const sessionId = `sim_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    logWindcaveAudit('SIMULATE_SESSION', { sessionId, merchantReference });
-    return {
-      id: sessionId,
-      state: "active",
-      links: [
-        {
-          rel: "self",
-          href: `/api/windcave/sessions/${sessionId}`,
-        }
-      ],
-    };
-  }
-
-  private simulatePaymentResult(sessionId: string): PaymentResult {
-    const isSuccess = Math.random() > 0.1;
-    logWindcaveAudit('SIMULATE_PAYMENT_RESULT', { sessionId, isSuccess });
-    
-    return {
-      id: sessionId,
-      type: "purchase",
-      amount: "0.00",
-      currency: "NZD",
-      merchantReference: "SIM_" + sessionId,
-      status: isSuccess ? "approved" : "declined",
-      responseText: isSuccess ? "Transaction Approved" : "Transaction Declined",
-      dpsTxnRef: `DPS_${Date.now()}`,
-      cardName: isSuccess ? "Visa" : undefined,
-      cardNumber: isSuccess ? "************1234" : undefined,
-    };
-  }
-
   isConfigured(): boolean {
-    return !!(this.config.username && this.config.apiKey);
+    return isWindcaveConfigured();
   }
 }
 

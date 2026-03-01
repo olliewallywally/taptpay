@@ -12,14 +12,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { QRCodeDisplay } from "@/components/qr-code-display";
 import { MerchantUrlDisplay } from "@/components/merchant-url-display";
 import { EnhancedPaymentStatus } from "@/components/enhanced-payment-status";
-import { BillSplit } from "@/components/bill-split";
 import { AnimatedBrandBackground } from "@/components/backgrounds/AnimatedBrandBackground";
 import { apiRequest } from "@/lib/queryClient";
 import { sseClient } from "@/lib/sse-client";
 import { useToast } from "@/hooks/use-toast";
 import { useDeviceStatusMonitoring, useSSEConnectionMonitoring } from "@/components/notification-system";
 import { getCurrentMerchantId } from "@/lib/auth";
-import { Send, Loader2, CheckCircle, Clock, XCircle, Eye, Copy, Check, QrCode, Smartphone, Waves, CreditCard, X, Edit, Split, MoreHorizontal, ChevronDown, Tag, Share, Link2, Mail, MessageCircle } from "lucide-react";
+import { Send, Loader2, CheckCircle, Clock, XCircle, Eye, Copy, Check, QrCode, Smartphone, Waves, CreditCard, X, Edit, MoreHorizontal, ChevronDown, Tag, Share, Link2, Mail, MessageCircle } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
 import { Link } from "wouter";
 
@@ -49,8 +49,7 @@ export default function MerchantTerminal() {
   const [nfcSession, setNfcSession] = useState<any>(null);
   const [showNfcOverlay, setShowNfcOverlay] = useState(false);
   
-  // Split payments state
-  const [splitPayments, setSplitPayments] = useState<any[]>([]);
+  const [splitEnabled, setSplitEnabled] = useState(false);
   const [copiedPaymentLink, setCopiedPaymentLink] = useState(false);
   
   const queryClient = useQueryClient();
@@ -117,17 +116,6 @@ export default function MerchantTerminal() {
     enabled: !!merchantId,
   });
 
-  // Get split payments for the current transaction (if it's split)
-  const { data: currentSplitPayments = [] } = useQuery({
-    queryKey: ["/api/transactions", activeTransaction?.id, "split-payments"],
-    queryFn: async () => {
-      const response = await fetch(`/api/transactions/${activeTransaction?.id}/split-payments`);
-      if (!response.ok) throw new Error("Failed to fetch split payments");
-      return response.json();
-    },
-    enabled: !!activeTransaction?.id && activeTransaction?.isSplit,
-  });
-
   // Create transaction mutation
   const createTransactionMutation = useMutation({
     mutationFn: async (data: TransactionFormData) => {
@@ -136,15 +124,19 @@ export default function MerchantTerminal() {
         itemName: data.itemName,
         price: data.price,
         status: "pending",
+        splitEnabled,
       });
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
       form.reset();
+      setSplitEnabled(false);
       toast({
         title: "Transaction Created",
-        description: "Customer can now proceed with payment",
+        description: splitEnabled
+          ? "Split bill enabled — customer will choose how many ways to split"
+          : "Customer can now proceed with payment",
       });
     },
     onError: () => {
@@ -407,10 +399,6 @@ export default function MerchantTerminal() {
     }
   };
 
-  const onSplitCreated = () => {
-    queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/transactions", activeTransaction?.id, "split-payments"] });
-  };
 
 // StonesSection Component
 function StonesSection({ 
@@ -556,7 +544,6 @@ function ActionsToolbar({
 }) {
   const actionButtons = [
     { id: "edit", icon: Edit, label: "New Payment", testId: "button-new-payment" },
-    { id: "split", icon: Split, label: "Split Bill", testId: "button-split-bill" },
     { id: "send", icon: Send, label: "Share Link", testId: "button-share-link" },
     { id: "quick", icon: Tag, label: "Quick Amounts", testId: "button-quick-amounts" }
   ];
@@ -598,57 +585,6 @@ function ActionsToolbar({
               <h3 className="text-sm font-semibold text-white">Edit Transaction</h3>
               {stockTaggingComponent}
               {itemFormComponent}
-            </div>
-          )}
-
-          {activeAction === "split" && (
-            <div className="space-y-2" data-testid="split-panel">
-              <h3 className="text-sm font-semibold text-white">Split Bill</h3>
-              <p className="text-xs text-gray-400">Split a bill between multiple customers</p>
-              <div className="py-2">
-                {activeTransaction ? (
-                  activeTransaction.isSplit ? (
-                    <div className="space-y-3">
-                      <div className="bg-gray-700 rounded-xl p-3">
-                        <p className="text-green-400 text-sm font-semibold text-center">
-                          ✅ Bill Split into {activeTransaction.totalSplits} payments
-                        </p>
-                        <p className="text-gray-300 text-xs text-center mt-1">
-                          {activeTransaction.completedSplits} of {activeTransaction.totalSplits} payments completed
-                        </p>
-                      </div>
-                      
-                      {currentSplitPayments.length > 0 && (
-                        <div className="space-y-2">
-                          <h4 className="text-xs font-medium text-gray-300">Individual Payments:</h4>
-                          <div className="grid grid-cols-2 gap-2">
-                            {currentSplitPayments.map((split: any) => (
-                              <div key={split.id} className="bg-gray-700 rounded-lg p-2">
-                                <p className="text-xs text-white">Split {split.splitIndex}</p>
-                                <p className="text-xs text-green-400">${split.amount}</p>
-                                <p className={`text-xs ${split.status === 'completed' ? 'text-green-400' : 'text-yellow-400'}`}>
-                                  {split.status}
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <BillSplit 
-                      transactionId={activeTransaction.id}
-                      totalAmount={parseFloat(activeTransaction.price)}
-                      merchantId={merchantId!.toString()}
-                      onSplitCreated={onSplitCreated}
-                    />
-                  )
-                ) : (
-                  <div className="text-center py-3">
-                    <p className="text-gray-400 text-xs">Create a transaction first to split the bill</p>
-                  </div>
-                )}
-              </div>
             </div>
           )}
 
@@ -784,7 +720,9 @@ function ItemForm({
   selectedStoneId, 
   setSelectedStoneId, 
   selectedStockItems, 
-  isSubmitting 
+  isSubmitting,
+  splitEnabled,
+  setSplitEnabled,
 }: {
   form: any;
   onSubmit: (data: any) => void;
@@ -793,6 +731,8 @@ function ItemForm({
   setSelectedStoneId: (id: number | null) => void;
   selectedStockItems: any[];
   isSubmitting: boolean;
+  splitEnabled: boolean;
+  setSplitEnabled: (v: boolean) => void;
 }) {
   return (
     <div className="space-y-2" data-testid="item-form-container">
@@ -872,6 +812,19 @@ function ItemForm({
               </FormItem>
             )}
           />
+
+          {/* Split Bill Toggle */}
+          <div className="flex items-center justify-between bg-gray-700 rounded-lg px-3 py-2">
+            <div>
+              <p className="text-xs font-medium text-white">Split Bill</p>
+              <p className="text-[10px] text-gray-400">Customer chooses how many ways to split</p>
+            </div>
+            <Switch
+              checked={splitEnabled}
+              onCheckedChange={setSplitEnabled}
+              data-testid="toggle-split-bill"
+            />
+          </div>
 
           <Button
             type="submit"
@@ -1133,6 +1086,8 @@ function PaymentStatus({ transaction }: { transaction: any }) {
                     setSelectedStoneId={setSelectedStoneId}
                     selectedStockItems={selectedStockItems}
                     isSubmitting={createTransactionMutation.isPending}
+                    splitEnabled={splitEnabled}
+                    setSplitEnabled={setSplitEnabled}
                   />
                 }
                 form={form}

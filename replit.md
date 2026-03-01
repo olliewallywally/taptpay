@@ -50,8 +50,9 @@ The application adopts a monorepo structure, separating client, server, and shar
 -   `Push Subscriptions` table: Stores Web Push subscription endpoints per merchant (endpoint, VAPID keys, active status).
 
 **Key Data Flows:**
--   **Transaction Creation:** Merchant input via terminal -> Frontend validation -> Backend creates transaction in DB -> QR code generation -> SSE notification.
--   **Payment Processing:** Customer scans QR/uses URL -> Payment details display -> Payment initiation updates status to "processing" -> SSE broadcasts status -> External processor handles payment -> Final status update.
+-   **Transaction Creation:** Merchant input via terminal (with optional Split Bill toggle) -> Frontend validation -> Backend creates transaction in DB with `splitEnabled` flag -> QR code generation -> SSE notification.
+-   **Payment Processing (Windcave HPP):** Customer scans QR/uses URL -> `/pay/:merchantId` page displays amount -> Customer clicks Pay -> `POST /api/transactions/:id/pay` creates Windcave session -> Backend returns `{ hppUrl }` -> Frontend redirects to Windcave HPP -> Customer enters card details on Windcave's secure page -> Windcave POSTs to `/api/windcave/notification` -> Session state machine updates DB -> SSE broadcasts to merchant -> Customer browser redirected to `/api/windcave/callback` -> Redirect to `/payment/result/:id?status=approved|declined|cancelled`.
+-   **Split Bill Flow:** Merchant toggles "Split Bill" on before creating transaction -> Customer opens payment URL -> Redirected to `/split/:transactionId` -> Customer chooses number of splits (2-10) -> `POST /api/transactions/:id/split` sets `isSplit=true` -> Each person sequentially goes through Windcave HPP for their share -> After each payment, callback redirects back to split page for next person.
 -   **Real-time Updates:** SSE connections per merchant for immediate transaction status broadcasts to both merchant and customer interfaces.
 -   **Push Notifications:** On transaction status changes (created, completed, failed, refunded), push notifications sent to all active subscriptions for the merchant via Web Push API. Merchants enable/disable in Settings page.
 
