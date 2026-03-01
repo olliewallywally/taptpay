@@ -1,0 +1,57 @@
+
+Hope you are well. Below are the integration guides for PCI SAQ A solution.
+
+
+
+Windcave Hosted Payment Page: https://www.windcave.com/developer-e-commerce-api-rest#HPP.
+
+Drop-In: https://www.windcave.com/developer-e-commerce-api-rest#drop_in
+
+
+
+A UAT user has been created to get you started. You should have received an email for UAT Payline user verification. After verifying the account, you can generate the corresponding REST API key in the Payline portal under the “My User” section by following https://www.windcave.com/api-key-handling. The UAT username is TaptPay_REST.
+
+
+
+Please see the REST API Authentication Guide https://px5.docs.apiary.io/#introduction/authentication to construct the API Authorization header value.
+
+
+
+Attached is the pseudo code text file to assist with integrating to this create session method and the correct robust logic to follow at a generic code level so your team can integrate specifically to your platform.
+
+
+
+Payline – Web portal
+
+Your account includes access to Payline, the portal for online reporting and account administration.
+
+To access Payline: https://uat.windcave.com/pxmi3/logon
+
+For more information about Payline, please visit: https://www.windcave.com/merchant-ecommerce-payline    
+
+
+
+3D Secure
+
+The 3D Secure feature will be enabled by default for production users to help protect merchants against fraudulent chargebacks. As a result, transaction requests must include the required 3D Secure fields, which are the customer’s email address and/or phone number. More information can be found here https://www.windcave.com/developer-e-commerce-api-rest#3DSecure_Fields.
+
+
+
+Test Card
+
+The standard test cards to simulator different responses can be found here https://www.windcave.com/support-merchant-frequently-asked-questions-testing-details.
+
+
+
+The 3DS test cards can be found here https://www.windcave.com/developer-e-commerce-api-rest#Testing_3DS.
+
+
+
+Apple Pay
+The production cards saved in the wallet can be used to execute the test transaction for ApplePay. Following the submission of payment, we will transform the production card into dummy card for UAT testing. No charges will be incurred on the production cards.
+
+
+
+Google Pay
+
+The test cards will be visible on your Google account after login.

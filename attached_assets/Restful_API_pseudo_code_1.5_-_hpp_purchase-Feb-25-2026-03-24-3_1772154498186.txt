@@ -1,0 +1,350 @@
+//========================================================================================================
+// Windcave Restful Api "Robust integration" pseudo code sample
+// Version 1.5
+
+//========================================================================================================
+// 
+// Synopsis
+//
+// To assist merchants doing custom integrations we provide this document as a reference to assist in the 
+// creation of a robust integration, showing what identified edge cases and important steps are from
+// a client side point of view, complementing the restful APIs documentation.
+//
+// ** Final assurance of robustness of your implemented is fully up to a merchants development and QA process. **
+//
+// If this document contains errors or omissions please let us know.
+
+//========================================================================================================
+//
+// This document is hand written in a form of pseudo code to ensure its considered for reference only.
+//
+// The processes illustrated here are shown as event driven for any request from browser to webserver,
+// and all the operations in between are performed synchronously. This is done mostly for clarity.
+// Your implementation may need perform extra steps asynchronously depending on your webserver architecture.
+
+
+//========================================================================================================
+//
+//   Use Case: "Purchase" /w Hosted Payment Page.
+//
+//   Purchase process:
+//
+//    1. Customer submits on checkout page, which calls HandleProceedToPayment
+//    2. ProceedToPayment creates a purchase session and extracts the redirect to hpp url.
+//    3. Customer is redirected to the hosted payment page url
+//    4. On completion of payment process Customer is redirected back to the merchants website which calls HandleCallbackUrl (optionally also HandleNotificationUrl)
+//    5. HandleCallbackUrl extracts the sessionId from the url and performs QuerySession.	
+//    6. QuerySession determines the purchase transaction result extracting the transactions id and authorised values
+//    7. if transaction is authorised, record the transactionId for reference.
+
+
+//========================================================================================================
+//
+// State
+//
+
+// Order
+// 
+// Your system theoretical order object, which is what you are using to track a single customers shopping process.
+//
+// All the below considered to occur in process in context of a single order (i.e the given order should be known already).
+//
+// Any order processed transactions these are financially binding, so should not be lost or forgotten.
+//
+// The order needs to track the following:
+//	
+//	the session and the sessions processing state (until the TransactionId known)
+//
+// an approved TransactionId should be stored long term should a refund ever be required.
+
+var Order 
+
+
+
+// Session Map
+//
+// To be clear we are showing tracking of session state in a global map but sessions are strictly 1 to 1 with an Order,
+// so the session id / state can be stored as part of the Order instead.
+// Session state is only required to be tracked until you retrieve the transaction Id from the Session Response.
+// State: {"pending", "processing", "approved", "declined"}
+
+var SessionMap<SessionId, State>
+
+
+//========================================================================================================
+//
+// Config
+//
+
+var SessionUrl = "https://sec.windcave.com/api/v1/sessions";
+
+var TransactionUrl = "https://sec.windcave.com/api/v1/transactions";
+
+var REQUEST_TIMEOUT = 15000	//15s, example value
+
+var RETRY_LIMIT = 5 	// example value
+
+
+//========================================================================================================
+//
+// Payment Process (Purchase only)
+//
+// Notification needs to determine session outcome if user call back is not doing this.
+//
+// NOTE: this process sets Order.purchaseTxnId only if the transaction is approved.
+//
+
+On Event HandleProceedToPayment ()
+
+	// ensure you have not successfully done this already
+	if Order.purchaseTxnId
+		return
+
+	// new payment attempt, new X-ID
+	var X-ID = getXID()
+
+	var success = CreateSession( X-ID, retries = 0)
+	
+	if success
+		if SessionMap[SessionId] == "pending"
+			// pending, just wait call back redirect was done
+			return
+		else
+			if Order.purchaseTxnId
+				// TODO approved render user page
+			else
+				// TODO declined render user page
+			response 200
+			return
+	else
+		// TODO respond to user with payment is out of service
+		response 200
+		return
+
+
+CreateSession ( X-ID , retries )
+
+	var Response = send( POST, SessionUrl, REQUEST_TIMEOUT, X-ID,
+	{
+		"type" : "purchase",
+		"amount" : Order.Amount.ToString(),
+		"currency" :Order.Currency.ToIsoCode(),
+		"merchantReference" : Order.Id,
+		"customer" : 
+		{
+			"firstName": Order.Customer.FirstName,
+			"lastName": Order.Customer.LastName,
+			"email": Order.Customer.EmailAddress
+		},
+		"callbackUrls" :
+		{
+			"approved" : "https://yourbiz.com/user_return?success=1",
+			"declined" : "https://yourbiz.com/user_return?success=0",
+			"cancelled" : "https://yourbiz.com/user_cancelled"
+		},
+		"notificationUrl" : "https://yourbiz.com/txn_result"
+	})
+
+	if Response[200]
+		// duplicate X-ID case (already complete)
+		// Session has finished. Just record the information.
+		// find if there is an approved transaction should be the first transaction if one was.
+		var lastTransaction = Response.JSON.transactions[0]
+		var approved = lastTransaction.authorised
+		if approved
+			// save the transactionId for refund process later. we are done here already!
+			Order.purchaseTxnId = lastTransaction.Id
+
+		if approved 
+			SessionMap[SessionId] = "approved"
+		else
+			SessionMap[SessionId] = "declined"
+
+		return true
+
+	else if Response[202]
+		// session is created successfully, and is pending payment processing
+		// TODO in this case we are using the hpp link if other links available could be used instead
+		var RedirectUrl = Response.JSON.links[rel="hpp", method="REDIRECT"].href
+		var SessionId = Response.JSON.id
+		SessionMap[SessionId] = "pending"
+		Redirect(RedirectUrl)
+		return true
+
+	else if Response[4xx]
+		// TODO Correct request message ( or Windcave config) based on error information logged
+		var ErrorList = ParseErrors( Response.JSON.errors )
+		log("Request fails: " + Response.errorCode + ", detailed error information: " + ErrorList)
+		return false
+
+	else if Response[5xx]
+		// retry
+		if retries < RETRY_LIMIT
+			Delay(5s)
+			return CreateSession ( X-ID, retries++ ) 
+		else
+			log(" Request fails: retry give up after: " + retries)
+			return false
+
+	else if Response[Timeout]
+		// retry
+		if retries < RETRY_LIMIT
+			Delay(5s)
+			return CreateSession ( X-ID, retries++ ) 
+		else
+			log(" Request fails: retry give up after: " + retries)
+			return false
+
+
+
+Redirect(RedirectUrl)
+	// Redirect customer to RedirectUrl
+	// customer should proceed to using hosted page. Wait for callback or notifications about session results
+
+
+
+
+
+//========================================================================================================
+//
+// HandleNotificationUrl
+//
+// Notification needs to determine session outcome if user call back is not doing this.
+//
+
+On Event HandleNotificationUrl (Request)
+
+	// Get style call back you must still use Query Session for outcome
+
+	var SessionId = Request.Url.getParameter("sessionid")
+
+	var approved = false
+
+	// Note: Atomically process session response
+	if SessionMap[SessionId] == "pending"
+		SessionMap[SessionId] = "processing"
+		if QuerySession(SessionId, 0)
+			if Order.purchaseTxnId
+				approved = true
+		else
+			// request didn't work
+			// generally respond /w 200 to make notifications stop occurring.
+			response = 200
+			return
+
+		// capture the session state so we don't try to process that again 
+		if approved
+			SessionMap[SessionId] = "approved"
+		else
+			SessionMap[SessionId] = "declined"
+	else
+		// the user call back has done this first
+	
+	// respond /w 200 to make notifications stop occurring.
+	response = 200
+
+
+
+
+// =============================================================================
+//
+// HandleCallbackUrl
+//
+// if not using notificationUrl need to handle both Customer and notification occur to same URL if notification is enabled.
+//
+// TODO add logic differently for cancel case perhaps.
+//
+
+On Event HandleCallbackUrl (Request)
+
+	// Note: do NOT rely on the authorisation to be described in the URL can be tampered.
+
+	var SessionId = Request.Url.getParameter("sessionid")
+
+	var approved = false
+
+	// Note: Atomically process session response
+	if SessionMap[SessionId] == "pending"
+		SessionMap[SessionId] = "processing"
+		if QuerySession(SessionId, 0)
+			if Order.purchaseTxnId
+				approved = true
+		else 
+			// request didn't work
+			// TODO error render user page
+			response 200
+			return
+
+		// capture the session state so we don't try to process that again 
+		if approved 
+			SessionMap[SessionId] = "approved"
+		else
+			SessionMap[SessionId] = "declined"
+	else
+		// the notification has changed the state already
+		while SessionMap[SessionId] == "processing"
+			Delay(5s) // wait until session map changes state again
+		approved = SessionMap[SessionId] == "approved"
+
+	if Request.referrer == "notificationReferrer":
+		// notification case.
+		response 200
+		return
+	else
+		if approved
+			// TODO approved render user page
+		else	
+			// TODO declined render user page
+		response 200
+		return
+
+
+QuerySession (SessionId, retries)
+
+	var Response = send( GET, SessionUrl + "/" + SessionId, REQUEST_TIMEOUT )
+
+	if Response[200]
+		// find if there is an approved transaction should be the first transaction.
+		var lastTransaction = Response.JSON.transactions[0]
+		var approved = lastTransaction.authorised
+		if approved
+			// save the transactionId for the refund process later.
+			Order.purchaseTxnId = lastTransaction.Id
+		return true
+
+	else if Response[202]
+		// retry
+		if retries < RETRY_LIMIT
+			Delay(5s)
+			return QuerySession( SessionId, retries++ )
+		else
+			// This is not good can't determine outcome
+			log("Request fails: retry give up after: " + retries)
+			return false
+
+	else if Response[4xx]
+		// TODO need to correct request message ( or Windcave config) based on error information logged
+		var ErrorList = ParseErrors( Response.JSON.errors )
+		log("Request fails: " + Response.errorCode + ", detailed error information: " + ErrorList)
+		return false
+
+	else if Response[5xx]
+		// retry
+		if retries < RETRY_LIMIT
+			Delay( 5s )
+			return QuerySession( SessionId, retries++ )
+		else
+			log("Request fails: retry give up after: " + retries)
+			return false  
+
+	else if Response[Timeout]
+		// retry
+		if retries < RETRY_LIMIT
+			Delay(5s)
+			return QuerySession( SessionId, retries++ )
+		else
+			// This is not good can't determine outcome
+			log("Request fails: retry give up after: " + retries)
+			return false
+
+
