@@ -103,6 +103,14 @@ export const transactions = pgTable("transactions", {
   // Refund tracking
   totalRefunded: decimal("total_refunded", { precision: 10, scale: 2 }).default("0.00"), // Total amount refunded
   refundableAmount: decimal("refundable_amount", { precision: 10, scale: 2 }), // Amount still available for refund
+
+  // Windcave session tracking
+  windcaveSessionId: text("windcave_session_id"), // Windcave session ID for HPP flow
+  windcaveSessionState: text("windcave_session_state"), // pending, processing, approved, declined
+  windcaveXId: text("windcave_x_id"), // Idempotency key for session creation
+
+  // Split bill toggle (set by merchant at transaction creation time)
+  splitEnabled: boolean("split_enabled").default(false),
   
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -328,11 +336,15 @@ export const insertTransactionSchema = createInsertSchema(transactions).omit({
   id: true,
   createdAt: true,
   windcaveTransactionId: true,
+  windcaveSessionId: true,
+  windcaveSessionState: true,
+  windcaveXId: true,
 }).extend({
   merchantId: z.number(),
   price: z.string().regex(/^\d+(\.\d{2})?$/, "Price must be a valid decimal"),
   status: z.enum(["pending", "processing", "completed", "failed"]).default("pending"),
   selectedStoneId: z.number().optional(),
+  splitEnabled: z.boolean().optional().default(false),
 });
 
 // Password reset schemas

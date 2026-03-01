@@ -3,7 +3,7 @@ import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema } from "@shared/schema";
-import { windcaveService } from "./windcave";
+import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, simulateCreateSession, simulateQuerySession } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, createUser, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
 import { generateBusinessReportPdf } from "./report-generator";
@@ -773,7 +773,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         price: amount.toString(),
         paymentMethod: "nfc_tap",
         deviceId: deviceId || "unknown",
-        status: "pending"
+        status: "pending",
+        splitEnabled: false,
       });
       
       // Generate NFC session for contactless payment
@@ -781,16 +782,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Update transaction with NFC session ID
       await storage.updateTransactionNfcSession(transaction.id, nfcSessionId);
-      
-      // Create Windcave payment session for NFC/contactless
-      const baseUrl = getBaseUrl(req);
-      const merchantReference = `NFC_${transaction.id}_${Date.now()}`;
-      
-      const session = await windcaveService.createPaymentSession(
-        amount.toString(),
-        merchantReference,
-        baseUrl
-      );
       
       // Notify connected clients about new NFC transaction
       broadcastToStone(merchantId, transaction.taptStoneId, { 
@@ -811,8 +802,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sessionId: nfcSessionId,
           amount: amount,
           merchantName: merchant.businessName || merchant.name,
-          windcaveSessionId: session?.id,
-          paymentUrl: session?.links?.find(link => link.rel === "self")?.href,
+          windcaveSessionId: null,
+          paymentUrl: null,
           supportedMethods: [
             'apple_pay',
             'google_pay', 
@@ -926,7 +917,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(capabilities);
   });
 
-  // Process payment with Windcave
+  // Process payment — creates Windcave HPP session and returns redirect URL
   app.post("/api/transactions/:id/pay", async (req, res) => {
     try {
       // SECURITY: Rate limiting for payment attempts
@@ -1001,142 +992,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // AUDIT: Log payment attempt
-      console.log(`Payment initiated for transaction ${transactionId}, merchant ${transaction.merchantId}, stone ${transaction.taptStoneId || 'none'}, requested stone ${requestStoneId || 'none'}, IP ${clientIp}`);
+      console.log(`Payment initiated for transaction ${transactionId}, merchant ${transaction.merchantId}, stone ${transaction.taptStoneId || 'none'}, IP ${clientIp}`);
 
+      // Idempotency: if already approved, return success immediately
+      if (transaction.windcaveSessionState === 'approved') {
+        return res.json({ status: 'completed', message: 'Transaction already completed' });
+      }
+
+      // Determine amount: split payments use the per-split amount
       let paymentAmount = transaction.price;
-      let currentSplit = null;
+      let currentSplit: any = null;
 
-      // Check if this is a split transaction
       if (transaction.isSplit) {
-        // Get the next pending split to pay
         currentSplit = await storage.getNextPendingSplit(transactionId);
-        
         if (!currentSplit) {
           return res.status(400).json({ message: "All splits have been paid" });
         }
-        
         paymentAmount = currentSplit.amount;
-        
-        // Update the split status to processing
-        await storage.updateSplitPaymentStatus(currentSplit.id, "processing");
-      } else {
-        // Update status to processing for regular transaction
-        await storage.updateTransactionStatus(transactionId, "processing");
-      }
-      
-      // Notify clients
-      const updatedTransaction = await storage.getTransaction(transactionId);
-      if (updatedTransaction) {
-        broadcastToStone(transaction.merchantId!, transaction.taptStoneId, { 
-          type: 'transaction_updated', 
-          transaction: updatedTransaction 
-        });
       }
 
-      // Create Windcave payment session
+      // Build Windcave session
       const baseUrl = getBaseUrl(req);
-      const merchantReference = transaction.isSplit 
-        ? `SPLIT_${currentSplit.id}_${Date.now()}`
-        : `TXN_${transactionId}_${Date.now()}`;
-      
-      const session = await windcaveService.createPaymentSession(
-        paymentAmount,
-        merchantReference,
-        baseUrl
-      );
+      const xId = crypto.randomBytes(8).toString('hex');
+      const merchantReference = currentSplit
+        ? `SPLIT_${currentSplit.id}_TXN_${transactionId}`
+        : `TXN_${transactionId}`;
 
-      if (session) {
-        // For hosted payment page, you would redirect to session.links[0].href
-        // For this demo, we'll simulate the payment process
-        if (windcaveService.isConfigured()) {
-          // Real Windcave integration - would redirect to payment page
-          res.json({ 
-            message: "Payment session created", 
-            sessionId: session.id,
-            paymentUrl: session.links.find(link => link.rel === "self")?.href
-          });
-        } else {
-          // Simulation mode
-          setTimeout(async () => {
-            const result = await windcaveService.getSessionResult(session.id);
-            const status = result?.status === "approved" ? "completed" : "failed";
-            const windcaveTransactionId = result?.dpsTxnRef;
-            
-            let finalTransaction;
-            
-            if (transaction.isSplit && currentSplit) {
-              // Update the specific split payment
-              await storage.updateSplitPaymentStatus(currentSplit.id, status, windcaveTransactionId);
-              
-              // Get updated transaction (status might change if all splits are completed)
-              finalTransaction = await storage.getTransaction(transactionId);
-              
-              // Create platform fee for this split if successful
-              if (status === "completed") {
-                await storage.createPlatformFee({
-                  transactionId: transactionId,
-                  merchantId: transaction.merchantId,
-                  feeAmount: currentSplit.platformFeeAmount,
-                  transactionAmount: currentSplit.amount,
-                  status: 'collected',
-                });
-                
-                // Track transaction for subscription billing
-                if (transaction.merchantId) {
-                  await storage.incrementTransactionCount(transaction.merchantId);
-                }
-              }
-            } else {
-              // Regular transaction processing
-              finalTransaction = await storage.updateTransactionStatus(transactionId, status, windcaveTransactionId);
-              
-              // Create platform fee if successful
-              if (status === "completed") {
-                await storage.createPlatformFee({
-                  transactionId: transactionId,
-                  merchantId: transaction.merchantId,
-                  feeAmount: transaction.platformFeeAmount || "0.05",
-                  transactionAmount: transaction.price,
-                  status: 'collected',
-                });
-                
-                // Track transaction for subscription billing
-                if (transaction.merchantId) {
-                  await storage.incrementTransactionCount(transaction.merchantId);
-                }
-              }
-            }
-            
-            // Notify clients of final result with payment URLs
-            if (finalTransaction) {
-              const paymentUrl = generatePaymentUrl(finalTransaction.merchantId!, finalTransaction.taptStoneId, req);
-              const qrCodeUrl = generateQrCodeUrl(finalTransaction.merchantId!, finalTransaction.taptStoneId, req);
-              
-              const transactionWithUrls = {
-                ...finalTransaction,
-                paymentUrl,
-                qrCodeUrl,
-              };
-              
-              broadcastToStone(finalTransaction.merchantId!, finalTransaction.taptStoneId ?? transaction.taptStoneId ?? null, { 
-                type: 'transaction_updated', 
-                transaction: transactionWithUrls 
-              });
+      // Get customer email for 3D Secure (required by Windcave)
+      const merchant = await storage.getMerchant(transaction.merchantId!);
+      const customerEmail = merchant?.email || 'customer@taptpay.co.nz';
 
-              const pushStatus = finalTransaction.status || "completed";
-              sendPushToMerchant(finalTransaction.merchantId!, pushStatus, finalTransaction.itemName, finalTransaction.price, finalTransaction.id).catch(() => {});
-            }
-          }, 2000);
-
-          res.json({ 
-            message: transaction.isSplit 
-              ? `Payment processing started for split ${currentSplit.splitIndex} of ${transaction.totalSplits} (simulation mode)`
-              : "Payment processing started (simulation mode)"
-          });
-        }
+      let sessionResult;
+      if (isWindcaveConfigured()) {
+        sessionResult = await createWindcaveSession(xId, paymentAmount, merchantReference, customerEmail, baseUrl);
       } else {
-        throw new Error("Failed to create payment session");
+        sessionResult = simulateCreateSession(merchantReference, baseUrl);
       }
+
+      if (!sessionResult.success) {
+        console.error('Windcave session creation failed:', sessionResult.error);
+        return res.status(503).json({ message: 'Payment gateway unavailable. Please try again.' });
+      }
+
+      if (sessionResult.alreadyComplete) {
+        // Session already processed (duplicate X-ID scenario)
+        const status = sessionResult.approved ? 'completed' : 'failed';
+        const finalTxn = await storage.updateTransactionStatus(transactionId, status, sessionResult.windcaveTransactionId);
+        if (finalTxn) {
+          broadcastToStone(finalTxn.merchantId!, finalTxn.taptStoneId, { type: 'transaction_updated', transaction: finalTxn });
+          sendPushToMerchant(finalTxn.merchantId!, status, finalTxn.itemName, finalTxn.price, finalTxn.id).catch(() => {});
+        }
+        return res.json({ status, message: sessionResult.approved ? 'Payment already completed' : 'Payment was declined' });
+      }
+
+      // Save session tracking info to the transaction
+      await storage.updateTransactionWindcaveSession(transactionId, sessionResult.sessionId!, 'pending', xId);
+
+      return res.json({ hppUrl: sessionResult.hppUrl, sessionId: sessionResult.sessionId });
     } catch (error) {
       console.error("Payment processing error:", error);
       res.status(500).json({ message: "Failed to process payment" });
@@ -1370,7 +1282,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         itemName,
         price: fiatAmount,
         status: "pending",
-        paymentMethod: "crypto"
+        paymentMethod: "crypto",
+        splitEnabled: false,
       });
       
       // Mock exchange rate (in production, fetch from CoinGecko or similar)
@@ -2224,60 +2137,172 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Windcave webhook notification handler - with signature verification
-  app.post("/api/windcave/notification", express.text({ type: '*/*' }), async (req, res) => {
+  // Windcave HTTP POST notification — called server-side when payment completes
+  app.post("/api/windcave/notification", express.urlencoded({ extended: true }), express.json(), async (req, res) => {
+    // Always respond 200 quickly to stop Windcave retrying
+    res.status(200).send("OK");
+
     try {
-      const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
-      const signature = req.headers['x-windcave-signature'] as string || '';
-
-      if (windcaveService.isConfigured() && !windcaveService.verifyWebhookSignature(rawBody, signature)) {
-        console.error("SECURITY: Windcave webhook signature verification failed");
-        return res.status(401).json({ message: "Invalid webhook signature" });
+      // Windcave sends sessionId in the POST body (form-encoded or JSON)
+      const sessionId = req.body?.sessionId || req.body?.sessionid || req.query?.sessionid as string;
+      if (!sessionId) {
+        console.warn('[WINDCAVE_NOTIF] No sessionId in notification body:', req.body);
+        return;
       }
 
-      const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-      const { sessionId, status, merchantReference } = body;
-      
-      console.log("Windcave notification received:", { sessionId, status, merchantReference });
-      
-      const transactionId = parseInt(merchantReference.split('_')[1]);
-      
-      if (transactionId) {
-        const existingTransaction = await storage.getTransaction(transactionId);
-        if (existingTransaction && (existingTransaction.status === 'completed' || existingTransaction.status === 'failed')) {
-          console.log(`Windcave webhook: Transaction ${transactionId} already in terminal state '${existingTransaction.status}', ignoring duplicate`);
-          return res.status(200).send("OK");
-        }
+      console.log(`[WINDCAVE_NOTIF] Received for session ${sessionId}`);
 
-        const finalStatus = status === "approved" ? "completed" : "failed";
-        const windcaveTransactionId = sessionId;
-        
-        const transaction = await storage.updateTransactionStatus(transactionId, finalStatus, windcaveTransactionId);
-        
-        if (transaction) {
-          broadcastToStone(transaction.merchantId!, transaction.taptStoneId, {
-            type: 'transaction_updated',
-            transaction
-          });
-          sendPushToMerchant(transaction.merchantId!, finalStatus, transaction.itemName, transaction.price, transaction.id).catch(() => {});
+      const transaction = await storage.getTransactionByWindcaveSessionId(sessionId);
+      if (!transaction) {
+        console.warn(`[WINDCAVE_NOTIF] No transaction found for session ${sessionId}`);
+        return;
+      }
+
+      // Only process if still pending (atomic state transition)
+      if (transaction.windcaveSessionState !== 'pending') {
+        console.log(`[WINDCAVE_NOTIF] Session ${sessionId} already processed (state: ${transaction.windcaveSessionState})`);
+        return;
+      }
+
+      // Mark as processing to prevent concurrent handling
+      await storage.updateTransactionSessionState(transaction.id, 'processing');
+
+      const queryResult = isWindcaveConfigured()
+        ? await queryWindcaveSession(sessionId)
+        : simulateQuerySession(sessionId);
+
+      if (!queryResult.success) {
+        console.error(`[WINDCAVE_NOTIF] querySession failed for ${sessionId}:`, queryResult.error);
+        await storage.updateTransactionSessionState(transaction.id, 'pending');
+        return;
+      }
+
+      const finalStatus = queryResult.approved ? 'completed' : 'failed';
+      const newSessionState = queryResult.approved ? 'approved' : 'declined';
+
+      const updatedTxn = await storage.updateTransactionStatus(transaction.id, finalStatus, queryResult.windcaveTransactionId);
+      await storage.updateTransactionSessionState(transaction.id, newSessionState);
+
+      if (updatedTxn && queryResult.approved) {
+        await storage.createPlatformFee({
+          transactionId: transaction.id,
+          merchantId: transaction.merchantId,
+          feeAmount: transaction.platformFeeAmount || '0.05',
+          transactionAmount: transaction.price,
+          status: 'collected',
+        });
+        if (transaction.merchantId) {
+          await storage.incrementTransactionCount(transaction.merchantId);
         }
       }
-      
-      res.status(200).send("OK");
+
+      if (updatedTxn) {
+        broadcastToStone(updatedTxn.merchantId!, updatedTxn.taptStoneId, { type: 'transaction_updated', transaction: updatedTxn });
+        sendPushToMerchant(updatedTxn.merchantId!, finalStatus, updatedTxn.itemName, updatedTxn.price, updatedTxn.id).catch(() => {});
+      }
+
+      console.log(`[WINDCAVE_NOTIF] Transaction ${transaction.id} → ${finalStatus}`);
     } catch (error) {
-      console.error("Error processing Windcave notification:", error);
-      res.status(500).json({ message: "Failed to process notification" });
+      console.error('[WINDCAVE_NOTIF] Error processing notification:', error);
     }
   });
 
-  // Check API configuration status
+  // Windcave callback — customer browser redirected here after paying on HPP
+  app.get("/api/windcave/callback", async (req, res) => {
+    try {
+      const sessionId = req.query.sessionid as string || req.query.sessionId as string;
+      const resultParam = req.query.result as string;
+      const isSim = req.query.sim === '1';
+
+      if (!sessionId) {
+        return res.redirect('/');
+      }
+
+      console.log(`[WINDCAVE_CALLBACK] session=${sessionId} result=${resultParam}`);
+
+      // Handle cancelled immediately — no need to query
+      if (resultParam === 'cancelled') {
+        const transaction = await storage.getTransactionByWindcaveSessionId(sessionId);
+        const txnId = transaction?.id;
+        if (txnId) {
+          await storage.updateTransactionStatus(txnId, 'failed');
+          await storage.updateTransactionSessionState(txnId, 'declined');
+        }
+        return res.redirect(txnId ? `/payment/result/${txnId}?status=cancelled` : '/');
+      }
+
+      const transaction = await storage.getTransactionByWindcaveSessionId(sessionId);
+      if (!transaction) {
+        console.warn(`[WINDCAVE_CALLBACK] No transaction for session ${sessionId}`);
+        return res.redirect('/');
+      }
+
+      // If notification already processed this, just redirect based on state
+      if (transaction.windcaveSessionState === 'approved') {
+        return res.redirect(`/payment/result/${transaction.id}?status=approved`);
+      }
+      if (transaction.windcaveSessionState === 'declined') {
+        return res.redirect(`/payment/result/${transaction.id}?status=declined`);
+      }
+
+      // Notification hasn't arrived yet — query ourselves
+      if (transaction.windcaveSessionState === 'pending') {
+        await storage.updateTransactionSessionState(transaction.id, 'processing');
+
+        const queryResult = isWindcaveConfigured() && !isSim
+          ? await queryWindcaveSession(sessionId)
+          : simulateQuerySession(sessionId);
+
+        const finalStatus = queryResult.approved ? 'completed' : 'failed';
+        const newSessionState = queryResult.approved ? 'approved' : 'declined';
+
+        const updatedTxn = await storage.updateTransactionStatus(transaction.id, finalStatus, queryResult.windcaveTransactionId);
+        await storage.updateTransactionSessionState(transaction.id, newSessionState);
+
+        if (updatedTxn && queryResult.approved) {
+          await storage.createPlatformFee({
+            transactionId: transaction.id,
+            merchantId: transaction.merchantId,
+            feeAmount: transaction.platformFeeAmount || '0.05',
+            transactionAmount: transaction.price,
+            status: 'collected',
+          });
+          if (transaction.merchantId) {
+            await storage.incrementTransactionCount(transaction.merchantId);
+          }
+        }
+
+        if (updatedTxn) {
+          broadcastToStone(updatedTxn.merchantId!, updatedTxn.taptStoneId, { type: 'transaction_updated', transaction: updatedTxn });
+          sendPushToMerchant(updatedTxn.merchantId!, finalStatus, updatedTxn.itemName, updatedTxn.price, updatedTxn.id).catch(() => {});
+        }
+
+        // For split transactions: redirect back to split page for next person
+        if (transaction.isSplit && queryResult.approved) {
+          return res.redirect(`/split/${transaction.id}?splitDone=true`);
+        }
+
+        const statusParam = queryResult.approved ? 'approved' : 'declined';
+        return res.redirect(`/payment/result/${transaction.id}?status=${statusParam}`);
+      }
+
+      return res.redirect(`/payment/result/${transaction.id}?status=${resultParam || 'declined'}`);
+    } catch (error) {
+      console.error('[WINDCAVE_CALLBACK] Error:', error);
+      res.redirect('/');
+    }
+  });
+
+  // Check Windcave configuration status
   app.get("/api/windcave/status", (req, res) => {
+    const configured = isWindcaveConfigured();
     res.json({
-      configured: windcaveService.isConfigured(),
-      mode: windcaveService.isConfigured() ? "live" : "simulation",
-      message: windcaveService.isConfigured() 
-        ? "Windcave API is configured and ready"
-        : "Running in simulation mode. Configure WINDCAVE_USERNAME and WINDCAVE_API_KEY to enable live payments."
+      configured,
+      mode: configured ? "live" : "simulation",
+      message: configured
+        ? "Windcave API is configured and ready (UAT)"
+        : "Running in simulation mode. Configure WINDCAVE_USERNAME and WINDCAVE_API_KEY to enable live payments.",
+      endpoint: process.env.WINDCAVE_ENDPOINT || "https://uat.windcave.com/api/v1",
     });
   });
 
@@ -3577,7 +3602,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         itemName: item_name,
         price: amount,
         status: 'pending',
-        paymentMethod: 'api'
+        paymentMethod: 'api',
+        splitEnabled: false,
       });
 
       // Log successful API request

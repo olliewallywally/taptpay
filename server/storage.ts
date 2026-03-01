@@ -159,6 +159,11 @@ export interface IStorage {
     transactions: number;
   }>>;
 
+  // Windcave session tracking
+  updateTransactionWindcaveSession(id: number, sessionId: string, sessionState: string, xId: string): Promise<Transaction | undefined>;
+  updateTransactionSessionState(id: number, sessionState: string): Promise<Transaction | undefined>;
+  getTransactionByWindcaveSessionId(sessionId: string): Promise<Transaction | undefined>;
+
   // Bill splitting operations
   createBillSplit(transactionId: number, totalSplits: number): Promise<Transaction | undefined>;
   createSplitPayment(data: any): Promise<any>;
@@ -479,6 +484,10 @@ export class MemStorage implements IStorage {
       paymentMethod: insertTransaction.paymentMethod || "qr_code",
       nfcSessionId: insertTransaction.nfcSessionId || null,
       deviceId: insertTransaction.deviceId || null,
+      splitEnabled: insertTransaction.splitEnabled ?? false,
+      windcaveSessionId: null,
+      windcaveSessionState: null,
+      windcaveXId: null,
     };
     this.transactions.set(id, transaction);
     
@@ -625,6 +634,26 @@ export class MemStorage implements IStorage {
     };
     this.transactions.set(id, updatedTransaction);
     return updatedTransaction;
+  }
+
+  async updateTransactionWindcaveSession(id: number, sessionId: string, sessionState: string, xId: string): Promise<Transaction | undefined> {
+    const transaction = this.transactions.get(id);
+    if (!transaction) return undefined;
+    const updated = { ...transaction, windcaveSessionId: sessionId, windcaveSessionState: sessionState, windcaveXId: xId };
+    this.transactions.set(id, updated);
+    return updated;
+  }
+
+  async updateTransactionSessionState(id: number, sessionState: string): Promise<Transaction | undefined> {
+    const transaction = this.transactions.get(id);
+    if (!transaction) return undefined;
+    const updated = { ...transaction, windcaveSessionState: sessionState };
+    this.transactions.set(id, updated);
+    return updated;
+  }
+
+  async getTransactionByWindcaveSessionId(sessionId: string): Promise<Transaction | undefined> {
+    return Array.from(this.transactions.values()).find(t => t.windcaveSessionId === sessionId);
   }
 
   async getTransactionsByMerchant(merchantId: number): Promise<Transaction[]> {
@@ -1116,6 +1145,10 @@ export class MemStorage implements IStorage {
         merchantNet: (parseFloat(transaction.price) - 0.25).toFixed(2),
         totalRefunded: "0.00",
         refundableAmount: transaction.price,
+        splitEnabled: false,
+        windcaveSessionId: null,
+        windcaveSessionState: null,
+        windcaveXId: null,
         createdAt: createdDate,
       };
       this.transactions.set(id, newTransaction);
@@ -1729,6 +1762,36 @@ export class DatabaseStorage implements IStorage {
       .set({ nfcSessionId })
       .where(eq(transactions.id, id))
       .returning();
+    return result[0];
+  }
+
+  async updateTransactionWindcaveSession(id: number, sessionId: string, sessionState: string, xId: string): Promise<Transaction | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .update(transactions)
+      .set({ windcaveSessionId: sessionId, windcaveSessionState: sessionState, windcaveXId: xId })
+      .where(eq(transactions.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async updateTransactionSessionState(id: number, sessionState: string): Promise<Transaction | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .update(transactions)
+      .set({ windcaveSessionState: sessionState })
+      .where(eq(transactions.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getTransactionByWindcaveSessionId(sessionId: string): Promise<Transaction | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.windcaveSessionId, sessionId))
+      .limit(1);
     return result[0];
   }
 
