@@ -3,7 +3,7 @@ import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { sseClient } from "@/lib/sse-client";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { CheckCircle, XCircle, Loader2, Split } from "lucide-react";
 import taptLogo from "@assets/IMG_6592_1755070818452.png";
 import { Button } from "@/components/ui/button";
 
@@ -66,7 +66,7 @@ export default function CustomerPayment() {
 
       if (message.transaction.status === "completed") {
         setPaymentStatus("success");
-        setTimeout(() => setLocation(`/receipt/${message.transaction.id}`), 1500);
+        setTimeout(() => setLocation(`/payment/result/${message.transaction.id}?status=approved`), 1500);
       } else if (message.transaction.status === "failed") {
         setPaymentStatus("error");
       } else if (message.transaction.status === "pending") {
@@ -89,13 +89,6 @@ export default function CustomerPayment() {
 
   const handlePay = async () => {
     if (!currentTransaction) return;
-
-    // If split is enabled by merchant, go to the split page first
-    if (currentTransaction.splitEnabled && !currentTransaction.isSplit) {
-      setLocation(`/split/${currentTransaction.id}`);
-      return;
-    }
-
     setPaymentStatus("redirecting");
 
     try {
@@ -109,7 +102,7 @@ export default function CustomerPayment() {
         window.location.href = data.hppUrl;
       } else if (data.status === "completed") {
         setPaymentStatus("success");
-        setTimeout(() => setLocation(`/receipt/${currentTransaction.id}`), 1500);
+        setTimeout(() => setLocation(`/payment/result/${currentTransaction.id}?status=approved`), 1500);
       } else {
         setPaymentStatus("error");
       }
@@ -117,6 +110,11 @@ export default function CustomerPayment() {
       console.error("Pay error:", err);
       setPaymentStatus("error");
     }
+  };
+
+  const handleSplitBill = () => {
+    if (!currentTransaction) return;
+    setLocation(`/split/${currentTransaction.id}`);
   };
 
   const renderStatus = () => {
@@ -177,8 +175,11 @@ export default function CustomerPayment() {
   }
 
   const displayAmount = currentTransaction.isSplit
-    ? parseFloat(currentTransaction.splitAmount).toFixed(2)
+    ? parseFloat(currentTransaction.splitAmount || currentTransaction.price).toFixed(2)
     : parseFloat(currentTransaction.price).toFixed(2);
+
+  const isAlreadySplit = currentTransaction.isSplit;
+  const canPay = currentTransaction.status === "pending" && paymentStatus === "idle";
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -192,7 +193,11 @@ export default function CustomerPayment() {
                 src={merchant?.customLogoUrl || taptLogo}
                 alt="merchant logo"
                 className="h-12 sm:h-14 mx-auto object-contain"
-                style={merchant?.customLogoUrl ? {} : { filter: "brightness(0) saturate(100%) invert(78%) sepia(96%) saturate(2453%) hue-rotate(131deg) brightness(97%) contrast(101%)" }}
+                style={
+                  merchant?.customLogoUrl
+                    ? {}
+                    : { filter: "brightness(0) saturate(100%) invert(78%) sepia(96%) saturate(2453%) hue-rotate(131deg) brightness(97%) contrast(101%)" }
+                }
               />
             </div>
 
@@ -206,33 +211,46 @@ export default function CustomerPayment() {
                 </div>
 
                 {/* Amount */}
-                <div className="text-center mb-10">
+                <div className="text-center mb-8">
                   <p className="text-[#00E5CC] text-5xl sm:text-6xl font-bold">${displayAmount}</p>
-                  {currentTransaction.isSplit && (
+                  {isAlreadySplit && (
                     <p className="text-white/70 text-sm mt-2">
-                      Person {currentTransaction.completedSplits + 1} of {currentTransaction.totalSplits}
+                      Person {currentTransaction.completedSplits + 1} of {currentTransaction.totalSplits} &mdash; your share
                     </p>
-                  )}
-                  {currentTransaction.splitEnabled && !currentTransaction.isSplit && (
-                    <p className="text-white/70 text-sm mt-2">Split bill available</p>
                   )}
                 </div>
               </div>
             )}
           </div>
 
-          {/* Cyan section — Pay button */}
-          <div className="bg-[#00E5CC] px-8 relative z-0" style={{ paddingTop: "4rem", paddingBottom: "2rem", marginTop: "-4rem" }}>
-            {paymentStatus === "idle" && (
-              <Button
-                className="w-full bg-[#0055FF] hover:bg-[#0044dd] text-[#00E5CC] rounded-[20px] py-6 text-lg font-medium"
-                onClick={handlePay}
-                data-testid="button-pay-now"
-              >
-                {currentTransaction.splitEnabled && !currentTransaction.isSplit
-                  ? "split the bill"
-                  : `pay $${displayAmount}`}
-              </Button>
+          {/* Cyan section — buttons */}
+          <div
+            className="bg-[#00E5CC] px-8 relative z-0"
+            style={{ paddingTop: "4rem", paddingBottom: "2rem", marginTop: "-4rem" }}
+          >
+            {canPay && (
+              <div className="space-y-3">
+                {/* Primary pay button */}
+                <Button
+                  className="w-full bg-[#0055FF] hover:bg-[#0044dd] text-[#00E5CC] rounded-[20px] py-6 text-lg font-medium"
+                  onClick={handlePay}
+                  data-testid="button-pay-now"
+                >
+                  pay ${displayAmount}
+                </Button>
+
+                {/* Split bill button — always shown unless already split */}
+                {!isAlreadySplit && (
+                  <button
+                    onClick={handleSplitBill}
+                    className="w-full flex items-center justify-center gap-2 text-[#0055FF] font-medium py-3 rounded-[20px] bg-white/60 hover:bg-white/80 transition-colors text-base"
+                    data-testid="button-split-bill"
+                  >
+                    <Split size={18} />
+                    split the bill
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </div>
