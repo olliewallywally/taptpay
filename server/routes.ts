@@ -1024,7 +1024,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let sessionResult;
       if (isWindcaveConfigured()) {
-        sessionResult = await createWindcaveSession(xId, paymentAmount, merchantReference, customerEmail, baseUrl);
+        sessionResult = await createWindcaveSession(xId, paymentAmount, merchantReference, customerEmail, baseUrl, transactionId);
       } else {
         sessionResult = simulateCreateSession(merchantReference, baseUrl);
       }
@@ -2137,16 +2137,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Windcave HTTP POST notification — called server-side when payment completes
-  app.post("/api/windcave/notification", express.urlencoded({ extended: true }), express.json(), async (req, res) => {
+  // Windcave notification — Windcave sends GET with ?sessionid=XXX in the URL (per pseudo code v1.5)
+  // Also handles POST for compatibility with other Windcave configurations
+  app.all("/api/windcave/notification", express.urlencoded({ extended: true }), express.json(), async (req, res) => {
     // Always respond 200 quickly to stop Windcave retrying
     res.status(200).send("OK");
 
     try {
-      // Windcave sends sessionId in the POST body (form-encoded or JSON)
-      const sessionId = req.body?.sessionId || req.body?.sessionid || req.query?.sessionid as string;
+      // Per Windcave pseudo code: sessionId is a URL query parameter (Request.Url.getParameter("sessionid"))
+      const sessionId = (req.query?.sessionid as string) || (req.query?.sessionId as string) || req.body?.sessionId || req.body?.sessionid;
+      console.log(`[WINDCAVE_NOTIF] ${req.method} notification received, sessionId=${sessionId}, query=${JSON.stringify(req.query)}`);
       if (!sessionId) {
-        console.warn('[WINDCAVE_NOTIF] No sessionId in notification body:', req.body);
+        console.warn('[WINDCAVE_NOTIF] No sessionId found. Query:', req.query, 'Body:', req.body);
         return;
       }
 
@@ -2210,83 +2212,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Windcave callback — customer browser redirected here after paying on HPP
   app.get("/api/windcave/callback", async (req, res) => {
     try {
-      const sessionId = req.query.sessionid as string || req.query.sessionId as string;
       const resultParam = req.query.result as string;
       const isSim = req.query.sim === '1';
 
-      if (!sessionId) {
+      // Primary lookup: by transactionId (new approach — avoids Windcave {id} template issues)
+      const txnIdParam = req.query.transactionId as string;
+      // Fallback: by sessionId (legacy / simulation)
+      const sessionId = req.query.sessionid as string || req.query.sessionId as string;
+
+      console.log(`[WINDCAVE_CALLBACK] transactionId=${txnIdParam} sessionId=${sessionId} result=${resultParam}`);
+
+      let transaction: any = null;
+
+      if (txnIdParam) {
+        transaction = await storage.getTransaction(parseInt(txnIdParam));
+      } else if (sessionId) {
+        transaction = await storage.getTransactionByWindcaveSessionId(sessionId);
+      }
+
+      if (!transaction) {
+        console.warn(`[WINDCAVE_CALLBACK] No transaction found (txnId=${txnIdParam}, session=${sessionId})`);
         return res.redirect('/');
       }
 
-      console.log(`[WINDCAVE_CALLBACK] session=${sessionId} result=${resultParam}`);
+      const txnId = transaction.id;
 
-      // Handle cancelled immediately — no need to query
+      // Handle cancelled — don't charge, just update status
       if (resultParam === 'cancelled') {
-        const transaction = await storage.getTransactionByWindcaveSessionId(sessionId);
-        const txnId = transaction?.id;
-        if (txnId) {
+        if (transaction.windcaveSessionState === 'pending') {
           await storage.updateTransactionStatus(txnId, 'failed');
           await storage.updateTransactionSessionState(txnId, 'declined');
+          broadcastToStone(transaction.merchantId!, transaction.taptStoneId, {
+            type: 'transaction_updated',
+            transaction: { ...transaction, status: 'failed' }
+          });
         }
-        return res.redirect(txnId ? `/payment/result/${txnId}?status=cancelled` : '/');
+        return res.redirect(`/payment/result/${txnId}?status=cancelled`);
       }
 
-      const transaction = await storage.getTransactionByWindcaveSessionId(sessionId);
-      if (!transaction) {
-        console.warn(`[WINDCAVE_CALLBACK] No transaction for session ${sessionId}`);
-        return res.redirect('/');
-      }
-
-      // If notification already processed this, just redirect based on state
+      // If notification already processed this, redirect based on known state
       if (transaction.windcaveSessionState === 'approved') {
-        return res.redirect(`/payment/result/${transaction.id}?status=approved`);
+        if (transaction.isSplit) return res.redirect(`/split/${txnId}?splitDone=true`);
+        return res.redirect(`/payment/result/${txnId}?status=approved`);
       }
       if (transaction.windcaveSessionState === 'declined') {
-        return res.redirect(`/payment/result/${transaction.id}?status=declined`);
+        return res.redirect(`/payment/result/${txnId}?status=declined`);
       }
 
-      // Notification hasn't arrived yet — query ourselves
-      if (transaction.windcaveSessionState === 'pending') {
-        await storage.updateTransactionSessionState(transaction.id, 'processing');
+      // Notification hasn't arrived yet (or sim mode) — query Windcave ourselves
+      const sessionToQuery = transaction.windcaveSessionId || sessionId;
 
-        const queryResult = isWindcaveConfigured() && !isSim
-          ? await queryWindcaveSession(sessionId)
-          : simulateQuerySession(sessionId);
-
-        const finalStatus = queryResult.approved ? 'completed' : 'failed';
-        const newSessionState = queryResult.approved ? 'approved' : 'declined';
-
-        const updatedTxn = await storage.updateTransactionStatus(transaction.id, finalStatus, queryResult.windcaveTransactionId);
-        await storage.updateTransactionSessionState(transaction.id, newSessionState);
-
-        if (updatedTxn && queryResult.approved) {
-          await storage.createPlatformFee({
-            transactionId: transaction.id,
-            merchantId: transaction.merchantId,
-            feeAmount: transaction.platformFeeAmount || '0.05',
-            transactionAmount: transaction.price,
-            status: 'collected',
-          });
-          if (transaction.merchantId) {
-            await storage.incrementTransactionCount(transaction.merchantId);
-          }
-        }
-
-        if (updatedTxn) {
-          broadcastToStone(updatedTxn.merchantId!, updatedTxn.taptStoneId, { type: 'transaction_updated', transaction: updatedTxn });
-          sendPushToMerchant(updatedTxn.merchantId!, finalStatus, updatedTxn.itemName, updatedTxn.price, updatedTxn.id).catch(() => {});
-        }
-
-        // For split transactions: redirect back to split page for next person
-        if (transaction.isSplit && queryResult.approved) {
-          return res.redirect(`/split/${transaction.id}?splitDone=true`);
-        }
-
-        const statusParam = queryResult.approved ? 'approved' : 'declined';
-        return res.redirect(`/payment/result/${transaction.id}?status=${statusParam}`);
+      if (!sessionToQuery && !isSim) {
+        console.warn(`[WINDCAVE_CALLBACK] No session ID available to query for transaction ${txnId}`);
+        return res.redirect(`/payment/result/${txnId}?status=${resultParam || 'declined'}`);
       }
 
-      return res.redirect(`/payment/result/${transaction.id}?status=${resultParam || 'declined'}`);
+      await storage.updateTransactionSessionState(txnId, 'processing');
+
+      const queryResult = isWindcaveConfigured() && !isSim && sessionToQuery
+        ? await queryWindcaveSession(sessionToQuery)
+        : simulateQuerySession(sessionToQuery || 'sim');
+
+      const finalStatus = queryResult.approved ? 'completed' : 'failed';
+      const newSessionState = queryResult.approved ? 'approved' : 'declined';
+
+      const updatedTxn = await storage.updateTransactionStatus(txnId, finalStatus, queryResult.windcaveTransactionId);
+      await storage.updateTransactionSessionState(txnId, newSessionState);
+
+      if (updatedTxn && queryResult.approved) {
+        await storage.createPlatformFee({
+          transactionId: txnId,
+          merchantId: transaction.merchantId,
+          feeAmount: transaction.platformFeeAmount || '0.05',
+          transactionAmount: transaction.price,
+          status: 'collected',
+        });
+        if (transaction.merchantId) {
+          await storage.incrementTransactionCount(transaction.merchantId);
+        }
+      }
+
+      if (updatedTxn) {
+        broadcastToStone(updatedTxn.merchantId!, updatedTxn.taptStoneId, { type: 'transaction_updated', transaction: updatedTxn });
+        sendPushToMerchant(updatedTxn.merchantId!, finalStatus, updatedTxn.itemName, updatedTxn.price, updatedTxn.id).catch(() => {});
+      }
+
+      console.log(`[WINDCAVE_CALLBACK] Transaction ${txnId} → ${finalStatus}`);
+
+      // For split transactions: redirect back to split page for next person
+      if (transaction.isSplit && queryResult.approved) {
+        return res.redirect(`/split/${txnId}?splitDone=true`);
+      }
+
+      const statusParam = queryResult.approved ? 'approved' : 'declined';
+      return res.redirect(`/payment/result/${txnId}?status=${statusParam}`);
     } catch (error) {
       console.error('[WINDCAVE_CALLBACK] Error:', error);
       res.redirect('/');
