@@ -239,8 +239,8 @@ export default function CustomerPayment() {
                   pay ${displayAmount}
                 </Button>
 
-                {/* Split bill button — always shown unless already split */}
-                {!isAlreadySplit && (
+                {/* Split bill button — only shown when merchant enabled it for this transaction */}
+                {!isAlreadySplit && currentTransaction.splitEnabled && (
                   <button
                     onClick={handleSplitBill}
                     className="w-full flex items-center justify-center gap-2 text-[#0055FF] font-medium py-3 rounded-[20px] bg-white/60 hover:bg-white/80 transition-colors text-base"
