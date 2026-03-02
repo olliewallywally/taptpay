@@ -160,7 +160,8 @@ export default function DemoTerminal() {
     if (selectedStoneId) {
       form.setValue("taptStoneId", selectedStoneId.toString());
     }
-  }, [selectedStoneId, form]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedStoneId]);
   
   // Get current user/merchant
   const { data: user } = useQuery<{ user: { merchantId: number } }>({
