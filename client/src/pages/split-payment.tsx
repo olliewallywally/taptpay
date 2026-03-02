@@ -95,10 +95,9 @@ export default function SplitPayment() {
     if (!currentTransaction) return;
     setPageStatus("redirecting");
     try {
-      const response = await apiRequest("POST", `/api/transactions/${txnId}/pay`, {
-        merchantId: currentTransaction.merchantId,
-        stoneId: currentTransaction.taptStoneId,
-      });
+      const body: Record<string, any> = { merchantId: currentTransaction.merchantId };
+      if (currentTransaction.taptStoneId) body.stoneId = currentTransaction.taptStoneId;
+      const response = await apiRequest("POST", `/api/transactions/${txnId}/pay`, body);
       const data = await response.json();
       if (data.hppUrl) {
         window.location.href = data.hppUrl;
