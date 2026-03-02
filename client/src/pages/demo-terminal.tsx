@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -66,7 +66,6 @@ export default function DemoTerminal() {
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [splitCount, setSplitCount] = useState(2);
   const [stockSearchInput, setStockSearchInput] = useState("");
-  const [filteredStockItems, setFilteredStockItems] = useState<any[]>([]);
   const [selectedStockItems, setSelectedStockItems] = useState<any[]>([]);
   const [copiedPaymentLink, setCopiedPaymentLink] = useState(false);
   const [selectedStoneId, setSelectedStoneId] = useState<number | undefined>();
@@ -447,17 +446,13 @@ export default function DemoTerminal() {
     createTransactionMutation.mutate(data);
   };
 
-  // Filter stock items based on search input
-  useEffect(() => {
-    if (stockSearchInput.trim() === "") {
-      setFilteredStockItems([]);
-    } else {
-      const filtered = stockItems.filter((item: any) =>
-        item.name.toLowerCase().includes(stockSearchInput.toLowerCase()) ||
-        item.description?.toLowerCase().includes(stockSearchInput.toLowerCase())
-      );
-      setFilteredStockItems(filtered.slice(0, 5)); // Show max 5 suggestions
-    }
+  // Derive filtered stock items without setState (avoids infinite re-render)
+  const filteredStockItems = useMemo(() => {
+    if (!stockSearchInput.trim()) return [];
+    return stockItems.filter((item: any) =>
+      item.name.toLowerCase().includes(stockSearchInput.toLowerCase()) ||
+      item.description?.toLowerCase().includes(stockSearchInput.toLowerCase())
+    ).slice(0, 5);
   }, [stockSearchInput, stockItems]);
 
   // Calculate total price from selected stock items
@@ -470,7 +465,6 @@ export default function DemoTerminal() {
     if (!selectedStockItems.find(item => item.id === stockItem.id)) {
       setSelectedStockItems(prev => [...prev, stockItem]);
       setStockSearchInput("");
-      setFilteredStockItems([]);
       
       // Update form values
       const newTotal = calculateTotalPrice();
