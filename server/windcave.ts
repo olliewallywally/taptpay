@@ -60,8 +60,11 @@ export async function createWindcaveSession(
   merchantReference: string,
   customerEmail: string,
   baseUrl: string,
+  transactionId: number,
   retries = 0
 ): Promise<CreateSessionResult> {
+  // Use transaction ID in callback URLs (Windcave does not reliably substitute {id} template vars)
+  const callbackBase = `${baseUrl}/api/windcave/callback?transactionId=${transactionId}`;
   const body = {
     type: "purchase",
     amount,
@@ -71,9 +74,9 @@ export async function createWindcaveSession(
       email: customerEmail,
     },
     callbackUrls: {
-      approved: `${baseUrl}/api/windcave/callback?result=approved&sessionid={id}`,
-      declined: `${baseUrl}/api/windcave/callback?result=declined&sessionid={id}`,
-      cancelled: `${baseUrl}/api/windcave/callback?result=cancelled&sessionid={id}`,
+      approved: `${callbackBase}&result=approved`,
+      declined: `${callbackBase}&result=declined`,
+      cancelled: `${callbackBase}&result=cancelled`,
     },
     notificationUrl: `${baseUrl}/api/windcave/notification`,
   };
@@ -96,7 +99,7 @@ export async function createWindcaveSession(
     logAudit("CREATE_SESSION_NETWORK_ERROR", { xId, error: err.message, isTimeout });
     if (retries < RETRY_LIMIT) {
       await delay(5000);
-      return createWindcaveSession(xId, amount, merchantReference, customerEmail, baseUrl, retries + 1);
+      return createWindcaveSession(xId, amount, merchantReference, customerEmail, baseUrl, transactionId, retries + 1);
     }
     return { success: false, error: err.message };
   }
@@ -142,7 +145,7 @@ export async function createWindcaveSession(
     logAudit("CREATE_SESSION_5XX", { xId, status: response.status, retries });
     if (retries < RETRY_LIMIT) {
       await delay(5000);
-      return createWindcaveSession(xId, amount, merchantReference, customerEmail, baseUrl, retries + 1);
+      return createWindcaveSession(xId, amount, merchantReference, customerEmail, baseUrl, transactionId, retries + 1);
     }
     return { success: false, error: `Windcave server error ${response.status}` };
   }
