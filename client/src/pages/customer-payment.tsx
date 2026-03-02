@@ -99,10 +99,10 @@ export default function CustomerPayment() {
     setPaymentStatus("redirecting");
 
     try {
-      const response = await apiRequest("POST", `/api/transactions/${currentTransaction.id}/pay`, {
-        merchantId: id,
-        stoneId: stoneNumber,
-      });
+      const body: Record<string, any> = { merchantId: id };
+      if (stoneNumber !== null) body.stoneId = stoneNumber;
+
+      const response = await apiRequest("POST", `/api/transactions/${currentTransaction.id}/pay`, body);
       const data = await response.json();
 
       if (data.hppUrl) {
@@ -140,8 +140,14 @@ export default function CustomerPayment() {
         return (
           <div className="bg-red-500/20 border border-red-400/30 rounded-xl p-4 text-center">
             <XCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-            <p className="text-white font-medium">Payment Failed</p>
-            <p className="text-white/80 text-sm">Please try again or contact staff</p>
+            <p className="text-white font-medium">Something went wrong</p>
+            <p className="text-white/80 text-sm mb-3">Please try again</p>
+            <button
+              onClick={() => setPaymentStatus("idle")}
+              className="bg-white/20 hover:bg-white/30 text-white text-sm px-4 py-2 rounded-lg transition-colors"
+            >
+              Try Again
+            </button>
           </div>
         );
       default:
