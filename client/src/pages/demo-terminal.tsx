@@ -73,6 +73,13 @@ export default function DemoTerminal() {
   const [isNfcOverlayActive, setIsNfcOverlayActive] = useState(false);
   const [editingStoneId, setEditingStoneId] = useState<number | null>(null);
   const [editStoneName, setEditStoneName] = useState("");
+  const [splitEnabled, setSplitEnabled] = useState<boolean>(
+    () => localStorage.getItem('taptpay_split_enabled') === 'true'
+  );
+
+  useEffect(() => {
+    localStorage.setItem('taptpay_split_enabled', String(splitEnabled));
+  }, [splitEnabled]);
 
   // Track last processed transaction to prevent infinite updates
   const lastProcessedTxRef = useRef<{ id?: number; status?: string }>({});
@@ -291,12 +298,14 @@ export default function DemoTerminal() {
             price: data.price,
             taptStoneId: parseInt(data.taptStoneId),
             status: "pending",
+            splitEnabled,
           }
         : {
             merchantId,
             itemName: `$${amount} Payment`,
             price: amount,
             status: "pending",
+            splitEnabled,
           };
       
       const response = await apiRequest("POST", "/api/transactions", payload);
@@ -1006,6 +1015,25 @@ export default function DemoTerminal() {
           <span className="text-xl">{status.text}</span>
           {status.icon}
         </button>
+
+        {/* Split Bill Toggle Pill */}
+        <div className="w-full bg-[#00E5CC] text-[#0055FF] rounded-full py-5 md:py-6 mb-4 flex items-center justify-between px-8 md:px-10">
+          <span className="text-xl">split bill</span>
+          <button
+            onClick={() => setSplitEnabled(prev => !prev)}
+            data-testid="toggle-split-bill"
+            aria-label="Toggle split bill"
+            className={`relative w-16 h-9 rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 ${
+              splitEnabled ? 'bg-[#0055FF]' : 'bg-red-500'
+            }`}
+          >
+            <span
+              className={`absolute top-1 w-7 h-7 bg-white rounded-full shadow transition-transform duration-200 ${
+                splitEnabled ? 'translate-x-8' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
 
         {/* Payment Stones Button */}
         <button 
