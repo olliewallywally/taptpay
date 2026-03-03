@@ -1028,7 +1028,7 @@ export default function DemoTerminal() {
             }`}
           >
             <span
-              className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform duration-200 ${
+              className={`absolute top-0 bottom-0 my-auto left-1 w-6 h-6 bg-white rounded-full shadow transition-transform duration-200 ${
                 splitEnabled ? 'translate-x-6' : 'translate-x-0'
               }`}
             />
