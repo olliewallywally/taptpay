@@ -1023,13 +1023,13 @@ export default function DemoTerminal() {
             onClick={() => setSplitEnabled(prev => !prev)}
             data-testid="toggle-split-bill"
             aria-label="Toggle split bill"
-            className={`relative w-16 h-9 rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 ${
+            className={`relative w-14 h-8 rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 overflow-hidden ${
               splitEnabled ? 'bg-[#0055FF]' : 'bg-red-500'
             }`}
           >
             <span
-              className={`absolute top-1 w-7 h-7 bg-white rounded-full shadow transition-transform duration-200 ${
-                splitEnabled ? 'translate-x-8' : 'translate-x-1'
+              className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform duration-200 ${
+                splitEnabled ? 'translate-x-6' : 'translate-x-0'
               }`}
             />
           </button>
