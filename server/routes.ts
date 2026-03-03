@@ -2179,31 +2179,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      const finalStatus = queryResult.approved ? 'completed' : 'failed';
       const newSessionState = queryResult.approved ? 'approved' : 'declined';
-
-      const updatedTxn = await storage.updateTransactionStatus(transaction.id, finalStatus, queryResult.windcaveTransactionId);
       await storage.updateTransactionSessionState(transaction.id, newSessionState);
 
-      if (updatedTxn && queryResult.approved) {
-        await storage.createPlatformFee({
-          transactionId: transaction.id,
-          merchantId: transaction.merchantId,
-          feeAmount: transaction.platformFeeAmount || '0.05',
-          transactionAmount: transaction.price,
-          status: 'collected',
-        });
-        if (transaction.merchantId) {
-          await storage.incrementTransactionCount(transaction.merchantId);
+      let broadcastTxn: any = null;
+
+      if (transaction.isSplit && queryResult.approved) {
+        // Split payment: update the individual split record, not the whole transaction
+        const currentSplit = await storage.getNextPendingSplit(transaction.id);
+        if (currentSplit) {
+          await storage.updateSplitPaymentStatus(currentSplit.id, 'completed', queryResult.windcaveTransactionId);
+          await storage.createPlatformFee({
+            transactionId: transaction.id,
+            merchantId: transaction.merchantId,
+            feeAmount: currentSplit.platformFeeAmount || '0.05',
+            transactionAmount: currentSplit.amount,
+            status: 'collected',
+          });
+          if (transaction.merchantId) {
+            await storage.incrementTransactionCount(transaction.merchantId);
+          }
+        }
+        // Fetch the freshly updated transaction so completedSplits is correct
+        broadcastTxn = await storage.getTransaction(transaction.id);
+        if (broadcastTxn) {
+          const allDone = (broadcastTxn.completedSplits ?? 0) >= (broadcastTxn.totalSplits ?? 1);
+          const pushMsg = allDone
+            ? `Split bill fully paid — ${broadcastTxn.totalSplits} payments received`
+            : `Split payment ${broadcastTxn.completedSplits} of ${broadcastTxn.totalSplits} received`;
+          broadcastToStone(broadcastTxn.merchantId!, broadcastTxn.taptStoneId, { type: 'transaction_updated', transaction: broadcastTxn });
+          sendPushToMerchant(broadcastTxn.merchantId!, allDone ? 'completed' : 'pending', pushMsg, broadcastTxn.price, broadcastTxn.id).catch(() => {});
+        }
+      } else {
+        // Standard (non-split) transaction
+        const finalStatus = queryResult.approved ? 'completed' : 'failed';
+        const updatedTxn = await storage.updateTransactionStatus(transaction.id, finalStatus, queryResult.windcaveTransactionId);
+        if (updatedTxn && queryResult.approved) {
+          await storage.createPlatformFee({
+            transactionId: transaction.id,
+            merchantId: transaction.merchantId,
+            feeAmount: transaction.platformFeeAmount || '0.05',
+            transactionAmount: transaction.price,
+            status: 'collected',
+          });
+          if (transaction.merchantId) {
+            await storage.incrementTransactionCount(transaction.merchantId);
+          }
+        }
+        broadcastTxn = updatedTxn;
+        if (broadcastTxn) {
+          broadcastToStone(broadcastTxn.merchantId!, broadcastTxn.taptStoneId, { type: 'transaction_updated', transaction: broadcastTxn });
+          sendPushToMerchant(broadcastTxn.merchantId!, finalStatus, broadcastTxn.itemName, broadcastTxn.price, broadcastTxn.id).catch(() => {});
         }
       }
 
-      if (updatedTxn) {
-        broadcastToStone(updatedTxn.merchantId!, updatedTxn.taptStoneId, { type: 'transaction_updated', transaction: updatedTxn });
-        sendPushToMerchant(updatedTxn.merchantId!, finalStatus, updatedTxn.itemName, updatedTxn.price, updatedTxn.id).catch(() => {});
-      }
+      console.log(`[WINDCAVE_NOTIF] Transaction ${transaction.id} processed (split=${transaction.isSplit})`);
 
-      console.log(`[WINDCAVE_NOTIF] Transaction ${transaction.id} → ${finalStatus}`);
     } catch (error) {
       console.error('[WINDCAVE_NOTIF] Error processing notification:', error);
     }
@@ -2273,39 +2304,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? await queryWindcaveSession(sessionToQuery)
         : simulateQuerySession(sessionToQuery || 'sim');
 
-      const finalStatus = queryResult.approved ? 'completed' : 'failed';
       const newSessionState = queryResult.approved ? 'approved' : 'declined';
-
-      const updatedTxn = await storage.updateTransactionStatus(txnId, finalStatus, queryResult.windcaveTransactionId);
       await storage.updateTransactionSessionState(txnId, newSessionState);
 
-      if (updatedTxn && queryResult.approved) {
-        await storage.createPlatformFee({
-          transactionId: txnId,
-          merchantId: transaction.merchantId,
-          feeAmount: transaction.platformFeeAmount || '0.05',
-          transactionAmount: transaction.price,
-          status: 'collected',
-        });
-        if (transaction.merchantId) {
-          await storage.incrementTransactionCount(transaction.merchantId);
-        }
-      }
+      let broadcastTxn: any = null;
 
-      if (updatedTxn) {
-        broadcastToStone(updatedTxn.merchantId!, updatedTxn.taptStoneId, { type: 'transaction_updated', transaction: updatedTxn });
-        sendPushToMerchant(updatedTxn.merchantId!, finalStatus, updatedTxn.itemName, updatedTxn.price, updatedTxn.id).catch(() => {});
-      }
-
-      console.log(`[WINDCAVE_CALLBACK] Transaction ${txnId} → ${finalStatus}`);
-
-      // For split transactions: redirect back to split page for next person
       if (transaction.isSplit && queryResult.approved) {
-        return res.redirect(`/split/${txnId}?splitDone=true`);
-      }
+        // Split payment: update the individual split record, not the whole transaction status
+        const currentSplit = await storage.getNextPendingSplit(txnId);
+        if (currentSplit) {
+          await storage.updateSplitPaymentStatus(currentSplit.id, 'completed', queryResult.windcaveTransactionId);
+          await storage.createPlatformFee({
+            transactionId: txnId,
+            merchantId: transaction.merchantId,
+            feeAmount: currentSplit.platformFeeAmount || '0.05',
+            transactionAmount: currentSplit.amount,
+            status: 'collected',
+          });
+          if (transaction.merchantId) {
+            await storage.incrementTransactionCount(transaction.merchantId);
+          }
+        }
+        // Fetch the freshly updated transaction so completedSplits is correct
+        broadcastTxn = await storage.getTransaction(txnId);
+        if (broadcastTxn) {
+          const allDone = (broadcastTxn.completedSplits ?? 0) >= (broadcastTxn.totalSplits ?? 1);
+          const pushMsg = allDone
+            ? `Split bill fully paid — ${broadcastTxn.totalSplits} payments received`
+            : `Split payment ${broadcastTxn.completedSplits} of ${broadcastTxn.totalSplits} received`;
+          broadcastToStone(broadcastTxn.merchantId!, broadcastTxn.taptStoneId, { type: 'transaction_updated', transaction: broadcastTxn });
+          sendPushToMerchant(broadcastTxn.merchantId!, allDone ? 'completed' : 'pending', pushMsg, broadcastTxn.price, broadcastTxn.id).catch(() => {});
+        }
 
-      const statusParam = queryResult.approved ? 'approved' : 'declined';
-      return res.redirect(`/payment/result/${txnId}?status=${statusParam}`);
+        console.log(`[WINDCAVE_CALLBACK] Transaction ${txnId} split payment recorded`);
+
+        // Redirect back to split page for the next person to pay
+        return res.redirect(`/split/${txnId}?splitDone=true`);
+      } else {
+        // Standard (non-split) or failed transaction
+        const finalStatus = queryResult.approved ? 'completed' : 'failed';
+        const updatedTxn = await storage.updateTransactionStatus(txnId, finalStatus, queryResult.windcaveTransactionId);
+        if (updatedTxn && queryResult.approved) {
+          await storage.createPlatformFee({
+            transactionId: txnId,
+            merchantId: transaction.merchantId,
+            feeAmount: transaction.platformFeeAmount || '0.05',
+            transactionAmount: transaction.price,
+            status: 'collected',
+          });
+          if (transaction.merchantId) {
+            await storage.incrementTransactionCount(transaction.merchantId);
+          }
+        }
+        broadcastTxn = updatedTxn;
+        if (broadcastTxn) {
+          broadcastToStone(broadcastTxn.merchantId!, broadcastTxn.taptStoneId, { type: 'transaction_updated', transaction: broadcastTxn });
+          sendPushToMerchant(broadcastTxn.merchantId!, finalStatus, broadcastTxn.itemName, broadcastTxn.price, broadcastTxn.id).catch(() => {});
+        }
+
+        console.log(`[WINDCAVE_CALLBACK] Transaction ${txnId} → ${finalStatus}`);
+
+        const statusParam = queryResult.approved ? 'approved' : 'declined';
+        return res.redirect(`/payment/result/${txnId}?status=${statusParam}`);
+      }
     } catch (error) {
       console.error('[WINDCAVE_CALLBACK] Error:', error);
       res.redirect('/');

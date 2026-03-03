@@ -508,6 +508,32 @@ export default function DemoTerminal() {
       color: "bg-[#00E5CC] text-[#0055FF]",
       icon: <CheckCircle2 size={28} />
     };
+
+    // Split-specific status — check before generic pending/processing
+    if (currentTransaction.isSplit) {
+      const completed = currentTransaction.completedSplits ?? 0;
+      const total = currentTransaction.totalSplits ?? 0;
+      if (currentTransaction.status === "completed" || completed >= total && total > 0) {
+        return {
+          text: "split complete",
+          color: "bg-green-400 text-white",
+          icon: <Check size={28} />
+        };
+      }
+      if (completed > 0) {
+        return {
+          text: `${completed} of ${total} received`,
+          color: "bg-[#00E5CC] text-[#0055FF]",
+          icon: <CheckCircle2 size={28} />
+        };
+      }
+      // 0 received yet — still waiting for first payment
+      return {
+        text: "awaiting split payments",
+        color: "bg-[#00E5CC] text-[#0055FF]",
+        icon: <Loader2 size={28} className="animate-spin" />
+      };
+    }
     
     switch (currentTransaction.status) {
       case "pending":
@@ -578,7 +604,7 @@ export default function DemoTerminal() {
             {currentTransaction?.isSplit && (
               <div className="mt-4 text-center">
                 <div className="text-xl md:text-2xl font-semibold text-[#0055FF]">
-                  Split {(currentTransaction.completedSplits ?? 0) + 1} of {currentTransaction.totalSplits ?? 0}
+                  {currentTransaction.completedSplits ?? 0} of {currentTransaction.totalSplits ?? 0} payments received
                 </div>
                 <div className="text-base md:text-lg text-[#0055FF]/80 mt-1">
                   Total: ${parseFloat(currentTransaction.price).toFixed(2)}
