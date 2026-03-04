@@ -707,6 +707,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get a single split payment by ID (public — needed for customer receipt page)
+  app.get("/api/split-payments/:id", async (req, res) => {
+    try {
+      const splitId = parseInt(req.params.id);
+      if (isNaN(splitId)) return res.status(400).json({ message: "Invalid split payment ID" });
+      const split = await storage.getSplitPaymentById(splitId);
+      if (!split) return res.status(404).json({ message: "Split payment not found" });
+      res.json(split);
+    } catch (error) {
+      console.error("Error fetching split payment:", error);
+      res.status(500).json({ message: "Failed to fetch split payment" });
+    }
+  });
+
   // Cancel transaction
   app.post("/api/transactions/:id/cancel", async (req, res) => {
     try {
@@ -1076,13 +1090,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/transactions/:id/receipt-pdf", async (req, res) => {
     try {
       const transactionId = parseInt(req.params.id);
+      const splitIdParam = req.query.splitId ? parseInt(req.query.splitId as string) : null;
       const transaction = await storage.getTransaction(transactionId);
       
       if (!transaction) {
         return res.status(404).json({ message: "Transaction not found" });
       }
 
-      if (transaction.status !== "completed") {
+      // For split receipts, allow generating PDF for individual completed splits
+      // For full receipts, require the whole transaction to be completed
+      let splitInfo: { amount: string; splitNumber: number; totalSplits: number } | undefined;
+      if (splitIdParam) {
+        const split = await storage.getSplitPaymentById(splitIdParam);
+        if (!split || split.status !== "completed") {
+          return res.status(400).json({ message: "Split payment not found or not completed" });
+        }
+        const allSplits = await storage.getSplitPaymentsByTransaction(transactionId);
+        const splitNumber = allSplits.findIndex((s: any) => s.id === splitIdParam) + 1;
+        splitInfo = {
+          amount: split.amount,
+          splitNumber: splitNumber > 0 ? splitNumber : 1,
+          totalSplits: transaction.totalSplits ?? 1,
+        };
+      } else if (transaction.status !== "completed") {
         return res.status(400).json({ message: "Cannot generate receipt for incomplete transaction" });
       }
 
@@ -1093,7 +1123,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Generate PDF receipt
-      const pdf = await generateReceiptPdf(transaction, merchant);
+      const pdf = await generateReceiptPdf(transaction, merchant, splitInfo);
       
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename=receipt-${transaction.id}-${new Date().toISOString().split('T')[0]}.pdf`);
@@ -2283,7 +2313,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // If notification already processed this, redirect based on known state
       if (transaction.windcaveSessionState === 'approved') {
-        if (transaction.isSplit) return res.redirect(`/split/${txnId}?splitDone=true`);
+        if (transaction.isSplit) return res.redirect(`/receipt/${txnId}`);
         return res.redirect(`/payment/result/${txnId}?status=approved`);
       }
       if (transaction.windcaveSessionState === 'declined') {
@@ -2338,8 +2368,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         console.log(`[WINDCAVE_CALLBACK] Transaction ${txnId} split payment recorded`);
 
-        // Redirect back to split page for the next person to pay
-        return res.redirect(`/split/${txnId}?splitDone=true`);
+        // Redirect to receipt for this individual payer
+        const splitReceiptId = currentSplit ? currentSplit.id : '';
+        return res.redirect(`/receipt/${txnId}?splitId=${splitReceiptId}`);
       } else {
         // Standard (non-split) or failed transaction
         const finalStatus = queryResult.approved ? 'completed' : 'failed';

@@ -137,7 +137,7 @@ export default function PaymentResult() {
                 data-testid="button-try-again"
               >
                 <ArrowLeft className="w-5 h-5 mr-2" />
-                {status === "declined" ? "try again" : "go back"}
+                Try Again
               </Button>
             )}
           </div>
