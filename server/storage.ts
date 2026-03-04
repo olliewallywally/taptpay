@@ -38,6 +38,7 @@ export interface IStorage {
   createBillSplit(transactionId: number, totalSplits: number): Promise<Transaction | undefined>;
   createSplitPayment(data: any): Promise<any>;
   getSplitPaymentsByTransaction(transactionId: number): Promise<any[]>;
+  getSplitPaymentById(id: number): Promise<any | undefined>;
   updateSplitPaymentStatus(id: number, status: string, windcaveTransactionId?: string): Promise<any>;
   getNextPendingSplit(transactionId: number): Promise<any | undefined>;
   
@@ -168,6 +169,7 @@ export interface IStorage {
   createBillSplit(transactionId: number, totalSplits: number): Promise<Transaction | undefined>;
   createSplitPayment(data: any): Promise<any>;
   getSplitPaymentsByTransaction(transactionId: number): Promise<any[]>;
+  getSplitPaymentById(id: number): Promise<any | undefined>;
   updateSplitPaymentStatus(id: number, status: string, windcaveTransactionId?: string): Promise<any>;
   getNextPendingSplit(transactionId: number): Promise<any | undefined>;
 }
@@ -720,6 +722,10 @@ export class MemStorage implements IStorage {
     return Array.from(this.splitPayments.values()).filter(
       (split) => split.transactionId === transactionId
     );
+  }
+
+  async getSplitPaymentById(id: number): Promise<any | undefined> {
+    return this.splitPayments.get(id);
   }
 
   async updateSplitPaymentStatus(id: number, status: string, windcaveTransactionId?: string): Promise<any> {
@@ -2321,6 +2327,20 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error("Database error in getSplitPaymentsByTransaction:", error);
       return [];
+    }
+  }
+
+  async getSplitPaymentById(id: number): Promise<any | undefined> {
+    try {
+      const [split] = await this.db!
+        .select()
+        .from(splitPayments)
+        .where(eq(splitPayments.id, id))
+        .limit(1);
+      return split;
+    } catch (error) {
+      console.error("Database error in getSplitPaymentById:", error);
+      return undefined;
     }
   }
 

@@ -1,19 +1,22 @@
-import { useState, useEffect } from "react";
-import { useParams } from "wouter";
+import { useState } from "react";
+import { useParams, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { CheckCircle, Download, ArrowLeft, Receipt as ReceiptIcon } from "lucide-react";
+import { CheckCircle, Download, Share2, Receipt as ReceiptIcon } from "lucide-react";
 
 export default function Receipt() {
   const { transactionId } = useParams<{ transactionId: string }>();
-  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const search = useSearch();
+  const params = new URLSearchParams(search);
+  const splitIdParam = params.get("splitId");
+  const splitId = splitIdParam ? parseInt(splitIdParam) : null;
+
+  const [isActioning, setIsActioning] = useState(false);
 
   const id = transactionId ? parseInt(transactionId) : null;
 
-  // Get transaction details
   const { data: transaction, isLoading: transactionLoading } = useQuery({
     queryKey: ["/api/transactions", id],
     queryFn: async () => {
@@ -25,7 +28,6 @@ export default function Receipt() {
     enabled: !!id,
   });
 
-  // Get merchant details for receipt
   const { data: merchant, isLoading: merchantLoading } = useQuery({
     queryKey: ["/api/merchants", transaction?.merchantId],
     queryFn: async () => {
@@ -37,50 +39,96 @@ export default function Receipt() {
     enabled: !!transaction?.merchantId,
   });
 
-  const handleDownloadPdf = async () => {
-    if (!transaction || !merchant) return;
-    
-    setIsGeneratingPdf(true);
+  const { data: splitPayment, isLoading: splitLoading } = useQuery({
+    queryKey: ["/api/split-payments", splitId],
+    queryFn: async () => {
+      if (!splitId) return null;
+      const response = await fetch(`/api/split-payments/${splitId}`);
+      if (!response.ok) throw new Error("Failed to fetch split payment");
+      return response.json();
+    },
+    enabled: !!splitId,
+  });
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString("en-NZ", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const getPdfUrl = () => {
+    const base = `/api/transactions/${id}/receipt-pdf`;
+    return splitId ? `${base}?splitId=${splitId}` : base;
+  };
+
+  const fetchPdfBlob = async (): Promise<Blob> => {
+    const response = await fetch(getPdfUrl(), { method: "POST" });
+    if (!response.ok) throw new Error("Failed to generate PDF");
+    return response.blob();
+  };
+
+  const handleDownload = async () => {
+    if (!transaction) return;
+    setIsActioning(true);
     try {
-      const response = await fetch(`/api/transactions/${transaction.id}/receipt-pdf`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      
-      if (!response.ok) throw new Error("Failed to generate PDF");
-      
-      const blob = await response.blob();
+      const blob = await fetchPdfBlob();
       const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = url;
-      link.download = `receipt-${transaction.id}-${new Date().toISOString().split('T')[0]}.pdf`;
+      link.download = `receipt-${transaction.id}-${new Date().toISOString().split("T")[0]}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Error generating PDF:', error);
+      console.error("Download error:", error);
     } finally {
-      setIsGeneratingPdf(false);
+      setIsActioning(false);
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-NZ', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
+  const handleShare = async () => {
+    if (!transaction || !merchant) return;
+    setIsActioning(true);
+    try {
+      const blob = await fetchPdfBlob();
+      const file = new File([blob], `receipt-${transaction.id}.pdf`, { type: "application/pdf" });
+      const merchantName = merchant.businessName || merchant.name || "the merchant";
+      const shareAmt = `$${effectiveAmount.toFixed(2)}`;
 
-  const calculateGst = (amount: number) => {
-    // NZ GST is 15%
-    const gstRate = 0.15;
-    const gstAmount = (amount * gstRate) / (1 + gstRate);
-    const netAmount = amount - gstAmount;
-    return { gstAmount, netAmount, gstRate };
+      if (navigator.share && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: `Receipt from ${merchantName}`,
+          text: `Payment receipt for ${shareAmt}`,
+          files: [file],
+        });
+      } else if (navigator.share) {
+        await navigator.share({
+          title: `Receipt from ${merchantName}`,
+          text: `Payment receipt for ${shareAmt}`,
+          url: window.location.href,
+        });
+      } else {
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `receipt-${transaction.id}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      if ((error as Error).name !== "AbortError") {
+        console.error("Share error:", error);
+      }
+    } finally {
+      setIsActioning(false);
+    }
   };
 
   if (!id) {
@@ -89,32 +137,26 @@ export default function Receipt() {
         <Card className="w-full max-w-md text-center">
           <CardContent className="p-8">
             <p className="text-gray-600">Invalid transaction ID</p>
-            <Button 
-              variant="outline" 
-              className="mt-4"
-              onClick={() => window.history.back()}
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Go Back
-            </Button>
           </CardContent>
         </Card>
       </div>
     );
   }
 
-  if (transactionLoading || merchantLoading) {
+  const isLoading = transactionLoading || merchantLoading || (!!splitId && splitLoading);
+
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="p-8">
             <div className="animate-pulse space-y-4">
-              <div className="h-6 bg-gray-200 rounded w-3/4 mx-auto"></div>
-              <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto"></div>
+              <div className="h-6 bg-gray-200 rounded w-3/4 mx-auto" />
+              <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto" />
               <div className="space-y-2">
-                <div className="h-4 bg-gray-200 rounded"></div>
-                <div className="h-4 bg-gray-200 rounded w-5/6"></div>
-                <div className="h-4 bg-gray-200 rounded w-4/6"></div>
+                <div className="h-4 bg-gray-200 rounded" />
+                <div className="h-4 bg-gray-200 rounded w-5/6" />
+                <div className="h-4 bg-gray-200 rounded w-4/6" />
               </div>
             </div>
           </CardContent>
@@ -123,138 +165,124 @@ export default function Receipt() {
     );
   }
 
-  if (!transaction || transaction.status !== "completed") {
+  if (!transaction) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
         <Card className="w-full max-w-md text-center">
           <CardContent className="p-8">
-            <p className="text-gray-600 mb-4">
-              {!transaction ? "Transaction not found" : "Transaction not completed"}
-            </p>
-            <Button 
-              variant="outline"
-              onClick={() => window.history.back()}
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Go Back
-            </Button>
+            <p className="text-gray-600">Transaction not found</p>
           </CardContent>
         </Card>
       </div>
     );
   }
 
-  // Use split amount if transaction is split, otherwise use original price
-  const effectiveAmount = transaction.isSplit 
-    ? parseFloat(transaction.splitAmount) 
+  const isSplitReceipt = !!splitId && !!splitPayment;
+  const effectiveAmount = isSplitReceipt
+    ? parseFloat(splitPayment.amount)
     : parseFloat(transaction.price);
-  const { gstAmount, netAmount, gstRate } = calculateGst(effectiveAmount);
+
+  const gstRate = 0.15;
+  const gstAmount = (effectiveAmount * gstRate) / (1 + gstRate);
+  const netAmount = effectiveAmount - gstAmount;
+
+  const allSplitsInReceipt = transaction.totalSplits && transaction.totalSplits > 1;
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-3 sm:p-4">
       <div className="w-full max-w-md">
-        
+
         {/* Success Header */}
-        <div className="text-center mb-6 sm:mb-8">
+        <div className="text-center mb-6">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle className="w-8 h-8 text-green-600" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Payment Accepted!</h1>
-          <p className="text-sm sm:text-base text-gray-600">Your transaction has been processed successfully</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">Payment Accepted!</h1>
+          <p className="text-sm text-gray-500">Your transaction has been processed successfully</p>
         </div>
 
         {/* Receipt Card */}
-        <Card className="shadow-lg mb-6">
-          <CardHeader className="text-center pb-4">
-            <CardTitle className="flex items-center justify-center space-x-2">
-              <ReceiptIcon className="h-5 w-5" />
+        <Card className="shadow-lg mb-5">
+          <CardHeader className="text-center pb-3">
+            <CardTitle className="flex items-center justify-center space-x-2 text-base">
+              <ReceiptIcon className="h-4 w-4" />
               <span>Receipt</span>
             </CardTitle>
-            <Badge variant="outline" className="w-fit mx-auto">
-              Transaction #{transaction.id}
-            </Badge>
+            <p className="text-xs text-gray-500">Transaction #{transaction.id}</p>
           </CardHeader>
-          
+
           <CardContent className="space-y-4">
-            {/* Business Information */}
+            {/* Business Info */}
             {merchant && (
               <div className="text-center border-b pb-4">
-                <h3 className="font-semibold text-lg">
+                <h3 className="font-semibold text-base">
                   {merchant.businessName || merchant.name}
                 </h3>
                 {merchant.businessAddress && (
-                  <p className="text-sm text-gray-600 whitespace-pre-line">
+                  <p className="text-xs text-gray-500 whitespace-pre-line mt-1">
                     {merchant.businessAddress}
                   </p>
                 )}
-                {merchant.contactEmail && (
-                  <p className="text-sm text-gray-600">{merchant.contactEmail}</p>
-                )}
                 {merchant.contactPhone && (
-                  <p className="text-sm text-gray-600">{merchant.contactPhone}</p>
+                  <p className="text-xs text-gray-500">{merchant.contactPhone}</p>
+                )}
+                {merchant.contactEmail && (
+                  <p className="text-xs text-gray-500">{merchant.contactEmail}</p>
                 )}
                 {merchant.gstNumber && (
-                  <p className="text-sm text-gray-600 mt-1">GST No: {merchant.gstNumber}</p>
+                  <p className="text-xs text-gray-500 mt-1 font-medium">GST No: {merchant.gstNumber}</p>
                 )}
                 {merchant.nzbn && (
-                  <p className="text-sm text-gray-600">NZBN: {merchant.nzbn}</p>
+                  <p className="text-xs text-gray-500">NZBN: {merchant.nzbn}</p>
                 )}
               </div>
             )}
 
-            {/* Transaction Details */}
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Date & Time:</span>
-                <span className="font-medium">{formatDate(transaction.createdAt)}</span>
-              </div>
-              
-              <div className="flex justify-between">
-                <span className="text-gray-600">Item:</span>
-                <span className="font-medium">{transaction.itemName}</span>
-              </div>
-              
-              <Separator />
-              
-              {/* Price Breakdown */}
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Subtotal (excl. GST):</span>
-                  <span>${netAmount.toFixed(2)}</span>
-                </div>
-                
-                <div className="flex justify-between">
-                  <span className="text-gray-600">GST ({(gstRate * 100).toFixed(0)}%):</span>
-                  <span>${gstAmount.toFixed(2)}</span>
-                </div>
-                
-                <Separator />
-                
-                <div className="flex justify-between text-lg font-bold">
-                  <span>Total{transaction.isSplit ? ' (Split Payment)' : ''}:</span>
-                  <span>${effectiveAmount.toFixed(2)}</span>
-                </div>
-
-                {/* Show split payment info if applicable */}
-                {transaction.isSplit && (
-                  <div className="text-xs text-gray-500 text-center mt-2">
-                    Payment {transaction.completedSplits + 1} of {transaction.totalSplits} 
-                    <br />
-                    Original total: ${parseFloat(transaction.price).toFixed(2)}
-                  </div>
-                )}
-              </div>
-
-              {/* Payment Method */}
-              <div className="flex justify-between">
-                <span className="text-gray-600">Payment Method:</span>
-                <span className="font-medium">Card Payment</span>
-              </div>
-
-              {/* Processing Fee */}
+            {/* Date & Item */}
+            <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Processing Fee:</span>
-                <span className="text-gray-500">$0.20</span>
+                <span className="text-gray-500">Date & Time</span>
+                <span className="font-medium text-right">{formatDate(transaction.createdAt)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Payment Method</span>
+                <span className="font-medium">Card</span>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Itemised breakdown */}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Items</p>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-700">{transaction.itemName}</span>
+                <span className="font-medium">${effectiveAmount.toFixed(2)}</span>
+              </div>
+              {isSplitReceipt && allSplitsInReceipt && (
+                <p className="text-xs text-gray-400">
+                  Split payment — original total ${parseFloat(transaction.price).toFixed(2)} divided {transaction.totalSplits} ways
+                </p>
+              )}
+            </div>
+
+            <Separator />
+
+            {/* Cost breakdown */}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Cost Breakdown</p>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Subtotal (excl. GST)</span>
+                <span>${netAmount.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">GST (15%)</span>
+                <span>${gstAmount.toFixed(2)}</span>
+              </div>
+              <Separator />
+              <div className="flex justify-between font-bold text-base">
+                <span>{isSplitReceipt ? "Your Share" : "Total"}</span>
+                <span>${effectiveAmount.toFixed(2)}</span>
               </div>
             </div>
           </CardContent>
@@ -262,16 +290,16 @@ export default function Receipt() {
 
         {/* Action Buttons */}
         <div className="space-y-3">
-          <Button 
-            onClick={handleDownloadPdf}
-            disabled={isGeneratingPdf}
-            className="w-full bg-green-600 hover:bg-green-700"
+          <Button
+            onClick={handleDownload}
+            disabled={isActioning}
+            className="w-full bg-[#0055FF] hover:bg-[#0044dd] text-white"
             size="lg"
           >
-            {isGeneratingPdf ? (
+            {isActioning ? (
               <>
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                Generating PDF...
+                Working...
               </>
             ) : (
               <>
@@ -280,20 +308,22 @@ export default function Receipt() {
               </>
             )}
           </Button>
-          
-          <Button 
-            variant="outline" 
-            className="w-full"
-            onClick={() => window.location.href = `/pay/${transaction.merchantId}`}
+
+          <Button
+            onClick={handleShare}
+            disabled={isActioning}
+            variant="outline"
+            className="w-full border-[#0055FF] text-[#0055FF] hover:bg-blue-50"
+            size="lg"
           >
-            New Transaction
+            <Share2 className="w-4 h-4 mr-2" />
+            Share Receipt
           </Button>
         </div>
 
-        {/* Footer */}
-        <div className="text-center mt-6 text-xs text-gray-500">
+        <div className="text-center mt-6 text-xs text-gray-400">
           <p>Thank you for your business!</p>
-          <p className="mt-1">Powered by Tapt Payment Terminal</p>
+          <p className="mt-1">Powered by TaptPay</p>
         </div>
       </div>
     </div>
