@@ -62,7 +62,7 @@ export function QRCodeDisplay({ paymentUrl, qrCodeUrl, merchantId, stoneId }: QR
     }
   };
   return (
-    <div className="w-full h-full">
+    <div className="w-full h-full bg-[#0A1628] rounded-xl flex items-center justify-center p-2">
       {actualQrCodeUrl ? (
         <img 
           src={actualQrCodeUrl} 
@@ -70,8 +70,8 @@ export function QRCodeDisplay({ paymentUrl, qrCodeUrl, merchantId, stoneId }: QR
           className="w-full h-full object-contain"
         />
       ) : (
-        <div className="w-full h-full flex items-center justify-center bg-gray-100">
-          <QrCode className="w-8 h-8 text-gray-400" />
+        <div className="w-full h-full flex items-center justify-center">
+          <QrCode className="w-8 h-8 text-[#00E5CC]/40" />
         </div>
       )}
     </div>

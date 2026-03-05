@@ -476,12 +476,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const qrBuffer = await QRCode.toBuffer(currentPaymentUrl, {
         type: 'png',
         width: size,
-        margin: 4, // Larger margin for better visibility
+        margin: 1,
         color: {
-          dark: '#16423C', // Forest green
-          light: '#FFFFFF'
+          dark: '#00E5CC',
+          light: '#00000000'
         },
-        errorCorrectionLevel: 'H', // High error correction for better scanning
+        errorCorrectionLevel: 'H',
       });
       
       res.send(qrBuffer);
@@ -521,12 +521,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const qrBuffer = await QRCode.toBuffer(currentPaymentUrl, {
         type: 'png',
         width: size,
-        margin: 4, // Larger margin for better visibility
+        margin: 1,
         color: {
-          dark: '#16423C', // Forest green
-          light: '#FFFFFF'
+          dark: '#00E5CC',
+          light: '#00000000'
         },
-        errorCorrectionLevel: 'H', // High error correction for better scanning
+        errorCorrectionLevel: 'H',
       });
       
       res.send(qrBuffer);
