@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Minus, Users2, Share2, Calculator, QrCode, Grid3x3, ChevronDown, Menu, X, LogOut, Tag, Copy, Check, Loader2, CheckCircle2, Smartphone, Pencil, Trash2 } from "lucide-react";
+import { Plus, Minus, Users2, Share2, Calculator, QrCode, Grid3x3, ChevronDown, Menu, X, LogOut, Tag, Copy, Check, Loader2, CheckCircle2, Smartphone, Pencil, Trash2, Download } from "lucide-react";
 import waveIconPath from "@assets/wave_1762733987203.png";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -73,6 +73,7 @@ export default function DemoTerminal() {
   const [isNfcOverlayActive, setIsNfcOverlayActive] = useState(false);
   const [editingStoneId, setEditingStoneId] = useState<number | null>(null);
   const [editStoneName, setEditStoneName] = useState("");
+  const [showQrModal, setShowQrModal] = useState(false);
   const [splitEnabled, setSplitEnabled] = useState<boolean>(
     () => localStorage.getItem('taptpay_split_enabled') === 'true'
   );
@@ -573,7 +574,32 @@ export default function DemoTerminal() {
 
   const status = getStatusDisplay();
 
+  const downloadQrCode = async () => {
+    if (!currentTransaction?.merchantId) return;
+    try {
+      const stoneId = currentTransaction.taptStoneId;
+      const url = stoneId
+        ? `/api/merchants/${currentTransaction.merchantId}/stone/${stoneId}/qr?size=800&download=true`
+        : `/api/merchants/${currentTransaction.merchantId}/qr?size=800&download=true`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed');
+      const blob = await response.blob();
+      const objectUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = stoneId ? `taptpay-qr-stone-${stoneId}.png` : `taptpay-qr-${currentTransaction.merchantId}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(objectUrl);
+      toast({ title: "QR Code Downloaded", description: "Saved to your downloads folder" });
+    } catch {
+      toast({ title: "Download Failed", description: "Could not download QR code", variant: "destructive" });
+    }
+  };
+
   return (
+    <>
     <div className="min-h-screen bg-[#0055FF] pb-24 md:pb-32 lg:pb-36 px-6 md:px-10 relative">
       <div className="max-w-md md:max-w-2xl mx-auto pt-24 md:pt-32">
         
@@ -979,8 +1005,8 @@ export default function DemoTerminal() {
                       </button>
                       <button
                         onClick={() => {
-                          if (currentTransaction.qrCodeUrl) {
-                            window.open(currentTransaction.qrCodeUrl, '_blank');
+                          if (currentTransaction?.qrCodeUrl || currentTransaction?.merchantId) {
+                            setShowQrModal(true);
                           } else {
                             toast({
                               title: "QR Code Unavailable",
@@ -1230,5 +1256,48 @@ export default function DemoTerminal() {
         </div>
       </div>
     </div>
+
+    {/* QR Code Modal */}
+    {showQrModal && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+        onClick={() => setShowQrModal(false)}
+      >
+        <div
+          className="bg-[#0A1628] rounded-3xl p-8 flex flex-col items-center gap-5 shadow-2xl mx-4"
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between w-full">
+            <p className="text-[#00E5CC] text-base font-semibold tracking-wide">Scan to Pay</p>
+            <button
+              className="text-white/40 hover:text-white/80 transition-colors"
+              onClick={() => setShowQrModal(false)}
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="w-64 h-64 flex items-center justify-center">
+            <img
+              src={
+                currentTransaction?.qrCodeUrl ||
+                (currentTransaction?.merchantId
+                  ? `/api/merchants/${currentTransaction.merchantId}/qr`
+                  : '')
+              }
+              alt="Scan to Pay QR Code"
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <button
+            onClick={downloadQrCode}
+            className="bg-[#00E5CC] hover:opacity-90 text-[#0A1628] font-semibold rounded-full px-8 py-3 flex items-center gap-2 transition-opacity"
+          >
+            <Download className="w-4 h-4" />
+            Download PNG
+          </button>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
