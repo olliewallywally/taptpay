@@ -465,7 +465,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Set response headers for PNG image - STATIC QR per merchant
       res.setHeader('Content-Type', 'image/png');
       res.setHeader('Cache-Control', 'public, max-age=2592000'); // Cache for 30 days - QR never changes per merchant
-      res.setHeader('ETag', `"merchant-qr-${merchantId}"`); // Static ETag per merchant
+      res.setHeader('ETag', `"merchant-qr-v2-${merchantId}"`); // v2 = cyan transparent style
       
       if (isDownload) {
         res.setHeader('Content-Disposition', `attachment; filename="tapt-payment-qr-merchant-${merchantId}.png"`);
@@ -476,12 +476,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const qrBuffer = await QRCode.toBuffer(currentPaymentUrl, {
         type: 'png',
         width: size,
-        margin: 1,
+        margin: 2,
         color: {
           dark: '#00E5CC',
           light: '#00000000'
         },
-        errorCorrectionLevel: 'H',
+        errorCorrectionLevel: 'L',
       });
       
       res.send(qrBuffer);
@@ -510,7 +510,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Set response headers for PNG image - STATIC QR per stone
       res.setHeader('Content-Type', 'image/png');
       res.setHeader('Cache-Control', 'public, max-age=2592000'); // Cache for 30 days - QR never changes per stone
-      res.setHeader('ETag', `"stone-qr-${stoneId}"`); // Static ETag per stone
+      res.setHeader('ETag', `"stone-qr-v2-${stoneId}"`); // v2 = cyan transparent style
       
       if (isDownload) {
         res.setHeader('Content-Disposition', `attachment; filename="tapt-payment-qr-merchant-${merchantId}-stone-${stoneId}.png"`);
@@ -521,12 +521,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const qrBuffer = await QRCode.toBuffer(currentPaymentUrl, {
         type: 'png',
         width: size,
-        margin: 1,
+        margin: 2,
         color: {
           dark: '#00E5CC',
           light: '#00000000'
         },
-        errorCorrectionLevel: 'H',
+        errorCorrectionLevel: 'L',
       });
       
       res.send(qrBuffer);
