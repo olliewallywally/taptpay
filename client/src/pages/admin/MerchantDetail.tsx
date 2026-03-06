@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
-import { ArrowLeft, DollarSign, Activity, MapPin, Mail, User, Phone, Building, CreditCard, CheckCircle, Send, Shield, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, DollarSign, Activity, MapPin, Mail, User, Phone, Building, CreditCard, CheckCircle, Send, Shield, AlertTriangle, Download, Share2, Receipt, X } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 
 interface MerchantDetailProps {
   merchantId: string;
@@ -13,6 +16,55 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [showConfirm, setShowConfirm] = useState(false);
+  const [selectedTx, setSelectedTx] = useState<any>(null);
+  const [isActioning, setIsActioning] = useState(false);
+
+  const fetchPdfBlob = async (txId: number): Promise<Blob> => {
+    const response = await fetch(`/api/transactions/${txId}/receipt-pdf`, { method: 'POST' });
+    if (!response.ok) throw new Error('Failed to generate PDF');
+    return response.blob();
+  };
+
+  const handleDownload = async (tx: any) => {
+    setIsActioning(true);
+    try {
+      const blob = await fetchPdfBlob(tx.id);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `receipt-${tx.id}-${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      toast({ title: 'Download failed', description: 'Could not generate receipt PDF.', variant: 'destructive' });
+    } finally {
+      setIsActioning(false);
+    }
+  };
+
+  const handleShare = async (tx: any, merchantName: string) => {
+    setIsActioning(true);
+    try {
+      const blob = await fetchPdfBlob(tx.id);
+      const file = new File([blob], `receipt-${tx.id}.pdf`, { type: 'application/pdf' });
+      const amount = `$${parseFloat(tx.price || tx.amount || 0).toFixed(2)}`;
+      if (navigator.share && navigator.canShare({ files: [file] })) {
+        await navigator.share({ title: `Receipt from ${merchantName}`, text: `Payment receipt for ${amount}`, files: [file] });
+      } else if (navigator.share) {
+        await navigator.share({ title: `Receipt from ${merchantName}`, text: `Payment receipt for ${amount}`, url: window.location.href });
+      } else {
+        await handleDownload(tx);
+      }
+    } catch (e: any) {
+      if (e.name !== 'AbortError') {
+        toast({ title: 'Share failed', description: 'Could not share receipt.', variant: 'destructive' });
+      }
+    } finally {
+      setIsActioning(false);
+    }
+  };
 
   const { data: merchant, isLoading } = useQuery({
     queryKey: ['/api/admin/merchants', merchantId],
@@ -326,16 +378,21 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
               <thead>
                 <tr className="border-b border-[#1d1e2c]">
                   <th className="text-left p-3 text-[#dbdfea] text-xs opacity-60 font-normal">Amount</th>
-                  <th className="text-left p-3 text-[#dbdfea] text-xs opacity-60 font-normal hidden md:table-cell">Type</th>
+                  <th className="text-left p-3 text-[#dbdfea] text-xs opacity-60 font-normal hidden md:table-cell">Item</th>
                   <th className="text-left p-3 text-[#dbdfea] text-xs opacity-60 font-normal">Status</th>
                   <th className="text-left p-3 text-[#dbdfea] text-xs opacity-60 font-normal hidden sm:table-cell">Date</th>
+                  <th className="text-left p-3 text-[#dbdfea] text-xs opacity-60 font-normal hidden sm:table-cell"></th>
                 </tr>
               </thead>
               <tbody>
                 {transactions.slice(0, 10).map((tx: any) => (
-                  <tr key={tx.id} className="border-b border-[#1d1e2c]">
-                    <td className="p-3 text-[#dbdfea] text-sm">${parseFloat(tx.amount).toFixed(2)}</td>
-                    <td className="p-3 text-[#dbdfea] text-sm opacity-60 hidden md:table-cell">{tx.type || '-'}</td>
+                  <tr
+                    key={tx.id}
+                    className="border-b border-[#1d1e2c] cursor-pointer hover:bg-[#1d1e2c] transition-colors"
+                    onClick={() => setSelectedTx(tx)}
+                  >
+                    <td className="p-3 text-[#dbdfea] text-sm">${parseFloat(tx.price || tx.amount || 0).toFixed(2)}</td>
+                    <td className="p-3 text-[#dbdfea] text-sm opacity-60 hidden md:table-cell">{tx.itemName || tx.type || '-'}</td>
                     <td className="p-3">
                       <span className={`text-xs ${
                         tx.status === 'completed' ? 'text-[#4ade80]' :
@@ -348,6 +405,7 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
                     <td className="p-3 text-[#dbdfea] text-sm opacity-60 hidden sm:table-cell">
                       {new Date(tx.createdAt).toLocaleDateString()}
                     </td>
+                    <td className="p-3 text-[#00E5CC] text-xs hidden sm:table-cell">View →</td>
                   </tr>
                 ))}
               </tbody>
@@ -355,6 +413,120 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
           </div>
         </div>
       )}
+
+      {/* Transaction Receipt Modal */}
+      <Dialog open={!!selectedTx} onOpenChange={(open) => { if (!open) setSelectedTx(null); }}>
+        <DialogContent className="bg-[#1a1b2e] border border-[#24263a] text-[#dbdfea] max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-[#dbdfea]">
+              <Receipt className="w-5 h-5 text-[#00E5CC]" />
+              Transaction Receipt
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedTx && (() => {
+            const effectiveAmount = parseFloat(selectedTx.price || selectedTx.amount || 0);
+            const gstAmount = (effectiveAmount * 0.15) / 1.15;
+            const netAmount = effectiveAmount - gstAmount;
+            const merchantName = merchant?.businessName || merchant?.name || 'Merchant';
+
+            return (
+              <div className="space-y-4">
+                {/* Transaction Details */}
+                <div className="bg-[#24263a] rounded-lg p-4 space-y-2">
+                  <p className="text-xs text-[#dbdfea] opacity-50 uppercase tracking-wide font-semibold">Transaction Details</p>
+                  <div className="flex justify-between text-sm">
+                    <span className="opacity-60">Transaction ID</span>
+                    <span className="font-mono">#{selectedTx.id}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="opacity-60">Date</span>
+                    <span>{new Date(selectedTx.createdAt).toLocaleString('en-NZ', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="opacity-60">Payment Method</span>
+                    <span className="capitalize">{(selectedTx.paymentMethod || 'card').replace(/_/g, ' ')}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="opacity-60">Status</span>
+                    <span className={
+                      selectedTx.status === 'completed' ? 'text-[#4ade80]' :
+                      selectedTx.status === 'pending' ? 'text-[#fbbf24]' :
+                      'text-[#ef4444]'
+                    }>{selectedTx.status}</span>
+                  </div>
+                </div>
+
+                {/* Receipt Card */}
+                <div className="bg-white rounded-lg p-4 text-gray-800">
+                  {/* Business Info */}
+                  <div className="text-center border-b border-gray-200 pb-3 mb-3">
+                    <h3 className="font-semibold text-base">{merchantName}</h3>
+                    {merchant?.businessAddress && (
+                      <p className="text-xs text-gray-500 whitespace-pre-line mt-1">{merchant.businessAddress}</p>
+                    )}
+                    {merchant?.contactPhone && <p className="text-xs text-gray-500">{merchant.contactPhone}</p>}
+                    {merchant?.contactEmail && <p className="text-xs text-gray-500">{merchant.contactEmail}</p>}
+                    {merchant?.gstNumber && <p className="text-xs text-gray-500 mt-1 font-medium">GST No: {merchant.gstNumber}</p>}
+                    {merchant?.nzbn && <p className="text-xs text-gray-500">NZBN: {merchant.nzbn}</p>}
+                  </div>
+
+                  {/* Items */}
+                  <div className="space-y-1 mb-3">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Items</p>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-700">{selectedTx.itemName || 'Payment'}</span>
+                      <span className="font-medium">${effectiveAmount.toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-gray-200 pt-2 space-y-1">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Cost Breakdown</p>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Subtotal (excl. GST)</span>
+                      <span>${netAmount.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">GST (15%)</span>
+                      <span>${gstAmount.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between font-bold text-base border-t border-gray-200 pt-1 mt-1">
+                      <span>Total</span>
+                      <span>${effectiveAmount.toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  <p className="text-center text-xs text-gray-400 mt-3">Powered by TaptPay</p>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="space-y-2 pt-1">
+                  <Button
+                    onClick={() => handleDownload(selectedTx)}
+                    disabled={isActioning}
+                    className="w-full bg-[#0055FF] hover:bg-[#0044dd] text-white"
+                  >
+                    {isActioning ? (
+                      <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />Working...</>
+                    ) : (
+                      <><Download className="w-4 h-4 mr-2" />Download Receipt PDF</>
+                    )}
+                  </Button>
+                  <Button
+                    onClick={() => handleShare(selectedTx, merchantName)}
+                    disabled={isActioning}
+                    variant="outline"
+                    className="w-full border-[#00E5CC] text-[#00E5CC] hover:bg-[#00E5CC]/10 bg-transparent"
+                  >
+                    <Share2 className="w-4 h-4 mr-2" />
+                    Share Receipt
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
