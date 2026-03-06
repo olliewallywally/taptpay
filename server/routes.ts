@@ -2631,7 +2631,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const activeMerchants = recentMerchants.filter(m => m.status === 'active').length;
-      const transactionFeeRevenue = totalCompletedTransactions * 0.20; // $0.20 per completed transaction
+      const transactionFeeRevenue = totalCompletedTransactions * 0.10; // $0.10 flat fee per completed transaction
 
       res.json({
         totalMerchants: merchants.length,
@@ -2640,11 +2640,161 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalTransactions,
         completedTransactions: totalCompletedTransactions,
         transactionFeeRevenue,
-        recentMerchants: recentMerchants.sort((a, b) => b.totalRevenue - a.totalRevenue), // Sort by revenue
+        recentMerchants: recentMerchants.sort((a, b) => b.totalRevenue - a.totalRevenue),
       });
     } catch (error) {
       console.error("Error fetching admin analytics:", error);
       res.status(500).json({ message: "Failed to get admin analytics" });
+    }
+  });
+
+  // Real daily revenue for last 7 days (admin charts)
+  app.get("/api/admin/revenue-over-time", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchants = await storage.getAllMerchants();
+      const now = new Date();
+
+      // Build 7-day date buckets
+      const days: { date: string; label: string; revenue: number; transactions: number }[] = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(now.getDate() - i);
+        const dateStr = d.toISOString().split('T')[0];
+        const label = i === 0 ? 'Today' : d.toLocaleDateString('en-NZ', { weekday: 'short' });
+        days.push({ date: dateStr, label, revenue: 0, transactions: 0 });
+      }
+
+      for (const merchant of merchants) {
+        const txs = await storage.getTransactionsByMerchant(merchant.id);
+        for (const tx of txs) {
+          if (tx.status !== 'completed' || !tx.createdAt) continue;
+          const dateStr = new Date(tx.createdAt).toISOString().split('T')[0];
+          const bucket = days.find(d => d.date === dateStr);
+          if (bucket) {
+            bucket.revenue += parseFloat(tx.price);
+            bucket.transactions += 1;
+          }
+        }
+      }
+
+      res.json(days.map(d => ({ day: d.label, revenue: parseFloat(d.revenue.toFixed(2)), transactions: d.transactions })));
+    } catch (error) {
+      console.error("Error fetching revenue over time:", error);
+      res.status(500).json({ message: "Failed to get revenue data" });
+    }
+  });
+
+  // Real payment method breakdown (admin charts)
+  app.get("/api/admin/payment-method-breakdown", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchants = await storage.getAllMerchants();
+      const counts: Record<string, number> = {};
+
+      for (const merchant of merchants) {
+        const txs = await storage.getTransactionsByMerchant(merchant.id);
+        for (const tx of txs) {
+          if (tx.status !== 'completed') continue;
+          const method = tx.paymentMethod || 'qr_code';
+          counts[method] = (counts[method] || 0) + 1;
+        }
+      }
+
+      const colorMap: Record<string, string> = {
+        qr_code: '#0055FF',
+        nfc_tap: '#00E5CC',
+        card_reader: '#10B981',
+        cash: '#F59E0B',
+        manual: '#8B5CF6',
+        contactless_card: '#06B6D4',
+      };
+
+      const result = Object.entries(counts).map(([method, value]) => ({
+        name: method.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        value,
+        color: colorMap[method] || '#6B7280',
+      }));
+
+      res.json(result.sort((a, b) => b.value - a.value));
+    } catch (error) {
+      console.error("Error fetching payment method breakdown:", error);
+      res.status(500).json({ message: "Failed to get payment methods" });
+    }
+  });
+
+  // GA4 metrics for admin portal
+  app.get("/api/admin/ga4-metrics", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    const propertyId = process.env.GOOGLE_ANALYTICS_PROPERTY_ID;
+    const serviceAccountRaw = process.env.GOOGLE_ANALYTICS_SERVICE_ACCOUNT;
+
+    if (!propertyId || !serviceAccountRaw) {
+      return res.json({ configured: false });
+    }
+
+    try {
+      const { BetaAnalyticsDataClient } = await import('@google-analytics/data');
+      const credentials = JSON.parse(serviceAccountRaw);
+      const analyticsClient = new BetaAnalyticsDataClient({ credentials });
+
+      const [response] = await analyticsClient.runReport({
+        property: `properties/${propertyId}`,
+        dateRanges: [{ startDate: '7daysAgo', endDate: 'today' }],
+        metrics: [
+          { name: 'sessions' },
+          { name: 'totalUsers' },
+          { name: 'screenPageViews' },
+          { name: 'bounceRate' },
+          { name: 'averageSessionDuration' },
+        ],
+        dimensions: [],
+      });
+
+      const [topPagesResp] = await analyticsClient.runReport({
+        property: `properties/${propertyId}`,
+        dateRanges: [{ startDate: '7daysAgo', endDate: 'today' }],
+        metrics: [{ name: 'screenPageViews' }],
+        dimensions: [{ name: 'pagePath' }],
+        orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
+        limit: 5,
+      });
+
+      const [devicesResp] = await analyticsClient.runReport({
+        property: `properties/${propertyId}`,
+        dateRanges: [{ startDate: '7daysAgo', endDate: 'today' }],
+        metrics: [{ name: 'sessions' }],
+        dimensions: [{ name: 'deviceCategory' }],
+        orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+      });
+
+      const [realtimeResp] = await analyticsClient.runRealtimeReport({
+        property: `properties/${propertyId}`,
+        metrics: [{ name: 'activeUsers' }],
+      });
+
+      const row = response.rows?.[0];
+      const metrics = {
+        sessions: parseInt(row?.metricValues?.[0]?.value || '0'),
+        totalUsers: parseInt(row?.metricValues?.[1]?.value || '0'),
+        pageViews: parseInt(row?.metricValues?.[2]?.value || '0'),
+        bounceRate: parseFloat(row?.metricValues?.[3]?.value || '0'),
+        avgSessionDuration: parseFloat(row?.metricValues?.[4]?.value || '0'),
+      };
+
+      const topPages = (topPagesResp.rows || []).map(r => ({
+        path: r.dimensionValues?.[0]?.value || '/',
+        views: parseInt(r.metricValues?.[0]?.value || '0'),
+      }));
+
+      const devices = (devicesResp.rows || []).map(r => ({
+        name: r.dimensionValues?.[0]?.value || 'unknown',
+        sessions: parseInt(r.metricValues?.[0]?.value || '0'),
+      }));
+
+      const activeUsers = parseInt(realtimeResp.rows?.[0]?.metricValues?.[0]?.value || '0');
+
+      res.json({ configured: true, metrics, topPages, devices, activeUsers });
+    } catch (error: any) {
+      console.error("GA4 API error:", error?.message);
+      res.status(500).json({ configured: true, error: error?.message || 'GA4 API error' });
     }
   });
 

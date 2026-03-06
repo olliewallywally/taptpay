@@ -157,35 +157,11 @@ const GlassTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-// Generate sample chart data based on analytics
-const generateChartData = (analytics: AdminAnalytics | undefined) => {
-  // Revenue trend data (last 7 days)
-  const revenueTrend = [
-    { day: 'Mon', revenue: Math.max(0, (analytics?.totalRevenue || 1000) * 0.1), transactions: Math.max(0, (analytics?.totalTransactions || 50) * 0.1) },
-    { day: 'Tue', revenue: Math.max(0, (analytics?.totalRevenue || 1000) * 0.15), transactions: Math.max(0, (analytics?.totalTransactions || 50) * 0.15) },
-    { day: 'Wed', revenue: Math.max(0, (analytics?.totalRevenue || 1000) * 0.12), transactions: Math.max(0, (analytics?.totalTransactions || 50) * 0.12) },
-    { day: 'Thu', revenue: Math.max(0, (analytics?.totalRevenue || 1000) * 0.18), transactions: Math.max(0, (analytics?.totalTransactions || 50) * 0.18) },
-    { day: 'Fri', revenue: Math.max(0, (analytics?.totalRevenue || 1000) * 0.22), transactions: Math.max(0, (analytics?.totalTransactions || 50) * 0.22) },
-    { day: 'Sat', revenue: Math.max(0, (analytics?.totalRevenue || 1000) * 0.13), transactions: Math.max(0, (analytics?.totalTransactions || 50) * 0.13) },
-    { day: 'Today', revenue: Math.max(0, (analytics?.totalRevenue || 1000) * 0.1), transactions: Math.max(0, (analytics?.totalTransactions || 50) * 0.1) },
-  ];
-
-  // Transaction status distribution
-  const statusData = [
-    { name: 'Completed', value: analytics?.completedTransactions || 0, color: '#10B981' },
-    { name: 'Pending', value: (analytics?.totalTransactions || 0) - (analytics?.completedTransactions || 0), color: '#F59E0B' },
-    { name: 'Failed', value: Math.max(0, Math.floor((analytics?.totalTransactions || 0) * 0.05)), color: '#EF4444' },
-  ];
-
-  // Payment method distribution
-  const paymentMethods = [
-    { name: 'QR Code', value: Math.floor((analytics?.totalTransactions || 0) * 0.6), color: '#10B981' },
-    { name: 'NFC Tap', value: Math.floor((analytics?.totalTransactions || 0) * 0.3), color: '#22C55E' },
-    { name: 'Manual', value: Math.floor((analytics?.totalTransactions || 0) * 0.1), color: '#16A34A' },
-  ];
-
-  return { revenueTrend, statusData, paymentMethods };
-};
+// Transaction status distribution uses real analytics data (no fake splits)
+const getStatusData = (analytics: AdminAnalytics | undefined) => [
+  { name: 'Completed', value: analytics?.completedTransactions || 0, color: '#10B981' },
+  { name: 'Pending', value: Math.max(0, (analytics?.totalTransactions || 0) - (analytics?.completedTransactions || 0)), color: '#F59E0B' },
+];
 
 export default function AdminDashboard() {
   const { toast } = useToast();
@@ -198,14 +174,38 @@ export default function AdminDashboard() {
     queryKey: ['/api/admin/analytics'],
     queryFn: async () => {
       const response = await fetch('/api/admin/analytics', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('adminAuthToken')}`
-        }
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('adminAuthToken')}` }
       });
       if (!response.ok) throw new Error('Failed to fetch admin analytics');
       return response.json();
     },
     staleTime: 30000,
+  });
+
+  // Real 7-day revenue data
+  const { data: revenueOverTime = [] } = useQuery<{ day: string; revenue: number; transactions: number }[]>({
+    queryKey: ['/api/admin/revenue-over-time'],
+    queryFn: async () => {
+      const res = await fetch('/api/admin/revenue-over-time', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('adminAuthToken')}` }
+      });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    staleTime: 60000,
+  });
+
+  // Real payment method breakdown
+  const { data: paymentMethodData = [] } = useQuery<{ name: string; value: number; color: string }[]>({
+    queryKey: ['/api/admin/payment-method-breakdown'],
+    queryFn: async () => {
+      const res = await fetch('/api/admin/payment-method-breakdown', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('adminAuthToken')}` }
+      });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    staleTime: 60000,
   });
 
   const handleLogout = () => {
@@ -569,7 +569,7 @@ export default function AdminDashboard() {
                 </div>
                 <div className="h-48 sm:h-80">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={generateChartData(analytics).revenueTrend}>
+                    <AreaChart data={revenueOverTime}>
                       <defs>
                         <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
@@ -613,7 +613,7 @@ export default function AdminDashboard() {
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
-                        data={generateChartData(analytics).statusData}
+                        data={getStatusData(analytics)}
                         cx="50%"
                         cy="50%"
                         innerRadius={isMobile ? 40 : 60}
@@ -621,7 +621,7 @@ export default function AdminDashboard() {
                         paddingAngle={5}
                         dataKey="value"
                       >
-                        {generateChartData(analytics).statusData.map((entry, index) => (
+                        {getStatusData(analytics).map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
@@ -647,7 +647,7 @@ export default function AdminDashboard() {
                 </div>
                 <div className="h-48 sm:h-80">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={generateChartData(analytics).paymentMethods}>
+                    <BarChart data={paymentMethodData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                       <XAxis 
                         dataKey="name" 
@@ -665,7 +665,7 @@ export default function AdminDashboard() {
                         dataKey="value" 
                         radius={[8, 8, 0, 0]}
                       >
-                        {generateChartData(analytics).paymentMethods.map((entry, index) => (
+                        {paymentMethodData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Bar>
@@ -682,7 +682,7 @@ export default function AdminDashboard() {
                 </div>
                 <div className="h-48 sm:h-80">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={generateChartData(analytics).revenueTrend}>
+                    <LineChart data={revenueOverTime}>
                       <defs>
                         <linearGradient id="transactionGradient" x1="0" y1="0" x2="1" y2="1">
                           <stop offset="0%" stopColor="#10B981" />
