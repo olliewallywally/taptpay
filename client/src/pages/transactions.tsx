@@ -4,12 +4,15 @@ import { useLocation } from "wouter";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { 
   Home, Package, BarChart3, SlidersHorizontal, Terminal, 
-  Download, Calendar, TrendingUp, DollarSign, CreditCard, ArrowUpDown 
+  Download, Calendar, TrendingUp, DollarSign, CreditCard, ArrowUpDown,
+  Share2, Receipt
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 
@@ -47,6 +50,8 @@ export default function Transactions() {
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState('revenue');
+  const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
+  const [isActioning, setIsActioning] = useState(false);
   const { toast } = useToast();
   const merchantId = getCurrentMerchantId();
 
@@ -66,6 +71,71 @@ export default function Transactions() {
       return response.json();
     },
   });
+
+  const { data: merchant } = useQuery({
+    queryKey: ["/api/merchants", merchantId],
+    queryFn: async () => {
+      const token = localStorage.getItem("authToken");
+      const response = await fetch(`/api/merchants/${merchantId}`, {
+        headers: { "Authorization": `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error("Failed to fetch merchant");
+      return response.json();
+    },
+    enabled: !!merchantId,
+  });
+
+  const fetchPdfBlob = async (txId: number): Promise<Blob> => {
+    const token = localStorage.getItem("authToken");
+    const response = await fetch(`/api/transactions/${txId}/receipt-pdf`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error("Failed to generate PDF");
+    return response.blob();
+  };
+
+  const handleDownload = async (tx: Transaction) => {
+    setIsActioning(true);
+    try {
+      const blob = await fetchPdfBlob(tx.id);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `receipt-${tx.id}-${new Date().toISOString().split("T")[0]}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch {
+      toast({ title: "Download failed", description: "Could not generate receipt PDF.", variant: "destructive" });
+    } finally {
+      setIsActioning(false);
+    }
+  };
+
+  const handleShare = async (tx: Transaction) => {
+    setIsActioning(true);
+    const merchantName = merchant?.businessName || merchant?.name || "Merchant";
+    try {
+      const blob = await fetchPdfBlob(tx.id);
+      const file = new File([blob], `receipt-${tx.id}.pdf`, { type: "application/pdf" });
+      const amount = `$${parseFloat(tx.price).toFixed(2)}`;
+      if (navigator.share && navigator.canShare({ files: [file] })) {
+        await navigator.share({ title: `Receipt from ${merchantName}`, text: `Payment receipt for ${amount}`, files: [file] });
+      } else if (navigator.share) {
+        await navigator.share({ title: `Receipt from ${merchantName}`, text: `Payment receipt for ${amount}`, url: window.location.href });
+      } else {
+        await handleDownload(tx);
+      }
+    } catch (e: any) {
+      if (e.name !== "AbortError") {
+        toast({ title: "Share failed", description: "Could not share receipt.", variant: "destructive" });
+      }
+    } finally {
+      setIsActioning(false);
+    }
+  };
 
   const filteredTransactions = transactions.filter((tx: Transaction) => {
     if (!dateRange.from && !dateRange.to) return true;
@@ -368,8 +438,9 @@ export default function Transactions() {
               {filteredTransactions.map((tx: Transaction) => (
                 <div
                   key={tx.id}
-                  className="border border-gray-200 rounded-xl p-3 sm:p-4 hover:border-[#0055FF]/30 transition-colors"
+                  className="border border-gray-200 rounded-xl p-3 sm:p-4 hover:border-[#0055FF]/50 hover:bg-blue-50/30 transition-colors cursor-pointer"
                   data-testid={`transaction-${tx.id}`}
+                  onClick={() => setSelectedTx(tx)}
                 >
                   <div className="flex items-start justify-between gap-2 sm:gap-4">
                     <div className="flex-1 min-w-0">
@@ -392,6 +463,7 @@ export default function Transactions() {
                       <div className="text-sm sm:text-base text-[#0055FF]">
                         ${parseFloat(tx.price).toFixed(2)}
                       </div>
+                      <span className="text-[#00E5CC] text-xs">View receipt →</span>
                     </div>
                   </div>
                 </div>
@@ -400,6 +472,117 @@ export default function Transactions() {
           )}
         </div>
       </div>
+
+      {/* Transaction Receipt Modal */}
+      <Dialog open={!!selectedTx} onOpenChange={(open) => { if (!open) setSelectedTx(null); }}>
+        <DialogContent className="max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Receipt className="w-5 h-5 text-[#00E5CC]" />
+              Transaction Receipt
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedTx && (() => {
+            const effectiveAmount = parseFloat(selectedTx.price);
+            const gstAmount = (effectiveAmount * 0.15) / 1.15;
+            const netAmount = effectiveAmount - gstAmount;
+            const merchantName = merchant?.businessName || merchant?.name || "Merchant";
+
+            return (
+              <div className="space-y-4">
+                {/* Transaction Details */}
+                <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                  <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold">Transaction Details</p>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Transaction ID</span>
+                    <span className="font-mono text-gray-800">#{selectedTx.id}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Date</span>
+                    <span className="text-gray-800">{new Date(selectedTx.createdAt).toLocaleString("en-NZ", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Payment Method</span>
+                    <span className="text-gray-800 capitalize">{selectedTx.paymentMethod.replace(/_/g, " ")}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Status</span>
+                    <span className={`font-medium ${getStatusColor(selectedTx.status)}`}>{selectedTx.status}</span>
+                  </div>
+                </div>
+
+                {/* Receipt Card */}
+                <div className="border border-gray-200 rounded-lg p-4 text-gray-800">
+                  <div className="text-center border-b border-gray-200 pb-3 mb-3">
+                    <h3 className="font-semibold text-base">{merchantName}</h3>
+                    {merchant?.businessAddress && (
+                      <p className="text-xs text-gray-500 whitespace-pre-line mt-1">{merchant.businessAddress}</p>
+                    )}
+                    {merchant?.contactPhone && <p className="text-xs text-gray-500">{merchant.contactPhone}</p>}
+                    {merchant?.contactEmail && <p className="text-xs text-gray-500">{merchant.contactEmail}</p>}
+                    {merchant?.gstNumber && <p className="text-xs text-gray-500 mt-1 font-medium">GST No: {merchant.gstNumber}</p>}
+                    {merchant?.nzbn && <p className="text-xs text-gray-500">NZBN: {merchant.nzbn}</p>}
+                  </div>
+
+                  <div className="space-y-1 mb-3">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Items</p>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-700">{selectedTx.itemName}</span>
+                      <span className="font-medium">${effectiveAmount.toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  <Separator className="my-2" />
+
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Cost Breakdown</p>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Subtotal (excl. GST)</span>
+                      <span>${netAmount.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">GST (15%)</span>
+                      <span>${gstAmount.toFixed(2)}</span>
+                    </div>
+                    <Separator className="my-1" />
+                    <div className="flex justify-between font-bold text-base">
+                      <span>Total</span>
+                      <span>${effectiveAmount.toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  <p className="text-center text-xs text-gray-400 mt-3">Powered by TaptPay</p>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="space-y-2">
+                  <Button
+                    onClick={() => handleDownload(selectedTx)}
+                    disabled={isActioning}
+                    className="w-full bg-[#0055FF] hover:bg-[#0044dd] text-white"
+                  >
+                    {isActioning ? (
+                      <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />Working...</>
+                    ) : (
+                      <><Download className="w-4 h-4 mr-2" />Download Receipt PDF</>
+                    )}
+                  </Button>
+                  <Button
+                    onClick={() => handleShare(selectedTx)}
+                    disabled={isActioning}
+                    variant="outline"
+                    className="w-full border-[#0055FF] text-[#0055FF] hover:bg-blue-50"
+                  >
+                    <Share2 className="w-4 h-4 mr-2" />
+                    Share Receipt
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
