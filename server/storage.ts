@@ -460,10 +460,9 @@ export class MemStorage implements IStorage {
     const id = this.currentTransactionId++;
     const transactionAmount = parseFloat(insertTransaction.price);
     
-    // Fixed fee structure: $0.02 platform + $0.08 processing = $0.10 total per transaction
-    const windcaveFeeAmount = 0.08; // Fixed $0.08 processing fee
-    const platformFeeAmount = 0.02; // Fixed $0.02 platform fee
-    const merchantNet = Math.round((transactionAmount - windcaveFeeAmount - platformFeeAmount) * 100) / 100;
+    // TaptPay fee: flat $0.10 per transaction, charged separately to merchant's card.
+    // Windcave handles their own fees on their backend — we do not track them.
+    const TAPTPAY_FEE = 0.10;
 
     const transaction: Transaction = {
       ...insertTransaction,
@@ -477,10 +476,10 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
       windcaveTransactionId: null,
       windcaveFeeRate: "0.0000",
-      windcaveFeeAmount: windcaveFeeAmount.toString(),
+      windcaveFeeAmount: "0.00",
       platformFeeRate: "0.0000",
-      platformFeeAmount: platformFeeAmount.toString(),
-      merchantNet: merchantNet.toString(),
+      platformFeeAmount: TAPTPAY_FEE.toFixed(2),
+      merchantNet: transactionAmount.toFixed(2),
       totalRefunded: "0.00",
       refundableAmount: transactionAmount.toString(),
       paymentMethod: insertTransaction.paymentMethod || "qr_code",
@@ -692,9 +691,9 @@ export class MemStorage implements IStorage {
         status: "pending",
         windcaveTransactionId: null,
         paymentMethod: "qr_code",
-        windcaveFeeAmount: (0.08 / totalSplits).toFixed(2), // Distribute fees across splits
-        platformFeeAmount: (0.02 / totalSplits).toFixed(2),
-        merchantNet: ((splitAmount - (0.08 / totalSplits) - (0.02 / totalSplits))).toFixed(2),
+        windcaveFeeAmount: "0.00",
+        platformFeeAmount: "0.10",
+        merchantNet: splitAmount.toFixed(2),
         paidAt: null,
         createdAt: new Date(),
       };
@@ -1145,10 +1144,10 @@ export class MemStorage implements IStorage {
         completedSplits: 0,
         splitAmount: null,
         windcaveFeeRate: "0.0000",
-        windcaveFeeAmount: "0.08",
+        windcaveFeeAmount: "0.00",
         platformFeeRate: "0.0000",
-        platformFeeAmount: "0.02",
-        merchantNet: (parseFloat(transaction.price) - 0.10).toFixed(2),
+        platformFeeAmount: "0.10",
+        merchantNet: transaction.price,
         totalRefunded: "0.00",
         refundableAmount: transaction.price,
         splitEnabled: false,
@@ -1721,19 +1720,17 @@ export class DatabaseStorage implements IStorage {
     const hasProvidedFees = (insertTransaction as any).windcaveFeeAmount !== undefined;
     const windcaveFeeAmount = hasProvidedFees
       ? parseFloat((insertTransaction as any).windcaveFeeAmount)
-      : 0.08;
-    const platformFeeAmount = hasProvidedFees
-      ? parseFloat((insertTransaction as any).platformFeeAmount)
-      : 0.02;
-    const merchantNet = hasProvidedFees
-      ? parseFloat((insertTransaction as any).merchantNet)
-      : Math.round((transactionAmount - windcaveFeeAmount - platformFeeAmount) * 100) / 100;
+      : 0.00;
+    // TaptPay charges a flat $0.10 per transaction to the merchant's card separately.
+    // Windcave handles their own fees. merchantNet = full transaction price.
+    const platformFeeAmount = 0.10;
+    const merchantNet = transactionAmount;
 
     const transactionWithFees = {
       ...insertTransaction,
       windcaveFeeRate: "0.0000",
-      windcaveFeeAmount: windcaveFeeAmount.toFixed(2),
-      platformFeeRate: hasProvidedFees ? (insertTransaction as any).platformFeeRate ?? "0.0000" : "0.0000",
+      windcaveFeeAmount: "0.00",
+      platformFeeRate: "0.0000",
       platformFeeAmount: platformFeeAmount.toFixed(2),
       merchantNet: merchantNet.toFixed(2),
       totalRefunded: "0.00",
@@ -2298,9 +2295,9 @@ export class DatabaseStorage implements IStorage {
             status: "pending",
             windcaveTransactionId: null,
             paymentMethod: "qr_code",
-            windcaveFeeAmount: (0.08 / totalSplits).toFixed(2),
-            platformFeeAmount: (0.02 / totalSplits).toFixed(2),
-            merchantNet: ((splitAmount - (0.08 / totalSplits) - (0.02 / totalSplits))).toFixed(2),
+            windcaveFeeAmount: "0.00",
+            platformFeeAmount: "0.10",
+            merchantNet: splitAmount.toFixed(2),
             paidAt: null,
           });
       }
