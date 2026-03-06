@@ -741,7 +741,7 @@ export default function DemoTerminal() {
                         {selectedStockItems.length > 0 && (
                           <div className="space-y-2">
                             <label className="text-[#0055FF] font-medium text-sm">Selected Items</label>
-                            <div className="flex flex-wrap gap-2" data-testid="selected-stock-items">
+                            <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto" data-testid="selected-stock-items">
                               {selectedStockItems.map((item) => (
                                 <div
                                   key={item.id}
