@@ -739,28 +739,30 @@ export default function DemoTerminal() {
                         </div>
 
                         {selectedStockItems.length > 0 && (
-                          <div className="space-y-2">
-                            <label className="text-[#0055FF] font-medium text-sm">Selected Items</label>
-                            <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto" data-testid="selected-stock-items">
+                          <div className="border border-[#00E5CC] rounded-2xl overflow-hidden" data-testid="selected-stock-items">
+                            <div className="max-h-[120px] overflow-y-auto divide-y divide-[#00E5CC]/30">
                               {selectedStockItems.map((item) => (
                                 <div
                                   key={item.id}
-                                  className="flex items-center gap-2 bg-[#00E5CC]/20 border-2 border-[#00E5CC] rounded-full px-3 py-2 text-sm text-[#0055FF]"
+                                  className="flex items-center justify-between px-3 py-2 bg-[#00E5CC]/10 text-[#0055FF]"
                                   data-testid={`selected-stock-item-${item.id}`}
                                 >
-                                  <Tag size={14} />
-                                  <span className="font-medium">{item.name}</span>
-                                  <span>${parseFloat(item.cost).toFixed(2)}</span>
+                                  <span className="text-sm font-medium truncate flex-1 mr-2">{item.name}</span>
+                                  <span className="text-sm font-semibold shrink-0">${parseFloat(item.cost).toFixed(2)}</span>
                                   <button
                                     type="button"
                                     onClick={() => removeStockItem(item.id)}
-                                    className="ml-1 hover:opacity-70 transition-opacity"
+                                    className="ml-3 shrink-0 opacity-50 hover:opacity-100 transition-opacity"
                                     data-testid={`remove-stock-item-${item.id}`}
                                   >
-                                    <X size={14} />
+                                    <X size={13} />
                                   </button>
                                 </div>
                               ))}
+                            </div>
+                            <div className="px-3 py-1.5 bg-[#00E5CC]/20 flex justify-between items-center">
+                              <span className="text-xs text-[#0055FF]/60">{selectedStockItems.length} item{selectedStockItems.length !== 1 ? 's' : ''}</span>
+                              <span className="text-xs font-bold text-[#0055FF]">Total: ${selectedStockItems.reduce((t, i) => t + parseFloat(i.cost), 0).toFixed(2)}</span>
                             </div>
                           </div>
                         )}
