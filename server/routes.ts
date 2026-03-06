@@ -780,6 +780,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Cash Sale — creates and immediately completes a transaction (no payment processing)
+  app.post("/api/transactions/cash-sale", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { merchantId, itemName, price, stoneId } = req.body;
+
+      if (!merchantId || !itemName || !price) {
+        return res.status(400).json({ message: "merchantId, itemName and price are required" });
+      }
+      if (!checkMerchantOwnership(req, parseInt(merchantId))) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const priceNum = parseFloat(price);
+      if (isNaN(priceNum) || priceNum <= 0) {
+        return res.status(400).json({ message: "Invalid price" });
+      }
+
+      // Platform fee (0.5%) — no Windcave fee for cash
+      const platformFeeRate = 0.005;
+      const platformFeeAmount = (priceNum * platformFeeRate).toFixed(2);
+      const merchantNet = (priceNum - parseFloat(platformFeeAmount)).toFixed(2);
+
+      const transaction = await storage.createTransaction({
+        merchantId: parseInt(merchantId),
+        taptStoneId: stoneId ? parseInt(stoneId) : null,
+        itemName,
+        price: priceNum.toFixed(2),
+        status: "completed",
+        paymentMethod: "cash",
+        windcaveFeeRate: "0.0000",
+        windcaveFeeAmount: "0.00",
+        platformFeeRate: String(platformFeeRate),
+        platformFeeAmount,
+        merchantNet,
+        splitEnabled: false,
+      } as any);
+
+      // Broadcast completion to SSE clients
+      broadcastToStone(transaction.merchantId!, transaction.taptStoneId, {
+        type: 'transaction_updated',
+        transaction: { ...transaction, paymentMethod: 'cash' },
+      });
+
+      sendPushToMerchant(transaction.merchantId!, "completed", transaction.itemName, transaction.price, transaction.id).catch(() => {});
+
+      res.json({ transaction });
+    } catch (error) {
+      console.error("Cash sale error:", error);
+      res.status(500).json({ message: "Failed to record cash sale" });
+    }
+  });
+
   // Create bill split
   app.post("/api/transactions/:id/split", async (req, res) => {
     try {
