@@ -797,11 +797,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid price" });
       }
 
-      // Platform fee (0.5%) — no Windcave fee for cash
-      const platformFeeRate = 0.005;
-      const platformFeeAmount = (priceNum * platformFeeRate).toFixed(2);
-      const merchantNet = (priceNum - parseFloat(platformFeeAmount)).toFixed(2);
-
+      // TaptPay flat fee: $0.10 per transaction, charged separately to merchant's card.
       const transaction = await storage.createTransaction({
         merchantId: parseInt(merchantId),
         taptStoneId: stoneId ? parseInt(stoneId) : null,
@@ -811,9 +807,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paymentMethod: "cash",
         windcaveFeeRate: "0.0000",
         windcaveFeeAmount: "0.00",
-        platformFeeRate: String(platformFeeRate),
-        platformFeeAmount,
-        merchantNet,
+        platformFeeRate: "0.0000",
+        platformFeeAmount: "0.10",
+        merchantNet: priceNum.toFixed(2),
         splitEnabled: false,
       } as any);
 
@@ -1032,7 +1028,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.createPlatformFee({
           transactionId: transaction.id,
           merchantId: transaction.merchantId,
-          feeAmount: transaction.platformFeeAmount || "0.02",
+          feeAmount: transaction.platformFeeAmount || "0.10",
           transactionAmount: transaction.price,
           status: 'collected',
         });
@@ -2386,7 +2382,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.createPlatformFee({
             transactionId: transaction.id,
             merchantId: transaction.merchantId,
-            feeAmount: currentSplit.platformFeeAmount || '0.02',
+            feeAmount: currentSplit.platformFeeAmount || '0.10',
             transactionAmount: currentSplit.amount,
             status: 'collected',
           });
@@ -2412,7 +2408,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.createPlatformFee({
             transactionId: transaction.id,
             merchantId: transaction.merchantId,
-            feeAmount: transaction.platformFeeAmount || '0.02',
+            feeAmount: transaction.platformFeeAmount || '0.10',
             transactionAmount: transaction.price,
             status: 'collected',
           });
@@ -2511,7 +2507,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.createPlatformFee({
             transactionId: txnId,
             merchantId: transaction.merchantId,
-            feeAmount: currentSplit.platformFeeAmount || '0.02',
+            feeAmount: currentSplit.platformFeeAmount || '0.10',
             transactionAmount: currentSplit.amount,
             status: 'collected',
           });
@@ -2543,7 +2539,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.createPlatformFee({
             transactionId: txnId,
             merchantId: transaction.merchantId,
-            feeAmount: transaction.platformFeeAmount || '0.02',
+            feeAmount: transaction.platformFeeAmount || '0.10',
             transactionAmount: transaction.price,
             status: 'collected',
           });
@@ -4079,7 +4075,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.createPlatformFee({
           transactionId: transactionId,
           merchantId: transaction.merchantId,
-          feeAmount: transaction.platformFeeAmount || "0.02",
+          feeAmount: transaction.platformFeeAmount || "0.10",
           transactionAmount: transaction.price,
           status: 'collected',
         });
@@ -4151,7 +4147,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.createPlatformFee({
           transactionId: transactionId,
           merchantId: transaction.merchantId,
-          feeAmount: transaction.platformFeeAmount || "0.02",
+          feeAmount: transaction.platformFeeAmount || "0.10",
           transactionAmount: transaction.price,
           status: 'collected',
         });
