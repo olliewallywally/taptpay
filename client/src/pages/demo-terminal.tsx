@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Minus, Users2, Share2, Calculator, QrCode, Grid3x3, ChevronDown, Menu, X, LogOut, Tag, Copy, Check, Loader2, CheckCircle2, Smartphone, Pencil, Trash2, Download } from "lucide-react";
+import { Plus, Minus, Users2, Share2, Calculator, QrCode, Grid3x3, ChevronDown, Menu, X, LogOut, Tag, Copy, Check, Loader2, CheckCircle2, Smartphone, Pencil, Trash2, Download, Banknote, CheckCircle } from "lucide-react";
 import waveIconPath from "@assets/wave_1762733987203.png";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -62,7 +62,12 @@ export default function DemoTerminal() {
   const [currentTransaction, setCurrentTransaction] = useState<Transaction | null>(null);
   const [showStones, setShowStones] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [activeDropdown, setActiveDropdown] = useState<'new-payment' | 'split-bill' | 'share-link' | 'quick-amounts' | null>(null);
+  const [activeDropdown, setActiveDropdown] = useState<'new-payment' | 'split-bill' | 'share-link' | 'cash-sale' | null>(null);
+  const [cashItemName, setCashItemName] = useState("");
+  const [cashAmount, setCashAmount] = useState("");
+  const [cashSaleLoading, setCashSaleLoading] = useState(false);
+  const [showCashModal, setShowCashModal] = useState(false);
+  const [cashSaleTransaction, setCashSaleTransaction] = useState<any>(null);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [splitCount, setSplitCount] = useState(2);
   const [stockSearchInput, setStockSearchInput] = useState("");
@@ -674,11 +679,11 @@ export default function DemoTerminal() {
                 <QrCode className="text-white" size={28} />
               </button>
               <button 
-                onClick={() => setActiveDropdown(activeDropdown === 'quick-amounts' ? null : 'quick-amounts')}
+                onClick={() => setActiveDropdown(activeDropdown === 'cash-sale' ? null : 'cash-sale')}
                 className="w-16 h-16 md:w-20 md:h-20 bg-[#0055FF] rounded-full flex items-center justify-center hover:opacity-90 transition-opacity"
-                data-testid="button-quick-amounts"
+                data-testid="button-cash-sale"
               >
-                <Grid3x3 className="text-white" size={28} />
+                <Banknote className="text-white" size={28} />
               </button>
             </div>
 
@@ -1032,32 +1037,76 @@ export default function DemoTerminal() {
               </div>
             </div>
 
-            {/* Quick Amounts Dropdown */}
+            {/* Cash Sale Dropdown */}
             <div 
               className="transition-all duration-500 ease-in-out overflow-hidden"
               style={{
-                maxHeight: activeDropdown === 'quick-amounts' ? '500px' : '0px',
-                opacity: activeDropdown === 'quick-amounts' ? 1 : 0,
+                maxHeight: activeDropdown === 'cash-sale' ? '500px' : '0px',
+                opacity: activeDropdown === 'cash-sale' ? 1 : 0,
               }}
             >
-              <div className="bg-white rounded-[32px] mt-4 px-6 md:px-8 pt-8 pb-6 md:pb-8 shadow-lg relative">
-                <h3 className="text-[#0055FF] font-semibold text-xl md:text-2xl mb-6">Quick Amounts</h3>
-                <div className="grid grid-cols-3 gap-2 md:gap-3">
-                  {['5.00', '10.00', '15.00', '20.00', '25.00', '50.00', '75.00', '100.00', '150.00'].map((quickAmount) => (
-                    <button
-                      key={quickAmount}
-                      onClick={() => {
-                        setAmount(quickAmount);
-                        form.setValue("price", quickAmount);
-                        form.setValue("itemName", `$${quickAmount} Payment`);
-                        toast({ title: "Amount Set", description: `$${quickAmount}` });
+              <div className="bg-white rounded-[32px] mt-4 px-6 md:px-8 pt-8 pb-6 md:pb-8 shadow-lg">
+                <div className="flex items-center gap-3 mb-6">
+                  <Banknote className="text-[#0055FF]" size={24} />
+                  <h3 className="text-[#0055FF] font-semibold text-xl md:text-2xl">Cash Sale</h3>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-[#0055FF]/70 text-sm font-medium mb-1.5 ml-1">Item name</label>
+                    <input
+                      type="text"
+                      value={cashItemName}
+                      onChange={e => setCashItemName(e.target.value)}
+                      placeholder="e.g. Coffee, Haircut..."
+                      className="w-full border-2 border-[#00E5CC] rounded-2xl px-4 py-3 text-[#0055FF] placeholder-[#0055FF]/30 focus:outline-none focus:border-[#0055FF] transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[#0055FF]/70 text-sm font-medium mb-1.5 ml-1">Amount ($)</label>
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={cashAmount}
+                      onChange={e => setCashAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full border-2 border-[#00E5CC] rounded-2xl px-4 py-3 text-[#0055FF] placeholder-[#0055FF]/30 focus:outline-none focus:border-[#0055FF] transition-colors"
+                    />
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (!cashItemName.trim() || !cashAmount || parseFloat(cashAmount) <= 0) {
+                        toast({ title: "Missing details", description: "Please enter an item name and amount.", variant: "destructive" });
+                        return;
+                      }
+                      setCashSaleLoading(true);
+                      try {
+                        const token = localStorage.getItem("authToken");
+                        const res = await fetch("/api/transactions/cash-sale", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                          body: JSON.stringify({ merchantId, itemName: cashItemName.trim(), price: parseFloat(cashAmount).toFixed(2), stoneId: selectedStoneId }),
+                        });
+                        if (!res.ok) throw new Error("Failed to record cash sale");
+                        const { transaction } = await res.json();
+                        setCashSaleTransaction(transaction);
+                        setShowCashModal(true);
                         setActiveDropdown(null);
-                      }}
-                      className="bg-[#0055FF] hover:opacity-90 rounded-2xl py-3 md:py-4 text-white font-medium transition-opacity text-sm md:text-base"
-                    >
-                      ${quickAmount}
-                    </button>
-                  ))}
+                        setCashItemName("");
+                        setCashAmount("");
+                        queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "transactions"] });
+                      } catch {
+                        toast({ title: "Error", description: "Could not record cash sale. Please try again.", variant: "destructive" });
+                      } finally {
+                        setCashSaleLoading(false);
+                      }
+                    }}
+                    disabled={cashSaleLoading}
+                    className="w-full bg-[#0055FF] hover:opacity-90 disabled:opacity-50 text-[#00E5CC] rounded-2xl py-4 font-semibold flex items-center justify-center gap-2 transition-opacity"
+                  >
+                    {cashSaleLoading ? <Loader2 className="animate-spin" size={18} /> : <CheckCircle size={18} />}
+                    {cashSaleLoading ? "Processing..." : "Confirm Cash Sale"}
+                  </button>
                 </div>
               </div>
             </div>
@@ -1297,6 +1346,93 @@ export default function DemoTerminal() {
             <Download className="w-4 h-4" />
             Download PNG
           </button>
+        </div>
+      </div>
+    )}
+
+    {/* Cash Sale Receipt Modal */}
+    {showCashModal && cashSaleTransaction && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+        onClick={() => setShowCashModal(false)}
+      >
+        <div
+          className="bg-[#0A1628] rounded-3xl p-8 flex flex-col items-center gap-5 shadow-2xl mx-4 w-full max-w-sm"
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between w-full">
+            <p className="text-[#00E5CC] text-base font-semibold tracking-wide">Cash Sale</p>
+            <button className="text-white/40 hover:text-white/80 transition-colors" onClick={() => setShowCashModal(false)}>
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="w-16 h-16 rounded-full bg-[#00E5CC]/20 flex items-center justify-center">
+            <CheckCircle className="text-[#00E5CC] w-10 h-10" />
+          </div>
+
+          <div className="text-center">
+            <p className="text-white text-2xl font-bold">${parseFloat(cashSaleTransaction.price).toFixed(2)}</p>
+            <p className="text-white/60 text-sm mt-1">{cashSaleTransaction.itemName}</p>
+            <p className="text-[#00E5CC]/60 text-xs mt-2">Sale recorded • Receipt ready</p>
+          </div>
+
+          <div className="flex flex-col gap-3 w-full">
+            <button
+              onClick={async () => {
+                try {
+                  const token = localStorage.getItem("authToken");
+                  const res = await fetch(`/api/transactions/${cashSaleTransaction.id}/receipt-pdf`, {
+                    method: "POST",
+                    headers: { "Authorization": `Bearer ${token}` },
+                  });
+                  if (!res.ok) throw new Error("Failed");
+                  const blob = await res.blob();
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `receipt-${cashSaleTransaction.id}.pdf`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  window.URL.revokeObjectURL(url);
+                  toast({ title: "Receipt Downloaded" });
+                } catch {
+                  toast({ title: "Download failed", variant: "destructive" });
+                }
+              }}
+              className="w-full bg-[#00E5CC] hover:opacity-90 text-[#0A1628] font-semibold rounded-full py-3 flex items-center justify-center gap-2 transition-opacity"
+            >
+              <Download className="w-4 h-4" />
+              Download Receipt
+            </button>
+            <button
+              onClick={async () => {
+                try {
+                  const token = localStorage.getItem("authToken");
+                  const res = await fetch(`/api/transactions/${cashSaleTransaction.id}/receipt-pdf`, {
+                    method: "POST",
+                    headers: { "Authorization": `Bearer ${token}` },
+                  });
+                  if (!res.ok) throw new Error("Failed");
+                  const blob = await res.blob();
+                  const file = new File([blob], `receipt-${cashSaleTransaction.id}.pdf`, { type: "application/pdf" });
+                  if (navigator.canShare?.({ files: [file] })) {
+                    await navigator.share({ files: [file], title: "Receipt", text: `Receipt for ${cashSaleTransaction.itemName}` });
+                  } else {
+                    const url = window.URL.createObjectURL(blob);
+                    window.open(url, "_blank");
+                  }
+                } catch {
+                  toast({ title: "Share failed", variant: "destructive" });
+                }
+              }}
+              className="w-full bg-white/10 hover:bg-white/20 text-white font-semibold rounded-full py-3 flex items-center justify-center gap-2 transition-colors"
+            >
+              <Share2 className="w-4 h-4" />
+              Share Receipt
+            </button>
+          </div>
         </div>
       </div>
     )}
