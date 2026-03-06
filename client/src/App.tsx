@@ -132,9 +132,23 @@ function AdminProtectedRoute({ children }: { children: React.ReactNode }) {
   return isAuthenticated ? <>{children}</> : null;
 }
 
+function GA4PageTracker() {
+  const [location] = useLocation();
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).gtag) {
+      (window as any).gtag('event', 'page_view', {
+        page_path: location,
+        page_title: document.title,
+      });
+    }
+  }, [location]);
+  return null;
+}
+
 function Router() {
   return (
     <PageTransition>
+      <GA4PageTracker />
       <Switch>
         <Route path="/" component={LandingPage} />
         <Route path="/login" component={Login} />
