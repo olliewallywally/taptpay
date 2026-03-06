@@ -1715,21 +1715,29 @@ export class DatabaseStorage implements IStorage {
   async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
     if (!this.db) throw new Error('Database not available');
     const transactionAmount = parseFloat(insertTransaction.price);
-    
-    // Fixed fee structure: $0.05 platform + $0.20 Windcave = $0.25 total per transaction
-    const windcaveFeeAmount = 0.20; // Fixed $0.20 Windcave fee
-    const platformFeeAmount = 0.05; // Fixed $0.05 platform fee
-    const merchantNet = Math.round((transactionAmount - windcaveFeeAmount - platformFeeAmount) * 100) / 100;
+
+    // Use caller-provided fees if present (e.g. cash sales have 0 Windcave fee),
+    // otherwise apply the standard fixed fee structure.
+    const hasProvidedFees = (insertTransaction as any).windcaveFeeAmount !== undefined;
+    const windcaveFeeAmount = hasProvidedFees
+      ? parseFloat((insertTransaction as any).windcaveFeeAmount)
+      : 0.20;
+    const platformFeeAmount = hasProvidedFees
+      ? parseFloat((insertTransaction as any).platformFeeAmount)
+      : 0.05;
+    const merchantNet = hasProvidedFees
+      ? parseFloat((insertTransaction as any).merchantNet)
+      : Math.round((transactionAmount - windcaveFeeAmount - platformFeeAmount) * 100) / 100;
 
     const transactionWithFees = {
       ...insertTransaction,
-      windcaveFeeRate: "0.0000", // Not percentage-based
-      windcaveFeeAmount: windcaveFeeAmount.toString(),
-      platformFeeRate: "0.0000", // Not percentage-based
-      platformFeeAmount: platformFeeAmount.toString(),
-      merchantNet: merchantNet.toString(),
+      windcaveFeeRate: "0.0000",
+      windcaveFeeAmount: windcaveFeeAmount.toFixed(2),
+      platformFeeRate: hasProvidedFees ? (insertTransaction as any).platformFeeRate ?? "0.0000" : "0.0000",
+      platformFeeAmount: platformFeeAmount.toFixed(2),
+      merchantNet: merchantNet.toFixed(2),
       totalRefunded: "0.00",
-      refundableAmount: merchantNet.toString(), // Amount merchant receives after fees
+      refundableAmount: merchantNet.toFixed(2),
     };
 
     const result = await this.db.insert(transactions).values(transactionWithFees).returning();
