@@ -24,6 +24,7 @@ export const merchants = pgTable("merchants", {
   status: text("status").notNull().default("pending"), // pending, verified, active, inactive
   verificationToken: text("verification_token"),
   passwordHash: text("password_hash"),
+  googleId: text("google_id"),
   qrCodeUrl: text("qr_code_url"),
   paymentUrl: text("payment_url"),
   currentProviderRate: decimal("current_provider_rate", { precision: 5, scale: 4 }).default("0.0290"), // Default 2.9%

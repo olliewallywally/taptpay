@@ -4,7 +4,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema } from "@shared/schema";
 import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, simulateCreateSession, simulateQuerySession } from "./windcave";
-import { authenticateUser, generateToken, authenticateToken, createUser, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
+import { authenticateUser, generateToken, authenticateToken, createUser, getUserByEmail, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
 import { generateBusinessReportPdf } from "./report-generator";
 import { getBaseUrl, generatePaymentUrl, generateQrCodeUrl, generateStonePaymentUrl } from "./url-utils";
@@ -168,6 +168,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (req.user.role === 'admin') return true;
     return req.user.merchantId === merchantId;
   }
+
+  // Google OAuth routes
+  app.get("/api/auth/google", (req, res) => {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      return res.redirect('/login?error=Google+sign+in+is+not+configured');
+    }
+    const redirectUri = `${getBaseUrl(req)}/api/auth/google/callback`;
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: 'openid email profile',
+      access_type: 'offline',
+      prompt: 'select_account',
+    });
+    res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
+  });
+
+  app.get("/api/auth/google/callback", async (req, res) => {
+    const { code, error } = req.query as { code?: string; error?: string };
+
+    if (error || !code) {
+      return res.redirect('/login?error=Google+sign+in+was+cancelled');
+    }
+
+    try {
+      const clientId = process.env.GOOGLE_CLIENT_ID!;
+      const clientSecret = process.env.GOOGLE_CLIENT_SECRET!;
+      const redirectUri = `${getBaseUrl(req)}/api/auth/google/callback`;
+
+      // Exchange code for tokens
+      const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          code,
+          client_id: clientId,
+          client_secret: clientSecret,
+          redirect_uri: redirectUri,
+          grant_type: 'authorization_code',
+        }).toString(),
+      });
+
+      if (!tokenRes.ok) {
+        console.error('Google token exchange failed:', await tokenRes.text());
+        return res.redirect('/login?error=Google+sign+in+failed');
+      }
+
+      const tokenData = await tokenRes.json() as { access_token: string };
+
+      // Fetch user profile from Google
+      const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` },
+      });
+
+      if (!userRes.ok) {
+        return res.redirect('/login?error=Google+sign+in+failed');
+      }
+
+      const profile = await userRes.json() as { id: string; email: string; name: string };
+      const { id: googleId, email, name } = profile;
+
+      if (!email) {
+        return res.redirect('/login?error=Google+account+has+no+email');
+      }
+
+      // Look up existing merchant by email
+      let merchant = await storage.getMerchantByEmail(email);
+      let isNewUser = false;
+
+      if (merchant) {
+        if (merchant.status === 'pending') {
+          return res.redirect('/login?error=Your+account+is+pending+verification.+Please+check+your+email.');
+        }
+        // Save googleId if not already stored
+        if (!merchant.googleId) {
+          await storage.updateMerchant(merchant.id, { googleId });
+        }
+      } else {
+        // Create new merchant account — Google already verified the email
+        merchant = await storage.createMerchant({
+          name: name || email.split('@')[0],
+          businessName: name || email.split('@')[0],
+          email,
+          status: 'verified',
+          googleId,
+        } as any);
+        isNewUser = true;
+      }
+
+      // Get or create the in-memory auth user
+      let authUser = getUserByEmail(email);
+      if (!authUser) {
+        // Create with a random unguessable password (Google users won't use password login)
+        const randomPwd = crypto.randomBytes(32).toString('hex');
+        authUser = await createUser(email, randomPwd, merchant.id);
+      }
+
+      const token = generateToken(authUser);
+      const redirectParams = new URLSearchParams({
+        token,
+        merchantId: String(merchant.id),
+        ...(isNewUser ? { newUser: 'true' } : {}),
+      });
+
+      return res.redirect(`/login?${redirectParams.toString()}`);
+    } catch (err) {
+      console.error('Google OAuth callback error:', err);
+      return res.redirect('/login?error=Google+sign+in+failed.+Please+try+again.');
+    }
+  });
 
   // Authentication routes
   app.post("/api/auth/login", async (req, res) => {

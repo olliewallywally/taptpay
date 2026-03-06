@@ -21,6 +21,34 @@ export default function Login() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [loginType, setLoginType] = useState<'merchant' | 'admin'>('merchant');
+
+  // Handle Google OAuth callback — token arrives as URL query param
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    const merchantId = params.get('merchantId');
+    const error = params.get('error');
+    const newUser = params.get('newUser');
+
+    if (token) {
+      localStorage.setItem('authToken', token);
+      if (merchantId) localStorage.setItem('merchantId', merchantId);
+      window.history.replaceState({}, '', '/login');
+      if (newUser === 'true') {
+        toast({
+          title: 'Welcome to TaptPay!',
+          description: 'Your account has been created. Please complete your profile in Settings.',
+        });
+      } else {
+        toast({ title: 'Welcome back!', description: 'Signed in with Google.' });
+      }
+      setLocation('/dashboard');
+    } else if (error) {
+      window.history.replaceState({}, '', '/login');
+      toast({ title: 'Sign in failed', description: decodeURIComponent(error), variant: 'destructive' });
+    }
+  }, []);
+
   const [showMore, setShowMore] = useState(false);
   const [isSignup, setIsSignup] = useState(false);
   const [name, setName] = useState("");
@@ -98,11 +126,7 @@ export default function Login() {
   };
 
   const handleGoogleLogin = () => {
-    // Placeholder for Google OAuth - will implement backend next
-    toast({
-      title: "Google Sign In",
-      description: "Google OAuth integration coming soon!",
-    });
+    window.location.href = '/api/auth/google';
   };
 
   const handleAppleLogin = () => {
