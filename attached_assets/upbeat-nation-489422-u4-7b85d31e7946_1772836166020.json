@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "upbeat-nation-489422-u4",
+  "private_key_id": "7b85d31e7946da519755cc6b2519df69ccdeed1b",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDLIALT/1K0BjoY\nt0bHMNupazxnWJUGel1nXVkAZUlaTcwdGwjxkMB1r+9EP/iWmb22a0Z7V7BzdsP9\nCHrtIbfJO7YmhtNYKmX3xIKAhYSHPI3ppNeqMgKFy+2qKShM9ZwS+dyDpmTKEBVD\nOnxzO5Q5MPSF/XmxGVPGYl2NGe8sfoltP7g/FBPmgYto0Ns1Oi5puFcFLOy5t66e\nkG3cTYb+YQL8QaPTQ/nKIt7bQV0wcOepJC9XYjeb8AIkl++znvionoFu2hbCUWE6\nrt85dMlkoYFLubiU2rQu6D7jIe7gfifdTOCYZihli5XXtRxQsDhnSKwNbMRiSVfU\nKydXh1OdAgMBAAECggEADAiuzOB+MIGDRPOWveD8d+JihxI4bKnTNCHTpAexe311\nxO5VGU/6Fv7VWLXG2c/smAzC9Yu8aHAg1wd+642T1dgzx781G4QSMRud9P9JWrm7\nrpvq1ap2JncZHXuoEjx61/pK64HFdt3SZKk9C5amsWdfv+XEeo7a57tBekU5u5Oo\ncC0CA4bTOPgljO6tK0XHIfvgvpNQfN17ZpqFkkDaepPlgsiDc4SLlpAmFvAwl4FB\ny/VzJ+FoGZAmTutEfJV8ftQgJVgAjr9WYgCm17QRIE6O5WrU60nAEou1/lxqXvqV\nm0a1fFGP3o0VJLvz8r8yYwU7Ot63c4Gl+xmFp8dwAQKBgQD5Qh+LAlXClVtG6IEE\nOCpsQlOGNdWGfpPGcq2t2/jBvDB5XINYlwkR6P8GSx0BngtTTjVeK2EC9/cAkE6S\naOWqyzB4aVtFwrEZv1k2maENEDd5CHLdQUjC/mBBGGWzpPUHJXGVDA9gIl3ab940\nJywCUEUUvY/Y02DKDgJuZax9+QKBgQDQnnV7np9HfAEXJ8T52VnMMQqdIbYN9JfB\n7IzZLlM6Tpq6xBfnoPpC7WCM19DfSMfHhx1LBKvBoaum6lYmntBEFgEXhJtDMN0g\ntkyizHhtn7AQFq3pVyyfJeh7uKRyZLQUBipdomE7PnTfgXABNwX7kfC3qCyXXiHz\nQ2Dvt1I7xQKBgELkj/qKYeGam6hn9VfgiuIK2seF4wv5JEd5t0qVYij8DDZFsaow\nvmpkESzrM5mfhIKS1pezJJHbYhpwn+WC6T/wz81A2RHbshOq2pJgoGwVEg4VSl4+\nivxpsANIPOL9PhTw446Qcf/muTFKHGP6r0DfsepjBRu3fp47LEPcXXJhAoGBAMeG\nRiatVvkviHt09ddgIZpBbT1LeKtwO5SlgTBWNhOWCjaGRbarJ6/LCISsBIEJQsl6\nWHHfTcYrsdg6V5soWVhFE1ZC5Zwlp9gZgsJRfPybtfAtQLfjQDIWN3vc5Krj1bcx\nDmPvYb8fxPfe/BitX3Nz6R4+IifDSAU5dATQ+D1hAoGAGNoA+i5x7SA6KMXY6cSu\nPknmI+mjuLd7z38vkcnYka66EZC86uiFt4aU88gYNcvPJB2TQQJxbx+Jmi72jvzM\nmLG/NAOJAshuu5OXJ+OlQyYD2kXhd5aLwiTbrxBL2oWoa52zwzb9HVt8Fg3joJxQ\nKsCkltHy+BPkrGXAzf4THkA=\n-----END PRIVATE KEY-----\n",
+  "client_email": "taptpay-analytics@upbeat-nation-489422-u4.iam.gserviceaccount.com",
+  "client_id": "114335305710666263685",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/taptpay-analytics%40upbeat-nation-489422-u4.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
