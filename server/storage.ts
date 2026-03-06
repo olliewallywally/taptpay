@@ -460,9 +460,9 @@ export class MemStorage implements IStorage {
     const id = this.currentTransactionId++;
     const transactionAmount = parseFloat(insertTransaction.price);
     
-    // Fixed fee structure: $0.05 platform + $0.20 Windcave = $0.25 total per transaction
-    const windcaveFeeAmount = 0.20; // Fixed $0.20 Windcave fee
-    const platformFeeAmount = 0.05; // Fixed $0.05 platform fee
+    // Fixed fee structure: $0.02 platform + $0.08 processing = $0.10 total per transaction
+    const windcaveFeeAmount = 0.08; // Fixed $0.08 processing fee
+    const platformFeeAmount = 0.02; // Fixed $0.02 platform fee
     const merchantNet = Math.round((transactionAmount - windcaveFeeAmount - platformFeeAmount) * 100) / 100;
 
     const transaction: Transaction = {
@@ -692,9 +692,9 @@ export class MemStorage implements IStorage {
         status: "pending",
         windcaveTransactionId: null,
         paymentMethod: "qr_code",
-        windcaveFeeAmount: (0.20 / totalSplits).toFixed(2), // Distribute fees across splits
-        platformFeeAmount: (0.05 / totalSplits).toFixed(2),
-        merchantNet: ((splitAmount - (0.20 / totalSplits) - (0.05 / totalSplits))).toFixed(2),
+        windcaveFeeAmount: (0.08 / totalSplits).toFixed(2), // Distribute fees across splits
+        platformFeeAmount: (0.02 / totalSplits).toFixed(2),
+        merchantNet: ((splitAmount - (0.08 / totalSplits) - (0.02 / totalSplits))).toFixed(2),
         paidAt: null,
         createdAt: new Date(),
       };
@@ -1145,10 +1145,10 @@ export class MemStorage implements IStorage {
         completedSplits: 0,
         splitAmount: null,
         windcaveFeeRate: "0.0000",
-        windcaveFeeAmount: "0.20",
+        windcaveFeeAmount: "0.08",
         platformFeeRate: "0.0000",
-        platformFeeAmount: "0.05",
-        merchantNet: (parseFloat(transaction.price) - 0.25).toFixed(2),
+        platformFeeAmount: "0.02",
+        merchantNet: (parseFloat(transaction.price) - 0.10).toFixed(2),
         totalRefunded: "0.00",
         refundableAmount: transaction.price,
         splitEnabled: false,
@@ -1721,10 +1721,10 @@ export class DatabaseStorage implements IStorage {
     const hasProvidedFees = (insertTransaction as any).windcaveFeeAmount !== undefined;
     const windcaveFeeAmount = hasProvidedFees
       ? parseFloat((insertTransaction as any).windcaveFeeAmount)
-      : 0.20;
+      : 0.08;
     const platformFeeAmount = hasProvidedFees
       ? parseFloat((insertTransaction as any).platformFeeAmount)
-      : 0.05;
+      : 0.02;
     const merchantNet = hasProvidedFees
       ? parseFloat((insertTransaction as any).merchantNet)
       : Math.round((transactionAmount - windcaveFeeAmount - platformFeeAmount) * 100) / 100;
@@ -2298,9 +2298,9 @@ export class DatabaseStorage implements IStorage {
             status: "pending",
             windcaveTransactionId: null,
             paymentMethod: "qr_code",
-            windcaveFeeAmount: (0.20 / totalSplits).toFixed(2),
-            platformFeeAmount: (0.05 / totalSplits).toFixed(2),
-            merchantNet: ((splitAmount - (0.20 / totalSplits) - (0.05 / totalSplits))).toFixed(2),
+            windcaveFeeAmount: (0.08 / totalSplits).toFixed(2),
+            platformFeeAmount: (0.02 / totalSplits).toFixed(2),
+            merchantNet: ((splitAmount - (0.08 / totalSplits) - (0.02 / totalSplits))).toFixed(2),
             paidAt: null,
           });
       }
