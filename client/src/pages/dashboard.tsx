@@ -65,7 +65,10 @@ export default function Dashboard() {
   const { data: analytics, isLoading: analyticsLoading } = useQuery({
     queryKey: ["/api/merchants", merchantId, "analytics"],
     queryFn: async () => {
-      const response = await fetch(`/api/merchants/${merchantId}/analytics`);
+      const token = localStorage.getItem("authToken");
+      const response = await fetch(`/api/merchants/${merchantId}/analytics`, {
+        headers: { "Authorization": `Bearer ${token}` },
+      });
       if (!response.ok) throw new Error("Failed to fetch analytics");
       return response.json();
     },
@@ -74,7 +77,10 @@ export default function Dashboard() {
   const { data: transactions = [] } = useQuery({
     queryKey: ["/api/merchants", merchantId, "transactions"],
     queryFn: async () => {
-      const response = await fetch(`/api/merchants/${merchantId}/transactions`);
+      const token = localStorage.getItem("authToken");
+      const response = await fetch(`/api/merchants/${merchantId}/transactions`, {
+        headers: { "Authorization": `Bearer ${token}` },
+      });
       if (!response.ok) throw new Error("Failed to fetch transactions");
       return response.json();
     },

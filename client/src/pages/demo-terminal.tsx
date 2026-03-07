@@ -263,7 +263,7 @@ export default function DemoTerminal() {
       try {
         const data = JSON.parse(event.data);
         
-        if (data.type === "transaction_update" && data.transaction) {
+        if ((data.type === "transaction_update" || data.type === "transaction_updated") && data.transaction) {
           // Only update if transaction belongs to the currently selected stone
           if (!selectedStoneId || data.transaction.taptStoneId === selectedStoneId) {
             setCurrentTransaction(data.transaction);

@@ -73,7 +73,10 @@ export default function Exports() {
       if (startDate) params.append('startDate', startDate.toISOString());
       if (endDate) params.append('endDate', endDate.toISOString());
       
-      const response = await fetch(`/api/merchants/${merchantId}/analytics/export?${params}`);
+      const token = localStorage.getItem("authToken");
+      const response = await fetch(`/api/merchants/${merchantId}/analytics/export?${params}`, {
+        headers: { "Authorization": `Bearer ${token}` },
+      });
       if (!response.ok) throw new Error('Failed to fetch analytics');
       return response.json();
     },
@@ -87,7 +90,10 @@ export default function Exports() {
       if (startDate) params.append('startDate', startDate.toISOString());
       if (endDate) params.append('endDate', endDate.toISOString());
       
-      const response = await fetch(`/api/merchants/${merchantId}/export/csv?${params}`);
+      const token = localStorage.getItem("authToken");
+      const response = await fetch(`/api/merchants/${merchantId}/export/csv?${params}`, {
+        headers: { "Authorization": `Bearer ${token}` },
+      });
       if (!response.ok) throw new Error('Failed to export CSV');
       
       // Download the file
@@ -124,7 +130,10 @@ export default function Exports() {
       if (startDate) params.append('startDate', startDate.toISOString());
       if (endDate) params.append('endDate', endDate.toISOString());
       
-      const response = await fetch(`/api/merchants/${merchantId}/export/pdf?${params}`);
+      const token = localStorage.getItem("authToken");
+      const response = await fetch(`/api/merchants/${merchantId}/export/pdf?${params}`, {
+        headers: { "Authorization": `Bearer ${token}` },
+      });
       if (!response.ok) throw new Error('Failed to export PDF');
       
       // Download the file
