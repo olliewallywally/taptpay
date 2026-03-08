@@ -1,19 +1,22 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { 
   Home, Package, BarChart3, SlidersHorizontal, Terminal, 
   Download, Calendar, TrendingUp, DollarSign, CreditCard, ArrowUpDown,
-  Share2, Receipt
+  Share2, Receipt, RotateCcw, AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 
 interface Transaction {
@@ -23,6 +26,9 @@ interface Transaction {
   itemName: string;
   paymentMethod: string;
   createdAt: string;
+  refundableAmount?: string;
+  totalRefunded?: string;
+  windcaveTransactionId?: string;
 }
 
 const CustomTooltip = ({ active, payload }: any) => {
@@ -52,6 +58,9 @@ export default function Transactions() {
   const [selectedMetric, setSelectedMetric] = useState('revenue');
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [isActioning, setIsActioning] = useState(false);
+  const [showRefundForm, setShowRefundForm] = useState(false);
+  const [refundAmount, setRefundAmount] = useState("");
+  const [refundReason, setRefundReason] = useState("");
   const { toast } = useToast();
   const merchantId = getCurrentMerchantId();
 
@@ -84,6 +93,49 @@ export default function Transactions() {
     },
     enabled: !!merchantId,
   });
+
+  const refundMutation = useMutation({
+    mutationFn: async ({ txId, amount, reason }: { txId: number; amount: string; reason: string }) => {
+      const res = await apiRequest("POST", `/api/transactions/${txId}/refunds`, {
+        refundAmount: amount,
+        refundReason: reason,
+        refundMethod: "original_payment_method",
+      });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: "Refund successful", description: data.message || "The refund has been processed." });
+      setShowRefundForm(false);
+      setRefundAmount("");
+      setRefundReason("");
+      if (data.transaction) {
+        setSelectedTx((prev) => prev ? { ...prev, ...data.transaction } : null);
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "transactions"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Refund failed", description: err.message || "Could not process refund.", variant: "destructive" });
+    },
+  });
+
+  const handleRefundSubmit = () => {
+    if (!selectedTx) return;
+    const amount = parseFloat(refundAmount);
+    const maxRefundable = parseFloat(selectedTx.refundableAmount || selectedTx.price);
+    if (!refundAmount || isNaN(amount) || amount <= 0) {
+      toast({ title: "Invalid amount", description: "Please enter a valid refund amount.", variant: "destructive" });
+      return;
+    }
+    if (amount > maxRefundable) {
+      toast({ title: "Amount too high", description: `Maximum refundable amount is $${maxRefundable.toFixed(2)}.`, variant: "destructive" });
+      return;
+    }
+    if (!refundReason.trim()) {
+      toast({ title: "Reason required", description: "Please enter a reason for the refund.", variant: "destructive" });
+      return;
+    }
+    refundMutation.mutate({ txId: selectedTx.id, amount: amount.toFixed(2), reason: refundReason.trim() });
+  };
 
   const fetchPdfBlob = async (txId: number): Promise<Blob> => {
     const token = localStorage.getItem("authToken");
@@ -236,6 +288,8 @@ export default function Transactions() {
       case 'completed': return 'text-[#00E5CC]';
       case 'pending': return 'text-yellow-500';
       case 'failed': return 'text-red-500';
+      case 'refunded': return 'text-purple-500';
+      case 'partially_refunded': return 'text-orange-500';
       default: return 'text-gray-500';
     }
   };
@@ -245,7 +299,16 @@ export default function Transactions() {
       case 'completed': return 'bg-[#00E5CC]/10';
       case 'pending': return 'bg-yellow-500/10';
       case 'failed': return 'bg-red-500/10';
+      case 'refunded': return 'bg-purple-500/10';
+      case 'partially_refunded': return 'bg-orange-500/10';
       default: return 'bg-gray-500/10';
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'partially_refunded': return 'partial refund';
+      default: return status;
     }
   };
 
@@ -447,7 +510,7 @@ export default function Transactions() {
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <h3 className="text-[#3B3D53] text-sm sm:text-base truncate">{tx.itemName}</h3>
                         <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusBg(tx.status)} ${getStatusColor(tx.status)}`}>
-                          {tx.status}
+                          {getStatusLabel(tx.status)}
                         </span>
                       </div>
                       <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs sm:text-sm">
@@ -474,7 +537,7 @@ export default function Transactions() {
       </div>
 
       {/* Transaction Receipt Modal */}
-      <Dialog open={!!selectedTx} onOpenChange={(open) => { if (!open) setSelectedTx(null); }}>
+      <Dialog open={!!selectedTx} onOpenChange={(open) => { if (!open) { setSelectedTx(null); setShowRefundForm(false); setRefundAmount(""); setRefundReason(""); } }}>
         <DialogContent className="max-w-md w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -508,7 +571,7 @@ export default function Transactions() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-500">Status</span>
-                    <span className={`font-medium ${getStatusColor(selectedTx.status)}`}>{selectedTx.status}</span>
+                    <span className={`font-medium ${getStatusColor(selectedTx.status)}`}>{getStatusLabel(selectedTx.status)}</span>
                   </div>
                 </div>
 
@@ -577,7 +640,76 @@ export default function Transactions() {
                     <Share2 className="w-4 h-4 mr-2" />
                     Share Receipt
                   </Button>
+
+                  {/* Refund button — only for completed / partially refunded transactions */}
+                  {(selectedTx.status === "completed" || selectedTx.status === "partially_refunded") && (
+                    parseFloat(selectedTx.refundableAmount || selectedTx.price) > 0
+                  ) && (
+                    <Button
+                      variant="outline"
+                      className="w-full border-red-400 text-red-500 hover:bg-red-50"
+                      onClick={() => {
+                        setShowRefundForm((v) => !v);
+                        const max = parseFloat(selectedTx.refundableAmount || selectedTx.price);
+                        setRefundAmount(max.toFixed(2));
+                        setRefundReason("");
+                      }}
+                    >
+                      <RotateCcw className="w-4 h-4 mr-2" />
+                      {showRefundForm ? "Cancel Refund" : "Issue Refund"}
+                    </Button>
+                  )}
                 </div>
+
+                {/* Inline refund form */}
+                {showRefundForm && (selectedTx.status === "completed" || selectedTx.status === "partially_refunded") && (
+                  <div className="border border-red-200 rounded-lg p-4 bg-red-50 space-y-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <AlertCircle className="w-4 h-4 text-red-500" />
+                      <p className="text-sm font-medium text-red-700">Issue a Refund</p>
+                    </div>
+                    <p className="text-xs text-red-600">
+                      Max refundable: <strong>${parseFloat(selectedTx.refundableAmount || selectedTx.price).toFixed(2)}</strong>
+                      {selectedTx.totalRefunded && parseFloat(selectedTx.totalRefunded) > 0 && (
+                        <> &nbsp;·&nbsp; Already refunded: <strong>${parseFloat(selectedTx.totalRefunded).toFixed(2)}</strong></>
+                      )}
+                    </p>
+                    <div>
+                      <label className="text-xs text-gray-600 mb-1 block">Refund Amount (NZD)</label>
+                      <Input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        max={parseFloat(selectedTx.refundableAmount || selectedTx.price)}
+                        value={refundAmount}
+                        onChange={(e) => setRefundAmount(e.target.value)}
+                        className="border-red-200 focus:border-red-400"
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-600 mb-1 block">Reason for Refund</label>
+                      <Textarea
+                        value={refundReason}
+                        onChange={(e) => setRefundReason(e.target.value)}
+                        className="border-red-200 focus:border-red-400 text-sm"
+                        placeholder="e.g. Customer requested refund, item out of stock..."
+                        rows={2}
+                      />
+                    </div>
+                    <Button
+                      className="w-full bg-red-500 hover:bg-red-600 text-white"
+                      onClick={handleRefundSubmit}
+                      disabled={refundMutation.isPending}
+                    >
+                      {refundMutation.isPending ? (
+                        <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />Processing Refund...</>
+                      ) : (
+                        <><RotateCcw className="w-4 h-4 mr-2" />Confirm Refund ${parseFloat(refundAmount || "0").toFixed(2)}</>
+                      )}
+                    </Button>
+                  </div>
+                )}
               </div>
             );
           })()}

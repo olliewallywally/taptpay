@@ -55,6 +55,7 @@ export interface IStorage {
   getRefundsByTransaction(transactionId: number): Promise<Refund[]>;
   getRefundsByMerchant(merchantId: number): Promise<Refund[]>;
   updateRefundStatus(id: number, status: string, windcaveRefundId?: string): Promise<Refund | undefined>;
+  updateTransactionAfterRefund(id: number, refundAmount: number): Promise<Transaction | undefined>;
   
   // Tapt Stone operations
   createTaptStone(data: InsertTaptStone): Promise<TaptStone>;
@@ -601,6 +602,26 @@ export class MemStorage implements IStorage {
     };
     this.refunds.set(id, updatedRefund);
     return updatedRefund;
+  }
+
+  async updateTransactionAfterRefund(id: number, refundAmount: number): Promise<Transaction | undefined> {
+    const transaction = this.transactions.get(id);
+    if (!transaction) return undefined;
+
+    const prevRefunded = parseFloat(transaction.totalRefunded || "0");
+    const newTotalRefunded = prevRefunded + refundAmount;
+    const originalPrice = parseFloat(transaction.price);
+    const newRefundableAmount = Math.max(0, originalPrice - newTotalRefunded);
+    const newStatus = newRefundableAmount <= 0 ? "refunded" : "partially_refunded";
+
+    const updated = {
+      ...transaction,
+      totalRefunded: newTotalRefunded.toFixed(2),
+      refundableAmount: newRefundableAmount.toFixed(2),
+      status: newStatus,
+    };
+    this.transactions.set(id, updated);
+    return updated;
   }
 
   async updateTransactionStatus(id: number, status: string, windcaveTransactionId?: string): Promise<Transaction | undefined> {
@@ -2125,6 +2146,30 @@ export class DatabaseStorage implements IStorage {
       .update(refunds)
       .set(updateData)
       .where(eq(refunds.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async updateTransactionAfterRefund(id: number, refundAmount: number): Promise<Transaction | undefined> {
+    if (!this.db) throw new Error('Database not available');
+
+    const [transaction] = await this.db.select().from(transactions).where(eq(transactions.id, id)).limit(1);
+    if (!transaction) return undefined;
+
+    const prevRefunded = parseFloat(transaction.totalRefunded || "0");
+    const newTotalRefunded = prevRefunded + refundAmount;
+    const originalPrice = parseFloat(transaction.price);
+    const newRefundableAmount = Math.max(0, originalPrice - newTotalRefunded);
+    const newStatus = newRefundableAmount <= 0 ? "refunded" : "partially_refunded";
+
+    const result = await this.db
+      .update(transactions)
+      .set({
+        totalRefunded: newTotalRefunded.toFixed(2),
+        refundableAmount: newRefundableAmount.toFixed(2),
+        status: newStatus,
+      })
+      .where(eq(transactions.id, id))
       .returning();
     return result[0];
   }

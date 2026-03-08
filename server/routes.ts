@@ -3595,8 +3595,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Merchant authentication required" });
       }
 
-      // Validate refund data
-      const validation = createRefundSchema.safeParse(req.body);
+      // Validate refund data — merge transactionId from URL param into body for schema validation
+      const validation = createRefundSchema.safeParse({ ...req.body, transactionId });
       if (!validation.success) {
         return res.status(400).json({ message: "Invalid refund data", errors: validation.error.errors });
       }
@@ -3614,8 +3614,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      // Check if transaction can be refunded
-      if (transaction.status !== "completed") {
+      // Check if transaction can be refunded (allow partially_refunded for further partial refunds)
+      if (transaction.status !== "completed" && transaction.status !== "partially_refunded") {
         return res.status(400).json({ message: "Only completed transactions can be refunded" });
       }
 
@@ -3647,37 +3647,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
         completedAt: null,
       });
 
-      // In a real system, this would integrate with Windcave refund API
-      // For now, we'll simulate the refund process
-      const isSimulation = !windcaveService.isConfigured();
-      
-      if (isSimulation) {
-        // Simulate successful refund
-        const windcaveRefundId = `REFUND_${Date.now()}`;
-        await storage.updateRefundStatus(refund.id, "completed", windcaveRefundId);
-        
-        // Notify connected clients about the refund
-        broadcastToStone(merchantId, transaction.taptStoneId, { 
-          type: 'refund_completed', 
-          refund: { ...refund, status: "completed", windcaveRefundId },
-          transactionId
-        });
+      let windcaveRefundId: string;
+      const isLive = isWindcaveConfigured() && transaction.windcaveTransactionId;
 
-        sendPushToMerchant(merchantId, "refunded", transaction.itemName, refund.amount, transaction.id).catch(() => {});
+      if (isLive) {
+        // Real Windcave refund against the original transaction
+        const merchantReference = `REFUND-${transaction.id}-${Date.now()}`;
+        const refundResult = await createWindcaveRefund(
+          transaction.windcaveTransactionId!,
+          parseFloat(refundAmount).toFixed(2),
+          merchantReference
+        );
 
-        res.json({ 
-          success: true,
-          message: "Refund processed successfully",
-          refund: { ...refund, status: "completed", windcaveRefundId }
-        });
+        if (!refundResult.success) {
+          await storage.updateRefundStatus(refund.id, "failed");
+          return res.status(502).json({ 
+            message: refundResult.error || "Windcave refund failed. Please try again." 
+          });
+        }
+
+        windcaveRefundId = refundResult.refundTransactionId!;
       } else {
-        // Real Windcave integration would go here
-        res.json({ 
-          success: true,
-          message: "Refund request created and being processed",
-          refund
-        });
+        // Simulation fallback (dev mode or no Windcave transaction ID on record)
+        windcaveRefundId = `REFUND_SIM_${Date.now()}`;
       }
+
+      // Mark refund record as completed
+      const completedRefund = await storage.updateRefundStatus(refund.id, "completed", windcaveRefundId);
+
+      // Update transaction totals and status (refunded / partially_refunded)
+      const updatedTransaction = await storage.updateTransactionAfterRefund(transactionId, requestedAmount);
+
+      // Broadcast real-time update
+      broadcastToStone(merchantId, transaction.taptStoneId, { 
+        type: 'refund_completed', 
+        refund: completedRefund,
+        transaction: updatedTransaction,
+        transactionId
+      });
+
+      sendPushToMerchant(merchantId, "refunded", transaction.itemName, refund.refundAmount, transaction.id).catch(() => {});
+
+      res.json({ 
+        success: true,
+        message: isLive ? "Refund processed with Windcave successfully" : "Refund processed successfully",
+        refund: completedRefund,
+        transaction: updatedTransaction
+      });
 
     } catch (error) {
       console.error("Error creating refund:", error);
