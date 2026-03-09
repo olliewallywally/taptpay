@@ -1,0 +1,949 @@
+/* TaptPay HPP Custom Style */
+/* Based on Windcave STYLE12 template — TaptPay brand: #0055FF (blue), #00E5CC (turquoise) */
+
+html,
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, Helvetica, sans-serif;
+    color: #1a1a2e;
+    font-size: 14px;
+    margin: 0;
+    padding: 0;
+    background-color: #f0f4ff;
+}
+
+.wrapper {
+    min-height: 100%;
+    height: auto !important;
+    height: 100%;
+    max-width: 440px;
+    margin: 0 auto;
+}
+
+.push {
+    height: 20px;
+    display: block;
+}
+
+.DpsRegularTextWeight {
+    font-weight: normal;
+}
+
+.DpsBoldText {
+    font-weight: bold;
+}
+
+blockquote {
+    margin: 1.25em;
+    padding: 1.25em;
+}
+
+q {
+    font-style: italic;
+}
+
+acronym {
+    border-bottom: 1px dashed;
+}
+
+small {
+    font-size: .85em;
+}
+
+big {
+    font-size: 1.2em;
+}
+
+table {
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+tbody {
+    margin: 0;
+    padding: 0;
+}
+
+form {
+    margin: 0;
+    padding: 0;
+    display: inline;
+}
+
+.clear {
+    clear: both;
+}
+
+.blockCenter {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.bold {
+    font-weight: bold;
+}
+
+.italic {
+    font-style: italic;
+}
+
+.underline {
+    text-decoration: underline;
+}
+
+.noindent {
+    margin-left: 0;
+    padding-left: 0;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    margin: 0;
+    padding: 0;
+    font-weight: 600;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, Helvetica, sans-serif;
+    color: #0055FF;
+}
+
+p,
+th,
+td,
+li,
+dd,
+dt,
+ul,
+ol,
+blockquote,
+q,
+acronym,
+abbr,
+a,
+input,
+select,
+textarea {
+    margin: 0;
+    padding: 0;
+    white-space: nowrap;
+}
+
+a,
+a:link,
+a:visited,
+a:active,
+a:hover {
+    text-decoration: none;
+    color: #0055FF;
+}
+
+a:active {
+    background-color: transparent;
+}
+
+a:focus {
+    border: 1px solid #0055FF !important;
+    outline: 0;
+    -webkit-box-shadow: inset 0 1px 1px rgba(0, 85, 255, .1), 0 0 8px rgba(0, 85, 255, .4);
+    box-shadow: inset 0 1px 1px rgba(0, 85, 255, .1), 0 0 8px rgba(0, 85, 255, .4);
+}
+
+label {
+    cursor: pointer;
+    color: #3b3d53;
+    font-size: 13px;
+}
+
+.DpsRadioButton:focus {
+    border: 1px solid #0055FF;
+    outline: 0;
+    -webkit-box-shadow: inset 0 1px 1px rgba(0, 85, 255, .1), 0 0 8px rgba(0, 85, 255, .4);
+    box-shadow: inset 0 1px 1px rgba(0, 85, 255, .1), 0 0 8px rgba(0, 85, 255, .4);
+}
+
+*::-ms-backdrop, .DpsRadioButton:focus {
+    border: 0;
+    outline: 1px solid;
+    outline-color: #0055FF;
+    -webkit-box-shadow: inset 0 1px 1px rgba(0, 85, 255, .1), 0 0 8px rgba(0, 85, 255, .4);
+    box-shadow: inset 0 1px 1px rgba(0, 85, 255, .1), 0 0 8px rgba(0, 85, 255, .4);
+}
+
+button:focus {
+    border: 1px solid #0044DD;
+    outline: 0;
+    -webkit-box-shadow: inset 0 1px 1px rgba(0, 85, 255, .1), 0 0 8px rgba(0, 85, 255, .4);
+    box-shadow: inset 0 1px 1px rgba(0, 85, 255, .1), 0 0 8px rgba(0, 85, 255, .4);
+}
+
+img {
+    border: none;
+}
+
+/* ── BODY BACKGROUND ─────────────────────────────────────────────────────── */
+
+.DpsBody {
+    background-color: #f0f4ff;
+    background-image: linear-gradient(160deg, #e8f0ff 0%, #f0f4ff 50%, #e0faf8 100%);
+    -webkit-background-size: cover;
+    -moz-background-size: cover;
+    -o-background-size: cover;
+    background-size: cover;
+    margin: 0;
+    padding: 16px 8px 32px 8px;
+    background-position: center center;
+    min-height: 100vh;
+}
+
+/* ── TAPTPAY BRAND HEADER ────────────────────────────────────────────────── */
+
+#PxPayHeader.DpsUiPanel {
+    background: linear-gradient(135deg, #0055FF 0%, #00E5CC 100%) !important;
+    border: none !important;
+    border-radius: 16px 16px 0 0 !important;
+    padding: 20px 20px 20px 20px !important;
+    margin: 0 0 0 0 !important;
+    box-shadow: 0 4px 20px rgba(0, 85, 255, 0.2);
+}
+
+#PxPayHeader.DpsUiPanel .DpsText,
+#PxPayHeader.DpsUiPanel .DpsLegend,
+#PxPayHeader.DpsUiPanel label,
+#PxPayHeader.DpsUiPanel td,
+#PxPayHeader.DpsUiPanel th {
+    color: #ffffff !important;
+    font-size: 13px;
+}
+
+#PxPayHeader.DpsUiPanel #Amount,
+#PxPayHeader.DpsUiPanel #AmountTotal,
+#PxPayHeader.DpsUiPanel #TotalAmount {
+    color: #ffffff !important;
+    font-size: 22px !important;
+    font-weight: 700 !important;
+}
+
+/* ── PANELS ──────────────────────────────────────────────────────────────── */
+
+.DpsUiPanel {
+    background-color: #ffffff;
+    border: 1px solid #e8eaf0;
+    border-bottom: 1px solid #e8eaf0;
+    border-radius: 0;
+    margin: 0 0 2px 0;
+    padding: 16px 20px 20px 20px;
+    box-shadow: 0 1px 4px rgba(0, 85, 255, 0.05);
+}
+
+.DpsUiPanel:first-of-type {
+    border-radius: 16px 16px 0 0;
+}
+
+.DpsUiPanel:last-of-type {
+    border-radius: 0 0 16px 16px;
+    margin-bottom: 0;
+}
+
+/* Footer panel */
+#PxPayFooter.DpsUiPanel {
+    background: none;
+    background-color: transparent !important;
+    border: none;
+    margin: 12px auto 0 auto;
+    padding: 0;
+    position: static;
+    display: table;
+    width: 100%;
+    box-shadow: none;
+}
+
+.DpsUiPanelPostalCode {
+    max-width: 85% !important;
+}
+
+.DpsUiPanelIssueNumber {
+    max-width: 85px;
+}
+
+.DpsUiPanelCountryDropList {
+    width: 210px !important;
+    margin-right: 0px !important;
+}
+
+.DpsUiPanelCvc {
+    float: left;
+}
+
+.DpsCvcLink {
+    float: left;
+    margin: 15px 0 0 0;
+    font-size: 13px;
+    color: #0055FF;
+}
+
+.DpsUiPanelCvcIcon {
+    margin: 15px 10px 0 10px;
+    float: left;
+}
+
+.DpsUiPanelExpiryDate {
+    min-width: 52px !important;
+}
+
+/* ── AMOUNT / TOTALS ─────────────────────────────────────────────────────── */
+
+#Amount, #AmountTotal, #AmountSurcharge, #TotalAmount, #PredetermineAmountSurcharge,
+#PredetermineAmountTotal, #AjaxAmountSurcharge, #AjaxAmountTotal,
+#ConvertedAmount, #GiftCardAmount {
+    font-weight: 700;
+    color: #0055FF;
+}
+
+/* ── FORM FIELDS ─────────────────────────────────────────────────────────── */
+
+.DpsField {
+    text-align: left;
+    height: 36px;
+    margin: 0;
+    white-space: pre-line;
+    margin: 4px 5px 4px 5px;
+    border-radius: 8px;
+}
+
+input.DpsField {
+    -webkit-appearance: none;
+    background-color: #fafbff;
+    border: 1.5px solid #dde2f0;
+    border-radius: 8px;
+    -webkit-box-shadow: none;
+    box-shadow: none;
+    -webkit-transition: border-color ease-in-out .15s, box-shadow ease-in-out .15s;
+    -o-transition: border-color ease-in-out .15s, box-shadow ease-in-out .15s;
+    transition: border-color ease-in-out .15s, box-shadow ease-in-out .15s;
+    padding: 6px 10px;
+    font-size: 14px;
+    color: #1a1a2e;
+}
+
+input.DpsField:focus {
+    border: 1.5px solid #0055FF;
+    background-color: #ffffff;
+    outline: 0;
+    -webkit-box-shadow: 0 0 0 3px rgba(0, 85, 255, 0.12);
+    box-shadow: 0 0 0 3px rgba(0, 85, 255, 0.12);
+}
+
+select.DpsField {
+    border: 1.5px solid #dde2f0;
+    color: #1a1a2e;
+    border-radius: 8px;
+    -webkit-box-shadow: none;
+    box-shadow: none;
+    background-color: #fafbff;
+    height: 40px;
+    font-size: 14px;
+    padding-left: 8px;
+    white-space: nowrap;
+}
+
+select.DpsField:focus {
+    border-color: #0055FF;
+    outline: 0;
+    -webkit-box-shadow: 0 0 0 3px rgba(0, 85, 255, 0.12);
+    box-shadow: 0 0 0 3px rgba(0, 85, 255, 0.12);
+}
+
+.DpsIssueNumber {
+    max-width: 93px;
+}
+
+.DpsField:focus {
+    border-color: #0055FF;
+    outline: 0;
+    -webkit-box-shadow: 0 0 0 3px rgba(0, 85, 255, 0.12);
+    box-shadow: 0 0 0 3px rgba(0, 85, 255, 0.12);
+}
+
+.DpsFieldLegend {
+    margin-bottom: 0px;
+    white-space: pre-line;
+    color: #3b3d53;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+/* ── RADIO BUTTONS ───────────────────────────────────────────────────────── */
+
+.DpsUiPanel input[type="radio"] {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    vertical-align: middle;
+    cursor: pointer;
+    accent-color: #0055FF;
+}
+
+.DpsUiPanel input[type="checkbox"] {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    vertical-align: unset;
+    cursor: pointer;
+    accent-color: #0055FF;
+}
+
+.DpsUiPanel input[type=radio]:checked ~ .check {
+    border: 5px solid #0055FF;
+}
+
+.DpsUiPanel input[type=radio]:checked ~ .check::before {
+    background: #0055FF;
+}
+
+.DpsUiPanel input[type=radio]:checked ~ label {
+    color: #0055FF;
+}
+
+#DCCInfoGroup input[type=radio]:checked ~ label {
+    color: unset !important;
+}
+
+#PxPaySelectMethodMain.DpsUiPanel input[type=radio]:checked ~ label {
+    background-color: #f0f4ff;
+    -moz-box-shadow: inset 0 0 12px #dde2f0;
+    -webkit-box-shadow: inset 0 0 12px #dde2f0;
+    box-shadow: inset 0 0 12px #dde2f0;
+}
+
+/* ── PAY / SUBMIT BUTTON ─────────────────────────────────────────────────── */
+
+input[type="submit"],
+button[type="submit"],
+.DpsButtonSubmit,
+input.DpsButtonSubmit,
+button.DpsButtonSubmit {
+    background-color: #0055FF !important;
+    background-image: none !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 10px !important;
+    padding: 12px 24px !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, Helvetica, sans-serif !important;
+    cursor: pointer !important;
+    width: 100% !important;
+    letter-spacing: 0.02em;
+    -webkit-transition: background-color 0.15s ease, box-shadow 0.15s ease;
+    -o-transition: background-color 0.15s ease, box-shadow 0.15s ease;
+    transition: background-color 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: 0 4px 14px rgba(0, 85, 255, 0.35) !important;
+    margin-top: 8px;
+}
+
+input[type="submit"]:hover,
+button[type="submit"]:hover,
+.DpsButtonSubmit:hover,
+input.DpsButtonSubmit:hover,
+button.DpsButtonSubmit:hover {
+    background-color: #0044DD !important;
+    box-shadow: 0 6px 20px rgba(0, 85, 255, 0.45) !important;
+}
+
+input[type="submit"]:active,
+button[type="submit"]:active,
+.DpsButtonSubmit:active {
+    background-color: #003DBB !important;
+    box-shadow: 0 2px 8px rgba(0, 85, 255, 0.3) !important;
+}
+
+input[type="submit"]:focus,
+button[type="submit"]:focus,
+.DpsButtonSubmit:focus {
+    outline: 0;
+    border: none !important;
+    box-shadow: 0 0 0 3px rgba(0, 85, 255, 0.3) !important;
+}
+
+/* Cancel / secondary buttons */
+.DpsButtonCancel,
+input.DpsButtonCancel,
+button.DpsButtonCancel {
+    background-color: transparent !important;
+    color: #0055FF !important;
+    border: 1.5px solid #0055FF !important;
+    border-radius: 10px !important;
+    padding: 10px 20px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    background-image: none !important;
+    -webkit-transition: background-color 0.15s ease;
+    transition: background-color 0.15s ease;
+    margin-top: 6px;
+}
+
+.DpsButtonCancel:hover,
+input.DpsButtonCancel:hover,
+button.DpsButtonCancel:hover {
+    background-color: #f0f4ff !important;
+}
+
+/* ── TITLES & LEGENDS ────────────────────────────────────────────────────── */
+
+.DpsUiPanelLegend {
+    margin: 5px 0 10px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #0055FF;
+}
+
+.DpsGroupHeader {
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    margin: 10px 0 10px 0;
+    color: #3b3d53;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.DpsLink {
+    color: #0055FF;
+}
+
+.DpsLink:hover {
+    color: #0044DD;
+    text-decoration: underline;
+}
+
+/* ── TEXT ELEMENTS ───────────────────────────────────────────────────────── */
+
+.DpsText {
+    display: inline-block;
+    position: static;
+    margin-top: 2px;
+    margin-bottom: 2px;
+    padding-top: 0px;
+    padding-bottom: 0px;
+    padding-left: 0px;
+    white-space: pre-line;
+    font-size: 13px;
+    color: #3b3d53;
+}
+
+.DpsTextError {
+    color: #c0392b;
+}
+
+.DpsLegend {
+    position: static;
+    margin-top: 2px;
+    margin-bottom: 2px;
+    padding: 1px 0;
+    white-space: pre-line;
+    font-size: 13px;
+    color: #3b3d53;
+}
+
+/* ── TABLE CELLS ─────────────────────────────────────────────────────────── */
+
+.DpsInlineValidationCell,
+.DpsTableCell {
+    padding: 2px 0px 2px 0;
+    vertical-align: middle !important;
+}
+
+#PxPaySelectMethodMain .DpsTableCell {
+    padding: 10px 0 0 0;
+}
+
+#PxPayAccount2AccountAuth .DpsTableCell {
+    padding: 15px 0 0 5px;
+}
+
+.DpsTableCellLegend {
+    width: 40%;
+    white-space: nowrap;
+    padding: 2px 0 2px 0;
+    vertical-align: middle;
+}
+
+#PaymenuMain .DpsTableCellLegend {
+    width: 0%;
+}
+
+#PxPayAuthMain .DpsTableCellLegend,
+#PxPayAuthResult .DpsTableCellLegend {
+    height: 25px;
+}
+
+#TxnAuthPayPal .DpsTableCellLegend {
+    width: auto;
+}
+
+div[id^="TxnAuthCreditCard_"] {
+    width: auto;
+}
+
+.DpsConfirmPaymentDetails .DpsTableCellLegend {
+    width: 0px !important;
+}
+
+/* ── FIELD WIDTHS ────────────────────────────────────────────────────────── */
+
+textarea.DpsField {
+    white-space: normal;
+    border-radius: 8px;
+}
+
+.DpsFieldChar2  { width: 20px; }
+.DpsFieldChar4  { width: 35px; }
+.DpsFieldChar6  { width: 55px; }
+.DpsFieldChar8  { width: 75px; }
+.DpsFieldChar10 { width: 95px; }
+.DpsFieldChar20,
+.DpsFieldChar30,
+.DpsFieldChar40,
+.DpsFieldChar50,
+.DpsFieldChar60,
+.DpsFieldChar70,
+.DpsFieldChar80,
+.DpsFieldChar90,
+.DpsFieldChar100 { max-width: 100%; }
+
+.DpsFieldAmountCurrency {
+    text-align: center;
+    width: 65px !important;
+    margin-top: 4px;
+    font-weight: 600;
+    color: #0055FF;
+}
+
+.DpsFieldAmountNumeral {
+    text-align: right;
+    max-width: 60px;
+}
+
+.DpsFieldAmountFraction {
+    text-align: right;
+    max-width: 30px !important;
+    margin: 0px !important;
+}
+
+.DpsShortPhonePrefix {
+    width: 70px;
+    font-family: monospace, monospace;
+}
+
+.DpsFieldPhoneNumber {
+    width: 108px;
+}
+
+/* ── ERROR / WARNING / SUCCESS MESSAGES ─────────────────────────────────── */
+
+.DpsWarningBanner {
+    color: #7d5a00;
+    background-color: #fff8e1;
+    border-left: 4px solid #f0b429;
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+}
+
+.DpsFieldError {
+    color: #c0392b;
+    font-size: 12px;
+    margin-top: 2px;
+}
+
+.DpsFieldErrorCaptcha {
+    color: #c0392b;
+    background-color: #fdf2f2;
+    padding: 12px !important;
+    margin-top: 10px;
+    margin-bottom: 5px;
+    border: 1.5px solid #f5c6c6 !important;
+    border-radius: 8px;
+    line-height: 20px;
+    display: block;
+}
+
+.DpsPageErrorPanel {
+    color: #c0392b;
+    background-color: #fdf2f2;
+    border-color: #f5c6c6;
+    padding: 14px !important;
+    margin: 10px 0 16px 0;
+    border: 1.5px solid #f5c6c6;
+    border-radius: 8px;
+    display: block !important;
+    float: none !important;
+}
+
+#PxPayAuthResult .DpsPageErrorPanel {
+    float: left !important;
+}
+
+.DpsPageAttentionPanel {
+    color: #0055FF;
+    background-color: #eef2ff;
+    border-color: #c7d2fe;
+    padding: 14px !important;
+    margin-bottom: 16px;
+    border: 1.5px solid #c7d2fe;
+    border-radius: 8px;
+    display: block !important;
+    float: none !important;
+}
+
+.DpsPageSuccessPanel {
+    color: #0a7a3e;
+    background-color: #e8faf0;
+    border-color: #a8e6c0;
+    padding: 14px !important;
+    margin-bottom: 16px;
+    border: 1.5px solid #a8e6c0;
+    border-radius: 8px;
+    display: block !important;
+}
+
+/* ── SPINNER / LOADING ───────────────────────────────────────────────────── */
+
+.DpsFieldDateMonth > option {
+    width: auto;
+}
+
+div.spinner {
+    position: relative;
+    width: 20px;
+    height: 0px;
+    left: inherit;
+    display: inline-block;
+    padding: 0;
+    margin: 0;
+}
+
+div.spinner div {
+    width: 2px;
+    height: 5px;
+    background: #00E5CC;
+    position: absolute;
+    left: 6px;
+    top: -8px;
+    opacity: 0;
+    -moz-border-radius: 50px;
+    -webkit-animation: fade 1s linear infinite;
+    -webkit-border-radius: 50px;
+    box-shadow: 0 0 3px rgba(0, 229, 204, 0.3);
+    -moz-animation: fade 1s linear infinite;
+    -ms-animation: fade 1s linear infinite;
+    -ms-border-radius: 50px;
+    -o-border-radius: 50px;
+    padding: 0;
+    margin: 0;
+}
+
+div.spinner div.bar1  { -webkit-transform:rotate(0deg)   translate(0,-142%); -moz-transform:rotate(0deg)   translate(0,-142%); -ms-transform:rotate(0deg)   translate(0,-142%); -webkit-animation-delay:0s;       -moz-animation-delay:0s;       -ms-animation-delay:0s; }
+div.spinner div.bar2  { -webkit-transform:rotate(30deg)  translate(0,-142%); -moz-transform:rotate(30deg)  translate(0,-142%); -ms-transform:rotate(30deg)  translate(0,-142%); -webkit-animation-delay:-0.9167s; -moz-animation-delay:-0.9167s; -ms-animation-delay:-0.9167s; }
+div.spinner div.bar3  { -webkit-transform:rotate(60deg)  translate(0,-142%); -moz-transform:rotate(60deg)  translate(0,-142%); -ms-transform:rotate(60deg)  translate(0,-142%); -webkit-animation-delay:-0.833s;  -moz-animation-delay:-0.833s;  -ms-animation-delay:-0.833s; }
+div.spinner div.bar4  { -webkit-transform:rotate(90deg)  translate(0,-142%); -moz-transform:rotate(90deg)  translate(0,-142%); -ms-transform:rotate(90deg)  translate(0,-142%); -webkit-animation-delay:-0.75s;   -moz-animation-delay:-0.75s;   -ms-animation-delay:-0.75s; }
+div.spinner div.bar5  { -webkit-transform:rotate(120deg) translate(0,-142%); -moz-transform:rotate(120deg) translate(0,-142%); -ms-transform:rotate(120deg) translate(0,-142%); -webkit-animation-delay:-0.667s;  -moz-animation-delay:-0.667s;  -ms-animation-delay:-0.667s; }
+div.spinner div.bar6  { -webkit-transform:rotate(150deg) translate(0,-142%); -moz-transform:rotate(150deg) translate(0,-142%); -ms-transform:rotate(150deg) translate(0,-142%); -webkit-animation-delay:-0.5833s; -moz-animation-delay:-0.5833s; -ms-animation-delay:-0.5833s; }
+div.spinner div.bar7  { -webkit-transform:rotate(180deg) translate(0,-142%); -moz-transform:rotate(180deg) translate(0,-142%); -ms-transform:rotate(180deg) translate(0,-142%); -webkit-animation-delay:-0.5s;    -moz-animation-delay:-0.5s;    -ms-animation-delay:-0.5s; }
+div.spinner div.bar8  { -webkit-transform:rotate(210deg) translate(0,-142%); -moz-transform:rotate(210deg) translate(0,-142%); -ms-transform:rotate(210deg) translate(0,-142%); -webkit-animation-delay:-0.41667s;-moz-animation-delay:-0.41667s;-ms-animation-delay:-0.41667s; }
+div.spinner div.bar9  { -webkit-transform:rotate(240deg) translate(0,-142%); -moz-transform:rotate(240deg) translate(0,-142%); -ms-transform:rotate(240deg) translate(0,-142%); -webkit-animation-delay:-0.333s;  -moz-animation-delay:-0.333s;  -ms-animation-delay:-0.333s; }
+div.spinner div.bar10 { -webkit-transform:rotate(270deg) translate(0,-142%); -moz-transform:rotate(270deg) translate(0,-142%); -ms-transform:rotate(270deg) translate(0,-142%); -webkit-animation-delay:-0.25s;   -moz-animation-delay:-0.25s;   -ms-animation-delay:-0.25s; }
+div.spinner div.bar11 { -webkit-transform:rotate(300deg) translate(0,-142%); -moz-transform:rotate(300deg) translate(0,-142%); -ms-transform:rotate(300deg) translate(0,-142%); -webkit-animation-delay:-0.1667s; -moz-animation-delay:-0.1667s; -ms-animation-delay:-0.1667s; }
+div.spinner div.bar12 { -webkit-transform:rotate(330deg) translate(0,-142%); -moz-transform:rotate(330deg) translate(0,-142%); -ms-transform:rotate(330deg) translate(0,-142%); -webkit-animation-delay:-0.0833s; -moz-animation-delay:-0.0833s; -ms-animation-delay:-0.0833s; }
+
+@keyframes fade {
+    from { opacity: 1; }
+    to   { opacity: 0.25; }
+}
+
+@-webkit-keyframes fade {
+    from { opacity: 1; }
+    to   { opacity: 0.25; }
+}
+
+@-moz-keyframes fade {
+    0%   { opacity: 0; }
+    100% { opacity: 1; }
+}
+
+/* Redirect loading spinner */
+
+.DpsRedirectLoadingSpinner {
+    width: 56px;
+    height: 56px;
+    border: 4px solid #e8eaf0;
+    border-top: 4px solid #00E5CC;
+    border-radius: 100%;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    margin: auto;
+    animation: spin 0.7s infinite linear;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
+.DpsUiPanel.DpsRedirectLoadingSpinnerPanel {
+    border: none !important;
+    border-bottom: none !important;
+    margin: 0;
+    padding: 0;
+    height: 0;
+}
+
+.DpsText.DpsRedirectLoadingSpinnerText {
+    margin-top: auto !important;
+    margin-bottom: auto !important;
+    display: block !important;
+    float: none !important;
+}
+
+.DpsRedirectLoadingSpinnerText {
+    height: 140px;
+    text-align: center;
+    position: absolute !important;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    margin: auto;
+    display: block;
+    color: #0055FF;
+    opacity: 1;
+    animation: pulse 1s infinite;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.7; }
+    50%       { opacity: 1; }
+}
+
+/* ── MISC HELPERS ────────────────────────────────────────────────────────── */
+
+div.labeled {
+    position: relative;
+    font-family: sans-serif;
+    font-size: 12px;
+    margin: 0;
+    background: #fff;
+    padding: 0;
+    display: inline-block;
+    color: #0055FF;
+    line-height: 18px;
+    border-radius: 1em;
+}
+
+div.labeled div.spinner {
+    float: left;
+    vertical-align: top;
+    width: 100px;
+    height: 100px;
+    margin: 0;
+    padding: 0;
+}
+
+div.labeled div.spinner div {
+    background: #0055FF;
+}
+
+/* ── TEXT PANEL OVERRIDES ────────────────────────────────────────────────── */
+
+#PxPaySelectMethodMain .DpsText {
+    margin: 0;
+    margin-bottom: 10px;
+}
+
+#TxnAuthCreditCard .DpsText,
+#TxnAuthPaymentExpressWalletLogin .DpsText {
+    margin: 5px 5px 5px 0;
+}
+
+#DCCInfoGroup .DpsText {
+    font-size: 14px;
+}
+
+#DCCInfoGroup .DpsTextWrapper {
+    text-align: left;
+}
+
+/* ── HIDDEN / UTILITY ────────────────────────────────────────────────────── */
+
+.DpsHidden {
+    display: none !important;
+}
+
+.DpsVisibilityHidden {
+    visibility: hidden;
+}
+
+.DpsUppercase {
+    text-transform: uppercase;
+}
+
+.DpsSrHidden {
+    position: absolute;
+    left: -10000px;
+    top: auto;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+}
+
+input:required:invalid {
+    outline: none;
+}
+
+:-moz-ui-invalid {
+    box-shadow: none;
+}
+
+#CaptchaContainer {
+    max-width: 300px;
+    margin: 0 auto;
+    margin-top: 10px;
+}
+
+fieldset {
+    position: static;
+    height: 100%;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    min-width: 1%;
+    display: block;
+    word-wrap: break-word;
+}
+
+#CopyShippingInfoFromBillingInfo {
+    margin: -1px 0 0 0;
+}
+
+/* ── POWERED BY TAPTPAY FOOTER ───────────────────────────────────────────── */
+
+#PxPayFooter.DpsUiPanel::after {
+    content: "Secured by TaptPay · taptpay.co.nz";
+    display: block;
+    text-align: center;
+    font-size: 11px;
+    color: #8892b0;
+    margin-top: 12px;
+    letter-spacing: 0.03em;
+}
