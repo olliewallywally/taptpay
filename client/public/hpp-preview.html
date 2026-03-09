@@ -4,11 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>TaptPay – Payment Page Design Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
       background: #ffffff;
       min-height: 100vh;
       display: flex;
@@ -25,6 +28,7 @@
       color: #fff;
       text-align: center;
       font-size: 12px;
+      font-family: 'Inter', sans-serif;
       padding: 8px 16px;
       letter-spacing: 0.03em;
       z-index: 999;
@@ -40,8 +44,8 @@
 
     .card {
       background: #0055FF;
-      border-radius: 36px;
-      padding: 28px 28px 32px;
+      border-radius: 40px;
+      padding: 28px 28px 44px;
       box-shadow: 0 24px 60px rgba(0, 85, 255, 0.35);
       position: relative;
       z-index: 2;
@@ -53,13 +57,11 @@
       justify-content: center;
       margin-bottom: 20px;
     }
-    .logo-text {
-      font-size: 22px;
-      font-weight: 700;
-      color: #00E5CC;
-      letter-spacing: -0.5px;
+    .logo img {
+      height: 36px;
+      object-fit: contain;
+      filter: brightness(0) saturate(100%) invert(78%) sepia(96%) saturate(2453%) hue-rotate(131deg) brightness(97%) contrast(101%);
     }
-    .logo-text span { color: #00E5CC; font-weight: 400; }
 
     /* Amount */
     .item-name {
@@ -68,77 +70,70 @@
       font-size: 14px;
       margin-bottom: 4px;
       font-weight: 400;
+      font-family: 'Inter', sans-serif;
     }
     .amount {
       text-align: center;
       color: #ffffff;
       font-size: 56px;
       font-weight: 700;
+      font-family: 'Inter', sans-serif;
       letter-spacing: -2px;
       line-height: 1;
       margin-bottom: 28px;
     }
 
-    /* Buttons */
+    /* Apple Pay button */
     .btn-apple {
       width: 100%;
       background: #000000;
       color: #fff;
       border: none;
-      border-radius: 16px;
-      padding: 16px;
-      font-size: 17px;
+      border-radius: 18px;
+      padding: 14px;
+      font-size: 15px;
       font-weight: 600;
+      font-family: 'Inter', sans-serif;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 8px;
       cursor: default;
-      margin-bottom: 10px;
+      margin-bottom: 0;
       letter-spacing: -0.2px;
     }
     .btn-apple svg { flex-shrink: 0; }
 
-    .btn-split {
-      width: 100%;
-      background: #00E5CC;
-      color: #0055FF;
-      border: none;
-      border-radius: 16px;
-      padding: 16px 20px;
-      font-size: 15px;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      cursor: default;
-    }
-
     /* Card details tab — sits below the blue card */
     .card-details-tab {
       background: #00E5CC;
-      border-radius: 0 0 28px 28px;
-      padding: 22px 28px 18px;
+      border-radius: 0 0 32px 32px;
+      padding: 20px 26px 17px;
       margin-top: -12px;
       position: relative;
       z-index: 1;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      cursor: default;
+      cursor: pointer;
       box-shadow: 0 16px 40px rgba(0, 229, 204, 0.25);
+      transition: background 0.15s ease;
+      user-select: none;
     }
+    .card-details-tab:hover { background: #00d4bc; }
+    .card-details-tab.open { border-radius: 0; box-shadow: none; }
+
     .card-details-tab .label {
       display: flex;
       align-items: center;
       gap: 8px;
       color: #0055FF;
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 600;
+      font-family: 'Inter', sans-serif;
     }
 
-    /* Chevron icon */
-    .chevron {
+    .tab-chevron {
       width: 20px;
       height: 20px;
       stroke: #0055FF;
@@ -146,12 +141,17 @@
       stroke-width: 2.5;
       stroke-linecap: round;
       stroke-linejoin: round;
+      transition: transform 0.25s ease;
+      flex-shrink: 0;
+    }
+    .card-details-tab.open .tab-chevron {
+      transform: rotate(180deg);
     }
 
     /* Credit card icon */
     .icon-card {
-      width: 20px;
-      height: 20px;
+      width: 18px;
+      height: 18px;
       stroke: #0055FF;
       fill: none;
       stroke-width: 2;
@@ -159,11 +159,76 @@
       stroke-linejoin: round;
     }
 
+    /* ── Expandable card form ──────────────────────────────────── */
+    .card-form {
+      display: none;
+      background: #00E5CC;
+      border-radius: 0 0 32px 32px;
+      padding: 4px 22px 22px;
+      position: relative;
+      z-index: 0;
+      box-shadow: 0 16px 40px rgba(0, 229, 204, 0.25);
+    }
+    .card-form.open { display: block; }
+
+    .form-field {
+      margin-bottom: 10px;
+    }
+    .form-label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+      color: #0044BB;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 5px;
+    }
+    .form-input {
+      width: 100%;
+      background: rgba(255,255,255,0.55);
+      border: 1.5px solid rgba(0,85,255,0.18);
+      border-radius: 12px;
+      padding: 11px 14px;
+      font-size: 14px;
+      font-family: 'Inter', sans-serif;
+      color: #0a1a4a;
+      outline: none;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .form-input::placeholder { color: rgba(0,40,120,0.4); }
+    .form-input:focus {
+      border-color: #0055FF;
+      background: rgba(255,255,255,0.8);
+    }
+    .form-row {
+      display: flex;
+      gap: 10px;
+    }
+    .form-row .form-field { flex: 1; }
+
+    .btn-pay {
+      width: 100%;
+      margin-top: 14px;
+      background: #0055FF;
+      color: #fff;
+      border: none;
+      border-radius: 18px;
+      padding: 14px;
+      font-size: 15px;
+      font-weight: 700;
+      font-family: 'Inter', sans-serif;
+      cursor: default;
+      letter-spacing: -0.1px;
+      box-shadow: 0 6px 20px rgba(0,85,255,0.35);
+    }
+
     /* Disclaimer */
     .disclaimer {
       margin-top: 28px;
       text-align: center;
       font-size: 11px;
+      font-family: 'Inter', sans-serif;
       color: #aab0c0;
       letter-spacing: 0.03em;
       max-width: 280px;
@@ -183,9 +248,9 @@
     <!-- Blue payment card -->
     <div class="card">
 
-      <!-- taptpay. logo -->
+      <!-- Logo -->
       <div class="logo">
-        <span class="logo-text">tapt<span>pay.</span></span>
+        <img src="/IMG_6592_1755070818452.png" alt="TaptPay" />
       </div>
 
       <!-- Item + Amount -->
@@ -194,36 +259,49 @@
 
       <!-- Apple Pay -->
       <button class="btn-apple" disabled>
-        <!-- Apple logo -->
-        <svg width="20" height="24" viewBox="0 0 814 1000" fill="white" xmlns="http://www.w3.org/2000/svg">
-          <path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76 0-103.7 40.8-165.9 40.8s-105.4-57.8-155.5-127.4C46 790.8 0 663.4 0 541.8c0-207.8 133.4-317.5 264.4-317.5 99.1 0 181.5 65.5 243.5 65.5 59.3 0 152-69.3 263.4-69.3zM643.4 159.5c-28.4 33.8-74.2 60.3-115.8 60.3-5.2 0-10.4-.5-15.5-1.5 -.9-5.5-1.4-11-1.4-16.5 0-49.5 25.5-101.3 62.6-134.4 19.4-16.9 49.7-33.5 75.6-43.9 4.8 8.1 6.8 17.3 6.8 26.3 0 47.8-20.2 99.1-42.3 109.7z"/>
+        <svg width="18" height="22" viewBox="0 0 814 1000" fill="white" xmlns="http://www.w3.org/2000/svg">
+          <path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76 0-103.7 40.8-165.9 40.8s-105.4-57.8-155.5-127.4C46 790.8 0 663.4 0 541.8c0-207.8 133.4-317.5 264.4-317.5 99.1 0 181.5 65.5 243.5 65.5 59.3 0 152-69.3 263.4-69.3zM643.4 159.5c-28.4 33.8-74.2 60.3-115.8 60.3-5.2 0-10.4-.5-15.5-1.5-.9-5.5-1.4-11-1.4-16.5 0-49.5 25.5-101.3 62.6-134.4 19.4-16.9 49.7-33.5 75.6-43.9 4.8 8.1 6.8 17.3 6.8 26.3 0 47.8-20.2 99.1-42.3 109.7z"/>
         </svg>
         Pay
-      </button>
-
-      <!-- Split the bill -->
-      <button class="btn-split" disabled>
-        <span>split the bill</span>
-        <svg class="chevron" viewBox="0 0 24 24">
-          <polyline points="6 9 12 15 18 9"/>
-        </svg>
       </button>
 
     </div>
 
     <!-- Enter card details tab -->
-    <div class="card-details-tab">
+    <div class="card-details-tab" id="card-tab" onclick="toggleCardForm()">
       <div class="label">
-        <!-- Credit card icon -->
         <svg class="icon-card" viewBox="0 0 24 24">
           <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
           <line x1="1" y1="10" x2="23" y2="10"/>
         </svg>
         enter card details
       </div>
-      <svg class="chevron" viewBox="0 0 24 24">
+      <svg class="tab-chevron" viewBox="0 0 24 24">
         <polyline points="6 9 12 15 18 9"/>
       </svg>
+    </div>
+
+    <!-- Expandable card form -->
+    <div class="card-form" id="card-form">
+      <div class="form-field">
+        <label class="form-label">Card Number</label>
+        <input class="form-input" type="text" placeholder="1234  5678  9012  3456" maxlength="19" />
+      </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label class="form-label">Expiry</label>
+          <input class="form-input" type="text" placeholder="MM / YY" maxlength="7" />
+        </div>
+        <div class="form-field">
+          <label class="form-label">CVC</label>
+          <input class="form-input" type="text" placeholder="•••" maxlength="4" />
+        </div>
+      </div>
+      <div class="form-field">
+        <label class="form-label">Cardholder Name</label>
+        <input class="form-input" type="text" placeholder="Name on card" />
+      </div>
+      <button class="btn-pay" disabled>Pay $8.99</button>
     </div>
 
   </div>
@@ -232,6 +310,16 @@
     This is a <strong>design preview</strong> of the TaptPay customer payment screen.<br/>
     The actual page is live at <strong>/pay/:merchantId</strong>
   </p>
+
+  <script>
+    function toggleCardForm() {
+      const tab = document.getElementById('card-tab');
+      const form = document.getElementById('card-form');
+      const isOpen = form.classList.contains('open');
+      tab.classList.toggle('open', !isOpen);
+      form.classList.toggle('open', !isOpen);
+    }
+  </script>
 
 </body>
 </html>
