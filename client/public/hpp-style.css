@@ -1,9 +1,11 @@
 /* TaptPay HPP Custom Style */
 /* Based on Windcave STYLE12 template — TaptPay brand: #0055FF (blue), #00E5CC (turquoise) */
 
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
 html,
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, Helvetica, sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, Helvetica, sans-serif;
     color: #1a1a2e;
     font-size: 14px;
     margin: 0;
@@ -432,11 +434,11 @@ button.DpsButtonSubmit {
     background-image: none !important;
     color: #ffffff !important;
     border: none !important;
-    border-radius: 10px !important;
+    border-radius: 18px !important;
     padding: 12px 24px !important;
     font-size: 15px !important;
     font-weight: 600 !important;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, Helvetica, sans-serif !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, Helvetica, sans-serif !important;
     cursor: pointer !important;
     width: 100% !important;
     letter-spacing: 0.02em;
@@ -475,24 +477,26 @@ button[type="submit"]:focus,
 .DpsButtonCancel,
 input.DpsButtonCancel,
 button.DpsButtonCancel {
-    background-color: transparent !important;
+    background-color: #00E5CC !important;
     color: #0055FF !important;
-    border: 1.5px solid #0055FF !important;
-    border-radius: 10px !important;
+    border: none !important;
+    border-radius: 18px !important;
     padding: 10px 20px !important;
-    font-size: 14px !important;
-    font-weight: 500 !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, Helvetica, sans-serif !important;
     cursor: pointer !important;
     background-image: none !important;
+    width: 100% !important;
     -webkit-transition: background-color 0.15s ease;
     transition: background-color 0.15s ease;
-    margin-top: 6px;
+    margin-top: 8px;
 }
 
 .DpsButtonCancel:hover,
 input.DpsButtonCancel:hover,
 button.DpsButtonCancel:hover {
-    background-color: #f0f4ff !important;
+    background-color: #00d4bc !important;
 }
 
 /* ── TITLES & LEGENDS ────────────────────────────────────────────────────── */
