@@ -104,6 +104,25 @@
     }
     .btn-apple svg { flex-shrink: 0; }
 
+    /* Cancel button */
+    .btn-cancel {
+      width: 100%;
+      background: #00E5CC;
+      color: #0055FF;
+      border: none;
+      border-radius: 18px;
+      padding: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: default;
+      margin-top: 10px;
+      letter-spacing: -0.1px;
+    }
+
     /* Card details tab — sits below the blue card */
     .card-details-tab {
       background: #00E5CC;
@@ -269,6 +288,9 @@
         </svg>
         Pay
       </button>
+
+      <!-- Cancel Payment -->
+      <button class="btn-cancel" disabled>Cancel Payment</button>
 
     </div>
 
