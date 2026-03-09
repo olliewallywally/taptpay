@@ -1,610 +1,278 @@
-/* TaptPay HPP Custom Style */
-/* Based on Windcave STYLE12 template — TaptPay brand: #0055FF (blue), #00E5CC (turquoise) */
+/* TaptPay HPP Custom Style — exact match to hpp-preview.html */
+/* Brand: #0055FF (blue) · #00E5CC (turquoise) · font: Inter */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
-html,
-body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, Helvetica, sans-serif;
-    color: #1a1a2e;
+/* ── RESET ─────────────────────────────────────────────────────────────────── */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
     font-size: 14px;
-    margin: 0;
-    padding: 0;
-    background-color: #f0f4ff;
+    color: #1a1a2e;
 }
 
+/* ── PAGE BODY ──────────────────────────────────────────────────────────────── */
+
+.DpsBody {
+    background: #f0f4ff;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px 40px;
+    margin: 0;
+}
+
+/* ── WRAPPER ────────────────────────────────────────────────────────────────── */
+
 .wrapper {
-    min-height: 100%;
-    height: auto !important;
-    height: 100%;
-    max-width: 440px;
+    width: 100%;
+    max-width: 320px;
     margin: 0 auto;
 }
 
-.push {
-    height: 20px;
-    display: block;
-}
-
-.DpsRegularTextWeight {
-    font-weight: normal;
-}
-
-.DpsBoldText {
-    font-weight: bold;
-}
-
-blockquote {
-    margin: 1.25em;
-    padding: 1.25em;
-}
-
-q {
-    font-style: italic;
-}
-
-acronym {
-    border-bottom: 1px dashed;
-}
-
-small {
-    font-size: .85em;
-}
-
-big {
-    font-size: 1.2em;
-}
-
-table {
-    margin: 0;
-    padding: 0;
-    border: none;
-    border-collapse: collapse;
-    border-spacing: 0;
-}
-
-tbody {
-    margin: 0;
-    padding: 0;
-}
-
-form {
-    margin: 0;
-    padding: 0;
-    display: inline;
-}
-
-.clear {
-    clear: both;
-}
-
-.blockCenter {
-    display: block;
-    margin-left: auto;
-    margin-right: auto;
-}
-
-.bold {
-    font-weight: bold;
-}
-
-.italic {
-    font-style: italic;
-}
-
-.underline {
-    text-decoration: underline;
-}
-
-.noindent {
-    margin-left: 0;
-    padding-left: 0;
-}
-
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-    margin: 0;
-    padding: 0;
-    font-weight: 600;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, Helvetica, sans-serif;
-    color: #0055FF;
-}
-
-p,
-th,
-td,
-li,
-dd,
-dt,
-ul,
-ol,
-blockquote,
-q,
-acronym,
-abbr,
-a,
-input,
-select,
-textarea {
-    margin: 0;
-    padding: 0;
-    white-space: nowrap;
-}
-
-a,
-a:link,
-a:visited,
-a:active,
-a:hover {
-    text-decoration: none;
-    color: #0055FF;
-}
-
-a:active {
-    background-color: transparent;
-}
-
-a:focus {
-    border: 1px solid #0055FF !important;
-    outline: 0;
-    -webkit-box-shadow: inset 0 1px 1px rgba(0, 85, 255, .1), 0 0 8px rgba(0, 85, 255, .4);
-    box-shadow: inset 0 1px 1px rgba(0, 85, 255, .1), 0 0 8px rgba(0, 85, 255, .4);
-}
-
-label {
-    cursor: pointer;
-    color: #3b3d53;
-    font-size: 13px;
-}
-
-.DpsRadioButton:focus {
-    border: 1px solid #0055FF;
-    outline: 0;
-    -webkit-box-shadow: inset 0 1px 1px rgba(0, 85, 255, .1), 0 0 8px rgba(0, 85, 255, .4);
-    box-shadow: inset 0 1px 1px rgba(0, 85, 255, .1), 0 0 8px rgba(0, 85, 255, .4);
-}
-
-*::-ms-backdrop, .DpsRadioButton:focus {
-    border: 0;
-    outline: 1px solid;
-    outline-color: #0055FF;
-    -webkit-box-shadow: inset 0 1px 1px rgba(0, 85, 255, .1), 0 0 8px rgba(0, 85, 255, .4);
-    box-shadow: inset 0 1px 1px rgba(0, 85, 255, .1), 0 0 8px rgba(0, 85, 255, .4);
-}
-
-button:focus {
-    border: 1px solid #0044DD;
-    outline: 0;
-    -webkit-box-shadow: inset 0 1px 1px rgba(0, 85, 255, .1), 0 0 8px rgba(0, 85, 255, .4);
-    box-shadow: inset 0 1px 1px rgba(0, 85, 255, .1), 0 0 8px rgba(0, 85, 255, .4);
-}
-
-img {
-    border: none;
-}
-
-/* ── BODY BACKGROUND ─────────────────────────────────────────────────────── */
-
-.DpsBody {
-    background-color: #f0f4ff;
-    background-image: linear-gradient(160deg, #e8f0ff 0%, #f0f4ff 50%, #e0faf8 100%);
-    -webkit-background-size: cover;
-    -moz-background-size: cover;
-    -o-background-size: cover;
-    background-size: cover;
-    margin: 0;
-    padding: 16px 8px 32px 8px;
-    background-position: center center;
-    min-height: 100vh;
-}
-
-/* ── TAPTPAY BRAND HEADER ────────────────────────────────────────────────── */
+/* ── BLUE CARD (header panel = .card in preview) ────────────────────────────── */
 
 #PxPayHeader.DpsUiPanel {
-    background: linear-gradient(135deg, #0055FF 0%, #00E5CC 100%) !important;
+    background: #0055FF !important;
     border: none !important;
-    border-radius: 16px 16px 0 0 !important;
-    padding: 20px 20px 20px 20px !important;
-    margin: 0 0 0 0 !important;
-    box-shadow: 0 4px 20px rgba(0, 85, 255, 0.2);
+    border-radius: 40px !important;
+    padding: 28px 28px 104px !important;
+    box-shadow: 0 24px 60px rgba(0, 85, 255, 0.35) !important;
+    position: relative !important;
+    z-index: 2 !important;
+    margin: 0 !important;
 }
 
+/* Logo inside header — turquoise filter to match preview */
+#PxPayHeader.DpsUiPanel img {
+    display: block;
+    height: 36px;
+    object-fit: contain;
+    margin: 0 auto 20px auto;
+    filter: brightness(0) saturate(100%) invert(78%) sepia(96%) saturate(2453%) hue-rotate(131deg) brightness(97%) contrast(101%);
+    border: none;
+}
+
+/* Item / merchant reference text (.item-name in preview) */
 #PxPayHeader.DpsUiPanel .DpsText,
 #PxPayHeader.DpsUiPanel .DpsLegend,
-#PxPayHeader.DpsUiPanel label,
 #PxPayHeader.DpsUiPanel td,
-#PxPayHeader.DpsUiPanel th {
-    color: #ffffff !important;
-    font-size: 13px;
+#PxPayHeader.DpsUiPanel th,
+#PxPayHeader.DpsUiPanel label,
+#PxPayHeader.DpsUiPanel p {
+    color: rgba(255, 255, 255, 0.65) !important;
+    font-size: 14px !important;
+    font-weight: 400 !important;
+    font-family: 'Inter', sans-serif !important;
+    text-align: center !important;
+    display: block !important;
+    white-space: pre-line;
+    margin-top: 0;
+    margin-bottom: 4px;
+    padding: 0;
 }
 
+/* Amount (.amount in preview) */
 #PxPayHeader.DpsUiPanel #Amount,
 #PxPayHeader.DpsUiPanel #AmountTotal,
-#PxPayHeader.DpsUiPanel #TotalAmount {
+#PxPayHeader.DpsUiPanel #TotalAmount,
+#PxPayHeader.DpsUiPanel #PredetermineAmountTotal,
+#PxPayHeader.DpsUiPanel #AjaxAmountTotal,
+#PxPayHeader.DpsUiPanel #ConvertedAmount {
     color: #ffffff !important;
-    font-size: 22px !important;
+    font-size: 56px !important;
     font-weight: 700 !important;
+    font-family: 'Inter', sans-serif !important;
+    letter-spacing: -2px !important;
+    line-height: 1 !important;
+    text-align: center !important;
+    display: block !important;
+    margin-bottom: 28px !important;
 }
 
-/* ── PANELS ──────────────────────────────────────────────────────────────── */
+/* ── CANCEL BUTTON (inside header = .btn-cancel in preview) ─────────────────── */
 
-.DpsUiPanel {
-    background-color: #ffffff;
-    border: 1px solid #e8eaf0;
-    border-bottom: 1px solid #e8eaf0;
-    border-radius: 0;
-    margin: 0 0 2px 0;
-    padding: 16px 20px 20px 20px;
-    box-shadow: 0 1px 4px rgba(0, 85, 255, 0.05);
-}
-
-.DpsUiPanel:first-of-type {
-    border-radius: 16px 16px 0 0;
-}
-
-.DpsUiPanel:last-of-type {
-    border-radius: 0 0 16px 16px;
-    margin-bottom: 0;
-}
-
-/* Footer panel */
-#PxPayFooter.DpsUiPanel {
-    background: none;
-    background-color: transparent !important;
-    border: none;
-    margin: 12px auto 0 auto;
-    padding: 0;
-    position: static;
-    display: table;
-    width: 100%;
-    box-shadow: none;
-}
-
-.DpsUiPanelPostalCode {
-    max-width: 85% !important;
-}
-
-.DpsUiPanelIssueNumber {
-    max-width: 85px;
-}
-
-.DpsUiPanelCountryDropList {
-    width: 210px !important;
-    margin-right: 0px !important;
-}
-
-.DpsUiPanelCvc {
-    float: left;
-}
-
-.DpsCvcLink {
-    float: left;
-    margin: 15px 0 0 0;
-    font-size: 13px;
-    color: #0055FF;
-}
-
-.DpsUiPanelCvcIcon {
-    margin: 15px 10px 0 10px;
-    float: left;
-}
-
-.DpsUiPanelExpiryDate {
-    min-width: 52px !important;
-}
-
-/* ── AMOUNT / TOTALS ─────────────────────────────────────────────────────── */
-
-#Amount, #AmountTotal, #AmountSurcharge, #TotalAmount, #PredetermineAmountSurcharge,
-#PredetermineAmountTotal, #AjaxAmountSurcharge, #AjaxAmountTotal,
-#ConvertedAmount, #GiftCardAmount {
-    font-weight: 700;
-    color: #0055FF;
-}
-
-/* ── FORM FIELDS ─────────────────────────────────────────────────────────── */
-
-.DpsField {
-    text-align: left;
-    height: 36px;
-    margin: 0;
-    white-space: pre-line;
-    margin: 4px 5px 4px 5px;
-    border-radius: 8px;
-}
-
-input.DpsField {
-    -webkit-appearance: none;
-    background-color: #fafbff;
-    border: 1.5px solid #dde2f0;
-    border-radius: 8px;
-    -webkit-box-shadow: none;
-    box-shadow: none;
-    -webkit-transition: border-color ease-in-out .15s, box-shadow ease-in-out .15s;
-    -o-transition: border-color ease-in-out .15s, box-shadow ease-in-out .15s;
-    transition: border-color ease-in-out .15s, box-shadow ease-in-out .15s;
-    padding: 6px 10px;
-    font-size: 14px;
-    color: #1a1a2e;
-}
-
-input.DpsField:focus {
-    border: 1.5px solid #0055FF;
-    background-color: #ffffff;
-    outline: 0;
-    -webkit-box-shadow: 0 0 0 3px rgba(0, 85, 255, 0.12);
-    box-shadow: 0 0 0 3px rgba(0, 85, 255, 0.12);
-}
-
-select.DpsField {
-    border: 1.5px solid #dde2f0;
-    color: #1a1a2e;
-    border-radius: 8px;
-    -webkit-box-shadow: none;
-    box-shadow: none;
-    background-color: #fafbff;
-    height: 40px;
-    font-size: 14px;
-    padding-left: 8px;
-    white-space: nowrap;
-}
-
-select.DpsField:focus {
-    border-color: #0055FF;
-    outline: 0;
-    -webkit-box-shadow: 0 0 0 3px rgba(0, 85, 255, 0.12);
-    box-shadow: 0 0 0 3px rgba(0, 85, 255, 0.12);
-}
-
-.DpsIssueNumber {
-    max-width: 93px;
-}
-
-.DpsField:focus {
-    border-color: #0055FF;
-    outline: 0;
-    -webkit-box-shadow: 0 0 0 3px rgba(0, 85, 255, 0.12);
-    box-shadow: 0 0 0 3px rgba(0, 85, 255, 0.12);
-}
-
-.DpsFieldLegend {
-    margin-bottom: 0px;
-    white-space: pre-line;
-    color: #3b3d53;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-}
-
-/* ── RADIO BUTTONS ───────────────────────────────────────────────────────── */
-
-.DpsUiPanel input[type="radio"] {
-    display: inline-block;
-    width: 16px;
-    height: 16px;
-    vertical-align: middle;
-    cursor: pointer;
-    accent-color: #0055FF;
-}
-
-.DpsUiPanel input[type="checkbox"] {
-    display: inline-block;
-    width: 16px;
-    height: 16px;
-    vertical-align: unset;
-    cursor: pointer;
-    accent-color: #0055FF;
-}
-
-.DpsUiPanel input[type=radio]:checked ~ .check {
-    border: 5px solid #0055FF;
-}
-
-.DpsUiPanel input[type=radio]:checked ~ .check::before {
-    background: #0055FF;
-}
-
-.DpsUiPanel input[type=radio]:checked ~ label {
-    color: #0055FF;
-}
-
-#DCCInfoGroup input[type=radio]:checked ~ label {
-    color: unset !important;
-}
-
-#PxPaySelectMethodMain.DpsUiPanel input[type=radio]:checked ~ label {
-    background-color: #f0f4ff;
-    -moz-box-shadow: inset 0 0 12px #dde2f0;
-    -webkit-box-shadow: inset 0 0 12px #dde2f0;
-    box-shadow: inset 0 0 12px #dde2f0;
-}
-
-/* ── PAY / SUBMIT BUTTON ─────────────────────────────────────────────────── */
-
-input[type="submit"],
-button[type="submit"],
-.DpsButtonSubmit,
-input.DpsButtonSubmit,
-button.DpsButtonSubmit {
-    background-color: #0055FF !important;
-    background-image: none !important;
-    color: #ffffff !important;
-    border: none !important;
-    border-radius: 18px !important;
-    padding: 12px 24px !important;
-    font-size: 15px !important;
-    font-weight: 600 !important;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, Helvetica, sans-serif !important;
-    cursor: pointer !important;
-    width: 100% !important;
-    letter-spacing: 0.02em;
-    -webkit-transition: background-color 0.15s ease, box-shadow 0.15s ease;
-    -o-transition: background-color 0.15s ease, box-shadow 0.15s ease;
-    transition: background-color 0.15s ease, box-shadow 0.15s ease;
-    box-shadow: 0 4px 14px rgba(0, 85, 255, 0.35) !important;
-    margin-top: 8px;
-}
-
-input[type="submit"]:hover,
-button[type="submit"]:hover,
-.DpsButtonSubmit:hover,
-input.DpsButtonSubmit:hover,
-button.DpsButtonSubmit:hover {
-    background-color: #0044DD !important;
-    box-shadow: 0 6px 20px rgba(0, 85, 255, 0.45) !important;
-}
-
-input[type="submit"]:active,
-button[type="submit"]:active,
-.DpsButtonSubmit:active {
-    background-color: #003DBB !important;
-    box-shadow: 0 2px 8px rgba(0, 85, 255, 0.3) !important;
-}
-
-input[type="submit"]:focus,
-button[type="submit"]:focus,
-.DpsButtonSubmit:focus {
-    outline: 0;
-    border: none !important;
-    box-shadow: 0 0 0 3px rgba(0, 85, 255, 0.3) !important;
-}
-
-/* Cancel / secondary buttons */
 .DpsButtonCancel,
 input.DpsButtonCancel,
-button.DpsButtonCancel {
-    background-color: #00E5CC !important;
+button.DpsButtonCancel,
+a.DpsButtonCancel {
+    display: block !important;
+    width: 100% !important;
+    background: #00E5CC !important;
     color: #0055FF !important;
     border: none !important;
     border-radius: 18px !important;
-    padding: 10px 20px !important;
-    font-size: 13px !important;
+    padding: 10px !important;
+    font-size: 12px !important;
     font-weight: 600 !important;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, Helvetica, sans-serif !important;
+    font-family: 'Inter', sans-serif !important;
+    text-align: center !important;
+    letter-spacing: -0.1px !important;
     cursor: pointer !important;
-    background-image: none !important;
-    width: 100% !important;
-    -webkit-transition: background-color 0.15s ease;
-    transition: background-color 0.15s ease;
-    margin-top: 8px;
+    margin-top: 10px !important;
+    text-decoration: none !important;
+    box-shadow: none !important;
+    -webkit-appearance: none;
 }
 
 .DpsButtonCancel:hover,
 input.DpsButtonCancel:hover,
 button.DpsButtonCancel:hover {
-    background-color: #00d4bc !important;
+    background: #00d4bc !important;
 }
 
-/* ── TITLES & LEGENDS ────────────────────────────────────────────────────── */
+/* ── CARD FORM PANELS (turquoise area = .card-form in preview) ──────────────── */
 
-.DpsUiPanelLegend {
-    margin: 5px 0 10px 0;
-    font-size: 16px;
-    font-weight: 600;
-    color: #0055FF;
+.DpsUiPanel {
+    background: #00E5CC !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 52px 22px 17px !important;
+    margin-top: -44px !important;
+    position: relative !important;
+    z-index: 1 !important;
+    box-shadow: 0 16px 40px rgba(0, 229, 204, 0.25) !important;
 }
 
-.DpsGroupHeader {
-    font-size: 13px !important;
+.DpsUiPanel:last-of-type {
+    border-radius: 0 0 32px 32px !important;
+    padding-bottom: 22px !important;
+}
+
+/* Footer panel — transparent, no visual */
+#PxPayFooter.DpsUiPanel {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin-top: 12px !important;
+    z-index: 0 !important;
+}
+
+/* Spinner loading panel — invisible container */
+.DpsUiPanel.DpsRedirectLoadingSpinnerPanel {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    height: 0 !important;
+}
+
+/* ── FIELD LABELS (.form-label in preview) ──────────────────────────────────── */
+
+.DpsLegend,
+.DpsFieldLegend,
+.DpsGroupHeader,
+label {
+    display: block !important;
+    font-size: 11px !important;
     font-weight: 600 !important;
-    margin: 10px 0 10px 0;
-    color: #3b3d53;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    font-family: 'Inter', sans-serif !important;
+    color: #0044BB !important;
+    letter-spacing: 0.06em !important;
+    text-transform: uppercase !important;
+    margin-bottom: 5px !important;
+    cursor: pointer;
 }
 
-.DpsLink {
-    color: #0055FF;
+/* ── INPUT FIELDS (.form-input in preview) ──────────────────────────────────── */
+
+input.DpsField,
+select.DpsField,
+textarea.DpsField {
+    display: block !important;
+    width: 100% !important;
+    background: rgba(255, 255, 255, 0.55) !important;
+    border: 1.5px solid rgba(0, 85, 255, 0.18) !important;
+    border-radius: 12px !important;
+    padding: 11px 14px !important;
+    font-size: 14px !important;
+    font-family: 'Inter', sans-serif !important;
+    color: #0a1a4a !important;
+    outline: none !important;
+    white-space: normal;
+    margin: 0 0 10px 0 !important;
+    -webkit-appearance: none;
+    transition: border-color 0.15s, background 0.15s;
 }
 
-.DpsLink:hover {
-    color: #0044DD;
-    text-decoration: underline;
+input.DpsField::placeholder,
+textarea.DpsField::placeholder {
+    color: rgba(0, 40, 120, 0.4);
 }
 
-/* ── TEXT ELEMENTS ───────────────────────────────────────────────────────── */
-
-.DpsText {
-    display: inline-block;
-    position: static;
-    margin-top: 2px;
-    margin-bottom: 2px;
-    padding-top: 0px;
-    padding-bottom: 0px;
-    padding-left: 0px;
-    white-space: pre-line;
-    font-size: 13px;
-    color: #3b3d53;
+input.DpsField:focus,
+select.DpsField:focus,
+textarea.DpsField:focus {
+    border-color: #0055FF !important;
+    background: rgba(255, 255, 255, 0.8) !important;
+    box-shadow: none !important;
+    outline: none !important;
 }
 
-.DpsTextError {
-    color: #c0392b;
+/* ── SUBMIT / PAY BUTTON (.btn-pay in preview) ──────────────────────────────── */
+
+.DpsButtonSubmit,
+input.DpsButtonSubmit,
+button.DpsButtonSubmit {
+    display: block !important;
+    width: 100% !important;
+    margin-top: 14px !important;
+    background: #0055FF !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 18px !important;
+    padding: 14px !important;
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    font-family: 'Inter', sans-serif !important;
+    cursor: pointer !important;
+    letter-spacing: -0.1px !important;
+    box-shadow: 0 6px 20px rgba(0, 85, 255, 0.35) !important;
+    text-align: center !important;
+    -webkit-appearance: none;
 }
 
-.DpsLegend {
-    position: static;
-    margin-top: 2px;
-    margin-bottom: 2px;
-    padding: 1px 0;
-    white-space: pre-line;
-    font-size: 13px;
-    color: #3b3d53;
+.DpsButtonSubmit:hover,
+input.DpsButtonSubmit:hover,
+button.DpsButtonSubmit:hover {
+    background: #0044DD !important;
 }
 
-/* ── TABLE CELLS ─────────────────────────────────────────────────────────── */
+/* ── TABLE LAYOUT (Windcave uses tables for form rows) ──────────────────────── */
 
-.DpsInlineValidationCell,
-.DpsTableCell {
-    padding: 2px 0px 2px 0;
+table, tbody, tr, td, th {
+    border: none;
+    border-collapse: collapse;
+    border-spacing: 0;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+}
+
+.DpsTableCell,
+.DpsInlineValidationCell {
+    padding: 2px 0 2px 0;
     vertical-align: middle !important;
 }
 
-#PxPaySelectMethodMain .DpsTableCell {
-    padding: 10px 0 0 0;
-}
-
-#PxPayAccount2AccountAuth .DpsTableCell {
-    padding: 15px 0 0 5px;
-}
-
 .DpsTableCellLegend {
-    width: 40%;
     white-space: nowrap;
-    padding: 2px 0 2px 0;
+    padding: 2px 8px 2px 0;
     vertical-align: middle;
+    width: 40%;
 }
 
-#PaymenuMain .DpsTableCellLegend {
-    width: 0%;
-}
+/* ── FIELD WIDTH CLASSES ─────────────────────────────────────────────────────── */
 
-#PxPayAuthMain .DpsTableCellLegend,
-#PxPayAuthResult .DpsTableCellLegend {
-    height: 25px;
-}
-
-#TxnAuthPayPal .DpsTableCellLegend {
-    width: auto;
-}
-
-div[id^="TxnAuthCreditCard_"] {
-    width: auto;
-}
-
-.DpsConfirmPaymentDetails .DpsTableCellLegend {
-    width: 0px !important;
-}
-
-/* ── FIELD WIDTHS ────────────────────────────────────────────────────────── */
-
-textarea.DpsField {
-    white-space: normal;
-    border-radius: 8px;
-}
+textarea.DpsField { white-space: normal; }
 
 .DpsFieldChar2  { width: 20px; }
 .DpsFieldChar4  { width: 35px; }
@@ -637,33 +305,61 @@ textarea.DpsField {
 .DpsFieldAmountFraction {
     text-align: right;
     max-width: 30px !important;
-    margin: 0px !important;
+    margin: 0 !important;
 }
 
-.DpsShortPhonePrefix {
-    width: 70px;
-    font-family: monospace, monospace;
-}
+.DpsUiPanelPostalCode { max-width: 85% !important; }
+.DpsUiPanelIssueNumber { max-width: 85px; }
+.DpsUiPanelExpiryDate { min-width: 52px !important; }
+.DpsUiPanelCvc { float: left; }
+.DpsUiPanelCvcIcon { margin: 15px 10px 0 10px; float: left; }
+.DpsUiPanelCountryDropList { width: 210px !important; margin-right: 0 !important; }
 
-.DpsFieldPhoneNumber {
-    width: 108px;
-}
+/* ── CVC / HELP LINKS ───────────────────────────────────────────────────────── */
 
-/* ── ERROR / WARNING / SUCCESS MESSAGES ─────────────────────────────────── */
-
-.DpsWarningBanner {
-    color: #7d5a00;
-    background-color: #fff8e1;
-    border-left: 4px solid #f0b429;
-    padding: 10px 14px;
-    border-radius: 6px;
+.DpsCvcLink {
+    float: left;
+    margin: 15px 0 0 0;
     font-size: 13px;
+    color: #0055FF;
+    text-decoration: none;
+}
+
+.DpsCvcLink:hover { color: #0044DD; text-decoration: underline; }
+
+/* ── LINKS ──────────────────────────────────────────────────────────────────── */
+
+a, a:link, a:visited, a:active {
+    color: #0055FF;
+    text-decoration: none;
+}
+
+a:hover { color: #0044DD; text-decoration: underline; }
+
+/* ── AMOUNT PANEL (standalone totals row) ───────────────────────────────────── */
+
+#Amount, #AmountTotal, #AmountSurcharge, #TotalAmount,
+#PredetermineAmountSurcharge, #PredetermineAmountTotal,
+#AjaxAmountSurcharge, #AjaxAmountTotal,
+#ConvertedAmount, #GiftCardAmount {
+    font-weight: 700;
+    color: #0055FF;
+    font-size: 18px;
+    font-family: 'Inter', sans-serif;
+}
+
+/* ── ERROR / WARNING / SUCCESS MESSAGES ─────────────────────────────────────── */
+
+.DpsTextError {
+    color: #c0392b;
+    font-size: 12px;
 }
 
 .DpsFieldError {
     color: #c0392b;
     font-size: 12px;
     margin-top: 2px;
+    display: block;
 }
 
 .DpsFieldErrorCaptcha {
@@ -681,7 +377,6 @@ textarea.DpsField {
 .DpsPageErrorPanel {
     color: #c0392b;
     background-color: #fdf2f2;
-    border-color: #f5c6c6;
     padding: 14px !important;
     margin: 10px 0 16px 0;
     border: 1.5px solid #f5c6c6;
@@ -690,14 +385,18 @@ textarea.DpsField {
     float: none !important;
 }
 
-#PxPayAuthResult .DpsPageErrorPanel {
-    float: left !important;
+.DpsWarningBanner {
+    color: #7d5a00;
+    background-color: #fff8e1;
+    border-left: 4px solid #f0b429;
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 13px;
 }
 
 .DpsPageAttentionPanel {
     color: #0055FF;
     background-color: #eef2ff;
-    border-color: #c7d2fe;
     padding: 14px !important;
     margin-bottom: 16px;
     border: 1.5px solid #c7d2fe;
@@ -709,7 +408,6 @@ textarea.DpsField {
 .DpsPageSuccessPanel {
     color: #0a7a3e;
     background-color: #e8faf0;
-    border-color: #a8e6c0;
     padding: 14px !important;
     margin-bottom: 16px;
     border: 1.5px solid #a8e6c0;
@@ -717,16 +415,12 @@ textarea.DpsField {
     display: block !important;
 }
 
-/* ── SPINNER / LOADING ───────────────────────────────────────────────────── */
-
-.DpsFieldDateMonth > option {
-    width: auto;
-}
+/* ── SPINNER / LOADING ──────────────────────────────────────────────────────── */
 
 div.spinner {
     position: relative;
     width: 20px;
-    height: 0px;
+    height: 0;
     left: inherit;
     display: inline-block;
     padding: 0;
@@ -741,59 +435,39 @@ div.spinner div {
     left: 6px;
     top: -8px;
     opacity: 0;
-    -moz-border-radius: 50px;
-    -webkit-animation: fade 1s linear infinite;
-    -webkit-border-radius: 50px;
+    border-radius: 50px;
     box-shadow: 0 0 3px rgba(0, 229, 204, 0.3);
-    -moz-animation: fade 1s linear infinite;
-    -ms-animation: fade 1s linear infinite;
-    -ms-border-radius: 50px;
-    -o-border-radius: 50px;
+    animation: fade 1s linear infinite;
     padding: 0;
     margin: 0;
 }
 
-div.spinner div.bar1  { -webkit-transform:rotate(0deg)   translate(0,-142%); -moz-transform:rotate(0deg)   translate(0,-142%); -ms-transform:rotate(0deg)   translate(0,-142%); -webkit-animation-delay:0s;       -moz-animation-delay:0s;       -ms-animation-delay:0s; }
-div.spinner div.bar2  { -webkit-transform:rotate(30deg)  translate(0,-142%); -moz-transform:rotate(30deg)  translate(0,-142%); -ms-transform:rotate(30deg)  translate(0,-142%); -webkit-animation-delay:-0.9167s; -moz-animation-delay:-0.9167s; -ms-animation-delay:-0.9167s; }
-div.spinner div.bar3  { -webkit-transform:rotate(60deg)  translate(0,-142%); -moz-transform:rotate(60deg)  translate(0,-142%); -ms-transform:rotate(60deg)  translate(0,-142%); -webkit-animation-delay:-0.833s;  -moz-animation-delay:-0.833s;  -ms-animation-delay:-0.833s; }
-div.spinner div.bar4  { -webkit-transform:rotate(90deg)  translate(0,-142%); -moz-transform:rotate(90deg)  translate(0,-142%); -ms-transform:rotate(90deg)  translate(0,-142%); -webkit-animation-delay:-0.75s;   -moz-animation-delay:-0.75s;   -ms-animation-delay:-0.75s; }
-div.spinner div.bar5  { -webkit-transform:rotate(120deg) translate(0,-142%); -moz-transform:rotate(120deg) translate(0,-142%); -ms-transform:rotate(120deg) translate(0,-142%); -webkit-animation-delay:-0.667s;  -moz-animation-delay:-0.667s;  -ms-animation-delay:-0.667s; }
-div.spinner div.bar6  { -webkit-transform:rotate(150deg) translate(0,-142%); -moz-transform:rotate(150deg) translate(0,-142%); -ms-transform:rotate(150deg) translate(0,-142%); -webkit-animation-delay:-0.5833s; -moz-animation-delay:-0.5833s; -ms-animation-delay:-0.5833s; }
-div.spinner div.bar7  { -webkit-transform:rotate(180deg) translate(0,-142%); -moz-transform:rotate(180deg) translate(0,-142%); -ms-transform:rotate(180deg) translate(0,-142%); -webkit-animation-delay:-0.5s;    -moz-animation-delay:-0.5s;    -ms-animation-delay:-0.5s; }
-div.spinner div.bar8  { -webkit-transform:rotate(210deg) translate(0,-142%); -moz-transform:rotate(210deg) translate(0,-142%); -ms-transform:rotate(210deg) translate(0,-142%); -webkit-animation-delay:-0.41667s;-moz-animation-delay:-0.41667s;-ms-animation-delay:-0.41667s; }
-div.spinner div.bar9  { -webkit-transform:rotate(240deg) translate(0,-142%); -moz-transform:rotate(240deg) translate(0,-142%); -ms-transform:rotate(240deg) translate(0,-142%); -webkit-animation-delay:-0.333s;  -moz-animation-delay:-0.333s;  -ms-animation-delay:-0.333s; }
-div.spinner div.bar10 { -webkit-transform:rotate(270deg) translate(0,-142%); -moz-transform:rotate(270deg) translate(0,-142%); -ms-transform:rotate(270deg) translate(0,-142%); -webkit-animation-delay:-0.25s;   -moz-animation-delay:-0.25s;   -ms-animation-delay:-0.25s; }
-div.spinner div.bar11 { -webkit-transform:rotate(300deg) translate(0,-142%); -moz-transform:rotate(300deg) translate(0,-142%); -ms-transform:rotate(300deg) translate(0,-142%); -webkit-animation-delay:-0.1667s; -moz-animation-delay:-0.1667s; -ms-animation-delay:-0.1667s; }
-div.spinner div.bar12 { -webkit-transform:rotate(330deg) translate(0,-142%); -moz-transform:rotate(330deg) translate(0,-142%); -ms-transform:rotate(330deg) translate(0,-142%); -webkit-animation-delay:-0.0833s; -moz-animation-delay:-0.0833s; -ms-animation-delay:-0.0833s; }
+div.spinner div.bar1  { transform: rotate(0deg)   translate(0,-142%); animation-delay: 0s; }
+div.spinner div.bar2  { transform: rotate(30deg)  translate(0,-142%); animation-delay: -0.9167s; }
+div.spinner div.bar3  { transform: rotate(60deg)  translate(0,-142%); animation-delay: -0.833s; }
+div.spinner div.bar4  { transform: rotate(90deg)  translate(0,-142%); animation-delay: -0.75s; }
+div.spinner div.bar5  { transform: rotate(120deg) translate(0,-142%); animation-delay: -0.667s; }
+div.spinner div.bar6  { transform: rotate(150deg) translate(0,-142%); animation-delay: -0.5833s; }
+div.spinner div.bar7  { transform: rotate(180deg) translate(0,-142%); animation-delay: -0.5s; }
+div.spinner div.bar8  { transform: rotate(210deg) translate(0,-142%); animation-delay: -0.41667s; }
+div.spinner div.bar9  { transform: rotate(240deg) translate(0,-142%); animation-delay: -0.333s; }
+div.spinner div.bar10 { transform: rotate(270deg) translate(0,-142%); animation-delay: -0.25s; }
+div.spinner div.bar11 { transform: rotate(300deg) translate(0,-142%); animation-delay: -0.1667s; }
+div.spinner div.bar12 { transform: rotate(330deg) translate(0,-142%); animation-delay: -0.0833s; }
 
 @keyframes fade {
     from { opacity: 1; }
     to   { opacity: 0.25; }
 }
 
-@-webkit-keyframes fade {
-    from { opacity: 1; }
-    to   { opacity: 0.25; }
-}
-
-@-moz-keyframes fade {
-    0%   { opacity: 0; }
-    100% { opacity: 1; }
-}
-
-/* Redirect loading spinner */
-
 .DpsRedirectLoadingSpinner {
     width: 56px;
     height: 56px;
-    border: 4px solid #e8eaf0;
+    border: 4px solid rgba(0, 229, 204, 0.2);
     border-top: 4px solid #00E5CC;
     border-radius: 100%;
     position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    top: 0; bottom: 0; left: 0; right: 0;
     margin: auto;
     animation: spin 0.7s infinite linear;
 }
@@ -803,17 +477,8 @@ div.spinner div.bar12 { -webkit-transform:rotate(330deg) translate(0,-142%); -mo
     to   { transform: rotate(360deg); }
 }
 
-.DpsUiPanel.DpsRedirectLoadingSpinnerPanel {
-    border: none !important;
-    border-bottom: none !important;
-    margin: 0;
-    padding: 0;
-    height: 0;
-}
-
 .DpsText.DpsRedirectLoadingSpinnerText {
-    margin-top: auto !important;
-    margin-bottom: auto !important;
+    margin: auto !important;
     display: block !important;
     float: none !important;
 }
@@ -822,10 +487,7 @@ div.spinner div.bar12 { -webkit-transform:rotate(330deg) translate(0,-142%); -mo
     height: 140px;
     text-align: center;
     position: absolute !important;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    top: 0; bottom: 0; left: 0; right: 0;
     margin: auto;
     display: block;
     color: #0055FF;
@@ -840,89 +502,12 @@ div.spinner div.bar12 { -webkit-transform:rotate(330deg) translate(0,-142%); -mo
     50%       { opacity: 1; }
 }
 
-/* ── MISC HELPERS ────────────────────────────────────────────────────────── */
+/* ── FORM / FIELDSET STRUCTURE ──────────────────────────────────────────────── */
 
-div.labeled {
-    position: relative;
-    font-family: sans-serif;
-    font-size: 12px;
-    margin: 0;
-    background: #fff;
-    padding: 0;
-    display: inline-block;
-    color: #0055FF;
-    line-height: 18px;
-    border-radius: 1em;
-}
-
-div.labeled div.spinner {
-    float: left;
-    vertical-align: top;
-    width: 100px;
-    height: 100px;
+form {
     margin: 0;
     padding: 0;
-}
-
-div.labeled div.spinner div {
-    background: #0055FF;
-}
-
-/* ── TEXT PANEL OVERRIDES ────────────────────────────────────────────────── */
-
-#PxPaySelectMethodMain .DpsText {
-    margin: 0;
-    margin-bottom: 10px;
-}
-
-#TxnAuthCreditCard .DpsText,
-#TxnAuthPaymentExpressWalletLogin .DpsText {
-    margin: 5px 5px 5px 0;
-}
-
-#DCCInfoGroup .DpsText {
-    font-size: 14px;
-}
-
-#DCCInfoGroup .DpsTextWrapper {
-    text-align: left;
-}
-
-/* ── HIDDEN / UTILITY ────────────────────────────────────────────────────── */
-
-.DpsHidden {
-    display: none !important;
-}
-
-.DpsVisibilityHidden {
-    visibility: hidden;
-}
-
-.DpsUppercase {
-    text-transform: uppercase;
-}
-
-.DpsSrHidden {
-    position: absolute;
-    left: -10000px;
-    top: auto;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-}
-
-input:required:invalid {
-    outline: none;
-}
-
-:-moz-ui-invalid {
-    box-shadow: none;
-}
-
-#CaptchaContainer {
-    max-width: 300px;
-    margin: 0 auto;
-    margin-top: 10px;
+    display: inline;
 }
 
 fieldset {
@@ -936,11 +521,50 @@ fieldset {
     word-wrap: break-word;
 }
 
-#CopyShippingInfoFromBillingInfo {
-    margin: -1px 0 0 0;
+.push { height: 20px; display: block; }
+.clear { clear: both; }
+.blockCenter { display: block; margin-left: auto; margin-right: auto; }
+.bold { font-weight: bold; }
+.italic { font-style: italic; }
+.underline { text-decoration: underline; }
+.noindent { margin-left: 0; padding-left: 0; }
+
+/* ── HIDDEN / UTILITY ───────────────────────────────────────────────────────── */
+
+.DpsHidden { display: none !important; }
+.DpsVisibilityHidden { visibility: hidden; }
+.DpsUppercase { text-transform: uppercase; }
+
+.DpsSrHidden {
+    position: absolute;
+    left: -10000px;
+    top: auto;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
 }
 
-/* ── POWERED BY TAPTPAY FOOTER ───────────────────────────────────────────── */
+input:required:invalid { outline: none; }
+:-moz-ui-invalid { box-shadow: none; }
+
+img { border: none; }
+
+#CaptchaContainer {
+    max-width: 300px;
+    margin: 10px auto 0 auto;
+}
+
+div[id^="TxnAuthCreditCard_"] { width: auto; }
+
+/* ── RADIO BUTTONS ──────────────────────────────────────────────────────────── */
+
+.DpsRadioButton:focus {
+    border: 1px solid #0055FF;
+    outline: 0;
+    box-shadow: inset 0 1px 1px rgba(0,85,255,.1), 0 0 8px rgba(0,85,255,.4);
+}
+
+/* ── TAPTPAY FOOTER ─────────────────────────────────────────────────────────── */
 
 #PxPayFooter.DpsUiPanel::after {
     content: "Secured by TaptPay · taptpay.co.nz";
