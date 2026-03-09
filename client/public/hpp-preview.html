@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TaptPay – Payment Page Preview</title>
+  <link rel="stylesheet" href="/hpp-style.css" />
+  <style>
+    .preview-banner {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      background: #1a1a2e;
+      color: #ffffff;
+      text-align: center;
+      font-size: 12px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      padding: 7px 12px;
+      letter-spacing: 0.04em;
+      z-index: 9999;
+    }
+    .preview-banner span { color: #00E5CC; font-weight: 600; }
+    body { padding-top: 34px; }
+  </style>
+</head>
+<body class="DpsBody">
+  <div class="preview-banner">
+    PREVIEW ONLY — this is how your Windcave payment page will look after TaptPay branding is applied.
+    <span>Not a real payment form.</span>
+  </div>
+
+  <div class="wrapper">
+
+    <!-- Header panel — merchant/amount info -->
+    <div id="PxPayHeader" class="DpsUiPanel">
+      <table style="width:100%">
+        <tbody>
+          <tr>
+            <td class="DpsTableCellLegend">
+              <span class="DpsLegend">Merchant</span>
+            </td>
+            <td class="DpsTableCell">
+              <span class="DpsText DpsBoldText">Demo Café Ltd</span>
+            </td>
+          </tr>
+          <tr>
+            <td class="DpsTableCellLegend">
+              <span class="DpsLegend">Reference</span>
+            </td>
+            <td class="DpsTableCell">
+              <span class="DpsText">TXN-20260310-001</span>
+            </td>
+          </tr>
+          <tr>
+            <td class="DpsTableCellLegend">
+              <span class="DpsLegend">Amount</span>
+            </td>
+            <td class="DpsTableCell">
+              <span class="DpsText DpsBoldText" style="font-size:22px">
+                <span id="Amount">NZD 24.50</span>
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Card details panel -->
+    <div id="TxnAuthCreditCard" class="DpsUiPanel">
+      <legend class="DpsUiPanelLegend">Card Details</legend>
+
+      <div class="DpsField" style="height:auto; margin-bottom:4px;">
+        <span class="DpsFieldLegend">Card Number</span>
+      </div>
+      <div>
+        <input
+          type="text"
+          class="DpsField DpsFieldChar20"
+          placeholder="•••• •••• •••• ••••"
+          style="width:calc(100% - 14px)"
+          disabled
+        />
+      </div>
+
+      <table style="width:100%; margin-top:8px">
+        <tbody>
+          <tr>
+            <td style="width:50%; padding-right:6px">
+              <div class="DpsField" style="height:auto; margin-bottom:4px">
+                <span class="DpsFieldLegend">Expiry</span>
+              </div>
+              <div>
+                <select class="DpsField DpsUiPanelExpiryDate" style="width:60px" disabled>
+                  <option>MM</option>
+                </select>
+                &nbsp;/&nbsp;
+                <select class="DpsField DpsUiPanelExpiryDate" style="width:60px" disabled>
+                  <option>YY</option>
+                </select>
+              </div>
+            </td>
+            <td style="width:50%; padding-left:6px">
+              <div class="DpsField" style="height:auto; margin-bottom:4px">
+                <span class="DpsFieldLegend">CVC</span>
+              </div>
+              <div class="DpsUiPanelCvc">
+                <input
+                  type="text"
+                  class="DpsField DpsFieldChar4"
+                  placeholder="•••"
+                  style="width:60px"
+                  disabled
+                />
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style="margin-top:14px">
+        <div class="DpsField" style="height:auto; margin-bottom:4px">
+          <span class="DpsFieldLegend">Cardholder Name</span>
+        </div>
+        <input
+          type="text"
+          class="DpsField DpsFieldChar30"
+          placeholder="Name on card"
+          style="width:calc(100% - 14px)"
+          disabled
+        />
+      </div>
+    </div>
+
+    <!-- Submit panel -->
+    <div class="DpsUiPanel">
+      <input type="submit" class="DpsButtonSubmit" value="Pay NZD 24.50" disabled />
+      <br />
+      <input type="submit" class="DpsButtonCancel" value="Cancel Payment" disabled />
+    </div>
+
+    <!-- Footer -->
+    <div id="PxPayFooter" class="DpsUiPanel">
+      <table style="width:100%; text-align:center">
+        <tbody>
+          <tr>
+            <td>
+              <span class="DpsText" style="font-size:11px; color:#8892b0">
+                Your payment is secured by 256-bit SSL encryption
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</body>
+</html>
