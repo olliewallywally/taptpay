@@ -148,6 +148,31 @@ export default function MerchantTerminal() {
     },
   });
 
+  // Update splitEnabled on an existing pending transaction
+  const updateSplitEnabledMutation = useMutation({
+    mutationFn: async ({ id, splitEnabled }: { id: number; splitEnabled: boolean }) => {
+      const response = await apiRequest("PATCH", `/api/transactions/${id}/split-enabled`, { splitEnabled });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
+    },
+    onError: () => {
+      toast({
+        title: "Could not update split bill",
+        description: "Please try again",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSplitToggle = (value: boolean) => {
+    setSplitEnabled(value);
+    if (activeTransaction?.id && activeTransaction?.status === "pending") {
+      updateSplitEnabledMutation.mutate({ id: activeTransaction.id, splitEnabled: value });
+    }
+  };
+
   // Filter stock items based on search input
   useEffect(() => {
     if (stockSearchInput.trim() === "") {
@@ -272,6 +297,8 @@ export default function MerchantTerminal() {
   useEffect(() => {
     if (activeTransaction && currentTransaction?.id !== activeTransaction.id) {
       setCurrentTransaction(activeTransaction);
+      // Sync split toggle with what's stored in DB
+      setSplitEnabled(!!activeTransaction.splitEnabled);
     }
   }, [activeTransaction]);
 
@@ -821,7 +848,7 @@ function ItemForm({
             </div>
             <Switch
               checked={splitEnabled}
-              onCheckedChange={setSplitEnabled}
+              onCheckedChange={handleSplitToggle}
               data-testid="toggle-split-bill"
             />
           </div>
