@@ -867,6 +867,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update splitEnabled on a pending transaction (merchant toggle)
+  app.patch("/api/transactions/:id/split-enabled", authenticateToken, async (req, res) => {
+    try {
+      const transactionId = parseInt(req.params.id);
+      const { splitEnabled } = req.body;
+
+      if (typeof splitEnabled !== 'boolean') {
+        return res.status(400).json({ message: "splitEnabled must be a boolean" });
+      }
+
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+
+      // Only the owning merchant can update
+      const user = (req as any).user;
+      if (!user.isAdmin && transaction.merchantId !== user.merchantId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      // Only update if still pending
+      if (transaction.status !== 'pending') {
+        return res.status(409).json({ message: "Cannot update split status on a non-pending transaction" });
+      }
+
+      const updated = await storage.updateTransactionSplitEnabled(transactionId, splitEnabled);
+      if (!updated) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+
+      // Broadcast change to SSE listeners
+      broadcastToStone(updated.merchantId!, updated.taptStoneId, {
+        type: 'transaction_updated',
+        transaction: updated,
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating split enabled:", error);
+      res.status(500).json({ message: "Failed to update split enabled" });
+    }
+  });
+
   // Get a single split payment by ID (public — needed for customer receipt page)
   app.get("/api/split-payments/:id", async (req, res) => {
     try {

@@ -31,6 +31,7 @@ export interface IStorage {
   getTransactionByNfcSession(nfcSessionId: string): Promise<Transaction | undefined>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   updateTransactionStatus(id: number, status: string, windcaveTransactionId?: string): Promise<Transaction | undefined>;
+  updateTransactionSplitEnabled(id: number, splitEnabled: boolean): Promise<Transaction | undefined>;
   updateTransactionNfcSession(id: number, nfcSessionId: string): Promise<Transaction | undefined>;
   getTransactionsByMerchant(merchantId: number): Promise<Transaction[]>;
   
@@ -644,6 +645,17 @@ export class MemStorage implements IStorage {
     }
     
     return updatedTransaction;
+  }
+
+  async updateTransactionSplitEnabled(id: number, splitEnabled: boolean): Promise<Transaction | undefined> {
+    const transaction = this.transactions.get(id);
+    if (!transaction) return undefined;
+    const updated = { ...transaction, splitEnabled };
+    this.transactions.set(id, updated);
+    if (transaction.status === 'pending') {
+      this.activeTransactionCache.set(String(transaction.merchantId), updated);
+    }
+    return updated;
   }
 
   async updateTransactionNfcSession(id: number, nfcSessionId: string): Promise<Transaction | undefined> {
@@ -1784,6 +1796,16 @@ export class DatabaseStorage implements IStorage {
       .from(transactions)
       .where(eq(transactions.nfcSessionId, nfcSessionId))
       .limit(1);
+    return result[0];
+  }
+
+  async updateTransactionSplitEnabled(id: number, splitEnabled: boolean): Promise<Transaction | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .update(transactions)
+      .set({ splitEnabled })
+      .where(eq(transactions.id, id))
+      .returning();
     return result[0];
   }
 
