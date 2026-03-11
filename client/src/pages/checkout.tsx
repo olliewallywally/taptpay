@@ -437,7 +437,7 @@ export default function Checkout() {
     return (
       <div style={pageStyle}>
         <div style={cardWrapStyle}>
-          <div style={{ ...blueCardStyle, paddingBottom: 96 }}>
+          <div style={blueCardStyle}>
             <div style={logoWrap}><img src={logoSrc} alt="logo" style={{ ...logoImgStyle, ...logoStyle }} /></div>
             <div style={{ textAlign: "center" }}>
               <XCircle size={48} color="#f87171" style={{ margin: "0 auto 16px" }} />
@@ -445,7 +445,7 @@ export default function Checkout() {
               <p style={{ color: "rgba(255,255,255,0.7)", fontSize: 13 }}>{errorMsg || "Something went wrong."}</p>
             </div>
           </div>
-          <div style={{ ...tealTabOpenStyle, paddingTop: 64, paddingBottom: 24 }}>
+          <div style={{ ...tealTabStyle, paddingTop: 64, paddingBottom: 24 }}>
             <button onClick={handleRetry} style={payBtnStyle}>Try again</button>
           </div>
         </div>
@@ -517,10 +517,6 @@ export default function Checkout() {
             </button>
           )}
 
-          {/* Cancel button */}
-          <button onClick={handleCancel} style={cancelBtnStyle} disabled={isProcessing}>
-            Cancel Payment
-          </button>
         </div>
 
         {/* ── Simulation mode OR scripts failed to load: single pay button, no card form ── */}
@@ -632,8 +628,30 @@ export default function Checkout() {
           </>
         )}
 
+        {/* Cancel link — sits cleanly below the card stack */}
+        <div style={{ textAlign: "center", marginTop: 20 }}>
+          <button
+            onClick={handleCancel}
+            disabled={isProcessing}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#8899bb",
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: isProcessing ? "default" : "pointer",
+              opacity: isProcessing ? 0.4 : 1,
+              padding: "4px 0",
+              textDecoration: "underline",
+              textUnderlineOffset: 3,
+            }}
+          >
+            Cancel payment
+          </button>
+        </div>
+
         {/* Secured by line */}
-        <p style={{ marginTop: 24, textAlign: "center", fontSize: 11, color: "#aab0c0", letterSpacing: "0.03em" }}>
+        <p style={{ marginTop: 12, textAlign: "center", fontSize: 11, color: "#aab0c0", letterSpacing: "0.03em" }}>
           Secured by <strong style={{ color: "#00E5CC", fontWeight: 600 }}>Windcave</strong> · PCI DSS Compliant
         </p>
       </div>
@@ -666,7 +684,7 @@ const cardWrapStyle: CSSProperties = {
 const blueCardStyle: CSSProperties = {
   background: "#0055FF",
   borderRadius: 40,
-  padding: "28px 28px 104px",
+  padding: "28px 28px 52px",
   boxShadow: "0 24px 60px rgba(0,85,255,0.35)",
   position: "relative",
   zIndex: 2,
