@@ -28,6 +28,7 @@ import { LandingPage } from "@/pages/landing-page";
 import LegalPage from "@/pages/legal";
 import SplitPayment from "@/pages/split-payment";
 import PaymentResult from "@/pages/payment-result";
+import Checkout from "@/pages/checkout";
 
 import { PageTransition } from "@/components/page-transition";
 import { BottomNavigation } from "@/components/bottom-navigation";
@@ -198,6 +199,7 @@ function Router() {
         <Route path="/verify-merchant" component={VerifyMerchant} />
         <Route path="/pay/:merchantId" component={CustomerPayment} />
         <Route path="/pay/:merchantId/stone/:stoneId" component={CustomerPayment} />
+        <Route path="/checkout/:transactionId" component={Checkout} />
         <Route path="/split/:transactionId" component={SplitPayment} />
         <Route path="/payment/result/:transactionId" component={PaymentResult} />
         <Route path="/receipt/:transactionId" component={Receipt} />

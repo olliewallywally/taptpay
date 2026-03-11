@@ -88,29 +88,8 @@ export default function CustomerPayment() {
       return;
     }
 
-    // Otherwise → go straight to Windcave HPP
-    setPaymentStatus("redirecting");
-
-    const body: Record<string, any> = { merchantId: id };
-    if (stoneNumber !== null) body.stoneId = stoneNumber;
-
-    apiRequest("POST", `/api/transactions/${currentTransaction.id}/pay`, body)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.hppUrl) {
-          window.location.href = data.hppUrl;
-        } else if (data.status === "completed") {
-          setPaymentStatus("success");
-          setTimeout(() => setLocation(`/payment/result/${currentTransaction.id}?status=approved`), 1500);
-        } else {
-          hasRedirected.current = false;
-          setPaymentStatus("error");
-        }
-      })
-      .catch(() => {
-        hasRedirected.current = false;
-        setPaymentStatus("error");
-      });
+    // → Go to branded Hosted Fields checkout page
+    setLocation(`/checkout/${currentTransaction.id}`);
   }, [currentTransaction]);
 
   const handleRetry = () => {
