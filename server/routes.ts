@@ -1292,10 +1292,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json({
         hppUrl: sessionResult.hppUrl,
         sessionId: sessionResult.sessionId,
-        // Only the card URL is sent to the frontend (used by the Hosted Fields controller
-        // which calls it directly from the browser as required by Windcave's SDK).
-        // Apple Pay and Google Pay URLs remain server-side only.
+        // Card URL: sent to frontend — Hosted Fields SDK submits directly from browser.
         ajaxSubmitCardUrl: sessionResult.ajaxSubmitCardUrl,
+        // Apple Pay URL: sent to frontend — Windcave ApplePay SDK submits directly from
+        // browser using Apple's own auth flow (no backend credentials involved).
+        ajaxSubmitApplePayUrl: sessionResult.ajaxSubmitApplePayUrl,
+        // Google Pay URL: intentionally omitted — backend looks it up from server-side
+        // cache to prevent SSRF when forwarding Windcave credentials.
       });
     } catch (error) {
       console.error("Payment processing error:", error);
@@ -1419,6 +1422,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("googlepay-complete error:", error);
       res.status(500).json({ message: "Failed to finalise Google Pay payment" });
     }
+  });
+
+  // ── Windcave simulation submit endpoint (dev/test mode only) ────────────────
+  // Mimics the Windcave ajaxSubmitCard/ApplePay/GooglePay endpoints so that
+  // the Hosted Fields and ApplePay SDKs get a plausible success response when
+  // running without real Windcave credentials.
+  app.post("/api/windcave/sim-submit", (req, res) => {
+    const method = (req.query.method as string) || "card";
+    console.log(`[SIM_SUBMIT] method=${method} sessionId=${req.query.sessionId}`);
+    // Return a minimal JSON structure the Windcave SDKs treat as "done"
+    res.json({ status: "done", authorised: true, responseCode: "00" });
   });
 
   // Get single transaction details
