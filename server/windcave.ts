@@ -1,11 +1,16 @@
 // Windcave RESTful API Integration
-// Following pseudo code v1.5 - HPP Purchase flow
 import crypto from "crypto";
 
-const SESSION_URL = `${process.env.WINDCAVE_ENDPOINT || "https://uat.windcave.com/api/v1"}/sessions`;
-const TRANSACTION_URL = `${process.env.WINDCAVE_ENDPOINT || "https://uat.windcave.com/api/v1"}/transactions`;
+const WINDCAVE_ENDPOINT = process.env.WINDCAVE_ENDPOINT || "https://uat.windcave.com/api/v1";
+const SESSION_URL = `${WINDCAVE_ENDPOINT}/sessions`;
+const TRANSACTION_URL = `${WINDCAVE_ENDPOINT}/transactions`;
 const REQUEST_TIMEOUT = 15000;
 const RETRY_LIMIT = 5;
+
+export function getWindcaveEnv(): "uat" | "sec" {
+  const endpoint = process.env.WINDCAVE_ENDPOINT || "";
+  return endpoint.includes("sec.windcave.com") ? "sec" : "uat";
+}
 
 function logAudit(action: string, details: Record<string, any>) {
   const sanitized = { ...details };
@@ -32,7 +37,14 @@ async function fetchWithTimeout(url: string, options: RequestInit): Promise<Resp
 
 export interface CreateSessionResult {
   success: boolean;
+  // Legacy HPP URL (kept for backward compatibility)
   hppUrl?: string;
+  // Hosted Fields — card form AJAX submission URL
+  ajaxSubmitCardUrl?: string;
+  // Apple Pay JS wrapper AJAX submission URL
+  ajaxSubmitApplePayUrl?: string;
+  // Google Pay AJAX submission URL
+  ajaxSubmitGooglePayUrl?: string;
   sessionId?: string;
   alreadyComplete?: boolean;
   approved?: boolean;
@@ -53,7 +65,7 @@ export interface RefundResult {
   error?: string;
 }
 
-// Create a Windcave payment session (HPP flow)
+// Create a Windcave payment session — returns all available submission URLs
 export async function createWindcaveSession(
   xId: string,
   amount: string,
@@ -63,7 +75,6 @@ export async function createWindcaveSession(
   transactionId: number,
   retries = 0
 ): Promise<CreateSessionResult> {
-  // Use transaction ID in callback URLs (Windcave does not reliably substitute {id} template vars)
   const callbackBase = `${baseUrl}/api/windcave/callback?transactionId=${transactionId}`;
   const body = {
     type: "purchase",
@@ -120,17 +131,33 @@ export async function createWindcaveSession(
   }
 
   if (response.status === 202) {
-    // Session created and pending — extract HPP link
     const data = await response.json();
-    const hppLink = data.links?.find(
-      (l: any) => l.rel === "hpp" || l.method === "REDIRECT" || l.rel === "redirect"
-    );
-    const hppUrl = hppLink?.href;
-    logAudit("CREATE_SESSION_PENDING", { xId, sessionId: data.id, hppUrl });
+    const links: any[] = data.links || [];
+
+    const findHref = (rel: string) =>
+      links.find((l) => l.rel === rel)?.href;
+
+    const hppUrl = findHref("hpp") || links.find((l) => l.method === "REDIRECT")?.href;
+    const ajaxSubmitCardUrl = findHref("ajaxSubmitCard");
+    const ajaxSubmitApplePayUrl = findHref("ajaxSubmitApplePay");
+    const ajaxSubmitGooglePayUrl = findHref("ajaxSubmitGooglePay");
+
+    logAudit("CREATE_SESSION_PENDING", {
+      xId,
+      sessionId: data.id,
+      hppUrl,
+      ajaxSubmitCardUrl: !!ajaxSubmitCardUrl,
+      ajaxSubmitApplePayUrl: !!ajaxSubmitApplePayUrl,
+      ajaxSubmitGooglePayUrl: !!ajaxSubmitGooglePayUrl,
+    });
+
     return {
       success: true,
       sessionId: data.id,
       hppUrl,
+      ajaxSubmitCardUrl,
+      ajaxSubmitApplePayUrl,
+      ajaxSubmitGooglePayUrl,
       alreadyComplete: false,
     };
   }
@@ -188,7 +215,6 @@ export async function queryWindcaveSession(
   }
 
   if (response.status === 202) {
-    // Still processing — retry
     if (retries < RETRY_LIMIT) {
       await delay(5000);
       return queryWindcaveSession(sessionId, retries + 1);
@@ -211,6 +237,39 @@ export async function queryWindcaveSession(
   }
 
   return { success: false, error: `Unexpected status ${response.status}` };
+}
+
+// Submit a Google Pay token to Windcave's ajaxSubmitGooglePay endpoint
+export async function submitGooglePayToken(
+  ajaxSubmitGooglePayUrl: string,
+  googlePayToken: object
+): Promise<{ success: boolean; approved?: boolean; windcaveTransactionId?: string; error?: string }> {
+  logAudit("GOOGLEPAY_SUBMIT", { url: ajaxSubmitGooglePayUrl });
+  try {
+    const response = await fetchWithTimeout(ajaxSubmitGooglePayUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: buildAuthHeader(),
+      },
+      body: JSON.stringify({ paymentData: googlePayToken }),
+    });
+
+    const text = await response.text();
+    logAudit("GOOGLEPAY_RESPONSE", { status: response.status, body: text.slice(0, 200) });
+
+    if (response.ok) {
+      let data: any = {};
+      try { data = JSON.parse(text); } catch {}
+      const approved = data.authorised === true || data.approved === true || data.responseCode === "00";
+      return { success: true, approved, windcaveTransactionId: data.id || data.transactionId };
+    }
+
+    return { success: false, error: `Windcave GooglePay ${response.status}: ${text.slice(0, 200)}` };
+  } catch (err: any) {
+    logAudit("GOOGLEPAY_ERROR", { error: err.message });
+    return { success: false, error: err.message };
+  }
 }
 
 // Process a refund against an approved transaction
@@ -269,9 +328,17 @@ function delay(ms: number): Promise<void> {
 export function simulateCreateSession(merchantReference: string, baseUrl: string): CreateSessionResult {
   const sessionId = `sim_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   logAudit("SIMULATE_SESSION", { sessionId, merchantReference });
-  // In simulation, return a fake HPP URL pointing to our own success callback
   const hppUrl = `${baseUrl}/api/windcave/callback?result=approved&sessionid=${sessionId}&sim=1`;
-  return { success: true, sessionId, hppUrl, alreadyComplete: false };
+  return {
+    success: true,
+    sessionId,
+    hppUrl,
+    // Fake AJAX submit URLs — the checkout page will detect sim mode and handle accordingly
+    ajaxSubmitCardUrl: `${baseUrl}/api/windcave/sim-submit?sessionId=${sessionId}&method=card`,
+    ajaxSubmitApplePayUrl: `${baseUrl}/api/windcave/sim-submit?sessionId=${sessionId}&method=applepay`,
+    ajaxSubmitGooglePayUrl: `${baseUrl}/api/windcave/sim-submit?sessionId=${sessionId}&method=googlepay`,
+    alreadyComplete: false,
+  };
 }
 
 export function simulateQuerySession(sessionId: string): QuerySessionResult {
