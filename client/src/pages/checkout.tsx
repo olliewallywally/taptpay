@@ -92,6 +92,8 @@ export default function Checkout() {
     "font-family": "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
     "font-size": "14px",
     "padding": "11px 14px",
+    "border": "1.5px solid rgba(0,85,255,0.18)",
+    "border-radius": "12px",
   };
 
   function initHostedFields() {
@@ -274,7 +276,12 @@ export default function Checkout() {
       (_: string, next: () => void) => { next(); },
       async (next: () => void, cancel: () => void) => {
         const session = await createSession();
-        if (!session?.ajaxSubmitApplePayUrl) { cancel(); return; }
+        if (!session?.ajaxSubmitApplePayUrl) {
+          cancel();
+          setPayState("error");
+          setErrorMsg("Could not start Apple Pay. Please try another payment method.");
+          return;
+        }
         opts.url = session.ajaxSubmitApplePayUrl;
         next();
       }
