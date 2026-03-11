@@ -67,6 +67,8 @@ export default function Checkout() {
   });
 
   const env: "uat" | "sec" = envData?.env || "uat";
+  const applePayMerchantId: string = envData?.applePayMerchantId || "";
+  const googlePayMerchantId: string = envData?.googlePayMerchantId || "";
   const base = `https://${env}.windcave.com`;
 
   useEffect(() => {
@@ -234,7 +236,7 @@ export default function Checkout() {
   function handleApplePay() {
     if (!window.WindcavePayments?.ApplePay?.create) return;
     const opts: any = {
-      merchantId: "",
+      merchantId: applePayMerchantId,
       merchantName: merchant?.businessName || "TaptPay",
       countryCode: "NZ",
       currency: "NZD",
@@ -294,7 +296,7 @@ export default function Checkout() {
           },
           tokenizationSpecification: {
             type: "PAYMENT_GATEWAY",
-            parameters: { gateway: "windcave", gatewayMerchantId: "" },
+            parameters: { gateway: "windcave", gatewayMerchantId: googlePayMerchantId },
           },
         }],
         merchantInfo: { merchantName: merchant?.businessName || "TaptPay" },
@@ -309,9 +311,10 @@ export default function Checkout() {
       const googlePayToken = typeof rawToken === "string" ? JSON.parse(rawToken) : rawToken;
       const session = await createSession();
       if (!session) { setPayState("error"); setErrorMsg("Unable to start payment."); return; }
+      // NOTE: ajaxSubmitGooglePayUrl is intentionally NOT sent — the backend looks it
+      // up from its server-side cache to prevent SSRF attacks.
       const res = await apiRequest("POST", `/api/transactions/${txId}/googlepay-complete`, {
         sessionId: session.sessionId,
-        ajaxSubmitGooglePayUrl: session.ajaxSubmitGooglePayUrl,
         googlePayToken,
       });
       const result = await res.json();

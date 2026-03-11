@@ -23,6 +23,21 @@ import { sendPushToMerchant } from "./push";
 // stoneId can be null for merchant-level connections
 const sseConnections = new Map<number, Map<number | null, Set<any>>>();
 
+// Server-side cache of Windcave AJAX submit URLs per transaction.
+// Populated at session creation; consumed once at payment completion.
+// Prevents SSRF by never accepting these URLs from client bodies.
+const sessionAjaxUrlCache = new Map<number, {
+  ajaxSubmitCardUrl?: string;
+  ajaxSubmitApplePayUrl?: string;
+  ajaxSubmitGooglePayUrl?: string;
+}>();
+
+// Validate that a URL belongs to a known Windcave domain before using it with auth headers.
+function assertWindcaveUrl(url: string): void {
+  const allowed = /^https:\/\/(?:uat|sec)\.windcave\.com\//;
+  if (!allowed.test(url)) throw new Error(`Blocked non-Windcave URL: ${url}`);
+}
+
 // Rate limiting: Track requests per IP
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 const RATE_LIMIT_WINDOW = 60000; // 1 minute
@@ -1266,12 +1281,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Save session tracking info to the transaction
       await storage.updateTransactionWindcaveSession(transactionId, sessionResult.sessionId!, 'pending', xId);
 
-      return res.json({
-        hppUrl: sessionResult.hppUrl,
-        sessionId: sessionResult.sessionId,
+      // Cache the Windcave AJAX URLs server-side — never send these back to the client
+      // so the client cannot supply an attacker-controlled URL to our payment endpoints.
+      sessionAjaxUrlCache.set(transactionId, {
         ajaxSubmitCardUrl: sessionResult.ajaxSubmitCardUrl,
         ajaxSubmitApplePayUrl: sessionResult.ajaxSubmitApplePayUrl,
         ajaxSubmitGooglePayUrl: sessionResult.ajaxSubmitGooglePayUrl,
+      });
+
+      return res.json({
+        hppUrl: sessionResult.hppUrl,
+        sessionId: sessionResult.sessionId,
+        // Only the card URL is sent to the frontend (used by the Hosted Fields controller
+        // which calls it directly from the browser as required by Windcave's SDK).
+        // Apple Pay and Google Pay URLs remain server-side only.
+        ajaxSubmitCardUrl: sessionResult.ajaxSubmitCardUrl,
       });
     } catch (error) {
       console.error("Payment processing error:", error);
@@ -1281,10 +1305,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ── Windcave environment info (for frontend Hosted Fields init) ─────────────
   app.get("/api/windcave/env", (_req, res) => {
-    res.json({ env: getWindcaveEnv() });
+    res.json({
+      env: getWindcaveEnv(),
+      applePayMerchantId: process.env.WINDCAVE_APPLE_PAY_MERCHANT_ID || "",
+      googlePayMerchantId: process.env.WINDCAVE_GOOGLE_PAY_MERCHANT_ID || "",
+    });
   });
 
-  // ── Hosted Fields completion — called by frontend after card submit ──────────
+  // ── Hosted Fields completion — called by frontend after card/Apple Pay submit ─
   app.post("/api/transactions/:id/hosted-fields-complete", async (req, res) => {
     try {
       const transactionId = parseInt(req.params.id);
@@ -1294,6 +1322,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const transaction = await storage.getTransaction(transactionId);
       if (!transaction) return res.status(404).json({ message: "Transaction not found" });
+
+      // Validate the provided sessionId matches what we stored — prevents session swapping
+      if (transaction.windcaveSessionId && transaction.windcaveSessionId !== sessionId) {
+        console.error(`[hosted-fields-complete] sessionId mismatch for txn ${transactionId}`);
+        return res.status(403).json({ message: "Session ID mismatch" });
+      }
 
       const queryResult = isWindcaveConfigured()
         ? await queryWindcaveSession(sessionId)
@@ -1317,13 +1351,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ── Google Pay completion — backend submits token to Windcave ───────────────
+  // ── Google Pay completion — backend submits token using server-side cached URL ─
   app.post("/api/transactions/:id/googlepay-complete", async (req, res) => {
     try {
       const transactionId = parseInt(req.params.id);
-      const { sessionId, ajaxSubmitGooglePayUrl, googlePayToken } = req.body as {
+      // NOTE: Do NOT accept ajaxSubmitGooglePayUrl from the client — SSRF risk.
+      // Only googlePayToken comes from the client (the opaque token from Google's SDK).
+      const { sessionId, googlePayToken } = req.body as {
         sessionId?: string;
-        ajaxSubmitGooglePayUrl?: string;
         googlePayToken?: object;
       };
 
@@ -1332,6 +1367,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const transaction = await storage.getTransaction(transactionId);
       if (!transaction) return res.status(404).json({ message: "Transaction not found" });
 
+      // Validate sessionId belongs to this transaction
+      if (transaction.windcaveSessionId && transaction.windcaveSessionId !== sessionId) {
+        console.error(`[googlepay-complete] sessionId mismatch for txn ${transactionId}`);
+        return res.status(403).json({ message: "Session ID mismatch" });
+      }
+
       let approved = false;
       let windcaveTransactionId: string | undefined;
 
@@ -1339,15 +1380,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Simulation mode — treat as approved
         approved = true;
         windcaveTransactionId = `SIMTXN_GPAY_${Date.now()}`;
-      } else if (ajaxSubmitGooglePayUrl && googlePayToken) {
-        const gpayResult = await submitGooglePayToken(ajaxSubmitGooglePayUrl, googlePayToken);
-        approved = gpayResult.approved === true;
-        windcaveTransactionId = gpayResult.windcaveTransactionId;
       } else {
-        // No URL (shouldn't happen) — fall back to session query
-        const queryResult = await queryWindcaveSession(sessionId);
-        approved = queryResult.approved === true;
-        windcaveTransactionId = queryResult.windcaveTransactionId;
+        // Look up the AJAX URL from server-side cache (set at session creation)
+        const cachedUrls = sessionAjaxUrlCache.get(transactionId);
+        const ajaxUrl = cachedUrls?.ajaxSubmitGooglePayUrl;
+
+        if (ajaxUrl && googlePayToken) {
+          // Validate it's a Windcave domain before forwarding credentials
+          assertWindcaveUrl(ajaxUrl);
+          const gpayResult = await submitGooglePayToken(ajaxUrl, googlePayToken);
+          approved = gpayResult.approved === true;
+          windcaveTransactionId = gpayResult.windcaveTransactionId;
+        } else {
+          // URL not cached (session may have been created before this deploy) — fall back to query
+          console.warn(`[googlepay-complete] No cached AJAX URL for txn ${transactionId}, falling back to session query`);
+          const queryResult = await queryWindcaveSession(sessionId);
+          approved = queryResult.approved === true;
+          windcaveTransactionId = queryResult.windcaveTransactionId;
+        }
+
+        // Clear cache entry after use
+        sessionAjaxUrlCache.delete(transactionId);
       }
 
       const status = approved ? "completed" : "failed";
