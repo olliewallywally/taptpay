@@ -1297,14 +1297,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Apple Pay URL: sent to frontend — Windcave ApplePay SDK submits directly from
         // browser using Apple's own auth flow (no backend credentials involved).
         ajaxSubmitApplePayUrl: sessionResult.ajaxSubmitApplePayUrl,
-        // Google Pay URL: intentionally omitted — backend looks it up from server-side
-        // cache to prevent SSRF when forwarding Windcave credentials.
+        // Google Pay URL: included for spec completeness but the backend ignores any
+        // client-supplied value; it uses the server-side cached URL instead.
+        ajaxSubmitGooglePayUrl: sessionResult.ajaxSubmitGooglePayUrl,
       });
     } catch (error) {
       console.error("Payment processing error:", error);
       res.status(500).json({ message: "Failed to process payment" });
     }
   });
+
+  // ── Shared helper: finalise a payment (handles split + non-split) ──────────
+  async function finaliseHostedPayment(
+    transactionId: number,
+    approved: boolean,
+    windcaveTransactionId: string | undefined
+  ): Promise<{ approved: boolean; redirectPath: string }> {
+    const transaction = await storage.getTransaction(transactionId);
+    if (!transaction) throw new Error(`Transaction ${transactionId} not found`);
+
+    const sessionState = approved ? "approved" : "declined";
+    await storage.updateTransactionSessionState(transactionId, sessionState);
+
+    if (transaction.isSplit && approved) {
+      // Split payment: update the individual split record, not the whole transaction
+      const currentSplit = await storage.getNextPendingSplit(transactionId);
+      if (currentSplit) {
+        await storage.updateSplitPaymentStatus(currentSplit.id, "completed", windcaveTransactionId);
+        await storage.createPlatformFee({
+          transactionId,
+          merchantId: transaction.merchantId,
+          feeAmount: currentSplit.platformFeeAmount || "0.10",
+          transactionAmount: currentSplit.amount,
+          status: "collected",
+        });
+        if (transaction.merchantId) {
+          await storage.incrementTransactionCount(transaction.merchantId);
+        }
+      }
+      const freshTxn = await storage.getTransaction(transactionId);
+      if (freshTxn) {
+        const allDone = (freshTxn.completedSplits ?? 0) >= (freshTxn.totalSplits ?? 1);
+        const pushMsg = allDone
+          ? `Split bill fully paid — ${freshTxn.totalSplits} payments received`
+          : `Split payment ${freshTxn.completedSplits} of ${freshTxn.totalSplits} received`;
+        broadcastToStone(freshTxn.merchantId!, freshTxn.taptStoneId, { type: "transaction_updated", transaction: freshTxn });
+        sendPushToMerchant(freshTxn.merchantId!, allDone ? "completed" : "pending", pushMsg, freshTxn.price, freshTxn.id).catch(() => {});
+        // Reset session state so next split can start a new session
+        await storage.updateTransactionSessionState(transactionId, "pending");
+        return { approved: true, redirectPath: `/receipt/${transactionId}` };
+      }
+    } else {
+      const finalStatus = approved ? "completed" : "failed";
+      const finalTxn = await storage.updateTransactionStatus(transactionId, finalStatus, windcaveTransactionId);
+      if (finalTxn && approved) {
+        await storage.createPlatformFee({
+          transactionId,
+          merchantId: transaction.merchantId,
+          feeAmount: transaction.platformFeeAmount || "0.10",
+          transactionAmount: transaction.price,
+          status: "collected",
+        });
+        if (transaction.merchantId) {
+          await storage.incrementTransactionCount(transaction.merchantId);
+        }
+        broadcastToStone(finalTxn.merchantId!, finalTxn.taptStoneId, { type: "transaction_updated", transaction: finalTxn });
+        sendPushToMerchant(finalTxn.merchantId!, finalStatus, finalTxn.itemName, finalTxn.price, finalTxn.id).catch(() => {});
+      } else if (finalTxn) {
+        broadcastToStone(finalTxn.merchantId!, finalTxn.taptStoneId, { type: "transaction_updated", transaction: finalTxn });
+      }
+    }
+
+    return {
+      approved,
+      redirectPath: approved ? `/payment/result/${transactionId}?status=approved` : `/payment/result/${transactionId}?status=declined`,
+    };
+  }
 
   // ── Windcave environment info (for frontend Hosted Fields init) ─────────────
   app.get("/api/windcave/env", (_req, res) => {
@@ -1336,18 +1404,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? await queryWindcaveSession(sessionId)
         : simulateQuerySession(sessionId);
 
-      const status = queryResult.approved ? "completed" : "failed";
-      const sessionState = queryResult.approved ? "approved" : "declined";
-
-      await storage.updateTransactionSessionState(transactionId, sessionState);
-      const finalTxn = await storage.updateTransactionStatus(transactionId, status, queryResult.windcaveTransactionId);
-
-      if (finalTxn) {
-        broadcastToStone(finalTxn.merchantId!, finalTxn.taptStoneId, { type: "transaction_updated", transaction: finalTxn });
-        sendPushToMerchant(finalTxn.merchantId!, status, finalTxn.itemName, finalTxn.price, finalTxn.id).catch(() => {});
-      }
-
-      return res.json({ approved: queryResult.approved === true });
+      const result = await finaliseHostedPayment(transactionId, queryResult.approved === true, queryResult.windcaveTransactionId);
+      return res.json(result);
     } catch (error) {
       console.error("hosted-fields-complete error:", error);
       res.status(500).json({ message: "Failed to finalise payment" });
@@ -1406,18 +1464,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sessionAjaxUrlCache.delete(transactionId);
       }
 
-      const status = approved ? "completed" : "failed";
-      const sessionState = approved ? "approved" : "declined";
-
-      await storage.updateTransactionSessionState(transactionId, sessionState);
-      const finalTxn = await storage.updateTransactionStatus(transactionId, status, windcaveTransactionId);
-
-      if (finalTxn) {
-        broadcastToStone(finalTxn.merchantId!, finalTxn.taptStoneId, { type: "transaction_updated", transaction: finalTxn });
-        sendPushToMerchant(finalTxn.merchantId!, status, finalTxn.itemName, finalTxn.price, finalTxn.id).catch(() => {});
-      }
-
-      return res.json({ approved });
+      const result = await finaliseHostedPayment(transactionId, approved, windcaveTransactionId);
+      return res.json(result);
     } catch (error) {
       console.error("googlepay-complete error:", error);
       res.status(500).json({ message: "Failed to finalise Google Pay payment" });

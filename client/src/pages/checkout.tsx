@@ -186,7 +186,7 @@ export default function Checkout() {
       const result = await res.json();
       if (result.approved) {
         setPayState("success");
-        setTimeout(() => setLocation(`/payment/result/${txId}?status=approved`), 1200);
+        setTimeout(() => setLocation(result.redirectPath || `/payment/result/${txId}?status=approved`), 1200);
       } else {
         setPayState("error");
         setErrorMsg("Payment was declined. Please try another card.");
@@ -257,7 +257,7 @@ export default function Checkout() {
             notify(result.approved === true);
             if (result.approved) {
               setPayState("success");
-              setTimeout(() => setLocation(`/payment/result/${txId}?status=approved`), 1200);
+              setTimeout(() => setLocation(result.redirectPath || `/payment/result/${txId}?status=approved`), 1200);
             } else {
               setPayState("error");
               setErrorMsg("Apple Pay payment was declined.");
@@ -320,7 +320,7 @@ export default function Checkout() {
       const result = await res.json();
       if (result.approved) {
         setPayState("success");
-        setTimeout(() => setLocation(`/payment/result/${txId}?status=approved`), 1200);
+        setTimeout(() => setLocation(result.redirectPath || `/payment/result/${txId}?status=approved`), 1200);
       } else {
         setPayState("error");
         setErrorMsg("Google Pay payment was declined.");
