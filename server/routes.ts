@@ -3,7 +3,7 @@ import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema } from "@shared/schema";
-import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, simulateCreateSession, simulateQuerySession } from "./windcave";
+import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, simulateCreateSession, simulateQuerySession, getWindcaveEnv, submitGooglePayToken } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, createUser, getUserByEmail, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
 import { generateBusinessReportPdf } from "./report-generator";
@@ -1266,10 +1266,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Save session tracking info to the transaction
       await storage.updateTransactionWindcaveSession(transactionId, sessionResult.sessionId!, 'pending', xId);
 
-      return res.json({ hppUrl: sessionResult.hppUrl, sessionId: sessionResult.sessionId });
+      return res.json({
+        hppUrl: sessionResult.hppUrl,
+        sessionId: sessionResult.sessionId,
+        ajaxSubmitCardUrl: sessionResult.ajaxSubmitCardUrl,
+        ajaxSubmitApplePayUrl: sessionResult.ajaxSubmitApplePayUrl,
+        ajaxSubmitGooglePayUrl: sessionResult.ajaxSubmitGooglePayUrl,
+      });
     } catch (error) {
       console.error("Payment processing error:", error);
       res.status(500).json({ message: "Failed to process payment" });
+    }
+  });
+
+  // ── Windcave environment info (for frontend Hosted Fields init) ─────────────
+  app.get("/api/windcave/env", (_req, res) => {
+    res.json({ env: getWindcaveEnv() });
+  });
+
+  // ── Hosted Fields completion — called by frontend after card submit ──────────
+  app.post("/api/transactions/:id/hosted-fields-complete", async (req, res) => {
+    try {
+      const transactionId = parseInt(req.params.id);
+      const { sessionId } = req.body as { sessionId?: string };
+
+      if (!sessionId) return res.status(400).json({ message: "sessionId required" });
+
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction) return res.status(404).json({ message: "Transaction not found" });
+
+      const queryResult = isWindcaveConfigured()
+        ? await queryWindcaveSession(sessionId)
+        : simulateQuerySession(sessionId);
+
+      const status = queryResult.approved ? "completed" : "failed";
+      const sessionState = queryResult.approved ? "approved" : "declined";
+
+      await storage.updateTransactionSessionState(transactionId, sessionState);
+      const finalTxn = await storage.updateTransactionStatus(transactionId, status, queryResult.windcaveTransactionId);
+
+      if (finalTxn) {
+        broadcastToStone(finalTxn.merchantId!, finalTxn.taptStoneId, { type: "transaction_updated", transaction: finalTxn });
+        sendPushToMerchant(finalTxn.merchantId!, status, finalTxn.itemName, finalTxn.price, finalTxn.id).catch(() => {});
+      }
+
+      return res.json({ approved: queryResult.approved === true });
+    } catch (error) {
+      console.error("hosted-fields-complete error:", error);
+      res.status(500).json({ message: "Failed to finalise payment" });
+    }
+  });
+
+  // ── Google Pay completion — backend submits token to Windcave ───────────────
+  app.post("/api/transactions/:id/googlepay-complete", async (req, res) => {
+    try {
+      const transactionId = parseInt(req.params.id);
+      const { sessionId, ajaxSubmitGooglePayUrl, googlePayToken } = req.body as {
+        sessionId?: string;
+        ajaxSubmitGooglePayUrl?: string;
+        googlePayToken?: object;
+      };
+
+      if (!sessionId) return res.status(400).json({ message: "sessionId required" });
+
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction) return res.status(404).json({ message: "Transaction not found" });
+
+      let approved = false;
+      let windcaveTransactionId: string | undefined;
+
+      if (!isWindcaveConfigured()) {
+        // Simulation mode — treat as approved
+        approved = true;
+        windcaveTransactionId = `SIMTXN_GPAY_${Date.now()}`;
+      } else if (ajaxSubmitGooglePayUrl && googlePayToken) {
+        const gpayResult = await submitGooglePayToken(ajaxSubmitGooglePayUrl, googlePayToken);
+        approved = gpayResult.approved === true;
+        windcaveTransactionId = gpayResult.windcaveTransactionId;
+      } else {
+        // No URL (shouldn't happen) — fall back to session query
+        const queryResult = await queryWindcaveSession(sessionId);
+        approved = queryResult.approved === true;
+        windcaveTransactionId = queryResult.windcaveTransactionId;
+      }
+
+      const status = approved ? "completed" : "failed";
+      const sessionState = approved ? "approved" : "declined";
+
+      await storage.updateTransactionSessionState(transactionId, sessionState);
+      const finalTxn = await storage.updateTransactionStatus(transactionId, status, windcaveTransactionId);
+
+      if (finalTxn) {
+        broadcastToStone(finalTxn.merchantId!, finalTxn.taptStoneId, { type: "transaction_updated", transaction: finalTxn });
+        sendPushToMerchant(finalTxn.merchantId!, status, finalTxn.itemName, finalTxn.price, finalTxn.id).catch(() => {});
+      }
+
+      return res.json({ approved });
+    } catch (error) {
+      console.error("googlepay-complete error:", error);
+      res.status(500).json({ message: "Failed to finalise Google Pay payment" });
     }
   });
 
