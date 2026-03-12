@@ -1,6 +1,7 @@
 import { useParams, useLocation, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { CheckCircle, XCircle, AlertCircle, ArrowLeft } from "lucide-react";
+import { useEffect } from "react";
+import { CheckCircle, XCircle, AlertCircle, ArrowLeft, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import taptLogo from "@assets/IMG_6592_1755070818452.png";
 
@@ -41,6 +42,15 @@ export default function PaymentResult() {
       ? `/pay/${transaction.merchantId}/stone/${transaction.taptStoneId}`
       : `/pay/${transaction.merchantId}`
     : "/";
+
+  const receiptUrl = `/receipt/${txnId}`;
+
+  // Auto-redirect to receipt after 2 seconds on approval
+  useEffect(() => {
+    if (status !== "approved" || !txnId) return;
+    const timer = setTimeout(() => setLocation(receiptUrl), 2000);
+    return () => clearTimeout(timer);
+  }, [status, txnId]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -128,7 +138,14 @@ export default function PaymentResult() {
           >
             {status === "approved" ? (
               <div className="text-center">
-                <p className="text-[#0055FF] font-semibold text-sm">Powered by TaptPay</p>
+                <Button
+                  className="w-full bg-[#0055FF] hover:bg-[#0044dd] text-white rounded-[20px] py-6 text-lg font-medium mb-3"
+                  onClick={() => setLocation(receiptUrl)}
+                >
+                  <Receipt className="w-5 h-5 mr-2" />
+                  View Receipt
+                </Button>
+                <p className="text-[#0055FF]/60 text-xs">Redirecting to receipt…</p>
               </div>
             ) : (
               <Button
