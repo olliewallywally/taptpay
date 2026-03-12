@@ -82,12 +82,6 @@ export default function CustomerPayment() {
 
     hasRedirected.current = true;
 
-    // If split is enabled by merchant → go to split page
-    if (currentTransaction.splitEnabled && !currentTransaction.isSplit) {
-      setLocation(`/split/${currentTransaction.id}`);
-      return;
-    }
-
     // → Go to branded Hosted Fields checkout page
     setLocation(`/checkout/${currentTransaction.id}`);
   }, [currentTransaction]);
