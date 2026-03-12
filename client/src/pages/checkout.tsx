@@ -33,7 +33,6 @@ export default function Checkout() {
   const [applePayAvailable, setApplePayAvailable] = useState(false);
   const [googlePayAvailable, setGooglePayAvailable] = useState(false);
   const [hfReady, setHfReady] = useState(false);
-  const [scriptsFailed, setScriptsFailed] = useState(false);
   const [payState, setPayState] = useState<"idle" | "processing" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -69,22 +68,12 @@ export default function Checkout() {
   });
 
   const env: "uat" | "sec" = envData?.env || "uat";
-  const simMode: boolean = envData?.simMode === true;
   const applePayMerchantId: string = envData?.applePayMerchantId || "";
   const googlePayMerchantId: string = envData?.googlePayMerchantId || "";
   const base = `https://${env}.windcave.com`;
 
   useEffect(() => {
     if (!envData) return;
-    // In simulation mode (no Windcave credentials), skip external scripts entirely.
-    // The UI shows a test button that bypasses the Hosted Fields controller.
-    if (simMode) return;
-
-    // Fallback: if scripts haven't loaded + HF isn't ready within 6 s, show sim button.
-    // hfReadyRef avoids stale closure — it's updated synchronously when HF init succeeds.
-    const timeout = setTimeout(() => {
-      if (!hfReadyRef.current) setScriptsFailed(true);
-    }, 6000);
 
     Promise.all([
       loadScript(`${base}/js/lib/hosted-fields-v1.js`),
@@ -92,13 +81,11 @@ export default function Checkout() {
       loadScript(`${base}/js/windcavepayments-applepay-v1.js`),
     ])
       .then(() => { initHostedFields(); checkApplePay(); })
-      .catch((e) => { console.warn("Windcave scripts:", e); setScriptsFailed(true); });
+      .catch((e) => console.warn("Windcave scripts:", e));
 
     loadScript("https://pay.google.com/gp/p/js/pay.js")
       .then(() => checkGooglePay())
       .catch(() => {});
-
-    return () => clearTimeout(timeout);
   }, [envData]);
 
   const fieldStyle = {
@@ -214,26 +201,6 @@ export default function Checkout() {
     }
   }
 
-  // Fully simulated payment — calls the backend sim-pay endpoint (no Windcave).
-  // Used when simMode=true (no credentials) or when scripts failed to load.
-  async function handleSimPay() {
-    if (!txId) return;
-    setPayState("processing");
-    try {
-      const res = await apiRequest("POST", `/api/transactions/${txId}/sim-pay`);
-      const data = await res.json();
-      if (data.redirectPath) {
-        setLocation(data.redirectPath);
-      } else {
-        setPayState("error");
-        setErrorMsg("Payment simulation failed. Please try again.");
-      }
-    } catch {
-      setPayState("error");
-      setErrorMsg("Payment simulation failed. Please try again.");
-    }
-  }
-
   async function handleCardPay() {
     setPayState("processing");
     const session = await createSession();
@@ -242,10 +209,9 @@ export default function Checkout() {
       setErrorMsg("Unable to start payment. Please try again.");
       return;
     }
-    // In simulation mode or when the card URL is a sim URL, bypass Hosted Fields
-    const isSimUrl = !session.ajaxSubmitCardUrl || session.ajaxSubmitCardUrl.includes("/api/windcave/sim-submit");
-    if (simMode || isSimUrl || !hfController.current) {
-      await finaliseCard(session.sessionId);
+    if (!hfController.current) {
+      setPayState("error");
+      setErrorMsg("Card payment is not ready yet. Please try again.");
       return;
     }
     hfController.current.validateField(
@@ -519,38 +485,7 @@ export default function Checkout() {
 
         </div>
 
-        {/* ── Simulation mode OR scripts failed to load: single pay button, no card form ── */}
-        {(simMode || scriptsFailed) ? (
-          <div style={{
-            background: "#00E5CC",
-            borderRadius: "0 0 32px 32px",
-            padding: "52px 22px 22px",
-            marginTop: -44,
-            position: "relative",
-            zIndex: 1,
-            boxShadow: "0 16px 40px rgba(0,229,204,0.25)",
-          }}>
-            <p style={{ textAlign: "center", fontSize: 11, color: "#0055FF", fontWeight: 600, marginBottom: 12, letterSpacing: "0.05em", textTransform: "uppercase" }}>
-              Test mode — no card required
-            </p>
-            <button
-              onClick={handleSimPay}
-              disabled={isProcessing}
-              style={payBtnStyle}
-            >
-              {isProcessing ? (
-                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                  <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} />
-                  Processing…
-                </span>
-              ) : (
-                `Simulate Payment ${amountDisplay}`
-              )}
-            </button>
-          </div>
-        ) : (
-          <>
-            {/* ── Expandable card details tab ── */}
+        {/* ── Expandable card details tab ── */}
             <div
               style={{ ...cardTabStyle, ...(cardOpen ? cardTabOpenStyle : {}) }}
               onClick={() => !isProcessing && setCardOpen((o) => !o)}
@@ -625,8 +560,6 @@ export default function Checkout() {
                 )}
               </button>
             </div>
-          </>
-        )}
 
         {/* Cancel link — sits cleanly below the card stack */}
         <div style={{ textAlign: "center", marginTop: 20 }}>
