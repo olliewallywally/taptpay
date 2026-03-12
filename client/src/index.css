@@ -1019,3 +1019,18 @@
     animation: none;
   }
 }
+
+/* ── Native Apple Pay button ─────────────────────────────────────────── */
+.apple-pay-btn {
+  -webkit-appearance: -apple-pay-button;
+  -apple-pay-button-type: pay;
+  -apple-pay-button-style: black;
+  display: block;
+  width: 100%;
+  height: 52px;
+  min-height: 44px;
+  border: none;
+  border-radius: 18px;
+  cursor: pointer;
+  margin-bottom: 10px;
+}

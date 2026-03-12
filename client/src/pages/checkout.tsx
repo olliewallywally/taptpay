@@ -442,28 +442,22 @@ export default function Checkout() {
           <p style={itemNameStyle}>{itemName}</p>
           <p style={amountStyle}>{amountDisplay}</p>
 
-          {/* Apple Pay button — only on Safari/Apple devices */}
+          {/* Apple Pay — native button (Safari/Apple devices only) */}
           {applePayAvailable && (
-            <button
-              onClick={handleApplePay}
-              disabled={isProcessing}
-              style={applePayBtnStyle}
-              aria-label="Pay with Apple Pay"
-            >
-              {isProcessing ? (
-                <Loader2 size={18} color="#fff" style={{ animation: "spin 1s linear infinite" }} />
-              ) : (
-                <>
-                  <svg width="18" height="22" viewBox="0 0 814 1000" fill="white" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
-                    <path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76 0-103.7 40.8-165.9 40.8s-105.4-57.8-155.5-127.4C46 790.8 0 663.4 0 541.8c0-207.8 133.4-317.5 264.4-317.5 99.1 0 181.5 65.5 243.5 65.5 59.3 0 152-69.3 263.4-69.3zM643.4 159.5c-28.4 33.8-74.2 60.3-115.8 60.3-5.2 0-10.4-.5-15.5-1.5-.9-5.5-1.4-11-1.4-16.5 0-49.5 25.5-101.3 62.6-134.4 19.4-16.9 49.7-33.5 75.6-43.9 4.8 8.1 6.8 17.3 6.8 26.3 0 47.8-20.2 99.1-42.3 109.7z" />
-                  </svg>
-                  Pay
-                </>
-              )}
-            </button>
+            isProcessing ? (
+              <button disabled style={applePayBtnStyle} aria-label="Processing">
+                <Loader2 size={20} color="#fff" style={{ animation: "spin 1s linear infinite" }} />
+              </button>
+            ) : (
+              <button
+                onClick={handleApplePay}
+                className="apple-pay-btn"
+                aria-label="Pay with Apple Pay"
+              />
+            )
           )}
 
-          {/* Google Pay button — only on Android/Chrome with Google Pay */}
+          {/* Google Pay — official branded button (Android/Chrome only) */}
           {googlePayAvailable && (
             <button
               onClick={handleGooglePay}
@@ -472,18 +466,13 @@ export default function Checkout() {
               aria-label="Pay with Google Pay"
             >
               {isProcessing ? (
-                <Loader2 size={18} color="#fff" style={{ animation: "spin 1s linear infinite" }} />
+                <Loader2 size={20} color="#fff" style={{ animation: "spin 1s linear infinite" }} />
               ) : (
-                <>
-                  <svg width="41" height="17" viewBox="0 0 41 17" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M19.527 11.338H17.6V7.54h1.927c.963 0 1.697.742 1.697 1.899s-.734 1.899-1.697 1.899zm-.077-4.582H16.5v6.54h1.05v-1.17h1.9c1.548 0 2.74-1.173 2.74-2.685s-1.192-2.685-2.74-2.685zM23.4 13.296h1.05V6.756H23.4v6.54zM27.826 11.648l-1.663-4.892h-1.127l2.254 6.297-.093.27c-.15.44-.39.65-.756.65-.13 0-.274-.02-.38-.06l-.126 1.003c.16.05.38.08.57.08.934 0 1.532-.49 1.98-1.718l2.347-6.522H29.7l-1.874 4.892z" fill="#fff"/>
-                    <path d="M10.254 8.03c0-.397-.034-.78-.097-1.147H5.23v2.17h2.822c-.122.65-.49 1.2-1.044 1.569v1.303h1.69c.99-.912 1.556-2.255 1.556-3.895z" fill="#4285F4"/>
-                    <path d="M5.23 12.83c1.418 0 2.607-.47 3.476-1.272l-1.69-1.303c-.47.314-1.07.5-1.786.5-1.373 0-2.535-.927-2.952-2.174H.533v1.344A5.228 5.228 0 005.23 12.83z" fill="#34A853"/>
-                    <path d="M2.278 8.581a3.12 3.12 0 010-1.993V5.244H.533A5.228 5.228 0 000 8.585a5.228 5.228 0 00.533 3.34l1.745-1.344z" fill="#FBBC04"/>
-                    <path d="M5.23 4.413c.773 0 1.467.266 2.013.788l1.508-1.508A5.198 5.198 0 005.23 2.341 5.228 5.228 0 00.533 5.245l1.745 1.344c.417-1.247 1.58-2.176 2.952-2.176z" fill="#EA4335"/>
-                  </svg>
-                  Pay
-                </>
+                <svg xmlns="http://www.w3.org/2000/svg" width="58" height="24" viewBox="0 0 58 24" aria-hidden="true">
+                  <path d="M25.516 10.185v3.934h-1.234V4.37h3.273a2.964 2.964 0 0 1 2.122.876 2.88 2.88 0 0 1 .879 2.123 2.9 2.9 0 0 1-.879 2.139 2.937 2.937 0 0 1-2.122.877h-2.039zm0-4.653v3.492h2.062a1.73 1.73 0 0 0 1.301-.531 1.79 1.79 0 0 0 0-2.422 1.712 1.712 0 0 0-1.301-.539h-2.062zm8.047 2.376c.91 0 1.627.244 2.152.731.525.487.787 1.155.787 2.004v4.046h-1.178v-.91h-.053a2.5 2.5 0 0 1-2.177 1.126 2.907 2.907 0 0 1-1.995-.713 2.27 2.27 0 0 1-.802-1.771c0-.748.283-1.343.847-1.783.564-.44 1.316-.66 2.256-.66.803 0 1.464.147 1.982.441v-.31a1.541 1.541 0 0 0-.551-1.194 1.93 1.93 0 0 0-1.31-.488 2.098 2.098 0 0 0-1.804.965l-1.085-.682a3.207 3.207 0 0 1 2.931-1.802zm-1.758 5.365a1.376 1.376 0 0 0 .574 1.12c.374.3.825.464 1.29.47a2.26 2.26 0 0 0 1.6-.665 2.127 2.127 0 0 0 .66-1.578c-.417-.333-.997-.499-1.74-.499-.54 0-.991.131-1.352.393a1.178 1.178 0 0 0-.532 1.01V13.273zm9.266 4.86-4.132-10.026h1.33l2.505 6.394h.035l2.442-6.394h1.33l-4.622 11.386-1.261-.001.373-.36z" fill="#fff"/>
+                  <path d="M10.785 10.766v-2.19H17.3a6.37 6.37 0 0 1 .096 1.148c0 1.427-.39 3.192-1.648 4.45-1.225 1.274-2.793 1.954-4.963 1.954C6.88 16.128 3.5 12.84 3.5 8.936s3.38-7.192 7.285-7.192c2.221 0 3.804.871 4.994 2.007l-1.404 1.404c-.847-.795-1.996-1.412-3.59-1.412-2.933 0-5.224 2.362-5.224 5.193 0 2.832 2.291 5.194 5.224 5.194 1.9 0 2.982-.763 3.678-1.46.563-.562.934-1.367 1.08-2.465l-4.758-.439z" fill="#4285F4"/>
+                  <path d="M10.785 10.766v-2.19H17.3a6.37 6.37 0 0 1 .096 1.148c0 1.427-.39 3.192-1.648 4.45-1.225 1.274-2.793 1.954-4.963 1.954C6.88 16.128 3.5 12.84 3.5 8.936s3.38-7.192 7.285-7.192c2.221 0 3.804.871 4.994 2.007l-1.404 1.404c-.847-.795-1.996-1.412-3.59-1.412-2.933 0-5.224 2.362-5.224 5.193 0 2.832 2.291 5.194 5.224 5.194 1.9 0 2.982-.763 3.678-1.46.563-.562.934-1.367 1.08-2.465l-4.758-.439z" fill="none"/>
+                </svg>
               )}
             </button>
           )}
@@ -663,34 +652,25 @@ const applePayBtnStyle: CSSProperties = {
   color: "#fff",
   border: "none",
   borderRadius: 18,
-  padding: 10,
-  fontSize: 12,
-  fontWeight: 600,
+  height: 52,
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  gap: 8,
-  cursor: "pointer",
-  marginBottom: 0,
-  letterSpacing: "-0.2px",
+  cursor: "not-allowed",
+  marginBottom: 10,
 };
 
 const googlePayBtnStyle: CSSProperties = {
   width: "100%",
-  background: "#1a1a1a",
-  color: "#fff",
+  background: "#000000",
   border: "none",
   borderRadius: 18,
-  padding: "10px 16px",
-  fontSize: 12,
-  fontWeight: 600,
+  height: 52,
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  gap: 8,
   cursor: "pointer",
-  marginTop: 10,
-  letterSpacing: "-0.2px",
+  marginBottom: 10,
 };
 
 const cancelBtnStyle: CSSProperties = {
