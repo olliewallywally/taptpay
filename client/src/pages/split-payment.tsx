@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useLocation, useSearch } from "wouter";
+import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { sseClient } from "@/lib/sse-client";
@@ -10,11 +10,10 @@ import taptLogo from "@assets/IMG_6592_1755070818452.png";
 export default function SplitPayment() {
   const { transactionId } = useParams<{ transactionId: string }>();
   const [, setLocation] = useLocation();
-  const search = useSearch();
   const txnId = parseInt(transactionId);
 
   const [splitCount, setSplitCount] = useState(2);
-  const [pageStatus, setPageStatus] = useState<"choosing" | "waiting" | "redirecting" | "done">("choosing");
+  const [isProcessing, setIsProcessing] = useState(false);
   const [currentTransaction, setCurrentTransaction] = useState<any>(null);
   const [customAmountMode, setCustomAmountMode] = useState(false);
   const [customAmount, setCustomAmount] = useState("");
@@ -43,9 +42,6 @@ export default function SplitPayment() {
   useEffect(() => {
     if (transaction) {
       setCurrentTransaction(transaction);
-      if (transaction.isSplit) {
-        setPageStatus("waiting");
-      }
     }
   }, [transaction]);
 
@@ -57,13 +53,6 @@ export default function SplitPayment() {
       if (message.transaction?.id === txnId) {
         setCurrentTransaction(message.transaction);
         queryClient.setQueryData(["/api/transactions", txnId], message.transaction);
-
-        if (message.transaction.status === "completed") {
-          setPageStatus("done");
-        }
-        if (message.transaction.isSplit && pageStatus === "choosing") {
-          setPageStatus("waiting");
-        }
       }
     };
 
@@ -74,50 +63,55 @@ export default function SplitPayment() {
     };
   }, [transaction?.merchantId, txnId]);
 
-  const handleConfirmSplit = async () => {
-    try {
-      setPageStatus("redirecting");
-      const response = await apiRequest("POST", `/api/transactions/${txnId}/split`, {
-        totalSplits: splitCount,
-      });
-      const data = await response.json();
-      if (data.transaction) {
-        setCurrentTransaction(data.transaction);
-        queryClient.setQueryData(["/api/transactions", txnId], data.transaction);
-      }
-      setPageStatus("waiting");
-    } catch (err) {
-      console.error("Split creation failed:", err);
-      setPageStatus("choosing");
-    }
-  };
-
-  const handlePay = () => {
-    if (!currentTransaction) return;
-    setPageStatus("redirecting");
-    const parsed = parseFloat(customAmount);
-    if (customAmountMode && parsed > 0) {
-      setLocation(`/checkout/${txnId}?amount=${parsed.toFixed(2)}`);
-    } else {
-      setLocation(`/checkout/${txnId}`);
-    }
-  };
-
   const txn = currentTransaction || transaction;
   const totalAmount = txn ? parseFloat(txn.price) : 0;
-  const splitAmount = (totalAmount / splitCount).toFixed(2);
-  const perSplitAmount = txn?.splitAmount ? parseFloat(txn.splitAmount).toFixed(2) : splitAmount;
+  const isSplitSetup = txn?.isSplit === true;
   const completedSplits = txn?.completedSplits || 0;
   const totalSplits = txn?.totalSplits || splitCount;
   const allDone = txn?.status === "completed";
   const nextPersonIndex = completedSplits + 1;
 
-  const totalPaid = txn?.splitAmount ? parseFloat(txn.splitAmount) * completedSplits : 0;
+  const perPersonAmount = isSplitSetup
+    ? (txn?.splitAmount ? parseFloat(txn.splitAmount).toFixed(2) : (totalAmount / totalSplits).toFixed(2))
+    : (totalAmount / splitCount).toFixed(2);
+
+  const totalPaid = isSplitSetup && txn?.splitAmount
+    ? parseFloat(txn.splitAmount) * completedSplits
+    : 0;
   const remaining = totalAmount - totalPaid;
 
   const parsedCustom = parseFloat(customAmount);
   const isCustomValid = customAmountMode && parsedCustom > 0 && parsedCustom <= remaining + 0.01;
-  const payAmount = customAmountMode && isCustomValid ? parsedCustom.toFixed(2) : perSplitAmount;
+  const payAmount = customAmountMode && isCustomValid ? parsedCustom.toFixed(2) : perPersonAmount;
+
+  const handlePay = async () => {
+    if (!txn) return;
+    setIsProcessing(true);
+    try {
+      if (!isSplitSetup) {
+        const response = await apiRequest("POST", `/api/transactions/${txnId}/split`, {
+          totalSplits: splitCount,
+        });
+        const data = await response.json();
+        if (data.transaction) {
+          setCurrentTransaction(data.transaction);
+          queryClient.setQueryData(["/api/transactions", txnId], data.transaction);
+        }
+      }
+      if (customAmountMode && parsedCustom > 0) {
+        setLocation(`/checkout/${txnId}?amount=${parsedCustom.toFixed(2)}`);
+      } else {
+        setLocation(`/checkout/${txnId}`);
+      }
+    } catch (err) {
+      console.error("Split payment error:", err);
+      setIsProcessing(false);
+    }
+  };
+
+  const logoStyle = merchant?.customLogoUrl
+    ? {}
+    : { filter: "brightness(0) saturate(100%) invert(78%) sepia(96%) saturate(2453%) hue-rotate(131deg) brightness(97%) contrast(101%)" };
 
   if (isLoading) {
     return (
@@ -141,33 +135,43 @@ export default function SplitPayment() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-sm md:max-w-md">
         <div className="rounded-[48px] overflow-hidden shadow-2xl">
+
           {/* Blue section */}
-          <div className="bg-[#0055FF] px-8 pt-8 pb-16 relative z-10">
+          <div className="bg-[#0055FF] px-8 pt-8 pb-16">
+
             {/* Logo */}
             <div className="text-center mb-6">
               <img
                 src={merchant?.customLogoUrl || taptLogo}
                 alt="logo"
                 className="h-12 mx-auto object-contain"
-                style={merchant?.customLogoUrl ? {} : { filter: "brightness(0) saturate(100%) invert(78%) sepia(96%) saturate(2453%) hue-rotate(131deg) brightness(97%) contrast(101%)" }}
+                style={logoStyle}
               />
             </div>
 
-            {/* All done */}
+            {/* ── All paid ── */}
             {allDone && (
               <div className="text-center py-6">
                 <CheckCircle className="w-16 h-16 text-[#00E5CC] mx-auto mb-4" />
                 <h2 className="text-2xl font-bold text-white mb-2">All Done!</h2>
                 <p className="text-white/70">All {totalSplits} payments complete</p>
-                <p className="text-[#00E5CC] text-4xl font-bold mt-4">${txn.price}</p>
+                <p className="text-[#00E5CC] text-4xl font-bold mt-4">${totalAmount.toFixed(2)}</p>
                 <p className="text-white/60 text-sm">Total paid</p>
               </div>
             )}
 
-            {/* Choose splits */}
-            {!allDone && pageStatus === "choosing" && (
+            {/* ── Loading / redirecting ── */}
+            {!allDone && isProcessing && (
+              <div className="text-center py-6">
+                <Loader2 className="w-8 h-8 text-[#00E5CC] animate-spin mx-auto mb-3" />
+                <p className="text-white">Taking you to payment...</p>
+              </div>
+            )}
+
+            {/* ── First person: choose how many ways to split ── */}
+            {!allDone && !isProcessing && !isSplitSetup && (
               <div>
-                <div className="text-center mb-3">
+                <div className="text-center mb-2">
                   <p className="text-white/60 text-lg">{txn.itemName}</p>
                 </div>
                 <div className="text-center mb-6">
@@ -176,7 +180,7 @@ export default function SplitPayment() {
                 <h2 className="text-white text-xl font-bold text-center mb-6">Split the bill</h2>
 
                 {/* Counter */}
-                <div className="flex items-center justify-center gap-8 mb-4">
+                <div className="flex items-center justify-center gap-8 mb-5">
                   <button
                     onClick={() => setSplitCount(Math.max(2, splitCount - 1))}
                     className="w-14 h-14 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors"
@@ -196,17 +200,17 @@ export default function SplitPayment() {
                   </button>
                 </div>
 
-                <div className="text-center mb-2">
-                  <p className="text-white/80 text-sm">each person pays</p>
+                <div className="text-center">
+                  <p className="text-white/70 text-sm">each person pays</p>
                   <p className="text-[#00E5CC] text-3xl font-bold" data-testid="text-split-amount">
-                    ${splitAmount}
+                    ${perPersonAmount}
                   </p>
                 </div>
               </div>
             )}
 
-            {/* Your turn to pay */}
-            {!allDone && pageStatus === "waiting" && (
+            {/* ── Subsequent payers: show their share ── */}
+            {!allDone && !isProcessing && isSplitSetup && (
               <div className="text-center">
                 <div className="bg-white/10 rounded-2xl px-4 py-2 inline-block mb-4">
                   <p className="text-white/70 text-sm">
@@ -217,10 +221,10 @@ export default function SplitPayment() {
 
                 {!customAmountMode && (
                   <>
-                    <p className="text-[#00E5CC] text-5xl font-bold mb-1">${perSplitAmount}</p>
+                    <p className="text-[#00E5CC] text-5xl font-bold mb-1">${perPersonAmount}</p>
                     <p className="text-white/50 text-sm">your share</p>
                     <button
-                      onClick={() => { setCustomAmountMode(true); setCustomAmount(perSplitAmount); }}
+                      onClick={() => { setCustomAmountMode(true); setCustomAmount(perPersonAmount); }}
                       className="mt-3 text-white/40 text-xs underline underline-offset-2 hover:text-white/60 transition-colors"
                     >
                       pay a different amount
@@ -247,7 +251,7 @@ export default function SplitPayment() {
                     <p className="text-white/40 text-xs mb-1">
                       remaining: ${remaining.toFixed(2)}
                     </p>
-                    {customAmountMode && customAmount && !isCustomValid && (
+                    {customAmount && !isCustomValid && (
                       <p className="text-red-300 text-xs">
                         Enter an amount between $0.01 and ${remaining.toFixed(2)}
                       </p>
@@ -275,28 +279,30 @@ export default function SplitPayment() {
                 </p>
               </div>
             )}
-
-            {pageStatus === "redirecting" && (
-              <div className="text-center py-6">
-                <Loader2 className="w-8 h-8 text-[#00E5CC] animate-spin mx-auto mb-3" />
-                <p className="text-white">Taking you to payment...</p>
-              </div>
-            )}
           </div>
 
-          {/* Cyan section — action button */}
+          {/* Turquoise section — action button */}
           <div className="bg-[#00E5CC] px-8 py-6">
-            {pageStatus === "choosing" && (
+            {allDone && (
               <Button
                 className="w-full bg-[#0055FF] hover:bg-[#0044dd] text-[#00E5CC] rounded-[20px] py-6 text-lg font-medium"
-                onClick={handleConfirmSplit}
-                data-testid="button-confirm-split"
+                onClick={() => setLocation("/")}
               >
-                confirm split
+                done
               </Button>
             )}
 
-            {pageStatus === "waiting" && (
+            {!allDone && !isProcessing && !isSplitSetup && (
+              <Button
+                className="w-full bg-[#0055FF] hover:bg-[#0044dd] text-[#00E5CC] rounded-[20px] py-6 text-lg font-medium"
+                onClick={handlePay}
+                data-testid="button-pay-split"
+              >
+                pay ${perPersonAmount}
+              </Button>
+            )}
+
+            {!allDone && !isProcessing && isSplitSetup && (
               <Button
                 className="w-full bg-[#0055FF] hover:bg-[#0044dd] text-[#00E5CC] rounded-[20px] py-6 text-lg font-medium"
                 onClick={handlePay}
@@ -306,16 +312,8 @@ export default function SplitPayment() {
                 pay ${payAmount}
               </Button>
             )}
-
-            {allDone && (
-              <Button
-                className="w-full bg-[#0055FF] hover:bg-[#0044dd] text-[#00E5CC] rounded-[20px] py-6 text-lg font-medium"
-                onClick={() => setLocation("/")}
-              >
-                done
-              </Button>
-            )}
           </div>
+
         </div>
       </div>
     </div>
