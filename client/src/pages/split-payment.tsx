@@ -137,7 +137,7 @@ export default function SplitPayment() {
         <div className="rounded-[48px] overflow-hidden shadow-2xl">
 
           {/* Blue section */}
-          <div className="bg-[#0055FF] px-8 pt-8 pb-16">
+          <div className="bg-[#0055FF] px-8 pt-8 pb-16 rounded-b-[48px]">
 
             {/* Logo */}
             <div className="text-center mb-6">
@@ -200,12 +200,47 @@ export default function SplitPayment() {
                   </button>
                 </div>
 
-                <div className="text-center">
-                  <p className="text-white/70 text-sm">each person pays</p>
-                  <p className="text-[#00E5CC] text-3xl font-bold" data-testid="text-split-amount">
-                    ${perPersonAmount}
-                  </p>
-                </div>
+                {!customAmountMode && (
+                  <div className="text-center">
+                    <p className="text-white/70 text-sm">each person pays</p>
+                    <p className="text-[#00E5CC] text-3xl font-bold" data-testid="text-split-amount">
+                      ${perPersonAmount}
+                    </p>
+                    <button
+                      onClick={() => { setCustomAmountMode(true); setCustomAmount(perPersonAmount); }}
+                      className="mt-3 text-white/40 text-xs underline underline-offset-2 hover:text-white/60 transition-colors"
+                    >
+                      pay a different amount
+                    </button>
+                  </div>
+                )}
+
+                {customAmountMode && (
+                  <div className="text-center mt-1">
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                      <span className="text-[#00E5CC] text-3xl font-bold">$</span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        min="0.01"
+                        value={customAmount}
+                        onChange={(e) => setCustomAmount(e.target.value)}
+                        className="w-32 text-center text-3xl font-bold bg-white/15 border border-white/20 rounded-xl px-3 py-2 text-[#00E5CC] outline-none focus:border-[#00E5CC]/50"
+                        autoFocus
+                      />
+                    </div>
+                    {customAmount && !isCustomValid && (
+                      <p className="text-red-300 text-xs mb-1">Enter an amount greater than $0.00</p>
+                    )}
+                    <button
+                      onClick={() => { setCustomAmountMode(false); setCustomAmount(""); }}
+                      className="text-white/40 text-xs underline underline-offset-2 hover:text-white/60 transition-colors"
+                    >
+                      use equal split
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -296,9 +331,10 @@ export default function SplitPayment() {
               <Button
                 className="w-full bg-[#0055FF] hover:bg-[#0044dd] text-[#00E5CC] rounded-[20px] py-6 text-lg font-medium"
                 onClick={handlePay}
+                disabled={customAmountMode && !isCustomValid}
                 data-testid="button-pay-split"
               >
-                pay ${perPersonAmount}
+                pay ${payAmount}
               </Button>
             )}
 
