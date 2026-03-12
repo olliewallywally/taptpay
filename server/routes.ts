@@ -1165,7 +1165,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         merchantId: z.number().int().positive().optional(),
         stoneId: z.number().int().positive().optional().nullable(),
         paymentMethod: z.string().optional(),
-        cardLast4: z.string().optional()
+        cardLast4: z.string().optional(),
+        amount: z.string().optional(),
       });
       
       const validation = paymentRequestSchema.safeParse(req.body);
@@ -1178,7 +1179,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const transactionId = parseInt(req.params.id);
-      const { merchantId: requestMerchantId, stoneId: requestStoneId } = validation.data;
+      const { merchantId: requestMerchantId, stoneId: requestStoneId, amount: requestAmount } = validation.data;
       
       const transaction = await storage.getTransaction(transactionId);
       
@@ -1232,7 +1233,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ status: 'completed', message: 'Transaction already completed' });
       }
 
-      // Determine amount: split payments use the per-split amount
       let paymentAmount = transaction.price;
       let currentSplit: any = null;
 
@@ -1241,7 +1241,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!currentSplit) {
           return res.status(400).json({ message: "All splits have been paid" });
         }
-        paymentAmount = currentSplit.amount;
+        if (requestAmount) {
+          const customAmt = parseFloat(requestAmount);
+          if (isNaN(customAmt) || customAmt <= 0) {
+            return res.status(400).json({ message: "Invalid custom amount" });
+          }
+          const totalPaid = (transaction.completedSplits || 0) * parseFloat(currentSplit.amount);
+          const remaining = parseFloat(transaction.price) - totalPaid;
+          if (customAmt > remaining + 0.01) {
+            return res.status(400).json({ message: "Custom amount exceeds remaining balance" });
+          }
+          paymentAmount = requestAmount;
+        } else {
+          paymentAmount = currentSplit.amount;
+        }
       }
 
       // Build Windcave session

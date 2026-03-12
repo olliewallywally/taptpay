@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type CSSProperties } from "react";
-import { useParams, useLocation } from "wouter";
+import { useParams, useLocation, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Loader2, CheckCircle, XCircle } from "lucide-react";
@@ -27,7 +27,10 @@ function loadScript(src: string): Promise<void> {
 export default function Checkout() {
   const { transactionId } = useParams<{ transactionId: string }>();
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const txId = transactionId ? parseInt(transactionId) : null;
+  const urlParams = new URLSearchParams(search);
+  const overrideAmount = urlParams.get("amount");
 
   const [cardOpen, setCardOpen] = useState(false);
   const [applePayAvailable, setApplePayAvailable] = useState(false);
@@ -175,6 +178,7 @@ export default function Checkout() {
     if (!txId || !transaction) return null;
     const body: Record<string, any> = { merchantId: transaction.merchantId };
     if (transaction.taptStoneId) body.stoneId = transaction.taptStoneId;
+    if (overrideAmount) body.amount = overrideAmount;
     try {
       const res = await apiRequest("POST", `/api/transactions/${txId}/pay`, body);
       if (!res.ok) return null;
@@ -243,7 +247,7 @@ export default function Checkout() {
       merchantName: merchant?.businessName || "TaptPay",
       countryCode: "NZ",
       currency: "NZD",
-      amount: transaction?.price || "0.00",
+      amount: overrideAmount || transaction?.price || "0.00",
       supportedNetworks: ["visa", "masterCard", "amex"],
       url: null,
     };
@@ -310,7 +314,7 @@ export default function Checkout() {
         merchantInfo: { merchantName: merchant?.businessName || "TaptPay" },
         transactionInfo: {
           totalPriceStatus: "FINAL",
-          totalPrice: transaction?.price || "0.00",
+          totalPrice: overrideAmount || transaction?.price || "0.00",
           currencyCode: "NZD",
           countryCode: "NZ",
         },
@@ -359,7 +363,8 @@ export default function Checkout() {
     filter: "brightness(0) saturate(100%) invert(78%) sepia(96%) saturate(2453%) hue-rotate(131deg) brightness(97%) contrast(101%)",
   };
 
-  const amountDisplay = `$${parseFloat(transaction?.price || "0").toFixed(2)}`;
+  const displayPrice = overrideAmount ? overrideAmount : (transaction?.price || "0");
+  const amountDisplay = `$${parseFloat(displayPrice).toFixed(2)}`;
   const itemName = transaction?.itemName || "";
 
   if (!txId || (!txLoading && !transaction)) {
