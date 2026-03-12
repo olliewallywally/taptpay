@@ -8,6 +8,10 @@ import { CheckCircle, Download, Share2, Receipt as ReceiptIcon } from "lucide-re
 
 export default function Receipt() {
   const { transactionId } = useParams<{ transactionId: string }>();
+  const search = useSearch();
+  const params = new URLSearchParams(search);
+  const splitIdParam = params.get("splitId");
+  const splitId = splitIdParam ? parseInt(splitIdParam) : null;
 
   const [isActioning, setIsActioning] = useState(false);
 
@@ -35,6 +39,17 @@ export default function Receipt() {
     enabled: !!transaction?.merchantId,
   });
 
+  const { data: splitPayment, isLoading: splitLoading } = useQuery({
+    queryKey: ["/api/split-payments", splitId],
+    queryFn: async () => {
+      if (!splitId) return null;
+      const response = await fetch(`/api/split-payments/${splitId}`);
+      if (!response.ok) throw new Error("Failed to fetch split payment");
+      return response.json();
+    },
+    enabled: !!splitId,
+  });
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString("en-NZ", {
       year: "numeric",
@@ -45,7 +60,10 @@ export default function Receipt() {
     });
   };
 
-  const getPdfUrl = () => `/api/transactions/${id}/receipt-pdf`;
+  const getPdfUrl = () => {
+    const base = `/api/transactions/${id}/receipt-pdf`;
+    return splitId ? `${base}?splitId=${splitId}` : base;
+  };
 
   const fetchPdfBlob = async (): Promise<Blob> => {
     const response = await fetch(getPdfUrl(), { method: "POST" });
@@ -125,7 +143,7 @@ export default function Receipt() {
     );
   }
 
-  const isLoading = transactionLoading || merchantLoading;
+  const isLoading = transactionLoading || merchantLoading || (!!splitId && splitLoading);
 
   if (isLoading) {
     return (
