@@ -16,6 +16,8 @@ export default function SplitPayment() {
   const [splitCount, setSplitCount] = useState(2);
   const [pageStatus, setPageStatus] = useState<"choosing" | "waiting" | "redirecting" | "done">("choosing");
   const [currentTransaction, setCurrentTransaction] = useState<any>(null);
+  const [customAmountMode, setCustomAmountMode] = useState(false);
+  const [customAmount, setCustomAmount] = useState("");
 
   const { data: transaction, isLoading } = useQuery({
     queryKey: ["/api/transactions", txnId],
@@ -47,7 +49,6 @@ export default function SplitPayment() {
     }
   }, [transaction]);
 
-  // SSE for real-time split progress updates
   useEffect(() => {
     if (!transaction?.merchantId) return;
     sseClient.connect(transaction.merchantId, transaction.taptStoneId);
@@ -94,7 +95,12 @@ export default function SplitPayment() {
   const handlePay = () => {
     if (!currentTransaction) return;
     setPageStatus("redirecting");
-    setLocation(`/checkout/${txnId}`);
+    const parsed = parseFloat(customAmount);
+    if (customAmountMode && parsed > 0) {
+      setLocation(`/checkout/${txnId}?amount=${parsed.toFixed(2)}`);
+    } else {
+      setLocation(`/checkout/${txnId}`);
+    }
   };
 
   const txn = currentTransaction || transaction;
@@ -105,6 +111,13 @@ export default function SplitPayment() {
   const totalSplits = txn?.totalSplits || splitCount;
   const allDone = txn?.status === "completed";
   const nextPersonIndex = completedSplits + 1;
+
+  const totalPaid = txn?.splitAmount ? parseFloat(txn.splitAmount) * completedSplits : 0;
+  const remaining = totalAmount - totalPaid;
+
+  const parsedCustom = parseFloat(customAmount);
+  const isCustomValid = customAmountMode && parsedCustom > 0 && parsedCustom <= remaining + 0.01;
+  const payAmount = customAmountMode && isCustomValid ? parsedCustom.toFixed(2) : perSplitAmount;
 
   if (isLoading) {
     return (
@@ -129,7 +142,7 @@ export default function SplitPayment() {
       <div className="w-full max-w-sm md:max-w-md">
         <div className="rounded-[48px] overflow-hidden shadow-2xl">
           {/* Blue section */}
-          <div className="bg-[#0055FF] px-8 pt-8 pb-24 rounded-b-[48px] relative z-10">
+          <div className="bg-[#0055FF] px-8 pt-8 pb-16 relative z-10">
             {/* Logo */}
             <div className="text-center mb-6">
               <img
@@ -201,8 +214,52 @@ export default function SplitPayment() {
                   </p>
                 </div>
                 <p className="text-white/60 text-lg mb-2">{txn.itemName}</p>
-                <p className="text-[#00E5CC] text-5xl font-bold mb-1">${perSplitAmount}</p>
-                <p className="text-white/50 text-sm">your share</p>
+
+                {!customAmountMode && (
+                  <>
+                    <p className="text-[#00E5CC] text-5xl font-bold mb-1">${perSplitAmount}</p>
+                    <p className="text-white/50 text-sm">your share</p>
+                    <button
+                      onClick={() => { setCustomAmountMode(true); setCustomAmount(perSplitAmount); }}
+                      className="mt-3 text-white/40 text-xs underline underline-offset-2 hover:text-white/60 transition-colors"
+                    >
+                      pay a different amount
+                    </button>
+                  </>
+                )}
+
+                {customAmountMode && (
+                  <div className="mt-1">
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                      <span className="text-[#00E5CC] text-3xl font-bold">$</span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        min="0.01"
+                        max={remaining}
+                        value={customAmount}
+                        onChange={(e) => setCustomAmount(e.target.value)}
+                        className="w-32 text-center text-3xl font-bold bg-white/15 border border-white/20 rounded-xl px-3 py-2 text-[#00E5CC] outline-none focus:border-[#00E5CC]/50"
+                        autoFocus
+                      />
+                    </div>
+                    <p className="text-white/40 text-xs mb-1">
+                      remaining: ${remaining.toFixed(2)}
+                    </p>
+                    {customAmountMode && customAmount && !isCustomValid && (
+                      <p className="text-red-300 text-xs">
+                        Enter an amount between $0.01 and ${remaining.toFixed(2)}
+                      </p>
+                    )}
+                    <button
+                      onClick={() => { setCustomAmountMode(false); setCustomAmount(""); }}
+                      className="text-white/40 text-xs underline underline-offset-2 hover:text-white/60 transition-colors"
+                    >
+                      use equal split
+                    </button>
+                  </div>
+                )}
 
                 {/* Progress bar */}
                 <div className="mt-6 flex gap-2 justify-center">
@@ -228,10 +285,7 @@ export default function SplitPayment() {
           </div>
 
           {/* Cyan section — action button */}
-          <div
-            className="bg-[#00E5CC] px-8 relative z-0"
-            style={{ paddingTop: "4rem", paddingBottom: "2rem", marginTop: "-4rem" }}
-          >
+          <div className="bg-[#00E5CC] px-8 py-6">
             {pageStatus === "choosing" && (
               <Button
                 className="w-full bg-[#0055FF] hover:bg-[#0044dd] text-[#00E5CC] rounded-[20px] py-6 text-lg font-medium"
@@ -246,9 +300,10 @@ export default function SplitPayment() {
               <Button
                 className="w-full bg-[#0055FF] hover:bg-[#0044dd] text-[#00E5CC] rounded-[20px] py-6 text-lg font-medium"
                 onClick={handlePay}
+                disabled={customAmountMode && !isCustomValid}
                 data-testid="button-pay-split"
               >
-                pay ${perSplitAmount}
+                pay ${payAmount}
               </Button>
             )}
 
