@@ -1374,26 +1374,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     };
   }
 
-  // ── Simulation pay — fully bypasses Windcave, always approves ────────────────
-  // Used by the frontend fallback when Windcave scripts fail to load (e.g. in dev).
-  app.post("/api/transactions/:id/sim-pay", async (req, res) => {
-    try {
-      const transactionId = parseInt(req.params.id);
-      if (isNaN(transactionId)) return res.status(400).json({ message: "Invalid transaction ID" });
-      const fakeWindcaveTxnId = `SIMTXN_${Date.now()}`;
-      const result = await finaliseHostedPayment(transactionId, true, fakeWindcaveTxnId);
-      return res.json(result);
-    } catch (error) {
-      console.error("sim-pay error:", error);
-      res.status(500).json({ message: "Simulation payment failed" });
-    }
-  });
-
   // ── Windcave environment info (for frontend Hosted Fields init) ─────────────
   app.get("/api/windcave/env", (_req, res) => {
     res.json({
       env: getWindcaveEnv(),
-      simMode: !isWindcaveConfigured(),
       applePayMerchantId: process.env.WINDCAVE_APPLE_PAY_MERCHANT_ID || "",
       googlePayMerchantId: process.env.WINDCAVE_GOOGLE_PAY_MERCHANT_ID || "",
     });
