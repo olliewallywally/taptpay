@@ -91,25 +91,10 @@ export default function SplitPayment() {
     }
   };
 
-  const handlePay = async () => {
+  const handlePay = () => {
     if (!currentTransaction) return;
     setPageStatus("redirecting");
-    try {
-      const body: Record<string, any> = { merchantId: currentTransaction.merchantId };
-      if (currentTransaction.taptStoneId) body.stoneId = currentTransaction.taptStoneId;
-      const response = await apiRequest("POST", `/api/transactions/${txnId}/pay`, body);
-      const data = await response.json();
-      if (data.hppUrl) {
-        window.location.href = data.hppUrl;
-      } else if (data.status === "completed") {
-        setPageStatus("done");
-      } else {
-        setPageStatus("waiting");
-      }
-    } catch (err) {
-      console.error("Pay error:", err);
-      setPageStatus("waiting");
-    }
+    setLocation(`/checkout/${txnId}`);
   };
 
   const txn = currentTransaction || transaction;
