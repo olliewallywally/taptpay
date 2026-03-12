@@ -134,10 +134,10 @@ export default function SplitPayment() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-sm md:max-w-md">
-        <div className="rounded-[48px] overflow-hidden shadow-2xl">
+        <div className="shadow-2xl">
 
           {/* Blue section */}
-          <div className="bg-[#0055FF] px-8 pt-8 pb-16 rounded-b-[48px]">
+          <div className="bg-[#0055FF] px-8 pt-8 pb-16 rounded-[48px] relative z-10">
 
             {/* Logo */}
             <div className="text-center mb-6">
@@ -316,8 +316,8 @@ export default function SplitPayment() {
             )}
           </div>
 
-          {/* Turquoise section — action button */}
-          <div className="bg-[#00E5CC] px-8 py-6">
+          {/* Turquoise section — overlaps blue card bottom */}
+          <div className="bg-[#00E5CC] px-8 rounded-b-[48px] relative z-0" style={{ marginTop: "-44px", paddingTop: "60px", paddingBottom: "28px" }}>
             {allDone && (
               <Button
                 className="w-full bg-[#0055FF] hover:bg-[#0044dd] text-[#00E5CC] rounded-[20px] py-6 text-lg font-medium"
