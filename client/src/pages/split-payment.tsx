@@ -217,18 +217,32 @@ export default function SplitPayment() {
 
                 {customAmountMode && (
                   <div className="text-center mt-1">
-                    <div className="flex items-center justify-center gap-1 mb-1">
-                      <span className="text-[#00E5CC] text-3xl font-bold">$</span>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        step="0.01"
-                        min="0.01"
-                        value={customAmount}
-                        onChange={(e) => setCustomAmount(e.target.value)}
-                        className="w-32 text-center text-3xl font-bold bg-white/15 border border-white/20 rounded-xl px-3 py-2 text-[#00E5CC] outline-none focus:border-[#00E5CC]/50"
-                        autoFocus
-                      />
+                    <div className="flex items-center justify-center gap-4 mb-1">
+                      <button
+                        onClick={() => setCustomAmount(v => Math.max(0.01, parseFloat(v || "0") - 1).toFixed(2))}
+                        className="w-11 h-11 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors flex-shrink-0"
+                      >
+                        <Minus size={20} className="text-white" />
+                      </button>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[#00E5CC] text-3xl font-bold">$</span>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          step="0.01"
+                          min="0.01"
+                          value={customAmount}
+                          onChange={(e) => setCustomAmount(e.target.value)}
+                          className="w-24 text-center text-3xl font-bold bg-white/15 border border-white/20 rounded-xl px-2 py-2 text-[#00E5CC] outline-none focus:border-[#00E5CC]/50"
+                          autoFocus
+                        />
+                      </div>
+                      <button
+                        onClick={() => setCustomAmount(v => (parseFloat(v || "0") + 1).toFixed(2))}
+                        className="w-11 h-11 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors flex-shrink-0"
+                      >
+                        <Plus size={20} className="text-white" />
+                      </button>
                     </div>
                     {customAmount && !isCustomValid && (
                       <p className="text-red-300 text-xs mb-1">Enter an amount greater than $0.00</p>
@@ -268,20 +282,34 @@ export default function SplitPayment() {
                 )}
 
                 {customAmountMode && (
-                  <div className="mt-1">
-                    <div className="flex items-center justify-center gap-1 mb-1">
-                      <span className="text-[#00E5CC] text-3xl font-bold">$</span>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        step="0.01"
-                        min="0.01"
-                        max={remaining}
-                        value={customAmount}
-                        onChange={(e) => setCustomAmount(e.target.value)}
-                        className="w-32 text-center text-3xl font-bold bg-white/15 border border-white/20 rounded-xl px-3 py-2 text-[#00E5CC] outline-none focus:border-[#00E5CC]/50"
-                        autoFocus
-                      />
+                  <div className="mt-1 text-center">
+                    <div className="flex items-center justify-center gap-4 mb-1">
+                      <button
+                        onClick={() => setCustomAmount(v => Math.max(0.01, parseFloat(v || "0") - 1).toFixed(2))}
+                        className="w-11 h-11 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors flex-shrink-0"
+                      >
+                        <Minus size={20} className="text-white" />
+                      </button>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[#00E5CC] text-3xl font-bold">$</span>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          step="0.01"
+                          min="0.01"
+                          max={remaining}
+                          value={customAmount}
+                          onChange={(e) => setCustomAmount(e.target.value)}
+                          className="w-24 text-center text-3xl font-bold bg-white/15 border border-white/20 rounded-xl px-2 py-2 text-[#00E5CC] outline-none focus:border-[#00E5CC]/50"
+                          autoFocus
+                        />
+                      </div>
+                      <button
+                        onClick={() => setCustomAmount(v => Math.min(remaining, parseFloat(v || "0") + 1).toFixed(2))}
+                        className="w-11 h-11 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors flex-shrink-0"
+                      >
+                        <Plus size={20} className="text-white" />
+                      </button>
                     </div>
                     <p className="text-white/40 text-xs mb-1">
                       remaining: ${remaining.toFixed(2)}
