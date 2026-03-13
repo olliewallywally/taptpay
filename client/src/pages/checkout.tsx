@@ -345,9 +345,10 @@ export default function Checkout() {
   }
 
   function handleRetry() {
-    setPayState("idle");
+    setCardOpen(false);
     setErrorMsg("");
     sessionRef.current = null;
+    setPayState("idle");
   }
 
   function handleCancel() {
@@ -404,27 +405,8 @@ export default function Checkout() {
     );
   }
 
-  if (payState === "error") {
-    return (
-      <div style={pageStyle}>
-        <div style={cardWrapStyle}>
-          <div style={blueCardStyle}>
-            <div style={logoWrap}><img src={logoSrc} alt="logo" style={{ ...logoImgStyle, ...logoStyle }} /></div>
-            <div style={{ textAlign: "center" }}>
-              <XCircle size={48} color="#f87171" style={{ margin: "0 auto 16px" }} />
-              <p style={{ color: "#fff", fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Payment failed</p>
-              <p style={{ color: "rgba(255,255,255,0.7)", fontSize: 13 }}>{errorMsg || "Something went wrong."}</p>
-            </div>
-          </div>
-          <div style={{ ...tealTabStyle, paddingTop: 64, paddingBottom: 24 }}>
-            <button onClick={handleRetry} style={payBtnStyle}>Try again</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   const isProcessing = payState === "processing";
+  const isError = payState === "error";
 
   return (
     <div style={pageStyle}>
@@ -438,49 +420,67 @@ export default function Checkout() {
             <img src={logoSrc} alt="logo" style={{ ...logoImgStyle, ...logoStyle }} />
           </div>
 
-          {/* Item name + Amount */}
-          <p style={itemNameStyle}>{itemName}</p>
-          <p style={amountStyle}>{amountDisplay}</p>
+          {/* Error overlay — shown in place of normal content on failure */}
+          {isError ? (
+            <div style={{ textAlign: "center" }}>
+              <XCircle size={48} color="#f87171" style={{ margin: "0 auto 16px" }} />
+              <p style={{ color: "#fff", fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Payment failed</p>
+              <p style={{ color: "rgba(255,255,255,0.7)", fontSize: 13 }}>{errorMsg || "Something went wrong."}</p>
+            </div>
+          ) : (
+            <>
+              {/* Item name + Amount */}
+              <p style={itemNameStyle}>{itemName}</p>
+              <p style={amountStyle}>{amountDisplay}</p>
 
-          {/* Apple Pay — native button (Safari/Apple devices only) */}
-          {applePayAvailable && (
-            isProcessing ? (
-              <button disabled style={applePayBtnStyle} aria-label="Processing">
-                <Loader2 size={20} color="#fff" style={{ animation: "spin 1s linear infinite" }} />
-              </button>
-            ) : (
-              <button
-                onClick={handleApplePay}
-                className="apple-pay-btn"
-                aria-label="Pay with Apple Pay"
-              />
-            )
-          )}
-
-          {/* Google Pay — official branded button (Android/Chrome only) */}
-          {googlePayAvailable && (
-            <button
-              onClick={handleGooglePay}
-              disabled={isProcessing}
-              style={googlePayBtnStyle}
-              aria-label="Pay with Google Pay"
-            >
-              {isProcessing ? (
-                <Loader2 size={20} color="#fff" style={{ animation: "spin 1s linear infinite" }} />
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" width="58" height="24" viewBox="0 0 58 24" aria-hidden="true">
-                  <path d="M25.516 10.185v3.934h-1.234V4.37h3.273a2.964 2.964 0 0 1 2.122.876 2.88 2.88 0 0 1 .879 2.123 2.9 2.9 0 0 1-.879 2.139 2.937 2.937 0 0 1-2.122.877h-2.039zm0-4.653v3.492h2.062a1.73 1.73 0 0 0 1.301-.531 1.79 1.79 0 0 0 0-2.422 1.712 1.712 0 0 0-1.301-.539h-2.062zm8.047 2.376c.91 0 1.627.244 2.152.731.525.487.787 1.155.787 2.004v4.046h-1.178v-.91h-.053a2.5 2.5 0 0 1-2.177 1.126 2.907 2.907 0 0 1-1.995-.713 2.27 2.27 0 0 1-.802-1.771c0-.748.283-1.343.847-1.783.564-.44 1.316-.66 2.256-.66.803 0 1.464.147 1.982.441v-.31a1.541 1.541 0 0 0-.551-1.194 1.93 1.93 0 0 0-1.31-.488 2.098 2.098 0 0 0-1.804.965l-1.085-.682a3.207 3.207 0 0 1 2.931-1.802zm-1.758 5.365a1.376 1.376 0 0 0 .574 1.12c.374.3.825.464 1.29.47a2.26 2.26 0 0 0 1.6-.665 2.127 2.127 0 0 0 .66-1.578c-.417-.333-.997-.499-1.74-.499-.54 0-.991.131-1.352.393a1.178 1.178 0 0 0-.532 1.01V13.273zm9.266 4.86-4.132-10.026h1.33l2.505 6.394h.035l2.442-6.394h1.33l-4.622 11.386-1.261-.001.373-.36z" fill="#fff"/>
-                  <path d="M10.785 10.766v-2.19H17.3a6.37 6.37 0 0 1 .096 1.148c0 1.427-.39 3.192-1.648 4.45-1.225 1.274-2.793 1.954-4.963 1.954C6.88 16.128 3.5 12.84 3.5 8.936s3.38-7.192 7.285-7.192c2.221 0 3.804.871 4.994 2.007l-1.404 1.404c-.847-.795-1.996-1.412-3.59-1.412-2.933 0-5.224 2.362-5.224 5.193 0 2.832 2.291 5.194 5.224 5.194 1.9 0 2.982-.763 3.678-1.46.563-.562.934-1.367 1.08-2.465l-4.758-.439z" fill="#4285F4"/>
-                  <path d="M10.785 10.766v-2.19H17.3a6.37 6.37 0 0 1 .096 1.148c0 1.427-.39 3.192-1.648 4.45-1.225 1.274-2.793 1.954-4.963 1.954C6.88 16.128 3.5 12.84 3.5 8.936s3.38-7.192 7.285-7.192c2.221 0 3.804.871 4.994 2.007l-1.404 1.404c-.847-.795-1.996-1.412-3.59-1.412-2.933 0-5.224 2.362-5.224 5.193 0 2.832 2.291 5.194 5.224 5.194 1.9 0 2.982-.763 3.678-1.46.563-.562.934-1.367 1.08-2.465l-4.758-.439z" fill="none"/>
-                </svg>
+              {/* Apple Pay — native button (Safari/Apple devices only) */}
+              {applePayAvailable && (
+                isProcessing ? (
+                  <button disabled style={applePayBtnStyle} aria-label="Processing">
+                    <Loader2 size={20} color="#fff" style={{ animation: "spin 1s linear infinite" }} />
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleApplePay}
+                    className="apple-pay-btn"
+                    aria-label="Pay with Apple Pay"
+                  />
+                )
               )}
-            </button>
+
+              {/* Google Pay — official branded button (Android/Chrome only) */}
+              {googlePayAvailable && (
+                <button
+                  onClick={handleGooglePay}
+                  disabled={isProcessing}
+                  style={googlePayBtnStyle}
+                  aria-label="Pay with Google Pay"
+                >
+                  {isProcessing ? (
+                    <Loader2 size={20} color="#fff" style={{ animation: "spin 1s linear infinite" }} />
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="58" height="24" viewBox="0 0 58 24" aria-hidden="true">
+                      <path d="M25.516 10.185v3.934h-1.234V4.37h3.273a2.964 2.964 0 0 1 2.122.876 2.88 2.88 0 0 1 .879 2.123 2.9 2.9 0 0 1-.879 2.139 2.937 2.937 0 0 1-2.122.877h-2.039zm0-4.653v3.492h2.062a1.73 1.73 0 0 0 1.301-.531 1.79 1.79 0 0 0 0-2.422 1.712 1.712 0 0 0-1.301-.539h-2.062zm8.047 2.376c.91 0 1.627.244 2.152.731.525.487.787 1.155.787 2.004v4.046h-1.178v-.91h-.053a2.5 2.5 0 0 1-2.177 1.126 2.907 2.907 0 0 1-1.995-.713 2.27 2.27 0 0 1-.802-1.771c0-.748.283-1.343.847-1.783.564-.44 1.316-.66 2.256-.66.803 0 1.464.147 1.982.441v-.31a1.541 1.541 0 0 0-.551-1.194 1.93 1.93 0 0 0-1.31-.488 2.098 2.098 0 0 0-1.804.965l-1.085-.682a3.207 3.207 0 0 1 2.931-1.802zm-1.758 5.365a1.376 1.376 0 0 0 .574 1.12c.374.3.825.464 1.29.47a2.26 2.26 0 0 0 1.6-.665 2.127 2.127 0 0 0 .66-1.578c-.417-.333-.997-.499-1.74-.499-.54 0-.991.131-1.352.393a1.178 1.178 0 0 0-.532 1.01V13.273zm9.266 4.86-4.132-10.026h1.33l2.505 6.394h.035l2.442-6.394h1.33l-4.622 11.386-1.261-.001.373-.36z" fill="#fff"/>
+                      <path d="M10.785 10.766v-2.19H17.3a6.37 6.37 0 0 1 .096 1.148c0 1.427-.39 3.192-1.648 4.45-1.225 1.274-2.793 1.954-4.963 1.954C6.88 16.128 3.5 12.84 3.5 8.936s3.38-7.192 7.285-7.192c2.221 0 3.804.871 4.994 2.007l-1.404 1.404c-.847-.795-1.996-1.412-3.59-1.412-2.933 0-5.224 2.362-5.224 5.193 0 2.832 2.291 5.194 5.224 5.194 1.9 0 2.982-.763 3.678-1.46.563-.562.934-1.367 1.08-2.465l-4.758-.439z" fill="#4285F4"/>
+                    </svg>
+                  )}
+                </button>
+              )}
+            </>
           )}
 
         </div>
 
-        {/* ── Expandable card details tab ── */}
-            <div
+        {/* ── Cyan tab — always rendered so hosted fields stay mounted ── */}
+        {isError ? (
+          /* Error state: full-width "Try again" button in the teal tab */
+          <div style={{ ...tealTabStyle, paddingTop: 64, paddingBottom: 24 }}>
+            <button onClick={handleRetry} style={payBtnStyle}>Try again</button>
+          </div>
+        ) : (
+          /* Normal state: expandable card details */
+          <>
+          <div
               style={{ ...cardTabStyle, ...(cardOpen ? cardTabOpenStyle : {}) }}
               onClick={() => !isProcessing && setCardOpen((o) => !o)}
               role="button"
@@ -554,6 +554,8 @@ export default function Checkout() {
                 )}
               </button>
             </div>
+          </>
+        )}
 
         {/* Cancel link — sits cleanly below the card stack */}
         <div style={{ textAlign: "center", marginTop: 20 }}>
