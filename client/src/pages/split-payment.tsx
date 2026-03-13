@@ -14,9 +14,12 @@ export default function SplitPayment() {
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentTransaction, setCurrentTransaction] = useState<any>(null);
-  const [editing, setEditing] = useState(false);
+
+  // First-person state
+  const [splitCount, setSplitCount] = useState(2);
+  const [editMode, setEditMode] = useState(false);
   const [editValue, setEditValue] = useState("");
-  const [confirmedAmount, setConfirmedAmount] = useState("");
+  const [confirmedCustom, setConfirmedCustom] = useState<string | null>(null); // null = use equal split
 
   const { data: transaction, isLoading } = useQuery({
     queryKey: ["/api/transactions", txnId],
@@ -63,57 +66,47 @@ export default function SplitPayment() {
   const totalAmount = txn ? parseFloat(txn.price) : 0;
   const isSplitSetup = txn?.isSplit === true;
   const completedSplits = txn?.completedSplits || 0;
-  const totalSplits = txn?.totalSplits || 2;
+  const totalSplits = txn?.totalSplits || splitCount;
   const allDone = txn?.status === "completed";
   const nextPersonIndex = completedSplits + 1;
 
-  const equalShare = isSplitSetup
-    ? parseFloat((txn?.splitAmount || totalAmount / totalSplits).toString()).toFixed(2)
-    : (totalAmount / 2).toFixed(2);
+  // Equal share based on split count
+  const equalShare = (totalAmount / (isSplitSetup ? totalSplits : splitCount)).toFixed(2);
 
+  // Subsequent payers: remaining amount and their share
   const totalPaid = isSplitSetup && txn?.splitAmount
     ? parseFloat(txn.splitAmount) * completedSplits
     : 0;
   const remaining = totalAmount - totalPaid;
+  const subsequentShare = isSplitSetup
+    ? (parseFloat(txn?.splitAmount || "0") || parseFloat(equalShare)).toFixed(2)
+    : equalShare;
 
-  useEffect(() => {
-    if (equalShare && !confirmedAmount) {
-      setConfirmedAmount(equalShare);
-      setEditValue(equalShare);
-    }
-  }, [equalShare]);
+  // What's shown as the large static amount
+  const displayAmount = isSplitSetup
+    ? subsequentShare
+    : (confirmedCustom ?? equalShare);
 
-  const step = parseFloat(equalShare) || 1;
+  // Edit step: for first person in edit mode, step by equalShare; for subsequent payers, step by their share
+  const editStep = parseFloat(isSplitSetup ? subsequentShare : equalShare);
+  const maxEditAmount = isSplitSetup ? remaining : totalAmount;
+
   const parsedEdit = parseFloat(editValue) || 0;
-  const maxAmount = isSplitSetup ? remaining : totalAmount;
-  const isEditValid = parsedEdit > 0 && parsedEdit <= maxAmount + 0.01;
+  const isEditValid = parsedEdit > 0 && parsedEdit <= maxEditAmount + 0.01;
 
-  const displayAmount = confirmedAmount || equalShare;
-
-  const handleStartEdit = () => {
-    setEditValue(confirmedAmount || equalShare);
-    setEditing(true);
-  };
-
-  const handleConfirm = () => {
-    if (isEditValid) {
-      setConfirmedAmount(parseFloat(editValue).toFixed(2));
-      setEditing(false);
-    }
-  };
-
-  const handleUseEqualSplit = () => {
-    setEditValue(equalShare);
-    setConfirmedAmount(equalShare);
-    setEditing(false);
-  };
+  // Subsequent payer edit state
+  const [subEditMode, setSubEditMode] = useState(false);
+  const [subEditValue, setSubEditValue] = useState("");
+  const [subConfirmed, setSubConfirmed] = useState<string | null>(null);
+  const subDisplay = subConfirmed ?? subsequentShare;
+  const parsedSubEdit = parseFloat(subEditValue) || 0;
+  const isSubEditValid = parsedSubEdit > 0 && parsedSubEdit <= remaining + 0.01;
 
   const handlePay = async () => {
     if (!txn) return;
     setIsProcessing(true);
     try {
       if (!isSplitSetup) {
-        const splitCount = Math.max(2, Math.round(totalAmount / parseFloat(displayAmount)));
         const response = await apiRequest("POST", `/api/transactions/${txnId}/split`, {
           totalSplits: splitCount,
         });
@@ -122,13 +115,21 @@ export default function SplitPayment() {
           setCurrentTransaction(data.transaction);
           queryClient.setQueryData(["/api/transactions", txnId], data.transaction);
         }
-      }
-      const payAmt = parseFloat(displayAmount);
-      const defaultAmt = parseFloat(equalShare);
-      if (Math.abs(payAmt - defaultAmt) > 0.001) {
-        setLocation(`/checkout/${txnId}?amount=${payAmt.toFixed(2)}`);
+        const payAmt = parseFloat(displayAmount);
+        const defaultAmt = parseFloat(equalShare);
+        if (Math.abs(payAmt - defaultAmt) > 0.001) {
+          setLocation(`/checkout/${txnId}?amount=${payAmt.toFixed(2)}`);
+        } else {
+          setLocation(`/checkout/${txnId}`);
+        }
       } else {
-        setLocation(`/checkout/${txnId}`);
+        const payAmt = parseFloat(subDisplay);
+        const defaultAmt = parseFloat(subsequentShare);
+        if (Math.abs(payAmt - defaultAmt) > 0.001) {
+          setLocation(`/checkout/${txnId}?amount=${payAmt.toFixed(2)}`);
+        } else {
+          setLocation(`/checkout/${txnId}`);
+        }
       }
     } catch (err) {
       console.error("Split payment error:", err);
@@ -158,175 +159,275 @@ export default function SplitPayment() {
     );
   }
 
-  /* ── Amount display: static or editable ── */
-  const AmountRow = ({ maxAmt }: { maxAmt: number }) => (
-    <div className="text-center">
-      {editing ? (
-        <>
-          <div className="flex items-center justify-center gap-4 mb-1">
-            <button
-              onClick={() => setEditValue(v => Math.max(0.01, parseFloat(v || "0") - step).toFixed(2))}
-              className="w-14 h-14 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors flex-shrink-0"
-            >
-              <Minus size={24} className="text-white" />
-            </button>
-            <input
-              type="number"
-              inputMode="decimal"
-              step="0.01"
-              min="0.01"
-              max={maxAmt}
-              value={editValue}
-              onChange={(e) => setEditValue(e.target.value)}
-              autoFocus
-              className="w-32 text-center text-4xl font-bold bg-white/15 border border-white/20 rounded-xl px-2 py-2 text-[#00E5CC] outline-none focus:border-[#00E5CC]/50"
-            />
-            <button
-              onClick={() => setEditValue(v => Math.min(maxAmt, parseFloat(v || "0") + step).toFixed(2))}
-              className="w-14 h-14 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors flex-shrink-0"
-            >
-              <Plus size={24} className="text-white" />
-            </button>
-          </div>
-          {editValue && !isEditValid && (
-            <p className="text-red-300 text-xs mt-1">
-              Enter an amount between $0.01 and ${maxAmt.toFixed(2)}
-            </p>
-          )}
-          <button
-            onClick={handleUseEqualSplit}
-            className="mt-2 text-white/40 text-xs underline underline-offset-2 hover:text-white/60 transition-colors"
-          >
-            use equal split
-          </button>
-        </>
-      ) : (
-        <>
-          <p className="text-[#00E5CC] text-5xl font-bold">${displayAmount}</p>
-          <button
-            onClick={handleStartEdit}
-            className="mt-3 text-white/40 text-xs underline underline-offset-2 hover:text-white/60 transition-colors"
-          >
-            enter different amount
-          </button>
-        </>
-      )}
-    </div>
-  );
-
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm md:max-w-md">
-        <div className="shadow-2xl">
+      <div className="w-full max-w-sm md:max-w-md shadow-2xl">
 
-          {/* Blue section */}
-          <div className="bg-[#0055FF] px-8 pt-8 pb-16 rounded-[48px] relative z-10">
+        {/* ── Blue card ── */}
+        <div className="bg-[#0055FF] px-8 pt-8 pb-16 rounded-[48px] relative z-10">
 
-            {/* Logo */}
-            <div className="text-center mb-6">
-              <img
-                src={merchant?.customLogoUrl || taptLogo}
-                alt="logo"
-                className="h-12 mx-auto object-contain"
-                style={logoStyle}
-              />
-            </div>
-
-            {/* ── All paid ── */}
-            {allDone && (
-              <div className="text-center py-6">
-                <CheckCircle className="w-16 h-16 text-[#00E5CC] mx-auto mb-4" />
-                <h2 className="text-2xl font-bold text-white mb-2">All Done!</h2>
-                <p className="text-white/70">All {totalSplits} payments complete</p>
-                <p className="text-[#00E5CC] text-4xl font-bold mt-4">${totalAmount.toFixed(2)}</p>
-                <p className="text-white/60 text-sm">Total paid</p>
-              </div>
-            )}
-
-            {/* ── Redirecting ── */}
-            {!allDone && isProcessing && (
-              <div className="text-center py-6">
-                <Loader2 className="w-8 h-8 text-[#00E5CC] animate-spin mx-auto mb-3" />
-                <p className="text-white">Taking you to payment...</p>
-              </div>
-            )}
-
-            {/* ── First person ── */}
-            {!allDone && !isProcessing && !isSplitSetup && (
-              <div>
-                <p className="text-white/60 text-lg text-center mb-2">{txn.itemName}</p>
-                <p className="text-[#00E5CC] text-5xl font-bold text-center mb-6">
-                  ${totalAmount.toFixed(2)}
-                </p>
-                <h2 className="text-white text-xl font-bold text-center mb-6">Split the bill</h2>
-                <AmountRow maxAmt={totalAmount} />
-              </div>
-            )}
-
-            {/* ── Subsequent payers ── */}
-            {!allDone && !isProcessing && isSplitSetup && (
-              <div className="text-center">
-                <div className="bg-white/10 rounded-2xl px-4 py-2 inline-block mb-4">
-                  <p className="text-white/70 text-sm">
-                    Person {nextPersonIndex} of {totalSplits}
-                  </p>
-                </div>
-                <p className="text-white/60 text-lg mb-6">{txn.itemName}</p>
-                <AmountRow maxAmt={remaining} />
-
-                {/* Progress bar */}
-                <div className="mt-6 flex gap-2 justify-center">
-                  {Array.from({ length: totalSplits }).map((_, i) => (
-                    <div
-                      key={i}
-                      className={`h-2 flex-1 rounded-full ${i < completedSplits ? "bg-[#00E5CC]" : "bg-white/20"}`}
-                    />
-                  ))}
-                </div>
-                <p className="text-white/50 text-xs mt-2">
-                  {completedSplits} of {totalSplits} paid
-                </p>
-              </div>
-            )}
+          {/* Logo */}
+          <div className="text-center mb-6">
+            <img
+              src={merchant?.customLogoUrl || taptLogo}
+              alt="logo"
+              className="h-12 mx-auto object-contain"
+              style={logoStyle}
+            />
           </div>
 
-          {/* Turquoise section */}
-          <div
-            className="bg-[#00E5CC] px-8 rounded-b-[48px] relative z-0"
-            style={{ marginTop: "-44px", paddingTop: "60px", paddingBottom: "28px" }}
-          >
-            {allDone && (
+          {/* ── All paid ── */}
+          {allDone && (
+            <div className="text-center py-6">
+              <CheckCircle className="w-16 h-16 text-[#00E5CC] mx-auto mb-4" />
+              <h2 className="text-2xl font-bold text-white mb-2">All Done!</h2>
+              <p className="text-white/70">All {totalSplits} payments complete</p>
+              <p className="text-[#00E5CC] text-4xl font-bold mt-4">${totalAmount.toFixed(2)}</p>
+              <p className="text-white/60 text-sm">Total paid</p>
+            </div>
+          )}
+
+          {/* ── Redirecting ── */}
+          {!allDone && isProcessing && (
+            <div className="text-center py-6">
+              <Loader2 className="w-8 h-8 text-[#00E5CC] animate-spin mx-auto mb-3" />
+              <p className="text-white">Taking you to payment...</p>
+            </div>
+          )}
+
+          {/* ── First person ── */}
+          {!allDone && !isProcessing && !isSplitSetup && (
+            <div className="text-center">
+              {/* Person badge */}
+              <div className="bg-white/10 rounded-2xl px-4 py-2 inline-block mb-4">
+                <p className="text-white/70 text-sm">Person 1 of {splitCount}</p>
+              </div>
+
+              <p className="text-white/60 text-lg mb-2">{txn.itemName}</p>
+
+              {/* Normal mode: static amount + split-count +/- */}
+              {!editMode && (
+                <>
+                  <p className="text-[#00E5CC] text-5xl font-bold mb-3">${displayAmount}</p>
+
+                  {/* Split count adjuster */}
+                  <div className="flex items-center justify-center gap-6 mb-3">
+                    <button
+                      onClick={() => { setSplitCount(c => Math.max(2, c - 1)); setConfirmedCustom(null); }}
+                      className="w-12 h-12 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors"
+                    >
+                      <Minus size={20} className="text-white" />
+                    </button>
+                    <span className="text-white/50 text-sm">{splitCount} people</span>
+                    <button
+                      onClick={() => { setSplitCount(c => Math.min(10, c + 1)); setConfirmedCustom(null); }}
+                      className="w-12 h-12 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors"
+                    >
+                      <Plus size={20} className="text-white" />
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={() => { setEditValue(displayAmount); setEditMode(true); }}
+                    className="text-white/40 text-xs underline underline-offset-2 hover:text-white/60 transition-colors"
+                  >
+                    enter different amount
+                  </button>
+                </>
+              )}
+
+              {/* Edit mode: fine dollar +/- input */}
+              {editMode && (
+                <>
+                  <div className="flex items-center justify-center gap-4 mb-1">
+                    <button
+                      onClick={() => setEditValue(v => Math.max(0.01, parseFloat(v || "0") - editStep).toFixed(2))}
+                      className="w-14 h-14 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors"
+                    >
+                      <Minus size={24} className="text-white" />
+                    </button>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      step="0.01"
+                      min="0.01"
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      autoFocus
+                      className="w-32 text-center text-4xl font-bold bg-white/15 border border-white/20 rounded-xl px-2 py-2 text-[#00E5CC] outline-none focus:border-[#00E5CC]/50"
+                    />
+                    <button
+                      onClick={() => setEditValue(v => Math.min(maxEditAmount, parseFloat(v || "0") + editStep).toFixed(2))}
+                      className="w-14 h-14 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors"
+                    >
+                      <Plus size={24} className="text-white" />
+                    </button>
+                  </div>
+                  {editValue && !isEditValid && (
+                    <p className="text-red-300 text-xs mt-1">
+                      Enter an amount between $0.01 and ${maxEditAmount.toFixed(2)}
+                    </p>
+                  )}
+                  <button
+                    onClick={() => { setConfirmedCustom(null); setEditMode(false); }}
+                    className="mt-2 text-white/40 text-xs underline underline-offset-2 hover:text-white/60 transition-colors"
+                  >
+                    use equal split
+                  </button>
+                </>
+              )}
+
+              {/* Progress bars */}
+              <div className="mt-6 flex gap-2 justify-center">
+                {Array.from({ length: splitCount }).map((_, i) => (
+                  <div key={i} className="h-2 flex-1 rounded-full bg-white/20" />
+                ))}
+              </div>
+              <p className="text-white/50 text-xs mt-2">0 of {splitCount} paid</p>
+            </div>
+          )}
+
+          {/* ── Subsequent payers ── */}
+          {!allDone && !isProcessing && isSplitSetup && (
+            <div className="text-center">
+              <div className="bg-white/10 rounded-2xl px-4 py-2 inline-block mb-4">
+                <p className="text-white/70 text-sm">Person {nextPersonIndex} of {totalSplits}</p>
+              </div>
+
+              <p className="text-white/60 text-lg mb-2">{txn.itemName}</p>
+
+              {!subEditMode && (
+                <>
+                  <p className="text-[#00E5CC] text-5xl font-bold mb-3">${subDisplay}</p>
+                  <button
+                    onClick={() => { setSubEditValue(subDisplay); setSubEditMode(true); }}
+                    className="text-white/40 text-xs underline underline-offset-2 hover:text-white/60 transition-colors"
+                  >
+                    enter different amount
+                  </button>
+                </>
+              )}
+
+              {subEditMode && (
+                <>
+                  <div className="flex items-center justify-center gap-4 mb-1">
+                    <button
+                      onClick={() => setSubEditValue(v => Math.max(0.01, parseFloat(v || "0") - editStep).toFixed(2))}
+                      className="w-14 h-14 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors"
+                    >
+                      <Minus size={24} className="text-white" />
+                    </button>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      step="0.01"
+                      min="0.01"
+                      max={remaining}
+                      value={subEditValue}
+                      onChange={(e) => setSubEditValue(e.target.value)}
+                      autoFocus
+                      className="w-32 text-center text-4xl font-bold bg-white/15 border border-white/20 rounded-xl px-2 py-2 text-[#00E5CC] outline-none focus:border-[#00E5CC]/50"
+                    />
+                    <button
+                      onClick={() => setSubEditValue(v => Math.min(remaining, parseFloat(v || "0") + editStep).toFixed(2))}
+                      className="w-14 h-14 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors"
+                    >
+                      <Plus size={24} className="text-white" />
+                    </button>
+                  </div>
+                  {subEditValue && !isSubEditValid && (
+                    <p className="text-red-300 text-xs mt-1">
+                      Enter an amount between $0.01 and ${remaining.toFixed(2)}
+                    </p>
+                  )}
+                  <button
+                    onClick={() => { setSubConfirmed(null); setSubEditMode(false); }}
+                    className="mt-2 text-white/40 text-xs underline underline-offset-2 hover:text-white/60 transition-colors"
+                  >
+                    use equal split
+                  </button>
+                </>
+              )}
+
+              {/* Progress bars */}
+              <div className="mt-6 flex gap-2 justify-center">
+                {Array.from({ length: totalSplits }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={`h-2 flex-1 rounded-full ${i < completedSplits ? "bg-[#00E5CC]" : "bg-white/20"}`}
+                  />
+                ))}
+              </div>
+              <p className="text-white/50 text-xs mt-2">{completedSplits} of {totalSplits} paid</p>
+            </div>
+          )}
+        </div>
+
+        {/* ── Cyan tab ── */}
+        <div
+          className="bg-[#00E5CC] px-8 rounded-b-[48px] relative z-0"
+          style={{ marginTop: "-44px", paddingTop: "60px", paddingBottom: "28px" }}
+        >
+          {allDone && (
+            <Button
+              className="w-full bg-[#0055FF] hover:bg-[#0044dd] text-[#00E5CC] rounded-[20px] py-6 text-lg font-medium"
+              onClick={() => setLocation("/")}
+            >
+              done
+            </Button>
+          )}
+
+          {!allDone && !isProcessing && !isSplitSetup && (
+            editMode ? (
               <Button
                 className="w-full bg-[#0055FF] hover:bg-[#0044dd] text-[#00E5CC] rounded-[20px] py-6 text-lg font-medium"
-                onClick={() => setLocation("/")}
+                onClick={() => {
+                  if (isEditValid) {
+                    setConfirmedCustom(parseFloat(editValue).toFixed(2));
+                    setEditMode(false);
+                  }
+                }}
+                disabled={!isEditValid}
               >
-                done
+                confirm
               </Button>
-            )}
+            ) : (
+              <Button
+                className="w-full bg-[#0055FF] hover:bg-[#0044dd] text-[#00E5CC] rounded-[20px] py-6 text-lg font-medium"
+                onClick={handlePay}
+                data-testid="button-pay-split"
+              >
+                pay ${displayAmount}
+              </Button>
+            )
+          )}
 
-            {!allDone && !isProcessing && (
-              editing ? (
-                <Button
-                  className="w-full bg-[#0055FF] hover:bg-[#0044dd] text-[#00E5CC] rounded-[20px] py-6 text-lg font-medium"
-                  onClick={handleConfirm}
-                  disabled={!isEditValid}
-                  data-testid="button-confirm-amount"
-                >
-                  confirm
-                </Button>
-              ) : (
-                <Button
-                  className="w-full bg-[#0055FF] hover:bg-[#0044dd] text-[#00E5CC] rounded-[20px] py-6 text-lg font-medium"
-                  onClick={handlePay}
-                  data-testid="button-pay-split"
-                >
-                  pay ${displayAmount}
-                </Button>
-              )
-            )}
-          </div>
-
+          {!allDone && !isProcessing && isSplitSetup && (
+            subEditMode ? (
+              <Button
+                className="w-full bg-[#0055FF] hover:bg-[#0044dd] text-[#00E5CC] rounded-[20px] py-6 text-lg font-medium"
+                onClick={() => {
+                  if (isSubEditValid) {
+                    setSubConfirmed(parseFloat(subEditValue).toFixed(2));
+                    setSubEditMode(false);
+                  }
+                }}
+                disabled={!isSubEditValid}
+              >
+                confirm
+              </Button>
+            ) : (
+              <Button
+                className="w-full bg-[#0055FF] hover:bg-[#0044dd] text-[#00E5CC] rounded-[20px] py-6 text-lg font-medium"
+                onClick={handlePay}
+                data-testid="button-pay-split"
+              >
+                pay ${subDisplay}
+              </Button>
+            )
+          )}
         </div>
+
       </div>
     </div>
   );
