@@ -14,6 +14,9 @@ export default function SplitPayment() {
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentTransaction, setCurrentTransaction] = useState<any>(null);
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState("");
+  const [confirmedAmount, setConfirmedAmount] = useState("");
 
   const { data: transaction, isLoading } = useQuery({
     queryKey: ["/api/transactions", txnId],
@@ -73,22 +76,36 @@ export default function SplitPayment() {
     : 0;
   const remaining = totalAmount - totalPaid;
 
-  const [displayAmount, setDisplayAmount] = useState(equalShare);
-  const [confirmedAmount, setConfirmedAmount] = useState(equalShare);
-
   useEffect(() => {
-    setDisplayAmount(equalShare);
-    setConfirmedAmount(equalShare);
+    if (equalShare && !confirmedAmount) {
+      setConfirmedAmount(equalShare);
+      setEditValue(equalShare);
+    }
   }, [equalShare]);
 
-  const stepAmount = parseFloat(equalShare);
-  const parsedDisplay = parseFloat(displayAmount) || 0;
+  const step = parseFloat(equalShare) || 1;
+  const parsedEdit = parseFloat(editValue) || 0;
   const maxAmount = isSplitSetup ? remaining : totalAmount;
-  const isEdited = parseFloat(displayAmount).toFixed(2) !== parseFloat(confirmedAmount).toFixed(2);
-  const isValid = parsedDisplay > 0 && parsedDisplay <= maxAmount + 0.01;
+  const isEditValid = parsedEdit > 0 && parsedEdit <= maxAmount + 0.01;
+
+  const displayAmount = confirmedAmount || equalShare;
+
+  const handleStartEdit = () => {
+    setEditValue(confirmedAmount || equalShare);
+    setEditing(true);
+  };
 
   const handleConfirm = () => {
-    if (isValid) setConfirmedAmount(parseFloat(displayAmount).toFixed(2));
+    if (isEditValid) {
+      setConfirmedAmount(parseFloat(editValue).toFixed(2));
+      setEditing(false);
+    }
+  };
+
+  const handleUseEqualSplit = () => {
+    setEditValue(equalShare);
+    setConfirmedAmount(equalShare);
+    setEditing(false);
   };
 
   const handlePay = async () => {
@@ -96,7 +113,7 @@ export default function SplitPayment() {
     setIsProcessing(true);
     try {
       if (!isSplitSetup) {
-        const splitCount = Math.max(2, Math.round(totalAmount / parseFloat(confirmedAmount)));
+        const splitCount = Math.max(2, Math.round(totalAmount / parseFloat(displayAmount)));
         const response = await apiRequest("POST", `/api/transactions/${txnId}/split`, {
           totalSplits: splitCount,
         });
@@ -106,7 +123,7 @@ export default function SplitPayment() {
           queryClient.setQueryData(["/api/transactions", txnId], data.transaction);
         }
       }
-      const payAmt = parseFloat(confirmedAmount);
+      const payAmt = parseFloat(displayAmount);
       const defaultAmt = parseFloat(equalShare);
       if (Math.abs(payAmt - defaultAmt) > 0.001) {
         setLocation(`/checkout/${txnId}?amount=${payAmt.toFixed(2)}`);
@@ -141,6 +158,62 @@ export default function SplitPayment() {
     );
   }
 
+  /* ── Amount display: static or editable ── */
+  const AmountRow = ({ maxAmt }: { maxAmt: number }) => (
+    <div className="text-center">
+      {editing ? (
+        <>
+          <div className="flex items-center justify-center gap-4 mb-1">
+            <button
+              onClick={() => setEditValue(v => Math.max(0.01, parseFloat(v || "0") - step).toFixed(2))}
+              className="w-14 h-14 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors flex-shrink-0"
+            >
+              <Minus size={24} className="text-white" />
+            </button>
+            <input
+              type="number"
+              inputMode="decimal"
+              step="0.01"
+              min="0.01"
+              max={maxAmt}
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              autoFocus
+              className="w-32 text-center text-4xl font-bold bg-white/15 border border-white/20 rounded-xl px-2 py-2 text-[#00E5CC] outline-none focus:border-[#00E5CC]/50"
+            />
+            <button
+              onClick={() => setEditValue(v => Math.min(maxAmt, parseFloat(v || "0") + step).toFixed(2))}
+              className="w-14 h-14 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors flex-shrink-0"
+            >
+              <Plus size={24} className="text-white" />
+            </button>
+          </div>
+          {editValue && !isEditValid && (
+            <p className="text-red-300 text-xs mt-1">
+              Enter an amount between $0.01 and ${maxAmt.toFixed(2)}
+            </p>
+          )}
+          <button
+            onClick={handleUseEqualSplit}
+            className="mt-2 text-white/40 text-xs underline underline-offset-2 hover:text-white/60 transition-colors"
+          >
+            use equal split
+          </button>
+        </>
+      ) : (
+        <>
+          <p className="text-[#00E5CC] text-5xl font-bold">${displayAmount}</p>
+          <button
+            onClick={handleStartEdit}
+            className="mt-3 text-white/40 text-xs underline underline-offset-2 hover:text-white/60 transition-colors"
+          >
+            enter different amount
+          </button>
+        </>
+      )}
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-sm md:max-w-md">
@@ -170,7 +243,7 @@ export default function SplitPayment() {
               </div>
             )}
 
-            {/* ── Loading / redirecting ── */}
+            {/* ── Redirecting ── */}
             {!allDone && isProcessing && (
               <div className="text-center py-6">
                 <Loader2 className="w-8 h-8 text-[#00E5CC] animate-spin mx-auto mb-3" />
@@ -178,58 +251,15 @@ export default function SplitPayment() {
               </div>
             )}
 
-            {/* ── First person: set their amount ── */}
+            {/* ── First person ── */}
             {!allDone && !isProcessing && !isSplitSetup && (
               <div>
-                <div className="text-center mb-2">
-                  <p className="text-white/60 text-lg">{txn.itemName}</p>
-                </div>
-                <div className="text-center mb-6">
-                  <p className="text-[#00E5CC] text-5xl font-bold">${totalAmount.toFixed(2)}</p>
-                </div>
+                <p className="text-white/60 text-lg text-center mb-2">{txn.itemName}</p>
+                <p className="text-[#00E5CC] text-5xl font-bold text-center mb-6">
+                  ${totalAmount.toFixed(2)}
+                </p>
                 <h2 className="text-white text-xl font-bold text-center mb-6">Split the bill</h2>
-
-                {/* Single amount row */}
-                <div className="flex items-center justify-center gap-4">
-                  <button
-                    onClick={() => setDisplayAmount(v => Math.max(0.01, parseFloat(v || "0") - stepAmount).toFixed(2))}
-                    className="w-14 h-14 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors flex-shrink-0"
-                  >
-                    <Minus size={24} className="text-white" />
-                  </button>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    step="0.01"
-                    min="0.01"
-                    value={displayAmount}
-                    onChange={(e) => setDisplayAmount(e.target.value)}
-                    className="w-32 text-center text-4xl font-bold bg-white/15 border border-white/20 rounded-xl px-2 py-2 text-[#00E5CC] outline-none focus:border-[#00E5CC]/50"
-                  />
-                  <button
-                    onClick={() => setDisplayAmount(v => (parseFloat(v || "0") + stepAmount).toFixed(2))}
-                    className="w-14 h-14 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors flex-shrink-0"
-                  >
-                    <Plus size={24} className="text-white" />
-                  </button>
-                </div>
-
-                {!isValid && parsedDisplay > 0 && (
-                  <p className="text-red-300 text-xs text-center mt-2">
-                    Amount must be between $0.01 and ${totalAmount.toFixed(2)}
-                  </p>
-                )}
-
-                {isEdited && (
-                  <div className="text-center mt-3">
-                    <button
-                      onClick={() => { setDisplayAmount(equalShare); setConfirmedAmount(equalShare); }}
-                      className="text-white/40 text-xs underline underline-offset-2 hover:text-white/60 transition-colors"
-                    >
-                      use equal split
-                    </button>
-                  </div>
-                )}
+                <AmountRow maxAmt={totalAmount} />
               </div>
             )}
 
@@ -242,49 +272,7 @@ export default function SplitPayment() {
                   </p>
                 </div>
                 <p className="text-white/60 text-lg mb-6">{txn.itemName}</p>
-
-                {/* Single amount row */}
-                <div className="flex items-center justify-center gap-4">
-                  <button
-                    onClick={() => setDisplayAmount(v => Math.max(0.01, parseFloat(v || "0") - stepAmount).toFixed(2))}
-                    className="w-14 h-14 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors flex-shrink-0"
-                  >
-                    <Minus size={24} className="text-white" />
-                  </button>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    step="0.01"
-                    min="0.01"
-                    max={remaining}
-                    value={displayAmount}
-                    onChange={(e) => setDisplayAmount(e.target.value)}
-                    className="w-32 text-center text-4xl font-bold bg-white/15 border border-white/20 rounded-xl px-2 py-2 text-[#00E5CC] outline-none focus:border-[#00E5CC]/50"
-                  />
-                  <button
-                    onClick={() => setDisplayAmount(v => Math.min(remaining, parseFloat(v || "0") + stepAmount).toFixed(2))}
-                    className="w-14 h-14 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors flex-shrink-0"
-                  >
-                    <Plus size={24} className="text-white" />
-                  </button>
-                </div>
-
-                {!isValid && parsedDisplay > 0 && (
-                  <p className="text-red-300 text-xs mt-2">
-                    Enter an amount between $0.01 and ${remaining.toFixed(2)}
-                  </p>
-                )}
-
-                {isEdited && (
-                  <div className="mt-3">
-                    <button
-                      onClick={() => { setDisplayAmount(equalShare); setConfirmedAmount(equalShare); }}
-                      className="text-white/40 text-xs underline underline-offset-2 hover:text-white/60 transition-colors"
-                    >
-                      use equal split
-                    </button>
-                  </div>
-                )}
+                <AmountRow maxAmt={remaining} />
 
                 {/* Progress bar */}
                 <div className="mt-6 flex gap-2 justify-center">
@@ -303,7 +291,10 @@ export default function SplitPayment() {
           </div>
 
           {/* Turquoise section */}
-          <div className="bg-[#00E5CC] px-8 rounded-b-[48px] relative z-0" style={{ marginTop: "-44px", paddingTop: "60px", paddingBottom: "28px" }}>
+          <div
+            className="bg-[#00E5CC] px-8 rounded-b-[48px] relative z-0"
+            style={{ marginTop: "-44px", paddingTop: "60px", paddingBottom: "28px" }}
+          >
             {allDone && (
               <Button
                 className="w-full bg-[#0055FF] hover:bg-[#0044dd] text-[#00E5CC] rounded-[20px] py-6 text-lg font-medium"
@@ -314,11 +305,11 @@ export default function SplitPayment() {
             )}
 
             {!allDone && !isProcessing && (
-              isEdited ? (
+              editing ? (
                 <Button
                   className="w-full bg-[#0055FF] hover:bg-[#0044dd] text-[#00E5CC] rounded-[20px] py-6 text-lg font-medium"
                   onClick={handleConfirm}
-                  disabled={!isValid}
+                  disabled={!isEditValid}
                   data-testid="button-confirm-amount"
                 >
                   confirm
@@ -329,7 +320,7 @@ export default function SplitPayment() {
                   onClick={handlePay}
                   data-testid="button-pay-split"
                 >
-                  pay ${confirmedAmount}
+                  pay ${displayAmount}
                 </Button>
               )
             )}
