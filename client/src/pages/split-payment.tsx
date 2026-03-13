@@ -203,48 +203,54 @@ export default function SplitPayment() {
                 <p className="text-white/70 text-sm">Person 1 of {splitCount}</p>
               </div>
 
-              <p className="text-white/60 text-lg mb-2">{txn.itemName}</p>
+              <p className="text-white/60 text-lg mb-1">{txn.itemName}</p>
 
-              {/* Normal mode: static amount + split-count +/- */}
+              {/* Full total — always shown */}
+              <p className="text-[#00E5CC] text-5xl font-bold mb-4">${totalAmount.toFixed(2)}</p>
+
+              {/* Split count adjuster — always visible */}
+              <div className="flex items-center justify-center gap-6 mb-2">
+                <button
+                  onClick={() => { setSplitCount(c => Math.max(2, c - 1)); setConfirmedCustom(null); }}
+                  className="w-12 h-12 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors"
+                >
+                  <Minus size={20} className="text-white" />
+                </button>
+                <span className="text-white/60 text-sm w-20">{splitCount} people</span>
+                <button
+                  onClick={() => { setSplitCount(c => Math.min(10, c + 1)); setConfirmedCustom(null); }}
+                  className="w-12 h-12 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors"
+                >
+                  <Plus size={20} className="text-white" />
+                </button>
+              </div>
+
+              {/* Per-person amount (equal split) */}
               {!editMode && (
-                <>
-                  <p className="text-[#00E5CC] text-5xl font-bold mb-3">${displayAmount}</p>
-
-                  {/* Split count adjuster */}
-                  <div className="flex items-center justify-center gap-6 mb-3">
-                    <button
-                      onClick={() => { setSplitCount(c => Math.max(2, c - 1)); setConfirmedCustom(null); }}
-                      className="w-12 h-12 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors"
-                    >
-                      <Minus size={20} className="text-white" />
-                    </button>
-                    <span className="text-white/50 text-sm">{splitCount} people</span>
-                    <button
-                      onClick={() => { setSplitCount(c => Math.min(10, c + 1)); setConfirmedCustom(null); }}
-                      className="w-12 h-12 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors"
-                    >
-                      <Plus size={20} className="text-white" />
-                    </button>
-                  </div>
-
-                  <button
-                    onClick={() => { setEditValue(displayAmount); setEditMode(true); }}
-                    className="text-white/40 text-xs underline underline-offset-2 hover:text-white/60 transition-colors"
-                  >
-                    enter different amount
-                  </button>
-                </>
+                <p className="text-white/70 text-sm mb-3">
+                  each pays <span className="text-white font-semibold">${equalShare}</span>
+                </p>
               )}
 
-              {/* Edit mode: fine dollar +/- input */}
+              {/* "Enter different amount" link — shown when not editing */}
+              {!editMode && (
+                <button
+                  onClick={() => { setEditValue(equalShare); setEditMode(true); }}
+                  className="text-white/40 text-xs underline underline-offset-2 hover:text-white/60 transition-colors"
+                >
+                  enter different amount
+                </button>
+              )}
+
+              {/* Edit mode: custom dollar input */}
               {editMode && (
-                <>
+                <div className="mt-1">
                   <div className="flex items-center justify-center gap-4 mb-1">
                     <button
                       onClick={() => setEditValue(v => Math.max(0.01, parseFloat(v || "0") - editStep).toFixed(2))}
-                      className="w-14 h-14 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors"
+                      className="w-12 h-12 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors"
                     >
-                      <Minus size={24} className="text-white" />
+                      <Minus size={20} className="text-white" />
                     </button>
                     <input
                       type="number"
@@ -254,13 +260,13 @@ export default function SplitPayment() {
                       value={editValue}
                       onChange={(e) => setEditValue(e.target.value)}
                       autoFocus
-                      className="w-32 text-center text-4xl font-bold bg-white/15 border border-white/20 rounded-xl px-2 py-2 text-[#00E5CC] outline-none focus:border-[#00E5CC]/50"
+                      className="w-28 text-center text-3xl font-bold bg-white/15 border border-white/20 rounded-xl px-2 py-2 text-[#00E5CC] outline-none focus:border-[#00E5CC]/50"
                     />
                     <button
                       onClick={() => setEditValue(v => Math.min(maxEditAmount, parseFloat(v || "0") + editStep).toFixed(2))}
-                      className="w-14 h-14 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors"
+                      className="w-12 h-12 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors"
                     >
-                      <Plus size={24} className="text-white" />
+                      <Plus size={20} className="text-white" />
                     </button>
                   </div>
                   {editValue && !isEditValid && (
@@ -274,11 +280,11 @@ export default function SplitPayment() {
                   >
                     use equal split
                   </button>
-                </>
+                </div>
               )}
 
               {/* Progress bars */}
-              <div className="mt-6 flex gap-2 justify-center">
+              <div className="mt-5 flex gap-2 justify-center">
                 {Array.from({ length: splitCount }).map((_, i) => (
                   <div key={i} className="h-2 flex-1 rounded-full bg-white/20" />
                 ))}
