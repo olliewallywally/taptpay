@@ -212,14 +212,16 @@ export default function SplitPayment() {
               <div className="flex items-center justify-center gap-6 mb-2">
                 <button
                   onClick={() => { setSplitCount(c => Math.max(2, c - 1)); setConfirmedCustom(null); }}
-                  className="w-12 h-12 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors"
+                  disabled={splitCount <= 2}
+                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${splitCount <= 2 ? "bg-[#00E5CC]/30 cursor-not-allowed" : "bg-[#00E5CC] hover:bg-[#00c9b3]"}`}
                 >
                   <Minus size={20} className="text-white" />
                 </button>
                 <span className="text-white/60 text-sm w-20">{splitCount} people</span>
                 <button
                   onClick={() => { setSplitCount(c => Math.min(10, c + 1)); setConfirmedCustom(null); }}
-                  className="w-12 h-12 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors"
+                  disabled={splitCount >= 10}
+                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${splitCount >= 10 ? "bg-[#00E5CC]/30 cursor-not-allowed" : "bg-[#00E5CC] hover:bg-[#00c9b3]"}`}
                 >
                   <Plus size={20} className="text-white" />
                 </button>
@@ -283,6 +285,16 @@ export default function SplitPayment() {
                 ))}
               </div>
               <p className="text-white/50 text-xs mt-2">0 of {splitCount} paid</p>
+
+              {/* Escape hatch — skip split and pay the full amount */}
+              {!editMode && (
+                <button
+                  onClick={() => setLocation(`/checkout/${txnId}`)}
+                  className="mt-4 text-white/30 text-xs underline underline-offset-2 hover:text-white/50 transition-colors"
+                >
+                  pay full amount instead
+                </button>
+              )}
             </div>
           )}
 
@@ -302,7 +314,7 @@ export default function SplitPayment() {
                     onClick={() => { setSubEditValue(subDisplay); setSubEditMode(true); }}
                     className="text-white/40 text-xs underline underline-offset-2 hover:text-white/60 transition-colors"
                   >
-                    enter different amount
+                    {subConfirmed ? "change amount" : "enter different amount"}
                   </button>
                 </>
               )}

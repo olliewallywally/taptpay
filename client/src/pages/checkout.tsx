@@ -190,7 +190,7 @@ export default function Checkout() {
 
   async function finaliseCard(sessionId: string) {
     try {
-      const res = await apiRequest("POST", `/api/transactions/${txId}/hosted-fields-complete`, { sessionId });
+      const res = await apiRequest("POST", `/api/transactions/${txId}/hosted-fields-complete`, { sessionId, paymentMethod: "card" });
       const result = await res.json();
       if (result.approved) {
         setPayState("success");
@@ -259,6 +259,7 @@ export default function Checkout() {
           try {
             const res = await apiRequest("POST", `/api/transactions/${txId}/hosted-fields-complete`, {
               sessionId: sessionRef.current?.sessionId,
+              paymentMethod: "apple_pay",
             });
             const result = await res.json();
             notify(result.approved === true);
@@ -352,7 +353,11 @@ export default function Checkout() {
   }
 
   function handleCancel() {
-    if (transaction?.merchantId) {
+    // If we came from a split flow (amount override or transaction is split-enabled),
+    // go back to the split page so the customer can adjust — not to /pay which would loop
+    if (transaction?.splitEnabled && txId) {
+      setLocation(`/split/${txId}`);
+    } else if (transaction?.merchantId) {
       setLocation(`/pay/${transaction.merchantId}`);
     } else {
       window.history.back();

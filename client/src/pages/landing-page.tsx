@@ -17,10 +17,10 @@ export function LandingPage() {
   return (
     <div className="min-h-screen bg-white" style={{ fontFamily: 'Outfit, sans-serif' }}>
       <SEOHead
-        title="TapTpay - Modern Payment Terminal | QR & NFC Payments"
+        title="TaptPay - Modern Payment Terminal | QR & NFC Payments"
         description="Accept payments anywhere with TapTpay. Simple QR code and NFC payment terminal for modern businesses. Fast, secure, and easy to use. Get started in minutes."
         keywords="payment terminal, QR payments, NFC payments, mobile payments, contactless payments, business payments, digital wallet, tap to pay, point of sale"
-        ogTitle="TapTpay - Modern Payment Terminal for Your Business"
+        ogTitle="TaptPay - Modern Payment Terminal for Your Business"
         ogDescription="Revolutionary payment solution with QR codes and NFC. Accept payments instantly with no hardware required."
       />
       <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-[#0055FF] px-6">

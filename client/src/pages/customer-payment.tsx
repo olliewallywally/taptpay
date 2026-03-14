@@ -145,30 +145,6 @@ export default function CustomerPayment() {
     );
   }
 
-  // Redirecting to Windcave
-  if (paymentStatus === "redirecting") {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="w-full max-w-sm md:max-w-md">
-          <div className="rounded-[48px] overflow-hidden shadow-2xl">
-            <div className="bg-[#0055FF] px-8 pt-8 pb-20 rounded-b-[48px]">
-              {logo}
-              <div className="text-center">
-                <Loader2 className="w-10 h-10 text-[#00E5CC] animate-spin mx-auto mb-4" />
-                <p className="text-[#00E5CC] text-4xl font-bold mb-2">
-                  ${parseFloat(currentTransaction?.price || "0").toFixed(2)}
-                </p>
-                <p className="text-white/80 text-lg">{currentTransaction?.itemName}</p>
-                <p className="text-white/50 text-sm mt-3">Taking you to payment...</p>
-              </div>
-            </div>
-            <div className="bg-[#00E5CC] px-8 py-4 -mt-4" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // Success
   if (paymentStatus === "success") {
     return (
