@@ -1324,13 +1324,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   async function finaliseHostedPayment(
     transactionId: number,
     approved: boolean,
-    windcaveTransactionId: string | undefined
+    windcaveTransactionId: string | undefined,
+    paymentMethod?: string
   ): Promise<{ approved: boolean; redirectPath: string }> {
     const transaction = await storage.getTransaction(transactionId);
     if (!transaction) throw new Error(`Transaction ${transactionId} not found`);
 
     const sessionState = approved ? "approved" : "declined";
     await storage.updateTransactionSessionState(transactionId, sessionState);
+
+    if (paymentMethod && approved) {
+      await storage.updateTransactionPaymentMethod(transactionId, paymentMethod);
+    }
 
     if (transaction.isSplit && approved) {
       // Split payment: update the individual split record, not the whole transaction
@@ -1400,7 +1405,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/transactions/:id/hosted-fields-complete", async (req, res) => {
     try {
       const transactionId = parseInt(req.params.id);
-      const { sessionId } = req.body as { sessionId?: string };
+      const { sessionId, paymentMethod } = req.body as { sessionId?: string; paymentMethod?: string };
 
       if (!sessionId) return res.status(400).json({ message: "sessionId required" });
 
@@ -1417,7 +1422,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? await queryWindcaveSession(sessionId)
         : simulateQuerySession(sessionId);
 
-      const result = await finaliseHostedPayment(transactionId, queryResult.approved === true, queryResult.windcaveTransactionId);
+      const method = paymentMethod === "apple_pay" ? "apple_pay" : "card";
+      const result = await finaliseHostedPayment(transactionId, queryResult.approved === true, queryResult.windcaveTransactionId, method);
       return res.json(result);
     } catch (error) {
       console.error("hosted-fields-complete error:", error);
@@ -1477,7 +1483,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sessionAjaxUrlCache.delete(transactionId);
       }
 
-      const result = await finaliseHostedPayment(transactionId, approved, windcaveTransactionId);
+      const result = await finaliseHostedPayment(transactionId, approved, windcaveTransactionId, "google_pay");
       return res.json(result);
     } catch (error) {
       console.error("googlepay-complete error:", error);
