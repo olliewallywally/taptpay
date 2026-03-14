@@ -225,21 +225,26 @@ export default function SplitPayment() {
                 </button>
               </div>
 
-              {/* Per-person amount (equal split) */}
+              {/* Per-person / custom amount display */}
               {!editMode && (
-                <p className="text-white/70 text-sm mb-3">
-                  each pays <span className="text-white font-semibold">${equalShare}</span>
-                </p>
-              )}
-
-              {/* "Enter different amount" link — shown when not editing */}
-              {!editMode && (
-                <button
-                  onClick={() => { setEditValue(equalShare); setEditMode(true); }}
-                  className="text-white/40 text-xs underline underline-offset-2 hover:text-white/60 transition-colors"
-                >
-                  enter different amount
-                </button>
+                <>
+                  {confirmedCustom ? (
+                    <p className="text-white/70 text-sm mb-3">
+                      your amount:{" "}
+                      <span className="text-[#00E5CC] font-semibold">${confirmedCustom}</span>
+                    </p>
+                  ) : (
+                    <p className="text-white/70 text-sm mb-3">
+                      each pays <span className="text-white font-semibold">${equalShare}</span>
+                    </p>
+                  )}
+                  <button
+                    onClick={() => { setEditValue(confirmedCustom ?? equalShare); setEditMode(true); }}
+                    className="text-white/40 text-xs underline underline-offset-2 hover:text-white/60 transition-colors"
+                  >
+                    {confirmedCustom ? "change amount" : "enter different amount"}
+                  </button>
+                </>
               )}
 
               {/* Edit mode: custom dollar input — type only, no +/- */}
