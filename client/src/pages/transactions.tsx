@@ -307,9 +307,11 @@ export default function Transactions() {
     const a = document.createElement('a');
     a.href = url;
 
+    const merchantSlug = (merchant?.businessName || merchant?.name || 'taptpay')
+      .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     const fromStr = dateRange.from ? dateRange.from.toISOString().split('T')[0] : 'all';
     const toStr = dateRange.to ? dateRange.to.toISOString().split('T')[0] : 'today';
-    a.download = `taptpay-xero-${fromStr}_${toStr}.csv`;
+    a.download = `${merchantSlug}-xero-${fromStr}_${toStr}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
     toast({ title: "Xero CSV downloaded", description: "Upload this file to Xero via Bank Accounts > Import a Statement." });
