@@ -242,16 +242,10 @@ export default function SplitPayment() {
                 </button>
               )}
 
-              {/* Edit mode: custom dollar input */}
+              {/* Edit mode: custom dollar input — type only, no +/- */}
               {editMode && (
                 <div className="mt-1">
-                  <div className="flex items-center justify-center gap-4 mb-1">
-                    <button
-                      onClick={() => setEditValue(v => Math.max(0.01, parseFloat(v || "0") - editStep).toFixed(2))}
-                      className="w-12 h-12 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors"
-                    >
-                      <Minus size={20} className="text-white" />
-                    </button>
+                  <div className="flex justify-center mb-1">
                     <input
                       type="number"
                       inputMode="decimal"
@@ -260,14 +254,8 @@ export default function SplitPayment() {
                       value={editValue}
                       onChange={(e) => setEditValue(e.target.value)}
                       autoFocus
-                      className="w-28 text-center text-3xl font-bold bg-white/15 border border-white/20 rounded-xl px-2 py-2 text-[#00E5CC] outline-none focus:border-[#00E5CC]/50"
+                      className="w-36 text-center text-3xl font-bold bg-white/15 border border-white/20 rounded-xl px-3 py-2 text-[#00E5CC] outline-none focus:border-[#00E5CC]/50"
                     />
-                    <button
-                      onClick={() => setEditValue(v => Math.min(maxEditAmount, parseFloat(v || "0") + editStep).toFixed(2))}
-                      className="w-12 h-12 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors"
-                    >
-                      <Plus size={20} className="text-white" />
-                    </button>
                   </div>
                   {editValue && !isEditValid && (
                     <p className="text-red-300 text-xs mt-1">
@@ -316,13 +304,7 @@ export default function SplitPayment() {
 
               {subEditMode && (
                 <>
-                  <div className="flex items-center justify-center gap-4 mb-1">
-                    <button
-                      onClick={() => setSubEditValue(v => Math.max(0.01, parseFloat(v || "0") - editStep).toFixed(2))}
-                      className="w-14 h-14 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors"
-                    >
-                      <Minus size={24} className="text-white" />
-                    </button>
+                  <div className="flex justify-center mb-1">
                     <input
                       type="number"
                       inputMode="decimal"
@@ -332,14 +314,8 @@ export default function SplitPayment() {
                       value={subEditValue}
                       onChange={(e) => setSubEditValue(e.target.value)}
                       autoFocus
-                      className="w-32 text-center text-4xl font-bold bg-white/15 border border-white/20 rounded-xl px-2 py-2 text-[#00E5CC] outline-none focus:border-[#00E5CC]/50"
+                      className="w-36 text-center text-3xl font-bold bg-white/15 border border-white/20 rounded-xl px-3 py-2 text-[#00E5CC] outline-none focus:border-[#00E5CC]/50"
                     />
-                    <button
-                      onClick={() => setSubEditValue(v => Math.min(remaining, parseFloat(v || "0") + editStep).toFixed(2))}
-                      className="w-14 h-14 bg-[#00E5CC] hover:bg-[#00c9b3] rounded-full flex items-center justify-center transition-colors"
-                    >
-                      <Plus size={24} className="text-white" />
-                    </button>
                   </div>
                   {subEditValue && !isSubEditValid && (
                     <p className="text-red-300 text-xs mt-1">
