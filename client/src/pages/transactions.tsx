@@ -5,7 +5,7 @@ import { getCurrentMerchantId } from "@/lib/auth";
 import { 
   Home, Package, BarChart3, SlidersHorizontal, Terminal, 
   Download, Calendar, TrendingUp, DollarSign, CreditCard, ArrowUpDown,
-  Share2, Receipt, RotateCcw, AlertCircle
+  Share2, Receipt, RotateCcw, AlertCircle, FileSpreadsheet
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,7 @@ interface Transaction {
   refundableAmount?: string;
   totalRefunded?: string;
   windcaveTransactionId?: string;
+  merchantNet?: string;
 }
 
 const CustomTooltip = ({ active, payload }: any) => {
@@ -261,6 +262,59 @@ export default function Transactions() {
     toast({ title: "CSV file downloaded successfully" });
   };
 
+  const handleDownloadXeroCSV = () => {
+    const xeroTransactions = filteredTransactions.filter(
+      (tx: Transaction) => tx.status === 'completed' || tx.status === 'partially_refunded' || tx.status === 'refunded'
+    );
+
+    if (xeroTransactions.length === 0) {
+      toast({ title: "No transactions to export", description: "There are no completed transactions in the selected date range.", variant: "destructive" });
+      return;
+    }
+
+    const headers = ['Date', 'Amount', 'Payee', 'Description', 'Reference'];
+    const rows: string[][] = [];
+
+    xeroTransactions.forEach((tx: Transaction) => {
+      const date = new Date(tx.createdAt);
+      const dd = String(date.getDate()).padStart(2, '0');
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const yyyy = date.getFullYear();
+      const xeroDate = `${dd}/${mm}/${yyyy}`;
+
+      const amount = parseFloat(tx.merchantNet || tx.price).toFixed(2);
+      const payee = tx.itemName;
+      const method = tx.paymentMethod.replace(/_/g, ' ');
+      const description = `${method} - ${tx.itemName}`;
+      const reference = `TAPT-${tx.id}`;
+
+      rows.push([xeroDate, amount, payee, description, reference]);
+
+      const refunded = parseFloat(tx.totalRefunded || '0');
+      if (refunded > 0) {
+        rows.push([xeroDate, `-${refunded.toFixed(2)}`, payee, `Refund - ${tx.itemName}`, `TAPT-${tx.id}-R`]);
+      }
+    });
+
+    const escapeCSV = (val: string) => `"${val.replace(/"/g, '""')}"`;
+    const csvContent = [
+      headers.join(','),
+      ...rows.map((row) => row.map(escapeCSV).join(',')),
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+
+    const fromStr = dateRange.from ? dateRange.from.toISOString().split('T')[0] : 'all';
+    const toStr = dateRange.to ? dateRange.to.toISOString().split('T')[0] : 'today';
+    a.download = `taptpay-xero-${fromStr}_${toStr}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+    toast({ title: "Xero CSV downloaded", description: "Upload this file to Xero via Bank Accounts > Import a Statement." });
+  };
+
   const handleDownloadPDF = async () => {
     try {
       const token = localStorage.getItem("authToken");
@@ -476,7 +530,7 @@ export default function Transactions() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Button onClick={handleDownloadPDF} className="bg-[#0055FF] hover:bg-[#0044DD] text-white" data-testid="button-pdf">
               <Download className="mr-2 h-4 w-4" />
               Business Report (PDF)
@@ -484,6 +538,10 @@ export default function Transactions() {
             <Button onClick={handleDownloadCSV} className="bg-[#00E5CC] hover:bg-[#00D4BC] text-white" data-testid="button-csv">
               <Download className="mr-2 h-4 w-4" />
               Raw Data (CSV)
+            </Button>
+            <Button onClick={handleDownloadXeroCSV} className="bg-[#13B5EA] hover:bg-[#1099C8] text-white" data-testid="button-xero-csv" title="Download CSV formatted for Xero bank statement import">
+              <FileSpreadsheet className="mr-2 h-4 w-4" />
+              Export for Xero
             </Button>
           </div>
         </div>
