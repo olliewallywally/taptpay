@@ -264,7 +264,7 @@ export default function Transactions() {
 
   const handleDownloadXeroCSV = () => {
     const xeroTransactions = filteredTransactions.filter(
-      (tx: Transaction) => tx.status === 'completed' || tx.status === 'partially_refunded' || tx.status === 'refunded'
+      (tx: Transaction) => tx.status === 'completed' || tx.status === 'partially_refunded'
     );
 
     if (xeroTransactions.length === 0) {
