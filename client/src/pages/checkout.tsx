@@ -616,7 +616,7 @@ const cardWrapStyle: CSSProperties = {
 const blueCardStyle: CSSProperties = {
   background: "#0055FF",
   borderRadius: 48,
-  padding: "34px 28px 62px",
+  padding: "41px 28px 74px",
   boxShadow: "0 24px 60px rgba(0,85,255,0.35)",
   position: "relative",
   zIndex: 2,
