@@ -8,6 +8,7 @@ interface SEOHeadProps {
   ogTitle?: string;
   ogDescription?: string;
   ogImage?: string;
+  canonicalUrl?: string;
 }
 
 export function SEOHead({
@@ -17,16 +18,15 @@ export function SEOHead({
   ogTitle,
   ogDescription,
   ogImage = '/og-image.png',
+  canonicalUrl,
 }: SEOHeadProps) {
   const [location] = useLocation();
   
   useEffect(() => {
-    // Update document title
     if (title) {
       document.title = title;
     }
     
-    // Update meta tags
     const updateMetaTag = (name: string, content: string, isProperty = false) => {
       const attribute = isProperty ? 'property' : 'name';
       let tag = document.querySelector(`meta[${attribute}="${name}"]`);
@@ -59,10 +59,10 @@ export function SEOHead({
       updateMetaTag('og:image', ogImage, true);
       updateMetaTag('twitter:image', ogImage);
     }
+
+    updateMetaTag('og:locale', 'en_NZ', true);
     
-    // Update canonical URL
-    const baseUrl = window.location.origin;
-    const canonical = `${baseUrl}${location}`;
+    const canonical = canonicalUrl || `https://taptpay.com${location === '/' ? '' : location}`;
     
     let linkTag = document.querySelector('link[rel="canonical"]');
     if (!linkTag) {
@@ -74,7 +74,16 @@ export function SEOHead({
     
     updateMetaTag('og:url', canonical, true);
     updateMetaTag('twitter:url', canonical);
-  }, [title, description, keywords, ogTitle, ogDescription, ogImage, location]);
+
+    let hreflangTag = document.querySelector('link[hreflang="en-NZ"]');
+    if (!hreflangTag) {
+      hreflangTag = document.createElement('link');
+      hreflangTag.setAttribute('rel', 'alternate');
+      hreflangTag.setAttribute('hreflang', 'en-NZ');
+      document.head.appendChild(hreflangTag);
+    }
+    hreflangTag.setAttribute('href', canonical);
+  }, [title, description, keywords, ogTitle, ogDescription, ogImage, canonicalUrl, location]);
   
   return null;
 }
