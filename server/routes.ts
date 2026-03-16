@@ -1392,17 +1392,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return { approved: true, redirectPath: `/receipt/${transactionId}` };
       }
     } else {
-      // A declined payment resets to "pending" so the customer can retry with
-      // a different card or payment method. Only a successful payment moves to
-      // "completed". Truly fatal errors (session creation failure, fraud block)
-      // are handled upstream and set "failed" directly — a simple card decline
-      // should never permanently kill the transaction.
-      const finalStatus = approved ? "completed" : "pending";
-      const finalTxn = await storage.updateTransactionStatus(transactionId, finalStatus, approved ? windcaveTransactionId : undefined);
-      if (finalTxn && !approved) {
-        // Reset session state so the next payment attempt can create a fresh Windcave session
-        await storage.updateTransactionSessionState(transactionId, "pending");
-      }
+      const finalStatus = approved ? "completed" : "failed";
+      const finalTxn = await storage.updateTransactionStatus(transactionId, finalStatus, windcaveTransactionId);
       if (finalTxn && approved) {
         await storage.createPlatformFee({
           transactionId,
