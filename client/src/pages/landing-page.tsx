@@ -7,7 +7,7 @@ import { TerminalFeaturesSection } from "@/components/TerminalFeaturesSection";
 import { PricingSection } from "@/components/PricingSection";
 import { FinalCTASection } from "@/components/FinalCTASection";
 import { SEOHead } from "@/components/SEOHead";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Smartphone, DollarSign, Zap, Shield, QrCode, Wifi } from "lucide-react";
 
 import logoImage from "@assets/logo_1762915255857.png";
 
@@ -17,17 +17,18 @@ export function LandingPage() {
   return (
     <div className="min-h-screen bg-white" style={{ fontFamily: 'Outfit, sans-serif' }}>
       <SEOHead
-        title="TaptPay - Modern Payment Terminal | QR & NFC Payments"
-        description="Accept payments anywhere with TapTpay. Simple QR code and NFC payment terminal for modern businesses. Fast, secure, and easy to use. Get started in minutes."
-        keywords="payment terminal, QR payments, NFC payments, mobile payments, contactless payments, business payments, digital wallet, tap to pay, point of sale"
-        ogTitle="TaptPay - Modern Payment Terminal for Your Business"
-        ogDescription="Revolutionary payment solution with QR codes and NFC. Accept payments instantly with no hardware required."
+        title="TaptPay – Low Cost EFTPOS & POS System NZ | Digital Point of Sale"
+        description="New Zealand's lowest-cost EFTPOS alternative and digital POS system. No hardware, no lock-in contracts. Accept QR code and NFC contactless payments instantly. Perfect POS solution for small business NZ. 100% Kiwi owned."
+        keywords="EFTPOS NZ, POS system NZ, digital POS, POS solutions, low cost POS system, point of sale New Zealand, cheap EFTPOS machine, cloud POS NZ, small business POS NZ, contactless payments NZ, mobile POS NZ, QR code payments, NFC payments, EFTPOS alternative, payment terminal NZ"
+        ogTitle="TaptPay – NZ's Lowest-Cost EFTPOS & POS System | No Hardware Required"
+        ogDescription="Ditch the EFTPOS machine. TaptPay is New Zealand's 100% digital POS system — accept contactless payments via QR code and NFC with no hardware and no lock-in contracts."
+        canonicalUrl="https://taptpay.com/"
       />
       <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-[#0055FF] px-6">
         <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center max-w-4xl mx-auto w-full">
           <ImageWithFallback
             src={logoImage}
-            alt="TaptPay Logo"
+            alt="TaptPay – New Zealand's low cost EFTPOS and POS system"
             className="h-24 md:h-32 mb-16"
           />
 
@@ -35,8 +36,12 @@ export function LandingPage() {
             a <span className="font-semibold">pos</span> system that isn't one
           </h1>
           
-          <p className="text-lg md:text-xl text-white/80 mb-12 font-light">
+          <p className="text-lg md:text-xl text-white/80 mb-4 font-light">
             100% digital point of sale system
+          </p>
+
+          <p className="text-sm md:text-base text-[#00E5CC] mb-12 font-medium tracking-wide">
+            New Zealand's lowest-cost EFTPOS & POS system — no hardware required
           </p>
 
           <button
@@ -73,6 +78,8 @@ export function LandingPage() {
 
       <CustomerExperienceSection />
 
+      <WhyTaptPaySection onGetStarted={() => setLocation("/login")} />
+
       <TerminalFeaturesSection />
 
       <PricingSection />
@@ -99,5 +106,79 @@ export function LandingPage() {
         </div>
       </footer>
     </div>
+  );
+}
+
+function WhyTaptPaySection({ onGetStarted }: { onGetStarted: () => void }) {
+  const benefits = [
+    {
+      icon: DollarSign,
+      title: "Lowest-Cost POS System in NZ",
+      description: "No monthly fees. No hardware rental. No lock-in contracts. Just a small per-transaction fee — making TaptPay the most affordable EFTPOS alternative in New Zealand.",
+    },
+    {
+      icon: Smartphone,
+      title: "No EFTPOS Machine Needed",
+      description: "Ditch the bulky EFTPOS terminal. TaptPay is a 100% digital point of sale system that runs on any device you already own — phone, tablet, or laptop.",
+    },
+    {
+      icon: QrCode,
+      title: "QR Code & NFC Contactless Payments",
+      description: "Your customers pay by scanning a QR code or tapping their phone. Supports Apple Pay, Google Pay, Visa payWave, and Mastercard contactless — all without a card reader.",
+    },
+    {
+      icon: Zap,
+      title: "Set Up in Under 5 Minutes",
+      description: "Sign up, create your first transaction, and start accepting payments immediately. No waiting for hardware delivery or complex installation — the fastest POS setup in NZ.",
+    },
+    {
+      icon: Shield,
+      title: "Secure NZ Payment Processing",
+      description: "Payments are processed securely through Windcave, New Zealand's trusted payment gateway. Funds settle directly to your NZ bank account.",
+    },
+    {
+      icon: Wifi,
+      title: "Cloud POS Dashboard & Analytics",
+      description: "Track every transaction in real time from anywhere. View revenue, manage refunds, export reports for Xero — all from your cloud POS dashboard.",
+    },
+  ];
+
+  return (
+    <section className="py-20 px-6 bg-gray-50">
+      <div className="max-w-6xl mx-auto">
+        <h2 className="text-3xl md:text-4xl lg:text-5xl font-light text-center mb-4 text-[#0055FF] lowercase">
+          why kiwi businesses choose taptpay
+        </h2>
+        <p className="text-base md:text-lg text-gray-600 text-center mb-6 max-w-3xl mx-auto">
+          The smarter EFTPOS alternative for New Zealand small businesses. A digital POS solution that saves you money and gets you paid faster.
+        </p>
+        <p className="text-sm text-gray-500 text-center mb-16 max-w-2xl mx-auto">
+          Whether you're a café, market stall, food truck, tradie, or service business — TaptPay is the point of sale system built for how NZ businesses work today.
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {benefits.map((benefit, index) => (
+            <div key={index} className="bg-white rounded-2xl p-8 shadow-sm hover:shadow-md transition-shadow">
+              <div className="w-12 h-12 bg-[#0055FF]/10 rounded-xl flex items-center justify-center mb-5">
+                <benefit.icon className="w-6 h-6 text-[#0055FF]" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">{benefit.title}</h3>
+              <p className="text-gray-600 text-sm leading-relaxed">{benefit.description}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="text-center mt-14">
+          <button
+            onClick={onGetStarted}
+            className="bg-[#0055FF] hover:bg-[#0044DD] text-white font-medium px-10 py-3.5 rounded-full text-base transition-all transform hover:scale-105 shadow-lg inline-flex items-center gap-2 lowercase"
+          >
+            start accepting payments today
+            <ArrowRight className="w-5 h-5" />
+          </button>
+          <p className="text-sm text-gray-500 mt-3">No credit card required · Set up in under 5 minutes · 100% Kiwi owned</p>
+        </div>
+      </div>
+    </section>
   );
 }

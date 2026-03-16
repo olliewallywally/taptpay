@@ -140,7 +140,33 @@ function removeUndefined<T extends Record<string, any>>(obj: T): Partial<T> {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  
+
+  app.get("/robots.txt", (_req, res) => {
+    res.type("text/plain").send(
+      `User-agent: *\nAllow: /\nDisallow: /dashboard\nDisallow: /terminal\nDisallow: /settings\nDisallow: /transactions\nDisallow: /stock\nDisallow: /nfc\nDisallow: /admin\nDisallow: /api/\n\nSitemap: https://taptpay.com/sitemap.xml\n`
+    );
+  });
+
+  app.get("/sitemap.xml", (_req, res) => {
+    const pages = [
+      { loc: "/", priority: "1.0", changefreq: "weekly" },
+      { loc: "/signup", priority: "0.8", changefreq: "monthly" },
+      { loc: "/login", priority: "0.6", changefreq: "monthly" },
+      { loc: "/terms", priority: "0.3", changefreq: "yearly" },
+      { loc: "/privacy", priority: "0.3", changefreq: "yearly" },
+    ];
+    const lastmod = new Date().toISOString().split("T")[0];
+    const urls = pages
+      .map(
+        (p) =>
+          `  <url>\n    <loc>https://taptpay.com${p.loc}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>${p.changefreq}</changefreq>\n    <priority>${p.priority}</priority>\n  </url>`
+      )
+      .join("\n");
+    res.type("application/xml").send(
+      `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`
+    );
+  });
+
   // Admin authentication middleware
   const authenticateAdmin = (req: AuthenticatedRequest, res: any, next: any) => {
     const authHeader = req.headers['authorization'];
