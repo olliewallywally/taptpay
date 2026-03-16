@@ -586,6 +586,52 @@ export default function Checkout() {
         <p style={{ marginTop: 12, textAlign: "center", fontSize: 11, color: "#aab0c0", letterSpacing: "0.03em" }}>
           Secured by <strong style={{ color: "#00E5CC", fontWeight: 600 }}>Windcave</strong> · PCI DSS Compliant
         </p>
+
+        {/* Test card hint — UAT environment only */}
+        {env === "uat" && (
+          <div style={{
+            marginTop: 16,
+            background: "#fffbeb",
+            border: "1.5px solid #f59e0b",
+            borderRadius: 12,
+            padding: "12px 14px",
+            fontSize: 11,
+            color: "#78350f",
+            lineHeight: 1.6,
+          }}>
+            <strong style={{ display: "block", marginBottom: 6, fontSize: 12, color: "#92400e" }}>
+              🧪 UAT Test Mode — Windcave Test Cards
+            </strong>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10.5 }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid #fcd34d" }}>
+                  <th style={{ textAlign: "left", paddingBottom: 4, fontWeight: 600 }}>Card Number</th>
+                  <th style={{ textAlign: "left", paddingBottom: 4, fontWeight: 600 }}>Type</th>
+                  <th style={{ textAlign: "left", paddingBottom: 4, fontWeight: 600 }}>Result</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { num: "4111 1111 1111 1111", type: "Visa", result: "Approved (Frictionless 3DS)" },
+                  { num: "4242 4242 4242 4242", type: "Visa", result: "Approved" },
+                  { num: "5431 1111 1111 1111", type: "Mastercard", result: "Approved" },
+                  { num: "5588 8800 0007 7770", type: "Mastercard", result: "3DS Challenge (code: 123)" },
+                  { num: "3711 1111 1111 114",  type: "Amex",       result: "Approved" },
+                  { num: "5431 1111 1111 1228", type: "Mastercard", result: "Declined (insufficient funds)" },
+                ].map((c) => (
+                  <tr key={c.num} style={{ borderBottom: "1px solid #fef3c7" }}>
+                    <td style={{ padding: "3px 0", fontFamily: "monospace", letterSpacing: "0.04em" }}>{c.num}</td>
+                    <td style={{ padding: "3px 4px" }}>{c.type}</td>
+                    <td style={{ padding: "3px 0", color: "#6b7280" }}>{c.result}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p style={{ marginTop: 6, color: "#92400e" }}>
+              Use any future expiry · Any 3-digit CVC · Amount ending <strong>.76</strong> = always declined
+            </p>
+          </div>
+        )}
       </div>
 
       <style>{`
