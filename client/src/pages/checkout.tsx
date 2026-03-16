@@ -157,6 +157,10 @@ export default function Checkout() {
 
   async function checkGooglePay() {
     try {
+      // Only enable Google Pay when a Windcave Google Pay merchant ID is configured.
+      // Without it, every Google Pay attempt will 400 from Windcave and permanently
+      // block the transaction from being retried with a card.
+      if (!googlePayMerchantId) return;
       if (!window.google?.payments?.api?.PaymentsClient) return;
       const client = new window.google.payments.api.PaymentsClient({
         environment: env === "sec" ? "PRODUCTION" : "TEST",
