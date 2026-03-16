@@ -125,6 +125,62 @@ app.use((req, res, next) => {
   });
 
 
+  const CRAWLER_UA_PATTERN = /bot|crawl|spider|slurp|facebookexternalhit|linkedinbot|twitterbot|whatsapp|telegram|pinterest|googlebot|bingbot|yandex|baiduspider|duckduckbot|applebot|ia_archiver|semrush|ahrefs|mj12bot/i;
+
+  const SEO_META = {
+    title: "TaptPay – Low Cost EFTPOS & POS System NZ | Digital Point of Sale",
+    description: "New Zealand's lowest-cost EFTPOS alternative and digital POS system. No hardware, no lock-in contracts. Accept QR code and NFC contactless payments instantly. Perfect POS solution for small business NZ. 100% Kiwi owned.",
+    ogTitle: "TaptPay – NZ's Lowest-Cost EFTPOS & POS System | No Hardware Required",
+    ogDescription: "Ditch the EFTPOS machine. TaptPay is New Zealand's 100% digital POS system — accept contactless payments via QR code and NFC with no hardware and no lock-in contracts.",
+    canonical: "https://taptpay.com/",
+    ogImage: "https://taptpay.com/og-image.png",
+    keywords: "EFTPOS NZ, POS system NZ, digital POS, POS solutions, low cost POS system, point of sale New Zealand, cheap EFTPOS machine, cloud POS NZ, small business POS NZ, contactless payments NZ, mobile POS NZ, QR code payments, NFC payments, EFTPOS alternative, payment terminal NZ",
+  };
+
+  app.use((req, res, next) => {
+    const ua = req.headers["user-agent"] || "";
+    if (req.path === "/" && CRAWLER_UA_PATTERN.test(ua)) {
+      const clientTemplate = path.resolve(
+        import.meta.dirname,
+        "..",
+        "client",
+        "index.html",
+      );
+      let html = fs.readFileSync(clientTemplate, "utf-8");
+      html = html.replace(/<title>[^<]*<\/title>/, `<title>${SEO_META.title}</title>`);
+      html = html.replace(
+        /<meta name="description" content="[^"]*"/,
+        `<meta name="description" content="${SEO_META.description}"`
+      );
+      html = html.replace(
+        /<meta name="keywords" content="[^"]*"/,
+        `<meta name="keywords" content="${SEO_META.keywords}"`
+      );
+      html = html.replace(
+        /<link rel="canonical" href="[^"]*"/,
+        `<link rel="canonical" href="${SEO_META.canonical}"`
+      );
+      html = html.replace(
+        /<meta property="og:title" content="[^"]*"/,
+        `<meta property="og:title" content="${SEO_META.ogTitle}"`
+      );
+      html = html.replace(
+        /<meta property="og:description" content="[^"]*"/,
+        `<meta property="og:description" content="${SEO_META.ogDescription}"`
+      );
+      html = html.replace(
+        /<meta property="og:url" content="[^"]*"/,
+        `<meta property="og:url" content="${SEO_META.canonical}"`
+      );
+      html = html.replace(
+        /<meta property="og:image" content="[^"]*"/,
+        `<meta property="og:image" content="${SEO_META.ogImage}"`
+      );
+      return res.status(200).set({ "Content-Type": "text/html" }).end(html);
+    }
+    next();
+  });
+
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
