@@ -47,7 +47,7 @@ The Tapt Payment Terminal has been implemented with comprehensive security measu
 - **Input Validation**: All endpoints validate request data via Zod schemas
 - **Error Messages**: Generic responses to prevent information leakage
 - **Security Headers**: Full Helmet.js configuration including:
-  - Content Security Policy (CSP) with Stripe/Windcave/Google Pay domains
+  - Content Security Policy (CSP) with Windcave/Google Pay domains
   - HSTS with 1-year max-age and preload
   - X-Frame-Options: DENY (clickjacking protection)
   - X-Content-Type-Options: nosniff

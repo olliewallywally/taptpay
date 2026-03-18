@@ -199,8 +199,8 @@ export function NativePaymentButtons({
           tokenizationSpecification: {
             type: 'PAYMENT_GATEWAY',
             parameters: {
-              'gateway': 'stripe', // Configure based on your payment processor
-              'gatewayMerchantId': 'your-merchant-id' // This needs to be configured
+              'gateway': 'windcave',
+              'gatewayMerchantId': 'your-merchant-id'
             }
           }
         }],

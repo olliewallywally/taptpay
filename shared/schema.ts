@@ -603,12 +603,6 @@ export const updateMerchantCryptoSettingsSchema = z.object({
   minConfirmations: z.number().min(1).max(6).default(1),
 });
 
-export const updateMerchantPaymentMethodSchema = z.object({
-  stripePaymentMethodId: z.string().min(1, "Payment method is required"),
-  paymentMethodLast4: z.string().length(4, "Last 4 digits required"),
-  paymentMethodBrand: z.string().min(1, "Card brand is required"),
-});
-
 // Subscription schemas
 export const insertMerchantSubscriptionSchema = createInsertSchema(merchantSubscriptions).omit({
   id: true,

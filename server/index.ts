@@ -24,12 +24,12 @@ app.use(helmet({
   contentSecurityPolicy: isProduction ? {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://js.stripe.com", "https://pay.google.com", "https://applepay.cdn-apple.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://pay.google.com", "https://applepay.cdn-apple.com"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "blob:", "https:"],
-      connectSrc: ["'self'", "https://api.stripe.com", "https://uat.windcave.com", "https://sec.windcave.com", "https://pay.google.com"],
-      frameSrc: ["'self'", "https://js.stripe.com", "https://sec.windcave.com", "https://uat.windcave.com"],
+      connectSrc: ["'self'", "https://uat.windcave.com", "https://sec.windcave.com", "https://pay.google.com"],
+      frameSrc: ["'self'", "https://sec.windcave.com", "https://uat.windcave.com"],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
       formAction: ["'self'"],

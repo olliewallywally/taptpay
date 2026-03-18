@@ -12,7 +12,7 @@ import { getCurrentMerchantId } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { Switch } from "@/components/ui/switch";
 import { 
-  Upload, CheckCircle, XCircle, LogOut, CreditCard, AlertCircle, Bell, BellOff, ChevronDown
+  Upload, CheckCircle, XCircle, LogOut, AlertCircle, Bell, BellOff, ChevronDown
 } from "lucide-react";
 
 function SettingsSection({ title, isOpen, onToggle, children }: {
@@ -749,39 +749,6 @@ export default function Settings() {
                   <SelectItem value="monthly">Monthly</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-
-            {/* Payment Method */}
-            <div className="p-4 bg-gray-50 rounded-xl">
-              <div className="flex items-center gap-3 mb-2">
-                <CreditCard className="text-[#0055FF]" size={20} />
-                <p className="text-gray-700 font-medium">Payment Method</p>
-              </div>
-              {subscriptionData?.paymentMethod ? (
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-gray-600">
-                    {subscriptionData.paymentMethod.brand} ending in {subscriptionData.paymentMethod.last4}
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-[#0055FF] text-[#0055FF]"
-                  >
-                    Update
-                  </Button>
-                </div>
-              ) : (
-                <div>
-                  <p className="text-sm text-gray-500 mb-2">No payment method on file</p>
-                  <Button
-                    variant="outline"
-                    className="border-[#0055FF] text-[#0055FF]"
-                    data-testid="button-add-payment"
-                  >
-                    Add Credit Card
-                  </Button>
-                </div>
-              )}
             </div>
 
             {/* Unbilled Transactions */}
