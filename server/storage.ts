@@ -135,7 +135,6 @@ export interface IStorage {
   getSubscription(merchantId: number): Promise<any | undefined>;
   updateSubscriptionTier(merchantId: number, tier: string): Promise<any>;
   updateSubscriptionBillingFrequency(merchantId: number, frequency: string): Promise<any>;
-  updateSubscriptionPaymentMethod(merchantId: number, stripeCustomerId: string, stripePaymentMethodId: string): Promise<any>;
   incrementTransactionCount(merchantId: number): Promise<void>;
   cancelSubscription(merchantId: number, reason: string): Promise<any>;
   getBillingHistory(merchantId: number, limit?: number): Promise<any[]>;
@@ -143,7 +142,6 @@ export interface IStorage {
   resetMonthlyTransactionCount(merchantId: number): Promise<void>;
   getUnbilledTransactions(merchantId: number): Promise<{ count: number; amount: number }>;
   resetUnbilledTransactions(merchantId: number): Promise<void>;
-  getAllActiveSubscriptions(billingFrequency?: string): Promise<any[]>;
   
   // Push subscription operations
   createPushSubscription(data: { merchantId: number; endpoint: string; p256dh: string; auth: string; userAgent?: string }): Promise<any>;
@@ -1492,10 +1490,6 @@ export class MemStorage implements IStorage {
     throw new Error('Subscriptions not supported in memory storage');
   }
 
-  async updateSubscriptionPaymentMethod(merchantId: number, stripeCustomerId: string, stripePaymentMethodId: string): Promise<any> {
-    throw new Error('Subscriptions not supported in memory storage');
-  }
-
   async incrementTransactionCount(merchantId: number): Promise<void> {
     // No-op in memory storage
   }
@@ -1524,9 +1518,6 @@ export class MemStorage implements IStorage {
     // No-op in memory storage
   }
 
-  async getAllActiveSubscriptions(billingFrequency?: string): Promise<any[]> {
-    return [];
-  }
 }
 
 // Database Storage Implementation
@@ -2749,21 +2740,6 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async updateSubscriptionPaymentMethod(merchantId: number, stripeCustomerId: string, stripePaymentMethodId: string): Promise<MerchantSubscription> {
-    if (!this.db) throw new Error('Database not available');
-    
-    const result = await this.db
-      .update(merchantSubscriptions)
-      .set({ 
-        stripeCustomerId,
-        stripePaymentMethodId,
-        updatedAt: new Date() 
-      })
-      .where(eq(merchantSubscriptions.merchantId, merchantId))
-      .returning();
-    return result[0];
-  }
-
   async incrementTransactionCount(merchantId: number): Promise<void> {
     if (!this.db) throw new Error('Database not available');
     
@@ -2898,21 +2874,6 @@ export class DatabaseStorage implements IStorage {
       .where(eq(merchantSubscriptions.merchantId, merchantId));
   }
 
-  async getAllActiveSubscriptions(billingFrequency?: string): Promise<MerchantSubscription[]> {
-    if (!this.db) throw new Error('Database not available');
-    
-    const conditions = [eq(merchantSubscriptions.status, 'active')];
-    
-    // Filter by billing frequency if provided
-    if (billingFrequency) {
-      conditions.push(eq(merchantSubscriptions.billingFrequency, billingFrequency));
-    }
-    
-    return await this.db
-      .select()
-      .from(merchantSubscriptions)
-      .where(and(...conditions));
-  }
 }
 
 // Use database storage if available, fall back to memory storage

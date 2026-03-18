@@ -1921,9 +1921,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.incrementTransactionCount(cryptoTransaction.merchantId);
       }
       
-      // TODO: Auto-charge merchant's payment method for platform fee
-      // This would use Stripe to charge the merchant's stored card
-      // For now, we just record the fee as pending
+      // TODO: Auto-charge merchant's payment method for platform fee via Windcave
       
       // Notify SSE clients
       const connections = sseConnections.get(cryptoTransaction.merchantId!);
@@ -4707,27 +4705,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const subscription = await storage.getOrCreateSubscription(merchantId);
       
-      // Get payment method info from Stripe if payment method ID exists
-      let paymentMethod = null;
-      if (subscription.stripePaymentMethodId) {
-        try {
-          const stripe = (await import('stripe')).default;
-          const stripeClient = new stripe(process.env.STRIPE_SECRET_KEY || '', {
-            apiVersion: '2025-11-17.clover',
-          });
-          const pm = await stripeClient.paymentMethods.retrieve(subscription.stripePaymentMethodId);
-          paymentMethod = {
-            last4: pm.card?.last4 || '',
-            brand: pm.card?.brand || ''
-          };
-        } catch (stripeError) {
-          console.error("Failed to fetch payment method from Stripe:", stripeError);
-        }
-      }
-      
       res.json({
-        subscription,
-        paymentMethod
+        subscription
       });
     } catch (error) {
       console.error("Get subscription error:", error);
@@ -4755,73 +4734,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Update billing frequency error:", error);
       res.status(500).json({ message: "Failed to update billing frequency" });
-    }
-  });
-
-  // Add or update payment method (Stripe setup intent)
-  app.post("/api/subscription/payment-method", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    try {
-      const merchantId = req.user?.merchantId;
-      if (!merchantId) {
-        return res.status(400).json({ message: "Merchant ID required" });
-      }
-
-      // This endpoint should receive payment method ID from Stripe Elements on frontend
-      const { paymentMethodId } = req.body;
-
-      if (!paymentMethodId) {
-        return res.status(400).json({ message: "Payment method ID required" });
-      }
-
-      // Get or create Stripe customer for this merchant
-      const stripe = (await import('stripe')).default;
-      const stripeClient = new stripe(process.env.STRIPE_SECRET_KEY || '', {
-        apiVersion: '2025-11-17.clover',
-      });
-
-      const subscription = await storage.getOrCreateSubscription(merchantId);
-      let stripeCustomerId = subscription.stripeCustomerId;
-
-      // Create Stripe customer if doesn't exist
-      if (!stripeCustomerId) {
-        const merchant = await storage.getMerchant(merchantId);
-        const customer = await stripeClient.customers.create({
-          email: merchant?.email,
-          metadata: {
-            merchantId: merchantId.toString()
-          }
-        });
-        stripeCustomerId = customer.id;
-      }
-
-      // Attach payment method to customer
-      await stripeClient.paymentMethods.attach(paymentMethodId, {
-        customer: stripeCustomerId,
-      });
-
-      // Set as default payment method
-      await stripeClient.customers.update(stripeCustomerId, {
-        invoice_settings: {
-          default_payment_method: paymentMethodId,
-        },
-      });
-
-      // Update subscription with payment method
-      await storage.updateSubscriptionPaymentMethod(merchantId, stripeCustomerId, paymentMethodId);
-
-      // Get payment method details for response
-      const pm = await stripeClient.paymentMethods.retrieve(paymentMethodId);
-
-      res.json({ 
-        success: true,
-        paymentMethod: { 
-          last4: pm.card?.last4 || '', 
-          brand: pm.card?.brand || '' 
-        }
-      });
-    } catch (error) {
-      console.error("Add payment method error:", error);
-      res.status(500).json({ message: "Failed to add payment method" });
     }
   });
 
@@ -4866,55 +4778,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Get billing history error:", error);
       res.status(500).json({ message: "Failed to get billing history" });
-    }
-  });
-
-  // Process billing for current merchant
-  app.post("/api/billing/process", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    try {
-      const merchantId = req.user?.merchantId;
-      if (!merchantId) {
-        return res.status(400).json({ message: "Merchant ID required" });
-      }
-
-      const { processMerchantBilling } = await import('./billingService');
-      const result = await processMerchantBilling(merchantId, storage);
-      
-      res.json({ result });
-    } catch (error) {
-      console.error("Process billing error:", error);
-      res.status(500).json({ message: "Failed to process billing" });
-    }
-  });
-
-  // Process billing for all merchants (admin only)
-  app.post("/api/admin/billing/process-all", authenticateAdmin, async (req, res) => {
-    try {
-      const { billingFrequency } = req.body;
-      const { processBillingForAllMerchants } = await import('./billingService');
-      const results = await processBillingForAllMerchants(storage, billingFrequency);
-      
-      res.json({ 
-        results,
-        totalProcessed: results.length,
-        successful: results.filter(r => r.success).length,
-        failed: results.filter(r => !r.success).length
-      });
-    } catch (error) {
-      console.error("Process all billing error:", error);
-      res.status(500).json({ message: "Failed to process billing for all merchants" });
-    }
-  });
-
-  // Get Stripe publishable key for frontend
-  app.get("/api/stripe/publishable-key", async (req, res) => {
-    try {
-      const { getStripePublishableKey } = await import('./stripeClient');
-      const publishableKey = await getStripePublishableKey();
-      res.json({ publishableKey });
-    } catch (error) {
-      console.error("Get Stripe key error:", error);
-      res.status(500).json({ message: "Failed to get Stripe key" });
     }
   });
 
