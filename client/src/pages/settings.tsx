@@ -12,7 +12,7 @@ import { getCurrentMerchantId } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { Switch } from "@/components/ui/switch";
 import { 
-  Upload, CheckCircle, XCircle, LogOut, AlertCircle, Bell, BellOff, ChevronDown
+  Upload, CheckCircle, XCircle, LogOut, AlertCircle, Bell, BellOff, ChevronDown, Printer, ArrowRight
 } from "lucide-react";
 
 function SettingsSection({ title, isOpen, onToggle, children }: {
@@ -456,6 +456,23 @@ export default function Settings() {
 
       {/* Content */}
       <div className="max-w-md mx-auto px-4 sm:px-6 mt-8">
+        {/* Payment Board Builder Shortcut */}
+        <button
+          onClick={() => setLocation('/board-builder')}
+          className="w-full bg-white rounded-2xl sm:rounded-3xl p-5 flex items-center justify-between mb-5 transition-all hover:shadow-md text-left"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-11 h-11 rounded-2xl bg-[#0055FF]/10 flex items-center justify-center flex-shrink-0">
+              <Printer className="w-5 h-5 text-[#0055FF]" />
+            </div>
+            <div>
+              <div className="text-[#0055FF] font-medium text-lg leading-tight">Payment Board Builder</div>
+              <div className="text-gray-400 text-sm mt-0.5">Design & print your custom payment sign</div>
+            </div>
+          </div>
+          <ArrowRight className="w-5 h-5 text-[#0055FF]/60 flex-shrink-0 ml-3" />
+        </button>
+
         {/* Business Details Section */}
         <SettingsSection title="Business Details" isOpen={openSections.has('business')} onToggle={() => toggle('business')}>
           <div className="space-y-4 mt-1">
