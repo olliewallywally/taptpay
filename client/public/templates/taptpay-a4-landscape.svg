@@ -20,7 +20,7 @@
 
       .cls-2 {
         fill: none;
-        stroke: var(--icons, #00f1d7);
+        stroke: var(--primary, #00f1d7);
         stroke-width: 18.33px;
         fill-rule: evenodd;
       }

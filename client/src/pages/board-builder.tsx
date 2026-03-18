@@ -92,6 +92,33 @@ interface BuildSvgOpts {
   forCapture?: boolean;
 }
 
+// Converts a hex colour to a CSS filter that recolours source-teal PNG icons.
+// Uses sepia as a neutral base then adjusts hue, saturation, brightness.
+function hexToIconFilter(hex: string): string {
+  if (!hex) return "";
+  try {
+    const r = parseInt(hex.slice(1, 3), 16) / 255;
+    const g = parseInt(hex.slice(3, 5), 16) / 255;
+    const b = parseInt(hex.slice(5, 7), 16) / 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    const d = max - min;
+    const l = (max + min) / 2;
+    const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+    let h = 0;
+    if (d > 0) {
+      if (max === r) h = 60 * (((g - b) / d) % 6);
+      else if (max === g) h = 60 * ((b - r) / d + 2);
+      else h = 60 * ((r - g) / d + 4);
+      if (h < 0) h += 360;
+    }
+    // sepia(1) yields hue ≈ 35°; rotate from there to target
+    const rot = Math.round(h - 35);
+    const sat = Math.round(s * 300); // amplify to saturate from sepia base
+    const bri = Math.round(l * 200); // 50% lightness = 100% brightness
+    return `sepia(1) hue-rotate(${rot}deg) saturate(${sat}%) brightness(${Math.max(bri, 15)}%)`;
+  } catch { return ""; }
+}
+
 function buildModifiedSvg(opts: BuildSvgOpts): string {
   const {
     svgTemplate, layout, primaryColor, backgroundColor, textColor, iconColor,
@@ -130,17 +157,16 @@ function buildModifiedSvg(opts: BuildSvgOpts): string {
   const styleEl = getOrCreate("font-style", "style", defsEl);
   const bgVar = backgroundColor ? `--background: ${backgroundColor};` : "";
   const txtVar = textColor ? `--text: ${textColor};` : "";
-  const iconsVar = iconColor ? `--icons: ${iconColor};` : "";
   if (customFontDataUrl) {
     styleEl.textContent = `
-      svg { --primary: ${primaryColor}; ${bgVar} ${txtVar} ${iconsVar} }
+      svg { --primary: ${primaryColor}; ${bgVar} ${txtVar} }
       @font-face { font-family: '__CustomFont__'; src: url('${customFontDataUrl}'); }
       text, tspan { font-family: '__CustomFont__', sans-serif !important; }
     `;
   } else {
     const gfUrl = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(selectedFont)}:wght@400;600;700&display=swap`;
     styleEl.textContent = `
-      svg { --primary: ${primaryColor}; ${bgVar} ${txtVar} ${iconsVar} }
+      svg { --primary: ${primaryColor}; ${bgVar} ${txtVar} }
       @import url('${gfUrl}');
       text, tspan { font-family: '${selectedFont}', sans-serif; }
     `;
@@ -215,6 +241,22 @@ function buildModifiedSvg(opts: BuildSvgOpts): string {
 
   setImg("qr-placeholder", qrDataUrl);
   setImg("logo-placeholder", logoDataUrl);
+
+  // Apply icon colour filter to the Paywave/NFC icon and QR image
+  const iconFilter = hexToIconFilter(iconColor);
+  if (iconFilter) {
+    const iconIds = ["Layer_6.svg", "qr-placeholder"];
+    iconIds.forEach((id) => {
+      const el = doc.getElementById(id);
+      if (el) el.setAttribute("style", `filter: ${iconFilter}`);
+    });
+  } else {
+    // Clear any previously set filter so toggling back to "A" works
+    ["Layer_6.svg", "qr-placeholder"].forEach((id) => {
+      const el = doc.getElementById(id);
+      if (el) el.removeAttribute("style");
+    });
+  }
 
   return new XMLSerializer().serializeToString(svg);
 }
@@ -737,7 +779,7 @@ export default function BoardBuilder() {
                     <div className="w-7 h-7 rounded-full border border-gray-200 flex-shrink-0" style={{ backgroundColor: iconColor || primaryColor }} />
                     <Input value={iconHexInput} onChange={(e) => { setIconHexInput(e.target.value); if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) setIconColor(e.target.value); }} placeholder="Same as Accent" className="font-mono text-xs border-gray-200 focus:border-[#0055FF]" maxLength={7} />
                   </div>
-                  <p className="text-[10px] text-gray-400 mt-1">Controls the QR and Paywave border boxes</p>
+                  <p className="text-[10px] text-gray-400 mt-1">Tints the QR code and Paywave/NFC icon images</p>
                 </div>
 
               </div>
