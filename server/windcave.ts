@@ -250,9 +250,9 @@ export async function submitGooglePayToken(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: buildAuthHeader(),
+        "x-seamless": "1",
       },
-      body: JSON.stringify({ paymentData: googlePayToken }),
+      body: JSON.stringify({ googlePay: googlePayToken }),
     });
 
     const text = await response.text();
@@ -261,6 +261,26 @@ export async function submitGooglePayToken(
     if (response.ok) {
       let data: any = {};
       try { data = JSON.parse(text); } catch {}
+
+      // Windcave returns { links: [{ rel: "done"|"3DSecure", href: "..." }] }
+      if (data.links && Array.isArray(data.links) && data.links.length > 0) {
+        const link = data.links[0];
+        logAudit("GOOGLEPAY_LINK", { rel: link.rel, href: link.href?.slice(0, 200) });
+
+        if (link.rel === "done") {
+          // href is our callback URL — result is embedded in the query string
+          const approved = typeof link.href === "string" && link.href.includes("result=approved");
+          return { success: true, approved };
+        }
+
+        if (link.rel === "3DSecure") {
+          // 3DS not supported in server-side submission — log and fall back to session query
+          logAudit("GOOGLEPAY_3DS_REQUIRED", { href: link.href?.slice(0, 200) });
+          return { success: false, error: "3DS_REQUIRED" };
+        }
+      }
+
+      // Fallback: try legacy response fields
       const approved = data.authorised === true || data.approved === true || data.responseCode === "00";
       return { success: true, approved, windcaveTransactionId: data.id || data.transactionId };
     }
