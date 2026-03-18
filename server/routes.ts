@@ -147,6 +147,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     );
   });
 
+  app.get("/.well-known/apple-developer-merchantid-domain-association", (_req, res) => {
+    const filePath = path.resolve(
+      import.meta.dirname,
+      "..",
+      "client",
+      "public",
+      ".well-known",
+      "apple-developer-merchantid-domain-association"
+    );
+    res.set("Content-Type", "application/json");
+    res.sendFile(filePath);
+  });
+
   app.get("/sitemap.xml", (_req, res) => {
     const pages = [
       { loc: "/", priority: "1.0", changefreq: "weekly" },
