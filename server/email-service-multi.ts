@@ -280,7 +280,7 @@ export async function sendBoardBuilderEmail(params: {
     ? EMAIL_CONFIG.sendgrid.fromEmail
     : EMAIL_CONFIG.gmail.user || EMAIL_CONFIG.outlook.user || EMAIL_CONFIG.smtp.auth.user || 'noreply@taptpay.co.nz';
 
-  const subject = `Payment Board Print Request – ${params.businessName}`;
+  const subject = `New Payment Board — ${params.businessName} (${params.layout})`;
   const html = `
     <h2>Payment Board Print Request</h2>
     <table style="border-collapse:collapse;width:100%;max-width:480px;">
