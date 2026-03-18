@@ -156,7 +156,25 @@ function buildModifiedSvg(opts: BuildSvgOpts): string {
 
   setText("text-business-name", businessName || "Your Business Name", primaryColor);
   setText("text-tagline", tagline || "");
-  setText("text-instructions", instructions || "Scan to Pay");
+
+  // Payment instruction: multi-line support via <tspan> elements
+  const instrEl = doc.getElementById("text-instructions");
+  if (instrEl) {
+    const rawInstr = instructions || "Scan to Pay";
+    const instrLines = rawInstr.split("\n");
+    const instrLineHeight = 188; // matches original SVG dy spacing
+    const instrX = instrEl.getAttribute("x") || "1192.22";
+    const instrBaseY = parseFloat(instrEl.getAttribute("y") || "2760.056");
+    const instrStartY = instrBaseY - ((instrLines.length - 1) * instrLineHeight) / 2;
+    while (instrEl.firstChild) instrEl.removeChild(instrEl.firstChild);
+    instrLines.forEach((line, i) => {
+      const tspan = doc.createElementNS("http://www.w3.org/2000/svg", "tspan");
+      tspan.setAttribute("x", instrX);
+      tspan.setAttribute("y", String(instrStartY + i * instrLineHeight));
+      tspan.textContent = line;
+      instrEl.appendChild(tspan);
+    });
+  }
 
   // Footer: multi-line support via <tspan> elements
   const footerEl = doc.getElementById("text-footer");
@@ -252,10 +270,10 @@ export default function BoardBuilder() {
   const [submitted, setSubmitted] = useState(false);
   const [openSection, setOpenSection] = useState<string>("stone");
 
-  // Load SVG template when layout changes
+  // Load SVG template when layout changes (cache-busted to always get latest)
   useEffect(() => {
     setTemplateLoading(true);
-    fetch(`/templates/${layout}.svg`)
+    fetch(`/templates/${layout}.svg?v=${encodeURIComponent(import.meta.env.VITE_BUILD_TIME ?? Date.now())}`, { cache: "no-store" })
       .then((r) => r.text())
       .then((text) => {
         setSvgTemplate(text);
@@ -280,12 +298,16 @@ export default function BoardBuilder() {
     }
   }, [selectedFont, customFontDataUrl]);
 
-  // Pre-populate business name from merchant record
+  // Pre-populate business name from merchant record (not used in TaptPay layout)
   useEffect(() => {
+    if (layout === "taptpay-a4-portrait") {
+      setBusinessName("");
+      return;
+    }
     if (merchantQuery.data?.businessName && !businessName) {
       setBusinessName(merchantQuery.data.businessName);
     }
-  }, [merchantQuery.data]);
+  }, [merchantQuery.data, layout]);
 
   // Fetch QR code as data URL when stone selection changes
   useEffect(() => {
@@ -597,18 +619,18 @@ export default function BoardBuilder() {
                 </div>
                 <div>
                   <Label className="text-xs text-gray-500 mb-1 block">Payment Instruction</Label>
-                  <Input value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="Scan to Pay" className="border-gray-200 focus:border-[#0055FF]" />
-                </div>
-                <div>
-                  <Label className="text-xs text-gray-500 mb-1 block">Footer Note</Label>
                   <Textarea
-                    value={footer}
-                    onChange={(e) => setFooter(e.target.value)}
-                    placeholder={"Powered by TaptPay"}
+                    value={instructions}
+                    onChange={(e) => setInstructions(e.target.value)}
+                    placeholder="Scan to Pay"
                     rows={3}
                     className="border-gray-200 focus:border-[#0055FF] resize-none text-sm"
                   />
                   <p className="text-[10px] text-gray-400 mt-1">Press Enter to add a new line — text will be centred</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500 mb-1 block">Footer Note</Label>
+                  <Input value={footer} onChange={(e) => setFooter(e.target.value)} placeholder="Powered by TaptPay" className="border-gray-200 focus:border-[#0055FF]" />
                 </div>
               </div>
             </ControlSection>

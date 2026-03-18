@@ -58,8 +58,8 @@
 
     <!-- Invisible colour marker for board builder -->
     <rect id="color-primary" width="0" height="0" fill="#00f1d7"/>
-    <!-- Merchant logo slot (top area, replaces business name) -->
-    <image id="logo-placeholder" x="940" y="120" width="600" height="360" href="" preserveAspectRatio="xMidYMid meet"/>
+    <!-- Merchant logo slot — covers and replaces the TaptPay branding text -->
+    <image id="logo-placeholder" x="600" y="440" width="1280" height="420" href="" preserveAspectRatio="xMidYMid meet"/>
     <!-- Tagline -->
     <text id="text-tagline" x="1240" y="1150" text-anchor="middle" font-family="Outfit, sans-serif" font-size="90" fill="#888888"></text>
     <!-- Footer — multi-line; tspans injected by board builder -->
