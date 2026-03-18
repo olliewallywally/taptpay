@@ -80,6 +80,7 @@ interface BuildSvgOpts {
   primaryColor: string;
   backgroundColor: string;
   textColor: string;
+  iconColor: string;
   businessName: string;
   tagline: string;
   instructions: string;
@@ -93,7 +94,7 @@ interface BuildSvgOpts {
 
 function buildModifiedSvg(opts: BuildSvgOpts): string {
   const {
-    svgTemplate, layout, primaryColor, backgroundColor, textColor,
+    svgTemplate, layout, primaryColor, backgroundColor, textColor, iconColor,
     businessName, tagline, instructions,
     footer, qrDataUrl, logoDataUrl, selectedFont, customFontDataUrl, forCapture = false,
   } = opts;
@@ -129,16 +130,17 @@ function buildModifiedSvg(opts: BuildSvgOpts): string {
   const styleEl = getOrCreate("font-style", "style", defsEl);
   const bgVar = backgroundColor ? `--background: ${backgroundColor};` : "";
   const txtVar = textColor ? `--text: ${textColor};` : "";
+  const iconsVar = iconColor ? `--icons: ${iconColor};` : "";
   if (customFontDataUrl) {
     styleEl.textContent = `
-      svg { --primary: ${primaryColor}; ${bgVar} ${txtVar} }
+      svg { --primary: ${primaryColor}; ${bgVar} ${txtVar} ${iconsVar} }
       @font-face { font-family: '__CustomFont__'; src: url('${customFontDataUrl}'); }
       text, tspan { font-family: '__CustomFont__', sans-serif !important; }
     `;
   } else {
     const gfUrl = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(selectedFont)}:wght@400;600;700&display=swap`;
     styleEl.textContent = `
-      svg { --primary: ${primaryColor}; ${bgVar} ${txtVar} }
+      svg { --primary: ${primaryColor}; ${bgVar} ${txtVar} ${iconsVar} }
       @import url('${gfUrl}');
       text, tspan { font-family: '${selectedFont}', sans-serif; }
     `;
@@ -261,6 +263,8 @@ export default function BoardBuilder() {
   const [bgHexInput, setBgHexInput] = useState("");
   const [textColor, setTextColor] = useState("#888888");
   const [textHexInput, setTextHexInput] = useState("#888888");
+  const [iconColor, setIconColor] = useState("");
+  const [iconHexInput, setIconHexInput] = useState("");
   const [businessName, setBusinessName] = useState("");
   const [tagline, setTagline] = useState("");
   const [instructions, setInstructions] = useState("\nsimply tap or scan\nto pay");
@@ -338,6 +342,7 @@ export default function BoardBuilder() {
     primaryColor,
     backgroundColor,
     textColor,
+    iconColor,
     businessName,
     tagline,
     instructions,
@@ -351,7 +356,7 @@ export default function BoardBuilder() {
   // Memoized preview SVG (scaled to fit container)
   const previewSvg = useMemo(
     () => buildModifiedSvg({ ...svgOpts, forCapture: false }),
-    [svgTemplate, layout, primaryColor, backgroundColor, textColor, businessName, tagline, instructions, footer, qrDataUrl, logoDataUrl, selectedFont, customFontDataUrl]
+    [svgTemplate, layout, primaryColor, backgroundColor, textColor, iconColor, businessName, tagline, instructions, footer, qrDataUrl, logoDataUrl, selectedFont, customFontDataUrl]
   );
 
   const dim = LAYOUTS[layout];
@@ -705,6 +710,34 @@ export default function BoardBuilder() {
                     <div className="w-7 h-7 rounded-full border border-gray-200 flex-shrink-0" style={{ backgroundColor: textColor }} />
                     <Input value={textHexInput} onChange={(e) => { setTextHexInput(e.target.value); if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) setTextColor(e.target.value); }} placeholder="#888888" className="font-mono text-xs border-gray-200 focus:border-[#0055FF]" maxLength={7} />
                   </div>
+                </div>
+
+                {/* Icons colour (QR border box + NFC box stroke) */}
+                <div>
+                  <Label className="text-xs text-gray-500 mb-2 block">Icons &amp; Borders</Label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {/* Default — follows Accent colour */}
+                    <button
+                      title="Same as Accent"
+                      onClick={() => { setIconColor(""); setIconHexInput(""); }}
+                      className={`w-7 h-7 rounded-full border-2 transition-all text-[8px] font-bold flex items-center justify-center ${iconColor === "" ? "border-gray-900 scale-110" : "border-gray-200"}`}
+                      style={{ backgroundColor: primaryColor, color: "#fff" }}
+                    >A</button>
+                    {PRESET_COLORS.map((c) => (
+                      <button
+                        key={c.value}
+                        title={c.label}
+                        onClick={() => { setIconColor(c.value); setIconHexInput(c.value); }}
+                        className={`w-7 h-7 rounded-full border-2 transition-all ${iconColor === c.value ? "border-gray-900 scale-110" : "border-transparent"}`}
+                        style={{ backgroundColor: c.value }}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full border border-gray-200 flex-shrink-0" style={{ backgroundColor: iconColor || primaryColor }} />
+                    <Input value={iconHexInput} onChange={(e) => { setIconHexInput(e.target.value); if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) setIconColor(e.target.value); }} placeholder="Same as Accent" className="font-mono text-xs border-gray-200 focus:border-[#0055FF]" maxLength={7} />
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1">Controls the QR and Paywave border boxes</p>
                 </div>
 
               </div>
