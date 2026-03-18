@@ -259,8 +259,8 @@ export default function BoardBuilder() {
   const [layout, setLayout] = useState<LayoutKey>("taptpay-a4-portrait");
   const [primaryColor, setPrimaryColor] = useState("#00f1d7");
   const [hexInput, setHexInput] = useState("#00f1d7");
-  const [backgroundColor, setBackgroundColor] = useState("");
-  const [bgHexInput, setBgHexInput] = useState("");
+  const [backgroundColor, setBackgroundColor] = useState("#0055FF");
+  const [bgHexInput, setBgHexInput] = useState("#0055FF");
   const [textColor, setTextColor] = useState("#888888");
   const [textHexInput, setTextHexInput] = useState("#888888");
   const [iconColor, setIconColor] = useState("");
