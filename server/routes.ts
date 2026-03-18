@@ -4781,8 +4781,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Board Builder: submit PDF for printing
-  app.post("/api/board-builder/submit", authenticateToken, async (req: AuthenticatedRequest, res) => {
+  // Board Builder: submit PDF for printing (public endpoint)
+  app.post("/api/board-builder/submit", async (req, res) => {
     try {
       const { pdf, businessName, submitterName, submitterEmail, stoneId, layout } = req.body;
       if (!pdf || !submitterName || !submitterEmail) {

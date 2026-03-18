@@ -82,7 +82,7 @@ export function LandingPage() {
 
       <TerminalFeaturesSection />
 
-      <BoardBuilderSection onGetStarted={() => setLocation("/login")} />
+      <BoardBuilderSection onGetStarted={() => setLocation("/board-builder")} />
 
       <PricingSection />
 
