@@ -658,20 +658,20 @@ export default function BoardBuilder() {
                 <div>
                   <Label className="text-xs text-gray-500 mb-2 block">Background</Label>
                   <div className="flex flex-wrap gap-2 mb-2">
-                    {[
-                      { label: "None",        value: "" },
-                      { label: "White",       value: "#ffffff" },
-                      { label: "Cream",       value: "#fdf6e3" },
-                      { label: "Light Grey",  value: "#f5f5f5" },
-                      { label: "Dark Navy",   value: "#1a1a2e" },
-                      { label: "Black",       value: "#111827" },
-                    ].map((c) => (
+                    {/* None / transparent option */}
+                    <button
+                      title="None (transparent)"
+                      onClick={() => { setBackgroundColor(""); setBgHexInput(""); }}
+                      className={`w-7 h-7 rounded-full border-2 transition-all ${backgroundColor === "" ? "border-gray-900 scale-110" : "border-gray-200"}`}
+                      style={{ backgroundImage: "linear-gradient(45deg,#ccc 25%,transparent 25%,transparent 75%,#ccc 75%),linear-gradient(45deg,#ccc 25%,transparent 25%,transparent 75%,#ccc 75%)", backgroundSize: "8px 8px", backgroundPosition: "0 0,4px 4px" }}
+                    />
+                    {PRESET_COLORS.map((c) => (
                       <button
                         key={c.value}
                         title={c.label}
                         onClick={() => { setBackgroundColor(c.value); setBgHexInput(c.value); }}
-                        className={`w-7 h-7 rounded-full border-2 transition-all ${backgroundColor === c.value ? "border-gray-900 scale-110" : "border-gray-200"}`}
-                        style={{ backgroundColor: c.value || "transparent", backgroundImage: c.value ? "none" : "linear-gradient(45deg,#ccc 25%,transparent 25%,transparent 75%,#ccc 75%),linear-gradient(45deg,#ccc 25%,transparent 25%,transparent 75%,#ccc 75%)", backgroundSize: "8px 8px", backgroundPosition: "0 0,4px 4px" }}
+                        className={`w-7 h-7 rounded-full border-2 transition-all ${backgroundColor === c.value ? "border-gray-900 scale-110" : "border-transparent"}`}
+                        style={{ backgroundColor: c.value }}
                       />
                     ))}
                   </div>
