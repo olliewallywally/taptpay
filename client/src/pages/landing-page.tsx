@@ -218,9 +218,9 @@ function BoardBuilderSection({ onGetStarted }: { onGetStarted: () => void }) {
         <div className="text-center">
           <button
             onClick={onGetStarted}
-            className="bg-[#0055FF] hover:bg-[#0044DD] text-white font-medium px-10 py-3.5 rounded-full text-base transition-all transform hover:scale-105 shadow-lg inline-flex items-center gap-2 lowercase"
+            className="bg-[#0055FF] hover:bg-[#0044DD] text-white font-medium px-10 py-3.5 rounded-full text-base transition-all transform hover:scale-105 shadow-lg inline-flex items-center gap-2"
           >
-            build your board
+            Design Your Board
             <ArrowRight className="w-5 h-5" />
           </button>
           <p className="text-sm text-gray-400 mt-3">Available to all TaptPay merchants — sign in to get started</p>
