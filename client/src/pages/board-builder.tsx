@@ -14,9 +14,10 @@ import {
 } from "lucide-react";
 import jsPDF from "jspdf";
 
-type LayoutKey = "a4-portrait" | "a4-landscape" | "a6-portrait" | "a6-landscape";
+type LayoutKey = "taptpay-a4-portrait" | "a4-portrait" | "a4-landscape" | "a6-portrait" | "a6-landscape";
 
-const LAYOUTS: Record<LayoutKey, { label: string; mmW: number; mmH: number; pxW: number; pxH: number; aspect: number }> = {
+const LAYOUTS: Record<LayoutKey, { label: string; mmW: number; mmH: number; pxW: number; pxH: number; aspect: number; branded?: boolean }> = {
+  "taptpay-a4-portrait": { label: "TaptPay A4", mmW: 210, mmH: 297, pxW: 794, pxH: 1123, aspect: 297 / 210, branded: true },
   "a4-portrait":  { label: "A4 Portrait",  mmW: 210, mmH: 297, pxW: 794,  pxH: 1123, aspect: 297 / 210 },
   "a4-landscape": { label: "A4 Landscape", mmW: 297, mmH: 210, pxW: 1123, pxH: 794,  aspect: 210 / 297 },
   "a6-portrait":  { label: "A6 Portrait",  mmW: 105, mmH: 148, pxW: 397,  pxH: 559,  aspect: 148 / 105 },
@@ -24,6 +25,7 @@ const LAYOUTS: Record<LayoutKey, { label: string; mmW: number; mmH: number; pxW:
 };
 
 const PRESET_COLORS = [
+  { label: "TaptPay Teal",  value: "#00f1d7" },
   { label: "TaptPay Blue",  value: "#0055FF" },
   { label: "Teal",          value: "#00E5CC" },
   { label: "Dark Navy",     value: "#1a1a2e" },
@@ -122,18 +124,20 @@ function buildModifiedSvg(opts: BuildSvgOpts): string {
   const styleEl = getOrCreate("font-style", "style", defsEl);
   if (customFontDataUrl) {
     styleEl.textContent = `
+      svg { --primary: ${primaryColor}; }
       @font-face { font-family: '__CustomFont__'; src: url('${customFontDataUrl}'); }
       text, tspan { font-family: '__CustomFont__', sans-serif !important; }
     `;
   } else {
     const gfUrl = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(selectedFont)}:wght@400;600;700&display=swap`;
     styleEl.textContent = `
+      svg { --primary: ${primaryColor}; }
       @import url('${gfUrl}');
       text, tspan { font-family: '${selectedFont}', sans-serif; }
     `;
   }
 
-  // Primary colour
+  // Primary colour (generic templates use a rect with id="color-primary")
   const colorEl = doc.getElementById("color-primary");
   if (colorEl) colorEl.setAttribute("fill", primaryColor);
 
@@ -206,9 +210,9 @@ export default function BoardBuilder() {
   });
 
   // Board state
-  const [layout, setLayout] = useState<LayoutKey>("a4-portrait");
-  const [primaryColor, setPrimaryColor] = useState("#0055FF");
-  const [hexInput, setHexInput] = useState("#0055FF");
+  const [layout, setLayout] = useState<LayoutKey>("taptpay-a4-portrait");
+  const [primaryColor, setPrimaryColor] = useState("#00f1d7");
+  const [hexInput, setHexInput] = useState("#00f1d7");
   const [businessName, setBusinessName] = useState("");
   const [tagline, setTagline] = useState("");
   const [instructions, setInstructions] = useState("Scan to Pay");
@@ -486,17 +490,32 @@ export default function BoardBuilder() {
             </ControlSection>
 
             <ControlSection icon={<Layout size={16} />} title="Layout" isOpen={openSection === "layout"} onToggle={() => toggle("layout")}>
-              <div className="grid grid-cols-2 gap-2">
-                {(Object.keys(LAYOUTS) as LayoutKey[]).map((key) => (
-                  <button
-                    key={key}
-                    onClick={() => setLayout(key)}
-                    className={`border-2 rounded-xl p-3 text-xs font-medium transition-all ${layout === key ? "border-[#0055FF] bg-[#0055FF]/5 text-[#0055FF]" : "border-gray-200 text-gray-600 hover:border-gray-300"}`}
-                  >
-                    <div className={`mx-auto mb-2 border-2 rounded ${layout === key ? "border-[#0055FF]" : "border-gray-300"} ${key.includes("portrait") ? "w-7 h-9" : "w-9 h-7"}`} />
-                    {LAYOUTS[key].label}
-                  </button>
-                ))}
+              <div className="space-y-2">
+                {/* Branded template — full width, prominent */}
+                <button
+                  onClick={() => setLayout("taptpay-a4-portrait")}
+                  className={`w-full border-2 rounded-xl p-3 flex items-center gap-3 text-left transition-all ${layout === "taptpay-a4-portrait" ? "border-[#00f1d7] bg-[#00f1d7]/5" : "border-gray-200 hover:border-gray-300"}`}
+                >
+                  <div className={`border-2 rounded flex-shrink-0 w-7 h-9 ${layout === "taptpay-a4-portrait" ? "border-[#00f1d7]" : "border-gray-300"}`} />
+                  <div>
+                    <div className={`text-xs font-semibold ${layout === "taptpay-a4-portrait" ? "text-[#00f1d7]" : "text-gray-700"}`}>TaptPay A4</div>
+                    <div className="text-[10px] text-gray-400 mt-0.5">Official branded design</div>
+                  </div>
+                  <span className="ml-auto text-[10px] bg-[#00f1d7]/15 text-[#00b8a9] px-2 py-0.5 rounded-full font-medium">Recommended</span>
+                </button>
+                {/* Generic templates — 2-column grid */}
+                <div className="grid grid-cols-2 gap-2">
+                  {(Object.keys(LAYOUTS) as LayoutKey[]).filter((k) => !LAYOUTS[k].branded).map((key) => (
+                    <button
+                      key={key}
+                      onClick={() => setLayout(key)}
+                      className={`border-2 rounded-xl p-3 text-xs font-medium transition-all ${layout === key ? "border-[#0055FF] bg-[#0055FF]/5 text-[#0055FF]" : "border-gray-200 text-gray-600 hover:border-gray-300"}`}
+                    >
+                      <div className={`mx-auto mb-2 border-2 rounded ${layout === key ? "border-[#0055FF]" : "border-gray-300"} ${key.includes("portrait") ? "w-7 h-9" : "w-9 h-7"}`} />
+                      {LAYOUTS[key].label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </ControlSection>
 
