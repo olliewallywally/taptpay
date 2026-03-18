@@ -1508,8 +1508,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Validate it's a Windcave domain before forwarding credentials
           assertWindcaveUrl(ajaxUrl);
           const gpayResult = await submitGooglePayToken(ajaxUrl, googlePayToken);
-          approved = gpayResult.approved === true;
-          windcaveTransactionId = gpayResult.windcaveTransactionId;
+          if (gpayResult.error === "3DS_REQUIRED") {
+            // 3DS required — fall back to session query to determine outcome
+            console.warn(`[googlepay-complete] 3DS required for txn ${transactionId}, querying session`);
+            const queryResult = await queryWindcaveSession(sessionId);
+            approved = queryResult.approved === true;
+            windcaveTransactionId = queryResult.windcaveTransactionId;
+          } else {
+            approved = gpayResult.approved === true;
+            windcaveTransactionId = gpayResult.windcaveTransactionId;
+          }
         } else {
           // URL not cached (session may have been created before this deploy) — fall back to query
           console.warn(`[googlepay-complete] No cached AJAX URL for txn ${transactionId}, falling back to session query`);
