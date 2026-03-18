@@ -190,22 +190,14 @@ export async function startServerWithPortManagement(
     if (!portCheck.available) {
       console.log(`⚠️ Port ${port} is in use`);
       
-      if (portCheck.pid && portCheck.command) {
-        console.log(`📋 Process details: PID ${portCheck.pid}, Command: ${portCheck.command}`);
-        
-        // Check if it's likely a stale node process
-        if (portCheck.command.includes('node') || portCheck.command.includes('tsx')) {
-          console.log(`🔄 Attempting to clean up stale Node.js process...`);
-          const cleaned = await cleanupPort(port, { force: true, timeout: 3000 });
-          
-          if (!cleaned) {
-            console.error(`❌ Could not clean up port ${port}. Manual intervention required.`);
-            console.log(`💡 Try running: kill ${portCheck.pid} or kill -9 ${portCheck.pid}`);
-            return false;
-          }
-        } else {
-          console.error(`❌ Port ${port} is in use by non-Node process: ${portCheck.command}`);
-          console.log(`💡 Please free the port manually or use a different port`);
+      if (portCheck.pid) {
+        console.log(`📋 Process details: PID ${portCheck.pid}, Command: ${portCheck.command || 'unknown'}`);
+        console.log(`🔄 Attempting to clean up process on port ${port}...`);
+        const cleaned = await cleanupPort(port, { force: true, timeout: 3000 });
+
+        if (!cleaned) {
+          console.error(`❌ Could not clean up port ${port}. Manual intervention required.`);
+          console.log(`💡 Try running: kill ${portCheck.pid} or kill -9 ${portCheck.pid}`);
           return false;
         }
       } else {
