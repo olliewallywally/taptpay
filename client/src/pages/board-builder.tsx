@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
@@ -154,9 +155,29 @@ function buildModifiedSvg(opts: BuildSvgOpts): string {
   };
 
   setText("text-business-name", businessName || "Your Business Name", primaryColor);
-  setText("text-tagline", tagline || "Your tagline or location here");
+  setText("text-tagline", tagline || "");
   setText("text-instructions", instructions || "Scan to Pay");
-  setText("text-footer", footer || "Powered by TaptPay");
+
+  // Footer: multi-line support via <tspan> elements
+  const footerEl = doc.getElementById("text-footer");
+  if (footerEl) {
+    const rawFooter = footer || "Powered by TaptPay";
+    const lines = rawFooter.split("\n");
+    const lineHeight = 100; // SVG user units (~font-size * 1.3)
+    const xCenter = footerEl.getAttribute("x") || "1240";
+    const baseY = parseFloat(footerEl.getAttribute("y") || "3440");
+    // Centre the block around baseY
+    const startY = baseY - ((lines.length - 1) * lineHeight) / 2;
+    // Clear existing content
+    while (footerEl.firstChild) footerEl.removeChild(footerEl.firstChild);
+    lines.forEach((line, i) => {
+      const tspan = doc.createElementNS("http://www.w3.org/2000/svg", "tspan");
+      tspan.setAttribute("x", xCenter);
+      tspan.setAttribute("y", String(startY + i * lineHeight));
+      tspan.textContent = line;
+      footerEl.appendChild(tspan);
+    });
+  }
 
   // QR code image (data URL from API)
   const setImg = (id: string, href: string): void => {
@@ -564,10 +585,12 @@ export default function BoardBuilder() {
 
             <ControlSection icon={<Type size={16} />} title="Text" isOpen={openSection === "text"} onToggle={() => toggle("text")}>
               <div className="space-y-3">
-                <div>
-                  <Label className="text-xs text-gray-500 mb-1 block">Business Name</Label>
-                  <Input value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Your Business Name" className="border-gray-200 focus:border-[#0055FF]" />
-                </div>
+                {layout !== "taptpay-a4-portrait" && (
+                  <div>
+                    <Label className="text-xs text-gray-500 mb-1 block">Business Name</Label>
+                    <Input value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Your Business Name" className="border-gray-200 focus:border-[#0055FF]" />
+                  </div>
+                )}
                 <div>
                   <Label className="text-xs text-gray-500 mb-1 block">Tagline (optional)</Label>
                   <Input value={tagline} onChange={(e) => setTagline(e.target.value)} placeholder="e.g. Fresh coffee · Thorndon" className="border-gray-200 focus:border-[#0055FF]" />
@@ -578,7 +601,14 @@ export default function BoardBuilder() {
                 </div>
                 <div>
                   <Label className="text-xs text-gray-500 mb-1 block">Footer Note</Label>
-                  <Input value={footer} onChange={(e) => setFooter(e.target.value)} placeholder="Powered by TaptPay" className="border-gray-200 focus:border-[#0055FF]" />
+                  <Textarea
+                    value={footer}
+                    onChange={(e) => setFooter(e.target.value)}
+                    placeholder={"Powered by TaptPay"}
+                    rows={3}
+                    className="border-gray-200 focus:border-[#0055FF] resize-none text-sm"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">Press Enter to add a new line — text will be centred</p>
                 </div>
               </div>
             </ControlSection>
