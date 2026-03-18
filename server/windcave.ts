@@ -246,6 +246,12 @@ export async function submitGooglePayToken(
 ): Promise<{ success: boolean; approved?: boolean; windcaveTransactionId?: string; error?: string }> {
   logAudit("GOOGLEPAY_SUBMIT", { url: ajaxSubmitGooglePayUrl });
   try {
+    // Body format confirmed from Windcave's official SDK source:
+    // windcavepayments-googlepay-v1.js → __submitTransaction():
+    //   var tokenObject = { googlePay: JSON.parse(payment.paymentMethodData.tokenizationData.token) };
+    //   var token = JSON.stringify(tokenObject);
+    //   self.__ajaxPost(url, token, { "Content-Type": "application/json", "x-seamless": 1 })
+    // Authorization header must NOT be sent — MHPP AJAX URLs authenticate via unique opaque URL.
     const response = await fetchWithTimeout(ajaxSubmitGooglePayUrl, {
       method: "POST",
       headers: {
@@ -256,7 +262,7 @@ export async function submitGooglePayToken(
     });
 
     const text = await response.text();
-    logAudit("GOOGLEPAY_RESPONSE", { status: response.status, body: text.slice(0, 200) });
+    logAudit("GOOGLEPAY_RESPONSE", { status: response.status, body: text });
 
     if (response.ok) {
       let data: any = {};
@@ -285,7 +291,8 @@ export async function submitGooglePayToken(
       return { success: true, approved, windcaveTransactionId: data.id || data.transactionId };
     }
 
-    return { success: false, error: `Windcave GooglePay ${response.status}: ${text.slice(0, 200)}` };
+    logAudit("GOOGLEPAY_ERROR_BODY", { status: response.status, body: text });
+    return { success: false, error: `Windcave GooglePay ${response.status}: ${text}` };
   } catch (err: any) {
     logAudit("GOOGLEPAY_ERROR", { error: err.message });
     return { success: false, error: err.message };
