@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 210 297">
+  <defs>
+    <style id="font-style"></style>
+  </defs>
+  <!-- Primary colour background -->
+  <rect id="color-primary" x="0" y="0" width="210" height="297" fill="#0055FF"/>
+  <!-- Inner white panel -->
+  <rect x="10" y="10" width="190" height="277" rx="6" fill="white"/>
+  <!-- Accent bar at top -->
+  <rect x="10" y="10" width="190" height="8" rx="4" fill="#00E5CC" id="color-accent"/>
+  <!-- Logo area -->
+  <image id="logo-placeholder" x="80" y="24" width="50" height="18" href="" preserveAspectRatio="xMidYMid meet"/>
+  <!-- Separator -->
+  <line x1="40" y1="50" x2="170" y2="50" stroke="#e5e7eb" stroke-width="0.4"/>
+  <!-- Business name -->
+  <text id="text-business-name" x="105" y="63" text-anchor="middle" font-family="sans-serif" font-size="9" font-weight="700" fill="#0055FF">Your Business Name</text>
+  <!-- Tagline -->
+  <text id="text-tagline" x="105" y="75" text-anchor="middle" font-family="sans-serif" font-size="5" fill="#6b7280">Your tagline or location here</text>
+  <!-- QR white background -->
+  <rect x="45" y="82" width="120" height="120" rx="6" fill="#f9fafb" stroke="#e5e7eb" stroke-width="0.5"/>
+  <!-- QR code image placeholder -->
+  <image id="qr-placeholder" x="49" y="86" width="112" height="112" href="" preserveAspectRatio="xMidYMid meet"/>
+  <!-- QR label -->
+  <text x="105" y="212" text-anchor="middle" font-family="sans-serif" font-size="4" fill="#9ca3af">scan with your phone camera</text>
+  <!-- Separator -->
+  <line x1="40" y1="220" x2="170" y2="220" stroke="#e5e7eb" stroke-width="0.4"/>
+  <!-- Instructions -->
+  <text id="text-instructions" x="105" y="232" text-anchor="middle" font-family="sans-serif" font-size="6.5" font-weight="600" fill="#111827">Scan to Pay</text>
+  <!-- Payment methods -->
+  <text x="105" y="243" text-anchor="middle" font-family="sans-serif" font-size="4" fill="#9ca3af">Apple Pay · Google Pay · Visa payWave · Mastercard</text>
+  <!-- Footer -->
+  <text id="text-footer" x="105" y="276" text-anchor="middle" font-family="sans-serif" font-size="3.5" fill="#9ca3af">Powered by TaptPay</text>
+</svg>

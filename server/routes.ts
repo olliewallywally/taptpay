@@ -4781,6 +4781,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Board Builder: submit PDF for printing
+  app.post("/api/board-builder/submit", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { pdf, businessName, submitterName, submitterEmail, stoneId, layout } = req.body;
+      if (!pdf || !submitterName || !submitterEmail) {
+        return res.status(400).json({ message: "Missing required fields: pdf, submitterName, submitterEmail" });
+      }
+      const { sendBoardBuilderEmail } = await import('./email-service-multi');
+      const sent = await sendBoardBuilderEmail({
+        pdfBase64: pdf,
+        businessName: businessName || "Business",
+        submitterName,
+        submitterEmail,
+        stoneId: stoneId || "main",
+        layout: layout || "A4 Portrait",
+      });
+      if (sent) {
+        res.json({ message: "Board submitted successfully" });
+      } else {
+        res.status(500).json({ message: "Failed to send email" });
+      }
+    } catch (error) {
+      console.error("Board builder submit error:", error);
+      res.status(500).json({ message: "Failed to process board submission" });
+    }
+  });
+
   // Serve static uploads
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 

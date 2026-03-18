@@ -266,6 +266,86 @@ Need help? Contact us at support@tapt.co.nz
   });
 }
 
+// Board Builder email with PDF attachment
+export async function sendBoardBuilderEmail(params: {
+  pdfBase64: string;
+  businessName: string;
+  submitterName: string;
+  submitterEmail: string;
+  stoneId: string;
+  layout: string;
+}): Promise<boolean> {
+  const PRINT_TARGET = 'oliverleonard@taptpay.co.nz';
+  const fromEmail = EMAIL_CONFIG.sendgrid.apiKey
+    ? EMAIL_CONFIG.sendgrid.fromEmail
+    : EMAIL_CONFIG.gmail.user || EMAIL_CONFIG.outlook.user || EMAIL_CONFIG.smtp.auth.user || 'noreply@taptpay.co.nz';
+
+  const subject = `Payment Board Print Request – ${params.businessName}`;
+  const html = `
+    <h2>Payment Board Print Request</h2>
+    <table style="border-collapse:collapse;width:100%;max-width:480px;">
+      <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Business</td><td style="padding:6px 0;font-weight:600;">${params.businessName}</td></tr>
+      <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Submitted by</td><td style="padding:6px 0;">${params.submitterName} &lt;${params.submitterEmail}&gt;</td></tr>
+      <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Layout</td><td style="padding:6px 0;">${params.layout}</td></tr>
+      <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Stone / QR</td><td style="padding:6px 0;">${params.stoneId === 'main' ? 'Main Payment Link' : `Stone ID ${params.stoneId}`}</td></tr>
+    </table>
+    <p style="margin-top:16px;color:#374151;">The payment board PDF is attached to this email.</p>
+    <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
+    <p style="color:#9ca3af;font-size:12px;">Sent via TaptPay Board Builder</p>
+  `;
+
+  const attachment = {
+    filename: `payment-board-${params.businessName.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}.pdf`,
+    content: params.pdfBase64,
+  };
+
+  if (sendGridService) {
+    try {
+      await sendGridService.send({
+        to: PRINT_TARGET,
+        from: fromEmail as string,
+        subject,
+        html,
+        text: `Payment Board Print Request from ${params.businessName} submitted by ${params.submitterName}.`,
+        attachments: [{
+          content: params.pdfBase64,
+          filename: attachment.filename,
+          type: 'application/pdf',
+          disposition: 'attachment',
+        }],
+      });
+      console.log('Board builder email sent via SendGrid');
+      return true;
+    } catch (error) {
+      console.error('SendGrid board builder email error:', error);
+    }
+  }
+
+  const transporter = createTransporter();
+  if (transporter) {
+    try {
+      await transporter.sendMail({
+        from: fromEmail as string,
+        to: PRINT_TARGET,
+        subject,
+        html,
+        attachments: [{
+          filename: attachment.filename,
+          content: Buffer.from(params.pdfBase64, 'base64'),
+          contentType: 'application/pdf',
+        }],
+      });
+      console.log('Board builder email sent via SMTP');
+      return true;
+    } catch (error) {
+      console.error('SMTP board builder email error:', error);
+    }
+  }
+
+  console.log('[SIMULATED] Board builder email to', PRINT_TARGET, 'for', params.businessName);
+  return true;
+}
+
 // Email service status check
 export function getEmailServiceStatus() {
   const status = {

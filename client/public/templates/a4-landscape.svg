@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 297 210">
+  <defs>
+    <style id="font-style"></style>
+  </defs>
+  <!-- Primary colour background -->
+  <rect id="color-primary" x="0" y="0" width="297" height="210" fill="#0055FF"/>
+  <!-- Inner white panel -->
+  <rect x="10" y="10" width="277" height="190" rx="6" fill="white"/>
+  <!-- Accent bar left -->
+  <rect x="10" y="10" width="8" height="190" rx="4" fill="#00E5CC" id="color-accent"/>
+  <!-- Left content column -->
+  <!-- Logo area -->
+  <image id="logo-placeholder" x="30" y="20" width="60" height="22" href="" preserveAspectRatio="xMidYMid meet"/>
+  <!-- Separator -->
+  <line x1="30" y1="48" x2="165" y2="48" stroke="#e5e7eb" stroke-width="0.4"/>
+  <!-- Business name -->
+  <text id="text-business-name" x="30" y="65" font-family="sans-serif" font-size="10" font-weight="700" fill="#0055FF">Your Business</text>
+  <!-- Tagline -->
+  <text id="text-tagline" x="30" y="78" font-family="sans-serif" font-size="5.5" fill="#6b7280">Your tagline or location here</text>
+  <!-- Instructions -->
+  <text id="text-instructions" x="30" y="115" font-family="sans-serif" font-size="7" font-weight="600" fill="#111827">Scan to Pay</text>
+  <text x="30" y="127" font-family="sans-serif" font-size="4.5" fill="#6b7280">Point your phone camera at</text>
+  <text x="30" y="136" font-family="sans-serif" font-size="4.5" fill="#6b7280">the QR code to pay securely</text>
+  <!-- Payment methods -->
+  <text x="30" y="155" font-family="sans-serif" font-size="3.8" fill="#9ca3af">Apple Pay · Google Pay</text>
+  <text x="30" y="163" font-family="sans-serif" font-size="3.8" fill="#9ca3af">Visa payWave · Mastercard</text>
+  <!-- Footer -->
+  <text id="text-footer" x="30" y="188" font-family="sans-serif" font-size="3.5" fill="#9ca3af">Powered by TaptPay</text>
+  <!-- Divider -->
+  <line x1="172" y1="20" x2="172" y2="190" stroke="#e5e7eb" stroke-width="0.4"/>
+  <!-- Right QR column -->
+  <!-- QR label -->
+  <text x="234" y="28" text-anchor="middle" font-family="sans-serif" font-size="4" fill="#9ca3af">scan to pay</text>
+  <!-- QR white background -->
+  <rect x="183" y="32" width="102" height="102" rx="5" fill="#f9fafb" stroke="#e5e7eb" stroke-width="0.5"/>
+  <!-- QR code image -->
+  <image id="qr-placeholder" x="187" y="36" width="94" height="94" href="" preserveAspectRatio="xMidYMid meet"/>
+  <!-- QR sub-label -->
+  <text x="234" y="144" text-anchor="middle" font-family="sans-serif" font-size="3.5" fill="#9ca3af">scan with your phone camera</text>
+</svg>
