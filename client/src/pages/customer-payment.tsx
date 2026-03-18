@@ -55,7 +55,7 @@ export default function CustomerPayment() {
 
       if (message.transaction.status === "completed") {
         setPaymentStatus("success");
-        setTimeout(() => setLocation(`/payment/result/${message.transaction.id}?status=approved`), 1500);
+        setTimeout(() => setLocation(`/receipt/${message.transaction.id}`), 1500);
       } else if (message.transaction.status === "failed") {
         setPaymentStatus("error");
       }

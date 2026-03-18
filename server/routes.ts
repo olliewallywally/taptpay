@@ -1427,7 +1427,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     return {
       approved,
-      redirectPath: approved ? `/payment/result/${transactionId}?status=approved` : `/payment/result/${transactionId}?status=declined`,
+      redirectPath: approved ? `/receipt/${transactionId}` : `/payment/result/${transactionId}?status=declined`,
     };
   }
 
@@ -2793,8 +2793,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // If notification already processed this, redirect based on known state
       if (transaction.windcaveSessionState === 'approved') {
-        if (transaction.isSplit) return res.redirect(`/receipt/${txnId}`);
-        return res.redirect(`/payment/result/${txnId}?status=approved`);
+        return res.redirect(`/receipt/${txnId}`);
       }
       if (transaction.windcaveSessionState === 'declined') {
         return res.redirect(`/payment/result/${txnId}?status=declined`);
@@ -2875,8 +2874,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         console.log(`[WINDCAVE_CALLBACK] Transaction ${txnId} → ${finalStatus}`);
 
-        const statusParam = queryResult.approved ? 'approved' : 'declined';
-        return res.redirect(`/payment/result/${txnId}?status=${statusParam}`);
+        if (queryResult.approved) return res.redirect(`/receipt/${txnId}`);
+        return res.redirect(`/payment/result/${txnId}?status=declined`);
       }
     } catch (error) {
       console.error('[WINDCAVE_CALLBACK] Error:', error);
