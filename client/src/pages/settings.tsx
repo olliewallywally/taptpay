@@ -12,9 +12,47 @@ import { getCurrentMerchantId } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { Switch } from "@/components/ui/switch";
 import { 
-  Home, Package, BarChart3, SlidersHorizontal, Terminal,
-  Upload, CheckCircle, XCircle, LogOut, CreditCard, AlertCircle, Bell, BellOff
+  Upload, CheckCircle, XCircle, LogOut, CreditCard, AlertCircle, Bell, BellOff, ChevronDown
 } from "lucide-react";
+
+function SettingsSection({ title, isOpen, onToggle, children }: {
+  title: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="bg-white rounded-2xl sm:rounded-3xl mb-5 overflow-hidden">
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between px-5 sm:px-6 py-5 text-left"
+      >
+        <h2 className="text-[#0055FF] text-xl font-medium">{title}</h2>
+        <ChevronDown
+          size={20}
+          className="text-[#0055FF] shrink-0 ml-2"
+          style={{
+            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 0.3s ease',
+          }}
+        />
+      </button>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateRows: isOpen ? '1fr' : '0fr',
+          transition: 'grid-template-rows 0.3s ease',
+        }}
+      >
+        <div style={{ overflow: 'hidden' }}>
+          <div className="px-5 sm:px-6 pb-5 sm:pb-6">
+            {children}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface MerchantDetails {
   businessName: string;
@@ -31,6 +69,13 @@ export default function Settings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const merchantId = getCurrentMerchantId();
+
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set());
+  const toggle = (id: string) => setOpenSections(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
 
   const [businessDetails, setBusinessDetails] = useState<MerchantDetails>({
     businessName: '',
@@ -412,10 +457,8 @@ export default function Settings() {
       {/* Content */}
       <div className="max-w-md mx-auto px-4 sm:px-6 mt-8">
         {/* Business Details Section */}
-        <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 mb-5">
-          <h2 className="text-[#0055FF] text-xl mb-5">Business Details</h2>
-          
-          <div className="space-y-4">
+        <SettingsSection title="Business Details" isOpen={openSections.has('business')} onToggle={() => toggle('business')}>
+          <div className="space-y-4 mt-1">
             <div>
               <Label htmlFor="businessName" className="!text-[#0055FF] font-semibold text-base mb-2 block">Company Name</Label>
               <Input
@@ -504,13 +547,11 @@ export default function Settings() {
           >
             {updateMerchantMutation.isPending ? "Saving..." : "Save Business Details"}
           </Button>
-        </div>
+        </SettingsSection>
 
         {/* API Status Section */}
-        <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 mb-5">
-          <h2 className="text-[#0055FF] text-xl mb-5">API Status</h2>
-          
-          <div className="space-y-4">
+        <SettingsSection title="API Status" isOpen={openSections.has('api')} onToggle={() => toggle('api')}>
+          <div className="space-y-4 mt-1">
             <div>
               <div className="flex items-center justify-between mb-3">
                 <Label htmlFor="windcaveApi" className="text-gray-700 text-sm">Windcave API Key</Label>
@@ -546,13 +587,11 @@ export default function Settings() {
               </div>
             </div>
           </div>
-        </div>
+        </SettingsSection>
 
         {/* Logo Upload Section */}
-        <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 mb-5">
-          <h2 className="text-[#0055FF] text-xl mb-5">Customer Payment Page Logo</h2>
-          
-          <div className="space-y-4">
+        <SettingsSection title="Customer Payment Page Logo" isOpen={openSections.has('logo')} onToggle={() => toggle('logo')}>
+          <div className="space-y-4 mt-1">
             <div>
               <Label className="text-gray-700 text-sm mb-2 block">Upload Logo (PNG only, max 20MB)</Label>
               <div className="border-2 border-dashed border-[#0055FF] rounded-xl p-6 text-center">
@@ -616,13 +655,11 @@ export default function Settings() {
               </div>
             </div>
           </div>
-        </div>
+        </SettingsSection>
 
         {/* Dashboard Preferences Section */}
-        <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 mb-5">
-          <h2 className="text-[#0055FF] text-xl mb-5">Dashboard Preferences</h2>
-          
-          <div className="space-y-4">
+        <SettingsSection title="Dashboard Preferences" isOpen={openSections.has('preferences')} onToggle={() => toggle('preferences')}>
+          <div className="space-y-4 mt-1">
             <div>
               <Label htmlFor="dailyGoal" className="text-gray-700 text-sm mb-1.5 block">
                 Daily Revenue Goal ($)
@@ -653,13 +690,11 @@ export default function Settings() {
               </div>
             </div>
           </div>
-        </div>
+        </SettingsSection>
 
         {/* Subscription & Billing Section */}
-        <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 mb-5">
-          <h2 className="text-[#0055FF] text-xl mb-5">Subscription & Billing</h2>
-          
-          <div className="space-y-5">
+        <SettingsSection title="Subscription & Billing" isOpen={openSections.has('billing')} onToggle={() => toggle('billing')}>
+          <div className="space-y-5 mt-1">
             {/* Current Tier */}
             <div className="flex items-center justify-between p-4 bg-gradient-to-r from-[#0055FF]/10 to-[#00E5CC]/10 rounded-xl">
               <div>
@@ -820,13 +855,11 @@ export default function Settings() {
               </div>
             )}
           </div>
-        </div>
+        </SettingsSection>
 
         {/* Account Section */}
-        <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 mb-5">
-          <h2 className="text-[#0055FF] text-xl mb-5">Account</h2>
-          
-          <div className="space-y-3">
+        <SettingsSection title="Account" isOpen={openSections.has('account')} onToggle={() => toggle('account')}>
+          <div className="space-y-3 mt-1">
             <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
               <div>
                 <p className="text-gray-700 font-medium">Account Status</p>
@@ -835,34 +868,32 @@ export default function Settings() {
               <CheckCircle className="text-green-500" size={24} />
             </div>
           </div>
-        </div>
+        </SettingsSection>
 
         {/* Push Notifications */}
-        <div className="bg-white rounded-2xl p-5 mb-5 shadow-sm">
-          <h3 className="text-lg font-bold mb-3 flex items-center gap-2">
-            {pushEnabled ? <Bell size={20} className="text-[#0055FF]" /> : <BellOff size={20} className="text-gray-400" />}
-            Transaction Notifications
-          </h3>
-          {pushSupported ? (
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">
-                  {pushEnabled 
-                    ? "You'll receive alerts when payments are received, failed, or refunded" 
-                    : "Enable to get real-time alerts for transaction updates"}
-                </p>
+        <SettingsSection title="Transaction Notifications" isOpen={openSections.has('notifications')} onToggle={() => toggle('notifications')}>
+          <div className="mt-1">
+            {pushSupported ? (
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">
+                    {pushEnabled 
+                      ? "You'll receive alerts when payments are received, failed, or refunded" 
+                      : "Enable to get real-time alerts for transaction updates"}
+                  </p>
+                </div>
+                <Switch
+                  checked={pushEnabled}
+                  onCheckedChange={togglePushNotifications}
+                  disabled={pushLoading}
+                  className="ml-4"
+                />
               </div>
-              <Switch
-                checked={pushEnabled}
-                onCheckedChange={togglePushNotifications}
-                disabled={pushLoading}
-                className="ml-4"
-              />
-            </div>
-          ) : (
-            <p className="text-sm text-gray-500">Push notifications are not supported in this browser.</p>
-          )}
-        </div>
+            ) : (
+              <p className="text-sm text-gray-500">Push notifications are not supported in this browser.</p>
+            )}
+          </div>
+        </SettingsSection>
 
         {/* Customer Payment Page Button */}
         <div className="mb-5">
