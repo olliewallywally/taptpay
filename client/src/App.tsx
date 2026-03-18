@@ -45,12 +45,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       const token = localStorage.getItem("authToken");
       if (!token) {
         setIsChecking(false);
-        setLocation("/login");
+        const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
+        setLocation(`/login?returnTo=${returnTo}`);
         return;
       }
       
       try {
-        // Verify token with server to check if it's still valid
         const response = await fetch('/api/auth/me', {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -60,12 +60,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
         if (response.ok) {
           setIsAuthenticated(true);
         } else {
-          // Token is invalid, remove it and redirect to login
           localStorage.removeItem("authToken");
-          setLocation("/login");
+          const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
+          setLocation(`/login?returnTo=${returnTo}`);
         }
       } catch (error) {
-        // Network error or server down, keep token for now
         console.log('Auth check failed, keeping existing token');
         setIsAuthenticated(true);
       }

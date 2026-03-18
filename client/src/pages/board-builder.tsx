@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -17,10 +17,10 @@ import jsPDF from "jspdf";
 type LayoutKey = "a4-portrait" | "a4-landscape" | "a6-portrait" | "a6-landscape";
 
 const LAYOUTS: Record<LayoutKey, { label: string; mmW: number; mmH: number; pxW: number; pxH: number; aspect: number }> = {
-  "a4-portrait":  { label: "A4 Portrait",  mmW: 210, mmH: 297, pxW: 794,  pxH: 1123, aspect: 297/210 },
-  "a4-landscape": { label: "A4 Landscape", mmW: 297, mmH: 210, pxW: 1123, pxH: 794,  aspect: 210/297 },
-  "a6-portrait":  { label: "A6 Portrait",  mmW: 105, mmH: 148, pxW: 397,  pxH: 559,  aspect: 148/105 },
-  "a6-landscape": { label: "A6 Landscape", mmW: 148, mmH: 105, pxW: 559,  pxH: 397,  aspect: 105/148 },
+  "a4-portrait":  { label: "A4 Portrait",  mmW: 210, mmH: 297, pxW: 794,  pxH: 1123, aspect: 297 / 210 },
+  "a4-landscape": { label: "A4 Landscape", mmW: 297, mmH: 210, pxW: 1123, pxH: 794,  aspect: 210 / 297 },
+  "a6-portrait":  { label: "A6 Portrait",  mmW: 105, mmH: 148, pxW: 397,  pxH: 559,  aspect: 148 / 105 },
+  "a6-landscape": { label: "A6 Landscape", mmW: 148, mmH: 105, pxW: 559,  pxH: 397,  aspect: 105 / 148 },
 };
 
 const PRESET_COLORS = [
@@ -39,11 +39,28 @@ const GOOGLE_FONTS = [
   "Playfair Display", "Oswald", "Lato", "Nunito", "Roboto",
 ];
 
+interface MerchantData {
+  id: number;
+  businessName: string;
+  email: string;
+  paymentUrl?: string;
+  qrCodeUrl?: string;
+}
+
+interface TaptStoneData {
+  id: number;
+  merchantId: number;
+  name: string;
+  stoneNumber: number;
+  qrCodeUrl?: string | null;
+  paymentUrl?: string | null;
+  isActive: boolean | null;
+}
+
 async function fetchAsDataUrl(url: string, authToken?: string): Promise<string> {
-  const headers: Record<string, string> = {};
-  if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+  const headers: HeadersInit = authToken ? { Authorization: `Bearer ${authToken}` } : {};
   const res = await fetch(url, { headers });
-  if (!res.ok) throw new Error(`Failed to fetch ${url}`);
+  if (!res.ok) throw new Error(`Failed to fetch ${url}: ${res.status}`);
   const blob = await res.blob();
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -53,7 +70,7 @@ async function fetchAsDataUrl(url: string, authToken?: string): Promise<string> 
   });
 }
 
-function buildModifiedSvg(opts: {
+interface BuildSvgOpts {
   svgTemplate: string;
   layout: LayoutKey;
   primaryColor: string;
@@ -66,7 +83,9 @@ function buildModifiedSvg(opts: {
   selectedFont: string;
   customFontDataUrl: string;
   forCapture?: boolean;
-}): string {
+}
+
+function buildModifiedSvg(opts: BuildSvgOpts): string {
   const {
     svgTemplate, layout, primaryColor, businessName, tagline, instructions,
     footer, qrDataUrl, logoDataUrl, selectedFont, customFontDataUrl, forCapture = false,
@@ -76,33 +95,31 @@ function buildModifiedSvg(opts: {
 
   const parser = new DOMParser();
   const doc = parser.parseFromString(svgTemplate, "image/svg+xml");
-  const svg = doc.documentElement as unknown as SVGSVGElement;
-
+  const svg = doc.documentElement;
   const dim = LAYOUTS[layout];
 
-  if (forCapture) {
-    svg.setAttribute("width", String(dim.pxW));
-    svg.setAttribute("height", String(dim.pxH));
-  } else {
-    svg.setAttribute("width", "100%");
-    svg.setAttribute("height", "100%");
-    svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
-  }
+  svg.setAttribute("width", forCapture ? String(dim.pxW) : "100%");
+  svg.setAttribute("height", forCapture ? String(dim.pxH) : "100%");
+  svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
 
-  // Inject font via Google Fonts API (dynamic loading)
+  // Ensure <defs> exists
   let defsEl = svg.querySelector("defs");
   if (!defsEl) {
     defsEl = doc.createElementNS("http://www.w3.org/2000/svg", "defs");
     svg.insertBefore(defsEl, svg.firstChild);
   }
 
-  let styleEl = doc.getElementById("font-style") as SVGStyleElement | null;
-  if (!styleEl) {
-    styleEl = doc.createElementNS("http://www.w3.org/2000/svg", "style") as unknown as SVGStyleElement;
-    (styleEl as any).id = "font-style";
-    defsEl.appendChild(styleEl);
-  }
+  // Get or create #font-style element
+  const getOrCreate = (id: string, tag: string, parent: Element): Element => {
+    const existing = doc.getElementById(id);
+    if (existing) return existing;
+    const el = doc.createElementNS("http://www.w3.org/2000/svg", tag);
+    el.id = id;
+    parent.appendChild(el);
+    return el;
+  };
 
+  const styleEl = getOrCreate("font-style", "style", defsEl);
   if (customFontDataUrl) {
     styleEl.textContent = `
       @font-face { font-family: '__CustomFont__'; src: url('${customFontDataUrl}'); }
@@ -116,16 +133,16 @@ function buildModifiedSvg(opts: {
     `;
   }
 
-  // Primary colour background
+  // Primary colour
   const colorEl = doc.getElementById("color-primary");
   if (colorEl) colorEl.setAttribute("fill", primaryColor);
 
-  // Accent colour (match primary)
+  // Accent colour
   const accentEl = doc.getElementById("color-accent");
   if (accentEl) accentEl.setAttribute("fill", primaryColor);
 
-  // Helper to set text + optional fill
-  const setText = (id: string, text: string, fill?: string) => {
+  // Text elements helper
+  const setText = (id: string, text: string, fill?: string): void => {
     const el = doc.getElementById(id);
     if (!el) return;
     el.textContent = text;
@@ -137,52 +154,52 @@ function buildModifiedSvg(opts: {
   setText("text-instructions", instructions || "Scan to Pay");
   setText("text-footer", footer || "Powered by TaptPay");
 
-  // QR code image
-  const qrEl = doc.getElementById("qr-placeholder");
-  if (qrEl) {
-    qrEl.setAttribute("href", qrDataUrl);
-    qrEl.setAttributeNS("http://www.w3.org/1999/xlink", "href", qrDataUrl);
-  }
+  // QR code image (data URL from API)
+  const setImg = (id: string, href: string): void => {
+    const el = doc.getElementById(id);
+    if (!el) return;
+    el.setAttribute("href", href);
+    el.setAttributeNS("http://www.w3.org/1999/xlink", "href", href);
+  };
 
-  // Logo image
-  const logoEl = doc.getElementById("logo-placeholder");
-  if (logoEl) {
-    logoEl.setAttribute("href", logoDataUrl);
-    logoEl.setAttributeNS("http://www.w3.org/1999/xlink", "href", logoDataUrl);
-  }
+  setImg("qr-placeholder", qrDataUrl);
+  setImg("logo-placeholder", logoDataUrl);
 
-  return new XMLSerializer().serializeToString(svg as unknown as Node);
+  return new XMLSerializer().serializeToString(svg);
 }
 
 export default function BoardBuilder() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const captureRef = useRef<HTMLDivElement>(null);
 
   const merchantId = getCurrentMerchantId();
-  const token = localStorage.getItem("authToken") || "";
+  const token = localStorage.getItem("authToken") ?? "";
 
   useEffect(() => {
     if (!merchantId) setLocation("/login?returnTo=/board-builder");
   }, [merchantId, setLocation]);
 
-  const merchantQuery = useQuery<any>({
+  const merchantQuery = useQuery<MerchantData>({
     queryKey: ["/api/merchants", merchantId],
     queryFn: async () => {
       const res = await fetch(`/api/merchants/${merchantId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      return res.json();
+      if (!res.ok) throw new Error("Failed to fetch merchant");
+      return res.json() as Promise<MerchantData>;
     },
     enabled: !!merchantId,
   });
 
-  const stonesQuery = useQuery<any[]>({
+  const stonesQuery = useQuery<TaptStoneData[]>({
     queryKey: ["/api/merchants", merchantId, "tapt-stones"],
     queryFn: async () => {
       const res = await fetch(`/api/merchants/${merchantId}/tapt-stones`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      return res.json();
+      if (!res.ok) throw new Error("Failed to fetch stones");
+      return res.json() as Promise<TaptStoneData[]>;
     },
     enabled: !!merchantId,
   });
@@ -201,18 +218,12 @@ export default function BoardBuilder() {
   const [selectedStoneId, setSelectedStoneId] = useState<string>("main");
   const [qrDataUrl, setQrDataUrl] = useState("");
   const [fetchingQr, setFetchingQr] = useState(false);
-
-  // Template loading
   const [svgTemplate, setSvgTemplate] = useState("");
   const [templateLoading, setTemplateLoading] = useState(false);
-
-  // Submission
   const [submitterName, setSubmitterName] = useState("");
   const [submitterEmail, setSubmitterEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-
-  // UI state
   const [openSection, setOpenSection] = useState<string>("stone");
 
   // Load SVG template when layout changes
@@ -230,7 +241,7 @@ export default function BoardBuilder() {
       });
   }, [layout]);
 
-  // Load Google Font into document (for live preview)
+  // Load Google Font into document for live preview rendering
   useEffect(() => {
     if (!selectedFont || customFontDataUrl) return;
     const id = `gfont-${selectedFont.replace(/\s+/g, "-")}`;
@@ -243,9 +254,9 @@ export default function BoardBuilder() {
     }
   }, [selectedFont, customFontDataUrl]);
 
-  // Pre-populate business name from merchant data
+  // Pre-populate business name from merchant record
   useEffect(() => {
-    if (merchantQuery.data?.businessName) {
+    if (merchantQuery.data?.businessName && !businessName) {
       setBusinessName(merchantQuery.data.businessName);
     }
   }, [merchantQuery.data]);
@@ -264,8 +275,7 @@ export default function BoardBuilder() {
       .finally(() => setFetchingQr(false));
   }, [merchantId, selectedStoneId, token]);
 
-  // Compute modified SVG (memoized)
-  const svgOpts = {
+  const svgOpts: BuildSvgOpts = {
     svgTemplate,
     layout,
     primaryColor,
@@ -279,6 +289,7 @@ export default function BoardBuilder() {
     customFontDataUrl,
   };
 
+  // Memoized preview SVG (scaled to fit container)
   const previewSvg = useMemo(
     () => buildModifiedSvg({ ...svgOpts, forCapture: false }),
     [svgTemplate, layout, primaryColor, businessName, tagline, instructions, footer, qrDataUrl, logoDataUrl, selectedFont, customFontDataUrl]
@@ -314,12 +325,14 @@ export default function BoardBuilder() {
     const reader = new FileReader();
     reader.onloadend = () => {
       const dataUrl = reader.result as string;
-      const name = "__CustomFont__";
-      const ff = new FontFace(name, `url(${dataUrl})`);
+      const fontName = "__CustomFont__";
+      const ff = new FontFace(fontName, `url(${dataUrl})`);
       ff.load().then((loaded) => {
         document.fonts.add(loaded);
         setCustomFontDataUrl(dataUrl);
         toast({ title: "Custom font loaded", description: file.name });
+      }).catch(() => {
+        toast({ title: "Failed to load font", variant: "destructive" });
       });
     };
     reader.readAsDataURL(file);
@@ -337,33 +350,29 @@ export default function BoardBuilder() {
 
     setIsSubmitting(true);
     try {
-      // Build capture SVG at 2× print dimensions
+      // Build full-size SVG for capture
       const captureSvg = buildModifiedSvg({ ...svgOpts, forCapture: true });
-      const capturePxW = dim.pxW * 2;
-      const capturePxH = dim.pxH * 2;
 
-      // Convert SVG to canvas via blob image
-      const svgBlob = new Blob([captureSvg], { type: "image/svg+xml;charset=utf-8" });
-      const svgUrl = URL.createObjectURL(svgBlob);
+      // Inject SVG into the hidden capture div
+      const captureEl = captureRef.current;
+      if (!captureEl) throw new Error("Capture container not found");
+      captureEl.innerHTML = captureSvg;
 
-      const img = new Image();
-      img.width = capturePxW;
-      img.height = capturePxH;
+      // Wait for fonts to load and SVG to render
+      await document.fonts.ready;
+      await new Promise<void>((resolve) => setTimeout(resolve, 150));
 
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => resolve();
-        img.onerror = () => reject(new Error("Failed to render SVG as image"));
-        img.src = svgUrl;
+      // Capture with html2canvas at 2× resolution
+      const { default: html2canvas } = await import("html2canvas");
+      const canvas = await html2canvas(captureEl, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: null,
+        logging: false,
+        width: dim.pxW,
+        height: dim.pxH,
       });
-      URL.revokeObjectURL(svgUrl);
-
-      const canvas = document.createElement("canvas");
-      canvas.width = capturePxW;
-      canvas.height = capturePxH;
-      const ctx = canvas.getContext("2d")!;
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, capturePxW, capturePxH);
-      ctx.drawImage(img, 0, 0, capturePxW, capturePxH);
 
       const imgData = canvas.toDataURL("image/png");
       const orientation = dim.mmW > dim.mmH ? "landscape" : "portrait";
@@ -381,22 +390,23 @@ export default function BoardBuilder() {
       });
 
       if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.message || "Submission failed");
+        const err = (await response.json()) as { message?: string };
+        throw new Error(err.message ?? "Submission failed");
       }
 
       setSubmitted(true);
       toast({ title: "Sent! We'll get your board printed and in touch soon." });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("PDF generation error:", error);
-      toast({ title: "Failed to generate PDF", description: error.message, variant: "destructive" });
+      const message = error instanceof Error ? error.message : "Unknown error";
+      toast({ title: "Failed to generate PDF", description: message, variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const toggle = (section: string) => setOpenSection((s) => (s === section ? "" : section));
-  const stones: any[] = stonesQuery.data || [];
+  const stones: TaptStoneData[] = stonesQuery.data ?? [];
 
   if (!merchantId) return null;
 
@@ -406,9 +416,7 @@ export default function BoardBuilder() {
         <div className="bg-white rounded-2xl shadow-lg p-12 max-w-md text-center">
           <CheckCircle className="w-16 h-16 text-[#00E5CC] mx-auto mb-6" />
           <h1 className="text-2xl font-bold text-gray-900 mb-3">Board Submitted!</h1>
-          <p className="text-gray-600 mb-8">
-            Your payment board design has been sent for printing. We'll be in touch shortly.
-          </p>
+          <p className="text-gray-600 mb-8">Your payment board design has been sent for printing. We'll be in touch shortly.</p>
           <div className="space-y-3">
             <Button onClick={() => setSubmitted(false)} className="w-full bg-[#0055FF] hover:bg-[#0044DD] text-white">
               Design Another Board
@@ -435,11 +443,10 @@ export default function BoardBuilder() {
       </div>
 
       <div className="flex flex-col lg:flex-row min-h-[calc(100vh-57px)]">
-        {/* LEFT PANEL: Controls */}
+        {/* LEFT: Controls */}
         <div className="w-full lg:w-[340px] xl:w-[380px] bg-white border-r border-gray-200 overflow-y-auto flex-shrink-0">
           <div className="p-4 space-y-1">
 
-            {/* Stone selector */}
             <ControlSection icon={<QrCode size={16} />} title="Payment QR Code" isOpen={openSection === "stone"} onToggle={() => toggle("stone")}>
               <div className="space-y-2">
                 <Label className="text-xs text-gray-500">Select which Tapt Stone or payment link to show</Label>
@@ -461,7 +468,6 @@ export default function BoardBuilder() {
               </div>
             </ControlSection>
 
-            {/* Layout */}
             <ControlSection icon={<Layout size={16} />} title="Layout" isOpen={openSection === "layout"} onToggle={() => toggle("layout")}>
               <div className="grid grid-cols-2 gap-2">
                 {(Object.keys(LAYOUTS) as LayoutKey[]).map((key) => (
@@ -477,7 +483,6 @@ export default function BoardBuilder() {
               </div>
             </ControlSection>
 
-            {/* Colour */}
             <ControlSection icon={<Palette size={16} />} title="Colour" isOpen={openSection === "colour"} onToggle={() => toggle("colour")}>
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-2">
@@ -504,7 +509,6 @@ export default function BoardBuilder() {
               </div>
             </ControlSection>
 
-            {/* Logo */}
             <ControlSection icon={<ImageIcon size={16} />} title="Logo" isOpen={openSection === "logo"} onToggle={() => toggle("logo")}>
               <div className="space-y-3">
                 {logoDataUrl && (
@@ -522,7 +526,6 @@ export default function BoardBuilder() {
               </div>
             </ControlSection>
 
-            {/* Text */}
             <ControlSection icon={<Type size={16} />} title="Text" isOpen={openSection === "text"} onToggle={() => toggle("text")}>
               <div className="space-y-3">
                 <div>
@@ -544,7 +547,6 @@ export default function BoardBuilder() {
               </div>
             </ControlSection>
 
-            {/* Font */}
             <ControlSection icon={<Type size={16} />} title="Font" isOpen={openSection === "font"} onToggle={() => toggle("font")}>
               <div className="space-y-3">
                 <div>
@@ -580,7 +582,7 @@ export default function BoardBuilder() {
           </div>
         </div>
 
-        {/* RIGHT PANEL: Live Preview */}
+        {/* RIGHT: Live Preview */}
         <div className="flex-1 flex flex-col items-center bg-gray-100 p-6 gap-8">
           <div className="text-center">
             <p className="text-sm text-gray-500 mb-4 font-medium">
@@ -619,19 +621,8 @@ export default function BoardBuilder() {
             <h3 className="font-semibold text-gray-900 mb-1">Ready to print?</h3>
             <p className="text-sm text-gray-500 mb-4">We'll email your board design as a PDF ready for printing.</p>
             <div className="space-y-3">
-              <Input
-                placeholder="Your name"
-                value={submitterName}
-                onChange={(e) => setSubmitterName(e.target.value)}
-                className="border-gray-200 focus:border-[#0055FF]"
-              />
-              <Input
-                placeholder="Your email"
-                type="email"
-                value={submitterEmail}
-                onChange={(e) => setSubmitterEmail(e.target.value)}
-                className="border-gray-200 focus:border-[#0055FF]"
-              />
+              <Input placeholder="Your name" value={submitterName} onChange={(e) => setSubmitterName(e.target.value)} className="border-gray-200 focus:border-[#0055FF]" />
+              <Input placeholder="Your email" type="email" value={submitterEmail} onChange={(e) => setSubmitterEmail(e.target.value)} className="border-gray-200 focus:border-[#0055FF]" />
               <Button
                 onClick={handleGeneratePdf}
                 disabled={isSubmitting || templateLoading}
@@ -650,6 +641,20 @@ export default function BoardBuilder() {
           </div>
         </div>
       </div>
+
+      {/* Hidden full-size capture div for html2canvas */}
+      <div
+        ref={captureRef}
+        style={{
+          position: "fixed",
+          left: "-9999px",
+          top: 0,
+          width: dim.pxW,
+          height: dim.pxH,
+          pointerEvents: "none",
+          overflow: "hidden",
+        }}
+      />
     </div>
   );
 }
@@ -675,13 +680,7 @@ function ControlSection({
         </div>
         <ChevronDown size={16} className={`text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
       </button>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateRows: isOpen ? "1fr" : "0fr",
-          transition: "grid-template-rows 0.22s ease",
-        }}
-      >
+      <div style={{ display: "grid", gridTemplateRows: isOpen ? "1fr" : "0fr", transition: "grid-template-rows 0.22s ease" }}>
         <div style={{ overflow: "hidden" }}>
           <div className="px-4 pb-4 pt-2 bg-white border-t border-gray-50">
             {children}

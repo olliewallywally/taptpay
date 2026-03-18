@@ -76,8 +76,10 @@ export default function Login() {
           title: "Welcome back!",
           description: "You have been successfully logged in.",
         });
-        
-        setLocation("/dashboard");
+
+        const params = new URLSearchParams(window.location.search);
+        const returnTo = params.get("returnTo");
+        setLocation(returnTo || "/dashboard");
       } else {
         localStorage.setItem("adminAuthToken", result.token);
         localStorage.setItem("adminUser", JSON.stringify(result.user));
