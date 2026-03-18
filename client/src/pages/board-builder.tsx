@@ -15,10 +15,11 @@ import {
 } from "lucide-react";
 import jsPDF from "jspdf";
 
-type LayoutKey = "taptpay-a4-portrait" | "a4-portrait" | "a4-landscape" | "a6-portrait" | "a6-landscape";
+type LayoutKey = "taptpay-a4-portrait" | "taptpay-a4-landscape" | "a4-portrait" | "a4-landscape" | "a6-portrait" | "a6-landscape";
 
 const LAYOUTS: Record<LayoutKey, { label: string; mmW: number; mmH: number; pxW: number; pxH: number; aspect: number; branded?: boolean }> = {
-  "taptpay-a4-portrait": { label: "TaptPay A4", mmW: 210, mmH: 297, pxW: 794, pxH: 1123, aspect: 297 / 210, branded: true },
+  "taptpay-a4-portrait":  { label: "TaptPay A4 Portrait",  mmW: 210, mmH: 297, pxW: 794,  pxH: 1123, aspect: 297 / 210, branded: true },
+  "taptpay-a4-landscape": { label: "TaptPay A4 Landscape", mmW: 297, mmH: 210, pxW: 1123, pxH: 794,  aspect: 210 / 297, branded: true },
   "a4-portrait":  { label: "A4 Portrait",  mmW: 210, mmH: 297, pxW: 794,  pxH: 1123, aspect: 297 / 210 },
   "a4-landscape": { label: "A4 Landscape", mmW: 297, mmH: 210, pxW: 1123, pxH: 794,  aspect: 210 / 297 },
   "a6-portrait":  { label: "A6 Portrait",  mmW: 105, mmH: 148, pxW: 397,  pxH: 559,  aspect: 148 / 105 },
@@ -308,7 +309,7 @@ export default function BoardBuilder() {
 
   // Pre-populate business name from merchant record (not used in TaptPay layout)
   useEffect(() => {
-    if (layout === "taptpay-a4-portrait") {
+    if (layout === "taptpay-a4-portrait" || layout === "taptpay-a4-landscape") {
       setBusinessName("");
       return;
     }
@@ -590,19 +591,31 @@ export default function BoardBuilder() {
 
             <ControlSection icon={<Layout size={16} />} title="Layout" isOpen={openSection === "layout"} onToggle={() => toggle("layout")}>
               <div className="space-y-2">
-                {/* Branded template — full width, prominent */}
-                <button
-                  onClick={() => setLayout("taptpay-a4-portrait")}
-                  className={`w-full border-2 rounded-xl p-3 flex items-center gap-3 text-left transition-all ${layout === "taptpay-a4-portrait" ? "border-[#00f1d7] bg-[#00f1d7]/5" : "border-gray-200 hover:border-gray-300"}`}
-                >
-                  <div className={`border-2 rounded flex-shrink-0 w-7 h-9 ${layout === "taptpay-a4-portrait" ? "border-[#00f1d7]" : "border-gray-300"}`} />
-                  <div>
-                    <div className={`text-xs font-semibold ${layout === "taptpay-a4-portrait" ? "text-[#00f1d7]" : "text-gray-700"}`}>TaptPay A4</div>
-                    <div className="text-[10px] text-gray-400 mt-0.5">Official branded design</div>
-                  </div>
-                  <span className="ml-auto text-[10px] bg-[#00f1d7]/15 text-[#00b8a9] px-2 py-0.5 rounded-full font-medium">Recommended</span>
-                </button>
+                {/* TaptPay branded templates — 2-column grid */}
+                <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide px-0.5">TaptPay Official</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {(["taptpay-a4-portrait", "taptpay-a4-landscape"] as LayoutKey[]).map((key) => {
+                    const isPortrait = key === "taptpay-a4-portrait";
+                    const active = layout === key;
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => setLayout(key)}
+                        className={`relative border-2 rounded-xl p-3 flex flex-col items-center gap-2 text-left transition-all ${active ? "border-[#00f1d7] bg-[#00f1d7]/5" : "border-gray-200 hover:border-gray-300"}`}
+                      >
+                        <div className={`border-2 rounded mx-auto flex-shrink-0 ${isPortrait ? "w-7 h-9" : "w-9 h-7"} ${active ? "border-[#00f1d7]" : "border-gray-300"}`} />
+                        <div className="text-center">
+                          <div className={`text-[11px] font-semibold leading-tight ${active ? "text-[#00f1d7]" : "text-gray-700"}`}>{isPortrait ? "A4 Portrait" : "A4 Landscape"}</div>
+                        </div>
+                        {key === "taptpay-a4-portrait" && (
+                          <span className="text-[9px] bg-[#00f1d7]/15 text-[#00b8a9] px-1.5 py-0.5 rounded-full font-medium">Recommended</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
                 {/* Generic templates — 2-column grid */}
+                <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide px-0.5 pt-1">Blank</p>
                 <div className="grid grid-cols-2 gap-2">
                   {(Object.keys(LAYOUTS) as LayoutKey[]).filter((k) => !LAYOUTS[k].branded).map((key) => (
                     <button
@@ -716,7 +729,7 @@ export default function BoardBuilder() {
 
             <ControlSection icon={<Type size={16} />} title="Text" isOpen={openSection === "text"} onToggle={() => toggle("text")}>
               <div className="space-y-3">
-                {layout !== "taptpay-a4-portrait" && (
+                {layout !== "taptpay-a4-portrait" && layout !== "taptpay-a4-landscape" && (
                   <div>
                     <Label className="text-xs text-gray-500 mb-1 block">Business Name</Label>
                     <Input value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Your Business Name" className="border-gray-200 focus:border-[#0055FF]" />
