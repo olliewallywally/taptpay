@@ -7,7 +7,7 @@ import { TerminalFeaturesSection } from "@/components/TerminalFeaturesSection";
 import { PricingSection } from "@/components/PricingSection";
 import { FinalCTASection } from "@/components/FinalCTASection";
 import { SEOHead } from "@/components/SEOHead";
-import { ArrowRight, Smartphone, DollarSign, Zap, Shield, QrCode, Wifi } from "lucide-react";
+import { ArrowRight, Smartphone, DollarSign, Zap, Shield, QrCode, Wifi, Printer, Palette, Type } from "lucide-react";
 
 import logoImage from "@assets/logo_1762915255857.png";
 
@@ -81,6 +81,8 @@ export function LandingPage() {
       <WhyTaptPaySection onGetStarted={() => setLocation("/login")} />
 
       <TerminalFeaturesSection />
+
+      <BoardBuilderSection onGetStarted={() => setLocation("/login")} />
 
       <PricingSection />
 
@@ -177,6 +179,51 @@ function WhyTaptPaySection({ onGetStarted }: { onGetStarted: () => void }) {
             <ArrowRight className="w-5 h-5" />
           </button>
           <p className="text-sm text-gray-500 mt-3">No credit card required · Set up in under 5 minutes · 100% Kiwi owned</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function BoardBuilderSection({ onGetStarted }: { onGetStarted: () => void }) {
+  const features = [
+    { icon: QrCode,  title: "Your QR, your brand", description: "Choose which Tapt Stone or payment link to display on your board — each stone gets its own unique QR code." },
+    { icon: Palette, title: "Custom colours & logo", description: "Match your brand perfectly with a full colour picker and logo upload. Choose from 4 paper layouts: A4 or A6, portrait or landscape." },
+    { icon: Type,    title: "Google Fonts & custom fonts", description: "Pick from 10 curated Google Fonts or upload your own .ttf / .otf file to keep your typography on-brand." },
+    { icon: Printer, title: "Print-ready PDF", description: "We generate a high-resolution PDF and send it straight to our print team — just approve the preview and hit send." },
+  ];
+  return (
+    <section className="py-20 px-6 bg-white">
+      <div className="max-w-6xl mx-auto">
+        <div className="text-center mb-14">
+          <span className="inline-block text-xs font-semibold tracking-widest uppercase text-[#0055FF] bg-[#0055FF]/10 px-3 py-1 rounded-full mb-4">For merchants</span>
+          <h2 className="text-4xl md:text-5xl font-light text-gray-900 mb-4 lowercase">payment board builder</h2>
+          <p className="text-lg text-gray-500 max-w-2xl mx-auto">
+            Design your own printed payment sign in minutes. Live preview, fully customisable, ready to print.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+          {features.map((f) => (
+            <div key={f.title} className="flex gap-4 p-5 rounded-2xl bg-gray-50 border border-gray-100">
+              <div className="w-10 h-10 rounded-xl bg-[#0055FF]/10 flex items-center justify-center flex-shrink-0">
+                <f.icon className="w-5 h-5 text-[#0055FF]" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-1">{f.title}</h3>
+                <p className="text-sm text-gray-500">{f.description}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="text-center">
+          <button
+            onClick={onGetStarted}
+            className="bg-[#0055FF] hover:bg-[#0044DD] text-white font-medium px-10 py-3.5 rounded-full text-base transition-all transform hover:scale-105 shadow-lg inline-flex items-center gap-2 lowercase"
+          >
+            build your board
+            <ArrowRight className="w-5 h-5" />
+          </button>
+          <p className="text-sm text-gray-400 mt-3">Available to all TaptPay merchants — sign in to get started</p>
         </div>
       </div>
     </section>

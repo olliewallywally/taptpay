@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { getCurrentMerchantId } from "@/lib/auth";
-import { Home, Package, Receipt, BarChart3, SlidersHorizontal, Terminal } from "lucide-react";
+import { Home, Package, Receipt, BarChart3, SlidersHorizontal, Terminal, Printer, ArrowRight } from "lucide-react";
 
 interface CircularProgressProps {
   percentage: number;
@@ -345,7 +345,7 @@ export default function Dashboard() {
         </div>
 
         {/* Total Revenue Block */}
-        <div className="bg-white rounded-2xl sm:rounded-3xl md:rounded-[28px] p-4 sm:p-8 md:p-10 flex items-center justify-between shadow-lg mb-12 md:mb-16 transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] cursor-pointer" data-testid="card-total-revenue">
+        <div className="bg-white rounded-2xl sm:rounded-3xl md:rounded-[28px] p-4 sm:p-8 md:p-10 flex items-center justify-between shadow-lg mb-4 sm:mb-6 transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] cursor-pointer" data-testid="card-total-revenue">
           <div className="flex-1">
             <div className="text-[#3B3D53] text-2xl sm:text-4xl md:text-5xl mb-1 sm:mb-2">${totalRevenue.toFixed(2)}</div>
             <div className="text-[#161A41] opacity-50 text-xs sm:text-base md:text-lg">Total Revenue</div>
@@ -356,6 +356,24 @@ export default function Dashboard() {
             <div className="text-[#161A41] opacity-50 text-xs sm:text-base">Transactions</div>
           </div>
         </div>
+
+        {/* Board Builder Card */}
+        <button
+          onClick={() => setLocation('/board-builder')}
+          className="w-full bg-[#0055FF] rounded-2xl sm:rounded-3xl p-4 sm:p-6 flex items-center justify-between mb-12 md:mb-16 transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] text-left"
+          data-testid="card-board-builder"
+        >
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-white/20 flex items-center justify-center">
+              <Printer className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+            </div>
+            <div>
+              <div className="text-white font-semibold text-sm sm:text-base">Payment Board Builder</div>
+              <div className="text-white/70 text-xs sm:text-sm">Design & print your custom payment sign</div>
+            </div>
+          </div>
+          <ArrowRight className="w-5 h-5 text-white/80 flex-shrink-0" />
+        </button>
       </div>
     </div>
   );

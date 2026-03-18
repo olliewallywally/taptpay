@@ -29,6 +29,7 @@ import LegalPage from "@/pages/legal";
 import SplitPayment from "@/pages/split-payment";
 import PaymentResult from "@/pages/payment-result";
 import Checkout from "@/pages/checkout";
+import BoardBuilder from "@/pages/board-builder";
 
 import { PageTransition } from "@/components/page-transition";
 import { BottomNavigation } from "@/components/bottom-navigation";
@@ -184,6 +185,11 @@ function Router() {
         <Route path="/nfc">
           <ProtectedRoute>
             <NFCPayment />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/board-builder">
+          <ProtectedRoute>
+            <BoardBuilder />
           </ProtectedRoute>
         </Route>
         
