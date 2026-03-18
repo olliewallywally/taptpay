@@ -166,7 +166,7 @@ function buildModifiedSvg(opts: BuildSvgOpts): string {
   // Payment instruction: multi-line support via <tspan> elements
   const instrEl = doc.getElementById("text-instructions");
   if (instrEl) {
-    const rawInstr = instructions || "simply tap or scan to pay";
+    const rawInstr = instructions || "simply tap or scan\nto pay";
     const instrLines = rawInstr.split("\n");
     const instrLineHeight = 188; // matches original SVG dy spacing
     const instrX = instrEl.getAttribute("x") || "1192.22";
@@ -263,7 +263,7 @@ export default function BoardBuilder() {
   const [textHexInput, setTextHexInput] = useState("#888888");
   const [businessName, setBusinessName] = useState("");
   const [tagline, setTagline] = useState("");
-  const [instructions, setInstructions] = useState("simply tap or scan to pay");
+  const [instructions, setInstructions] = useState("simply tap or scan\nto pay");
   const [footer, setFooter] = useState("Powered by TaptPay");
   const [logoDataUrl, setLogoDataUrl] = useState("");
   const [selectedFont, setSelectedFont] = useState("Outfit");
