@@ -77,6 +77,8 @@ interface BuildSvgOpts {
   svgTemplate: string;
   layout: LayoutKey;
   primaryColor: string;
+  backgroundColor: string;
+  textColor: string;
   businessName: string;
   tagline: string;
   instructions: string;
@@ -90,7 +92,8 @@ interface BuildSvgOpts {
 
 function buildModifiedSvg(opts: BuildSvgOpts): string {
   const {
-    svgTemplate, layout, primaryColor, businessName, tagline, instructions,
+    svgTemplate, layout, primaryColor, backgroundColor, textColor,
+    businessName, tagline, instructions,
     footer, qrDataUrl, logoDataUrl, selectedFont, customFontDataUrl, forCapture = false,
   } = opts;
 
@@ -123,16 +126,18 @@ function buildModifiedSvg(opts: BuildSvgOpts): string {
   };
 
   const styleEl = getOrCreate("font-style", "style", defsEl);
+  const bgVar = backgroundColor ? `--background: ${backgroundColor};` : "";
+  const txtVar = textColor ? `--text: ${textColor};` : "";
   if (customFontDataUrl) {
     styleEl.textContent = `
-      svg { --primary: ${primaryColor}; }
+      svg { --primary: ${primaryColor}; ${bgVar} ${txtVar} }
       @font-face { font-family: '__CustomFont__'; src: url('${customFontDataUrl}'); }
       text, tspan { font-family: '__CustomFont__', sans-serif !important; }
     `;
   } else {
     const gfUrl = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(selectedFont)}:wght@400;600;700&display=swap`;
     styleEl.textContent = `
-      svg { --primary: ${primaryColor}; }
+      svg { --primary: ${primaryColor}; ${bgVar} ${txtVar} }
       @import url('${gfUrl}');
       text, tspan { font-family: '${selectedFont}', sans-serif; }
     `;
@@ -252,6 +257,10 @@ export default function BoardBuilder() {
   const [layout, setLayout] = useState<LayoutKey>("taptpay-a4-portrait");
   const [primaryColor, setPrimaryColor] = useState("#00f1d7");
   const [hexInput, setHexInput] = useState("#00f1d7");
+  const [backgroundColor, setBackgroundColor] = useState("");
+  const [bgHexInput, setBgHexInput] = useState("");
+  const [textColor, setTextColor] = useState("#888888");
+  const [textHexInput, setTextHexInput] = useState("#888888");
   const [businessName, setBusinessName] = useState("");
   const [tagline, setTagline] = useState("");
   const [instructions, setInstructions] = useState("Scan to Pay");
@@ -327,6 +336,8 @@ export default function BoardBuilder() {
     svgTemplate,
     layout,
     primaryColor,
+    backgroundColor,
+    textColor,
     businessName,
     tagline,
     instructions,
@@ -340,7 +351,7 @@ export default function BoardBuilder() {
   // Memoized preview SVG (scaled to fit container)
   const previewSvg = useMemo(
     () => buildModifiedSvg({ ...svgOpts, forCapture: false }),
-    [svgTemplate, layout, primaryColor, businessName, tagline, instructions, footer, qrDataUrl, logoDataUrl, selectedFont, customFontDataUrl]
+    [svgTemplate, layout, primaryColor, backgroundColor, textColor, businessName, tagline, instructions, footer, qrDataUrl, logoDataUrl, selectedFont, customFontDataUrl]
   );
 
   const dim = LAYOUTS[layout];
@@ -563,28 +574,81 @@ export default function BoardBuilder() {
             </ControlSection>
 
             <ControlSection icon={<Palette size={16} />} title="Colour" isOpen={openSection === "colour"} onToggle={() => toggle("colour")}>
-              <div className="space-y-3">
-                <div className="flex flex-wrap gap-2">
-                  {PRESET_COLORS.map((c) => (
-                    <button
-                      key={c.value}
-                      title={c.label}
-                      onClick={() => handleColorChange(c.value)}
-                      className={`w-8 h-8 rounded-full border-2 transition-all ${primaryColor === c.value ? "border-gray-900 scale-110" : "border-transparent"}`}
-                      style={{ backgroundColor: c.value }}
-                    />
-                  ))}
+              <div className="space-y-4">
+
+                {/* Accent colour */}
+                <div>
+                  <Label className="text-xs text-gray-500 mb-2 block">Accent</Label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {PRESET_COLORS.map((c) => (
+                      <button
+                        key={c.value}
+                        title={c.label}
+                        onClick={() => handleColorChange(c.value)}
+                        className={`w-7 h-7 rounded-full border-2 transition-all ${primaryColor === c.value ? "border-gray-900 scale-110" : "border-transparent"}`}
+                        style={{ backgroundColor: c.value }}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full border border-gray-200 flex-shrink-0" style={{ backgroundColor: primaryColor }} />
+                    <Input value={hexInput} onChange={(e) => handleHexInput(e.target.value)} placeholder="#00f1d7" className="font-mono text-xs border-gray-200 focus:border-[#0055FF]" maxLength={7} />
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full border border-gray-200 flex-shrink-0" style={{ backgroundColor: primaryColor }} />
-                  <Input
-                    value={hexInput}
-                    onChange={(e) => handleHexInput(e.target.value)}
-                    placeholder="#0055FF"
-                    className="font-mono text-sm border-gray-200 focus:border-[#0055FF]"
-                    maxLength={7}
-                  />
+
+                {/* Background colour */}
+                <div>
+                  <Label className="text-xs text-gray-500 mb-2 block">Background</Label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {[
+                      { label: "None",        value: "" },
+                      { label: "White",       value: "#ffffff" },
+                      { label: "Cream",       value: "#fdf6e3" },
+                      { label: "Light Grey",  value: "#f5f5f5" },
+                      { label: "Dark Navy",   value: "#1a1a2e" },
+                      { label: "Black",       value: "#111827" },
+                    ].map((c) => (
+                      <button
+                        key={c.value}
+                        title={c.label}
+                        onClick={() => { setBackgroundColor(c.value); setBgHexInput(c.value); }}
+                        className={`w-7 h-7 rounded-full border-2 transition-all ${backgroundColor === c.value ? "border-gray-900 scale-110" : "border-gray-200"}`}
+                        style={{ backgroundColor: c.value || "transparent", backgroundImage: c.value ? "none" : "linear-gradient(45deg,#ccc 25%,transparent 25%,transparent 75%,#ccc 75%),linear-gradient(45deg,#ccc 25%,transparent 25%,transparent 75%,#ccc 75%)", backgroundSize: "8px 8px", backgroundPosition: "0 0,4px 4px" }}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full border border-gray-200 flex-shrink-0" style={{ backgroundColor: backgroundColor || "transparent" }} />
+                    <Input value={bgHexInput} onChange={(e) => { setBgHexInput(e.target.value); if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value) || e.target.value === "") setBackgroundColor(e.target.value); }} placeholder="None" className="font-mono text-xs border-gray-200 focus:border-[#0055FF]" maxLength={7} />
+                  </div>
                 </div>
+
+                {/* Text colour */}
+                <div>
+                  <Label className="text-xs text-gray-500 mb-2 block">Text</Label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {[
+                      { label: "Grey",    value: "#888888" },
+                      { label: "Dark",    value: "#111827" },
+                      { label: "White",   value: "#ffffff" },
+                      { label: "Teal",    value: "#00f1d7" },
+                      { label: "Navy",    value: "#1a1a2e" },
+                    ].map((c) => (
+                      <button
+                        key={c.value}
+                        title={c.label}
+                        onClick={() => { setTextColor(c.value); setTextHexInput(c.value); }}
+                        className={`w-7 h-7 rounded-full border-2 transition-all ${textColor === c.value ? "border-gray-900 scale-110" : "border-transparent"}`}
+                        style={{ backgroundColor: c.value }}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full border border-gray-200 flex-shrink-0" style={{ backgroundColor: textColor }} />
+                    <Input value={textHexInput} onChange={(e) => { setTextHexInput(e.target.value); if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) setTextColor(e.target.value); }} placeholder="#888888" className="font-mono text-xs border-gray-200 focus:border-[#0055FF]" maxLength={7} />
+                  </div>
+                </div>
+
               </div>
             </ControlSection>
 
