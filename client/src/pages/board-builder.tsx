@@ -172,6 +172,7 @@ export default function BoardBuilder() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const captureRef = useRef<HTMLDivElement>(null);
+  const [mobileTab, setMobileTab] = useState<"edit" | "preview">("edit");
 
   const merchantId = getCurrentMerchantId();
   const token = localStorage.getItem("authToken") ?? "";
@@ -442,9 +443,25 @@ export default function BoardBuilder() {
         <span className="text-xs bg-[#0055FF]/10 text-[#0055FF] px-2 py-0.5 rounded-full font-medium ml-1">Beta</span>
       </div>
 
+      {/* Mobile Tab Bar */}
+      <div className="lg:hidden sticky top-[57px] z-10 bg-white border-b border-gray-200 flex">
+        <button
+          onClick={() => setMobileTab("edit")}
+          className={`flex-1 py-2.5 text-sm font-medium transition-colors border-b-2 ${mobileTab === "edit" ? "text-[#0055FF] border-[#0055FF]" : "text-gray-500 border-transparent"}`}
+        >
+          Edit
+        </button>
+        <button
+          onClick={() => setMobileTab("preview")}
+          className={`flex-1 py-2.5 text-sm font-medium transition-colors border-b-2 ${mobileTab === "preview" ? "text-[#0055FF] border-[#0055FF]" : "text-gray-500 border-transparent"}`}
+        >
+          Preview
+        </button>
+      </div>
+
       <div className="flex flex-col lg:flex-row min-h-[calc(100vh-57px)]">
         {/* LEFT: Controls */}
-        <div className="w-full lg:w-[340px] xl:w-[380px] bg-white border-r border-gray-200 overflow-y-auto flex-shrink-0">
+        <div className={`w-full lg:w-[340px] xl:w-[380px] bg-white border-r border-gray-200 overflow-y-auto flex-shrink-0 ${mobileTab === "preview" ? "hidden lg:block" : "block"}`}>
           <div className="p-4 space-y-1">
 
             <ControlSection icon={<QrCode size={16} />} title="Payment QR Code" isOpen={openSection === "stone"} onToggle={() => toggle("stone")}>
@@ -580,18 +597,37 @@ export default function BoardBuilder() {
               </div>
             </ControlSection>
           </div>
+
+          {/* Mobile: See Preview button */}
+          <div className="lg:hidden p-4 pt-2">
+            <Button
+              onClick={() => setMobileTab("preview")}
+              className="w-full bg-[#0055FF] hover:bg-[#0044DD] text-white rounded-xl font-medium"
+            >
+              See Preview
+            </Button>
+          </div>
         </div>
 
         {/* RIGHT: Live Preview */}
-        <div className="flex-1 flex flex-col items-center bg-gray-100 p-6 gap-8">
-          <div className="text-center">
-            <p className="text-sm text-gray-500 mb-4 font-medium">
+        <div className={`flex-1 flex-col items-center bg-gray-100 p-3 lg:p-6 gap-6 lg:gap-8 ${mobileTab === "edit" ? "hidden lg:flex" : "flex"}`}>
+          {/* Mobile: Back to Edit button */}
+          <div className="lg:hidden w-full max-w-[420px]">
+            <Button variant="outline" size="sm" onClick={() => setMobileTab("edit")} className="gap-1.5 text-gray-600">
+              <ArrowLeft size={14} /> Back to Edit
+            </Button>
+          </div>
+
+          <div className="w-full max-w-[420px] lg:max-w-none text-center">
+            <p className="text-sm text-gray-500 mb-3 lg:mb-4 font-medium">
               Live Preview — {dim.label} ({dim.mmW}×{dim.mmH}mm)
             </p>
             <div
               style={{
-                width: Math.round(previewW),
-                height: Math.round(previewH),
+                width: "100%",
+                maxWidth: Math.round(previewW),
+                aspectRatio: `${dim.mmW} / ${dim.mmH}`,
+                margin: "0 auto",
                 overflow: "hidden",
                 boxShadow: "0 8px 40px rgba(0,0,0,0.18)",
                 borderRadius: 8,
@@ -617,7 +653,7 @@ export default function BoardBuilder() {
           </div>
 
           {/* Submit section */}
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+          <div className="w-full max-w-[420px] lg:max-w-md bg-white rounded-2xl shadow-sm border border-gray-200 p-4 lg:p-6">
             <h3 className="font-semibold text-gray-900 mb-1">Ready to print?</h3>
             <p className="text-sm text-gray-500 mb-4">We'll email your board design as a PDF ready for printing.</p>
             <div className="space-y-3">
