@@ -15,11 +15,13 @@ import {
 } from "lucide-react";
 import jsPDF from "jspdf";
 
-type LayoutKey = "taptpay-a4-portrait" | "taptpay-a4-landscape" | "taptpay-a6-portrait" | "taptpay-a6-landscape";
+type LayoutKey = "taptpay-a4-portrait" | "taptpay-a4-landscape" | "taptpay-a5-portrait" | "taptpay-a5-landscape" | "taptpay-a6-portrait" | "taptpay-a6-landscape";
 
 const LAYOUTS: Record<LayoutKey, { label: string; mmW: number; mmH: number; pxW: number; pxH: number; aspect: number }> = {
   "taptpay-a4-portrait":  { label: "A4 Portrait",  mmW: 210, mmH: 297, pxW: 794,  pxH: 1123, aspect: 297 / 210 },
   "taptpay-a4-landscape": { label: "A4 Landscape", mmW: 297, mmH: 210, pxW: 1123, pxH: 794,  aspect: 210 / 297 },
+  "taptpay-a5-portrait":  { label: "A5 Portrait",  mmW: 148, mmH: 210, pxW: 559,  pxH: 794,  aspect: 210 / 148 },
+  "taptpay-a5-landscape": { label: "A5 Landscape", mmW: 210, mmH: 148, pxW: 794,  pxH: 559,  aspect: 148 / 210 },
   "taptpay-a6-portrait":  { label: "A6 Portrait",  mmW: 105, mmH: 148, pxW: 397,  pxH: 559,  aspect: 148 / 105 },
   "taptpay-a6-landscape": { label: "A6 Landscape", mmW: 148, mmH: 105, pxW: 559,  pxH: 397,  aspect: 105 / 148 },
 };
@@ -636,7 +638,7 @@ export default function BoardBuilder() {
 
             <ControlSection icon={<Layout size={16} />} title="Layout" isOpen={openSection === "layout"} onToggle={() => toggle("layout")}>
               <div className="space-y-3">
-                {(["a4", "a6"] as const).map((size) => (
+                {(["a4", "a5", "a6"] as const).map((size) => (
                   <div key={size}>
                     <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-1.5">{size.toUpperCase()}</p>
                     <div className="grid grid-cols-2 gap-2">
