@@ -15,11 +15,13 @@ import {
 } from "lucide-react";
 import jsPDF from "jspdf";
 
-type LayoutKey = "taptpay-a4-portrait" | "taptpay-a4-landscape";
+type LayoutKey = "taptpay-a4-portrait" | "taptpay-a4-landscape" | "taptpay-a6-portrait" | "taptpay-a6-landscape";
 
 const LAYOUTS: Record<LayoutKey, { label: string; mmW: number; mmH: number; pxW: number; pxH: number; aspect: number }> = {
   "taptpay-a4-portrait":  { label: "A4 Portrait",  mmW: 210, mmH: 297, pxW: 794,  pxH: 1123, aspect: 297 / 210 },
   "taptpay-a4-landscape": { label: "A4 Landscape", mmW: 297, mmH: 210, pxW: 1123, pxH: 794,  aspect: 210 / 297 },
+  "taptpay-a6-portrait":  { label: "A6 Portrait",  mmW: 105, mmH: 148, pxW: 397,  pxH: 559,  aspect: 148 / 105 },
+  "taptpay-a6-landscape": { label: "A6 Landscape", mmW: 148, mmH: 105, pxW: 559,  pxH: 397,  aspect: 105 / 148 },
 };
 
 const PRESET_COLORS = [
@@ -633,26 +635,34 @@ export default function BoardBuilder() {
             </ControlSection>
 
             <ControlSection icon={<Layout size={16} />} title="Layout" isOpen={openSection === "layout"} onToggle={() => toggle("layout")}>
-              <div className="grid grid-cols-2 gap-2">
-                {(Object.keys(LAYOUTS) as LayoutKey[]).map((key) => {
-                  const isPortrait = key === "taptpay-a4-portrait";
-                  const active = layout === key;
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => setLayout(key)}
-                      className={`relative border-2 rounded-xl p-3 flex flex-col items-center gap-2 transition-all ${active ? "border-[#00f1d7] bg-[#00f1d7]/5" : "border-gray-200 hover:border-gray-300"}`}
-                    >
-                      <div className={`border-2 rounded mx-auto flex-shrink-0 ${isPortrait ? "w-7 h-9" : "w-9 h-7"} ${active ? "border-[#00f1d7]" : "border-gray-300"}`} />
-                      <div className={`text-[11px] font-semibold leading-tight ${active ? "text-[#00f1d7]" : "text-gray-700"}`}>
-                        {LAYOUTS[key].label}
-                      </div>
-                      {isPortrait && (
-                        <span className="text-[9px] bg-[#00f1d7]/15 text-[#00b8a9] px-1.5 py-0.5 rounded-full font-medium">Recommended</span>
-                      )}
-                    </button>
-                  );
-                })}
+              <div className="space-y-3">
+                {(["a4", "a6"] as const).map((size) => (
+                  <div key={size}>
+                    <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-1.5">{size.toUpperCase()}</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(["portrait", "landscape"] as const).map((orientation) => {
+                        const key = `taptpay-${size}-${orientation}` as LayoutKey;
+                        const isPortrait = orientation === "portrait";
+                        const active = layout === key;
+                        return (
+                          <button
+                            key={key}
+                            onClick={() => setLayout(key)}
+                            className={`relative border-2 rounded-xl p-3 flex flex-col items-center gap-2 transition-all ${active ? "border-[#00f1d7] bg-[#00f1d7]/5" : "border-gray-200 hover:border-gray-300"}`}
+                          >
+                            <div className={`border-2 rounded mx-auto flex-shrink-0 ${isPortrait ? "w-7 h-9" : "w-9 h-7"} ${active ? "border-[#00f1d7]" : "border-gray-300"}`} />
+                            <div className={`text-[11px] font-semibold leading-tight ${active ? "text-[#00f1d7]" : "text-gray-700"}`}>
+                              {isPortrait ? "Portrait" : "Landscape"}
+                            </div>
+                            {key === "taptpay-a4-portrait" && (
+                              <span className="text-[9px] bg-[#00f1d7]/15 text-[#00b8a9] px-1.5 py-0.5 rounded-full font-medium">Recommended</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
             </ControlSection>
 
