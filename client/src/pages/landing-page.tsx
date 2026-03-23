@@ -63,9 +63,9 @@ function ScrambleHeading({
   );
 }
 
-function StickySection({ children, zIndex }: { children: React.ReactNode; zIndex: number }) {
+function StickySection({ children, zIndex, peek = true }: { children: React.ReactNode; zIndex: number; peek?: boolean }) {
   return (
-    <div style={{ position: "sticky", top: 0, zIndex }} className="px-3 md:px-4">
+    <div style={{ position: "sticky", top: 0, zIndex, paddingTop: peek ? 12 : 0 }}>
       {children}
     </div>
   );
@@ -670,8 +670,8 @@ export function LandingPage() {
 
       <Nav onGetStarted={goLogin} />
 
-      <div className="flex flex-col gap-3 md:gap-4 px-3 md:px-4 pb-3 md:pb-4">
-        <StickySection zIndex={10}>
+      <div className="px-3 md:px-4 pb-3 md:pb-4">
+        <StickySection zIndex={10} peek={false}>
           <HeroCard onGetStarted={goLogin} />
         </StickySection>
 
