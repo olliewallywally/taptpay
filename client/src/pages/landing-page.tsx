@@ -71,6 +71,87 @@ function StickySection({ children, zIndex, peek = true }: { children: React.Reac
   );
 }
 
+function MagneticButton({ children, className, onClick, style, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  const elRef = useRef<HTMLButtonElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!elRef.current || !textRef.current) return;
+    const { left, top, width, height } = elRef.current.getBoundingClientRect();
+    const dX = e.clientX - (left + width / 2);
+    const dY = e.clientY - (top + height / 2);
+    textRef.current.style.transform = `translate(${dX * 0.4}px, ${dY * 0.4}px)`;
+  };
+
+  const handleMouseLeave = () => {
+    if (textRef.current) textRef.current.style.transform = "translate(0px, 0px)";
+  };
+
+  return (
+    <button
+      ref={elRef}
+      className={className}
+      onClick={onClick}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      style={style}
+      {...props}
+    >
+      <span
+        ref={textRef}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "inherit",
+          pointerEvents: "none",
+          transition: "transform 0.4s cubic-bezier(0.23, 1, 0.32, 1)",
+        }}
+      >
+        {children}
+      </span>
+    </button>
+  );
+}
+
+function MagneticLink({ children, className, href, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) {
+  const elRef = useRef<HTMLAnchorElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!elRef.current || !textRef.current) return;
+    const { left, top, width, height } = elRef.current.getBoundingClientRect();
+    const dX = e.clientX - (left + width / 2);
+    const dY = e.clientY - (top + height / 2);
+    textRef.current.style.transform = `translate(${dX * 0.4}px, ${dY * 0.4}px)`;
+  };
+
+  const handleMouseLeave = () => {
+    if (textRef.current) textRef.current.style.transform = "translate(0px, 0px)";
+  };
+
+  return (
+    <a
+      ref={elRef}
+      href={href}
+      className={className}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      {...props}
+    >
+      <span
+        ref={textRef}
+        style={{
+          display: "inline-block",
+          pointerEvents: "none",
+          transition: "transform 0.4s cubic-bezier(0.23, 1, 0.32, 1)",
+        }}
+      >
+        {children}
+      </span>
+    </a>
+  );
+}
+
 function Nav({ onGetStarted }: { onGetStarted: () => void }) {
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
@@ -85,12 +166,12 @@ function Nav({ onGetStarted }: { onGetStarted: () => void }) {
       }`}
     >
       <img src={logoImage} alt="TaptPay" className="h-7 md:h-8" />
-      <button
+      <MagneticButton
         onClick={onGetStarted}
-        className="bg-[#00f1d7] hover:bg-[#00d9c0] text-[#000a36] font-semibold px-5 py-2 rounded-full text-sm transition-all hover:scale-105"
+        className="bg-[#00f1d7] hover:bg-[#00d9c0] text-[#000a36] font-semibold px-5 py-2 rounded-full text-sm transition-colors"
       >
         get started
-      </button>
+      </MagneticButton>
     </nav>
   );
 }
@@ -111,13 +192,13 @@ function HeroCard({ onGetStarted }: { onGetStarted: () => void }) {
         <p className="text-sm md:text-base text-[#00f1d7] font-medium tracking-wide mb-12">
           New Zealand's lowest-cost EFTPOS alternative — no hardware required
         </p>
-        <button
+        <MagneticButton
           onClick={onGetStarted}
-          className="bg-[#00f1d7] hover:bg-[#00d9c0] text-[#000a36] font-semibold px-10 py-4 rounded-full text-base md:text-lg transition-all hover:scale-105 shadow-lg flex items-center gap-2 lowercase"
+          className="bg-[#00f1d7] hover:bg-[#00d9c0] text-[#000a36] font-semibold px-10 py-4 rounded-full text-base md:text-lg transition-colors shadow-lg flex items-center gap-2 lowercase"
           data-testid="button-get-started"
         >
           get started <ArrowRight className="w-5 h-5" />
-        </button>
+        </MagneticButton>
         <p className="mt-5 text-white/40 text-xs tracking-widest uppercase">
           100% KIWI OWNED AND OPERATED
         </p>
@@ -480,12 +561,12 @@ function WhyTaptPayCard({ onGetStarted }: { onGetStarted: () => void }) {
           ))}
         </div>
         <div className="text-center mt-14">
-          <button
+          <MagneticButton
             onClick={onGetStarted}
-            className="bg-[#00f1d7] hover:bg-[#00d9c0] text-[#000a36] font-semibold px-10 py-4 rounded-full text-base transition-all hover:scale-105 shadow-lg inline-flex items-center gap-2 lowercase"
+            className="bg-[#00f1d7] hover:bg-[#00d9c0] text-[#000a36] font-semibold px-10 py-4 rounded-full text-base transition-colors shadow-lg inline-flex items-center gap-2 lowercase"
           >
             start accepting payments today <ArrowRight className="w-5 h-5" />
-          </button>
+          </MagneticButton>
           <p className="text-white/30 text-sm mt-3">No credit card required · Set up in under 5 minutes · 100% Kiwi owned</p>
         </div>
       </div>
@@ -530,12 +611,12 @@ function BoardBuilderCard({ onGetStarted }: { onGetStarted: () => void }) {
           ))}
         </div>
         <div className="text-center">
-          <button
+          <MagneticButton
             onClick={onGetStarted}
-            className="bg-[#00f1d7] hover:bg-[#00d9c0] text-[#000a36] font-semibold px-10 py-4 rounded-full text-base transition-all hover:scale-105 shadow-lg inline-flex items-center gap-2 lowercase"
+            className="bg-[#00f1d7] hover:bg-[#00d9c0] text-[#000a36] font-semibold px-10 py-4 rounded-full text-base transition-colors shadow-lg inline-flex items-center gap-2 lowercase"
           >
             design your board <ArrowRight className="w-5 h-5" />
-          </button>
+          </MagneticButton>
           <p className="text-white/40 text-sm mt-3">Available to all TaptPay merchants — sign in to get started</p>
         </div>
       </div>
@@ -601,12 +682,12 @@ function PricingCard({ onGetStarted }: { onGetStarted: () => void }) {
           ))}
         </div>
         <div className="text-center mt-12">
-          <button
+          <MagneticButton
             onClick={onGetStarted}
-            className="bg-[#00f1d7] hover:bg-[#00d9c0] text-[#000a36] font-semibold px-10 py-4 rounded-full text-base transition-all hover:scale-105 shadow-lg inline-flex items-center gap-2 lowercase"
+            className="bg-[#00f1d7] hover:bg-[#00d9c0] text-[#000a36] font-semibold px-10 py-4 rounded-full text-base transition-colors shadow-lg inline-flex items-center gap-2 lowercase"
           >
             get started for free <ArrowRight className="w-5 h-5" />
-          </button>
+          </MagneticButton>
         </div>
       </div>
     </div>
@@ -624,12 +705,12 @@ function FinalCTACard({ onGetStarted }: { onGetStarted: () => void }) {
         <p className="text-white/65 text-lg mb-10">
           Join hundreds of Kiwi businesses accepting payments the smart way. Set up in minutes, pay only when you get paid.
         </p>
-        <button
+        <MagneticButton
           onClick={onGetStarted}
-          className="bg-[#00f1d7] hover:bg-[#00d9c0] text-[#000a36] font-semibold px-12 py-4 rounded-full text-lg transition-all hover:scale-105 shadow-xl inline-flex items-center gap-2 lowercase"
+          className="bg-[#00f1d7] hover:bg-[#00d9c0] text-[#000a36] font-semibold px-12 py-4 rounded-full text-lg transition-colors shadow-xl inline-flex items-center gap-2 lowercase"
         >
           start free today <ArrowRight className="w-6 h-6" />
-        </button>
+        </MagneticButton>
         <p className="text-white/35 text-sm mt-4">No credit card required · No lock-in contracts · 100% Kiwi owned</p>
       </div>
     </div>
@@ -643,9 +724,9 @@ function FooterCard() {
         <img src={logoImage} alt="TaptPay" className="h-8 mx-auto mb-5 opacity-70" />
         <p className="text-white/30 text-sm">© 2026 TaptPay. All rights reserved.</p>
         <div className="mt-3 flex justify-center gap-4 text-sm text-white/25">
-          <a href="/terms" className="hover:text-white/60 transition-colors">Terms of Service</a>
+          <MagneticLink href="/terms" className="hover:text-white/60 transition-colors">Terms of Service</MagneticLink>
           <span>·</span>
-          <a href="/privacy" className="hover:text-white/60 transition-colors">Privacy Policy</a>
+          <MagneticLink href="/privacy" className="hover:text-white/60 transition-colors">Privacy Policy</MagneticLink>
         </div>
       </div>
     </div>
