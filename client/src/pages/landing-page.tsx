@@ -63,9 +63,20 @@ function ScrambleHeading({
   );
 }
 
-function StickySection({ children, zIndex, peek = true }: { children: React.ReactNode; zIndex: number; peek?: boolean }) {
+function StickySection({ children, zIndex, peek = true, room = "40vh" }: {
+  children: React.ReactNode;
+  zIndex: number;
+  peek?: boolean;
+  room?: string;
+}) {
   return (
-    <div style={{ position: "sticky", top: 0, zIndex, paddingTop: peek ? 12 : 0 }}>
+    <div style={{
+      position: "sticky",
+      top: 0,
+      zIndex,
+      paddingTop: peek ? 12 : 0,
+      paddingBottom: room,
+    }}>
       {children}
     </div>
   );
@@ -638,14 +649,13 @@ const PRICING_PLANS = [
   },
   {
     name: "Enterprise",
-    subtitle: "Over 1,000 transactions per month",
-    price: "Custom pricing",
-    perTx: "Volume discount applies",
+    subtitle: "1000+ transactions and above per month",
+    price: "$19.99",
+    perTx: "per month system fee",
     features: [
-      "Unlimited logins",
-      "Unlimited payment stones",
-      "Dedicated account manager",
-      "Custom integrations & reporting",
+      "10 login's per business",
+      "5-10 payment stones ($29.99 normally)",
+      "$129.99 for set up kit - 5 design requests. (kit includes x5 payment stones, 3 other info signage, x2 magnetic mount)",
     ],
   },
 ];
@@ -752,7 +762,7 @@ export function LandingPage() {
       <Nav onGetStarted={goLogin} />
 
       <div className="px-3 md:px-4 pb-3 md:pb-4">
-        <StickySection zIndex={10} peek={false}>
+        <StickySection zIndex={10} peek={false} room="60vh">
           <HeroCard onGetStarted={goLogin} />
         </StickySection>
 
@@ -792,7 +802,7 @@ export function LandingPage() {
           <FinalCTACard onGetStarted={goLogin} />
         </StickySection>
 
-        <StickySection zIndex={110}>
+        <StickySection zIndex={110} room="0">
           <FooterCard />
         </StickySection>
       </div>
