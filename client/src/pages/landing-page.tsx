@@ -63,11 +63,10 @@ function ScrambleHeading({
   );
 }
 
-function StickySection({ children, zIndex, peek = true, room = "40vh" }: {
+function StickySection({ children, zIndex, peek = true }: {
   children: React.ReactNode;
   zIndex: number;
   peek?: boolean;
-  room?: string;
 }) {
   return (
     <div style={{
@@ -75,7 +74,6 @@ function StickySection({ children, zIndex, peek = true, room = "40vh" }: {
       top: 0,
       zIndex,
       paddingTop: peek ? 12 : 0,
-      paddingBottom: room,
     }}>
       {children}
     </div>
@@ -762,7 +760,7 @@ export function LandingPage() {
       <Nav onGetStarted={goLogin} />
 
       <div className="px-3 md:px-4 pb-3 md:pb-4">
-        <StickySection zIndex={10} peek={false} room="60vh">
+        <StickySection zIndex={10} peek={false}>
           <HeroCard onGetStarted={goLogin} />
         </StickySection>
 
@@ -802,7 +800,7 @@ export function LandingPage() {
           <FinalCTACard onGetStarted={goLogin} />
         </StickySection>
 
-        <StickySection zIndex={110} room="0">
+        <StickySection zIndex={110}>
           <FooterCard />
         </StickySection>
       </div>
