@@ -1,46 +1,31 @@
 import { useLocation } from "wouter";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   ArrowRight, Volume2, VolumeX, DollarSign, Smartphone, QrCode, Zap,
-  Shield, Wifi, Printer, Palette, Type, CheckCircle, ChevronDown
+  Shield, Wifi, Printer, Palette, Type, CheckCircle, ChevronDown,
+  UserPlus, Settings, CreditCard, BarChart3, ChevronLeft, ChevronRight
 } from "lucide-react";
 import { SEOHead } from "@/components/SEOHead";
+import { useScrambleText } from "@/hooks/use-scramble-text";
 import logoImage from "@assets/logo_1762915255857.png";
 import dashboardMockup from "@assets/dashboard_3d_1774258691269.png";
 import paymentMockup from "@assets/payment_page_1774258691269.png";
 import terminalMockup from "@assets/terminal_3d_1774258691270.png";
+import paymentStonesImage from "@assets/pay stone_1762915255862.png";
 
-const SCRAMBLE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$%&";
-
-function useScrambleText(text: string) {
-  const [displayText, setDisplayText] = useState(text);
-  const frameRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const scramble = useCallback(() => {
-    if (frameRef.current) clearInterval(frameRef.current);
-    let iteration = 0;
-    frameRef.current = setInterval(() => {
-      setDisplayText(
-        text
-          .split("")
-          .map((char, i) => {
-            if (char === " ") return " ";
-            if (i < iteration) return text[i];
-            return SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)];
-          })
-          .join("")
-      );
-      iteration += 0.4;
-      if (iteration > text.length) {
-        if (frameRef.current) clearInterval(frameRef.current);
-        setDisplayText(text);
-      }
-    }, 35);
-  }, [text]);
-
-  useEffect(() => () => { if (frameRef.current) clearInterval(frameRef.current); }, []);
-
-  return { displayText, scramble };
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined"
+      ? window.matchMedia("(max-width: 767px)").matches
+      : false
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+  return isMobile;
 }
 
 function ScrambleHeading({
@@ -146,30 +131,27 @@ function HeroCard({ onGetStarted }: { onGetStarted: () => void }) {
 }
 
 function VideoCard() {
+  const isMobile = useIsMobile();
   const [muted, setMuted] = useState(true);
-  const desktopRef = useRef<HTMLVideoElement>(null);
-  const mobileRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   const toggleMute = () => {
     const next = !muted;
-    if (desktopRef.current) desktopRef.current.muted = next;
-    if (mobileRef.current) mobileRef.current.muted = next;
+    if (videoRef.current) videoRef.current.muted = next;
     setMuted(next);
   };
 
   return (
     <div className="rounded-3xl overflow-hidden bg-[#000a36] relative">
       <video
-        ref={desktopRef}
-        className="w-full object-cover hidden md:block"
-        autoPlay loop muted playsInline
-        src="/videos/web.mp4"
-      />
-      <video
-        ref={mobileRef}
-        className="w-full object-cover block md:hidden"
-        autoPlay loop muted playsInline
-        src="/videos/mobile.mp4"
+        key={isMobile ? "mobile" : "desktop"}
+        ref={videoRef}
+        className="w-full object-cover"
+        autoPlay
+        loop
+        muted
+        playsInline
+        src={isMobile ? "/videos/mobile.mp4" : "/videos/web.mp4"}
       />
       <button
         onClick={toggleMute}
@@ -183,10 +165,26 @@ function VideoCard() {
 }
 
 const FEATURES = [
-  { icon: Smartphone, title: "No EFTPOS machine needed", description: "Run entirely on any device you already own — phone, tablet or laptop." },
-  { icon: QrCode, title: "QR & NFC contactless", description: "Apple Pay, Google Pay, Visa payWave, Mastercard contactless — no card reader." },
-  { icon: Zap, title: "Set up in under 5 minutes", description: "Sign up, create your first transaction, and start accepting payments immediately." },
-  { icon: Wifi, title: "Cloud dashboard & analytics", description: "Track every transaction in real time from anywhere, export to Xero." },
+  {
+    icon: Zap,
+    title: "Real-Time Dashboard",
+    description: "Track active transactions, sales performance, and inventory all in one beautiful interface.",
+  },
+  {
+    icon: BarChart3,
+    title: "Visual Analytics",
+    description: "Understand your business at a glance with intuitive charts and progress indicators.",
+  },
+  {
+    icon: Smartphone,
+    title: "Mobile-First Design",
+    description: "Manage your entire business from your phone with our optimized mobile experience.",
+  },
+  {
+    icon: CreditCard,
+    title: "NFC Payments",
+    description: "Accept contactless payments instantly with secure NFC technology.",
+  },
 ];
 
 function FeaturesCard() {
@@ -204,7 +202,7 @@ function FeaturesCard() {
           <div className="flex justify-center">
             <img
               src={dashboardMockup}
-              alt="TaptPay dashboard on phone"
+              alt="taptpay active transactions dashboard"
               className="w-64 md:w-80 drop-shadow-2xl hover:scale-105 transition-transform duration-500"
             />
           </div>
@@ -227,11 +225,35 @@ function FeaturesCard() {
   );
 }
 
-const STEPS = [
-  { num: "01", title: "Sign up", desc: "Create your free TaptPay account in under 2 minutes. No credit card required." },
-  { num: "02", title: "Set your amount", desc: "Enter a dollar amount on your terminal — by item or total sale." },
-  { num: "03", title: "Share the link", desc: "Display your QR code or send a payment link — works anywhere, anytime." },
-  { num: "04", title: "Get paid", desc: "Your customer pays by phone. Funds settle to your NZ bank account." },
+const HOW_IT_WORKS_STEPS = [
+  {
+    number: "1",
+    icon: UserPlus,
+    iconBg: "#FF6B9D",
+    title: "Sign Up & Connect",
+    description: "Create your free account and connect your merchant API - no setup fees, ready in minutes.",
+  },
+  {
+    number: "2",
+    icon: Settings,
+    iconBg: "#FFB800",
+    title: "Customize Your Setup",
+    description: "Activate payment stones, add products to inventory, and personalize your dashboard to fit your business.",
+  },
+  {
+    number: "3",
+    icon: Smartphone,
+    iconBg: "#00f1d7",
+    title: "Connect & Prepare",
+    description: "Use an NFC-capable device, connect to WiFi, and enable notifications for instant updates.",
+  },
+  {
+    number: "4",
+    icon: CheckCircle,
+    iconBg: "#00FF9D",
+    title: "Start Accepting Payments!",
+    description: "You're all set! Begin processing payments and managing your business with taptpay.",
+  },
 ];
 
 function HowItWorksCard() {
@@ -243,16 +265,25 @@ function HowItWorksCard() {
           className="text-4xl md:text-6xl font-extralight text-[#00f1d7] text-center mb-4 tracking-tight"
         />
         <p className="text-center text-white/60 mb-16 text-lg">
-          Get started with TaptPay in 4 simple steps
+          Get started with taptpay in 4 simple steps
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {STEPS.map((s) => (
-            <div key={s.num} className="bg-white/10 border border-white/15 rounded-2xl p-7 hover:bg-white/15 transition-all">
-              <div className="text-[#00f1d7] text-4xl font-bold mb-3 opacity-80">{s.num}</div>
-              <h3 className="text-white text-xl font-semibold mb-2">{s.title}</h3>
-              <p className="text-white/65 text-sm leading-relaxed">{s.desc}</p>
-            </div>
-          ))}
+          {HOW_IT_WORKS_STEPS.map((s) => {
+            const Icon = s.icon;
+            return (
+              <div key={s.number} className="bg-white/10 border border-white/15 rounded-2xl p-7 relative hover:bg-white/15 transition-all">
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-white text-base font-bold mb-4"
+                  style={{ backgroundColor: s.iconBg }}
+                >
+                  {s.number}
+                </div>
+                <Icon className="w-7 h-7 text-white mb-3" />
+                <h3 className="text-white text-lg font-semibold mb-2">{s.title}</h3>
+                <p className="text-white/65 text-sm leading-relaxed">{s.description}</p>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
@@ -260,56 +291,91 @@ function HowItWorksCard() {
 }
 
 function CustomerExperienceCard() {
+  const customerSteps = [
+    {
+      icon: Smartphone,
+      title: "Scan Or Tap the QR or NFC Tag",
+      description: "Customers can scan the QR code or tap the NFC tag on your payment stone",
+    },
+    {
+      icon: CreditCard,
+      title: "Digital Wallet to Pay",
+      description: "Customer is taken to the payment web page and pays with their Apple or Google Pay",
+    },
+    {
+      icon: CheckCircle,
+      title: "Done in Seconds",
+      description: "Payment processed instantly with confirmation",
+    },
+  ];
+
   return (
-    <div className="rounded-3xl overflow-hidden bg-[#060e42] py-20 px-6 md:px-16">
-      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-        <div>
-          <span className="inline-block text-xs font-semibold tracking-widest uppercase text-[#00f1d7] bg-[#00f1d7]/10 px-3 py-1 rounded-full mb-5">
-            For customers
-          </span>
-          <ScrambleHeading
-            text="frictionless for your customers"
-            className="text-3xl md:text-5xl font-light text-white leading-tight mb-6"
-          />
-          <p className="text-white/60 text-lg leading-relaxed mb-8">
-            No app downloads, no sign-ups. Your customer opens their camera, scans the QR code, and pays — it's that simple.
-          </p>
-          <ul className="flex flex-col gap-3">
-            {["Apple Pay & Google Pay", "Visa & Mastercard contactless", "Works on any smartphone", "Instant payment confirmation"].map((item) => (
-              <li key={item} className="flex items-center gap-3 text-white/80 text-sm">
-                <CheckCircle className="w-4 h-4 text-[#00f1d7] flex-shrink-0" />
-                {item}
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div className="flex justify-center">
+    <div className="rounded-3xl overflow-hidden bg-[#060e42]">
+      <div className="grid grid-cols-1 lg:grid-cols-2">
+        <div className="lg:block overflow-hidden" style={{ minHeight: "400px" }}>
           <img
-            src={paymentMockup}
-            alt="Customer payment screen on phone"
-            className="w-64 md:w-80 drop-shadow-2xl hover:scale-105 transition-transform duration-500"
+            src={paymentStonesImage}
+            alt="taptpay payment stones - scan or tap to pay"
+            className="w-full h-full object-cover"
           />
+        </div>
+        <div className="flex flex-col justify-center py-16 px-8 md:px-12 gap-8">
+          <div>
+            <ScrambleHeading
+              text="seamless for your customers"
+              className="text-3xl md:text-4xl font-light text-white leading-tight mb-3"
+            />
+            <p className="text-white/55 text-base">
+              Give your customers multiple ways to pay with a beautiful, intuitive interface
+            </p>
+          </div>
+          <div className="flex flex-col gap-5">
+            {customerSteps.map((s) => {
+              const Icon = s.icon;
+              return (
+                <div key={s.title} className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#00f1d7] flex items-center justify-center flex-shrink-0">
+                    <Icon className="w-5 h-5 text-[#0055ff]" />
+                  </div>
+                  <div>
+                    <h3 className="text-white font-semibold text-sm mb-1">{s.title}</h3>
+                    <p className="text-white/55 text-sm leading-relaxed">{s.description}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-const TERMINAL_FEATURES = [
-  { icon: Zap, title: "Instant transactions", desc: "Create a sale in seconds — enter amount, charge, done." },
-  { icon: Shield, title: "Split bill", desc: "Divide any sale between multiple customers with one tap." },
-  { icon: QrCode, title: "Payment stones", desc: "Assign QR codes to specific products or services." },
-  { icon: Wifi, title: "Works offline", desc: "Create transactions even with a spotty connection." },
+const TERMINAL_SLIDES = [
+  { title: "Quick Payment Entry", description: "Enter amounts with one tap, adjust with custom buttons, and trigger payment stones instantly" },
+  { title: "Split Bill", description: "Divide payments evenly among multiple people with automatic calculation" },
+  { title: "Share Payment", description: "Send payment links via email, SMS, or QR code for remote payments" },
+  { title: "NFC Paywave", description: "Turn your phone into an EFTPOS machine - accept all contactless payment methods directly" },
 ];
 
 function TerminalFeaturesCard() {
+  const [current, setCurrent] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setCurrent((p) => (p + 1) % TERMINAL_SLIDES.length), 6000);
+    return () => clearInterval(id);
+  }, []);
+
+  const prev = () => setCurrent((p) => (p - 1 + TERMINAL_SLIDES.length) % TERMINAL_SLIDES.length);
+  const next = () => setCurrent((p) => (p + 1) % TERMINAL_SLIDES.length);
+
   return (
     <div className="rounded-3xl overflow-hidden bg-[#0a1040] py-20 px-6 md:px-16">
       <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
         <div className="flex justify-center order-2 lg:order-1">
           <img
             src={terminalMockup}
-            alt="TaptPay terminal on phone"
+            alt="taptpay terminal on phone"
             className="w-64 md:w-80 drop-shadow-2xl hover:scale-105 transition-transform duration-500"
           />
         </div>
@@ -318,24 +384,37 @@ function TerminalFeaturesCard() {
             Terminal
           </span>
           <ScrambleHeading
-            text="a terminal that lives in your pocket"
-            className="text-3xl md:text-5xl font-light text-white leading-tight mb-6"
+            text="the digital terminal"
+            className="text-3xl md:text-5xl font-light text-[#00f1d7] leading-tight mb-4"
           />
-          <p className="text-white/60 text-lg leading-relaxed mb-8">
-            The TaptPay terminal turns any device into a powerful point of sale — with features tradies, cafés, and market sellers love.
+          <p className="text-white/60 text-lg leading-relaxed mb-10">
+            Everything you need to process payments, right from your phone
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {TERMINAL_FEATURES.map((f) => (
-              <div key={f.title} className="flex gap-3">
-                <div className="w-9 h-9 rounded-lg bg-[#0055ff]/40 flex items-center justify-center flex-shrink-0">
-                  <f.icon className="w-4 h-4 text-[#00f1d7]" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-white text-sm">{f.title}</h4>
-                  <p className="text-white/50 text-xs leading-relaxed">{f.desc}</p>
-                </div>
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-6 relative">
+            <div className="mb-4 min-h-[80px]">
+              <h3 className="text-white font-semibold text-lg mb-2">{TERMINAL_SLIDES[current].title}</h3>
+              <p className="text-white/55 text-sm leading-relaxed">{TERMINAL_SLIDES[current].description}</p>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex gap-2">
+                {TERMINAL_SLIDES.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setCurrent(i)}
+                    className={`w-2 h-2 rounded-full transition-all ${i === current ? "bg-[#00f1d7] w-4" : "bg-white/30"}`}
+                    aria-label={`Slide ${i + 1}`}
+                  />
+                ))}
               </div>
-            ))}
+              <div className="flex gap-2">
+                <button onClick={prev} className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all" aria-label="Previous">
+                  <ChevronLeft className="w-4 h-4 text-white" />
+                </button>
+                <button onClick={next} className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all" aria-label="Next">
+                  <ChevronRight className="w-4 h-4 text-white" />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -344,12 +423,36 @@ function TerminalFeaturesCard() {
 }
 
 const BENEFITS = [
-  { icon: DollarSign, title: "Lowest-cost POS in NZ", desc: "No monthly fees. No hardware rental. No lock-in contracts. Just a small per-transaction fee." },
-  { icon: Smartphone, title: "No EFTPOS machine", desc: "Ditch the bulky terminal — run on your existing device." },
-  { icon: QrCode, title: "QR & NFC payments", desc: "Apple Pay, Google Pay, payWave — all without a card reader." },
-  { icon: Zap, title: "Set up in under 5 min", desc: "Sign up and start accepting payments immediately." },
-  { icon: Shield, title: "Secure NZ processing", desc: "Payments processed securely through Windcave. Funds settle directly to your NZ bank account." },
-  { icon: Wifi, title: "Cloud POS dashboard", desc: "Track revenue, manage refunds, export to Xero — all in real time." },
+  {
+    icon: DollarSign,
+    title: "Lowest-Cost POS System in NZ",
+    description: "No monthly fees. No hardware rental. No lock-in contracts. Just a small per-transaction fee — making TaptPay the most affordable EFTPOS alternative in New Zealand.",
+  },
+  {
+    icon: Smartphone,
+    title: "No EFTPOS Machine Needed",
+    description: "Ditch the bulky EFTPOS terminal. TaptPay is a 100% digital point of sale system that runs on any device you already own — phone, tablet, or laptop.",
+  },
+  {
+    icon: QrCode,
+    title: "QR Code & NFC Contactless Payments",
+    description: "Your customers pay by scanning a QR code or tapping their phone. Supports Apple Pay, Google Pay, Visa payWave, and Mastercard contactless — all without a card reader.",
+  },
+  {
+    icon: Zap,
+    title: "Set Up in Under 5 Minutes",
+    description: "Sign up, create your first transaction, and start accepting payments immediately. No waiting for hardware delivery or complex installation — the fastest POS setup in NZ.",
+  },
+  {
+    icon: Shield,
+    title: "Secure NZ Payment Processing",
+    description: "Payments are processed securely through Windcave, New Zealand's trusted payment gateway. Funds settle directly to your NZ bank account.",
+  },
+  {
+    icon: Wifi,
+    title: "Cloud POS Dashboard & Analytics",
+    description: "Track every transaction in real time from anywhere. View revenue, manage refunds, export reports for Xero — all from your cloud POS dashboard.",
+  },
 ];
 
 function WhyTaptPayCard({ onGetStarted }: { onGetStarted: () => void }) {
@@ -373,7 +476,7 @@ function WhyTaptPayCard({ onGetStarted }: { onGetStarted: () => void }) {
                 <b.icon className="w-5 h-5 text-[#00f1d7]" />
               </div>
               <h3 className="text-white font-semibold mb-2 text-base">{b.title}</h3>
-              <p className="text-white/50 text-sm leading-relaxed">{b.desc}</p>
+              <p className="text-white/50 text-sm leading-relaxed">{b.description}</p>
             </div>
           ))}
         </div>
@@ -392,10 +495,10 @@ function WhyTaptPayCard({ onGetStarted }: { onGetStarted: () => void }) {
 }
 
 const BOARD_FEATURES = [
-  { icon: QrCode, title: "Your QR, your brand", desc: "Choose which Tapt Stone or payment link to display on your board — each stone gets its own unique QR code." },
-  { icon: Palette, title: "Custom colours & logo", desc: "Match your brand perfectly with a full colour picker and logo upload. Choose from 4 paper layouts: A4 or A6, portrait or landscape." },
-  { icon: Type, title: "Google Fonts & custom fonts", desc: "Pick from 10 curated Google Fonts or upload your own .ttf / .otf file to keep your typography on-brand." },
-  { icon: Printer, title: "Print-ready PDF", desc: "We generate a high-resolution PDF and send it straight to our print team — just approve the preview and hit send." },
+  { icon: QrCode, title: "Your QR, your brand", description: "Choose which Tapt Stone or payment link to display on your board — each stone gets its own unique QR code." },
+  { icon: Palette, title: "Custom colours & logo", description: "Match your brand perfectly with a full colour picker and logo upload. Choose from 4 paper layouts: A4 or A6, portrait or landscape." },
+  { icon: Type, title: "Google Fonts & custom fonts", description: "Pick from 10 curated Google Fonts or upload your own .ttf / .otf file to keep your typography on-brand." },
+  { icon: Printer, title: "Print-ready PDF", description: "We generate a high-resolution PDF and send it straight to our print team — just approve the preview and hit send." },
 ];
 
 function BoardBuilderCard({ onGetStarted }: { onGetStarted: () => void }) {
@@ -422,7 +525,7 @@ function BoardBuilderCard({ onGetStarted }: { onGetStarted: () => void }) {
               </div>
               <div>
                 <h3 className="font-semibold text-white mb-1 text-sm">{f.title}</h3>
-                <p className="text-white/55 text-sm leading-relaxed">{f.desc}</p>
+                <p className="text-white/55 text-sm leading-relaxed">{f.description}</p>
               </div>
             </div>
           ))}
@@ -441,32 +544,33 @@ function BoardBuilderCard({ onGetStarted }: { onGetStarted: () => void }) {
   );
 }
 
+const PRICING_PLANS = [
+  {
+    name: "SME",
+    subtitle: "1000 transactions and below per month",
+    price: "No monthly system fee",
+    perTx: "$0.10 per transaction",
+    features: [
+      "2 login's per business",
+      "2 payment stones ($29.99 normally)",
+      "$89.99 for set up kit - 2 design requests. (kit includes x2 payment stones, 2 other info signage, magnetic mount)",
+    ],
+  },
+  {
+    name: "Enterprise",
+    subtitle: "Over 1,000 transactions per month",
+    price: "Custom pricing",
+    perTx: "Volume discount applies",
+    features: [
+      "Unlimited logins",
+      "Unlimited payment stones",
+      "Dedicated account manager",
+      "Custom integrations & reporting",
+    ],
+  },
+];
+
 function PricingCard({ onGetStarted }: { onGetStarted: () => void }) {
-  const plans = [
-    {
-      name: "SME",
-      subtitle: "1,000 transactions and below per month",
-      price: "No monthly system fee",
-      perTx: "$0.10 per transaction",
-      features: [
-        "2 logins per business",
-        "2 payment stones ($29.99 normally)",
-        "$89.99 set-up kit — 2 design requests (×2 payment stones, 2 signage, magnetic mount)",
-      ],
-    },
-    {
-      name: "Enterprise",
-      subtitle: "Over 1,000 transactions per month",
-      price: "Custom pricing",
-      perTx: "Volume discount applies",
-      features: [
-        "Unlimited logins",
-        "Unlimited payment stones",
-        "Dedicated account manager",
-        "Custom integrations & reporting",
-      ],
-    },
-  ];
   return (
     <div className="rounded-3xl overflow-hidden bg-[#060e42] py-20 px-6 md:px-16">
       <div className="max-w-5xl mx-auto">
@@ -478,7 +582,7 @@ function PricingCard({ onGetStarted }: { onGetStarted: () => void }) {
           you will be charged $0.10 per transaction by adding a credit card/debit card to the system and you will be charged either weekly/bi-weekly/monthly
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {plans.map((plan) => (
+          {PRICING_PLANS.map((plan) => (
             <div key={plan.name} className="bg-[#0055ff] border-2 border-[#00f1d7]/40 rounded-2xl p-8 flex flex-col">
               <h3 className="text-[#00f1d7] text-2xl font-bold mb-1">{plan.name}</h3>
               <p className="text-white/50 text-sm mb-5">{plan.subtitle}</p>
@@ -558,8 +662,8 @@ export function LandingPage() {
     <div className="min-h-screen" style={{ background: "#000a36", fontFamily: "Outfit, sans-serif" }}>
       <SEOHead
         title="TaptPay – Low Cost EFTPOS & POS System NZ | Digital Point of Sale"
-        description="New Zealand's lowest-cost EFTPOS alternative and digital POS system. No hardware, no lock-in contracts. Accept QR code and NFC contactless payments instantly. 100% Kiwi owned."
-        keywords="EFTPOS NZ, POS system NZ, digital POS, low cost POS system, point of sale New Zealand, cheap EFTPOS machine, cloud POS NZ, small business POS NZ, contactless payments NZ, mobile POS NZ, QR code payments, NFC payments"
+        description="New Zealand's lowest-cost EFTPOS alternative and digital POS system. No hardware, no lock-in contracts. Accept QR code and NFC contactless payments instantly. Perfect POS solution for small business NZ. 100% Kiwi owned."
+        keywords="EFTPOS NZ, POS system NZ, digital POS, POS solutions, low cost POS system, point of sale New Zealand, cheap EFTPOS machine, cloud POS NZ, small business POS NZ, contactless payments NZ, mobile POS NZ, QR code payments, NFC payments, EFTPOS alternative, payment terminal NZ"
         ogTitle="TaptPay – NZ's Lowest-Cost EFTPOS & POS System | No Hardware Required"
         ogDescription="Ditch the EFTPOS machine. TaptPay is New Zealand's 100% digital POS system — accept contactless payments via QR code and NFC with no hardware and no lock-in contracts."
         canonicalUrl="https://taptpay.com/"
