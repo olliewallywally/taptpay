@@ -11,7 +11,6 @@ import logoImage from "@assets/logo_1762915255857.png";
 import dashboardMockup from "@assets/dashboard_3d_1774258691269.png";
 import paymentMockup from "@assets/payment_page_1774258691269.png";
 import terminalMockup from "@assets/terminal_3d_1774258691270.png";
-import paymentStonesImage from "@assets/pay stone_1762915255862.png";
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(() =>
@@ -135,11 +134,13 @@ function VideoCard() {
   const [muted, setMuted] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  const toggleMute = () => {
-    const next = !muted;
-    if (videoRef.current) videoRef.current.muted = next;
-    setMuted(next);
-  };
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.muted = muted;
+    }
+  }, [muted]);
+
+  const toggleMute = () => setMuted((prev) => !prev);
 
   return (
     <div className="rounded-3xl overflow-hidden bg-[#000a36] relative">
@@ -310,25 +311,16 @@ function CustomerExperienceCard() {
   ];
 
   return (
-    <div className="rounded-3xl overflow-hidden bg-[#060e42]">
-      <div className="grid grid-cols-1 lg:grid-cols-2">
-        <div className="lg:block overflow-hidden" style={{ minHeight: "400px" }}>
-          <img
-            src={paymentStonesImage}
-            alt="taptpay payment stones - scan or tap to pay"
-            className="w-full h-full object-cover"
+    <div className="rounded-3xl overflow-hidden bg-[#060e42] py-20 px-6 md:px-16">
+      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+        <div>
+          <ScrambleHeading
+            text="seamless for your customers"
+            className="text-3xl md:text-4xl font-light text-white leading-tight mb-3"
           />
-        </div>
-        <div className="flex flex-col justify-center py-16 px-8 md:px-12 gap-8">
-          <div>
-            <ScrambleHeading
-              text="seamless for your customers"
-              className="text-3xl md:text-4xl font-light text-white leading-tight mb-3"
-            />
-            <p className="text-white/55 text-base">
-              Give your customers multiple ways to pay with a beautiful, intuitive interface
-            </p>
-          </div>
+          <p className="text-white/55 text-base mb-8">
+            Give your customers multiple ways to pay with a beautiful, intuitive interface
+          </p>
           <div className="flex flex-col gap-5">
             {customerSteps.map((s) => {
               const Icon = s.icon;
@@ -345,6 +337,13 @@ function CustomerExperienceCard() {
               );
             })}
           </div>
+        </div>
+        <div className="flex justify-center">
+          <img
+            src={paymentMockup}
+            alt="taptpay customer payment page on phone"
+            className="w-64 md:w-80 drop-shadow-2xl hover:scale-105 transition-transform duration-500"
+          />
         </div>
       </div>
     </div>
