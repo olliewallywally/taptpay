@@ -10,9 +10,6 @@ import dashboardMockup from "@assets/dashboard_3d_1774258691269.png";
 import paymentMockup from "@assets/payment_page_1774258691269.png";
 import terminalMockup from "@assets/terminal_3d_1774258691270.png";
 
-/* ─────────────────────────────────────────────
-   Scramble-text hook
-───────────────────────────────────────────── */
 const SCRAMBLE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$%&";
 
 function useScrambleText(text: string) {
@@ -46,10 +43,6 @@ function useScrambleText(text: string) {
   return { displayText, scramble };
 }
 
-/* ─────────────────────────────────────────────
-   ScrambleHeading — fires on hover (desktop)
-   and on first scroll-into-view (mobile)
-───────────────────────────────────────────── */
 function ScrambleHeading({
   text,
   className,
@@ -73,7 +66,7 @@ function ScrambleHeading({
           scramble();
         }
       },
-      { threshold: 0.6 }
+      { threshold: 0.5 }
     );
     obs.observe(el);
     return () => obs.disconnect();
@@ -86,31 +79,14 @@ function ScrambleHeading({
   );
 }
 
-/* ─────────────────────────────────────────────
-   Card wrapper — rounded box on dark page bg
-───────────────────────────────────────────── */
-function Card({
-  children,
-  className = "",
-  style,
-}: {
-  children: React.ReactNode;
-  className?: string;
-  style?: React.CSSProperties;
-}) {
+function StickySection({ children, zIndex }: { children: React.ReactNode; zIndex: number }) {
   return (
-    <div
-      className={`rounded-3xl overflow-hidden w-full ${className}`}
-      style={style}
-    >
+    <div style={{ position: "sticky", top: 0, zIndex }} className="px-3 md:px-4">
       {children}
     </div>
   );
 }
 
-/* ─────────────────────────────────────────────
-   Nav
-───────────────────────────────────────────── */
 function Nav({ onGetStarted }: { onGetStarted: () => void }) {
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
@@ -120,7 +96,7 @@ function Nav({ onGetStarted }: { onGetStarted: () => void }) {
   }, []);
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 md:px-10 py-4 transition-all duration-300 ${
+      className={`fixed top-0 left-0 right-0 z-[200] flex items-center justify-between px-6 md:px-10 py-4 transition-all duration-300 ${
         scrolled ? "bg-[#000a36]/80 backdrop-blur-md shadow-xl" : ""
       }`}
     >
@@ -135,28 +111,22 @@ function Nav({ onGetStarted }: { onGetStarted: () => void }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   Hero Card
-───────────────────────────────────────────── */
 function HeroCard({ onGetStarted }: { onGetStarted: () => void }) {
   return (
-    <Card className="bg-[#0055ff] min-h-screen flex flex-col items-center justify-center px-6 text-center relative">
+    <div className="rounded-3xl overflow-hidden bg-[#0055ff] min-h-screen flex flex-col items-center justify-center px-6 text-center relative">
       <div className="flex flex-col items-center max-w-3xl mx-auto">
         <img src={logoImage} alt="TaptPay" className="h-20 md:h-28 mb-14 opacity-95" />
-
         <ScrambleHeading
           tag="h1"
           text="a pos system that isn't one"
           className="text-4xl md:text-6xl lg:text-7xl font-extralight text-white leading-[1.08] tracking-tight mb-6"
         />
-
         <p className="text-lg md:text-xl text-white/75 font-light mb-3">
           100% digital point of sale system
         </p>
         <p className="text-sm md:text-base text-[#00f1d7] font-medium tracking-wide mb-12">
           New Zealand's lowest-cost EFTPOS alternative — no hardware required
         </p>
-
         <button
           onClick={onGetStarted}
           className="bg-[#00f1d7] hover:bg-[#00d9c0] text-[#000a36] font-semibold px-10 py-4 rounded-full text-base md:text-lg transition-all hover:scale-105 shadow-lg flex items-center gap-2 lowercase"
@@ -164,22 +134,17 @@ function HeroCard({ onGetStarted }: { onGetStarted: () => void }) {
         >
           get started <ArrowRight className="w-5 h-5" />
         </button>
-
         <p className="mt-5 text-white/40 text-xs tracking-widest uppercase">
           100% KIWI OWNED AND OPERATED
         </p>
       </div>
-
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 text-white/30 animate-bounce">
         <ChevronDown className="w-6 h-6" />
       </div>
-    </Card>
+    </div>
   );
 }
 
-/* ─────────────────────────────────────────────
-   Video Card
-───────────────────────────────────────────── */
 function VideoCard() {
   const [muted, setMuted] = useState(true);
   const desktopRef = useRef<HTMLVideoElement>(null);
@@ -193,71 +158,48 @@ function VideoCard() {
   };
 
   return (
-    <Card className="bg-[#000a36] relative overflow-hidden">
-      <div className="relative w-full">
-        <video
-          ref={desktopRef}
-          className="w-full hidden md:block"
-          autoPlay loop muted playsInline
-          src="/videos/web.mp4"
-          style={{ display: undefined }}
-        />
-        <video
-          ref={mobileRef}
-          className="w-full block md:hidden"
-          autoPlay loop muted playsInline
-          src="/videos/mobile.mp4"
-        />
-        <button
-          onClick={toggleMute}
-          className="absolute bottom-5 right-5 bg-black/50 hover:bg-black/70 backdrop-blur-sm text-white rounded-full p-3 transition-all hover:scale-110 z-10"
-          aria-label={muted ? "Unmute" : "Mute"}
-        >
-          {muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-        </button>
-      </div>
-    </Card>
+    <div className="rounded-3xl overflow-hidden bg-[#000a36] relative">
+      <video
+        ref={desktopRef}
+        className="w-full object-cover hidden md:block"
+        autoPlay loop muted playsInline
+        src="/videos/web.mp4"
+      />
+      <video
+        ref={mobileRef}
+        className="w-full object-cover block md:hidden"
+        autoPlay loop muted playsInline
+        src="/videos/mobile.mp4"
+      />
+      <button
+        onClick={toggleMute}
+        className="absolute bottom-5 right-5 bg-black/50 hover:bg-black/70 backdrop-blur-sm text-white rounded-full p-3 transition-all hover:scale-110 z-10"
+        aria-label={muted ? "Unmute" : "Mute"}
+      >
+        {muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+      </button>
+    </div>
   );
 }
 
-/* ─────────────────────────────────────────────
-   Features Card
-───────────────────────────────────────────── */
 const FEATURES = [
-  {
-    icon: Smartphone,
-    title: "No EFTPOS machine needed",
-    description: "Run entirely on any device you already own — phone, tablet or laptop.",
-  },
-  {
-    icon: QrCode,
-    title: "QR & NFC contactless",
-    description: "Apple Pay, Google Pay, Visa payWave, Mastercard contactless — no card reader.",
-  },
-  {
-    icon: Zap,
-    title: "Set up in under 5 minutes",
-    description: "Sign up, create your first transaction, and start accepting payments immediately.",
-  },
-  {
-    icon: Wifi,
-    title: "Cloud dashboard & analytics",
-    description: "Track every transaction in real time from anywhere, export to Xero.",
-  },
+  { icon: Smartphone, title: "No EFTPOS machine needed", description: "Run entirely on any device you already own — phone, tablet or laptop." },
+  { icon: QrCode, title: "QR & NFC contactless", description: "Apple Pay, Google Pay, Visa payWave, Mastercard contactless — no card reader." },
+  { icon: Zap, title: "Set up in under 5 minutes", description: "Sign up, create your first transaction, and start accepting payments immediately." },
+  { icon: Wifi, title: "Cloud dashboard & analytics", description: "Track every transaction in real time from anywhere, export to Xero." },
 ];
 
 function FeaturesCard() {
   return (
-    <Card className="bg-white py-20 px-6 md:px-16">
+    <div className="rounded-3xl overflow-hidden bg-[#050d38] py-20 px-6 md:px-16">
       <div className="max-w-6xl mx-auto">
         <ScrambleHeading
           text="everything you need. nothing you don't."
-          className="text-3xl md:text-5xl lg:text-6xl font-light text-[#000a36] text-center mb-4 leading-tight"
+          className="text-3xl md:text-5xl lg:text-6xl font-light text-white text-center mb-4 leading-tight"
         />
-        <p className="text-center text-gray-500 mb-16 text-lg">
+        <p className="text-center text-white/50 mb-16 text-lg">
           A complete payment solution designed for modern businesses
         </p>
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div className="flex justify-center">
             <img
@@ -269,25 +211,22 @@ function FeaturesCard() {
           <div className="flex flex-col gap-8">
             {FEATURES.map((f) => (
               <div key={f.title} className="flex gap-4">
-                <div className="w-11 h-11 rounded-xl bg-[#0055ff]/10 flex items-center justify-center flex-shrink-0">
-                  <f.icon className="w-5 h-5 text-[#0055ff]" />
+                <div className="w-11 h-11 rounded-xl bg-[#0055ff]/40 flex items-center justify-center flex-shrink-0">
+                  <f.icon className="w-5 h-5 text-[#00f1d7]" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">{f.title}</h3>
-                  <p className="text-gray-500 text-sm leading-relaxed">{f.description}</p>
+                  <h3 className="font-semibold text-white mb-1">{f.title}</h3>
+                  <p className="text-white/50 text-sm leading-relaxed">{f.description}</p>
                 </div>
               </div>
             ))}
           </div>
         </div>
       </div>
-    </Card>
+    </div>
   );
 }
 
-/* ─────────────────────────────────────────────
-   How It Works Card
-───────────────────────────────────────────── */
 const STEPS = [
   { num: "01", title: "Sign up", desc: "Create your free TaptPay account in under 2 minutes. No credit card required." },
   { num: "02", title: "Set your amount", desc: "Enter a dollar amount on your terminal — by item or total sale." },
@@ -297,7 +236,7 @@ const STEPS = [
 
 function HowItWorksCard() {
   return (
-    <Card className="bg-[#0055ff] py-20 px-6 md:px-16">
+    <div className="rounded-3xl overflow-hidden bg-[#0055ff] py-20 px-6 md:px-16">
       <div className="max-w-5xl mx-auto">
         <ScrambleHeading
           text="how it works"
@@ -306,13 +245,9 @@ function HowItWorksCard() {
         <p className="text-center text-white/60 mb-16 text-lg">
           Get started with TaptPay in 4 simple steps
         </p>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {STEPS.map((s) => (
-            <div
-              key={s.num}
-              className="bg-white/10 border border-white/15 rounded-2xl p-7 hover:bg-white/15 transition-all"
-            >
+            <div key={s.num} className="bg-white/10 border border-white/15 rounded-2xl p-7 hover:bg-white/15 transition-all">
               <div className="text-[#00f1d7] text-4xl font-bold mb-3 opacity-80">{s.num}</div>
               <h3 className="text-white text-xl font-semibold mb-2">{s.title}</h3>
               <p className="text-white/65 text-sm leading-relaxed">{s.desc}</p>
@@ -320,16 +255,13 @@ function HowItWorksCard() {
           ))}
         </div>
       </div>
-    </Card>
+    </div>
   );
 }
 
-/* ─────────────────────────────────────────────
-   Customer Experience Card
-───────────────────────────────────────────── */
 function CustomerExperienceCard() {
   return (
-    <Card className="bg-[#050d38] py-20 px-6 md:px-16">
+    <div className="rounded-3xl overflow-hidden bg-[#060e42] py-20 px-6 md:px-16">
       <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
         <div>
           <span className="inline-block text-xs font-semibold tracking-widest uppercase text-[#00f1d7] bg-[#00f1d7]/10 px-3 py-1 rounded-full mb-5">
@@ -359,13 +291,10 @@ function CustomerExperienceCard() {
           />
         </div>
       </div>
-    </Card>
+    </div>
   );
 }
 
-/* ─────────────────────────────────────────────
-   Terminal Features Card
-───────────────────────────────────────────── */
 const TERMINAL_FEATURES = [
   { icon: Zap, title: "Instant transactions", desc: "Create a sale in seconds — enter amount, charge, done." },
   { icon: Shield, title: "Split bill", desc: "Divide any sale between multiple customers with one tap." },
@@ -375,7 +304,7 @@ const TERMINAL_FEATURES = [
 
 function TerminalFeaturesCard() {
   return (
-    <Card className="bg-white py-20 px-6 md:px-16">
+    <div className="rounded-3xl overflow-hidden bg-[#0a1040] py-20 px-6 md:px-16">
       <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
         <div className="flex justify-center order-2 lg:order-1">
           <img
@@ -385,65 +314,61 @@ function TerminalFeaturesCard() {
           />
         </div>
         <div className="order-1 lg:order-2">
-          <span className="inline-block text-xs font-semibold tracking-widest uppercase text-[#0055ff] bg-[#0055ff]/10 px-3 py-1 rounded-full mb-5">
+          <span className="inline-block text-xs font-semibold tracking-widest uppercase text-[#00f1d7] bg-[#00f1d7]/10 px-3 py-1 rounded-full mb-5">
             Terminal
           </span>
           <ScrambleHeading
             text="a terminal that lives in your pocket"
-            className="text-3xl md:text-5xl font-light text-[#000a36] leading-tight mb-6"
+            className="text-3xl md:text-5xl font-light text-white leading-tight mb-6"
           />
-          <p className="text-gray-500 text-lg leading-relaxed mb-8">
+          <p className="text-white/60 text-lg leading-relaxed mb-8">
             The TaptPay terminal turns any device into a powerful point of sale — with features tradies, cafés, and market sellers love.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {TERMINAL_FEATURES.map((f) => (
               <div key={f.title} className="flex gap-3">
-                <div className="w-9 h-9 rounded-lg bg-[#0055ff]/10 flex items-center justify-center flex-shrink-0">
-                  <f.icon className="w-4 h-4 text-[#0055ff]" />
+                <div className="w-9 h-9 rounded-lg bg-[#0055ff]/40 flex items-center justify-center flex-shrink-0">
+                  <f.icon className="w-4 h-4 text-[#00f1d7]" />
                 </div>
                 <div>
-                  <h4 className="font-semibold text-gray-900 text-sm">{f.title}</h4>
-                  <p className="text-gray-500 text-xs leading-relaxed">{f.desc}</p>
+                  <h4 className="font-semibold text-white text-sm">{f.title}</h4>
+                  <p className="text-white/50 text-xs leading-relaxed">{f.desc}</p>
                 </div>
               </div>
             ))}
           </div>
         </div>
       </div>
-    </Card>
+    </div>
   );
 }
 
-/* ─────────────────────────────────────────────
-   Why TaptPay Card
-───────────────────────────────────────────── */
 const BENEFITS = [
-  { icon: DollarSign, title: "Lowest-cost POS in NZ", desc: "No monthly fees. No hardware rental. No lock-in contracts." },
+  { icon: DollarSign, title: "Lowest-cost POS in NZ", desc: "No monthly fees. No hardware rental. No lock-in contracts. Just a small per-transaction fee." },
   { icon: Smartphone, title: "No EFTPOS machine", desc: "Ditch the bulky terminal — run on your existing device." },
   { icon: QrCode, title: "QR & NFC payments", desc: "Apple Pay, Google Pay, payWave — all without a card reader." },
   { icon: Zap, title: "Set up in under 5 min", desc: "Sign up and start accepting payments immediately." },
-  { icon: Shield, title: "Secure NZ processing", desc: "Processed via Windcave — NZ's trusted payment gateway." },
-  { icon: Wifi, title: "Cloud POS dashboard", desc: "Track revenue, manage refunds, export to Xero in real time." },
+  { icon: Shield, title: "Secure NZ processing", desc: "Payments processed securely through Windcave. Funds settle directly to your NZ bank account." },
+  { icon: Wifi, title: "Cloud POS dashboard", desc: "Track revenue, manage refunds, export to Xero — all in real time." },
 ];
 
 function WhyTaptPayCard({ onGetStarted }: { onGetStarted: () => void }) {
   return (
-    <Card className="bg-[#0a1040] py-20 px-6 md:px-16">
+    <div className="rounded-3xl overflow-hidden bg-[#050d38] py-20 px-6 md:px-16">
       <div className="max-w-6xl mx-auto">
         <ScrambleHeading
           text="why kiwi businesses choose taptpay"
           className="text-3xl md:text-5xl font-light text-white text-center mb-4 leading-tight"
         />
-        <p className="text-white/50 text-center mb-16 max-w-2xl mx-auto text-lg">
-          Whether you're a café, market stall, food truck, tradie, or service business — TaptPay is the POS system built for how NZ businesses work today.
+        <p className="text-white/50 text-center mb-6 max-w-3xl mx-auto text-lg">
+          The smarter EFTPOS alternative for New Zealand small businesses. A digital POS solution that saves you money and gets you paid faster.
         </p>
-
+        <p className="text-white/35 text-center text-sm mb-16 max-w-2xl mx-auto">
+          Whether you're a café, market stall, food truck, tradie, or service business — TaptPay is the point of sale system built for how NZ businesses work today.
+        </p>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {BENEFITS.map((b) => (
-            <div
-              key={b.title}
-              className="bg-white/5 border border-white/10 rounded-2xl p-6 hover:bg-white/10 hover:border-[#00f1d7]/30 transition-all"
-            >
+            <div key={b.title} className="bg-white/5 border border-white/10 rounded-2xl p-6 hover:bg-white/10 hover:border-[#00f1d7]/30 transition-all">
               <div className="w-10 h-10 rounded-xl bg-[#0055ff]/30 flex items-center justify-center mb-4">
                 <b.icon className="w-5 h-5 text-[#00f1d7]" />
               </div>
@@ -452,7 +377,6 @@ function WhyTaptPayCard({ onGetStarted }: { onGetStarted: () => void }) {
             </div>
           ))}
         </div>
-
         <div className="text-center mt-14">
           <button
             onClick={onGetStarted}
@@ -463,23 +387,20 @@ function WhyTaptPayCard({ onGetStarted }: { onGetStarted: () => void }) {
           <p className="text-white/30 text-sm mt-3">No credit card required · Set up in under 5 minutes · 100% Kiwi owned</p>
         </div>
       </div>
-    </Card>
+    </div>
   );
 }
 
-/* ─────────────────────────────────────────────
-   Board Builder Card
-───────────────────────────────────────────── */
 const BOARD_FEATURES = [
-  { icon: QrCode, title: "Your QR, your brand", desc: "Display any payment link on your board — each stone gets its own unique QR code." },
-  { icon: Palette, title: "Custom colours & logo", desc: "Match your brand perfectly with a full colour picker and logo upload." },
-  { icon: Type, title: "Google Fonts & custom fonts", desc: "Pick from curated Google Fonts or upload your own .ttf / .otf file." },
-  { icon: Printer, title: "Print-ready PDF", desc: "High-resolution PDF sent to our print team — just approve and hit send." },
+  { icon: QrCode, title: "Your QR, your brand", desc: "Choose which Tapt Stone or payment link to display on your board — each stone gets its own unique QR code." },
+  { icon: Palette, title: "Custom colours & logo", desc: "Match your brand perfectly with a full colour picker and logo upload. Choose from 4 paper layouts: A4 or A6, portrait or landscape." },
+  { icon: Type, title: "Google Fonts & custom fonts", desc: "Pick from 10 curated Google Fonts or upload your own .ttf / .otf file to keep your typography on-brand." },
+  { icon: Printer, title: "Print-ready PDF", desc: "We generate a high-resolution PDF and send it straight to our print team — just approve the preview and hit send." },
 ];
 
 function BoardBuilderCard({ onGetStarted }: { onGetStarted: () => void }) {
   return (
-    <Card className="bg-[#0055ff] py-20 px-6 md:px-16">
+    <div className="rounded-3xl overflow-hidden bg-[#0055ff] py-20 px-6 md:px-16">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-14">
           <span className="inline-block text-xs font-semibold tracking-widest uppercase text-[#000a36] bg-[#00f1d7] px-3 py-1 rounded-full mb-5">
@@ -493,7 +414,6 @@ function BoardBuilderCard({ onGetStarted }: { onGetStarted: () => void }) {
             Design your own printed payment sign in minutes. Live preview, fully customisable, ready to print.
           </p>
         </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-12">
           {BOARD_FEATURES.map((f) => (
             <div key={f.title} className="flex gap-4 p-5 bg-white/10 border border-white/15 rounded-2xl hover:bg-white/15 transition-all">
@@ -507,7 +427,6 @@ function BoardBuilderCard({ onGetStarted }: { onGetStarted: () => void }) {
             </div>
           ))}
         </div>
-
         <div className="text-center">
           <button
             onClick={onGetStarted}
@@ -518,13 +437,10 @@ function BoardBuilderCard({ onGetStarted }: { onGetStarted: () => void }) {
           <p className="text-white/40 text-sm mt-3">Available to all TaptPay merchants — sign in to get started</p>
         </div>
       </div>
-    </Card>
+    </div>
   );
 }
 
-/* ─────────────────────────────────────────────
-   Pricing Card
-───────────────────────────────────────────── */
 function PricingCard({ onGetStarted }: { onGetStarted: () => void }) {
   const plans = [
     {
@@ -551,24 +467,19 @@ function PricingCard({ onGetStarted }: { onGetStarted: () => void }) {
       ],
     },
   ];
-
   return (
-    <Card className="bg-[#000a36] py-20 px-6 md:px-16 border border-white/5">
+    <div className="rounded-3xl overflow-hidden bg-[#060e42] py-20 px-6 md:px-16">
       <div className="max-w-5xl mx-auto">
         <ScrambleHeading
           text="what does it cost?"
           className="text-4xl md:text-6xl font-extralight text-[#00f1d7] text-center mb-4 tracking-tight"
         />
         <p className="text-white/50 text-center mb-16 max-w-2xl mx-auto text-lg">
-          $0.10 per transaction. No monthly fees. No setup costs. Just pay as you go.
+          you will be charged $0.10 per transaction by adding a credit card/debit card to the system and you will be charged either weekly/bi-weekly/monthly
         </p>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {plans.map((plan) => (
-            <div
-              key={plan.name}
-              className="bg-[#0055ff] border-2 border-[#00f1d7]/40 rounded-2xl p-8 flex flex-col"
-            >
+            <div key={plan.name} className="bg-[#0055ff] border-2 border-[#00f1d7]/40 rounded-2xl p-8 flex flex-col">
               <h3 className="text-[#00f1d7] text-2xl font-bold mb-1">{plan.name}</h3>
               <p className="text-white/50 text-sm mb-5">{plan.subtitle}</p>
               <div className="border-b border-white/10 pb-5 mb-5">
@@ -586,7 +497,6 @@ function PricingCard({ onGetStarted }: { onGetStarted: () => void }) {
             </div>
           ))}
         </div>
-
         <div className="text-center mt-12">
           <button
             onClick={onGetStarted}
@@ -596,16 +506,13 @@ function PricingCard({ onGetStarted }: { onGetStarted: () => void }) {
           </button>
         </div>
       </div>
-    </Card>
+    </div>
   );
 }
 
-/* ─────────────────────────────────────────────
-   Final CTA Card
-───────────────────────────────────────────── */
 function FinalCTACard({ onGetStarted }: { onGetStarted: () => void }) {
   return (
-    <Card className="bg-[#0055ff] py-24 px-6 text-center">
+    <div className="rounded-3xl overflow-hidden bg-[#0055ff] py-24 px-6 text-center">
       <div className="max-w-3xl mx-auto">
         <ScrambleHeading
           text="ready to ditch the EFTPOS machine?"
@@ -622,16 +529,13 @@ function FinalCTACard({ onGetStarted }: { onGetStarted: () => void }) {
         </button>
         <p className="text-white/35 text-sm mt-4">No credit card required · No lock-in contracts · 100% Kiwi owned</p>
       </div>
-    </Card>
+    </div>
   );
 }
 
-/* ─────────────────────────────────────────────
-   Footer Card
-───────────────────────────────────────────── */
 function FooterCard() {
   return (
-    <Card className="bg-[#060e38] py-12 px-6">
+    <div className="rounded-3xl overflow-hidden bg-[#060e38] py-12 px-6">
       <div className="max-w-6xl mx-auto text-center">
         <img src={logoImage} alt="TaptPay" className="h-8 mx-auto mb-5 opacity-70" />
         <p className="text-white/30 text-sm">© 2026 TaptPay. All rights reserved.</p>
@@ -641,23 +545,17 @@ function FooterCard() {
           <a href="/privacy" className="hover:text-white/60 transition-colors">Privacy Policy</a>
         </div>
       </div>
-    </Card>
+    </div>
   );
 }
 
-/* ─────────────────────────────────────────────
-   Landing Page — main export
-───────────────────────────────────────────── */
 export function LandingPage() {
   const [, setLocation] = useLocation();
   const goLogin = () => setLocation("/login");
   const goBoard = () => setLocation("/board-builder");
 
   return (
-    <div
-      className="min-h-screen"
-      style={{ background: "#000a36", fontFamily: "Outfit, sans-serif" }}
-    >
+    <div className="min-h-screen" style={{ background: "#000a36", fontFamily: "Outfit, sans-serif" }}>
       <SEOHead
         title="TaptPay – Low Cost EFTPOS & POS System NZ | Digital Point of Sale"
         description="New Zealand's lowest-cost EFTPOS alternative and digital POS system. No hardware, no lock-in contracts. Accept QR code and NFC contactless payments instantly. 100% Kiwi owned."
@@ -669,23 +567,50 @@ export function LandingPage() {
 
       <Nav onGetStarted={goLogin} />
 
-      {/* Stacked cards layout — gap between each shows #000a36 bg */}
-      <div className="flex flex-col gap-3 md:gap-4 p-3 md:p-4 pt-0">
-        {/* Hero — full screen, flush top (nav is fixed over it) */}
-        <div className="pt-0">
+      <div className="flex flex-col gap-3 md:gap-4 px-3 md:px-4 pb-3 md:pb-4">
+        <StickySection zIndex={10}>
           <HeroCard onGetStarted={goLogin} />
-        </div>
+        </StickySection>
 
-        <VideoCard />
-        <FeaturesCard />
-        <HowItWorksCard />
-        <CustomerExperienceCard />
-        <TerminalFeaturesCard />
-        <WhyTaptPayCard onGetStarted={goLogin} />
-        <BoardBuilderCard onGetStarted={goBoard} />
-        <PricingCard onGetStarted={goLogin} />
-        <FinalCTACard onGetStarted={goLogin} />
-        <FooterCard />
+        <StickySection zIndex={20}>
+          <VideoCard />
+        </StickySection>
+
+        <StickySection zIndex={30}>
+          <FeaturesCard />
+        </StickySection>
+
+        <StickySection zIndex={40}>
+          <HowItWorksCard />
+        </StickySection>
+
+        <StickySection zIndex={50}>
+          <CustomerExperienceCard />
+        </StickySection>
+
+        <StickySection zIndex={60}>
+          <TerminalFeaturesCard />
+        </StickySection>
+
+        <StickySection zIndex={70}>
+          <WhyTaptPayCard onGetStarted={goLogin} />
+        </StickySection>
+
+        <StickySection zIndex={80}>
+          <BoardBuilderCard onGetStarted={goBoard} />
+        </StickySection>
+
+        <StickySection zIndex={90}>
+          <PricingCard onGetStarted={goLogin} />
+        </StickySection>
+
+        <StickySection zIndex={100}>
+          <FinalCTACard onGetStarted={goLogin} />
+        </StickySection>
+
+        <StickySection zIndex={110}>
+          <FooterCard />
+        </StickySection>
       </div>
     </div>
   );
