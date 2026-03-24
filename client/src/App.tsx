@@ -147,6 +147,17 @@ function GA4PageTracker() {
 }
 
 function Router() {
+  const [location] = useLocation();
+
+  if (location === "/") {
+    return (
+      <>
+        <GA4PageTracker />
+        <LandingPage />
+      </>
+    );
+  }
+
   return (
     <PageTransition>
       <GA4PageTracker />
