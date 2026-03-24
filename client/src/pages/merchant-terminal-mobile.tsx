@@ -749,46 +749,27 @@ export default function MerchantTerminalMobile() {
                           </label>
                           <div className="grid grid-cols-1 gap-2">
                             {taptStones.map((stone: any) => {
-                              const nfcTagUrl = stone.paymentUrl
+                              const universalUrl = stone.paymentUrl
                                 ? stone.paymentUrl.replace(/\/pay\//, "/nfc/")
-                                : null;
+                                : stone.paymentUrl;
                               return (
-                                <div key={stone.id} className="space-y-1">
-                                  <button
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(stone.paymentUrl);
-                                      setCopiedLink(true);
-                                      setTimeout(() => setCopiedLink(false), 2000);
-                                      toast({
-                                        title: "Payment Link Copied",
-                                        description: `${stone.name} payment link copied`,
-                                      });
-                                      setActiveAction(null);
-                                    }}
-                                    className="w-full p-3 rounded-lg text-sm font-medium transition-colors text-black"
-                                    style={{ backgroundColor: '#00FF66' }}
-                                  >
-                                    Copy {stone.name} Link
-                                  </button>
-                                  {nfcTagUrl && (
-                                    <button
-                                      onClick={() => {
-                                        navigator.clipboard.writeText(nfcTagUrl);
-                                        setCopiedLink(true);
-                                        setTimeout(() => setCopiedLink(false), 2000);
-                                        toast({
-                                          title: "NFC Tag URL Copied",
-                                          description: `Programme this URL into your ${stone.name} NFC tag for Chrome on Android`,
-                                        });
-                                        setActiveAction(null);
-                                      }}
-                                      className="w-full p-2 rounded-lg text-xs font-medium transition-colors"
-                                      style={{ backgroundColor: 'rgba(0,241,215,0.15)', color: '#00f1d7', border: '1px solid rgba(0,241,215,0.3)' }}
-                                    >
-                                      Copy {stone.name} NFC Tag URL
-                                    </button>
-                                  )}
-                                </div>
+                                <button
+                                  key={stone.id}
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(universalUrl);
+                                    setCopiedLink(true);
+                                    setTimeout(() => setCopiedLink(false), 2000);
+                                    toast({
+                                      title: "Link Copied",
+                                      description: `${stone.name} link copied — use this for the NFC tag and sharing`,
+                                    });
+                                    setActiveAction(null);
+                                  }}
+                                  className="w-full p-3 rounded-lg text-sm font-medium transition-colors text-black"
+                                  style={{ backgroundColor: '#00FF66' }}
+                                >
+                                  Copy {stone.name} Link
+                                </button>
                               );
                             })}
                           </div>
@@ -800,12 +781,15 @@ export default function MerchantTerminalMobile() {
                         <Button
                           onClick={() => {
                             if (merchant) {
-                              navigator.clipboard.writeText(merchant.paymentUrl);
+                              const universalUrl = merchant.paymentUrl
+                                ? merchant.paymentUrl.replace(/\/pay\//, "/nfc/")
+                                : merchant.paymentUrl;
+                              navigator.clipboard.writeText(universalUrl);
                               setCopiedLink(true);
                               setTimeout(() => setCopiedLink(false), 2000);
                               toast({
                                 title: "Link Copied",
-                                description: "Payment link copied to clipboard",
+                                description: "Payment link copied — use this for NFC tag and sharing",
                               });
                             }
                             setActiveAction(null);
