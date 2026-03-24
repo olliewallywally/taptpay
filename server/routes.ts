@@ -7,7 +7,7 @@ import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWind
 import { authenticateUser, generateToken, authenticateToken, createUser, getUserByEmail, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
 import { generateBusinessReportPdf } from "./report-generator";
-import { getBaseUrl, generatePaymentUrl, generateQrCodeUrl, generateStonePaymentUrl } from "./url-utils";
+import { getBaseUrl, generatePaymentUrl, generateQrCodeUrl, generateStonePaymentUrl, generateNfcTagUrl } from "./url-utils";
 import { sendEmail } from "./email-service";
 import QRCode from "qrcode";
 import { z } from "zod";
@@ -145,6 +145,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.type("text/plain").send(
       `User-agent: *\nAllow: /\nDisallow: /dashboard\nDisallow: /terminal\nDisallow: /settings\nDisallow: /transactions\nDisallow: /stock\nDisallow: /nfc\nDisallow: /admin\nDisallow: /api/\n\nSitemap: https://taptpay.com/sitemap.xml\n`
     );
+  });
+
+  // NFC tag redirect — sends Android to Chrome via intent://, iOS straight to pay URL
+  function nfcRedirectHtml(payUrl: string, intentUrl: string): string {
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TaptPay</title><style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#000a36;font-family:system-ui,sans-serif;color:#fff;text-align:center;padding:24px}</style></head><body><p style="opacity:.7;font-size:14px">Opening payment page…</p><script>
+var ua=navigator.userAgent||'';
+var isAndroid=/Android/i.test(ua);
+var isIOS=/iPhone|iPad|iPod/i.test(ua);
+var isInApp=/FBAN|FBAV|Instagram|Twitter|Line|WeChat|Snapchat|TikTok|Bytedance/i.test(ua)||(isAndroid&&/wv\\)/i.test(ua));
+if(isAndroid&&isInApp){window.location.href=${JSON.stringify(intentUrl)};}
+else if(isIOS){window.location.href=${JSON.stringify(payUrl)};}
+else{window.location.href=${JSON.stringify(payUrl)};}
+</script><noscript><a href="${payUrl}" style="color:#00f1d7">Tap to pay</a></noscript></body></html>`;
+  }
+
+  app.get("/nfc/:merchantId/stone/:stoneId", (req, res) => {
+    const merchantId = parseInt(req.params.merchantId);
+    const stoneId = parseInt(req.params.stoneId);
+    const payUrl = generatePaymentUrl(merchantId, stoneId, req);
+    const host = payUrl.replace(/^https?:\/\//, "");
+    const intentUrl = `intent://${host}#Intent;scheme=https;package=com.android.chrome;end`;
+    res.setHeader("Cache-Control", "no-store");
+    res.type("text/html").send(nfcRedirectHtml(payUrl, intentUrl));
+  });
+
+  app.get("/nfc/:merchantId", (req, res) => {
+    const merchantId = parseInt(req.params.merchantId);
+    const payUrl = generatePaymentUrl(merchantId, undefined, req);
+    const host = payUrl.replace(/^https?:\/\//, "");
+    const intentUrl = `intent://${host}#Intent;scheme=https;package=com.android.chrome;end`;
+    res.setHeader("Cache-Control", "no-store");
+    res.type("text/html").send(nfcRedirectHtml(payUrl, intentUrl));
   });
 
   app.get("/.well-known/apple-developer-merchantid-domain-association", (_req, res) => {
