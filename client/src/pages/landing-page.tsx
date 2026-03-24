@@ -57,7 +57,7 @@ function ScrambleHeading({
   }, [scramble]);
 
   return (
-    <div ref={ref} onMouseEnter={scramble} className="cursor-default">
+    <div ref={ref} className="cursor-default">
       <Tag className={className}>{displayText}</Tag>
     </div>
   );
