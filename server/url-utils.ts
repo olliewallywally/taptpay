@@ -51,3 +51,17 @@ export function generateStonePaymentUrl(merchantId: number, stoneId: number, req
   const stoneIdNumber = typeof stoneId === 'number' ? stoneId : parseInt(String(stoneId));
   return `${baseUrl}/pay/${merchantId}/stone/${stoneIdNumber}`;
 }
+
+/**
+ * Generates the URL to programme into a physical NFC tag.
+ * Hits a server-side redirect that sends Android users to Chrome via
+ * intent:// and iOS users straight to the HTTPS pay URL.
+ */
+export function generateNfcTagUrl(merchantId: number, stoneId?: number | null, req?: any): string {
+  const baseUrl = getBaseUrl(req);
+  if (stoneId) {
+    const stoneIdNumber = typeof stoneId === 'number' ? stoneId : parseInt(String(stoneId));
+    return `${baseUrl}/nfc/${merchantId}/stone/${stoneIdNumber}`;
+  }
+  return `${baseUrl}/nfc/${merchantId}`;
+}
