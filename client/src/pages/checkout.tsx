@@ -14,6 +14,17 @@ declare global {
   }
 }
 
+function detectInAppBrowser(): { isInApp: boolean; isAndroid: boolean; isIOS: boolean } {
+  const ua = navigator.userAgent || "";
+  const isAndroid = /Android/i.test(ua);
+  const isIOS = /iPhone|iPad|iPod/i.test(ua);
+  const isInApp =
+    /FBAN|FBAV|Instagram|Twitter|Line|WeChat|Snapchat|TikTok|LinkedIn|Pinterest|Tumblr|Reddit|Bytedance/i.test(ua) ||
+    (isAndroid && /wv\)/i.test(ua)) ||
+    (/\bMobile\b/.test(ua) && !/Chrome|CriOS|FxiOS|Safari/i.test(ua) && (isAndroid || isIOS));
+  return { isInApp, isAndroid, isIOS };
+}
+
 function loadScript(src: string): Promise<void> {
   return new Promise((resolve, reject) => {
     if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
@@ -39,6 +50,8 @@ export default function Checkout() {
   const [hfReady, setHfReady] = useState(false);
   const [payState, setPayState] = useState<"idle" | "processing" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [linkCopied, setLinkCopied] = useState(false);
+  const inAppEnv = detectInAppBrowser();
 
   const hfController = useRef<any>(null);
   const hfReadyRef = useRef(false);
@@ -439,35 +452,113 @@ export default function Checkout() {
               <p style={itemNameStyle}>{itemName}</p>
               <p style={amountStyle}>{amountDisplay}</p>
 
-              {/* Apple Pay — native button (Safari/Apple devices only) */}
-              {applePayAvailable && (
-                isProcessing ? (
-                  <button disabled style={applePayBtnStyle} aria-label="Processing">
-                    <Loader2 size={20} color="#fff" style={{ animation: "spin 1s linear infinite" }} />
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleApplePay}
-                    className="apple-pay-btn"
-                    aria-label="Pay with Apple Pay"
-                  />
-                )
-              )}
-
-              {/* Google Pay — official branded button (Android/Chrome only) */}
-              {googlePayAvailable && (
-                <button
-                  onClick={handleGooglePay}
-                  disabled={isProcessing}
-                  style={googlePayBtnStyle}
-                  aria-label="Pay with Google Pay"
-                >
-                  {isProcessing ? (
-                    <Loader2 size={20} color="#fff" style={{ animation: "spin 1s linear infinite" }} />
-                  ) : (
-                    <img src={googlePayLogo} alt="Google Pay" style={{ height: 24, objectFit: "contain" }} />
+              {/* In-app browser warning — shown instead of wallet buttons */}
+              {inAppEnv.isInApp ? (
+                <div style={{
+                  background: "rgba(255,255,255,0.12)",
+                  border: "1px solid rgba(255,255,255,0.25)",
+                  borderRadius: 16,
+                  padding: "16px 18px",
+                  marginTop: 8,
+                  textAlign: "center",
+                }}>
+                  <p style={{ color: "#fff", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                    Google Pay &amp; Apple Pay not available
+                  </p>
+                  <p style={{ color: "rgba(255,255,255,0.72)", fontSize: 12, marginBottom: 14, lineHeight: 1.5 }}>
+                    This page is open in an in-app browser. Open it in Chrome or Safari to use wallet payments, or pay by card below.
+                  </p>
+                  {inAppEnv.isAndroid && (
+                    <a
+                      href={`intent://${window.location.href.replace(/^https?:\/\//, "")}#Intent;scheme=https;package=com.android.chrome;end`}
+                      style={{
+                        display: "block",
+                        background: "#0055FF",
+                        color: "#fff",
+                        borderRadius: 10,
+                        padding: "10px 0",
+                        fontSize: 13,
+                        fontWeight: 700,
+                        textDecoration: "none",
+                        marginBottom: 8,
+                      }}
+                    >
+                      Open in Chrome
+                    </a>
                   )}
-                </button>
+                  {inAppEnv.isIOS && (
+                    <a
+                      href={`googlechrome://${window.location.href.replace(/^https?:\/\//, "")}`}
+                      style={{
+                        display: "block",
+                        background: "#0055FF",
+                        color: "#fff",
+                        borderRadius: 10,
+                        padding: "10px 0",
+                        fontSize: 13,
+                        fontWeight: 700,
+                        textDecoration: "none",
+                        marginBottom: 8,
+                      }}
+                    >
+                      Open in Chrome
+                    </a>
+                  )}
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(window.location.href).then(() => {
+                        setLinkCopied(true);
+                        setTimeout(() => setLinkCopied(false), 2500);
+                      });
+                    }}
+                    style={{
+                      background: "rgba(255,255,255,0.15)",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 10,
+                      padding: "10px 0",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      width: "100%",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {linkCopied ? "Link copied!" : "Copy payment link"}
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {/* Apple Pay — native button (Safari/Apple devices only) */}
+                  {applePayAvailable && (
+                    isProcessing ? (
+                      <button disabled style={applePayBtnStyle} aria-label="Processing">
+                        <Loader2 size={20} color="#fff" style={{ animation: "spin 1s linear infinite" }} />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleApplePay}
+                        className="apple-pay-btn"
+                        aria-label="Pay with Apple Pay"
+                      />
+                    )
+                  )}
+
+                  {/* Google Pay — official branded button (Android/Chrome only) */}
+                  {googlePayAvailable && (
+                    <button
+                      onClick={handleGooglePay}
+                      disabled={isProcessing}
+                      style={googlePayBtnStyle}
+                      aria-label="Pay with Google Pay"
+                    >
+                      {isProcessing ? (
+                        <Loader2 size={20} color="#fff" style={{ animation: "spin 1s linear infinite" }} />
+                      ) : (
+                        <img src={googlePayLogo} alt="Google Pay" style={{ height: 24, objectFit: "contain" }} />
+                      )}
+                    </button>
+                  )}
+                </>
               )}
             </>
           )}
