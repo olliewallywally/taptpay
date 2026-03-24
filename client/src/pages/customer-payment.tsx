@@ -6,12 +6,45 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
 import taptLogo from "@assets/IMG_6592_1755070818452.png";
 
+function redirectToRealBrowser() {
+  const ua = navigator.userAgent || "";
+  const isAndroid = /Android/i.test(ua);
+  const isIOS = /iPhone|iPad|iPod/i.test(ua);
+  const isInApp =
+    /FBAN|FBAV|Instagram|Twitter|Line|WeChat|Snapchat|TikTok|LinkedIn|Pinterest|Tumblr|Reddit|Bytedance/i.test(ua) ||
+    (isAndroid && /wv\)/i.test(ua)) ||
+    (/\bMobile\b/.test(ua) && !/Chrome|CriOS|FxiOS|Safari/i.test(ua) && (isAndroid || isIOS));
+
+  if (!isInApp) return false;
+
+  const url = window.location.href;
+
+  if (isAndroid) {
+    // Intent URL forces Chrome on Android
+    window.location.href = `intent://${url.replace(/^https?:\/\//, "")}#Intent;scheme=https;package=com.android.chrome;end`;
+    return true;
+  }
+
+  if (isIOS) {
+    // Chrome on iOS uses googlechrome:// scheme; fall back to x-safari-https:// if Chrome not installed
+    const path = url.replace(/^https?:\/\//, "");
+    window.location.href = `googlechrome://${path}`;
+    setTimeout(() => { window.location.href = `x-safari-https://${path}`; }, 800);
+    return true;
+  }
+
+  return false;
+}
+
 export default function CustomerPayment() {
   const { merchantId, stoneId } = useParams<{ merchantId: string; stoneId?: string }>();
   const [, setLocation] = useLocation();
   const [currentTransaction, setCurrentTransaction] = useState<any>(null);
   const [paymentStatus, setPaymentStatus] = useState<"loading" | "redirecting" | "success" | "error">("loading");
   const hasRedirected = useRef(false);
+
+  // Immediately redirect to Chrome/Safari if opened in an in-app browser
+  useEffect(() => { redirectToRealBrowser(); }, []);
 
   const id = merchantId ? parseInt(merchantId) : null;
   const stoneNumber = stoneId ? parseInt(stoneId) : null;
