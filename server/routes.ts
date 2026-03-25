@@ -602,15 +602,117 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   // Regular user authentication check
-  app.get("/api/auth/me", authenticateToken, (req: AuthenticatedRequest, res) => {
+  app.get("/api/auth/me", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    const merchantId = req.user!.merchantId;
+    let onboardingCompleted = true; // default for non-merchant users
+    if (merchantId) {
+      const merchant = await storage.getMerchant(merchantId);
+      onboardingCompleted = merchant?.onboardingCompleted ?? false;
+    }
     res.json({
       user: {
         id: req.user!.id,
         email: req.user!.email,
         merchantId: req.user!.merchantId,
         role: req.user!.role,
+        onboardingCompleted,
       },
     });
+  });
+
+  // Merchant KYC onboarding submission
+  app.post("/api/merchants/:id/onboarding", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      const userMerchantId = req.user?.merchantId;
+
+      if (userMerchantId !== merchantId && req.user?.role !== 'admin') {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+
+      const {
+        director,
+        nzbn,
+        gstNumber,
+        bankName,
+        bankAccountNumber,
+        bankBranch,
+        accountHolderName,
+        websiteUrl,
+        estimatedAnnualTurnover,
+        businessDescription,
+      } = req.body;
+
+      // Save all KYC details to merchant record
+      await storage.updateMerchant(merchantId, {
+        director: director || null,
+        nzbn: nzbn || null,
+        gstNumber: gstNumber || null,
+        bankName: bankName || null,
+        bankAccountNumber: bankAccountNumber || null,
+        bankBranch: bankBranch || null,
+        accountHolderName: accountHolderName || null,
+        onboardingCompleted: true,
+      });
+
+      // Send notification email to TaptPay admin
+      const emailHtml = `
+        <h2>New Merchant KYC Submission</h2>
+        <p>A merchant has completed their onboarding details and is ready for Windcave KYC/AML review.</p>
+        
+        <h3>Business Information</h3>
+        <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse; width:100%; font-family:sans-serif;">
+          <tr><td><strong>Business Name</strong></td><td>${merchant.businessName}</td></tr>
+          <tr><td><strong>Business Type</strong></td><td>${merchant.businessType || 'N/A'}</td></tr>
+          <tr><td><strong>Business Address</strong></td><td>${merchant.address || 'N/A'}</td></tr>
+          ${businessDescription ? `<tr><td><strong>Business Description</strong></td><td>${businessDescription}</td></tr>` : ''}
+          ${websiteUrl ? `<tr><td><strong>Website</strong></td><td>${websiteUrl}</td></tr>` : ''}
+          ${estimatedAnnualTurnover ? `<tr><td><strong>Estimated Annual Card Turnover</strong></td><td>${estimatedAnnualTurnover}</td></tr>` : ''}
+        </table>
+
+        <h3>Director / Owner Details</h3>
+        <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse; width:100%; font-family:sans-serif;">
+          <tr><td><strong>Contact Name</strong></td><td>${merchant.name}</td></tr>
+          <tr><td><strong>Director / Legal Name</strong></td><td>${director || 'N/A'}</td></tr>
+          <tr><td><strong>Email</strong></td><td>${merchant.email}</td></tr>
+          <tr><td><strong>Phone</strong></td><td>${merchant.phone || 'N/A'}</td></tr>
+        </table>
+
+        <h3>Tax & Registration</h3>
+        <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse; width:100%; font-family:sans-serif;">
+          <tr><td><strong>NZBN</strong></td><td>${nzbn || 'N/A'}</td></tr>
+          <tr><td><strong>GST Number</strong></td><td>${gstNumber || 'N/A'}</td></tr>
+        </table>
+
+        <h3>Bank Account Details (for settlements)</h3>
+        <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse; width:100%; font-family:sans-serif;">
+          <tr><td><strong>Bank</strong></td><td>${bankName || 'N/A'}</td></tr>
+          <tr><td><strong>Account Holder</strong></td><td>${accountHolderName || 'N/A'}</td></tr>
+          <tr><td><strong>Account Number</strong></td><td>${bankAccountNumber || 'N/A'}</td></tr>
+          <tr><td><strong>Branch</strong></td><td>${bankBranch || 'N/A'}</td></tr>
+        </table>
+
+        <p style="margin-top:20px; color:#666;">Submitted via TaptPay merchant onboarding form.</p>
+      `;
+
+      await sendEmail({
+        to: 'oliverleonard@taptpay.co.nz',
+        from: 'noreply@taptpay.co.nz',
+        subject: `New Merchant KYC Submission — ${merchant.businessName}`,
+        html: emailHtml,
+        text: `New merchant KYC submission from ${merchant.businessName} (${merchant.email}). Director: ${director || 'N/A'}. NZBN: ${nzbn || 'N/A'}. GST: ${gstNumber || 'N/A'}. Bank: ${bankName || 'N/A'} / ${bankAccountNumber || 'N/A'}.`,
+      });
+
+      res.json({ message: "Onboarding details submitted successfully" });
+    } catch (error: any) {
+      console.error("Onboarding submission error:", error);
+      res.status(500).json({ message: "Failed to submit onboarding details" });
+    }
   });
 
   app.get("/api/admin/auth/me", (req: AuthenticatedRequest, res) => {

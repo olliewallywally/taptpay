@@ -63,6 +63,9 @@ export const merchants = pgTable("merchants", {
   autoConvertToFiat: boolean("auto_convert_to_fiat").default(false),
   minConfirmations: integer("min_confirmations").default(1),
   
+  // Onboarding status
+  onboardingCompleted: boolean("onboarding_completed").default(false),
+
   // Dashboard preferences
   dailyGoal: decimal("daily_goal", { precision: 10, scale: 2 }).default("500.00"), // Daily revenue goal in dollars
   

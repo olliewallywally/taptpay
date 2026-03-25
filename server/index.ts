@@ -117,6 +117,27 @@ app.use((req, res, next) => {
     log(`⚠️ Failed to sync verified merchants: ${error}`);
   }
 
+  // Mark all pre-existing verified/active merchants as onboarding completed
+  // so they aren't forced through the new onboarding flow
+  if (isDatabaseConnected()) {
+    try {
+      const { db } = await import("./db");
+      const { merchants } = await import("../shared/schema");
+      const { eq, or } = await import("drizzle-orm");
+      await db.update(merchants)
+        .set({ onboardingCompleted: true })
+        .where(
+          or(
+            eq(merchants.status, 'verified'),
+            eq(merchants.status, 'active')
+          )
+        );
+      log("✅ Existing verified merchants marked as onboarding completed");
+    } catch (error) {
+      log(`⚠️ Failed to mark existing merchants as onboarded: ${error}`);
+    }
+  }
+
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
