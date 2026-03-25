@@ -222,65 +222,21 @@
   }
 }
 
-/* Slide animations with different directions */
-@keyframes slideInFromRight {
+/* Page transition — smooth fade-up enter */
+@keyframes pageEnter {
   from {
-    transform: translateX(100%);
     opacity: 0;
+    transform: translateY(10px);
   }
   to {
-    transform: translateX(0);
     opacity: 1;
+    transform: translateY(0);
   }
 }
 
-@keyframes slideOutToLeft {
-  from {
-    transform: translateX(0);
-    opacity: 1;
-  }
-  to {
-    transform: translateX(-100%);
-    opacity: 0;
-  }
-}
-
-@keyframes slideInFromLeft {
-  from {
-    transform: translateX(-100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-@keyframes slideOutToRight {
-  from {
-    transform: translateX(0);
-    opacity: 1;
-  }
-  to {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-}
-
-.slide-enter-right {
-  animation: slideInFromRight 350ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
-.slide-exit-left {
-  animation: slideOutToLeft 350ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
-.slide-enter-left {
-  animation: slideInFromLeft 350ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
-.slide-exit-right {
-  animation: slideOutToRight 350ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+.page-enter {
+  animation: pageEnter 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: opacity, transform;
 }
 
 /* Mobile Menu Animations */
