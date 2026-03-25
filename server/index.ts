@@ -47,6 +47,7 @@ app.use(helmet({
   xssFilter: true,
   referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   dnsPrefetchControl: { allow: false },
+  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
 }));
 
 // Skip JSON parsing for webhook routes to preserve raw body for signature verification
