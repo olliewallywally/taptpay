@@ -26,6 +26,7 @@ import VerifyMerchant from "@/pages/verify-merchant";
 import StockManagement from "@/pages/stock-management";
 import { LandingPage } from "@/pages/landing-page";
 import LegalPage from "@/pages/legal";
+import MerchantOnboarding from "@/pages/merchant-onboarding";
 import SplitPayment from "@/pages/split-payment";
 import PaymentResult from "@/pages/payment-result";
 import Checkout from "@/pages/checkout";
@@ -35,7 +36,7 @@ import { PageTransition } from "@/components/page-transition";
 import { BottomNavigation } from "@/components/bottom-navigation";
 
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function ProtectedRoute({ children, skipOnboardingCheck = false }: { children: React.ReactNode; skipOnboardingCheck?: boolean }) {
   const [, setLocation] = useLocation();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
@@ -58,7 +59,19 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
         });
         
         if (response.ok) {
+          const data = await response.json();
           setIsAuthenticated(true);
+          // Redirect to onboarding if not yet completed (merchant users only)
+          if (
+            !skipOnboardingCheck &&
+            data?.user?.merchantId &&
+            data?.user?.role !== 'admin' &&
+            data?.user?.onboardingCompleted === false
+          ) {
+            setIsChecking(false);
+            setLocation("/onboarding");
+            return;
+          }
         } else {
           localStorage.removeItem("authToken");
           const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
@@ -73,7 +86,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     };
 
     checkAuthStatus();
-  }, [setLocation]);
+  }, [setLocation, skipOnboardingCheck]);
 
   if (isChecking) {
     return (
@@ -200,6 +213,11 @@ function Router() {
         <Route path="/board-builder">
           <ProtectedRoute>
             <BoardBuilder />
+          </ProtectedRoute>
+        </Route>
+        <Route path="/onboarding">
+          <ProtectedRoute skipOnboardingCheck={true}>
+            <MerchantOnboarding />
           </ProtectedRoute>
         </Route>
         
