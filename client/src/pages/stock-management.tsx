@@ -246,7 +246,7 @@ export default function StockManagement() {
 
       {/* Add Stock Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="bg-white rounded-3xl max-w-md mx-4">
+        <DialogContent className="bg-white rounded-3xl w-[calc(100%-2rem)] max-w-md mx-auto max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-[#0055FF] text-xl">Add New Product</DialogTitle>
             <DialogDescription className="text-gray-600">
@@ -256,19 +256,19 @@ export default function StockManagement() {
           
           <div className="space-y-4 pt-4">
             <div>
-              <Label htmlFor="productName" className="text-gray-700">Product Name *</Label>
+              <Label htmlFor="productName" className="text-gray-700 font-medium">Product Name *</Label>
               <Input
                 id="productName"
                 value={newItem.name}
                 onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
                 placeholder="e.g. Wireless Earbuds"
-                className="border-[#0055FF]/30 focus:border-[#00E5CC] focus:ring-[#00E5CC] mt-1"
+                className="mt-1 border-2 border-gray-300 focus:border-[#0055FF] focus-visible:ring-0 bg-white text-gray-900 placeholder:text-gray-400"
                 data-testid="input-product-name"
               />
             </div>
 
             <div>
-              <Label htmlFor="cost" className="text-gray-700">Price ($) *</Label>
+              <Label htmlFor="cost" className="text-gray-700 font-medium">Price ($) *</Label>
               <Input
                 id="cost"
                 type="number"
@@ -277,19 +277,19 @@ export default function StockManagement() {
                 value={newItem.cost}
                 onChange={(e) => setNewItem({ ...newItem, cost: e.target.value })}
                 placeholder="0.00"
-                className="border-[#0055FF]/30 focus:border-[#00E5CC] focus:ring-[#00E5CC] mt-1"
+                className="mt-1 border-2 border-gray-300 focus:border-[#0055FF] focus-visible:ring-0 bg-white text-gray-900 placeholder:text-gray-400"
                 data-testid="input-price"
               />
             </div>
 
             <div>
-              <Label htmlFor="description" className="text-gray-700">Description</Label>
+              <Label htmlFor="description" className="text-gray-700 font-medium">Description</Label>
               <Input
                 id="description"
                 value={newItem.description}
                 onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
                 placeholder="Optional description"
-                className="border-[#0055FF]/30 focus:border-[#00E5CC] focus:ring-[#00E5CC] mt-1"
+                className="mt-1 border-2 border-gray-300 focus:border-[#0055FF] focus-visible:ring-0 bg-white text-gray-900 placeholder:text-gray-400"
                 data-testid="input-description"
               />
             </div>
@@ -301,7 +301,7 @@ export default function StockManagement() {
                   setIsDialogOpen(false);
                   setNewItem({ name: "", cost: "", description: "" });
                 }}
-                className="flex-1 border-[#0055FF]/30 text-[#0055FF] hover:bg-[#0055FF]/10"
+                className="flex-1 border-2 border-gray-300 text-gray-700 hover:bg-gray-50"
                 data-testid="button-cancel-add"
               >
                 Cancel
@@ -321,7 +321,7 @@ export default function StockManagement() {
 
       {/* Edit Stock Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="bg-white rounded-3xl max-w-md mx-4">
+        <DialogContent className="bg-white rounded-3xl w-[calc(100%-2rem)] max-w-md mx-auto max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-[#0055FF] text-xl">Edit Product</DialogTitle>
             <DialogDescription className="text-gray-600">
@@ -332,19 +332,19 @@ export default function StockManagement() {
           {editingItem && (
             <div className="space-y-4 pt-4">
               <div>
-                <Label htmlFor="editProductName" className="text-gray-700">Product Name *</Label>
+                <Label htmlFor="editProductName" className="text-gray-700 font-medium">Product Name *</Label>
                 <Input
                   id="editProductName"
                   value={editingItem.name}
                   onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
                   placeholder="e.g. Wireless Earbuds"
-                  className="border-[#0055FF]/30 focus:border-[#00E5CC] focus:ring-[#00E5CC] mt-1"
+                  className="mt-1 border-2 border-gray-300 focus:border-[#0055FF] focus-visible:ring-0 bg-white text-gray-900 placeholder:text-gray-400"
                   data-testid="input-edit-name"
                 />
               </div>
 
               <div>
-                <Label htmlFor="editCost" className="text-gray-700">Price ($) *</Label>
+                <Label htmlFor="editCost" className="text-gray-700 font-medium">Price ($) *</Label>
                 <Input
                   id="editCost"
                   type="number"
@@ -353,19 +353,19 @@ export default function StockManagement() {
                   value={editingItem.cost}
                   onChange={(e) => setEditingItem({ ...editingItem, cost: e.target.value })}
                   placeholder="0.00"
-                  className="border-[#0055FF]/30 focus:border-[#00E5CC] focus:ring-[#00E5CC] mt-1"
+                  className="mt-1 border-2 border-gray-300 focus:border-[#0055FF] focus-visible:ring-0 bg-white text-gray-900 placeholder:text-gray-400"
                   data-testid="input-edit-price"
                 />
               </div>
 
               <div>
-                <Label htmlFor="editDescription" className="text-gray-700">Description</Label>
+                <Label htmlFor="editDescription" className="text-gray-700 font-medium">Description</Label>
                 <Input
                   id="editDescription"
                   value={editingItem.description || ""}
                   onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
                   placeholder="Optional description"
-                  className="border-[#0055FF]/30 focus:border-[#00E5CC] focus:ring-[#00E5CC] mt-1"
+                  className="mt-1 border-2 border-gray-300 focus:border-[#0055FF] focus-visible:ring-0 bg-white text-gray-900 placeholder:text-gray-400"
                   data-testid="input-edit-description"
                 />
               </div>
@@ -375,7 +375,7 @@ export default function StockManagement() {
                   variant="outline"
                   onClick={handleDeleteStock}
                   disabled={deleteItemMutation.isPending}
-                  className="border-red-500/30 text-red-500 hover:bg-red-500/10 gap-2"
+                  className="border-2 border-red-300 text-red-500 hover:bg-red-50 gap-2"
                   data-testid="button-delete"
                 >
                   <Trash2 size={16} />
@@ -387,7 +387,7 @@ export default function StockManagement() {
                     setIsEditDialogOpen(false);
                     setEditingItem(null);
                   }}
-                  className="flex-1 border-[#0055FF]/30 text-[#0055FF] hover:bg-[#0055FF]/10"
+                  className="flex-1 border-2 border-gray-300 text-gray-700 hover:bg-gray-50"
                   data-testid="button-cancel-edit"
                 >
                   Cancel
