@@ -714,14 +714,14 @@ export function LandingPage() {
         </StickyCard>
 
         {/* Pricing — full-screen, non-sticky */}
-        <div className="h-screen flex items-center justify-center px-3 md:px-4" style={{ backgroundColor: "#ececec" }}>
+        <div className="relative z-10 h-screen flex items-center justify-center px-3 md:px-4" style={{ backgroundColor: "#ececec" }}>
           <div className="w-full max-w-7xl h-[90vh] rounded-3xl shadow-2xl overflow-hidden" style={{ backgroundColor: "#060e42" }}>
             <PricingCard onGetStarted={goLogin} />
           </div>
         </div>
 
         {/* Footer */}
-        <div className="pt-4 px-3 md:px-4 pb-8" style={{ backgroundColor: "#ececec" }}>
+        <div className="relative z-10 pt-4 px-3 md:px-4 pb-8" style={{ backgroundColor: "#ececec" }}>
           <FooterCard />
         </div>
       </div>
