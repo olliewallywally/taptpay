@@ -171,7 +171,7 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
       <div className="h-screen flex flex-row relative overflow-hidden">
 
         {/* Left — text pinned to bottom, above the phone */}
-        <div className="relative z-10 flex flex-col justify-end px-5 md:px-12 lg:px-20 pb-8 md:pb-14 gap-3 md:gap-5 w-[52%] md:w-[48%] lg:w-[45%] shrink-0">
+        <div className="relative z-10 flex flex-col justify-end px-5 md:px-12 lg:px-20 pb-[22%] gap-3 md:gap-5 w-[52%] md:w-[48%] lg:w-[45%] shrink-0">
           <motion.h2
             initial={{ opacity: 0, y: 24, filter: "blur(14px)" }}
             whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
@@ -214,7 +214,7 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
           viewport={{ once: false, amount: 0.2 }}
           transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
           className="relative z-0 flex-1 self-end overflow-hidden"
-          style={{ transformOrigin: "bottom center", transform: "scale(1.15)" }}
+          style={{ transformOrigin: "bottom center", transform: "translateX(-14%) scale(1.05)" }}
         >
           <video
             className="w-full h-full object-cover block"
