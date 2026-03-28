@@ -9,6 +9,7 @@ import dashboardMockup from "@assets/dashboard_3d_1774258691269.png";
 import paymentMockup from "@assets/payment_page_1774258691269.png";
 import terminalMockup from "@assets/terminal_3d_1774258691270.png";
 import welcomeVideo from "@assets/welcome_to_tapt_-_web_1774671768422.mp4";
+import dashTerminalVideo from "@assets/dash_abd_terminal_video_1774672821806.mov";
 
 function MagneticButton({ children, className, onClick, style, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   const elRef = useRef<HTMLButtonElement>(null);
@@ -110,14 +111,10 @@ function FixedNav({ onGetStarted }: { onGetStarted: () => void }) {
 }
 
 function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
-  const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
-  const scale = useTransform(scrollYProgress, [0, 0.5], [1, 0.95]);
-
   return (
-    <div ref={ref} className="relative h-full w-full overflow-hidden flex flex-col items-center justify-center">
-      <motion.div style={{ opacity, scale }} className="flex flex-col items-center text-center px-6 space-y-6">
+    <div className="w-full bg-[#0055ff] rounded-3xl overflow-hidden">
+      {/* Top half — centred hero */}
+      <div className="min-h-screen flex flex-col items-center justify-center text-center px-6 space-y-6">
         <motion.img
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -149,7 +146,47 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
           </MagneticButton>
           <p className="text-white/40 text-xs tracking-widest uppercase">100% kiwi owned and operated</p>
         </motion.div>
-      </motion.div>
+      </div>
+
+      {/* Bottom half — text left, video right */}
+      <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2">
+        {/* Left — text */}
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+          viewport={{ once: true }}
+          className="flex flex-col justify-center px-10 md:px-16 lg:px-20 py-16 gap-7"
+        >
+          <h2 className="text-5xl md:text-6xl lg:text-7xl font-medium text-[#00f1d7] leading-tight">
+            what is tapt?
+          </h2>
+          <p className="text-[#00f1d7]/80 text-base md:text-lg leading-relaxed max-w-lg">
+            We've set out to change how merchants of all industries collect payments.<br /><br />
+            No need for those clunky EFTPOS machines or expensive pos systems, all you need is your phone and if you're a store, then one of our payment boards as well.<br /><br />
+            Perfect for merchants on the move or operating where you need a quick and painless set up.
+          </p>
+          <div>
+            <MagneticButton
+              onClick={onGetStarted}
+              className="bg-[#00f1d7] hover:bg-white text-[#000a36] font-semibold px-8 py-3 rounded-full text-sm uppercase tracking-wider transition-colors shadow-lg inline-flex items-center gap-2"
+            >
+              get started <ArrowRight className="w-4 h-4" />
+            </MagneticButton>
+          </div>
+        </motion.div>
+
+        {/* Right — video */}
+        <div className="relative overflow-hidden min-h-[50vh] lg:min-h-0">
+          <video
+            className="absolute inset-0 w-full h-full object-cover"
+            src={dashTerminalVideo}
+            autoPlay
+            loop
+            playsInline
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -410,18 +447,18 @@ export function LandingPage() {
       <FixedNav onGetStarted={goLogin} />
 
       <div>
-        {/* Hero */}
-        <StickyCard index={0} backgroundColor="#0055ff" isDouble>
+        {/* Hero — no sticky, doubled height */}
+        <div className="px-3 md:px-4 pb-3 md:pb-4">
           <HeroSection onGetStarted={goLogin} />
-        </StickyCard>
+        </div>
 
         {/* Video */}
-        <StickyCard index={1} backgroundColor="#000000">
+        <StickyCard index={0} backgroundColor="#000000">
           <VideoCard />
         </StickyCard>
 
         {/* Digital Terminal */}
-        <StickyCard index={2} backgroundColor="#00f1d7">
+        <StickyCard index={1} backgroundColor="#00f1d7">
           <FeatureSection
             title="the digital terminal"
             image={terminalMockup}
@@ -438,7 +475,7 @@ export function LandingPage() {
         </StickyCard>
 
         {/* Payment Board */}
-        <StickyCard index={3} backgroundColor="#000a36">
+        <StickyCard index={2} backgroundColor="#000a36">
           <FeatureSection
             title="the payment board"
             image={paymentMockup}
@@ -457,7 +494,7 @@ export function LandingPage() {
         </StickyCard>
 
         {/* Split Payments */}
-        <StickyCard index={4} backgroundColor="#ffffff">
+        <StickyCard index={3} backgroundColor="#ffffff">
           <FeatureSection
             title="Split Bill Payments"
             image={dashboardMockup}
@@ -468,7 +505,7 @@ export function LandingPage() {
         </StickyCard>
 
         {/* Share Payment */}
-        <StickyCard index={5} backgroundColor="#ffffff">
+        <StickyCard index={4} backgroundColor="#ffffff">
           <FeatureSection
             title="Share Payment Requests"
             image={paymentMockup}
@@ -479,7 +516,7 @@ export function LandingPage() {
         </StickyCard>
 
         {/* Bill Splitting Interface */}
-        <StickyCard index={6} backgroundColor="#ffffff">
+        <StickyCard index={5} backgroundColor="#ffffff">
           <FeatureSection
             title="Smart Bill Splitting"
             image={terminalMockup}
@@ -490,7 +527,7 @@ export function LandingPage() {
         </StickyCard>
 
         {/* Receipts */}
-        <StickyCard index={7} backgroundColor="#ffffff">
+        <StickyCard index={6} backgroundColor="#ffffff">
           <FeatureSection
             title="Professional Receipts"
             image={dashboardMockup}
@@ -501,7 +538,7 @@ export function LandingPage() {
         </StickyCard>
 
         {/* Pricing */}
-        <StickyCard index={8} backgroundColor="#060e42">
+        <StickyCard index={7} backgroundColor="#060e42">
           <PricingCard onGetStarted={goLogin} />
         </StickyCard>
 
