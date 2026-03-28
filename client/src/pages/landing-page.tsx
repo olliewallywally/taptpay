@@ -167,16 +167,17 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
         </motion.div>
       </div>
 
-      {/* ── Screen 2: What is tapt? — text left, video right — revealed on scroll ── */}
-      <div className="h-screen flex flex-col lg:flex-row">
-        {/* Left text — pinned to bottom */}
-        <div className="flex-1 flex flex-col justify-end px-6 md:px-14 lg:px-20 pb-10 md:pb-16 gap-4 md:gap-6">
+      {/* ── Screen 2: What is tapt? — always row, text left z-10, video right z-0 ── */}
+      <div className="h-screen flex flex-row relative overflow-hidden">
+
+        {/* Left — text pinned to bottom, above the phone */}
+        <div className="relative z-10 flex flex-col justify-end px-5 md:px-12 lg:px-20 pb-8 md:pb-14 gap-3 md:gap-5 w-[52%] md:w-[48%] lg:w-[45%] shrink-0">
           <motion.h2
             initial={{ opacity: 0, y: 24, filter: "blur(14px)" }}
             whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
             viewport={{ once: false, amount: 0.2 }}
             transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0 }}
-            className="text-4xl md:text-5xl lg:text-7xl font-medium text-[#00f1d7] leading-tight"
+            className="text-3xl md:text-5xl lg:text-7xl font-medium text-[#00f1d7] leading-tight"
           >
             what<br />is tapt?
           </motion.h2>
@@ -185,11 +186,11 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
             whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
             viewport={{ once: false, amount: 0.2 }}
             transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.14 }}
-            className="text-[#00f1d7]/80 text-sm md:text-base lg:text-lg leading-relaxed max-w-lg"
+            className="text-[#00f1d7]/80 text-xs md:text-base lg:text-lg leading-relaxed"
           >
-            We've set out to change how merchants of all industries collect payments.<br /><br />
-            No need for those clunky EFTPOS machines or expensive POS systems — all you need is your phone, and if you're a store, one of our payment boards.<br /><br />
-            Perfect for merchants on the move or where you need a quick, painless setup.
+            We've set out to change how merchants of all industries collect payments.<br /><br className="hidden md:block" />
+            <span className="hidden md:inline">No need for those clunky EFTPOS machines or expensive POS systems — all you need is your phone, and if you're a store, one of our payment boards.<br /><br />Perfect for merchants on the move or where you need a quick, painless setup.</span>
+            <span className="md:hidden">No clunky EFTPOS machines — just your phone. Perfect for merchants on the move.</span>
           </motion.p>
           <motion.div
             initial={{ opacity: 0, y: 24, filter: "blur(14px)" }}
@@ -206,17 +207,14 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
           </motion.div>
         </div>
 
-        {/* Right — phone video pinned to bottom */}
+        {/* Right — phone video, bottom layer, pinned to bottom of card */}
         <motion.div
           initial={{ opacity: 0, filter: "blur(14px)" }}
           whileInView={{ opacity: 1, filter: "blur(0px)" }}
           viewport={{ once: false, amount: 0.2 }}
           transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
-          className="flex-1 self-end overflow-hidden"
-          style={{
-            transform: isMobile ? "scale(0.9)" : "translateX(-8%) scale(0.88)",
-            transformOrigin: "bottom center",
-          }}
+          className="relative z-0 flex-1 self-end overflow-hidden"
+          style={{ transformOrigin: "bottom center", transform: "scale(0.92)" }}
         >
           <video
             className="w-full h-full object-cover block"
@@ -228,6 +226,7 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
             <source src="/hero-phone.mp4" type="video/mp4" />
           </video>
         </motion.div>
+
       </div>
 
     </div>
