@@ -29,7 +29,7 @@ app.use(helmet({
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "blob:", "https:"],
       connectSrc: ["'self'", "https://uat.windcave.com", "https://sec.windcave.com", "https://pay.google.com"],
-      frameSrc: ["'self'", "https://sec.windcave.com", "https://uat.windcave.com"],
+      frameSrc: ["'self'", "https://sec.windcave.com", "https://uat.windcave.com", "https://pay.google.com"],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
       formAction: ["'self'"],
