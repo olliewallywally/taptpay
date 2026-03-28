@@ -177,7 +177,7 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
             whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
             viewport={{ once: false, amount: 0.2 }}
             transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0 }}
-            className="text-3xl md:text-5xl lg:text-7xl font-medium text-[#00f1d7] leading-tight"
+            className="text-4xl md:text-6xl lg:text-8xl font-medium text-[#00f1d7] leading-tight"
           >
             what<br />is tapt?
           </motion.h2>
@@ -214,7 +214,7 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
           viewport={{ once: false, amount: 0.2 }}
           transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
           className="relative z-0 flex-1 self-end overflow-hidden"
-          style={{ transformOrigin: "bottom center", transform: "scale(0.92)" }}
+          style={{ transformOrigin: "bottom center", transform: "scale(1.15)" }}
         >
           <video
             className="w-full h-full object-cover block"
