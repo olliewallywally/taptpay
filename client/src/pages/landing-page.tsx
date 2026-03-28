@@ -9,7 +9,6 @@ import dashboardMockup from "@assets/dashboard_3d_1774258691269.png";
 import paymentMockup from "@assets/payment_page_1774258691269.png";
 import terminalMockup from "@assets/terminal_3d_1774258691270.png";
 import welcomeVideo from "@assets/welcome_to_tapt_-_web_1774671768422.mp4";
-import dashTerminalVideo from "@assets/dash_abd_terminal_video_1774672821806.mov";
 
 function MagneticButton({ children, className, onClick, style, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   const elRef = useRef<HTMLButtonElement>(null);
@@ -180,11 +179,14 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
         <div className="relative overflow-hidden min-h-[50vh] lg:min-h-0">
           <video
             className="absolute inset-0 w-full h-full object-cover"
-            src={dashTerminalVideo}
             autoPlay
             loop
             playsInline
-          />
+            muted
+          >
+            <source src="/dash-terminal.mov" type="video/mp4" />
+            <source src="/dash-terminal.mov" type="video/quicktime" />
+          </video>
         </div>
       </div>
     </div>

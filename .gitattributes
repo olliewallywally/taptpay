@@ -1,1 +1,2 @@
 attached_assets/dash_abd_terminal_video_1774672821806.mov filter=lfs diff=lfs merge=lfs -text
+client/public/dash-terminal.mov filter=lfs diff=lfs merge=lfs -text
