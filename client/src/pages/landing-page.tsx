@@ -686,15 +686,17 @@ export function LandingPage() {
             details="Perfect for cafes, retail stores, food trucks, and any business that wants to offer a modern, contactless payment experience."
             imagePosition="right"
             titleStyle="split"
-            titleColor="#ffffff"
+            titleColor="#000a36"
             imageScale="large"
             showButton
             buttonText="more"
             onButton={goLogin}
-            textColor="white"
+            textColor="default"
             smallTextSize="3.2rem"
             largeTitleSize="7rem"
             smallTextMarginBottom="-1rem"
+            imageContainerStyle={{ overflow: "hidden" }}
+            imageStyle={{ transform: "scale(2)", transformOrigin: "center center" }}
           />
         </StickyCard>
 
