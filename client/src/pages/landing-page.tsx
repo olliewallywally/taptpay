@@ -498,6 +498,8 @@ export function LandingPage() {
             imageScale="large"
             smallTextSize="3rem"
             largeTitleSize="6rem"
+            imageContainerStyle={{ overflow: "hidden" }}
+            imageStyle={{ transform: "scale(2)", transformOrigin: "center center" }}
             showButton
             buttonText="more"
             onButton={goLogin}
