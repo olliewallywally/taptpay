@@ -7,6 +7,7 @@ import { useScrambleText } from "@/hooks/use-scramble-text";
 import logoImage from "@assets/logo_1762915255857.png";
 import dashboardMockup from "@assets/dashboard_3d_1774258691269.png";
 import paymentMockup from "@assets/payment_page_1774258691269.png";
+import paymentBoardMockup from "@assets/payment_board_3d_v2_1774674925840.png";
 import terminalMockup from "@assets/terminal_3d_1774258691270.png";
 import welcomeVideo from "@assets/welcome_to_tapt_-_web_1774671768422.mp4";
 
@@ -510,7 +511,7 @@ export function LandingPage() {
         <StickyCard index={2} backgroundColor="#000a36">
           <FeatureSection
             title="the payment board"
-            image={paymentMockup}
+            image={paymentBoardMockup}
             description="Display your custom QR code and NFC payment option for customers. Our physical payment boards make it easy for customers to pay using their preferred method."
             details="Perfect for cafes, retail stores, food trucks, and any business that wants to offer a modern, contactless payment experience."
             imagePosition="right"
@@ -522,6 +523,7 @@ export function LandingPage() {
             onButton={goLogin}
             textColor="white"
             smallTextSize="2.5rem"
+            largeTitleSize="7rem"
           />
         </StickyCard>
 
