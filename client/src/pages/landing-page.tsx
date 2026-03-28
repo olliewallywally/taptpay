@@ -695,7 +695,6 @@ export function LandingPage() {
             smallTextSize="3.2rem"
             largeTitleSize="7rem"
             smallTextMarginBottom="-1rem"
-            imageContainerStyle={{ overflow: "hidden" }}
             imageStyle={{ transform: "scale(2)", transformOrigin: "center center" }}
           />
         </StickyCard>
