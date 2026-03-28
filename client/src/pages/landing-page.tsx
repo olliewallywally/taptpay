@@ -129,22 +129,23 @@ function FixedNav({ onGetStarted }: { onGetStarted: () => void }) {
 function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
   const isMobile = useIsMobile();
   return (
-    <div className="w-full h-[90vh] bg-[#0055ff] rounded-3xl overflow-hidden flex flex-col">
-      {/* Top — centred logo / tagline / CTA, compact */}
-      <div className="flex flex-col items-center justify-center text-center px-6 gap-5 pt-16 md:pt-20 pb-6">
+    <div className="w-full bg-[#0055ff] rounded-3xl overflow-hidden flex flex-col">
+
+      {/* ── Screen 1: Logo / tagline / CTA — full viewport height ── */}
+      <div className="h-screen flex flex-col items-center justify-center text-center px-6 gap-4 md:gap-6">
         <motion.img
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.8, delay: 0.2 }}
           src={logoImage}
           alt="TaptPay"
-          className="w-44 md:w-72 lg:w-[380px] h-auto"
+          className="w-52 md:w-80 lg:w-[420px] h-auto"
         />
         <motion.h1
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.4 }}
-          className="text-sm md:text-2xl lg:text-3xl text-white font-light tracking-[0.2em] uppercase"
+          className="text-xs md:text-2xl lg:text-3xl text-white font-light tracking-[0.2em] uppercase"
         >
           100% digital pos &amp; eftpos solution
         </motion.h1>
@@ -156,60 +157,65 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
         >
           <MagneticButton
             onClick={onGetStarted}
-            className="bg-[#00f1d7] hover:bg-white text-[#000a36] font-semibold px-7 py-2.5 md:py-3 rounded-full text-sm md:text-base uppercase tracking-wider transition-colors shadow-lg flex items-center gap-2"
+            className="bg-[#00f1d7] hover:bg-white text-[#000a36] font-semibold px-5 py-2 md:px-8 md:py-3 rounded-full text-xs md:text-base uppercase tracking-wider transition-colors shadow-lg flex items-center gap-1.5 md:gap-2"
             data-testid="button-get-started"
           >
-            get started <ArrowRight className="w-4 h-4" />
+            get started <ArrowRight className="w-3 h-3 md:w-4 md:h-4" />
           </MagneticButton>
-          <p className="text-white/40 text-xs tracking-widest uppercase">100% kiwi owned and operated</p>
+          <p className="text-white/40 text-[10px] md:text-xs tracking-widest uppercase">100% kiwi owned and operated</p>
         </motion.div>
       </div>
 
-      {/* Bottom — text left, phone video right — fills remaining height, both visible on load */}
-      <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
+      {/* ── Screen 2: What is tapt? — text left, video right — revealed on scroll ── */}
+      <div className="h-screen flex flex-col lg:flex-row">
         {/* Left text — pinned to bottom */}
-        <div className="flex-1 flex flex-col justify-end px-6 md:px-14 lg:px-20 pt-4 pb-7 md:pb-10 gap-4 md:gap-6">
+        <div className="flex-1 flex flex-col justify-end px-6 md:px-14 lg:px-20 pb-10 md:pb-16 gap-4 md:gap-6">
           <motion.h2
-            initial={{ opacity: 0, y: 16, filter: "blur(12px)" }}
+            initial={{ opacity: 0, y: 24, filter: "blur(14px)" }}
             whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-            viewport={{ once: false, amount: 0 }}
-            transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
+            viewport={{ once: false, amount: 0.2 }}
+            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0 }}
             className="text-4xl md:text-5xl lg:text-7xl font-medium text-[#00f1d7] leading-tight"
           >
             what<br />is tapt?
           </motion.h2>
           <motion.p
-            initial={{ opacity: 0, y: 16, filter: "blur(12px)" }}
+            initial={{ opacity: 0, y: 24, filter: "blur(14px)" }}
             whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-            viewport={{ once: false, amount: 0 }}
-            transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1], delay: 0.34 }}
-            className="text-[#00f1d7]/80 text-sm md:text-base lg:text-lg leading-relaxed max-w-lg hidden md:block"
+            viewport={{ once: false, amount: 0.2 }}
+            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.14 }}
+            className="text-[#00f1d7]/80 text-sm md:text-base lg:text-lg leading-relaxed max-w-lg"
           >
-            We've set out to change how merchants of all industries collect payments. No need for those clunky EFTPOS machines — all you need is your phone.
+            We've set out to change how merchants of all industries collect payments.<br /><br />
+            No need for those clunky EFTPOS machines or expensive POS systems — all you need is your phone, and if you're a store, one of our payment boards.<br /><br />
+            Perfect for merchants on the move or where you need a quick, painless setup.
           </motion.p>
           <motion.div
-            initial={{ opacity: 0, y: 16, filter: "blur(12px)" }}
+            initial={{ opacity: 0, y: 24, filter: "blur(14px)" }}
             whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-            viewport={{ once: false, amount: 0 }}
-            transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1], delay: 0.46 }}
+            viewport={{ once: false, amount: 0.2 }}
+            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.26 }}
           >
             <MagneticButton
               onClick={onGetStarted}
-              className="bg-[#00f1d7] hover:bg-white text-[#000a36] font-semibold px-7 py-2.5 rounded-full text-sm uppercase tracking-wider transition-colors shadow-lg inline-flex items-center gap-2"
+              className="bg-[#00f1d7] hover:bg-white text-[#000a36] font-semibold px-5 py-2 md:px-8 md:py-3 rounded-full text-xs md:text-base uppercase tracking-wider transition-colors shadow-lg inline-flex items-center gap-1.5 md:gap-2"
             >
-              get started <ArrowRight className="w-4 h-4" />
+              get started <ArrowRight className="w-3 h-3 md:w-4 md:h-4" />
             </MagneticButton>
           </motion.div>
         </div>
 
-        {/* Right — phone video scaled to fit bottom of card */}
+        {/* Right — phone video pinned to bottom */}
         <motion.div
-          initial={{ opacity: 0, filter: "blur(12px)" }}
+          initial={{ opacity: 0, filter: "blur(14px)" }}
           whileInView={{ opacity: 1, filter: "blur(0px)" }}
-          viewport={{ once: false, amount: 0 }}
-          transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay: 0.5 }}
-          className="flex-1 overflow-hidden self-end"
-          style={{ transform: isMobile ? "scale(0.85)" : "translateX(-10%) scale(0.85)", transformOrigin: "bottom center" }}
+          viewport={{ once: false, amount: 0.2 }}
+          transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
+          className="flex-1 self-end overflow-hidden"
+          style={{
+            transform: isMobile ? "scale(0.9)" : "translateX(-8%) scale(0.88)",
+            transformOrigin: "bottom center",
+          }}
         >
           <video
             className="w-full h-full object-cover block"
@@ -222,6 +228,7 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
           </video>
         </motion.div>
       </div>
+
     </div>
   );
 }
