@@ -474,18 +474,17 @@ function FeaturesCard() {
   const next = () => { const i = (activeIndex + 1) % FEATURES.length; setDirection(1); setActiveIndex(i); };
 
   return (
-    <div className="relative h-full w-full flex flex-col items-center justify-center px-5 md:px-14 py-6 md:py-10 gap-4 md:gap-5 overflow-hidden bg-white">
-      <h2 className="text-4xl md:text-6xl font-medium text-[#000a36] self-start w-full">features</h2>
+    <div className="relative h-full w-full flex flex-col px-4 md:px-14 pt-5 md:pt-10 pb-5 md:pb-8 gap-3 md:gap-4 overflow-hidden bg-white">
+      <h2 className="text-2xl md:text-6xl font-medium text-[#000a36] shrink-0">features</h2>
 
-      {/* Carousel row */}
-      <div className="relative w-full flex items-center gap-2 md:gap-3 px-0 md:px-[10%]">
-        <button onClick={prev} className="flex-shrink-0 w-10 h-10 rounded-full bg-[#000a36]/10 hover:bg-[#0055ff] hover:text-white flex items-center justify-center transition-colors">
-          <ChevronLeft className="w-5 h-5" />
+      {/* Carousel row — flex-1 so image fills remaining card height */}
+      <div className="relative flex-1 min-h-0 flex items-stretch gap-2 md:gap-3 md:px-[10%]">
+        <button onClick={prev} className="flex-shrink-0 self-center w-8 h-8 md:w-10 md:h-10 rounded-full bg-[#000a36]/10 hover:bg-[#0055ff] hover:text-white flex items-center justify-center transition-colors">
+          <ChevronLeft className="w-4 h-4 md:w-5 md:h-5" />
         </button>
 
         <div
           className="relative flex-1 overflow-hidden rounded-2xl cursor-pointer bg-gray-50"
-          style={{ aspectRatio: "16/9" }}
           onClick={() => setExpandedIndex(activeIndex)}
         >
           <AnimatePresence custom={direction} mode="wait">
@@ -497,7 +496,7 @@ function FeaturesCard() {
               animate="center"
               exit="exit"
               transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-              className="absolute inset-0 flex items-center justify-center p-6"
+              className="absolute inset-0 flex items-center justify-center p-4 md:p-6"
             >
               <img src={FEATURES[activeIndex].image} alt={FEATURES[activeIndex].title} className="w-full h-full object-contain" />
             </motion.div>
@@ -505,34 +504,36 @@ function FeaturesCard() {
           <div className="absolute inset-0 bg-[#0055ff]/0 hover:bg-[#0055ff]/5 transition-colors rounded-2xl" />
         </div>
 
-        <button onClick={next} className="flex-shrink-0 w-10 h-10 rounded-full bg-[#000a36]/10 hover:bg-[#0055ff] hover:text-white flex items-center justify-center transition-colors">
-          <ChevronRight className="w-5 h-5" />
+        <button onClick={next} className="flex-shrink-0 self-center w-8 h-8 md:w-10 md:h-10 rounded-full bg-[#000a36]/10 hover:bg-[#0055ff] hover:text-white flex items-center justify-center transition-colors">
+          <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
         </button>
       </div>
 
-      {/* Current feature label */}
-      <AnimatePresence mode="wait">
-        <motion.p
-          key={activeIndex}
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -6 }}
-          transition={{ duration: 0.2 }}
-          className="text-base font-medium text-[#000a36]"
-        >
-          {FEATURES[activeIndex].title}
-        </motion.p>
-      </AnimatePresence>
+      {/* Current feature label + pill dots */}
+      <div className="flex flex-col items-center gap-1.5 shrink-0">
+        <AnimatePresence mode="wait">
+          <motion.p
+            key={activeIndex}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.2 }}
+            className="text-sm md:text-base font-medium text-[#000a36]"
+          >
+            {FEATURES[activeIndex].title}
+          </motion.p>
+        </AnimatePresence>
 
-      {/* Pill dots */}
-      <div className="flex items-center gap-2">
-        {FEATURES.map((_, i) => (
-          <button
-            key={i}
-            onClick={() => goTo(i)}
-            className={`rounded-full transition-all duration-300 h-2 ${i === activeIndex ? "w-8 bg-[#0055ff]" : "w-2 bg-[#000a36]/20 hover:bg-[#000a36]/40"}`}
-          />
-        ))}
+        {/* Smaller pill dots */}
+        <div className="flex items-center gap-1.5">
+          {FEATURES.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => goTo(i)}
+              className={`rounded-full transition-all duration-300 h-1.5 ${i === activeIndex ? "w-5 bg-[#0055ff]" : "w-1.5 bg-[#000a36]/20 hover:bg-[#000a36]/40"}`}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Expanded widget */}
