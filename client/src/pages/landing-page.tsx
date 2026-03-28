@@ -291,6 +291,7 @@ function FeatureSection({
   smallTextSize = "2.5rem",
   largeTitleSize = "5rem",
   smallTextMarginBottom = "0",
+  buttonClassName,
   imageStyle,
   imageContainerStyle,
   onButton,
@@ -309,6 +310,7 @@ function FeatureSection({
   smallTextSize?: string;
   largeTitleSize?: string;
   smallTextMarginBottom?: string;
+  buttonClassName?: string;
   imageStyle?: React.CSSProperties;
   imageContainerStyle?: React.CSSProperties;
   onButton?: () => void;
@@ -364,7 +366,7 @@ function FeatureSection({
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={onButton}
-                className={`mt-4 px-8 py-3 rounded-full text-sm uppercase tracking-[0.2em] font-medium transition-colors duration-300 ${textColor === "white" ? "bg-[#00f1d7] text-[#000a36] hover:bg-white" : "bg-[#0055ff] text-white hover:bg-[#000a36]"}`}
+                className={buttonClassName ?? `mt-4 px-8 py-3 rounded-full text-sm uppercase tracking-[0.2em] font-medium transition-colors duration-300 ${textColor === "white" ? "bg-[#00f1d7] text-[#000a36] hover:bg-white" : "bg-[#0055ff] text-white hover:bg-[#000a36]"}`}
               >
                 {buttonText}
               </motion.button>
@@ -696,6 +698,7 @@ export function LandingPage() {
             largeTitleSize="7rem"
             smallTextMarginBottom="-1rem"
             imageStyle={{ transform: "scale(2)", transformOrigin: "center center" }}
+            buttonClassName="mt-4 px-8 py-3 rounded-full text-sm uppercase tracking-[0.2em] font-medium transition-colors duration-300 bg-[#000a36] text-white hover:bg-white hover:text-[#000a36]"
           />
         </StickyCard>
 
