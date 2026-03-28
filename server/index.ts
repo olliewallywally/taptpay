@@ -231,4 +231,18 @@ app.use((req, res, next) => {
   }
 
   log(`✅ Server successfully running on ${host}:${port}`);
+
+  // Keep Neon database endpoint alive — ping every 4 minutes to prevent auto-suspension
+  if (process.env.DATABASE_URL) {
+    const { neon } = await import("@neondatabase/serverless");
+    const keepAliveSql = neon(process.env.DATABASE_URL);
+    setInterval(async () => {
+      try {
+        await keepAliveSql`SELECT 1`;
+      } catch {
+        // Silently ignore — server continues regardless
+      }
+    }, 4 * 60 * 1000);
+    log("✅ Database keep-alive ping started (every 4 minutes)");
+  }
 })();
