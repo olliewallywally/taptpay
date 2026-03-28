@@ -733,8 +733,31 @@ export function LandingPage() {
           />
         </StickyCard>
 
+        {/* Dashboard */}
+        <StickyCard index={4} backgroundColor="#000a36">
+          <FeatureSection
+            title="the dashboard"
+            image={dashboardMockup}
+            description="Get a complete overview of your business performance with real-time analytics, transaction history, and revenue insights all in one place."
+            details="Track daily sales, monitor trends, and make data-driven decisions — all from a beautifully designed dashboard built for modern merchants."
+            imagePosition="right"
+            titleStyle="split"
+            titleColor="#00f1d7"
+            imageScale="large"
+            showButton
+            buttonText="more"
+            onButton={goLogin}
+            textColor="white"
+            smallTextSize="clamp(1.6rem, 4.5vw, 3.2rem)"
+            largeTitleSize="clamp(2.5rem, 9vw, 7rem)"
+            smallTextMarginBottom="-1rem"
+            imageStyle={{ transform: isMobile ? "scale(1.6)" : "scale(2.6)", transformOrigin: "center center" }}
+            bodyTextSmall
+          />
+        </StickyCard>
+
         {/* Features carousel */}
-        <StickyCard index={4} backgroundColor="#ffffff">
+        <StickyCard index={5} backgroundColor="#ffffff">
           <FeaturesCard />
         </StickyCard>
 
