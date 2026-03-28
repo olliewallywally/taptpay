@@ -289,6 +289,7 @@ function FeatureSection({
   textColor = "default",
   smallTextSize = "2.5rem",
   largeTitleSize = "5rem",
+  smallTextMarginBottom = "0",
   imageStyle,
   imageContainerStyle,
   onButton,
@@ -306,6 +307,7 @@ function FeatureSection({
   textColor?: "default" | "white";
   smallTextSize?: string;
   largeTitleSize?: string;
+  smallTextMarginBottom?: string;
   imageStyle?: React.CSSProperties;
   imageContainerStyle?: React.CSSProperties;
   onButton?: () => void;
@@ -345,7 +347,7 @@ function FeatureSection({
               {titleStyle === "split" ? (
                 <>
                   {titleWords.map((word, i) => (
-                    <span key={i} className="block" style={{ fontSize: i === 0 ? smallTextSize : largeTitleSize, lineHeight: i === 0 ? "1.3" : "0.9" }}>
+                    <span key={i} className="block" style={{ fontSize: i === 0 ? smallTextSize : largeTitleSize, lineHeight: i === 0 ? "1.3" : "0.9", marginBottom: i === 0 ? smallTextMarginBottom : undefined }}>
                       {word}
                     </span>
                   ))}
@@ -524,6 +526,7 @@ export function LandingPage() {
             textColor="white"
             smallTextSize="3.2rem"
             largeTitleSize="7rem"
+            smallTextMarginBottom="1.5rem"
           />
         </StickyCard>
 
