@@ -113,7 +113,7 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
   return (
     <div className="w-full bg-[#0055ff] rounded-3xl overflow-hidden">
       {/* Top half — centred hero */}
-      <div className="min-h-screen flex flex-col items-center justify-center text-center px-6 space-y-6">
+      <div className="min-h-screen flex flex-col items-center justify-center text-center px-6 space-y-6 pt-20">
         <motion.img
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -148,7 +148,7 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
       </div>
 
       {/* Bottom half — text left, video right */}
-      <div className="flex flex-col lg:flex-row" style={{ minHeight: "100vh" }}>
+      <div className="flex flex-col lg:flex-row" style={{ minHeight: "70vh" }}>
         {/* Left — text */}
         <motion.div
           initial={{ opacity: 0, y: 40 }}
@@ -176,10 +176,10 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
         </motion.div>
 
         {/* Right — video */}
-        <div className="flex-1 overflow-hidden" style={{ minHeight: "50vh" }}>
+        <div className="flex-1 overflow-hidden" style={{ minHeight: "35vh" }}>
           <video
             className="w-full h-full object-cover block"
-            style={{ minHeight: "50vh" }}
+            style={{ minHeight: "35vh" }}
             autoPlay
             loop
             playsInline
