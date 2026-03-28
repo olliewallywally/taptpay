@@ -634,7 +634,9 @@ export function LandingPage() {
       <div>
         {/* Hero — no sticky, doubled height */}
         <div className="px-3 md:px-4 pb-3 md:pb-4">
-          <HeroSection onGetStarted={goLogin} />
+          <div className="max-w-7xl mx-auto">
+            <HeroSection onGetStarted={goLogin} />
+          </div>
         </div>
 
         {/* Video */}
