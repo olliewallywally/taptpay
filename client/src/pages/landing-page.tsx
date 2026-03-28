@@ -11,6 +11,10 @@ import paymentBoardMockup from "@assets/payment_board_3d_v2_1774674925840.png";
 import paymentPageMockup from "@assets/payment_page_1774675283693.png";
 import terminalMockup from "@assets/terminal_3d_1774258691270.png";
 import welcomeVideo from "@assets/welcome_to_tapt_-_web_1774671768422.mp4";
+import featureSplitPayment from "@assets/split_payment_1774675808091.png";
+import featureMerchantSplit from "@assets/merchant_split_payment_1774675808089.png";
+import featureSharePayment from "@assets/share_payment_1774675808091.png";
+import featureReceipt from "@assets/recipt_generation_1774675808090.png";
 
 function MagneticButton({ children, className, onClick, style, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   const elRef = useRef<HTMLButtonElement>(null);
@@ -406,25 +410,25 @@ const PRICING_PLANS = [
 const FEATURES = [
   {
     title: "Split Bill Payments",
-    image: dashboardMockup,
-    description: "Make splitting bills effortless. Enable split payment functionality and track who has paid their share in real-time.",
+    image: featureSplitPayment,
+    description: "Make splitting bills effortless for your customers. They can divide any amount evenly or set custom amounts per person.",
     details: "Perfect for group dining, shared services, or any situation where multiple people need to contribute to a single payment.",
   },
   {
+    title: "Merchant Split Payment",
+    image: featureMerchantSplit,
+    description: "Enable split bill mode directly from the terminal. Track each partial payment as it comes in and see the total in real-time.",
+    details: "Toggle split bill on per transaction, monitor who has paid their share, and accept payments via QR, NFC, or payment board.",
+  },
+  {
     title: "Share Payment Requests",
-    image: paymentMockup,
+    image: featureSharePayment,
     description: "Send payment requests instantly via Email, SMS, or QR Code. Your customers can pay with a single tap, no app download required.",
     details: "Copy and share payment links anywhere. Track payment status and get notified when customers complete their payment.",
   },
   {
-    title: "Smart Bill Splitting",
-    image: terminalMockup,
-    description: "Divide bills evenly or customise amounts for each person. Track payments in real-time and see exactly who still needs to pay.",
-    details: "Whether it's lunch with colleagues or a group event, make splitting the bill simple and transparent for everyone involved.",
-  },
-  {
     title: "Professional Receipts",
-    image: dashboardMockup,
+    image: featureReceipt,
     description: "Generate detailed transaction receipts automatically. Every payment includes a professional receipt with full transaction details.",
     details: "Download PDFs or share receipts instantly. Fully compliant receipts with business name, itemised costs and GST breakdown.",
   },
