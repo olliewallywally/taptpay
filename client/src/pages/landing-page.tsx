@@ -287,6 +287,8 @@ function FeatureSection({
   buttonText = "more",
   textColor = "default",
   smallTextSize = "2.5rem",
+  largeTitleSize = "5rem",
+  imageStyle,
   onButton,
 }: {
   title: string;
@@ -301,6 +303,8 @@ function FeatureSection({
   buttonText?: string;
   textColor?: "default" | "white";
   smallTextSize?: string;
+  largeTitleSize?: string;
+  imageStyle?: React.CSSProperties;
   onButton?: () => void;
 }) {
   const titleWords = titleStyle === "split" ? title.split(" ") : [title];
@@ -322,6 +326,7 @@ function FeatureSection({
               src={image}
               alt={title}
               className={`h-auto object-contain ${imageScale === "large" ? "w-full max-w-none lg:translate-x-8" : "w-full max-w-xs md:max-w-sm"}`}
+              style={imageStyle}
             />
           </motion.div>
 
@@ -336,7 +341,7 @@ function FeatureSection({
               {titleStyle === "split" ? (
                 <>
                   {titleWords.map((word, i) => (
-                    <span key={i} className="block" style={{ fontSize: i === 0 ? smallTextSize : "5rem", lineHeight: i === 0 ? "1.3" : "0.9" }}>
+                    <span key={i} className="block" style={{ fontSize: i === 0 ? smallTextSize : largeTitleSize, lineHeight: i === 0 ? "1.3" : "0.9" }}>
                       {word}
                     </span>
                   ))}
@@ -480,7 +485,7 @@ export function LandingPage() {
         {/* Digital Terminal */}
         <StickyCard index={1} backgroundColor="#00f1d7">
           <FeatureSection
-            title="the digital terminal"
+            title="the terminal"
             image={terminalMockup}
             description="Transform your smartphone into a powerful payment terminal. The Tapt Pay app provides a complete point-of-sale experience with real-time transaction tracking, analytics, and revenue insights."
             details="View your daily transactions, monitor average transaction values, and track your business growth — all from one beautiful, intuitive interface."
@@ -488,6 +493,8 @@ export function LandingPage() {
             titleStyle="split"
             titleColor="#0055ff"
             imageScale="large"
+            largeTitleSize="9rem"
+            imageStyle={{ transform: "scale(2.5)", transformOrigin: "center right" }}
             showButton
             buttonText="more"
             onButton={goLogin}
