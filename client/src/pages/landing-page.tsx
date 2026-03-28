@@ -495,9 +495,9 @@ export function LandingPage() {
             imagePosition="right"
             titleStyle="split"
             titleColor="#0055ff"
-            largeTitleSize="9rem"
-            imageContainerStyle={{ overflow: "hidden", width: "280px", height: "430px", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "flex-end" }}
-            imageStyle={{ width: "auto", height: "120%", marginLeft: "-35%", display: "block", maxWidth: "none" }}
+            imageScale="large"
+            smallTextSize="3rem"
+            largeTitleSize="6rem"
             showButton
             buttonText="more"
             onButton={goLogin}
