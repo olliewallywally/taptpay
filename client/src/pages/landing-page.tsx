@@ -451,7 +451,7 @@ function FeaturesCard() {
       <h2 className="text-5xl md:text-6xl font-medium text-[#000a36] self-start w-full">features</h2>
 
       {/* Carousel row */}
-      <div className="relative w-full flex items-center gap-3">
+      <div className="relative w-full flex items-center gap-3 px-[10%]">
         <button onClick={prev} className="flex-shrink-0 w-10 h-10 rounded-full bg-[#000a36]/10 hover:bg-[#0055ff] hover:text-white flex items-center justify-center transition-colors">
           <ChevronLeft className="w-5 h-5" />
         </button>
