@@ -713,16 +713,16 @@ export function LandingPage() {
           <FeaturesCard />
         </StickyCard>
 
-        {/* Pricing */}
-        <StickyCard index={5} backgroundColor="#060e42">
-          <PricingCard onGetStarted={goLogin} />
-        </StickyCard>
-
-        {/* Spacer so final card unsticks cleanly */}
-        <div className="h-screen" style={{ backgroundColor: "#ececec" }}>
-          <div className="pt-4 px-3 md:px-4">
-            <FooterCard />
+        {/* Pricing — non-sticky */}
+        <div className="px-3 md:px-4 pt-3 md:pt-4">
+          <div className="w-full max-w-7xl mx-auto rounded-3xl shadow-2xl overflow-hidden" style={{ backgroundColor: "#060e42" }}>
+            <PricingCard onGetStarted={goLogin} />
           </div>
+        </div>
+
+        {/* Footer */}
+        <div className="pt-4 px-3 md:px-4" style={{ backgroundColor: "#ececec" }}>
+          <FooterCard />
         </div>
       </div>
     </div>
