@@ -11,6 +11,7 @@ import paymentBoardMockup from "@assets/payment_board_3d_v2_1774674925840.png";
 import paymentPageMockup from "@assets/payment_page_1774675283693.png";
 import terminalMockup from "@assets/terminal_3d_1774258691270.png";
 import welcomeVideo from "@assets/welcome_to_tapt_-_web_1774671768422.mp4";
+import welcomeVideoMobile from "@assets/welcome_to_tapt_-_mobile_1774685803328.mp4";
 import featureSplitPayment from "@assets/split_payment_1774675808091.png";
 import featureMerchantSplit from "@assets/merchant_split_payment_1774675808089.png";
 import featureSharePayment from "@assets/share_payment_1774675808091.png";
@@ -234,11 +235,13 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
 }
 
 function VideoCard() {
+  const isMobile = useIsMobile();
   return (
     <div className="h-full w-full relative overflow-hidden">
       <video
+        key={isMobile ? "mobile" : "desktop"}
         className="absolute inset-0 w-full h-full object-cover"
-        src={welcomeVideo}
+        src={isMobile ? welcomeVideoMobile : welcomeVideo}
         autoPlay
         loop
         playsInline
