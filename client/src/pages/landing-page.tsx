@@ -526,7 +526,7 @@ export function LandingPage() {
             textColor="white"
             smallTextSize="3.2rem"
             largeTitleSize="7rem"
-            smallTextMarginBottom="1.5rem"
+            smallTextMarginBottom="-1rem"
           />
         </StickyCard>
 
