@@ -148,14 +148,14 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
       </div>
 
       {/* Bottom half — text left, video right */}
-      <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2">
+      <div className="flex flex-col lg:flex-row" style={{ minHeight: "100vh" }}>
         {/* Left — text */}
         <motion.div
           initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
           viewport={{ once: true }}
-          className="flex flex-col justify-center px-10 md:px-16 lg:px-20 py-16 gap-7"
+          className="flex-1 flex flex-col justify-center px-10 md:px-16 lg:px-20 py-16 gap-7"
         >
           <h2 className="text-5xl md:text-6xl lg:text-7xl font-medium text-[#00f1d7] leading-tight">
             what is tapt?
@@ -176,9 +176,10 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
         </motion.div>
 
         {/* Right — video */}
-        <div className="relative overflow-hidden min-h-[50vh] lg:min-h-0">
+        <div className="flex-1 overflow-hidden" style={{ minHeight: "50vh" }}>
           <video
-            className="absolute inset-0 w-full h-full object-cover"
+            className="w-full h-full object-cover block"
+            style={{ minHeight: "50vh" }}
             autoPlay
             loop
             playsInline
