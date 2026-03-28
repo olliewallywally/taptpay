@@ -1,7 +1,7 @@
 import { useLocation } from "wouter";
 import { useState, useEffect, useRef } from "react";
-import { motion, useScroll, useTransform } from "motion/react";
-import { ArrowRight, CheckCircle } from "lucide-react";
+import { motion, useScroll, useTransform, AnimatePresence } from "motion/react";
+import { ArrowRight, CheckCircle, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { SEOHead } from "@/components/SEOHead";
 import { useScrambleText } from "@/hooks/use-scramble-text";
 import logoImage from "@assets/logo_1762915255857.png";
@@ -401,6 +401,153 @@ const PRICING_PLANS = [
   },
 ];
 
+const FEATURES = [
+  {
+    title: "Split Bill Payments",
+    image: dashboardMockup,
+    description: "Make splitting bills effortless. Enable split payment functionality and track who has paid their share in real-time.",
+    details: "Perfect for group dining, shared services, or any situation where multiple people need to contribute to a single payment.",
+  },
+  {
+    title: "Share Payment Requests",
+    image: paymentMockup,
+    description: "Send payment requests instantly via Email, SMS, or QR Code. Your customers can pay with a single tap, no app download required.",
+    details: "Copy and share payment links anywhere. Track payment status and get notified when customers complete their payment.",
+  },
+  {
+    title: "Smart Bill Splitting",
+    image: terminalMockup,
+    description: "Divide bills evenly or customise amounts for each person. Track payments in real-time and see exactly who still needs to pay.",
+    details: "Whether it's lunch with colleagues or a group event, make splitting the bill simple and transparent for everyone involved.",
+  },
+  {
+    title: "Professional Receipts",
+    image: dashboardMockup,
+    description: "Generate detailed transaction receipts automatically. Every payment includes a professional receipt with full transaction details.",
+    details: "Download PDFs or share receipts instantly. Fully compliant receipts with business name, itemised costs and GST breakdown.",
+  },
+];
+
+const slideVariants = {
+  enter: (dir: number) => ({ x: dir > 0 ? "100%" : "-100%", opacity: 0 }),
+  center: { x: 0, opacity: 1 },
+  exit: (dir: number) => ({ x: dir > 0 ? "-100%" : "100%", opacity: 0 }),
+};
+
+function FeaturesCard() {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [direction, setDirection] = useState(1);
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+
+  const goTo = (i: number) => {
+    setDirection(i > activeIndex ? 1 : -1);
+    setActiveIndex(i);
+  };
+  const prev = () => { const i = (activeIndex - 1 + FEATURES.length) % FEATURES.length; setDirection(-1); setActiveIndex(i); };
+  const next = () => { const i = (activeIndex + 1) % FEATURES.length; setDirection(1); setActiveIndex(i); };
+
+  return (
+    <div className="relative h-full w-full flex flex-col items-center justify-center px-8 md:px-14 py-10 gap-5 overflow-hidden bg-white">
+      <h2 className="text-5xl md:text-6xl font-medium text-[#000a36] self-start w-full">features</h2>
+
+      {/* Carousel row */}
+      <div className="relative w-full flex items-center gap-3">
+        <button onClick={prev} className="flex-shrink-0 w-10 h-10 rounded-full bg-[#000a36]/10 hover:bg-[#0055ff] hover:text-white flex items-center justify-center transition-colors">
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+
+        <div
+          className="relative flex-1 overflow-hidden rounded-2xl cursor-pointer bg-gray-50"
+          style={{ aspectRatio: "16/9" }}
+          onClick={() => setExpandedIndex(activeIndex)}
+        >
+          <AnimatePresence custom={direction} mode="wait">
+            <motion.div
+              key={activeIndex}
+              custom={direction}
+              variants={slideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+              className="absolute inset-0 flex items-center justify-center p-6"
+            >
+              <img src={FEATURES[activeIndex].image} alt={FEATURES[activeIndex].title} className="w-full h-full object-contain" />
+            </motion.div>
+          </AnimatePresence>
+          <div className="absolute inset-0 bg-[#0055ff]/0 hover:bg-[#0055ff]/5 transition-colors rounded-2xl" />
+        </div>
+
+        <button onClick={next} className="flex-shrink-0 w-10 h-10 rounded-full bg-[#000a36]/10 hover:bg-[#0055ff] hover:text-white flex items-center justify-center transition-colors">
+          <ChevronRight className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Current feature label */}
+      <AnimatePresence mode="wait">
+        <motion.p
+          key={activeIndex}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.2 }}
+          className="text-base font-medium text-[#000a36]"
+        >
+          {FEATURES[activeIndex].title}
+        </motion.p>
+      </AnimatePresence>
+
+      {/* Pill dots */}
+      <div className="flex items-center gap-2">
+        {FEATURES.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => goTo(i)}
+            className={`rounded-full transition-all duration-300 h-2 ${i === activeIndex ? "w-8 bg-[#0055ff]" : "w-2 bg-[#000a36]/20 hover:bg-[#000a36]/40"}`}
+          />
+        ))}
+      </div>
+
+      {/* Expanded widget */}
+      <AnimatePresence>
+        {expandedIndex !== null && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-40 bg-black/25 rounded-3xl"
+              onClick={() => setExpandedIndex(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.88, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.88, y: 20 }}
+              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+              className="absolute inset-6 z-50 bg-white rounded-2xl shadow-2xl flex flex-col lg:flex-row overflow-hidden"
+            >
+              <button
+                onClick={() => setExpandedIndex(null)}
+                className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-[#000a36]/10 hover:bg-[#000a36]/20 flex items-center justify-center transition-colors"
+              >
+                <X className="w-4 h-4 text-[#000a36]" />
+              </button>
+              <div className="flex-1 flex items-center justify-center p-8 bg-gray-50">
+                <img src={FEATURES[expandedIndex].image} alt={FEATURES[expandedIndex].title} className="w-full h-auto max-h-64 lg:max-h-full object-contain" />
+              </div>
+              <div className="flex-1 flex flex-col justify-center p-8 md:p-12 gap-5">
+                <h3 className="text-3xl md:text-4xl font-medium text-[#000a36] leading-tight">{FEATURES[expandedIndex].title}</h3>
+                <p className="text-[#000a36] leading-relaxed text-base md:text-lg">{FEATURES[expandedIndex].description}</p>
+                <p className="text-[#000a36]/60 leading-relaxed text-sm md:text-base">{FEATURES[expandedIndex].details}</p>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function PricingCard({ onGetStarted }: { onGetStarted: () => void }) {
   return (
     <div className="h-full w-full flex flex-col items-center justify-center py-16 px-6 md:px-16 overflow-y-auto">
@@ -551,52 +698,13 @@ export function LandingPage() {
           />
         </StickyCard>
 
-        {/* Split Payments */}
+        {/* Features carousel */}
         <StickyCard index={4} backgroundColor="#ffffff">
-          <FeatureSection
-            title="Split Bill Payments"
-            image={dashboardMockup}
-            description="Make splitting bills effortless. Enable split payment functionality and track who has paid their share in real-time."
-            details="Perfect for group dining, shared services, or any situation where multiple people need to contribute to a single payment."
-            imagePosition="left"
-          />
-        </StickyCard>
-
-        {/* Share Payment */}
-        <StickyCard index={5} backgroundColor="#ffffff">
-          <FeatureSection
-            title="Share Payment Requests"
-            image={paymentMockup}
-            description="Send payment requests instantly via Email, SMS, or QR Code. Your customers can pay with a single tap, no app download required."
-            details="Copy and share payment links anywhere. Track payment status and get notified when customers complete their payment."
-            imagePosition="right"
-          />
-        </StickyCard>
-
-        {/* Bill Splitting Interface */}
-        <StickyCard index={6} backgroundColor="#ffffff">
-          <FeatureSection
-            title="Smart Bill Splitting"
-            image={terminalMockup}
-            description="Divide bills evenly or customise amounts for each person. Track payments in real-time and see exactly who still needs to pay."
-            details="Whether it's lunch with colleagues or a group event, make splitting the bill simple and transparent for everyone involved."
-            imagePosition="left"
-          />
-        </StickyCard>
-
-        {/* Receipts */}
-        <StickyCard index={7} backgroundColor="#ffffff">
-          <FeatureSection
-            title="Professional Receipts"
-            image={dashboardMockup}
-            description="Generate detailed transaction receipts automatically. Every payment includes a professional receipt with full transaction details and cost breakdown."
-            details="Download PDFs or share receipts instantly. All receipts include your business name, itemised costs, GST breakdown, and are fully compliant for accounting."
-            imagePosition="right"
-          />
+          <FeaturesCard />
         </StickyCard>
 
         {/* Pricing */}
-        <StickyCard index={8} backgroundColor="#060e42">
+        <StickyCard index={5} backgroundColor="#060e42">
           <PricingCard onGetStarted={goLogin} />
         </StickyCard>
 
