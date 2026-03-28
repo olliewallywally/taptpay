@@ -193,7 +193,7 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
           viewport={{ once: false, amount: 0.3 }}
           transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
           className="flex-1 overflow-hidden"
-          style={{ minHeight: "35vh" }}
+          style={{ minHeight: "35vh", transform: "translateX(-15%) scale(0.8)", transformOrigin: "center center" }}
         >
           <video
             className="w-full h-full object-cover block"
