@@ -8,6 +8,7 @@ import logoImage from "@assets/logo_1762915255857.png";
 import dashboardMockup from "@assets/dashboard_3d_1774258691269.png";
 import paymentMockup from "@assets/payment_page_1774258691269.png";
 import paymentBoardMockup from "@assets/payment_board_3d_v2_1774674925840.png";
+import paymentPageMockup from "@assets/payment_page_1774675283693.png";
 import terminalMockup from "@assets/terminal_3d_1774258691270.png";
 import welcomeVideo from "@assets/welcome_to_tapt_-_web_1774671768422.mp4";
 
@@ -529,8 +530,29 @@ export function LandingPage() {
           />
         </StickyCard>
 
+        {/* Customer Payment Page */}
+        <StickyCard index={3} backgroundColor="#0055ff">
+          <FeatureSection
+            title="the payment page"
+            image={paymentPageMockup}
+            description="Display your custom QR code and NFC payment option for customers. Our physical payment boards make it easy for customers to pay using their preferred method."
+            details="Perfect for cafes, retail stores, food trucks, and any business that wants to offer a modern, contactless payment experience."
+            imagePosition="right"
+            titleStyle="split"
+            titleColor="#ffffff"
+            imageScale="large"
+            showButton
+            buttonText="more"
+            onButton={goLogin}
+            textColor="white"
+            smallTextSize="3.2rem"
+            largeTitleSize="7rem"
+            smallTextMarginBottom="-1rem"
+          />
+        </StickyCard>
+
         {/* Split Payments */}
-        <StickyCard index={3} backgroundColor="#ffffff">
+        <StickyCard index={4} backgroundColor="#ffffff">
           <FeatureSection
             title="Split Bill Payments"
             image={dashboardMockup}
@@ -541,7 +563,7 @@ export function LandingPage() {
         </StickyCard>
 
         {/* Share Payment */}
-        <StickyCard index={4} backgroundColor="#ffffff">
+        <StickyCard index={5} backgroundColor="#ffffff">
           <FeatureSection
             title="Share Payment Requests"
             image={paymentMockup}
@@ -552,7 +574,7 @@ export function LandingPage() {
         </StickyCard>
 
         {/* Bill Splitting Interface */}
-        <StickyCard index={5} backgroundColor="#ffffff">
+        <StickyCard index={6} backgroundColor="#ffffff">
           <FeatureSection
             title="Smart Bill Splitting"
             image={terminalMockup}
@@ -563,7 +585,7 @@ export function LandingPage() {
         </StickyCard>
 
         {/* Receipts */}
-        <StickyCard index={6} backgroundColor="#ffffff">
+        <StickyCard index={7} backgroundColor="#ffffff">
           <FeatureSection
             title="Professional Receipts"
             image={dashboardMockup}
@@ -574,7 +596,7 @@ export function LandingPage() {
         </StickyCard>
 
         {/* Pricing */}
-        <StickyCard index={7} backgroundColor="#060e42">
+        <StickyCard index={8} backgroundColor="#060e42">
           <PricingCard onGetStarted={goLogin} />
         </StickyCard>
 
