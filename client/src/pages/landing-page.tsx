@@ -757,10 +757,10 @@ export function LandingPage() {
           />
         </StickyCard>
 
-        {/* Features carousel */}
-        <StickyCard index={5} backgroundColor="#ffffff">
+        {/* Features carousel — full-width, non-sticky */}
+        <div className="relative z-10 h-screen w-full" style={{ backgroundColor: "#ffffff" }}>
           <FeaturesCard />
-        </StickyCard>
+        </div>
 
         {/* Pricing — full-screen, non-sticky */}
         <div className="relative z-10 h-screen flex items-center justify-center px-3 md:px-4" style={{ backgroundColor: "#ececec" }}>
