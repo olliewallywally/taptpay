@@ -150,7 +150,7 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
       {/* Bottom half — text left, video right */}
       <div className="flex flex-col lg:flex-row" style={{ minHeight: "35vh" }}>
         {/* Left — each element has its own whileInView so reverse-on-scroll-up works */}
-        <div className="flex-1 flex flex-col justify-center px-10 md:px-16 lg:px-20 py-6 gap-7">
+        <div className="flex-1 flex flex-col justify-end px-10 md:px-16 lg:px-20 pt-6 pb-10 gap-7">
           <motion.h2
             initial={{ opacity: 0, y: -20, filter: "blur(12px)" }}
             whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
@@ -158,7 +158,7 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
             transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1], delay: 0 }}
             className="text-5xl md:text-6xl lg:text-7xl font-medium text-[#00f1d7] leading-tight"
           >
-            what is tapt?
+            what<br />is tapt?
           </motion.h2>
           <motion.p
             initial={{ opacity: 0, y: -20, filter: "blur(12px)" }}
