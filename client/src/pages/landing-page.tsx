@@ -522,7 +522,7 @@ export function LandingPage() {
             buttonText="more"
             onButton={goLogin}
             textColor="white"
-            smallTextSize="2.5rem"
+            smallTextSize="3.2rem"
             largeTitleSize="7rem"
           />
         </StickyCard>
