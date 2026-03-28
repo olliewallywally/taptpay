@@ -111,7 +111,7 @@ function FixedNav({ onGetStarted }: { onGetStarted: () => void }) {
 
 function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
   return (
-    <div className="w-full bg-[#0055ff] rounded-3xl overflow-hidden" style={{ maxHeight: "143vh" }}>
+    <div className="w-full bg-[#0055ff] rounded-3xl overflow-hidden">
       {/* Top half — centred hero */}
       <div className="flex flex-col items-center justify-center text-center px-6 space-y-6 pt-20" style={{ minHeight: "80vh" }}>
         <motion.img
