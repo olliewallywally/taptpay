@@ -680,7 +680,7 @@ export function LandingPage() {
             imageScale="large"
             smallTextSize="clamp(1.6rem, 4.5vw, 3rem)"
             largeTitleSize="clamp(2.5rem, 8vw, 6rem)"
-            imageStyle={{ transform: isMobile ? "scale(1.6)" : "scale(2.6)", transformOrigin: "center center" }}
+            imageStyle={{ transform: isMobile ? "translateY(-10%) scale(2.0)" : "translateY(-10%) scale(3.0)", transformOrigin: "center center" }}
             showButton
             buttonText="more"
             onButton={goLogin}
@@ -727,7 +727,7 @@ export function LandingPage() {
             smallTextSize="clamp(1.6rem, 4.5vw, 3.2rem)"
             largeTitleSize="clamp(2.5rem, 9vw, 7rem)"
             smallTextMarginBottom="-1rem"
-            imageStyle={{ transform: isMobile ? "scale(1.6)" : "scale(2.6)", transformOrigin: "center center" }}
+            imageStyle={{ transform: isMobile ? "translateY(-10%) scale(2.0)" : "translateY(-10%) scale(3.0)", transformOrigin: "center center" }}
             buttonClassName="mt-2 px-5 py-2 rounded-full text-xs uppercase tracking-[0.15em] font-medium transition-colors duration-300 bg-[#000a36] text-white hover:bg-white hover:text-[#000a36]"
             bodyTextSmall
           />
@@ -736,7 +736,7 @@ export function LandingPage() {
         {/* Dashboard */}
         <StickyCard index={4} backgroundColor="#000a36">
           <FeatureSection
-            title="the dashboard"
+            title="dashboard"
             image={dashboardMockup}
             description="Get a complete overview of your business performance with real-time analytics, transaction history, and revenue insights all in one place."
             details="Track daily sales, monitor trends, and make data-driven decisions — all from a beautifully designed dashboard built for modern merchants."
@@ -748,10 +748,10 @@ export function LandingPage() {
             buttonText="more"
             onButton={goLogin}
             textColor="white"
-            smallTextSize="clamp(1.6rem, 4.5vw, 3.2rem)"
-            largeTitleSize="clamp(2.5rem, 9vw, 7rem)"
+            smallTextSize="clamp(2rem, 6vw, 4rem)"
+            largeTitleSize="clamp(3rem, 10vw, 8rem)"
             smallTextMarginBottom="-1rem"
-            imageStyle={{ transform: isMobile ? "scale(1.6)" : "scale(2.6)", transformOrigin: "center center" }}
+            imageStyle={{ transform: isMobile ? "translateY(-10%) scale(2.0)" : "translateY(-10%) scale(3.0)", transformOrigin: "center center" }}
             bodyTextSmall
           />
         </StickyCard>
