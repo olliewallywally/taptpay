@@ -113,7 +113,7 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
   return (
     <div className="w-full bg-[#0055ff] rounded-3xl overflow-hidden">
       {/* Top half — centred hero */}
-      <div className="min-h-screen flex flex-col items-center justify-center text-center px-6 space-y-6 pt-20">
+      <div className="flex flex-col items-center justify-center text-center px-6 space-y-6 pt-20" style={{ minHeight: "80vh" }}>
         <motion.img
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
