@@ -8,6 +8,7 @@ import logoImage from "@assets/logo_1762915255857.png";
 import dashboardMockup from "@assets/dashboard_3d_1774258691269.png";
 import paymentMockup from "@assets/payment_page_1774258691269.png";
 import terminalMockup from "@assets/terminal_3d_1774258691270.png";
+import welcomeVideo from "@assets/welcome_to_tapt_-_web_1774671768422.mp4";
 
 function MagneticButton({ children, className, onClick, style, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   const elRef = useRef<HTMLButtonElement>(null);
@@ -149,6 +150,20 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
           <p className="text-white/40 text-xs tracking-widest uppercase">100% kiwi owned and operated</p>
         </motion.div>
       </motion.div>
+    </div>
+  );
+}
+
+function VideoCard() {
+  return (
+    <div className="h-full w-full relative overflow-hidden">
+      <video
+        className="absolute inset-0 w-full h-full object-cover"
+        src={welcomeVideo}
+        autoPlay
+        loop
+        playsInline
+      />
     </div>
   );
 }
@@ -400,9 +415,9 @@ export function LandingPage() {
           <HeroSection onGetStarted={goLogin} />
         </StickyCard>
 
-        {/* About */}
-        <StickyCard index={1} backgroundColor="#ececec">
-          <AboutSection />
+        {/* Video */}
+        <StickyCard index={1} backgroundColor="#000000">
+          <VideoCard />
         </StickyCard>
 
         {/* Digital Terminal */}
