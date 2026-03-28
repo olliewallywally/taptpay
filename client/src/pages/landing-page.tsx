@@ -52,6 +52,16 @@ function MagneticLink({ children, className, href, ...props }: React.AnchorHTMLA
   );
 }
 
+function useIsMobile() {
+  const [mobile, setMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 768);
+  useEffect(() => {
+    const fn = () => setMobile(window.innerWidth < 768);
+    window.addEventListener("resize", fn, { passive: true });
+    return () => window.removeEventListener("resize", fn);
+  }, []);
+  return mobile;
+}
+
 function ScrambleHeading({ text, className, tag: Tag = "h2" }: { text: string; className?: string; tag?: "h1" | "h2" | "h3" }) {
   const { displayText, scramble } = useScrambleText(text);
   const ref = useRef<HTMLDivElement>(null);
@@ -73,12 +83,13 @@ function StickyCard({ children, index, backgroundColor = "#ffffff", isDouble = f
   isDouble?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
   const scale = useTransform(scrollYProgress, [0, 1], [1, 0.9]);
   const opacity = useTransform(scrollYProgress, [0, 0.5, 1], [1, 1, 0.7]);
 
   return (
-    <div ref={ref} className="sticky top-0 h-screen flex items-center justify-center px-3 md:px-4" style={{ paddingTop: `${index * 30}px` }}>
+    <div ref={ref} className="sticky top-0 h-screen flex items-center justify-center px-3 md:px-4" style={{ paddingTop: `${index * (isMobile ? 12 : 28)}px` }}>
       <motion.div
         style={{ scale, opacity, backgroundColor }}
         className={`w-full max-w-7xl rounded-3xl shadow-2xl overflow-hidden ${isDouble ? "h-[95vh]" : "h-[90vh]"}`}
@@ -102,10 +113,10 @@ function FixedNav({ onGetStarted }: { onGetStarted: () => void }) {
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className={`pointer-events-auto bg-[#000a36] rounded-full px-6 py-3 flex gap-6 md:gap-8 items-center transition-all duration-300 ${scrolled ? "shadow-2xl" : "shadow-lg"}`}
+        className={`pointer-events-auto bg-[#000a36] rounded-full px-4 md:px-6 py-3 flex gap-3 md:gap-8 items-center transition-all duration-300 ${scrolled ? "shadow-2xl" : "shadow-lg"}`}
       >
-        <button onClick={() => document.getElementById("about")?.scrollIntoView({ behavior: "smooth" })} className="text-white hover:text-[#00f1d7] transition-colors text-xs md:text-sm uppercase tracking-wider">services</button>
-        <button onClick={() => document.getElementById("about")?.scrollIntoView({ behavior: "smooth" })} className="text-white hover:text-[#00f1d7] transition-colors text-xs md:text-sm uppercase tracking-wider">about</button>
+        <button onClick={() => document.getElementById("about")?.scrollIntoView({ behavior: "smooth" })} className="hidden sm:block text-white hover:text-[#00f1d7] transition-colors text-xs md:text-sm uppercase tracking-wider">services</button>
+        <button onClick={() => document.getElementById("about")?.scrollIntoView({ behavior: "smooth" })} className="hidden sm:block text-white hover:text-[#00f1d7] transition-colors text-xs md:text-sm uppercase tracking-wider">about</button>
         <button onClick={onGetStarted} className="text-white hover:text-[#00f1d7] transition-colors text-xs md:text-sm uppercase tracking-wider">login</button>
         <MagneticButton onClick={onGetStarted} className="bg-[#00f1d7] text-[#000a36] font-semibold px-4 py-1.5 rounded-full text-xs md:text-sm uppercase tracking-wider hover:bg-white transition-colors">
           get started
@@ -116,10 +127,11 @@ function FixedNav({ onGetStarted }: { onGetStarted: () => void }) {
 }
 
 function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
+  const isMobile = useIsMobile();
   return (
     <div className="w-full bg-[#0055ff] rounded-3xl overflow-hidden">
       {/* Top half — centred hero */}
-      <div className="flex flex-col items-center justify-center text-center px-6 space-y-6 pt-20" style={{ minHeight: "80vh" }}>
+      <div className="flex flex-col items-center justify-center text-center px-6 space-y-6 pt-16 md:pt-20" style={{ minHeight: isMobile ? "65vh" : "80vh" }}>
         <motion.img
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -154,15 +166,15 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
       </div>
 
       {/* Bottom half — text left, video right */}
-      <div className="flex flex-col lg:flex-row" style={{ minHeight: "35vh" }}>
+      <div className="flex flex-col lg:flex-row" style={{ minHeight: isMobile ? "auto" : "35vh" }}>
         {/* Left — each element has its own whileInView so reverse-on-scroll-up works */}
-        <div className="flex-1 flex flex-col justify-end px-10 md:px-16 lg:px-20 pt-6 pb-10 gap-7">
+        <div className="flex-1 flex flex-col justify-end px-6 md:px-16 lg:px-20 pt-6 pb-8 md:pb-10 gap-5 md:gap-7">
           <motion.h2
             initial={{ opacity: 0, y: -20, filter: "blur(12px)" }}
             whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
             viewport={{ once: false, amount: 0.6 }}
             transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1], delay: 0 }}
-            className="text-5xl md:text-6xl lg:text-7xl font-medium text-[#00f1d7] leading-tight"
+            className="text-4xl md:text-6xl lg:text-7xl font-medium text-[#00f1d7] leading-tight"
           >
             what<br />is tapt?
           </motion.h2>
@@ -199,7 +211,7 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
           viewport={{ once: false, amount: 0.3 }}
           transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
           className="flex-1 overflow-hidden self-end"
-          style={{ minHeight: "35vh", transform: "translateX(-15%) scale(0.8)", transformOrigin: "bottom center" }}
+          style={{ minHeight: isMobile ? "40vw" : "35vh", transform: isMobile ? "scale(0.9)" : "translateX(-15%) scale(0.8)", transformOrigin: "bottom center" }}
         >
           <video
             className="w-full h-full object-cover block"
@@ -226,6 +238,7 @@ function VideoCard() {
         autoPlay
         loop
         playsInline
+        muted
       />
     </div>
   );
@@ -326,7 +339,7 @@ function FeatureSection({
   return (
     <div className="h-full w-full flex items-center justify-center p-6 md:p-10 lg:p-16 overflow-y-auto">
       <div className="w-full max-w-6xl">
-        <div className={`grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center ${imagePosition === "right" ? "lg:grid-flow-col-dense" : ""}`}>
+        <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-16 items-center ${imagePosition === "right" ? "lg:grid-flow-col-dense" : ""}`}>
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             whileInView={{ opacity: 1, scale: 1 }}
@@ -338,7 +351,7 @@ function FeatureSection({
             <img
               src={image}
               alt={title}
-              className={`h-auto object-contain ${imageScale === "large" ? "w-full max-w-none lg:translate-x-8" : "w-full max-w-xs md:max-w-sm"}`}
+              className={`h-auto object-contain ${imageScale === "large" ? "w-full max-w-[70%] md:max-w-none mx-auto md:mx-0 lg:translate-x-8" : "w-full max-w-xs md:max-w-sm"}`}
               style={imageStyle}
             />
           </motion.div>
@@ -453,11 +466,11 @@ function FeaturesCard() {
   const next = () => { const i = (activeIndex + 1) % FEATURES.length; setDirection(1); setActiveIndex(i); };
 
   return (
-    <div className="relative h-full w-full flex flex-col items-center justify-center px-8 md:px-14 py-10 gap-5 overflow-hidden bg-white">
-      <h2 className="text-5xl md:text-6xl font-medium text-[#000a36] self-start w-full">features</h2>
+    <div className="relative h-full w-full flex flex-col items-center justify-center px-5 md:px-14 py-6 md:py-10 gap-4 md:gap-5 overflow-hidden bg-white">
+      <h2 className="text-4xl md:text-6xl font-medium text-[#000a36] self-start w-full">features</h2>
 
       {/* Carousel row */}
-      <div className="relative w-full flex items-center gap-3 px-[10%]">
+      <div className="relative w-full flex items-center gap-2 md:gap-3 px-0 md:px-[10%]">
         <button onClick={prev} className="flex-shrink-0 w-10 h-10 rounded-full bg-[#000a36]/10 hover:bg-[#0055ff] hover:text-white flex items-center justify-center transition-colors">
           <ChevronLeft className="w-5 h-5" />
         </button>
@@ -530,21 +543,21 @@ function FeaturesCard() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.88, y: 20 }}
               transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-              className="absolute inset-6 z-50 bg-white rounded-2xl shadow-2xl flex flex-col lg:flex-row overflow-hidden"
+              className="absolute inset-3 md:inset-6 z-50 bg-white rounded-2xl shadow-2xl flex flex-col lg:flex-row overflow-y-auto"
             >
               <button
                 onClick={() => setExpandedIndex(null)}
-                className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-[#000a36]/10 hover:bg-[#000a36]/20 flex items-center justify-center transition-colors"
+                className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-[#000a36]/10 hover:bg-[#000a36]/20 flex items-center justify-center transition-colors"
               >
                 <X className="w-4 h-4 text-[#000a36]" />
               </button>
-              <div className="flex-1 flex items-center justify-center p-8 bg-gray-50">
-                <img src={FEATURES[expandedIndex].image} alt={FEATURES[expandedIndex].title} className="w-full h-auto max-h-64 lg:max-h-full object-contain" />
+              <div className="flex items-center justify-center p-6 md:p-8 bg-gray-50 lg:flex-1">
+                <img src={FEATURES[expandedIndex].image} alt={FEATURES[expandedIndex].title} className="w-auto h-auto max-h-40 md:max-h-56 lg:max-h-full object-contain" />
               </div>
-              <div className="flex-1 flex flex-col justify-center p-8 md:p-12 gap-5">
-                <h3 className="text-3xl md:text-4xl font-medium text-[#000a36] leading-tight">{FEATURES[expandedIndex].title}</h3>
-                <p className="text-[#000a36] leading-relaxed text-base md:text-lg">{FEATURES[expandedIndex].description}</p>
-                <p className="text-[#000a36]/60 leading-relaxed text-sm md:text-base">{FEATURES[expandedIndex].details}</p>
+              <div className="flex flex-col justify-center p-6 md:p-12 gap-4 lg:flex-1">
+                <h3 className="text-2xl md:text-4xl font-medium text-[#000a36] leading-tight">{FEATURES[expandedIndex].title}</h3>
+                <p className="text-[#000a36] leading-relaxed text-sm md:text-lg">{FEATURES[expandedIndex].description}</p>
+                <p className="text-[#000a36]/60 leading-relaxed text-xs md:text-base">{FEATURES[expandedIndex].details}</p>
               </div>
             </motion.div>
           </>
@@ -556,13 +569,13 @@ function FeaturesCard() {
 
 function PricingCard({ onGetStarted }: { onGetStarted: () => void }) {
   return (
-    <div className="h-full w-full flex flex-col items-center justify-center py-16 px-6 md:px-16 overflow-y-auto">
+    <div className="h-full w-full flex flex-col items-center justify-center py-10 md:py-16 px-5 md:px-16 overflow-y-auto">
       <div className="max-w-5xl w-full">
         <ScrambleHeading
           text="what does it cost?"
-          className="text-4xl md:text-6xl font-extralight text-[#00f1d7] text-center mb-4 tracking-tight"
+          className="text-3xl md:text-6xl font-extralight text-[#00f1d7] text-center mb-4 tracking-tight"
         />
-        <p className="text-white/50 text-center mb-12 max-w-2xl mx-auto text-base md:text-lg">
+        <p className="text-white/50 text-center mb-6 md:mb-12 max-w-2xl mx-auto text-sm md:text-lg">
           you will be charged $0.10 per transaction by adding a credit card/debit card to the system and you will be charged either weekly/bi-weekly/monthly
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -616,6 +629,7 @@ function FooterCard() {
 
 export function LandingPage() {
   const [, setLocation] = useLocation();
+  const isMobile = useIsMobile();
   const goLogin = () => setLocation("/login");
 
   return (
@@ -655,9 +669,9 @@ export function LandingPage() {
             titleStyle="split"
             titleColor="#0055ff"
             imageScale="large"
-            smallTextSize="3rem"
-            largeTitleSize="6rem"
-            imageStyle={{ transform: "scale(2)", transformOrigin: "center center" }}
+            smallTextSize="clamp(1.6rem, 4.5vw, 3rem)"
+            largeTitleSize="clamp(2.5rem, 8vw, 6rem)"
+            imageStyle={{ transform: isMobile ? "scale(1.2)" : "scale(2)", transformOrigin: "center center" }}
             showButton
             buttonText="more"
             onButton={goLogin}
@@ -679,8 +693,8 @@ export function LandingPage() {
             buttonText="more"
             onButton={goLogin}
             textColor="white"
-            smallTextSize="3.2rem"
-            largeTitleSize="7rem"
+            smallTextSize="clamp(1.6rem, 4.5vw, 3.2rem)"
+            largeTitleSize="clamp(2.5rem, 9vw, 7rem)"
             smallTextMarginBottom="-1rem"
           />
         </StickyCard>
@@ -700,10 +714,10 @@ export function LandingPage() {
             buttonText="more"
             onButton={goLogin}
             textColor="default"
-            smallTextSize="3.2rem"
-            largeTitleSize="7rem"
+            smallTextSize="clamp(1.6rem, 4.5vw, 3.2rem)"
+            largeTitleSize="clamp(2.5rem, 9vw, 7rem)"
             smallTextMarginBottom="-1rem"
-            imageStyle={{ transform: "scale(2)", transformOrigin: "center center" }}
+            imageStyle={{ transform: isMobile ? "scale(1.2)" : "scale(2)", transformOrigin: "center center" }}
             buttonClassName="mt-4 px-8 py-3 rounded-full text-sm uppercase tracking-[0.2em] font-medium transition-colors duration-300 bg-[#000a36] text-white hover:bg-white hover:text-[#000a36]"
           />
         </StickyCard>
