@@ -149,28 +149,22 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
 
       {/* Bottom half — text left, video right */}
       <div className="flex flex-col lg:flex-row" style={{ minHeight: "70vh" }}>
-        {/* Left — text, each element blur-fades in staggered top→bottom */}
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: false, margin: "-8%" }}
-          variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.13 } } }}
-          className="flex-1 flex flex-col justify-center px-10 md:px-16 lg:px-20 py-16 gap-7"
-        >
+        {/* Left — each element has its own whileInView so reverse-on-scroll-up works */}
+        <div className="flex-1 flex flex-col justify-center px-10 md:px-16 lg:px-20 py-16 gap-7">
           <motion.h2
-            variants={{
-              hidden: { opacity: 0, filter: "blur(14px)", y: -18 },
-              visible: { opacity: 1, filter: "blur(0px)", y: 0, transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] } },
-            }}
+            initial={{ opacity: 0, y: -20, filter: "blur(12px)" }}
+            whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            viewport={{ once: false, amount: 0.6 }}
+            transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1], delay: 0 }}
             className="text-5xl md:text-6xl lg:text-7xl font-medium text-[#00f1d7] leading-tight"
           >
             what is tapt?
           </motion.h2>
           <motion.p
-            variants={{
-              hidden: { opacity: 0, filter: "blur(14px)", y: -18 },
-              visible: { opacity: 1, filter: "blur(0px)", y: 0, transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] } },
-            }}
+            initial={{ opacity: 0, y: -20, filter: "blur(12px)" }}
+            whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            viewport={{ once: false, amount: 0.4 }}
+            transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1], delay: 0.12 }}
             className="text-[#00f1d7]/80 text-base md:text-lg leading-relaxed max-w-lg"
           >
             We've set out to change how merchants of all industries collect payments.<br /><br />
@@ -178,10 +172,10 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
             Perfect for merchants on the move or operating where you need a quick and painless set up.
           </motion.p>
           <motion.div
-            variants={{
-              hidden: { opacity: 0, filter: "blur(14px)", y: -18 },
-              visible: { opacity: 1, filter: "blur(0px)", y: 0, transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] } },
-            }}
+            initial={{ opacity: 0, y: -20, filter: "blur(12px)" }}
+            whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            viewport={{ once: false, amount: 0.8 }}
+            transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1], delay: 0.22 }}
           >
             <MagneticButton
               onClick={onGetStarted}
@@ -190,14 +184,14 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
               get started <ArrowRight className="w-4 h-4" />
             </MagneticButton>
           </motion.div>
-        </motion.div>
+        </div>
 
-        {/* Right — video, blur-fades in after text */}
+        {/* Right — video */}
         <motion.div
-          initial={{ opacity: 0, filter: "blur(14px)", y: -18 }}
-          whileInView={{ opacity: 1, filter: "blur(0px)", y: 0 }}
-          viewport={{ once: false, margin: "-8%" }}
-          transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: 0.35 }}
+          initial={{ opacity: 0, filter: "blur(12px)" }}
+          whileInView={{ opacity: 1, filter: "blur(0px)" }}
+          viewport={{ once: false, amount: 0.3 }}
+          transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
           className="flex-1 overflow-hidden"
           style={{ minHeight: "35vh" }}
         >
