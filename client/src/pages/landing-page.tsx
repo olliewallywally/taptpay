@@ -289,6 +289,7 @@ function FeatureSection({
   smallTextSize = "2.5rem",
   largeTitleSize = "5rem",
   imageStyle,
+  imageContainerStyle,
   onButton,
 }: {
   title: string;
@@ -305,6 +306,7 @@ function FeatureSection({
   smallTextSize?: string;
   largeTitleSize?: string;
   imageStyle?: React.CSSProperties;
+  imageContainerStyle?: React.CSSProperties;
   onButton?: () => void;
 }) {
   const titleWords = titleStyle === "split" ? title.split(" ") : [title];
@@ -321,6 +323,7 @@ function FeatureSection({
             transition={{ duration: 0.8 }}
             viewport={{ once: true }}
             className={`flex ${imagePosition === "right" ? "lg:col-start-2 justify-end" : "justify-center"}`}
+            style={imageContainerStyle}
           >
             <img
               src={image}
@@ -492,9 +495,9 @@ export function LandingPage() {
             imagePosition="right"
             titleStyle="split"
             titleColor="#0055ff"
-            imageScale="large"
             largeTitleSize="9rem"
-            imageStyle={{ transform: "scale(2.5)", transformOrigin: "center right" }}
+            imageContainerStyle={{ overflow: "hidden", width: "280px", height: "430px", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "flex-end" }}
+            imageStyle={{ width: "auto", height: "120%", marginLeft: "-35%", display: "block", maxWidth: "none" }}
             showButton
             buttonText="more"
             onButton={goLogin}
