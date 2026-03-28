@@ -751,8 +751,7 @@ export function LandingPage() {
             smallTextSize="clamp(2rem, 6vw, 4rem)"
             largeTitleSize="clamp(3rem, 10vw, 8rem)"
             smallTextMarginBottom="-1rem"
-            imageStyle={{ transform: isMobile ? "translateY(-30%) scale(2.0)" : "translateY(-30%) scale(3.0)", transformOrigin: "center center" }}
-            imageContainerStyle={{ overflow: "hidden" }}
+            imageStyle={{ transform: isMobile ? "translateY(-8%) scale(1.6)" : "translateY(-12%) scale(2.2)", transformOrigin: "center center" }}
             bodyTextSmall
           />
         </StickyCard>
