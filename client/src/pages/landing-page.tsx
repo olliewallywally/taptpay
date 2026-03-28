@@ -119,7 +119,7 @@ function FixedNav({ onGetStarted }: { onGetStarted: () => void }) {
         <button onClick={() => document.getElementById("about")?.scrollIntoView({ behavior: "smooth" })} className="hidden sm:block text-white hover:text-[#00f1d7] transition-colors text-xs md:text-sm uppercase tracking-wider">services</button>
         <button onClick={() => document.getElementById("about")?.scrollIntoView({ behavior: "smooth" })} className="hidden sm:block text-white hover:text-[#00f1d7] transition-colors text-xs md:text-sm uppercase tracking-wider">about</button>
         <button onClick={onGetStarted} className="text-white hover:text-[#00f1d7] transition-colors text-xs md:text-sm uppercase tracking-wider">login</button>
-        <MagneticButton onClick={onGetStarted} className="bg-[#00f1d7] text-[#000a36] font-semibold px-4 py-1.5 rounded-full text-xs md:text-sm uppercase tracking-wider hover:bg-white transition-colors">
+        <MagneticButton onClick={onGetStarted} className="bg-[#00f1d7] text-[#000a36] font-semibold px-3 py-1 rounded-full text-[10px] md:text-xs uppercase tracking-wider hover:bg-white transition-colors">
           get started
         </MagneticButton>
       </motion.div>
@@ -158,7 +158,7 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
         >
           <MagneticButton
             onClick={onGetStarted}
-            className="bg-[#00f1d7] hover:bg-white text-[#000a36] font-semibold px-5 py-2 md:px-8 md:py-3 rounded-full text-xs md:text-base uppercase tracking-wider transition-colors shadow-lg flex items-center gap-1.5 md:gap-2"
+            className="bg-[#00f1d7] hover:bg-white text-[#000a36] font-semibold px-4 py-1.5 md:px-6 md:py-2 rounded-full text-[10px] md:text-sm uppercase tracking-wider transition-colors shadow-lg flex items-center gap-1 md:gap-1.5"
             data-testid="button-get-started"
           >
             get started <ArrowRight className="w-3 h-3 md:w-4 md:h-4" />
@@ -200,7 +200,7 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
           >
             <MagneticButton
               onClick={onGetStarted}
-              className="bg-[#00f1d7] hover:bg-white text-[#000a36] font-semibold px-5 py-2 md:px-8 md:py-3 rounded-full text-xs md:text-base uppercase tracking-wider transition-colors shadow-lg inline-flex items-center gap-1.5 md:gap-2"
+              className="bg-[#00f1d7] hover:bg-white text-[#000a36] font-semibold px-4 py-1.5 md:px-6 md:py-2 rounded-full text-[10px] md:text-sm uppercase tracking-wider transition-colors shadow-lg inline-flex items-center gap-1 md:gap-1.5"
             >
               get started <ArrowRight className="w-3 h-3 md:w-4 md:h-4" />
             </MagneticButton>
@@ -389,7 +389,7 @@ function FeatureSection({
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={onButton}
-                className={buttonClassName ?? `mt-4 px-8 py-3 rounded-full text-sm uppercase tracking-[0.2em] font-medium transition-colors duration-300 ${textColor === "white" ? "bg-[#00f1d7] text-[#000a36] hover:bg-white" : "bg-[#0055ff] text-white hover:bg-[#000a36]"}`}
+                className={buttonClassName ?? `mt-2 px-5 py-2 rounded-full text-xs uppercase tracking-[0.15em] font-medium transition-colors duration-300 ${textColor === "white" ? "bg-[#00f1d7] text-[#000a36] hover:bg-white" : "bg-[#0055ff] text-white hover:bg-[#000a36]"}`}
               >
                 {buttonText}
               </motion.button>
@@ -607,7 +607,7 @@ function PricingCard({ onGetStarted }: { onGetStarted: () => void }) {
         <div className="text-center mt-10">
           <MagneticButton
             onClick={onGetStarted}
-            className="bg-[#00f1d7] hover:bg-white text-[#000a36] font-semibold px-10 py-4 rounded-full text-base transition-colors shadow-lg inline-flex items-center gap-2 lowercase"
+            className="bg-[#00f1d7] hover:bg-white text-[#000a36] font-semibold px-6 py-2.5 rounded-full text-sm transition-colors shadow-lg inline-flex items-center gap-2 lowercase"
           >
             get started for free <ArrowRight className="w-5 h-5" />
           </MagneticButton>
@@ -724,7 +724,7 @@ export function LandingPage() {
             largeTitleSize="clamp(2.5rem, 9vw, 7rem)"
             smallTextMarginBottom="-1rem"
             imageStyle={{ transform: isMobile ? "scale(1.2)" : "scale(2)", transformOrigin: "center center" }}
-            buttonClassName="mt-4 px-8 py-3 rounded-full text-sm uppercase tracking-[0.2em] font-medium transition-colors duration-300 bg-[#000a36] text-white hover:bg-white hover:text-[#000a36]"
+            buttonClassName="mt-2 px-5 py-2 rounded-full text-xs uppercase tracking-[0.15em] font-medium transition-colors duration-300 bg-[#000a36] text-white hover:bg-white hover:text-[#000a36]"
           />
         </StickyCard>
 
