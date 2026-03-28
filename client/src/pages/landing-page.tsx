@@ -148,9 +148,9 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
       </div>
 
       {/* Bottom half — text left, video right */}
-      <div className="flex flex-col lg:flex-row" style={{ minHeight: "70vh" }}>
+      <div className="flex flex-col lg:flex-row" style={{ minHeight: "35vh" }}>
         {/* Left — each element has its own whileInView so reverse-on-scroll-up works */}
-        <div className="flex-1 flex flex-col justify-center px-10 md:px-16 lg:px-20 py-16 gap-7">
+        <div className="flex-1 flex flex-col justify-center px-10 md:px-16 lg:px-20 py-6 gap-7">
           <motion.h2
             initial={{ opacity: 0, y: -20, filter: "blur(12px)" }}
             whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
