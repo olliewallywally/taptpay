@@ -184,8 +184,7 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
             playsInline
             muted
           >
-            <source src="/dash-terminal.mov" type="video/mp4" />
-            <source src="/dash-terminal.mov" type="video/quicktime" />
+            <source src="/hero-phone.mp4" type="video/mp4" />
           </video>
         </div>
       </div>
