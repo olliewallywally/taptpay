@@ -170,6 +170,8 @@ export default function Checkout() {
 
   async function checkGooglePay() {
     try {
+      // Never show Google Pay on iOS — Apple Pay is the correct wallet there
+      if (inAppEnv.isIOS) return;
       if (!window.google?.payments?.api?.PaymentsClient) return;
       const client = new window.google.payments.api.PaymentsClient({
         environment: env === "sec" ? "PRODUCTION" : "TEST",
@@ -326,7 +328,10 @@ export default function Checkout() {
             parameters: { gateway: "windcave", gatewayMerchantId: googlePayMerchantId },
           },
         }],
-        merchantInfo: { merchantName: merchant?.businessName || "TaptPay" },
+        merchantInfo: {
+          merchantId: googlePayMerchantId,
+          merchantName: merchant?.businessName || "TaptPay",
+        },
         transactionInfo: {
           totalPriceStatus: "FINAL",
           totalPrice: overrideAmount || transaction?.price || "0.00",
@@ -463,10 +468,12 @@ export default function Checkout() {
                   textAlign: "center",
                 }}>
                   <p style={{ color: "#fff", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                    Google Pay &amp; Apple Pay not available
+                    {inAppEnv.isIOS ? "Apple Pay not available" : "Google Pay & Apple Pay not available"}
                   </p>
                   <p style={{ color: "rgba(255,255,255,0.72)", fontSize: 12, marginBottom: 14, lineHeight: 1.5 }}>
-                    This page is open in an in-app browser. Open it in Chrome or Safari to use wallet payments, or pay by card below.
+                    {inAppEnv.isIOS
+                      ? "This page is open in an in-app browser. Open it in Safari to use Apple Pay, or pay by card below."
+                      : "This page is open in an in-app browser. Open it in Chrome to use wallet payments, or pay by card below."}
                   </p>
                   {inAppEnv.isAndroid && (
                     <a
@@ -488,7 +495,9 @@ export default function Checkout() {
                   )}
                   {inAppEnv.isIOS && (
                     <a
-                      href={`googlechrome://${window.location.href.replace(/^https?:\/\//, "")}`}
+                      href={window.location.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       style={{
                         display: "block",
                         background: "#0055FF",
@@ -501,7 +510,7 @@ export default function Checkout() {
                         marginBottom: 8,
                       }}
                     >
-                      Open in Chrome
+                      Open in Safari
                     </a>
                   )}
                   <button
