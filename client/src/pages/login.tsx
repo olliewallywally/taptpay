@@ -163,8 +163,8 @@ export default function Login() {
       <div className="w-full max-w-xs md:max-w-sm lg:max-w-md">
         {/* Main login card — outer wrapper owns the outermost rounded corners */}
         <div className="shadow-2xl overflow-hidden rounded-[40px] md:rounded-[48px]">
-          {/* Blue section — rounded bottom where it meets the cyan strip */}
-          <div className="bg-[#0055FF] px-6 md:px-10 pt-10 md:pt-12 pb-7 md:pb-10 rounded-b-[32px] md:rounded-b-[40px]">
+          {/* Blue section — rounded bottom, sits above the cyan strip */}
+          <div className="bg-[#0055FF] px-6 md:px-10 pt-10 md:pt-12 pb-7 md:pb-10 rounded-b-[32px] md:rounded-b-[40px] relative z-[1]">
             {/* Logo */}
             <div className="text-center mb-8 md:mb-10">
               <img src={taptLogoPath} alt="taptpay" className="h-8 md:h-10 mx-auto" style={{ filter: 'brightness(0) saturate(100%) invert(78%) sepia(96%) saturate(2453%) hue-rotate(131deg) brightness(97%) contrast(101%)' }} />
@@ -321,9 +321,9 @@ export default function Login() {
             </div>
           </div>
 
-          {/* Cyan bottom section */}
+          {/* Cyan bottom section — pulled up under the blue rounded bottom */}
           <div 
-            className="bg-[#00E5CC] px-8 md:px-12 py-4 md:py-5 flex items-center justify-center cursor-pointer hover:bg-[#00FFE5] transition-colors"
+            className="bg-[#00E5CC] -mt-8 pt-10 pb-4 px-6 flex items-center justify-center cursor-pointer hover:bg-[#00FFE5] transition-colors"
             onClick={() => setShowMore(!showMore)}
             data-testid="button-show-more"
           >
