@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { CheckCircle, Download, Share2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import taptLogo from "@assets/IMG_6592_1755070818452.png";
 
 function formatPaymentMethod(method?: string): string {
@@ -25,6 +26,7 @@ export default function Receipt() {
   const splitId = splitIdParam ? parseInt(splitIdParam) : null;
 
   const [isActioning, setIsActioning] = useState(false);
+  const { toast } = useToast();
 
   const id = transactionId ? parseInt(transactionId) : null;
 
@@ -77,7 +79,15 @@ export default function Receipt() {
 
   const fetchPdfBlob = async (): Promise<Blob> => {
     const response = await fetch(getPdfUrl(), { method: "POST" });
-    if (!response.ok) throw new Error("Failed to generate PDF");
+    if (!response.ok) {
+      const contentType = response.headers.get("content-type") || "";
+      let msg = "Failed to generate PDF";
+      if (contentType.includes("application/json")) {
+        const json = await response.json().catch(() => ({}));
+        msg = json.message || msg;
+      }
+      throw new Error(msg);
+    }
     return response.blob();
   };
 
@@ -96,6 +106,11 @@ export default function Receipt() {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Download error:", error);
+      toast({
+        title: "Download failed",
+        description: "Could not generate the PDF receipt. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsActioning(false);
     }
@@ -135,6 +150,11 @@ export default function Receipt() {
     } catch (error) {
       if ((error as Error).name !== "AbortError") {
         console.error("Share error:", error);
+        toast({
+          title: "Share failed",
+          description: "Could not share the receipt. Try downloading it instead.",
+          variant: "destructive",
+        });
       }
     } finally {
       setIsActioning(false);

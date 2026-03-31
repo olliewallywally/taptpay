@@ -55,6 +55,8 @@ export default function Checkout() {
 
   const hfController = useRef<any>(null);
   const hfReadyRef = useRef(false);
+  const hfScriptsReady = useRef(false);
+  const hfInitialised = useRef(false);
   const googleClient = useRef<any>(null);
   const sessionRef = useRef<any>(null);
   const applePayOptions = useRef<any>(null);
@@ -97,13 +99,22 @@ export default function Checkout() {
       loadScript(`${base}/js/windcavepayments-hostedfields-v1.js`),
       loadScript(`${base}/js/windcavepayments-applepay-v1.js`),
     ])
-      .then(() => { initHostedFields(); checkApplePay(); })
+      .then(() => { hfScriptsReady.current = true; checkApplePay(); })
       .catch((e) => console.warn("Windcave scripts:", e));
 
     loadScript("https://pay.google.com/gp/p/js/pay.js")
       .then(() => checkGooglePay())
       .catch(() => {});
   }, [envData]);
+
+  // Lazy-init hosted fields the first time the card tab is opened
+  // so the iframes inject into visible containers, not hidden ones
+  useEffect(() => {
+    if (cardOpen && hfScriptsReady.current && !hfInitialised.current) {
+      hfInitialised.current = true;
+      initHostedFields();
+    }
+  }, [cardOpen]);
 
   const fieldStyle = {
     "background-color": "rgba(255,255,255,0.55)",
@@ -617,45 +628,56 @@ export default function Checkout() {
               overflow: "hidden",
               transition: "max-height 0.4s ease, padding 0.4s ease",
             }}>
-              {/* Card Number */}
-              <div style={{ marginBottom: 10 }}>
-                <label style={formLabelStyle}>Card Number</label>
-                <div id="hf-number" style={hfContainerStyle} />
-              </div>
-
-              {/* Expiry + CVV row */}
-              <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-                <div style={{ flex: 1 }}>
-                  <label style={formLabelStyle}>Expiry</label>
-                  <div id="hf-expiry" style={hfContainerStyle} />
+              {/* Loading state while hosted fields initialise */}
+              {cardOpen && !hfReady && (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "24px 0", color: "#0055FF" }}>
+                  <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} />
+                  <span style={{ fontSize: 13, fontWeight: 500 }}>Loading payment form…</span>
                 </div>
-                <div style={{ flex: 1 }}>
-                  <label style={formLabelStyle}>CVC</label>
-                  <div id="hf-cvv" style={hfContainerStyle} />
+              )}
+
+              {/* Card fields — only visible once hosted fields are ready */}
+              <div style={{ display: hfReady ? "block" : "none" }}>
+                {/* Card Number */}
+                <div style={{ marginBottom: 10 }}>
+                  <label style={formLabelStyle}>Card Number</label>
+                  <div id="hf-number" style={hfContainerStyle} />
                 </div>
-              </div>
 
-              {/* Cardholder Name */}
-              <div style={{ marginBottom: 10 }}>
-                <label style={formLabelStyle}>Cardholder Name</label>
-                <div id="hf-name" style={hfContainerStyle} />
-              </div>
+                {/* Expiry + CVV row */}
+                <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={formLabelStyle}>Expiry</label>
+                    <div id="hf-expiry" style={hfContainerStyle} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={formLabelStyle}>CVC</label>
+                    <div id="hf-cvv" style={hfContainerStyle} />
+                  </div>
+                </div>
 
-              {/* Pay button */}
-              <button
-                onClick={handleCardPay}
-                disabled={isProcessing}
-                style={payBtnStyle}
-              >
-                {isProcessing ? (
-                  <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                    <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} />
-                    Processing…
-                  </span>
-                ) : (
-                  `Pay ${amountDisplay}`
-                )}
-              </button>
+                {/* Cardholder Name */}
+                <div style={{ marginBottom: 10 }}>
+                  <label style={formLabelStyle}>Cardholder Name</label>
+                  <div id="hf-name" style={hfContainerStyle} />
+                </div>
+
+                {/* Pay button */}
+                <button
+                  onClick={handleCardPay}
+                  disabled={isProcessing}
+                  style={payBtnStyle}
+                >
+                  {isProcessing ? (
+                    <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                      <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} />
+                      Processing…
+                    </span>
+                  ) : (
+                    `Pay ${amountDisplay}`
+                  )}
+                </button>
+              </div>
             </div>
           </>
         )}

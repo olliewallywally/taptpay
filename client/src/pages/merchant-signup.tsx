@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, Store, Mail, Lock } from "lucide-react";
+import { CheckCircle, Store, Lock, ClipboardList, ShieldCheck, CreditCard, Zap } from "lucide-react";
 
 export default function MerchantSignup() {
   const { toast } = useToast();
@@ -34,18 +34,22 @@ export default function MerchantSignup() {
       const response = await apiRequest("POST", "/api/merchants/signup", data);
       return response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       setSubmittedEmail(formData.email);
       setIsSuccess(true);
-      toast({
-        title: "Account Created Successfully",
-        description: "Please check your email to verify your account",
-      });
     },
     onError: (error: any) => {
+      // apiRequest throws as "STATUS: {json}" — extract the human-readable message
+      let description = "Failed to create account. Please try again.";
+      try {
+        const raw = error.message || "";
+        const jsonPart = raw.substring(raw.indexOf("{"));
+        const parsed = JSON.parse(jsonPart);
+        description = parsed.message || description;
+      } catch {}
       toast({
-        title: "Signup Failed",
-        description: error.message || "Failed to create account",
+        title: "Signup failed",
+        description,
         variant: "destructive",
       });
     },
@@ -104,55 +108,83 @@ export default function MerchantSignup() {
   };
 
   if (isSuccess) {
+    const steps = [
+      {
+        icon: <ClipboardList className="w-5 h-5 text-[#0055FF]" />,
+        title: "Details submitted",
+        description: "Your business information has been received by the TaptPay team.",
+        done: true,
+      },
+      {
+        icon: <ShieldCheck className="w-5 h-5 text-[#0055FF]" />,
+        title: "KYC & AML verification",
+        description: "We'll submit your application to Windcave who will be in touch to complete identity and compliance checks.",
+        done: false,
+      },
+      {
+        icon: <CreditCard className="w-5 h-5 text-[#0055FF]" />,
+        title: "Add a payment card",
+        description: "Once your account is set up, you'll add a valid card to your TaptPay account for payouts.",
+        done: false,
+      },
+      {
+        icon: <Zap className="w-5 h-5 text-[#0055FF]" />,
+        title: "Start collecting payments",
+        description: "Once approved, your QR code and payment link will be live and ready to go.",
+        done: false,
+      },
+    ];
+
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center p-6">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-cyan-50 flex items-center justify-center p-6">
         <div className="w-full max-w-md">
-          <Card>
-            <CardHeader className="text-center">
-              <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                <CheckCircle className="w-8 h-8 text-green-600" />
+          <Card className="border-0 shadow-xl rounded-3xl overflow-hidden">
+            <div className="bg-[#0055FF] px-8 pt-8 pb-6 text-center">
+              <div className="mx-auto w-14 h-14 bg-white/20 rounded-full flex items-center justify-center mb-4">
+                <CheckCircle className="w-8 h-8 text-white" />
               </div>
-              <CardTitle className="text-2xl text-green-600">Check Your Email!</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="bg-gray-50 p-4 rounded-lg text-center">
-                <div className="flex items-center justify-center mb-2">
-                  <Mail className="w-5 h-5 text-blue-600 mr-2" />
-                  <span className="font-medium">Verification Email Sent</span>
-                </div>
-                <p className="text-sm text-gray-600">
-                  We've sent a verification email to:
-                </p>
-                <p className="text-sm font-medium text-blue-600 mt-1">
-                  {submittedEmail}
-                </p>
-              </div>
-              
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <h3 className="font-semibold mb-2 text-blue-900">Next Steps</h3>
-                <ol className="text-sm text-blue-700 space-y-1">
-                  <li>1. Check your email inbox</li>
-                  <li>2. Click the verification link</li>
-                  <li>3. Complete your password setup</li>
-                  <li>4. Start accepting payments!</li>
-                </ol>
+              <CardTitle className="text-2xl text-white font-bold">You're on your way!</CardTitle>
+              <p className="text-white/75 text-sm mt-2">
+                Account created for <span className="font-semibold text-white">{submittedEmail}</span>
+              </p>
+            </div>
+
+            <CardContent className="px-6 pt-6 pb-8 space-y-5">
+              <p className="text-sm text-gray-500 text-center">Here's what happens next:</p>
+
+              <div className="space-y-4">
+                {steps.map((step, i) => (
+                  <div key={i} className="flex gap-4">
+                    <div className="flex flex-col items-center">
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${step.done ? "bg-[#0055FF]/10" : "bg-gray-100"}`}>
+                        {step.done ? step.icon : <span className="text-xs font-bold text-gray-400">{i + 1}</span>}
+                      </div>
+                      {i < steps.length - 1 && (
+                        <div className="w-px flex-1 bg-gray-200 mt-1 mb-1" />
+                      )}
+                    </div>
+                    <div className="pt-1 pb-4">
+                      <p className={`text-sm font-semibold ${step.done ? "text-[#0055FF]" : "text-gray-800"}`}>
+                        {step.title} {step.done && <span className="text-[#00E5CC]">✓</span>}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{step.description}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
 
-              <div className="flex space-x-2">
-                <Button 
-                  variant="outline"
-                  onClick={() => setLocation("/")}
-                  className="flex-1"
-                >
-                  Back to Home
-                </Button>
-                <Button 
-                  onClick={() => setLocation("/login")}
-                  className="flex-1"
-                >
-                  Login
-                </Button>
+              <div className="bg-[#00E5CC]/10 border border-[#00E5CC]/30 rounded-2xl p-4 text-center">
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  Keep an eye on your email at <span className="font-semibold text-[#0055FF]">{submittedEmail}</span> — Windcave will reach out directly to complete your verification.
+                </p>
               </div>
+
+              <Button
+                onClick={() => setLocation("/")}
+                className="w-full bg-[#0055FF] hover:bg-[#0044dd] text-white rounded-2xl py-5 font-semibold"
+              >
+                Back to Home
+              </Button>
             </CardContent>
           </Card>
         </div>
