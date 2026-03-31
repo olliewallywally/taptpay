@@ -27,6 +27,7 @@ import StockManagement from "@/pages/stock-management";
 import { LandingPage } from "@/pages/landing-page";
 import LegalPage from "@/pages/legal";
 import InfoPage from "@/pages/info";
+import BusinessDetails from "@/pages/business-details";
 import MerchantOnboarding from "@/pages/merchant-onboarding";
 import SplitPayment from "@/pages/split-payment";
 import PaymentResult from "@/pages/payment-result";
@@ -178,6 +179,7 @@ function Router() {
       <Switch>
         <Route path="/" component={LandingPage} />
         <Route path="/info" component={InfoPage} />
+        <Route path="/business-details" component={BusinessDetails} />
         <Route path="/login" component={Login} />
         <Route path="/signup" component={MerchantSignup} />
         <Route path="/forgot-password" component={ForgotPassword} />

@@ -259,6 +259,33 @@ export const createRefundSchema = z.object({
   refundMethod: z.enum(["original_payment_method", "bank_transfer", "manual"]).default("original_payment_method"),
 });
 
+export const publicSignupSchema = z.object({
+  name: z.string().min(1, "Full name is required").max(100),
+  email: z.string().email("Valid email is required"),
+  password: z.string()
+    .min(8, "Password must be at least 8 characters")
+    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+    .regex(/[0-9]/, "Password must contain at least one number"),
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
+});
+
+export const businessDetailsSchema = z.object({
+  businessName: z.string().min(1, "Business name is required").max(100),
+  director: z.string().min(1, "Director / responsible person name is required").max(100),
+  contactEmail: z.string().email("Valid email is required"),
+  contactPhone: z.string().min(1, "Phone number is required").max(20),
+  gstNumber: z.string().min(1, "GST number is required").max(20),
+  businessAddress: z.string().max(200).optional(),
+  nzbn: z.string().max(20).optional(),
+});
+
+export type PublicSignup = z.infer<typeof publicSignupSchema>;
+export type BusinessDetails = z.infer<typeof businessDetailsSchema>;
+
 export const createMerchantSchema = z.object({
   name: z.string().min(1, "Merchant name is required").max(50),
   businessName: z.string().min(1, "Business name is required").max(100),
