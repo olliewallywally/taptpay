@@ -139,7 +139,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-10 px-4">
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center py-6 px-4">
       <SEOHead
         title="Login - TapTpay Payment Terminal"
         description="Access your TapTpay merchant account to manage payments, view transactions, track revenue, and configure your payment settings."
@@ -147,24 +147,27 @@ export default function Login() {
         ogTitle="Login to TapTpay"
         ogDescription="Sign in to your merchant dashboard to manage payments and track your business."
       />
-      {/* Back to Landing Page Button — fixed so it's always visible */}
-      <button
-        onClick={() => setLocation("/")}
-        className="fixed top-5 left-5 z-50 flex items-center gap-2 text-gray-600 hover:text-[#0055FF] transition-colors group bg-white/80 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-sm"
-        data-testid="button-back-to-landing"
-      >
-        <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-        <span className="font-medium text-sm">Back</span>
-      </button>
 
-      <div className="w-full max-w-sm md:max-w-md lg:max-w-lg mx-auto">
-        {/* Main login card — outer wrapper owns all rounded corners and clips children */}
-        <div className="shadow-2xl overflow-hidden rounded-[48px] md:rounded-[60px]">
-          {/* Blue section with form */}
-          <div className="bg-[#0055FF] px-8 md:px-12 pt-12 md:pt-16 pb-8 md:pb-12">
+      {/* Back button sits in its own row above the card — zero overlap guaranteed */}
+      <div className="w-full max-w-xs md:max-w-sm lg:max-w-md mb-3 flex items-center">
+        <button
+          onClick={() => setLocation("/")}
+          className="flex items-center gap-1.5 text-gray-500 hover:text-[#0055FF] transition-colors group"
+          data-testid="button-back-to-landing"
+        >
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+          <span className="font-medium text-sm">Back</span>
+        </button>
+      </div>
+
+      <div className="w-full max-w-xs md:max-w-sm lg:max-w-md">
+        {/* Main login card — outer wrapper owns the outermost rounded corners */}
+        <div className="shadow-2xl overflow-hidden rounded-[40px] md:rounded-[48px]">
+          {/* Blue section — rounded bottom where it meets the cyan strip */}
+          <div className="bg-[#0055FF] px-6 md:px-10 pt-10 md:pt-12 pb-7 md:pb-10 rounded-b-[32px] md:rounded-b-[40px]">
             {/* Logo */}
-            <div className="text-center mb-12 md:mb-16">
-              <img src={taptLogoPath} alt="taptpay" className="h-10 md:h-12 mx-auto" style={{ filter: 'brightness(0) saturate(100%) invert(78%) sepia(96%) saturate(2453%) hue-rotate(131deg) brightness(97%) contrast(101%)' }} />
+            <div className="text-center mb-8 md:mb-10">
+              <img src={taptLogoPath} alt="taptpay" className="h-8 md:h-10 mx-auto" style={{ filter: 'brightness(0) saturate(100%) invert(78%) sepia(96%) saturate(2453%) hue-rotate(131deg) brightness(97%) contrast(101%)' }} />
             </div>
 
             {/* Success message */}
@@ -210,7 +213,7 @@ export default function Login() {
             )}
 
             {/* Form */}
-            <form onSubmit={handleLogin} className="space-y-6 md:space-y-8">
+            <form onSubmit={handleLogin} className="space-y-5">
               {/* Name field (signup only) */}
               {isSignup && (
                 <div>
@@ -280,7 +283,7 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={loginMutation.isPending}
-                className="w-full bg-[#00E5CC] text-[#0055FF] rounded-full py-4 md:py-5 mt-8 md:mt-10 hover:bg-[#00FFE5] transition-colors text-center font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-[#00E5CC] text-[#0055FF] rounded-full py-4 mt-6 hover:bg-[#00FFE5] transition-colors text-center font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="button-login"
               >
                 {loginMutation.isPending ? 'loading...' : isSignup ? 'sign up' : 'login'}
@@ -288,7 +291,7 @@ export default function Login() {
             </form>
 
             {/* Social login buttons */}
-            <div className="mt-6 md:mt-8 space-y-3 md:space-y-4">
+            <div className="mt-5 space-y-3">
               <div className="text-center text-[#00E5CC] mb-3 md:mb-4 text-sm md:text-base">or continue with</div>
               
               <button
