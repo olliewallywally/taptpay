@@ -139,7 +139,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-start justify-center pt-12 pb-8 px-4 relative overflow-y-auto">
+    <div className="min-h-screen bg-gray-50 py-10 px-4">
       <SEOHead
         title="Login - TapTpay Payment Terminal"
         description="Access your TapTpay merchant account to manage payments, view transactions, track revenue, and configure your payment settings."
@@ -147,21 +147,21 @@ export default function Login() {
         ogTitle="Login to TapTpay"
         ogDescription="Sign in to your merchant dashboard to manage payments and track your business."
       />
-      {/* Back to Landing Page Button */}
+      {/* Back to Landing Page Button — fixed so it's always visible */}
       <button
         onClick={() => setLocation("/")}
-        className="absolute top-6 left-6 flex items-center gap-2 text-gray-600 hover:text-[#0055FF] transition-colors group"
+        className="fixed top-5 left-5 z-50 flex items-center gap-2 text-gray-600 hover:text-[#0055FF] transition-colors group bg-white/80 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-sm"
         data-testid="button-back-to-landing"
       >
-        <ArrowLeft className="w-6 h-6 group-hover:-translate-x-1 transition-transform" />
-        <span className="font-medium">Back</span>
+        <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+        <span className="font-medium text-sm">Back</span>
       </button>
 
-      <div className="w-full max-w-sm md:max-w-md lg:max-w-lg">
-        {/* Main login card */}
-        <div className="shadow-2xl overflow-visible">
+      <div className="w-full max-w-sm md:max-w-md lg:max-w-lg mx-auto">
+        {/* Main login card — outer wrapper owns all rounded corners and clips children */}
+        <div className="shadow-2xl overflow-hidden rounded-[48px] md:rounded-[60px]">
           {/* Blue section with form */}
-          <div className="bg-[#0055FF] px-8 md:px-12 pt-12 md:pt-16 pb-8 md:pb-12 rounded-t-[48px] md:rounded-t-[60px] rounded-b-[48px] md:rounded-b-[60px] relative z-10">
+          <div className="bg-[#0055FF] px-8 md:px-12 pt-12 md:pt-16 pb-8 md:pb-12">
             {/* Logo */}
             <div className="text-center mb-12 md:mb-16">
               <img src={taptLogoPath} alt="taptpay" className="h-10 md:h-12 mx-auto" style={{ filter: 'brightness(0) saturate(100%) invert(78%) sepia(96%) saturate(2453%) hue-rotate(131deg) brightness(97%) contrast(101%)' }} />
@@ -320,7 +320,7 @@ export default function Login() {
 
           {/* Cyan bottom section */}
           <div 
-            className={`bg-[#00E5CC] px-8 md:px-12 py-4 md:py-5 flex items-center justify-center cursor-pointer hover:bg-[#00FFE5] transition-colors -mt-12 md:-mt-14 pt-16 md:pt-20 ${!showMore ? 'rounded-b-[48px] md:rounded-b-[60px]' : ''}`}
+            className="bg-[#00E5CC] px-8 md:px-12 py-4 md:py-5 flex items-center justify-center cursor-pointer hover:bg-[#00FFE5] transition-colors"
             onClick={() => setShowMore(!showMore)}
             data-testid="button-show-more"
           >
@@ -333,7 +333,7 @@ export default function Login() {
 
           {/* Expandable more section */}
           {showMore && (
-            <div className="bg-[#00E5CC] px-8 md:px-12 pb-6 md:pb-8 space-y-3 md:space-y-4 rounded-b-[48px] md:rounded-b-[60px]">
+            <div className="bg-[#00E5CC] px-8 md:px-12 pb-6 md:pb-8 space-y-3 md:space-y-4">
               <button 
                 onClick={() => {
                   toast({
