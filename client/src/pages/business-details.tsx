@@ -27,16 +27,18 @@ export default function BusinessDetails() {
 
   useEffect(() => {
     const id = getMerchantId();
-    if (!id) return;
+    if (!id) {
+      setEmailVerified(true);
+      return;
+    }
     fetch(`/api/merchants/${id}/email-status`)
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => {
-        if (data) {
-          setEmailVerified(data.emailVerified ?? false);
-          setMerchantEmail(data.email || "");
-        }
+      .then(async (r) => {
+        if (!r.ok) { setEmailVerified(false); return; }
+        const data = await r.json();
+        setEmailVerified(data.emailVerified ?? false);
+        setMerchantEmail(data.email || "");
       })
-      .catch(() => setEmailVerified(true));
+      .catch(() => setEmailVerified(false));
   }, []);
 
   const handleResend = async () => {
@@ -99,6 +101,14 @@ export default function BusinessDetails() {
     e.preventDefault();
     submitMutation.mutate(formData);
   };
+
+  if (emailVerified === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "#0055ff" }}>
+        <div className="w-7 h-7 border-2 border-[#00f1d7] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   if (emailVerified === false) {
     return (
