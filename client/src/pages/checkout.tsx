@@ -94,27 +94,36 @@ export default function Checkout() {
   useEffect(() => {
     if (!envData) return;
 
-    Promise.all([
-      loadScript(`${base}/js/lib/hosted-fields-v1.js`),
-      loadScript(`${base}/js/windcavepayments-hostedfields-v1.js`),
-      loadScript(`${base}/js/windcavepayments-applepay-v1.js`),
-    ])
-      .then(() => { hfScriptsReady.current = true; checkApplePay(); })
-      .catch((e) => console.warn("Windcave scripts:", e));
+    // Apple Pay SDK: only load on Apple devices (window.ApplePaySession exists).
+    // Loading it on Android causes the SDK to auto-initialise without a session
+    // and redirect the browser to the Windcave HPP fallback URL.
+    if (typeof window.ApplePaySession !== "undefined") {
+      loadScript(`${base}/js/windcavepayments-applepay-v1.js`)
+        .then(() => checkApplePay())
+        .catch((e) => console.warn("Windcave ApplePay script:", e));
+    }
 
+    // Google Pay script is safe to load unconditionally — Google's own SDK
+    // never redirects; it only shows a native bottom sheet.
     loadScript("https://pay.google.com/gp/p/js/pay.js")
       .then(() => checkGooglePay())
       .catch(() => {});
   }, [envData]);
 
-  // Lazy-init hosted fields the first time the card tab is opened
-  // so the iframes inject into visible containers, not hidden ones
+  // Lazy-load Windcave Hosted Fields scripts only when the card tab is first
+  // opened — loading them at page load causes the HF SDK to auto-initialise
+  // without a session and redirect the browser to the HPP fallback URL,
+  // which breaks the Google Pay native sheet flow on Android.
   useEffect(() => {
-    if (cardOpen && hfScriptsReady.current && !hfInitialised.current) {
-      hfInitialised.current = true;
-      initHostedFields();
-    }
-  }, [cardOpen]);
+    if (!envData || !cardOpen || hfInitialised.current) return;
+    hfInitialised.current = true;
+    Promise.all([
+      loadScript(`${base}/js/lib/hosted-fields-v1.js`),
+      loadScript(`${base}/js/windcavepayments-hostedfields-v1.js`),
+    ])
+      .then(() => { hfScriptsReady.current = true; initHostedFields(); })
+      .catch((e) => console.warn("Windcave HF scripts:", e));
+  }, [envData, cardOpen]);
 
   const fieldStyle = {
     "background-color": "rgba(255,255,255,0.55)",
