@@ -26,6 +26,7 @@ import VerifyMerchant from "@/pages/verify-merchant";
 import StockManagement from "@/pages/stock-management";
 import { LandingPage } from "@/pages/landing-page";
 import LegalPage from "@/pages/legal";
+import InfoPage from "@/pages/info";
 import MerchantOnboarding from "@/pages/merchant-onboarding";
 import SplitPayment from "@/pages/split-payment";
 import PaymentResult from "@/pages/payment-result";
@@ -176,6 +177,7 @@ function Router() {
       <GA4PageTracker />
       <Switch>
         <Route path="/" component={LandingPage} />
+        <Route path="/info" component={InfoPage} />
         <Route path="/login" component={Login} />
         <Route path="/signup" component={MerchantSignup} />
         <Route path="/forgot-password" component={ForgotPassword} />
