@@ -403,29 +403,13 @@ function FeatureSection({
   );
 }
 
-const PRICING_PLANS = [
-  {
-    name: "SME",
-    subtitle: "1000 transactions and below per month",
-    price: "No monthly system fee",
-    perTx: "$0.10 per transaction",
-    features: [
-      "2 login's per business",
-      "2 payment stones ($29.99 normally)",
-      "$89.99 for set up kit - 2 design requests. (kit includes x2 payment stones, 2 other info signage, magnetic mount)",
-    ],
-  },
-  {
-    name: "Enterprise",
-    subtitle: "1000+ transactions and above per month",
-    price: "$19.99",
-    perTx: "per month system fee",
-    features: [
-      "10 login's per business",
-      "5-10 payment stones ($29.99 normally)",
-      "$129.99 for set up kit - 5 design requests. (kit includes x5 payment stones, 3 other info signage, x2 magnetic mount)",
-    ],
-  },
+const PRICING_ITEMS = [
+  { label: "$0.10 per transaction" },
+  { label: "Flexible monthly software fee — only pay $9.99 if you go over 100 transactions in a month" },
+  { label: "No contract" },
+  { label: "Free technical support" },
+  { label: "$25.99 per payment board A5 (design service free for first 2 boards)" },
+  { label: "Custom payment board size — priced on request" },
 ];
 
 const FEATURES = [
@@ -584,28 +568,17 @@ function PricingCard({ onGetStarted }: { onGetStarted: () => void }) {
           text="what does it cost?"
           className="text-3xl md:text-6xl font-extralight text-[#00f1d7] text-center mb-4 tracking-tight"
         />
-        <p className="text-white/50 text-center mb-6 md:mb-12 max-w-2xl mx-auto text-sm md:text-lg">
-          you will be charged $0.10 per transaction by adding a credit card/debit card to the system and you will be charged either weekly/bi-weekly/monthly
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {PRICING_PLANS.map((plan) => (
-            <div key={plan.name} className="bg-[#0055ff] border-2 border-[#00f1d7]/40 rounded-2xl p-8 flex flex-col">
-              <h3 className="text-[#00f1d7] text-2xl font-bold mb-1">{plan.name}</h3>
-              <p className="text-white/50 text-sm mb-5">{plan.subtitle}</p>
-              <div className="border-b border-white/10 pb-5 mb-5">
-                <div className="text-white text-2xl font-light">{plan.price}</div>
-                <div className="text-[#00f1d7] text-sm mt-1">{plan.perTx}</div>
-              </div>
-              <ul className="flex flex-col gap-3 flex-1">
-                {plan.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-white/80 text-sm">
-                    <CheckCircle className="w-4 h-4 text-[#00f1d7] flex-shrink-0 mt-0.5" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+        <div className="max-w-xl mx-auto">
+          <div className="bg-[#0055ff] border border-[#00f1d7]/30 rounded-3xl p-8 md:p-10">
+            <ul className="flex flex-col gap-4">
+              {PRICING_ITEMS.map((item, i) => (
+                <li key={i} className="flex items-start gap-3">
+                  <CheckCircle className="w-5 h-5 text-[#00f1d7] flex-shrink-0 mt-0.5" />
+                  <span className="text-white/90 text-sm md:text-base leading-relaxed">{item.label}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
         <div className="text-center mt-10">
           <MagneticButton
