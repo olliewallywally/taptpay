@@ -24,7 +24,7 @@ app.use(helmet({
   contentSecurityPolicy: isProduction ? {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://pay.google.com", "https://applepay.cdn-apple.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://pay.google.com", "https://applepay.cdn-apple.com", "https://uat.windcave.com", "https://sec.windcave.com"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "blob:", "https:"],

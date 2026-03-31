@@ -36,6 +36,9 @@ function loadScript(src: string): Promise<void> {
   });
 }
 
+// Windcave HPP domain pattern — used by the navigation guard below.
+const WINDCAVE_HPP_RE = /^https?:\/\/(?:uat|sec)\.windcave\.com/i;
+
 export default function Checkout() {
   const { transactionId } = useParams<{ transactionId: string }>();
   const [, setLocation] = useLocation();
@@ -128,6 +131,33 @@ export default function Checkout() {
         hfInitialised.current = false;
       });
   }, [envData, cardOpen]);
+
+  // ── Navigation guard ────────────────────────────────────────────────────
+  // Belt-and-suspenders: intercept any programmatic navigation to Windcave's
+  // Hosted Payment Page (HPP) and block it.  This catches both SDK-triggered
+  // location.assign() / location.replace() calls and any future code that
+  // accidentally re-introduces the HPP URL.  The guard is installed for the
+  // lifetime of the checkout page and removed on unmount.
+  useEffect(() => {
+    const origAssign  = window.location.assign.bind(window.location);
+    const origReplace = window.location.replace.bind(window.location);
+
+    function guardUrl(url: string): boolean {
+      if (WINDCAVE_HPP_RE.test(url)) {
+        console.error("[Checkout] Blocked unexpected navigation to Windcave HPP:", url);
+        return false;
+      }
+      return true;
+    }
+
+    (window.location as any).assign  = (url: string) => { if (guardUrl(url)) origAssign(url); };
+    (window.location as any).replace = (url: string) => { if (guardUrl(url)) origReplace(url); };
+
+    return () => {
+      (window.location as any).assign  = origAssign;
+      (window.location as any).replace = origReplace;
+    };
+  }, []);
 
   const fieldStyle = {
     "background-color": "rgba(255,255,255,0.55)",
