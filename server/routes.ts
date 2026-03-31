@@ -2230,6 +2230,18 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
+  app.get("/api/admin/merchants/:id/transactions", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      if (isNaN(merchantId)) return res.status(400).json({ message: "Invalid merchant ID" });
+      const txList = await storage.getTransactionsByMerchant(merchantId);
+      res.json(txList);
+    } catch (error) {
+      console.error("Admin fetch transactions error:", error);
+      res.status(500).json({ message: "Failed to fetch transactions" });
+    }
+  });
+
   // Update Windcave Merchant ID (admin only)
   app.patch("/api/admin/merchants/:id/windcave-merchant-id", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {

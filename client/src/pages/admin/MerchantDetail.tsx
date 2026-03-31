@@ -41,16 +41,16 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
   });
 
   const { data: transactions = [] } = useQuery<any[]>({
-    queryKey: ['/api/merchants', merchantId, 'transactions'],
+    queryKey: ['/api/admin/merchants', merchantId, 'transactions'],
     queryFn: async () => {
-      const res = await fetch(`/api/merchants/${merchantId}/transactions`, { headers: ADMIN_HEADERS() });
+      const res = await fetch(`/api/admin/merchants/${merchantId}/transactions`, { headers: ADMIN_HEADERS() });
       if (!res.ok) return [];
       return res.json();
     },
   });
 
   // ── Derived data ────────────────────────────────────────────────────────────
-  const totalRevenue = transactions.reduce((s, t) => s + parseFloat(t.amount || 0), 0);
+  const totalRevenue = transactions.reduce((s, t) => s + parseFloat(t.price || 0), 0);
   const completedTx = transactions.filter((t) => t.status === 'completed');
   const avgTransaction = transactions.length ? totalRevenue / transactions.length : 0;
 
@@ -66,7 +66,7 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
     transactions.forEach((t) => {
       if (t.status !== 'completed' || !t.createdAt) return;
       const key = new Date(t.createdAt).toISOString().split('T')[0];
-      if (key in days) days[key] += parseFloat(t.amount || 0);
+      if (key in days) days[key] += parseFloat(t.price || 0);
     });
     return Object.entries(days).map(([date, revenue]) => ({
       label: new Date(date).toLocaleDateString('en-NZ', { month: 'short', day: 'numeric' }),
