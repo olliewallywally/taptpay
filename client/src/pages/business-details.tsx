@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, ClipboardList, ShieldCheck, CreditCard, Zap, ArrowRight } from "lucide-react";
+import { CheckCircle, ClipboardList, ShieldCheck, CreditCard, Zap, ArrowRight, Mail, RefreshCw } from "lucide-react";
 import logoImage from "@assets/IMG_6592_1755070818452.png";
 
 const inputClass =
@@ -20,6 +20,48 @@ export default function BusinessDetails() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [isSuccess, setIsSuccess] = useState(false);
+  const [emailVerified, setEmailVerified] = useState<boolean | null>(null);
+  const [merchantEmail, setMerchantEmail] = useState("");
+  const [resending, setResending] = useState(false);
+  const [resent, setResent] = useState(false);
+
+  useEffect(() => {
+    const id = getMerchantId();
+    if (!id) return;
+    fetch(`/api/merchants/${id}/email-status`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data) {
+          setEmailVerified(data.emailVerified ?? false);
+          setMerchantEmail(data.email || "");
+        }
+      })
+      .catch(() => setEmailVerified(true));
+  }, []);
+
+  const handleResend = async () => {
+    if (!merchantEmail) return;
+    setResending(true);
+    try {
+      const res = await fetch("/api/auth/resend-confirmation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: merchantEmail }),
+      });
+      if (res.ok) {
+        setResent(true);
+        toast({ title: "Email sent", description: "Check your inbox for the confirmation link." });
+      } else {
+        const d = await res.json();
+        toast({ title: "Failed to resend", description: d.message, variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Failed to resend", variant: "destructive" });
+    } finally {
+      setResending(false);
+    }
+  };
+
   const [formData, setFormData] = useState({
     businessName: "",
     director: "",
@@ -57,6 +99,52 @@ export default function BusinessDetails() {
     e.preventDefault();
     submitMutation.mutate(formData);
   };
+
+  if (emailVerified === false) {
+    return (
+      <div
+        className="min-h-screen flex flex-col items-center justify-center px-4 py-10"
+        style={{ background: "#0055ff", fontFamily: "Outfit, sans-serif" }}
+      >
+        <div className="w-full max-w-sm text-center">
+          <div className="flex justify-center mb-6">
+            <img src={logoImage} alt="TaptPay" className="h-8 w-auto" style={{ filter: "brightness(0) invert(1)" }} />
+          </div>
+
+          <div className="mx-auto w-16 h-16 rounded-full bg-[#00f1d7]/20 flex items-center justify-center mb-5">
+            <Mail className="w-8 h-8 text-[#00f1d7]" />
+          </div>
+
+          <h1 className="text-white text-xl font-semibold mb-2">Verify your email first</h1>
+          <p className="text-white/60 text-sm leading-relaxed mb-6">
+            Before you can complete your business details, please confirm your email address using the link we sent you.
+          </p>
+
+          <div className="bg-white/10 border border-white/15 rounded-2xl p-4 mb-6">
+            <p className="text-white/70 text-sm">
+              Check your inbox at <span className="text-white font-medium">{merchantEmail || "your email"}</span>
+            </p>
+          </div>
+
+          <button
+            onClick={handleResend}
+            disabled={resending || resent}
+            className="w-full flex items-center justify-center gap-2 text-sm text-[#00f1d7] hover:text-white border border-[#00f1d7]/40 hover:border-white/40 rounded-2xl py-3 transition-colors disabled:opacity-50 mb-4"
+          >
+            {resending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            {resent ? "Email sent!" : resending ? "Sending..." : "Resend confirmation email"}
+          </button>
+
+          <button
+            onClick={() => window.location.reload()}
+            className="text-white/40 hover:text-white text-xs underline transition-colors"
+          >
+            I've confirmed my email — refresh
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (isSuccess) {
     const steps = [

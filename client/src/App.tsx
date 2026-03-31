@@ -28,6 +28,8 @@ import { LandingPage } from "@/pages/landing-page";
 import LegalPage from "@/pages/legal";
 import InfoPage from "@/pages/info";
 import BusinessDetails from "@/pages/business-details";
+import CheckEmail from "@/pages/check-email";
+import ConfirmEmail from "@/pages/confirm-email";
 import MerchantOnboarding from "@/pages/merchant-onboarding";
 import SplitPayment from "@/pages/split-payment";
 import PaymentResult from "@/pages/payment-result";
@@ -180,6 +182,8 @@ function Router() {
         <Route path="/" component={LandingPage} />
         <Route path="/info" component={InfoPage} />
         <Route path="/business-details" component={BusinessDetails} />
+        <Route path="/check-email" component={CheckEmail} />
+        <Route path="/confirm-email" component={ConfirmEmail} />
         <Route path="/login" component={Login} />
         <Route path="/signup" component={MerchantSignup} />
         <Route path="/forgot-password" component={ForgotPassword} />

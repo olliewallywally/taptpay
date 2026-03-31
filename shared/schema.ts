@@ -64,6 +64,9 @@ export const merchants = pgTable("merchants", {
   autoConvertToFiat: boolean("auto_convert_to_fiat").default(false),
   minConfirmations: integer("min_confirmations").default(1),
   
+  // Email verification
+  emailVerified: boolean("email_verified").default(false),
+
   // Onboarding status
   onboardingCompleted: boolean("onboarding_completed").default(false),
 
