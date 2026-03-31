@@ -3733,7 +3733,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (isNaN(merchantId)) return res.status(400).json({ message: "Invalid merchant ID" });
       const merchant = await storage.getMerchant(merchantId);
       if (!merchant) return res.status(404).json({ message: "Merchant not found" });
-      res.json({ emailVerified: merchant.emailVerified ?? false, email: merchant.email });
+      // Treat existing active/verified merchants as email-verified for backwards compatibility
+      const emailVerified = merchant.emailVerified === true ||
+        merchant.status === "verified" ||
+        merchant.status === "active";
+      res.json({ emailVerified, email: merchant.email });
     } catch (error) {
       console.error("Email status check error:", error);
       res.status(500).json({ message: "Failed to check email status" });
@@ -3867,6 +3871,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const merchant = await storage.getMerchant(merchantId);
       if (!merchant) {
         return res.status(404).json({ message: "Merchant not found" });
+      }
+
+      // Enforce email verification before accepting business details
+      const isEmailVerified = merchant.emailVerified === true ||
+        merchant.status === "verified" ||
+        merchant.status === "active";
+      if (!isEmailVerified) {
+        return res.status(403).json({ message: "Email address must be verified before submitting business details" });
       }
 
       const validation = businessDetailsSchema.safeParse(req.body);
