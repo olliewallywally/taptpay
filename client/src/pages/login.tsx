@@ -139,7 +139,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 relative">
+    <div className="min-h-screen bg-gray-50 flex items-start justify-center pt-12 pb-8 px-4 relative overflow-y-auto">
       <SEOHead
         title="Login - TapTpay Payment Terminal"
         description="Access your TapTpay merchant account to manage payments, view transactions, track revenue, and configure your payment settings."
