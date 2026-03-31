@@ -122,7 +122,11 @@ export default function Checkout() {
       loadScript(`${base}/js/windcavepayments-hostedfields-v1.js`),
     ])
       .then(() => { hfScriptsReady.current = true; initHostedFields(); })
-      .catch((e) => console.warn("Windcave HF scripts:", e));
+      .catch((e) => {
+        console.warn("Windcave HF scripts:", e);
+        // Reset so the user can retry by closing and re-opening the card tab
+        hfInitialised.current = false;
+      });
   }, [envData, cardOpen]);
 
   const fieldStyle = {
