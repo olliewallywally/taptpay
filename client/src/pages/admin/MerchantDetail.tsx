@@ -5,7 +5,7 @@ import {
   ArrowLeft, DollarSign, Activity, MapPin, Mail, User, Phone, Building,
   CreditCard, CheckCircle, Send, Shield, AlertTriangle, Download, Share2,
   Receipt, Search, Edit2, Check, X, ExternalLink, Hash, Landmark,
-  FileText, CalendarDays, TrendingUp
+  FileText, CalendarDays, TrendingUp, BadgeCheck, BadgeX
 } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -295,6 +295,20 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
               </div>
             </div>
           ))}
+          {/* Email verified badge */}
+          <div className="flex items-start gap-3 py-2">
+            {merchant.emailVerified ? (
+              <BadgeCheck className="size-4 text-[#4ade80] mt-0.5 shrink-0" />
+            ) : (
+              <BadgeX className="size-4 text-[#fbbf24] mt-0.5 shrink-0" />
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-[#dbdfea]/50 text-xs">Email Verified</p>
+              <p className={`text-sm font-medium ${merchant.emailVerified ? 'text-[#4ade80]' : 'text-[#fbbf24]'}`}>
+                {merchant.emailVerified ? 'Verified' : 'Not verified'}
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Windcave integration */}

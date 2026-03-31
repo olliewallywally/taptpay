@@ -31,7 +31,7 @@ export default function MerchantSignup() {
       return response.json();
     },
     onSuccess: (data) => {
-      setLocation(`/business-details?id=${data.merchant.id}`);
+      setLocation(`/check-email?email=${encodeURIComponent(data.merchant.email)}&id=${data.merchant.id}`);
     },
     onError: (error: any) => {
       let description = "Failed to create account. Please try again.";

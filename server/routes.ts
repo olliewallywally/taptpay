@@ -3726,6 +3726,62 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
+  // Public email verification status check (for /business-details soft gate)
+  app.get("/api/merchants/:id/email-status", async (req, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      if (isNaN(merchantId)) return res.status(400).json({ message: "Invalid merchant ID" });
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) return res.status(404).json({ message: "Merchant not found" });
+      res.json({ emailVerified: merchant.emailVerified ?? false, email: merchant.email });
+    } catch (error) {
+      console.error("Email status check error:", error);
+      res.status(500).json({ message: "Failed to check email status" });
+    }
+  });
+
+  // Confirm email via token (public signup flow)
+  app.get("/api/auth/confirm-email", async (req, res) => {
+    try {
+      const token = req.query.token as string;
+      if (!token) return res.status(400).json({ message: "Token is required" });
+
+      const merchant = await storage.getMerchantByToken(token);
+      if (!merchant) return res.status(400).json({ message: "Invalid or expired verification token" });
+
+      if (!merchant.emailVerified) {
+        await storage.updateMerchant(merchant.id, { emailVerified: true });
+      }
+
+      res.json({ message: "Email verified", merchantId: merchant.id });
+    } catch (error) {
+      console.error("Confirm email error:", error);
+      res.status(500).json({ message: "Failed to confirm email" });
+    }
+  });
+
+  // Resend confirmation email (public — for check-email screen)
+  app.post("/api/auth/resend-confirmation", async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) return res.status(400).json({ message: "Email is required" });
+
+      const merchant = await storage.getMerchantByEmail(email);
+      if (!merchant) return res.status(404).json({ message: "Merchant not found" });
+      if (merchant.emailVerified) return res.json({ message: "Email is already verified" });
+      if (!merchant.verificationToken) return res.status(400).json({ message: "No verification token found" });
+
+      const { sendMerchantVerificationEmail } = await import('./email-service-multi');
+      const { getBaseUrl } = await import('./url-utils');
+      const baseUrl = getBaseUrl(req);
+      await sendMerchantVerificationEmail(merchant.email, merchant.verificationToken, merchant.name, baseUrl);
+      res.json({ message: "Verification email sent" });
+    } catch (error) {
+      console.error("Resend confirmation error:", error);
+      res.status(500).json({ message: "Failed to resend email" });
+    }
+  });
+
   // Public merchant signup (no admin required) - with rate limiting
   app.post("/api/merchants/signup", async (req, res) => {
     try {
@@ -3785,7 +3841,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       res.json({
-        message: "Account created. Please complete your business details.",
+        message: "Account created. Please check your email to continue.",
         merchant: {
           id: merchant.id,
           name: merchant.name,

@@ -190,77 +190,59 @@ export async function sendMerchantVerificationEmail(
   const properBaseUrl = baseUrl || (process.env.REPLIT_DOMAINS ? 
     `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` : 
     'http://localhost:5000');
-  const verificationUrl = `${properBaseUrl}/verify-merchant?token=${token}`;
-  
+  const confirmUrl = `${properBaseUrl}/confirm-email?token=${token}`;
+
   const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f9fafb; padding: 20px;">
-      <div style="background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-        <div style="text-align: center; margin-bottom: 30px;">
-          <h1 style="color: #16423C; margin: 0; font-size: 28px;">Welcome to Tapt!</h1>
-          <p style="color: #666; margin: 10px 0 0 0;">Complete your merchant account setup</p>
+    <div style="font-family: 'Outfit', Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #060e42; padding: 32px 20px;">
+      <div style="background-color: #0d1147; border: 1px solid rgba(255,255,255,0.08); padding: 40px 36px; border-radius: 20px;">
+
+        <div style="text-align: center; margin-bottom: 32px;">
+          <p style="font-size: 22px; font-weight: 700; color: #ffffff; margin: 0; letter-spacing: -0.5px;">TaptPay</p>
+          <p style="color: rgba(255,255,255,0.5); margin: 6px 0 0 0; font-size: 14px;">Merchant Account Verification</p>
         </div>
-        
-        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 6px; margin-bottom: 25px;">
-          <h3 style="color: #16423C; margin: 0 0 10px 0;">Account Details</h3>
-          <p style="margin: 5px 0; color: #333;"><strong>Business:</strong> ${merchantName}</p>
-          <p style="margin: 5px 0; color: #333;"><strong>Email:</strong> ${email}</p>
-        </div>
-        
-        <p style="color: #333; line-height: 1.6;">
-          Your Tapt merchant account has been created! To start accepting payments, please verify your email address and set up your password.
+
+        <p style="color: rgba(255,255,255,0.85); font-size: 15px; line-height: 1.6; margin: 0 0 12px 0;">
+          Hi ${merchantName},
         </p>
-        
-        <div style="text-align: center; margin: 30px 0;">
-          <a href="${verificationUrl}" 
-             style="background-color: #16423C; color: white; padding: 15px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
-            Verify Account & Set Password
+        <p style="color: rgba(255,255,255,0.65); font-size: 14px; line-height: 1.7; margin: 0 0 28px 0;">
+          Thanks for signing up. Please confirm your email address to continue setting up your TaptPay merchant account.
+        </p>
+
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="${confirmUrl}"
+             style="background-color: #00f1d7; color: #000a36; padding: 14px 36px; text-decoration: none; border-radius: 50px; display: inline-block; font-weight: 700; font-size: 15px; letter-spacing: 0.2px;">
+            Confirm email address
           </a>
         </div>
-        
-        <div style="background-color: #e8f5e8; padding: 15px; border-radius: 6px; margin-top: 25px;">
-          <h4 style="color: #16423C; margin: 0 0 10px 0;">🚀 What's Next?</h4>
-          <ul style="color: #333; margin: 0; padding-left: 20px;">
-            <li>Complete your account verification</li>
-            <li>Access your payment terminal</li>
-            <li>Start accepting customer payments</li>
-            <li>View analytics and manage transactions</li>
-          </ul>
-        </div>
-        
-        <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;">
-        
-        <p style="color: #666; font-size: 14px; margin: 0;">
-          If you didn't create this account, please ignore this email. This verification link will expire in 24 hours.
+
+        <p style="color: rgba(255,255,255,0.35); font-size: 12px; line-height: 1.6; margin: 28px 0 0 0; text-align: center;">
+          If you didn't create a TaptPay account, you can safely ignore this email.
         </p>
-        
-        <p style="color: #666; font-size: 14px; margin: 10px 0 0 0;">
-          Need help? Contact us at support@tapt.co.nz
+        <p style="color: rgba(255,255,255,0.35); font-size: 12px; margin: 8px 0 0 0; text-align: center;">
+          Need help? <a href="mailto:support@taptpay.co.nz" style="color: #00f1d7; text-decoration: none;">support@taptpay.co.nz</a>
         </p>
       </div>
     </div>
   `;
-  
+
   const textContent = `
-Welcome to Tapt!
+Hi ${merchantName},
 
-Your merchant account has been created for ${merchantName}.
+Please confirm your email address to continue setting up your TaptPay merchant account:
 
-To complete your setup, please verify your email and set your password:
-${verificationUrl}
+${confirmUrl}
 
-This link will expire in 24 hours.
+If you didn't create a TaptPay account, ignore this email.
 
-If you didn't create this account, please ignore this email.
-
-Need help? Contact us at support@tapt.co.nz
+Need help? Contact us at support@taptpay.co.nz
   `;
-  
+
   const fromEmail = EMAIL_CONFIG.provider === 'gmail' ? EMAIL_CONFIG.gmail.user : EMAIL_CONFIG.sendgrid.fromEmail;
-  
+
   return sendEmailMulti({
     to: email,
-    from: fromEmail || 'noreply@tapt.co.nz',
-    subject: 'Welcome to Tapt - Verify Your Merchant Account',
+    from: fromEmail || 'noreply@taptpay.co.nz',
+    subject: 'Confirm your TaptPay email address',
     html,
     text: textContent
   });
