@@ -653,7 +653,7 @@ export function LandingPage() {
             imageScale="large"
             smallTextSize="clamp(1.6rem, 4.5vw, 3rem)"
             largeTitleSize="clamp(2.5rem, 8vw, 6rem)"
-            imageStyle={{ transform: isMobile ? "translateY(-10%) scale(2.0)" : "translateY(-10%) scale(3.0)", transformOrigin: "center center" }}
+            imageStyle={{ transform: isMobile ? "translateY(-10%) scale(2.0)" : "translateY(-10%) scale(2.25)", transformOrigin: "center center" }}
             showButton
             buttonText="more"
             onButton={goLogin}
@@ -700,7 +700,7 @@ export function LandingPage() {
             smallTextSize="clamp(1.6rem, 4.5vw, 3.2rem)"
             largeTitleSize="clamp(2.5rem, 9vw, 7rem)"
             smallTextMarginBottom="-1rem"
-            imageStyle={{ transform: isMobile ? "translateY(-10%) scale(2.0)" : "translateY(-10%) scale(3.0)", transformOrigin: "center center" }}
+            imageStyle={{ transform: isMobile ? "translateY(-10%) scale(2.0)" : "translateY(-10%) scale(2.25)", transformOrigin: "center center" }}
             buttonClassName="mt-2 px-5 py-2 rounded-full text-xs uppercase tracking-[0.15em] font-medium transition-colors duration-300 bg-[#000a36] text-white hover:bg-white hover:text-[#000a36]"
             bodyTextSmall
           />
