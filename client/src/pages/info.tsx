@@ -17,7 +17,7 @@ export default function InfoPage() {
         errorCorrectionLevel: "H" as const,
         margin: 2,
         width: 300,
-        color: { dark: "#000a36", light: "#ffffff" },
+        color: { dark: "#000a36", light: "#00000000" },
       };
       if (qrRef.current) {
         QRCode.default.toCanvas(qrRef.current, INFO_URL, opts);
@@ -166,9 +166,7 @@ export default function InfoPage() {
       {/* QR code for desktop */}
       <div className="bg-[#000a36] border-t border-white/10 py-10 px-6 flex flex-col items-center gap-5">
         <p className="text-white/50 text-xs uppercase tracking-widest">scan to open on mobile</p>
-        <div className="bg-white p-4 rounded-2xl shadow-xl">
-          <canvas ref={qrRef} />
-        </div>
+        <canvas ref={qrRef} />
         <p className="text-white/30 text-xs">{INFO_URL}</p>
         <button
           onClick={handleDownloadQR}
