@@ -23,13 +23,14 @@ export default function CheckEmail() {
   const id = params.get("id") || "";
 
   const handleResend = async () => {
-    if (!email) return;
+    if (!id && !email) return;
     setResending(true);
     try {
+      const body = id ? { merchantId: id } : { email };
       const res = await fetch("/api/auth/resend-confirmation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify(body),
       });
       if (res.ok) {
         setResent(true);

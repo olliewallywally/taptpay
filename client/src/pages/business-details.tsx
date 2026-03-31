@@ -21,7 +21,6 @@ export default function BusinessDetails() {
   const [, setLocation] = useLocation();
   const [isSuccess, setIsSuccess] = useState(false);
   const [emailVerified, setEmailVerified] = useState<boolean | null>(null);
-  const [merchantEmail, setMerchantEmail] = useState("");
   const [resending, setResending] = useState(false);
   const [resent, setResent] = useState(false);
 
@@ -36,19 +35,19 @@ export default function BusinessDetails() {
         if (!r.ok) { setEmailVerified(false); return; }
         const data = await r.json();
         setEmailVerified(data.emailVerified ?? false);
-        setMerchantEmail(data.email || "");
       })
       .catch(() => setEmailVerified(false));
   }, []);
 
   const handleResend = async () => {
-    if (!merchantEmail) return;
+    const id = getMerchantId();
+    if (!id) return;
     setResending(true);
     try {
       const res = await fetch("/api/auth/resend-confirmation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: merchantEmail }),
+        body: JSON.stringify({ merchantId: id }),
       });
       if (res.ok) {
         setResent(true);

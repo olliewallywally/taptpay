@@ -3737,7 +3737,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const emailVerified = merchant.emailVerified === true ||
         merchant.status === "verified" ||
         merchant.status === "active";
-      res.json({ emailVerified, email: merchant.email });
+      res.json({ emailVerified });
     } catch (error) {
       console.error("Email status check error:", error);
       res.status(500).json({ message: "Failed to check email status" });
@@ -3767,10 +3767,16 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Resend confirmation email (public — for check-email screen)
   app.post("/api/auth/resend-confirmation", async (req, res) => {
     try {
-      const { email } = req.body;
-      if (!email) return res.status(400).json({ message: "Email is required" });
+      const { merchantId, email } = req.body;
 
-      const merchant = await storage.getMerchantByEmail(email);
+      let merchant;
+      if (merchantId) {
+        const id = parseInt(merchantId);
+        if (!isNaN(id)) merchant = await storage.getMerchant(id);
+      } else if (email) {
+        merchant = await storage.getMerchantByEmail(email);
+      }
+
       if (!merchant) return res.status(404).json({ message: "Merchant not found" });
       if (merchant.emailVerified) return res.json({ message: "Email is already verified" });
       if (!merchant.verificationToken) return res.status(400).json({ message: "No verification token found" });
