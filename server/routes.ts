@@ -2,7 +2,7 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema } from "@shared/schema";
+import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema } from "@shared/schema";
 import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, simulateCreateSession, simulateQuerySession, getWindcaveEnv, submitGooglePayToken } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, createUser, getUserByEmail, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
@@ -3707,18 +3707,18 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(429).json({ message: "Too many signup attempts. Please try again later." });
       }
 
-      const validation = createMerchantSchema.safeParse(req.body);
+      const validation = publicSignupSchema.safeParse(req.body);
       if (!validation.success) {
         return res.status(400).json({ 
-          message: "Invalid input", 
+          message: validation.error.issues[0]?.message || "Invalid input",
           errors: validation.error.issues 
         });
       }
 
-      const { password, confirmPassword, ...merchantData } = validation.data;
+      const { name, email, password, confirmPassword } = validation.data;
 
       // Check if email already exists
-      const existingMerchant = await storage.getMerchantByEmail(merchantData.email);
+      const existingMerchant = await storage.getMerchantByEmail(email);
       if (existingMerchant) {
         return res.status(400).json({ message: "Email already registered" });
       }
@@ -3729,41 +3729,38 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // Generate verification token
       const verificationToken = crypto.randomBytes(32).toString('hex');
 
-      // Create merchant with pending status and password hash
+      // Create merchant with pending status — business details filled in next step
       const merchant = await storage.createMerchantWithSignup({
-        ...merchantData,
+        name,
+        businessName: name,
+        businessType: 'general',
+        email,
+        phone: '',
+        address: '',
         password,
         confirmPassword,
         verificationToken,
       });
 
-      // Store the password hash on the merchant so they can log in after verification
       if (merchant) {
         await storage.updateMerchantPasswordHash(merchant.id, passwordHash);
       }
 
-      // Send verification email using the new email service
+      // Send verification email
       const { sendMerchantVerificationEmail } = await import('./email-service-multi');
       const { getBaseUrl } = await import('./url-utils');
       const baseUrl = getBaseUrl(req);
       
-      const emailSent = await sendMerchantVerificationEmail(
-        merchantData.email,
-        verificationToken,
-        merchantData.businessName || merchantData.name,
-        baseUrl
-      );
-
+      const emailSent = await sendMerchantVerificationEmail(email, verificationToken, name, baseUrl);
       if (!emailSent) {
         console.warn('Failed to send verification email, but merchant account was created');
       }
 
       res.json({
-        message: "Merchant account created successfully. Please check your email to verify your account.",
+        message: "Account created. Please complete your business details.",
         merchant: {
           id: merchant.id,
           name: merchant.name,
-          businessName: merchant.businessName,
           email: merchant.email,
           status: merchant.status
         }
@@ -3772,6 +3769,75 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     } catch (error) {
       console.error("Public merchant signup error:", error);
       res.status(500).json({ message: "Failed to create merchant account" });
+    }
+  });
+
+  // Submit business details after signup
+  app.put("/api/merchants/:id/business-details", async (req, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      if (isNaN(merchantId)) {
+        return res.status(400).json({ message: "Invalid merchant ID" });
+      }
+
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+
+      const validation = businessDetailsSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          message: validation.error.issues[0]?.message || "Invalid input",
+          errors: validation.error.issues,
+        });
+      }
+
+      const { businessName, director, contactEmail, contactPhone, gstNumber, businessAddress, nzbn } = validation.data;
+
+      await storage.updateMerchant(merchantId, {
+        businessName,
+        director,
+        contactEmail,
+        contactPhone,
+        gstNumber,
+        businessAddress: businessAddress || null,
+        nzbn: nzbn || null,
+        phone: contactPhone,
+        address: businessAddress || '',
+      });
+
+      // Notify oliverleonard@taptpay.co.nz of new merchant registration
+      const { sendEmail } = await import('./email-service');
+      const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@taptpay.co.nz';
+      await sendEmail({
+        to: 'oliverleonard@taptpay.co.nz',
+        from: fromEmail,
+        subject: `🆕 New Merchant Registration — ${businessName}`,
+        html: `
+          <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
+            <h2 style="color:#0055ff;margin-top:0">New Merchant Registered</h2>
+            <table style="width:100%;border-collapse:collapse">
+              <tr><td style="padding:8px 0;color:#666;width:40%">Business Name</td><td style="padding:8px 0;font-weight:600">${businessName}</td></tr>
+              <tr><td style="padding:8px 0;color:#666">Director</td><td style="padding:8px 0;font-weight:600">${director}</td></tr>
+              <tr><td style="padding:8px 0;color:#666">Account Name</td><td style="padding:8px 0">${merchant.name}</td></tr>
+              <tr><td style="padding:8px 0;color:#666">Email</td><td style="padding:8px 0"><a href="mailto:${contactEmail}">${contactEmail}</a></td></tr>
+              <tr><td style="padding:8px 0;color:#666">Phone</td><td style="padding:8px 0">${contactPhone}</td></tr>
+              <tr><td style="padding:8px 0;color:#666">GST Number</td><td style="padding:8px 0">${gstNumber}</td></tr>
+              <tr><td style="padding:8px 0;color:#666">Business Address</td><td style="padding:8px 0">${businessAddress || '—'}</td></tr>
+              <tr><td style="padding:8px 0;color:#666">NZBN</td><td style="padding:8px 0">${nzbn || '—'}</td></tr>
+            </table>
+            <p style="margin-top:24px;color:#999;font-size:12px">Submitted via TaptPay merchant registration</p>
+          </div>
+        `,
+        text: `New merchant registered:\nBusiness: ${businessName}\nDirector: ${director}\nEmail: ${contactEmail}\nPhone: ${contactPhone}\nGST: ${gstNumber}\nAddress: ${businessAddress || '—'}\nNZBN: ${nzbn || '—'}`,
+      });
+
+      res.json({ message: "Business details saved successfully." });
+
+    } catch (error) {
+      console.error("Business details update error:", error);
+      res.status(500).json({ message: "Failed to save business details" });
     }
   });
 
