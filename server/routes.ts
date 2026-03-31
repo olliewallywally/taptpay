@@ -1492,7 +1492,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       });
 
       return res.json({
-        hppUrl: sessionResult.hppUrl,
         sessionId: sessionResult.sessionId,
         // Card URL: sent to frontend — Hosted Fields SDK submits directly from browser.
         ajaxSubmitCardUrl: sessionResult.ajaxSubmitCardUrl,
@@ -1502,6 +1501,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         // Google Pay URL: included for spec completeness but the backend ignores any
         // client-supplied value; it uses the server-side cached URL instead.
         ajaxSubmitGooglePayUrl: sessionResult.ajaxSubmitGooglePayUrl,
+        // hppUrl intentionally omitted — the native Google Pay / Apple Pay /
+        // Hosted Fields flows never use it, and exposing it to the browser risks
+        // an accidental or SDK-triggered redirect to the Windcave HPP.
       });
     } catch (error) {
       console.error("Payment processing error:", error);
