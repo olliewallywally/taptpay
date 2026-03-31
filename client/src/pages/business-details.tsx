@@ -131,7 +131,7 @@ export default function BusinessDetails() {
 
           <div className="bg-white/10 border border-white/15 rounded-2xl p-4 mb-6">
             <p className="text-white/70 text-sm">
-              Check your inbox at <span className="text-white font-medium">{merchantEmail || "your email"}</span>
+              Check your inbox for the confirmation link we sent you.
             </p>
           </div>
 

@@ -43,6 +43,22 @@ const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 const RATE_LIMIT_WINDOW = 60000; // 1 minute
 const MAX_REQUESTS_PER_WINDOW = 100; // 100 requests per minute per IP
 
+// Strict rate limit for email resend (5 per 10 minutes per IP/merchantId)
+const resendRateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const RESEND_WINDOW = 10 * 60 * 1000;
+const MAX_RESEND = 5;
+function checkResendRateLimit(key: string): boolean {
+  const now = Date.now();
+  const record = resendRateLimitMap.get(key);
+  if (!record || now > record.resetTime) {
+    resendRateLimitMap.set(key, { count: 1, resetTime: now + RESEND_WINDOW });
+    return true;
+  }
+  if (record.count >= MAX_RESEND) return false;
+  record.count++;
+  return true;
+}
+
 function checkRateLimit(ip: string): boolean {
   const now = Date.now();
   const record = rateLimitMap.get(ip);
@@ -3753,9 +3769,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const merchant = await storage.getMerchantByToken(token);
       if (!merchant) return res.status(400).json({ message: "Invalid or expired verification token" });
 
-      if (!merchant.emailVerified) {
-        await storage.updateMerchant(merchant.id, { emailVerified: true });
-      }
+      await storage.updateMerchant(merchant.id, { emailVerified: true, verificationToken: null });
 
       res.json({ message: "Email verified", merchantId: merchant.id });
     } catch (error) {
@@ -3767,7 +3781,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Resend confirmation email (public — for check-email screen)
   app.post("/api/auth/resend-confirmation", async (req, res) => {
     try {
+      const ip = req.ip || req.socket.remoteAddress || 'unknown';
       const { merchantId, email } = req.body;
+      const rateLimitKey = `resend:${ip}:${merchantId || email || 'unknown'}`;
+      if (!checkResendRateLimit(rateLimitKey)) {
+        return res.status(429).json({ message: "Too many resend attempts. Please wait a few minutes." });
+      }
 
       let merchant;
       if (merchantId) {
