@@ -2230,6 +2230,22 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
+  // Update Windcave Merchant ID (admin only)
+  app.patch("/api/admin/merchants/:id/windcave-merchant-id", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      const { windcaveMerchantId } = req.body;
+      if (isNaN(merchantId)) return res.status(400).json({ message: "Invalid merchant ID" });
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) return res.status(404).json({ message: "Merchant not found" });
+      await storage.updateMerchant(merchantId, { windcaveMerchantId: windcaveMerchantId || null });
+      res.json({ message: "Windcave Merchant ID updated" });
+    } catch (error) {
+      console.error("Windcave merchant ID update error:", error);
+      res.status(500).json({ message: "Failed to update Windcave Merchant ID" });
+    }
+  });
+
   // Admin manual merchant activation with password (bypass email verification)
   app.post("/api/admin/merchants/:id/activate", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {

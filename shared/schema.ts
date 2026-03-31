@@ -51,6 +51,7 @@ export const merchants = pgTable("merchants", {
   
   // Payment integration
   windcaveApiKey: text("windcave_api_key"), // Encrypted Windcave API key
+  windcaveMerchantId: text("windcave_merchant_id"), // Windcave-assigned merchant ID
   
   // Theme customization
   themeId: text("theme_id").default("classic"),
