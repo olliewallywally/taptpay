@@ -295,20 +295,27 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
               </div>
             </div>
           ))}
-          {/* Email verified badge */}
-          <div className="flex items-start gap-3 py-2">
-            {merchant.emailVerified ? (
-              <BadgeCheck className="size-4 text-[#4ade80] mt-0.5 shrink-0" />
-            ) : (
-              <BadgeX className="size-4 text-[#fbbf24] mt-0.5 shrink-0" />
-            )}
-            <div className="flex-1 min-w-0">
-              <p className="text-[#dbdfea]/50 text-xs">Email Verified</p>
-              <p className={`text-sm font-medium ${merchant.emailVerified ? 'text-[#4ade80]' : 'text-[#fbbf24]'}`}>
-                {merchant.emailVerified ? 'Verified' : 'Not verified'}
-              </p>
-            </div>
-          </div>
+          {/* Email verified badge — treat active/verified merchants as email-verified */}
+          {(() => {
+            const isEmailVerified = merchant.emailVerified === true ||
+              merchant.status === 'verified' ||
+              merchant.status === 'active';
+            return (
+              <div className="flex items-start gap-3 py-2">
+                {isEmailVerified ? (
+                  <BadgeCheck className="size-4 text-[#4ade80] mt-0.5 shrink-0" />
+                ) : (
+                  <BadgeX className="size-4 text-[#fbbf24] mt-0.5 shrink-0" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-[#dbdfea]/50 text-xs">Email Verified</p>
+                  <p className={`text-sm font-medium ${isEmailVerified ? 'text-[#4ade80]' : 'text-[#fbbf24]'}`}>
+                    {isEmailVerified ? 'Verified' : 'Not verified'}
+                  </p>
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Windcave integration */}
