@@ -72,8 +72,8 @@ export default function InfoPage() {
       }
       try { localStorage.setItem(LS_KEY, "1"); } catch {}
       setUnlocked(true);
-    } catch (err: any) {
-      setError(err.message || "Failed to submit. Please try again.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to submit. Please try again.");
     } finally {
       setSubmitting(false);
     }

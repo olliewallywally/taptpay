@@ -117,6 +117,28 @@ app.use((req, res, next) => {
     log(`⚠️ Failed to sync verified merchants: ${error}`);
   }
 
+  // Ensure info_pack_leads table exists (additive migration, safe to re-run)
+  if (isDatabaseConnected()) {
+    try {
+      const { getDb } = await import("./database");
+      const { sql } = await import("drizzle-orm");
+      const pgDb = getDb();
+      if (pgDb) {
+        await pgDb.execute(sql`
+          CREATE TABLE IF NOT EXISTS info_pack_leads (
+            id serial PRIMARY KEY,
+            name text NOT NULL,
+            email text NOT NULL,
+            created_at timestamp DEFAULT now()
+          )
+        `);
+        log("✅ info_pack_leads table ready");
+      }
+    } catch (error) {
+      log(`⚠️ Failed to ensure info_pack_leads table: ${error}`);
+    }
+  }
+
   // Mark all pre-existing verified/active merchants as onboarding completed
   // so they aren't forced through the new onboarding flow
   if (isDatabaseConnected()) {

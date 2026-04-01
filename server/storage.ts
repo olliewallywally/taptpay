@@ -2344,17 +2344,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createInfoPackLead(data: { name: string; email: string }): Promise<any> {
-    try {
-      const { infoPackLeads } = await import("@shared/schema");
-      const [lead] = await this.db!
-        .insert(infoPackLeads)
-        .values({ name: data.name, email: data.email })
-        .returning();
-      return lead;
-    } catch (error) {
-      console.error("Database error in createInfoPackLead:", error);
-      return { id: Date.now(), ...data, createdAt: new Date() };
-    }
+    const { infoPackLeads } = await import("@shared/schema");
+    const [lead] = await this.db!
+      .insert(infoPackLeads)
+      .values({ name: data.name, email: data.email })
+      .returning();
+    return lead;
   }
 
   // Bill splitting operations
