@@ -540,6 +540,24 @@ export const subscriptionBillingHistory = pgTable("subscription_billing_history"
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Info pack lead capture table
+export const infoPackLeads = pgTable("info_pack_leads", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertInfoPackLeadSchema = createInsertSchema(infoPackLeads).omit({ id: true, createdAt: true });
+
+export const createInfoPackLeadSchema = z.object({
+  name: z.string().min(1, "Name is required").max(100),
+  email: z.string().email("Valid email is required"),
+});
+
+export type InfoPackLead = typeof infoPackLeads.$inferSelect;
+export type InsertInfoPackLead = z.infer<typeof insertInfoPackLeadSchema>;
+
 // Push notification subscriptions table
 export const pushSubscriptions = pgTable("push_subscriptions", {
   id: serial("id").primaryKey(),
