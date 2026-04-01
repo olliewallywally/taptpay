@@ -3814,8 +3814,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   // Info pack lead capture — public endpoint, no auth required
+  // Rate limited: max 5 submissions per IP per 10 minutes (re-uses existing resend limiter pattern)
   app.post("/api/info-pack-leads", async (req, res) => {
     try {
+      const ip = req.ip || req.socket.remoteAddress || 'unknown';
+      if (!checkResendRateLimit(`info-lead:${ip}`)) {
+        return res.status(429).json({ message: "Too many requests. Please try again later." });
+      }
+
       const { createInfoPackLeadSchema } = await import("@shared/schema");
       const validation = createInfoPackLeadSchema.safeParse(req.body);
       if (!validation.success) {
@@ -3827,13 +3833,17 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const { name, email } = validation.data;
       const lead = await storage.createInfoPackLead({ name, email });
 
+      // Escape HTML to prevent malformed rendering from crafted input
+      const safeName = name.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const safeEmail = email.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
       // Fire-and-forget notification to Oliver — do not block the response
       const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@taptpay.co.nz';
       sendEmail({
         to: 'oliverleonard@taptpay.co.nz',
         from: fromEmail,
         subject: `New info pack request from ${name}`,
-        html: `<p><strong>Name:</strong> ${name}</p><p><strong>Email:</strong> <a href="mailto:${email}">${email}</a></p><p>They have just unlocked the TaptPay info pack on taptpay.co.nz/info.</p>`,
+        html: `<p><strong>Name:</strong> ${safeName}</p><p><strong>Email:</strong> <a href="mailto:${safeEmail}">${safeEmail}</a></p><p>They have just unlocked the TaptPay info pack on taptpay.co.nz/info.</p>`,
         text: `New info pack request\n\nName: ${name}\nEmail: ${email}\n\nThey have just unlocked the TaptPay info pack on taptpay.co.nz/info.`,
       }).catch((e) => console.error("Info pack lead notification failed:", e));
 
