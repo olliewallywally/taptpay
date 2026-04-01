@@ -149,6 +149,9 @@ export interface IStorage {
   deactivatePushSubscription(id: number): Promise<void>;
   deactivatePushSubscriptionByEndpoint(endpoint: string): Promise<void>;
 
+  // Info pack lead capture
+  createInfoPackLead(data: { name: string; email: string }): Promise<any>;
+
   // Webhook delivery tracking
   createWebhookDelivery(data: any): Promise<any>;
   updateWebhookDelivery(id: number, data: any): Promise<any>;
@@ -1286,6 +1289,11 @@ export class MemStorage implements IStorage {
     if (sub) sub.isActive = false;
   }
 
+  async createInfoPackLead(data: { name: string; email: string }): Promise<any> {
+    const lead = { id: Date.now(), ...data, createdAt: new Date() };
+    return lead;
+  }
+
   async createWebhookDelivery(data: any): Promise<any> {
     return { ...data, id: Date.now(), createdAt: new Date() };
   }
@@ -2332,6 +2340,20 @@ export class DatabaseStorage implements IStorage {
         .where(eq(pushSubscriptions.endpoint, endpoint));
     } catch (error) {
       console.error("Database error in deactivatePushSubscriptionByEndpoint:", error);
+    }
+  }
+
+  async createInfoPackLead(data: { name: string; email: string }): Promise<any> {
+    try {
+      const { infoPackLeads } = await import("@shared/schema");
+      const [lead] = await this.db!
+        .insert(infoPackLeads)
+        .values({ name: data.name, email: data.email })
+        .returning();
+      return lead;
+    } catch (error) {
+      console.error("Database error in createInfoPackLead:", error);
+      return { id: Date.now(), ...data, createdAt: new Date() };
     }
   }
 

@@ -3813,7 +3813,37 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Public merchant signup (no admin required) - with rate limiting
+  // Info pack lead capture — public endpoint, no auth required
+  app.post("/api/info-pack-leads", async (req, res) => {
+    try {
+      const { createInfoPackLeadSchema } = await import("@shared/schema");
+      const validation = createInfoPackLeadSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          message: validation.error.issues[0]?.message || "Invalid input",
+          errors: validation.error.issues,
+        });
+      }
+      const { name, email } = validation.data;
+      const lead = await storage.createInfoPackLead({ name, email });
+
+      // Fire-and-forget notification to Oliver — do not block the response
+      const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@taptpay.co.nz';
+      sendEmail({
+        to: 'oliverleonard@taptpay.co.nz',
+        from: fromEmail,
+        subject: `New info pack request from ${name}`,
+        html: `<p><strong>Name:</strong> ${name}</p><p><strong>Email:</strong> <a href="mailto:${email}">${email}</a></p><p>They have just unlocked the TaptPay info pack on taptpay.co.nz/info.</p>`,
+        text: `New info pack request\n\nName: ${name}\nEmail: ${email}\n\nThey have just unlocked the TaptPay info pack on taptpay.co.nz/info.`,
+      }).catch((e) => console.error("Info pack lead notification failed:", e));
+
+      return res.status(201).json({ id: lead.id });
+    } catch (error) {
+      console.error("Error saving info pack lead:", error);
+      return res.status(500).json({ message: "Failed to save lead" });
+    }
+  });
+
   app.post("/api/merchants/signup", async (req, res) => {
     try {
       const ip = req.ip || req.socket.remoteAddress || 'unknown';
