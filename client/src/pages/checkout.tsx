@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type CSSProperties } from "react";
+import { useState, useEffect, useRef, type CSSProperties, Component, type ReactNode } from "react";
 import { useParams, useLocation, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -11,6 +11,36 @@ declare global {
     WindcavePayments?: any;
     ApplePaySession?: any;
     google?: any;
+  }
+}
+
+// ── Error boundary — catches any render crash and shows a safe fallback ──
+class CheckoutErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(err: Error) { console.error("[Checkout] Render error:", err); }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f0f4ff", padding: 24 }}>
+          <div style={{ background: "#fff", borderRadius: 24, padding: 32, textAlign: "center", maxWidth: 320 }}>
+            <XCircle size={48} color="#e53e3e" style={{ margin: "0 auto 16px" }} />
+            <h2 style={{ color: "#e53e3e", fontWeight: 700, marginBottom: 8 }}>Something went wrong</h2>
+            <p style={{ color: "#666", marginBottom: 20 }}>Please scan the QR code again to restart your payment.</p>
+            <button
+              onClick={() => window.history.back()}
+              style={{ background: "#0055FF", color: "#fff", border: "none", borderRadius: 14, padding: "12px 24px", fontWeight: 600, cursor: "pointer" }}
+            >
+              Go back
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
   }
 }
 
@@ -39,7 +69,7 @@ function loadScript(src: string): Promise<void> {
 // Windcave HPP domain pattern — used by the navigation guard below.
 const WINDCAVE_HPP_RE = /^https?:\/\/(?:uat|sec)\.windcave\.com/i;
 
-export default function Checkout() {
+function CheckoutInner() {
   const { transactionId } = useParams<{ transactionId: string }>();
   const [, setLocation] = useLocation();
   const search = useSearch();
@@ -134,13 +164,14 @@ export default function Checkout() {
 
   // ── Navigation guard ────────────────────────────────────────────────────
   // Belt-and-suspenders: intercept any programmatic navigation to Windcave's
-  // Hosted Payment Page (HPP) and block it.  This catches both SDK-triggered
-  // location.assign() / location.replace() calls and any future code that
-  // accidentally re-introduces the HPP URL.  The guard is installed for the
-  // lifetime of the checkout page and removed on unmount.
+  // Hosted Payment Page (HPP) and block it.  Wrapped in try/catch because on
+  // iOS Safari, window.location.assign / replace are non-configurable prototype
+  // properties — assigning to them in strict mode throws a TypeError which
+  // would otherwise crash the React component and produce a white screen.
   useEffect(() => {
-    const origAssign  = window.location.assign.bind(window.location);
-    const origReplace = window.location.replace.bind(window.location);
+    let origAssign: ((...args: any[]) => void) | null = null;
+    let origReplace: ((...args: any[]) => void) | null = null;
+    let guardInstalled = false;
 
     function guardUrl(url: string): boolean {
       if (WINDCAVE_HPP_RE.test(url)) {
@@ -150,12 +181,24 @@ export default function Checkout() {
       return true;
     }
 
-    (window.location as any).assign  = (url: string) => { if (guardUrl(url)) origAssign(url); };
-    (window.location as any).replace = (url: string) => { if (guardUrl(url)) origReplace(url); };
+    try {
+      origAssign  = window.location.assign.bind(window.location);
+      origReplace = window.location.replace.bind(window.location);
+      (window.location as any).assign  = (url: string) => { if (guardUrl(url)) origAssign!(url); };
+      (window.location as any).replace = (url: string) => { if (guardUrl(url)) origReplace!(url); };
+      guardInstalled = true;
+    } catch (e) {
+      // Non-fatal: guard couldn't be installed (e.g. iOS Safari read-only props).
+      // The lazy-load approach is still the primary HPP protection.
+      console.warn("[Checkout] Navigation guard not installed:", e);
+    }
 
     return () => {
-      (window.location as any).assign  = origAssign;
-      (window.location as any).replace = origReplace;
+      if (!guardInstalled) return;
+      try {
+        if (origAssign)  (window.location as any).assign  = origAssign;
+        if (origReplace) (window.location as any).replace = origReplace;
+      } catch {}
     };
   }, []);
 
@@ -932,3 +975,11 @@ const payBtnStyle: CSSProperties = {
   letterSpacing: "-0.1px",
   boxShadow: "0 6px 20px rgba(0,85,255,0.35)",
 };
+
+export default function Checkout() {
+  return (
+    <CheckoutErrorBoundary>
+      <CheckoutInner />
+    </CheckoutErrorBoundary>
+  );
+}
