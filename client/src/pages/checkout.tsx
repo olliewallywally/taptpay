@@ -66,8 +66,9 @@ function loadScript(src: string): Promise<void> {
   });
 }
 
-// Windcave HPP domain pattern — used by the navigation guard below.
-const WINDCAVE_HPP_RE = /^https?:\/\/(?:uat|sec)\.windcave\.com/i;
+// Windcave HPP domain pattern — matches any *.windcave.com host.
+// Broadened from uat|sec to cover any future subdomain Windcave may use.
+const WINDCAVE_HPP_RE = /^https?:\/\/[a-z0-9-]*\.windcave\.com/i;
 
 function CheckoutInner() {
   const { transactionId } = useParams<{ transactionId: string }>();
@@ -173,7 +174,8 @@ function CheckoutInner() {
     let origHrefDesc: PropertyDescriptor | undefined;
     let origAssign: typeof Location.prototype.assign | undefined;
     let origReplace: typeof Location.prototype.replace | undefined;
-    let guardInstalled = false;
+    let hrefPatched = false;
+    let methodsPatched = false;
 
     function blockHPP(url: string, via: string): boolean {
       if (WINDCAVE_HPP_RE.test(url)) {
@@ -183,41 +185,45 @@ function CheckoutInner() {
       return false;
     }
 
+    // Patch href setter in its own try so a failure here does NOT prevent
+    // assign/replace from being patched (partial guard is better than none).
     try {
       origHrefDesc = Object.getOwnPropertyDescriptor(Location.prototype, "href");
-      origAssign   = Location.prototype.assign;
-      origReplace  = Location.prototype.replace;
-
       if (origHrefDesc?.set) {
         const origSet = origHrefDesc.set;
         Object.defineProperty(Location.prototype, "href", {
           ...origHrefDesc,
-          set(url: string) { if (!blockHPP(url, "href"))    origSet.call(this, url); },
+          set(url: string) { if (!blockHPP(url, "href")) origSet.call(this, url); },
           configurable: true,
         });
+        hrefPatched = true;
       }
+    } catch (e) {
+      console.warn("[Checkout] href guard not installed:", e);
+    }
 
+    // Patch assign / replace in a separate try for the same reason.
+    try {
+      origAssign  = Location.prototype.assign;
+      origReplace = Location.prototype.replace;
       Location.prototype.assign = function guardAssign(url: string) {
         if (!blockHPP(url, "assign")) origAssign!.call(this, url);
       };
-
       Location.prototype.replace = function guardReplace(url: string) {
         if (!blockHPP(url, "replace")) origReplace!.call(this, url);
       };
-
-      guardInstalled = true;
+      methodsPatched = true;
     } catch (e) {
-      // Non-fatal — CSP or browser restriction prevented the prototype patch.
-      // The lazy-load strategy is still the primary HPP protection.
-      console.warn("[Checkout] Navigation guard (prototype) not installed:", e);
+      console.warn("[Checkout] assign/replace guard not installed:", e);
     }
 
     return () => {
-      if (!guardInstalled) return;
       try {
-        if (origHrefDesc) Object.defineProperty(Location.prototype, "href", origHrefDesc);
-        if (origAssign)   Location.prototype.assign  = origAssign;
-        if (origReplace)  Location.prototype.replace = origReplace;
+        if (hrefPatched && origHrefDesc) Object.defineProperty(Location.prototype, "href", origHrefDesc);
+        if (methodsPatched) {
+          if (origAssign)  Location.prototype.assign  = origAssign;
+          if (origReplace) Location.prototype.replace = origReplace;
+        }
       } catch {}
     };
   }, []);
@@ -230,12 +236,18 @@ function CheckoutInner() {
   useEffect(() => {
     if (payState !== "processing") return;
     function onBeforeUnload(e: BeforeUnloadEvent) {
-      console.error("[Checkout] Navigation attempted during payment processing (beforeunload)");
+      console.error("[Checkout] Navigation attempted during payment processing (beforeunload)", {
+        currentUrl: window.location.href,
+        referrer: document.referrer,
+      });
       e.preventDefault();
       e.returnValue = "";
     }
     function onPageHide() {
-      console.error("[Checkout] Page hidden during payment processing (pagehide)");
+      console.error("[Checkout] Page hidden during payment processing (pagehide)", {
+        currentUrl: window.location.href,
+        referrer: document.referrer,
+      });
     }
     window.addEventListener("beforeunload", onBeforeUnload);
     window.addEventListener("pagehide", onPageHide);
@@ -397,6 +409,10 @@ function CheckoutInner() {
   }
 
   async function handleApplePay() {
+    // Signal that a payment is in progress — activates the beforeunload/pagehide
+    // navigation blocker and gives the UI a processing state for Apple Pay too.
+    setPayState("processing");
+
     // Lazy-load the Windcave Apple Pay SDK on first tap only — never at page
     // load.  Loading eagerly gave the SDK a chance to auto-initialise without a
     // session and redirect the browser to the HPP fallback URL.
