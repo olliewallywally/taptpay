@@ -87,7 +87,6 @@ export async function sendPushToMerchant(
   transactionId: number
 ): Promise<void> {
   initPush();
-  if (!pushInitialized) return;
 
   try {
     const subscriptions = await storage.getPushSubscriptionsByMerchant(merchantId);
@@ -96,10 +95,16 @@ export async function sendPushToMerchant(
     const payload = buildTransactionPayload(status, itemName, amount, transactionId);
     const payloadStr = JSON.stringify(payload);
 
-    const results = await Promise.allSettled(
-      subscriptions
-        .filter((sub) => sub.isActive)
-        .map(async (sub) => {
+    const webSubs = subscriptions.filter(
+      (sub) => sub.isActive && !sub.endpoint.startsWith("apns://")
+    );
+    const nativeSubs = subscriptions.filter(
+      (sub) => sub.isActive && sub.endpoint.startsWith("apns://")
+    );
+
+    if (pushInitialized && webSubs.length > 0) {
+      const results = await Promise.allSettled(
+        webSubs.map(async (sub) => {
           try {
             await webpush.sendNotification(
               {
@@ -115,13 +120,33 @@ export async function sendPushToMerchant(
             throw error;
           }
         })
-    );
+      );
 
-    const failed = results.filter((r) => r.status === "rejected").length;
-    if (failed > 0) {
-      console.log(`Push: ${results.length - failed}/${results.length} delivered for merchant ${merchantId}`);
+      const failed = results.filter((r) => r.status === "rejected").length;
+      if (failed > 0) {
+        console.log(`Web push: ${results.length - failed}/${results.length} delivered for merchant ${merchantId}`);
+      }
+    }
+
+    if (nativeSubs.length > 0) {
+      await sendNativePushToMerchant(nativeSubs, payload);
     }
   } catch (error) {
     console.error("Push notification error:", error);
   }
+}
+
+async function sendNativePushToMerchant(
+  nativeSubs: any[],
+  payload: PushPayload
+): Promise<void> {
+  const APNS_KEY = process.env.APNS_KEY_P8;
+  const APNS_KEY_ID = process.env.APNS_KEY_ID;
+  const APNS_TEAM_ID = process.env.APNS_TEAM_ID;
+
+  if (!APNS_KEY || !APNS_KEY_ID || !APNS_TEAM_ID) {
+    return;
+  }
+
+  console.log(`APNs: would send to ${nativeSubs.length} native iOS device(s) — configure APNS_KEY_P8, APNS_KEY_ID, APNS_TEAM_ID to activate`);
 }
