@@ -22,6 +22,7 @@ export interface IStorage {
   updateMerchantTheme(id: number, themeId: string): Promise<Merchant | undefined>;
   updateMerchantCryptoSettings(id: number, settings: any): Promise<Merchant | undefined>;
   updateMerchantLogoUrl(id: number, logoUrl: string | null): Promise<Merchant | undefined>;
+  updateMerchantBillingCard(id: number, card: { last4: string; brand: string; expiry: string } | null): Promise<Merchant | undefined>;
   getAllMerchants(): Promise<Merchant[]>;
   deleteMerchant(id: number): Promise<boolean>;
   
@@ -853,6 +854,20 @@ export class MemStorage implements IStorage {
     return updatedMerchant;
   }
 
+  async updateMerchantBillingCard(id: number, card: { last4: string; brand: string; expiry: string } | null): Promise<Merchant | undefined> {
+    const merchant = this.merchants.get(id);
+    if (!merchant) return undefined;
+    const updatedMerchant = {
+      ...merchant,
+      billingCardLast4: card?.last4 ?? null,
+      billingCardBrand: card?.brand ?? null,
+      billingCardExpiry: card?.expiry ?? null,
+      updatedAt: new Date(),
+    };
+    this.merchants.set(id, updatedMerchant);
+    return updatedMerchant;
+  }
+
   async updateMerchantDetails(id: number, details: { businessName: string; contactEmail: string; contactPhone: string; businessAddress: string }): Promise<Merchant | undefined> {
     const merchant = this.merchants.get(id);
     if (!merchant) return undefined;
@@ -1587,6 +1602,21 @@ export class DatabaseStorage implements IStorage {
     const result = await this.db
       .update(merchants)
       .set({ customLogoUrl: logoUrl, updatedAt: new Date() })
+      .where(eq(merchants.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async updateMerchantBillingCard(id: number, card: { last4: string; brand: string; expiry: string } | null): Promise<Merchant | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .update(merchants)
+      .set({
+        billingCardLast4: card?.last4 ?? null,
+        billingCardBrand: card?.brand ?? null,
+        billingCardExpiry: card?.expiry ?? null,
+        updatedAt: new Date(),
+      })
       .where(eq(merchants.id, id))
       .returning();
     return result[0];
@@ -2789,9 +2819,9 @@ export class DatabaseStorage implements IStorage {
     const currentCount = subscription.currentMonthTransactions || 0;
     const isFreeTier = subscription.tier === 'free';
     
-    // For free tier: only charge beyond 1000 transactions
+    // For free tier: only charge beyond 100 transactions
     // For paid tier: charge every transaction
-    const shouldCharge = !isFreeTier || currentCount >= 1000;
+    const shouldCharge = !isFreeTier || currentCount >= 100;
     
     // Increment counters
     const updates: any = {
