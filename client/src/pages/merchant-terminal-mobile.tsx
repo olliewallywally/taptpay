@@ -404,9 +404,9 @@ export default function MerchantTerminalMobile() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
         body: JSON.stringify({
           merchantId,
+          transactionId: transaction.id,
           amount: parseFloat(transaction.price),
           windcaveToken: bridgeResult.token,
-          itemName: transaction.itemName,
         }),
       });
 

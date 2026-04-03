@@ -238,7 +238,7 @@ export const createSplitPaymentSchema = z.object({
     const num = parseFloat(val);
     return !isNaN(num) && num > 0;
   }, "Amount must be a positive number"),
-  paymentMethod: z.enum(["qr_code", "nfc_tap", "card_reader", "manual", "cash"]).default("qr_code"),
+  paymentMethod: z.enum(["qr_code", "nfc_tap", "card_reader", "manual", "cash", "tap_to_pay"]).default("qr_code"),
 });
 
 // Bill split creation schema
