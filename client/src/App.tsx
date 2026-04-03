@@ -35,6 +35,7 @@ import SplitPayment from "@/pages/split-payment";
 import PaymentResult from "@/pages/payment-result";
 import Checkout from "@/pages/checkout";
 import BoardBuilder from "@/pages/board-builder";
+import AppLogin from "@/pages/app-login";
 
 import { PageTransition } from "@/components/page-transition";
 import { BottomNavigation } from "@/components/bottom-navigation";
@@ -236,6 +237,7 @@ function Router() {
           </AdminProtectedRoute>
         </Route>
         
+        <Route path="/app-login" component={AppLogin} />
         <Route path="/terms" component={LegalPage} />
         <Route path="/privacy" component={LegalPage} />
         <Route path="/verify-merchant" component={VerifyMerchant} />

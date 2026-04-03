@@ -10,6 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
+import { isNativeApp } from "@/lib/native";
 import { Switch } from "@/components/ui/switch";
 import { 
   Upload, CheckCircle, XCircle, LogOut, AlertCircle, Bell, BellOff, ChevronDown, Printer, ArrowRight
@@ -710,6 +711,24 @@ export default function Settings() {
         </SettingsSection>
 
         {/* Subscription & Billing Section */}
+        {isNativeApp() ? (
+          <div className="bg-white rounded-2xl sm:rounded-3xl mb-5 overflow-hidden">
+            <div className="px-5 sm:px-6 py-5">
+              <h2 className="text-[#0055FF] text-xl font-medium mb-4">Subscription & Billing</h2>
+              <div className="p-5 bg-[#0055FF]/5 rounded-xl text-center space-y-3">
+                <p className="text-gray-700 text-sm leading-relaxed">
+                  To add or update your payment method, visit
+                </p>
+                <a
+                  href="https://taptpay.co.nz/settings"
+                  className="text-[#0055FF] font-semibold text-base underline block"
+                >
+                  taptpay.co.nz
+                </a>
+              </div>
+            </div>
+          </div>
+        ) : (
         <SettingsSection title="Subscription & Billing" isOpen={openSections.has('billing')} onToggle={() => toggle('billing')}>
           <div className="space-y-5 mt-1">
             {/* Current Tier */}
@@ -840,6 +859,7 @@ export default function Settings() {
             )}
           </div>
         </SettingsSection>
+        )}
 
         {/* Account Section */}
         <SettingsSection title="Account" isOpen={openSections.has('account')} onToggle={() => toggle('account')}>
