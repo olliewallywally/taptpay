@@ -1126,15 +1126,24 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         transaction = transaction ?? pendingTransaction;
       } else {
         // No pending transaction exists — create a fresh record using the exact charged amount.
+        // windcaveTransactionId is not part of the insert type (omitted from schema); set it
+        // via updateTransactionStatus after creation so the type contract is preserved.
         transaction = await storage.createTransaction({
           merchantId: mid,
           itemName: "Tap to Pay Sale",
           price: chargeAmount.toFixed(2),
           status: finalStatus,
           paymentMethod: "tap_to_pay",
-          windcaveTransactionId: paymentResult.windcaveTransactionId ?? null,
           splitEnabled: false,
         });
+        if (paymentResult.windcaveTransactionId) {
+          const updated = await storage.updateTransactionStatus(
+            transaction.id,
+            finalStatus,
+            paymentResult.windcaveTransactionId
+          );
+          transaction = updated ?? transaction;
+        }
       }
 
       if (paymentResult.approved) {
