@@ -393,15 +393,15 @@ export interface AttendedPaymentResult {
 }
 
 /**
- * Step 1: Create a Windcave attended session for Tap to Pay on iPhone.
+ * Step 1 (server-side): Create a Windcave attended session for Tap to Pay on iPhone.
  *
- * This session is created server-side before the iOS SDK starts the NFC
- * capture. The returned sessionId is passed to the iOS plugin via the JS
- * bridge so the SDK can bind card data to this specific payment intent.
+ * Flow ordering: the iOS SDK (WCPaymentSDK) has already captured the NFC card
+ * data and returned a token to the JS bridge. This session is then created
+ * server-side to provide a Windcave context for submitting that token.
  *
- * Windcave attended sessions use `type: "purchase"` with an additional
- * `attended: true` flag and no callback URLs (the result is polled server-side
- * using the session query endpoint after the token is submitted).
+ * Windcave attended sessions use `type: "purchase"` with `attended: true` and
+ * no callback URLs — the authorisation result is returned synchronously when
+ * the token is submitted via submitTapToPayToken().
  */
 export async function createAttendedSession(
   amount: string,
