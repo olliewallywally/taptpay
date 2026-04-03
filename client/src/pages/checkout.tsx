@@ -93,6 +93,7 @@ function CheckoutInner() {
   const googleClient = useRef<any>(null);
   const sessionRef = useRef<any>(null);
   const applePayOptions = useRef<any>(null);
+  const applePaySdkLoaded = useRef(false);
 
   const { data: transaction, isLoading: txLoading } = useQuery({
     queryKey: ["/api/transactions", txId],
@@ -127,14 +128,11 @@ function CheckoutInner() {
   useEffect(() => {
     if (!envData) return;
 
-    // Apple Pay SDK: only load on Apple devices (window.ApplePaySession exists).
-    // Loading it on Android causes the SDK to auto-initialise without a session
-    // and redirect the browser to the Windcave HPP fallback URL.
-    if (typeof window.ApplePaySession !== "undefined") {
-      loadScript(`${base}/js/windcavepayments-applepay-v1.js`)
-        .then(() => checkApplePay())
-        .catch((e) => console.warn("Windcave ApplePay script:", e));
-    }
+    // Apple Pay availability: checked using the native browser API — no Windcave
+    // SDK needed. The SDK is lazy-loaded only when the user taps the Apple Pay
+    // button, which prevents it from auto-initialising without a session and
+    // redirecting to the Windcave HPP fallback URL.
+    checkApplePay();
 
     // Google Pay script is safe to load unconditionally — Google's own SDK
     // never redirects; it only shows a native bottom sheet.
@@ -162,45 +160,90 @@ function CheckoutInner() {
       });
   }, [envData, cardOpen]);
 
-  // ── Navigation guard ────────────────────────────────────────────────────
-  // Belt-and-suspenders: intercept any programmatic navigation to Windcave's
-  // Hosted Payment Page (HPP) and block it.  Wrapped in try/catch because on
-  // iOS Safari, window.location.assign / replace are non-configurable prototype
-  // properties — assigning to them in strict mode throws a TypeError which
-  // would otherwise crash the React component and produce a white screen.
+  // ── Navigation guard (prototype-level) ──────────────────────────────────
+  // Intercepts ALL three paths Windcave SDKs use to redirect to the HPP:
+  //   • window.location.href = url  (the href *setter* on Location.prototype)
+  //   • window.location.assign(url)
+  //   • window.location.replace(url)
+  // The previous instance-property approach missed the href setter entirely
+  // because it lives on Location.prototype, not on the window.location instance.
+  // Object.defineProperty on the prototype catches every caller uniformly and
+  // is the only approach that works reliably across Chrome, Safari, and Firefox.
   useEffect(() => {
-    let origAssign: ((...args: any[]) => void) | null = null;
-    let origReplace: ((...args: any[]) => void) | null = null;
+    let origHrefDesc: PropertyDescriptor | undefined;
+    let origAssign: typeof Location.prototype.assign | undefined;
+    let origReplace: typeof Location.prototype.replace | undefined;
     let guardInstalled = false;
 
-    function guardUrl(url: string): boolean {
+    function blockHPP(url: string, via: string): boolean {
       if (WINDCAVE_HPP_RE.test(url)) {
-        console.error("[Checkout] Blocked unexpected navigation to Windcave HPP:", url);
-        return false;
+        console.error(`[Checkout] Blocked Windcave HPP navigation (location.${via}):`, url);
+        return true;
       }
-      return true;
+      return false;
     }
 
     try {
-      origAssign  = window.location.assign.bind(window.location);
-      origReplace = window.location.replace.bind(window.location);
-      (window.location as any).assign  = (url: string) => { if (guardUrl(url)) origAssign!(url); };
-      (window.location as any).replace = (url: string) => { if (guardUrl(url)) origReplace!(url); };
+      origHrefDesc = Object.getOwnPropertyDescriptor(Location.prototype, "href");
+      origAssign   = Location.prototype.assign;
+      origReplace  = Location.prototype.replace;
+
+      if (origHrefDesc?.set) {
+        const origSet = origHrefDesc.set;
+        Object.defineProperty(Location.prototype, "href", {
+          ...origHrefDesc,
+          set(url: string) { if (!blockHPP(url, "href"))    origSet.call(this, url); },
+          configurable: true,
+        });
+      }
+
+      Location.prototype.assign = function guardAssign(url: string) {
+        if (!blockHPP(url, "assign")) origAssign!.call(this, url);
+      };
+
+      Location.prototype.replace = function guardReplace(url: string) {
+        if (!blockHPP(url, "replace")) origReplace!.call(this, url);
+      };
+
       guardInstalled = true;
     } catch (e) {
-      // Non-fatal: guard couldn't be installed (e.g. iOS Safari read-only props).
-      // The lazy-load approach is still the primary HPP protection.
-      console.warn("[Checkout] Navigation guard not installed:", e);
+      // Non-fatal — CSP or browser restriction prevented the prototype patch.
+      // The lazy-load strategy is still the primary HPP protection.
+      console.warn("[Checkout] Navigation guard (prototype) not installed:", e);
     }
 
     return () => {
       if (!guardInstalled) return;
       try {
-        if (origAssign)  (window.location as any).assign  = origAssign;
-        if (origReplace) (window.location as any).replace = origReplace;
+        if (origHrefDesc) Object.defineProperty(Location.prototype, "href", origHrefDesc);
+        if (origAssign)   Location.prototype.assign  = origAssign;
+        if (origReplace)  Location.prototype.replace = origReplace;
       } catch {}
     };
   }, []);
+
+  // ── Active-payment navigation blocker ───────────────────────────────────
+  // While processing, any navigation attempt (beforeunload / pagehide) is
+  // logged as a console.error so future regressions are immediately visible
+  // in production logs. The beforeunload handler also prompts the browser to
+  // confirm before leaving, which stops most accidental navigations.
+  useEffect(() => {
+    if (payState !== "processing") return;
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      console.error("[Checkout] Navigation attempted during payment processing (beforeunload)");
+      e.preventDefault();
+      e.returnValue = "";
+    }
+    function onPageHide() {
+      console.error("[Checkout] Page hidden during payment processing (pagehide)");
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    window.addEventListener("pagehide", onPageHide);
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      window.removeEventListener("pagehide", onPageHide);
+    };
+  }, [payState]);
 
   const fieldStyle = {
     "background-color": "rgba(255,255,255,0.55)",
@@ -353,8 +396,26 @@ function CheckoutInner() {
     );
   }
 
-  function handleApplePay() {
-    if (!window.WindcavePayments?.ApplePay?.create) return;
+  async function handleApplePay() {
+    // Lazy-load the Windcave Apple Pay SDK on first tap only — never at page
+    // load.  Loading eagerly gave the SDK a chance to auto-initialise without a
+    // session and redirect the browser to the HPP fallback URL.
+    if (!applePaySdkLoaded.current) {
+      try {
+        await loadScript(`${base}/js/windcavepayments-applepay-v1.js`);
+        applePaySdkLoaded.current = true;
+      } catch (e) {
+        console.error("[Checkout] Apple Pay SDK load failed:", e);
+        setPayState("error");
+        setErrorMsg("Apple Pay is not available right now. Please try another payment method.");
+        return;
+      }
+    }
+    if (!window.WindcavePayments?.ApplePay?.create) {
+      setPayState("error");
+      setErrorMsg("Apple Pay is not available.");
+      return;
+    }
     const opts: any = {
       merchantId: applePayMerchantId,
       merchantName: merchant?.businessName || "TaptPay",
