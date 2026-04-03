@@ -162,7 +162,7 @@ function CheckoutInner() {
       });
   }, [envData, cardOpen]);
 
-  // ── Navigation guard (prototype-level, comprehensive) ───────────────────
+  // ── Navigation guard (prototype-level, comprehensive, self-healing) ──────
   // Intercepts every path Windcave SDKs may use to redirect to the HPP:
   //   1. window.location.href = url     (Location.prototype href setter)
   //   2. window.location.assign(url)    (Location.prototype.assign)
@@ -171,108 +171,134 @@ function CheckoutInner() {
   //   5. history.replaceState(…, url)   (History.prototype.replaceState)
   //   6. window.open(url, …)            (window.open)
   //
-  // Each vector is patched in its own try/catch so a failure in one does not
-  // prevent the others from being installed (partial guard > no guard).
+  // Guards are re-asserted on a 2 s interval so that a later SDK script load
+  // cannot silently overwrite the patched methods.  Each patch uses its own
+  // try/catch so a failure in one does not prevent the others from installing.
   useEffect(() => {
-    let origHrefDesc: PropertyDescriptor | undefined;
-    let origAssign: typeof Location.prototype.assign | undefined;
-    let origReplace: typeof Location.prototype.replace | undefined;
-    let origPushState: typeof History.prototype.pushState | undefined;
-    let origReplaceState: typeof History.prototype.replaceState | undefined;
-    let origWindowOpen: typeof window.open | undefined;
+    // Track all guard functions so re-assertion can tell whether the currently
+    // installed method is ours or was replaced by a later SDK script load.
+    const guardFns = new Set<Function>();
 
-    let hrefPatched       = false;
-    let methodsPatched    = false;
-    let historyPatched    = false;
-    let windowOpenPatched = false;
+    // Stash the true original methods once — never overwrite these during
+    // re-assertion, so the chain always terminates at the real browser impl.
+    const origHrefDesc    = Object.getOwnPropertyDescriptor(Location.prototype, "href");
+    const origAssign      = Location.prototype.assign;
+    const origReplace     = Location.prototype.replace;
+    const origPushState   = History.prototype.pushState;
+    const origReplState   = History.prototype.replaceState;
+    const origWindowOpen  = window.open.bind(window);
 
     function blockHPP(url: string | URL | null | undefined, via: string): boolean {
       const urlStr = url == null ? "" : String(url);
       if (WINDCAVE_HPP_RE.test(urlStr)) {
-        // Always log — even in production — so future regressions are visible in console.
-        console.error(
-          `[Checkout] ⚠ Blocked Windcave HPP redirect attempt (${via}):`,
-          urlStr.slice(0, 200),
-          { timestamp: new Date().toISOString() }
-        );
+        if (import.meta.env.DEV) {
+          console.warn(
+            `[Checkout] Blocked Windcave HPP redirect (${via}):`,
+            urlStr.slice(0, 200)
+          );
+        }
         return true;
       }
       return false;
     }
 
-    // 1 & 2: href setter
-    try {
-      origHrefDesc = Object.getOwnPropertyDescriptor(Location.prototype, "href");
-      if (origHrefDesc?.set) {
-        const origSet = origHrefDesc.set;
-        Object.defineProperty(Location.prototype, "href", {
-          ...origHrefDesc,
-          set(url: string) { if (!blockHPP(url, "location.href")) origSet.call(this, url); },
-          configurable: true,
-        });
-        hrefPatched = true;
-      }
-    } catch (e) {
-      console.warn("[Checkout] href guard not installed:", e);
+    function installGuards() {
+      // 1. href setter
+      try {
+        const current = Object.getOwnPropertyDescriptor(Location.prototype, "href");
+        if (origHrefDesc?.set && !guardFns.has(current?.set ?? Function.prototype)) {
+          const origSet = origHrefDesc.set;
+          function hrefGuard(this: Location, url: string) {
+            if (!blockHPP(url, "location.href")) origSet.call(this, url);
+          }
+          guardFns.add(hrefGuard);
+          Object.defineProperty(Location.prototype, "href", {
+            ...origHrefDesc,
+            set: hrefGuard,
+            configurable: true,
+          });
+        }
+      } catch {}
+
+      // 2. assign
+      try {
+        if (!guardFns.has(Location.prototype.assign)) {
+          function assignGuard(this: Location, url: string | URL) {
+            if (!blockHPP(url, "location.assign")) origAssign.call(this, url);
+          }
+          guardFns.add(assignGuard);
+          Location.prototype.assign = assignGuard;
+        }
+      } catch {}
+
+      // 3. replace
+      try {
+        if (!guardFns.has(Location.prototype.replace)) {
+          function replaceGuard(this: Location, url: string | URL) {
+            if (!blockHPP(url, "location.replace")) origReplace.call(this, url);
+          }
+          guardFns.add(replaceGuard);
+          Location.prototype.replace = replaceGuard;
+        }
+      } catch {}
+
+      // 4. history.pushState
+      try {
+        if (!guardFns.has(History.prototype.pushState)) {
+          function pushStateGuard(
+            this: History,
+            ...args: Parameters<typeof History.prototype.pushState>
+          ) {
+            if (blockHPP(args[2], "history.pushState")) return;
+            origPushState.call(this, ...args);
+          }
+          guardFns.add(pushStateGuard);
+          History.prototype.pushState = pushStateGuard;
+        }
+      } catch {}
+
+      // 5. history.replaceState
+      try {
+        if (!guardFns.has(History.prototype.replaceState)) {
+          function replStateGuard(
+            this: History,
+            ...args: Parameters<typeof History.prototype.replaceState>
+          ) {
+            if (blockHPP(args[2], "history.replaceState")) return;
+            origReplState.call(this, ...args);
+          }
+          guardFns.add(replStateGuard);
+          History.prototype.replaceState = replStateGuard;
+        }
+      } catch {}
+
+      // 6. window.open
+      try {
+        if (!guardFns.has(window.open)) {
+          function openGuard(url?: string | URL, target?: string, features?: string): WindowProxy | null {
+            if (blockHPP(url, "window.open")) return null;
+            return origWindowOpen(url, target, features);
+          }
+          guardFns.add(openGuard);
+          window.open = openGuard;
+        }
+      } catch {}
     }
 
-    // 3 & 4: assign / replace
-    try {
-      origAssign  = Location.prototype.assign;
-      origReplace = Location.prototype.replace;
-      Location.prototype.assign = function guardAssign(url: string | URL) {
-        if (!blockHPP(url, "location.assign")) origAssign!.call(this, url as string);
-      };
-      Location.prototype.replace = function guardReplace(url: string | URL) {
-        if (!blockHPP(url, "location.replace")) origReplace!.call(this, url as string);
-      };
-      methodsPatched = true;
-    } catch (e) {
-      console.warn("[Checkout] assign/replace guard not installed:", e);
-    }
-
-    // 5 & 6: history.pushState / replaceState — Windcave SDKs can use the
-    // History API for soft redirects that bypass Location entirely.
-    try {
-      origPushState    = History.prototype.pushState;
-      origReplaceState = History.prototype.replaceState;
-      History.prototype.pushState = function guardPushState(data: any, unused: string, url?: string | URL | null) {
-        if (blockHPP(url, "history.pushState")) return;
-        origPushState!.call(this, data, unused, url as any);
-      };
-      History.prototype.replaceState = function guardReplaceState(data: any, unused: string, url?: string | URL | null) {
-        if (blockHPP(url, "history.replaceState")) return;
-        origReplaceState!.call(this, data, unused, url as any);
-      };
-      historyPatched = true;
-    } catch (e) {
-      console.warn("[Checkout] history guard not installed:", e);
-    }
-
-    // 7: window.open — some HPP flows try to open a popup window.
-    try {
-      origWindowOpen = window.open.bind(window);
-      window.open = function guardWindowOpen(url?: string | URL, target?: string, ...rest: any[]) {
-        if (blockHPP(url, "window.open")) return null;
-        return origWindowOpen!(url as string, target, ...rest);
-      };
-      windowOpenPatched = true;
-    } catch (e) {
-      console.warn("[Checkout] window.open guard not installed:", e);
-    }
+    // Install immediately on mount, then re-assert every 2 s in case a
+    // subsequently-loaded Windcave SDK script overwrites the patched methods.
+    installGuards();
+    const reassertInterval = setInterval(installGuards, 2000);
 
     return () => {
+      clearInterval(reassertInterval);
       try {
-        if (hrefPatched && origHrefDesc) Object.defineProperty(Location.prototype, "href", origHrefDesc);
-        if (methodsPatched) {
-          if (origAssign)  Location.prototype.assign  = origAssign;
-          if (origReplace) Location.prototype.replace = origReplace;
-        }
-        if (historyPatched) {
-          if (origPushState)    History.prototype.pushState    = origPushState;
-          if (origReplaceState) History.prototype.replaceState = origReplaceState;
-        }
-        if (windowOpenPatched && origWindowOpen) window.open = origWindowOpen;
+        if (origHrefDesc) Object.defineProperty(Location.prototype, "href", origHrefDesc);
+        Location.prototype.assign  = origAssign;
+        Location.prototype.replace = origReplace;
+        History.prototype.pushState    = origPushState;
+        History.prototype.replaceState = origReplState;
+        window.open = origWindowOpen;
       } catch {}
     };
   }, []);
