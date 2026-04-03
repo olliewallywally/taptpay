@@ -467,10 +467,11 @@ export async function createAttendedSession(
  */
 export async function submitTapToPayToken(
   sessionId: string,
-  windcaveToken: string
+  windcaveToken: string,
+  retries = 0
 ): Promise<AttendedPaymentResult> {
   const xId = crypto.randomBytes(8).toString("hex");
-  logAudit("TAP_TO_PAY_SUBMIT", { sessionId, xId });
+  logAudit("TAP_TO_PAY_SUBMIT", { sessionId, xId, retries });
 
   const body = {
     type: "purchase",
@@ -479,8 +480,9 @@ export async function submitTapToPayToken(
     token: windcaveToken,
   };
 
+  let response: Response;
   try {
-    const response = await fetchWithTimeout(TRANSACTION_URL, {
+    response = await fetchWithTimeout(TRANSACTION_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -489,22 +491,31 @@ export async function submitTapToPayToken(
       },
       body: JSON.stringify(body),
     });
-
-    const text = await response.text();
-    logAudit("TAP_TO_PAY_RESPONSE", { status: response.status, body: text.slice(0, 400) });
-
-    if (response.ok) {
-      let data: any = {};
-      try { data = JSON.parse(text); } catch {}
-      const approved = data.authorised === true || data.approved === true || data.responseCode === "00";
-      return { success: true, approved, windcaveTransactionId: data.id || data.transactionId };
-    }
-
-    return { success: false, error: `Windcave ${response.status}: ${text.slice(0, 200)}` };
   } catch (err: any) {
-    logAudit("TAP_TO_PAY_ERROR", { error: err.message });
+    logAudit("TAP_TO_PAY_NETWORK_ERROR", { xId, error: err.message });
+    if (retries < RETRY_LIMIT) {
+      await delay(5000);
+      return submitTapToPayToken(sessionId, windcaveToken, retries + 1);
+    }
     return { success: false, error: err.message };
   }
+
+  const text = await response.text();
+  logAudit("TAP_TO_PAY_RESPONSE", { status: response.status, body: text.slice(0, 400) });
+
+  if (response.ok) {
+    let data: any = {};
+    try { data = JSON.parse(text); } catch {}
+    const approved = data.authorised === true || data.approved === true || data.responseCode === "00";
+    return { success: true, approved, windcaveTransactionId: data.id || data.transactionId };
+  }
+
+  if (response.status >= 500 && retries < RETRY_LIMIT) {
+    await delay(5000);
+    return submitTapToPayToken(sessionId, windcaveToken, retries + 1);
+  }
+
+  return { success: false, error: `Windcave ${response.status}: ${text.slice(0, 200)}` };
 }
 
 /**

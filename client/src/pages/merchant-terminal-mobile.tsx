@@ -378,10 +378,16 @@ export default function MerchantTerminalMobile() {
           currency: "NZD",
           merchantName: merchant?.businessName || "TaptPay",
         });
-      } else {
-        // Simulation fallback — native bridge not available
+      } else if (import.meta.env.DEV) {
+        // Dev-only simulation fallback — native bridge not available in browser preview
         await new Promise(r => setTimeout(r, 2000));
         bridgeResult = { approved: true, token: `SIM_TOKEN_${Date.now()}` };
+      } else {
+        // Production: bridge is required — Paywave should only be accessible in the iOS app
+        setTapToPayStatus("idle");
+        setShowTapToPayOverlay(false);
+        toast({ title: "Not available", description: "Tap to Pay requires the TaptPay iOS app.", variant: "destructive" });
+        return;
       }
 
       if (bridgeResult.cancelled) {
