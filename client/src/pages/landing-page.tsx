@@ -610,10 +610,7 @@ function PricingCard({ onGetStarted }: { onGetStarted: () => void }) {
   return (
     <div className="h-full w-full flex flex-col items-center justify-center py-10 md:py-16 px-5 md:px-16 overflow-y-auto">
       <div className="max-w-5xl w-full">
-        <ScrambleHeading
-          text="what does it cost?"
-          className="text-3xl md:text-6xl font-extralight text-[#00f1d7] text-center mb-4 tracking-tight"
-        />
+        <h2 className="text-3xl md:text-6xl font-extralight text-[#00f1d7] text-center mb-4 tracking-tight">what does it cost?</h2>
         <div className="max-w-xl mx-auto">
           <div className="bg-[#0055ff] border border-[#00f1d7]/30 rounded-3xl p-8 md:p-10">
             <ul className="flex flex-col gap-4">
