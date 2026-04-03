@@ -4311,6 +4311,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       nativePush: {
         available: nativePushReady,
         reason: nativePushReady ? undefined : "APNs credentials not configured",
+        bundleId: process.env.APNS_BUNDLE_ID || "nz.taptpay.app",
       },
     });
   });
@@ -4443,7 +4444,15 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       const subs = await storage.getPushSubscriptionsByMerchant(merchantId);
-      res.json({ subscribed: subs.length > 0, deviceCount: subs.length });
+      const webSubs = subs.filter((s: any) => !s.endpoint.startsWith("apns://"));
+      const nativeSubs = subs.filter((s: any) => s.endpoint.startsWith("apns://"));
+
+      res.json({
+        subscribed: subs.length > 0,
+        deviceCount: subs.length,
+        webSubscribed: webSubs.length > 0,
+        nativeSubscribed: nativeSubs.length > 0,
+      });
     } catch (error) {
       res.status(500).json({ message: "Failed to check push status" });
     }

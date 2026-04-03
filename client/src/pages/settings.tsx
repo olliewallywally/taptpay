@@ -137,7 +137,22 @@ export default function Settings() {
     try {
       const { PushNotifications } = await import('@capacitor/push-notifications');
       const { receive } = await PushNotifications.checkPermissions();
-      setPushEnabled(receive === 'granted');
+      if (receive !== 'granted') {
+        setPushEnabled(false);
+        return;
+      }
+      const token = localStorage.getItem("authToken");
+      if (token) {
+        const statusResp = await fetch('/api/push/status', {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (statusResp.ok) {
+          const status = await statusResp.json();
+          setPushEnabled(!!status.nativeSubscribed);
+          return;
+        }
+      }
+      setPushEnabled(true);
     } catch {
       setPushSupported(false);
     }
@@ -203,10 +218,13 @@ export default function Settings() {
         });
       } else {
         const authToken = localStorage.getItem("authToken");
-        await fetch('/api/push/native-unsubscribe', {
+        const unsubResp = await fetch('/api/push/native-unsubscribe', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
         });
+        if (!unsubResp.ok) {
+          throw new Error("Server failed to remove notification subscription");
+        }
         setPushEnabled(false);
         toast({ title: "Notifications disabled" });
       }

@@ -7,7 +7,7 @@ const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || "";
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || "";
 const VAPID_SUBJECT = "mailto:support@taptpay.co.nz";
 
-const APNS_BUNDLE_ID = "nz.taptpay.app";
+const APNS_BUNDLE_ID = process.env.APNS_BUNDLE_ID || "nz.taptpay.app";
 const APNS_HOST = "api.push.apple.com";
 
 let pushInitialized = false;
