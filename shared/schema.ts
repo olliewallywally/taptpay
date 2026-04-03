@@ -73,6 +73,11 @@ export const merchants = pgTable("merchants", {
   // Dashboard preferences
   dailyGoal: decimal("daily_goal", { precision: 10, scale: 2 }).default("500.00"), // Daily revenue goal in dollars
   
+  // Billing card (stored masked — Windcave will handle live processing when ready)
+  billingCardLast4: text("billing_card_last4"),
+  billingCardBrand: text("billing_card_brand"), // e.g. Visa, Mastercard
+  billingCardExpiry: text("billing_card_expiry"), // MM/YY masked storage only
+  
   // Password reset tokens (persisted in DB)
   resetToken: text("reset_token"),
   resetTokenExpiry: timestamp("reset_token_expiry"),

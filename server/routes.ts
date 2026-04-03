@@ -5356,6 +5356,65 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
+  // Save billing card (masked stub — Windcave billing API integration ready)
+  app.post("/api/billing/card", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId || req.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+
+      const { cardNumber, expiry, cvc } = req.body;
+      if (!cardNumber || !expiry || !cvc) {
+        return res.status(400).json({ message: "Card number, expiry and CVC are required" });
+      }
+
+      const raw = String(cardNumber).replace(/\s+/g, '');
+      if (!/^\d{13,19}$/.test(raw)) {
+        return res.status(400).json({ message: "Invalid card number" });
+      }
+      if (!/^\d{2}\/\d{2}$/.test(String(expiry).trim())) {
+        return res.status(400).json({ message: "Expiry must be in MM/YY format" });
+      }
+
+      const last4 = raw.slice(-4);
+      const firstDigit = raw[0];
+      let brand = "Card";
+      if (firstDigit === "4") brand = "Visa";
+      else if (firstDigit === "5" || firstDigit === "2") brand = "Mastercard";
+      else if (firstDigit === "3") brand = "Amex";
+
+      // TODO: When Windcave billing API is available, tokenise the card here and store the token.
+      // For now store masked placeholder only — no real card data is persisted.
+      const merchant = await storage.updateMerchantBillingCard(merchantId, {
+        last4,
+        brand,
+        expiry: String(expiry).trim(),
+      });
+
+      res.json({
+        success: true,
+        card: { last4, brand, expiry: String(expiry).trim() },
+        merchant,
+      });
+    } catch (error) {
+      console.error("Save billing card error:", error);
+      res.status(500).json({ message: "Failed to save card" });
+    }
+  });
+
+  // Remove billing card
+  app.delete("/api/billing/card", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId || req.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+
+      await storage.updateMerchantBillingCard(merchantId, null);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Remove billing card error:", error);
+      res.status(500).json({ message: "Failed to remove card" });
+    }
+  });
+
   // Board Builder: submit PDF for printing (public endpoint)
   app.post("/api/board-builder/submit", async (req, res) => {
     try {

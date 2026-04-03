@@ -99,6 +99,14 @@ export default function Settings() {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancellationReason, setCancellationReason] = useState('');
 
+  // Billing card state
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvc, setCardCvc] = useState('');
+  const [showCardForm, setShowCardForm] = useState(false);
+  const [cardSaving, setCardSaving] = useState(false);
+  const [cardRemoving, setCardRemoving] = useState(false);
+
   // Push notification state
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
@@ -551,8 +559,76 @@ export default function Settings() {
     cancelSubscriptionMutation.mutate(cancellationReason);
   };
 
+  const formatCardNumber = (value: string) => {
+    const digits = value.replace(/\D/g, '').slice(0, 16);
+    return digits.replace(/(.{4})/g, '$1 ').trim();
+  };
+
+  const formatExpiry = (value: string) => {
+    const digits = value.replace(/\D/g, '').slice(0, 4);
+    if (digits.length >= 3) return digits.slice(0, 2) + '/' + digits.slice(2);
+    return digits;
+  };
+
+  const handleSaveCard = async () => {
+    const rawNumber = cardNumber.replace(/\s/g, '');
+    if (rawNumber.length < 13 || rawNumber.length > 19) {
+      toast({ title: "Please enter a valid card number", variant: "destructive" });
+      return;
+    }
+    if (!/^\d{2}\/\d{2}$/.test(cardExpiry)) {
+      toast({ title: "Please enter expiry in MM/YY format", variant: "destructive" });
+      return;
+    }
+    if (cardCvc.length < 3) {
+      toast({ title: "Please enter a valid CVC", variant: "destructive" });
+      return;
+    }
+    setCardSaving(true);
+    try {
+      const authToken = localStorage.getItem("authToken");
+      const resp = await fetch('/api/billing/card', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+        body: JSON.stringify({ cardNumber: rawNumber, expiry: cardExpiry, cvc: cardCvc }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to save card');
+      }
+      queryClient.invalidateQueries({ queryKey: ['/api/merchants', merchantId] });
+      setShowCardForm(false);
+      setCardNumber('');
+      setCardExpiry('');
+      setCardCvc('');
+      toast({ title: "Card saved successfully" });
+    } catch (error: any) {
+      toast({ title: error.message || "Failed to save card", variant: "destructive" });
+    } finally {
+      setCardSaving(false);
+    }
+  };
+
+  const handleRemoveCard = async () => {
+    setCardRemoving(true);
+    try {
+      const authToken = localStorage.getItem("authToken");
+      const resp = await fetch('/api/billing/card', {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${authToken}` },
+      });
+      if (!resp.ok) throw new Error('Failed to remove card');
+      queryClient.invalidateQueries({ queryKey: ['/api/merchants', merchantId] });
+      toast({ title: "Card removed" });
+    } catch {
+      toast({ title: "Failed to remove card", variant: "destructive" });
+    } finally {
+      setCardRemoving(false);
+    }
+  };
+
   const subscription = subscriptionData?.subscription;
-  const transactionProgress = subscription ? Math.min((subscription.currentMonthTransactions / 1000) * 100, 100) : 0;
+  const transactionProgress = subscription ? Math.min((subscription.currentMonthTransactions / 100) * 100, 100) : 0;
   const isFreeTier = subscription?.tier === 'free';
   const isCancelled = subscription?.status === 'cancelled';
 
@@ -867,19 +943,19 @@ export default function Settings() {
               <div className="flex items-center justify-between mb-2">
                 <p className="text-gray-700 font-medium">Monthly Transaction Usage</p>
                 <p className="text-sm font-medium text-gray-600">
-                  {subscription?.currentMonthTransactions || 0} / 1000
+                  {subscription?.currentMonthTransactions || 0} / 100
                 </p>
               </div>
               <Progress value={transactionProgress} className="h-3 mb-2" />
               <p className="text-xs text-gray-500">
                 {isFreeTier 
-                  ? 'Free tier includes up to 1,000 transactions per month. Additional charges apply after that.'
+                  ? 'Free tier includes up to 100 transactions per month. Additional charges of $0.10 per transaction apply after that.'
                   : 'You will be charged 10 cents per transaction at your selected billing frequency.'}
               </p>
-              {isFreeTier && subscription && subscription.currentMonthTransactions >= 1000 && (
+              {isFreeTier && subscription && subscription.currentMonthTransactions >= 100 && (
                 <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg">
                   <p className="text-xs text-red-600 font-medium">
-                    ⚠️ You've reached your free tier limit. Your card will be charged 10 cents per additional transaction.
+                    ⚠️ You've reached your free tier limit. Your card will be charged $0.10 per additional transaction.
                   </p>
                 </div>
               )}
@@ -916,6 +992,113 @@ export default function Settings() {
                 </p>
               </div>
             )}
+
+            {/* Billing Card */}
+            <div>
+              <Label className="text-gray-700 text-sm mb-2 block">Payment Card</Label>
+              <div className="p-3 mb-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <p className="text-xs text-amber-800 font-medium">
+                  Payment processing coming soon via Windcave. Saving your card details now will allow automatic billing once the integration goes live.
+                </p>
+              </div>
+              {merchant?.billingCardLast4 && !showCardForm ? (
+                <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-7 bg-white border border-gray-300 rounded flex items-center justify-center">
+                      <span className="text-[9px] font-bold text-gray-600">{merchant.billingCardBrand?.toUpperCase()}</span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">
+                        {merchant.billingCardBrand} ending in {merchant.billingCardLast4}
+                      </p>
+                      <p className="text-xs text-gray-500">Expires {merchant.billingCardExpiry}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setShowCardForm(true)}
+                      className="text-xs"
+                    >
+                      Replace
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleRemoveCard}
+                      disabled={cardRemoving}
+                      className="text-xs border-red-300 text-red-600 hover:bg-red-50"
+                    >
+                      {cardRemoving ? "Removing..." : "Remove"}
+                    </Button>
+                  </div>
+                </div>
+              ) : showCardForm || !merchant?.billingCardLast4 ? (
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-xs text-gray-600 mb-1 block">Card Number</Label>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="1234 5678 9012 3456"
+                      value={cardNumber}
+                      onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
+                      className="border-[#0055FF] focus:border-[#00E5CC] font-mono"
+                      maxLength={19}
+                      data-testid="input-card-number"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs text-gray-600 mb-1 block">Expiry (MM/YY)</Label>
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="MM/YY"
+                        value={cardExpiry}
+                        onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
+                        className="border-[#0055FF] focus:border-[#00E5CC] font-mono"
+                        maxLength={5}
+                        data-testid="input-card-expiry"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-600 mb-1 block">CVC</Label>
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="123"
+                        value={cardCvc}
+                        onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                        className="border-[#0055FF] focus:border-[#00E5CC] font-mono"
+                        maxLength={4}
+                        data-testid="input-card-cvc"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    {showCardForm && (
+                      <Button
+                        variant="outline"
+                        onClick={() => { setShowCardForm(false); setCardNumber(''); setCardExpiry(''); setCardCvc(''); }}
+                        className="flex-1"
+                      >
+                        Cancel
+                      </Button>
+                    )}
+                    <Button
+                      onClick={handleSaveCard}
+                      disabled={cardSaving}
+                      className="flex-1 bg-[#0055FF] hover:bg-[#0044CC] text-white"
+                      data-testid="button-save-card"
+                    >
+                      {cardSaving ? "Saving..." : "Save Card"}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
 
             {/* Cancellation Section */}
             {!isCancelled ? (
