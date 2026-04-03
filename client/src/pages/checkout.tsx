@@ -182,11 +182,13 @@ function CheckoutInner() {
     // Stash the true original methods once — never overwrite these during
     // re-assertion, so the chain always terminates at the real browser impl.
     const origHrefDesc    = Object.getOwnPropertyDescriptor(Location.prototype, "href");
+    const origDocLocDesc  = Object.getOwnPropertyDescriptor(Document.prototype, "location");
     const origAssign      = Location.prototype.assign;
     const origReplace     = Location.prototype.replace;
     const origPushState   = History.prototype.pushState;
     const origReplState   = History.prototype.replaceState;
-    const origWindowOpen  = window.open.bind(window);
+    // Store the raw reference (not a bound wrapper) so restoration is exact.
+    const origWindowOpen  = window.open;
 
     function blockHPP(url: string | URL | null | undefined, via: string): boolean {
       const raw = (url == null ? "" : String(url)).trim();
@@ -280,10 +282,31 @@ function CheckoutInner() {
         if (!guardFns.has(window.open)) {
           function openGuard(url?: string | URL, target?: string, features?: string): WindowProxy | null {
             if (blockHPP(url, "window.open")) return null;
-            return origWindowOpen(url, target, features);
+            return origWindowOpen.call(window, url, target, features);
           }
           guardFns.add(openGuard);
           window.open = openGuard;
+        }
+      } catch {}
+
+      // 7. document.location setter — legacy path some webviews support.
+      // In modern browsers document.location is the same Location object as
+      // window.location, so setting .href/.assign()/.replace() on it is already
+      // covered by guards 1-3.  This additionally intercepts the direct
+      // `document.location = url` assignment form.
+      try {
+        const curDocLoc = Object.getOwnPropertyDescriptor(Document.prototype, "location");
+        if (origDocLocDesc?.set && !guardFns.has(curDocLoc?.set ?? Function.prototype)) {
+          const origDocLocSet = origDocLocDesc.set;
+          function docLocGuard(this: Document, url: string) {
+            if (!blockHPP(url, "document.location")) origDocLocSet.call(this, url);
+          }
+          guardFns.add(docLocGuard);
+          Object.defineProperty(Document.prototype, "location", {
+            ...origDocLocDesc,
+            set: docLocGuard,
+            configurable: true,
+          });
         }
       } catch {}
     }
@@ -297,6 +320,7 @@ function CheckoutInner() {
       clearInterval(reassertInterval);
       try {
         if (origHrefDesc) Object.defineProperty(Location.prototype, "href", origHrefDesc);
+        if (origDocLocDesc) Object.defineProperty(Document.prototype, "location", origDocLocDesc);
         Location.prototype.assign  = origAssign;
         Location.prototype.replace = origReplace;
         History.prototype.pushState    = origPushState;
