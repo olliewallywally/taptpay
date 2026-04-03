@@ -1046,8 +1046,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(403).json({ message: "Access denied" });
       }
 
-      const priceNum = parseFloat(amount);
-      if (isNaN(priceNum) || priceNum <= 0) {
+      const requestedAmount = parseFloat(amount);
+      if (isNaN(requestedAmount) || requestedAmount <= 0) {
         return res.status(400).json({ message: "Invalid amount" });
       }
 
@@ -1066,6 +1066,17 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         pendingTransaction = await storage.getActiveTransactionByMerchant(mid);
       }
 
+      // The amount to charge Windcave is always the pending transaction's stored price.
+      // If no pending transaction, fall back to request body amount.
+      // This prevents any divergence between charged amount and recorded ledger amount.
+      const chargeAmount = pendingTransaction
+        ? parseFloat(pendingTransaction.price)
+        : requestedAmount;
+
+      if (isNaN(chargeAmount) || chargeAmount <= 0) {
+        return res.status(400).json({ message: "Invalid charge amount" });
+      }
+
       const merchantRef = `TAPTP-${pendingTransaction?.id ?? Date.now()}`;
       let paymentResult;
 
@@ -1076,8 +1087,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           return res.status(400).json({ message: "windcaveToken is required when Windcave is configured" });
         }
 
-        // Step 1: Create an attended session on Windcave
-        const sessionResult = await createAttendedSession(priceNum.toFixed(2), merchantRef);
+        // Step 1: Create an attended session on Windcave using the pending transaction price
+        const sessionResult = await createAttendedSession(chargeAmount.toFixed(2), merchantRef);
         if (!sessionResult.success || !sessionResult.sessionId) {
           return res.status(502).json({ message: `Failed to create attended session: ${sessionResult.error}` });
         }
@@ -1086,7 +1097,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         paymentResult = await submitTapToPayToken(sessionResult.sessionId, windcaveToken);
 
         // A false `success` means a processor/network error — not a card decline.
-        // Return upstream error without persisting a transaction outcome.
+        // Return upstream error without persisting any transaction outcome.
         if (!paymentResult.success) {
           return res.status(502).json({ message: `Payment processor error: ${paymentResult.error}` });
         }
@@ -1099,7 +1110,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       let transaction;
       if (pendingTransaction) {
-        // Finalize the existing pending transaction in place
+        // Finalize the existing pending transaction in place.
+        // The stored price is unchanged — it was the source of truth for chargeAmount.
         transaction = await storage.updateTransactionStatus(
           pendingTransaction.id,
           finalStatus,
@@ -1108,11 +1120,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         await storage.updateTransactionPaymentMethod(pendingTransaction.id, "tap_to_pay");
         transaction = transaction ?? pendingTransaction;
       } else {
-        // No pending transaction exists — create a fresh completed record
+        // No pending transaction exists — create a fresh record using the exact charged amount.
         transaction = await storage.createTransaction({
           merchantId: mid,
           itemName: "Tap to Pay Sale",
-          price: priceNum.toFixed(2),
+          price: chargeAmount.toFixed(2),
           status: finalStatus,
           paymentMethod: "tap_to_pay",
           windcaveTransactionId: paymentResult.windcaveTransactionId ?? null,
