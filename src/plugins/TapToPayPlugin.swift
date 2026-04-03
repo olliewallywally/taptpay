@@ -4,11 +4,19 @@ import Capacitor
 // MARK: - TapToPayPlugin
 //
 // Capacitor bridge for Windcave Tap to Pay on iPhone (iOS 16.4+, iPhone XS and later).
+// Surfaced to JavaScript as window.TaptPay via Capacitor's plugin system.
+//
+// JS CONTRACT
+// ───────────
+//   await window.TaptPay.startTapToPay({ amount, currency, merchantName })
+//   → { approved: boolean, token?: string, cancelled?: boolean, error?: string }
+//
+// The JS shim in client/src/plugins/TaptPayPlugin.ts calls registerPlugin('TaptPay')
+// which Capacitor maps to this class through jsName = "TaptPay" below.
 //
 // INTEGRATION STEPS
 // ─────────────────
-// 1. Add the Windcave iOS SDK (WCPaymentSDK) to your Xcode project via Swift Package Manager
-//    or CocoaPods:
+// 1. Add the Windcave iOS SDK (WCPaymentSDK) via Swift Package Manager or CocoaPods:
 //      pod 'WCPaymentSDK'
 //
 // 2. Add the required entitlements to your target:
@@ -18,18 +26,29 @@ import Capacitor
 //
 // 4. Uncomment the WCPaymentSDK import and implementation below when the SDK is installed.
 //
-// 5. The JavaScript side calls:
-//      await window.TaptPay.startTapToPay({ amount, currency, merchantName })
-//    and receives:
-//      { approved: boolean, token?: string, cancelled?: boolean, error?: string }
-//
-// 6. On success the JS layer posts { merchantId, amount, windcaveToken: token, itemName }
-//    to POST /api/transactions/tap-to-pay where the server submits the token to Windcave.
+// 5. On success the JS layer posts { merchantId, transactionId, amount, windcaveToken: token }
+//    to POST /api/transactions/tap-to-pay. The server creates an attended Windcave session,
+//    submits the token, and finalises the pending transaction.
 
 @objc(TapToPayPlugin)
-public class TapToPayPlugin: CAPPlugin {
+public class TapToPayPlugin: CAPPlugin, CAPBridgedPlugin {
 
-    // MARK: startTapToPay
+    // MARK: - Capacitor bridge registration
+    //
+    // These three properties are required by the CAPBridgedPlugin protocol.
+    // They wire this Swift class to the JavaScript name "TaptPay" so that
+    //   registerPlugin('TaptPay')  in client/src/plugins/TaptPayPlugin.ts
+    // and
+    //   window.TaptPay.startTapToPay(...)
+    // both resolve to this plugin.
+
+    public let identifier = "TapToPayPlugin"   // must match @objc(TapToPayPlugin)
+    public let jsName = "TaptPay"              // must match registerPlugin('TaptPay')
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "startTapToPay", returnType: CAPPluginReturnPromise)
+    ]
+
+    // MARK: - startTapToPay
 
     @objc func startTapToPay(_ call: CAPPluginCall) {
         guard let amount = call.getDouble("amount"),
@@ -39,7 +58,7 @@ public class TapToPayPlugin: CAPPlugin {
             return
         }
 
-        // ── Windcave SDK integration (uncomment when WCPaymentSDK is available) ───────
+        // ── Windcave WCPaymentSDK integration (uncomment when SDK is available) ───────
         //
         // import WCPaymentSDK
         //
@@ -68,7 +87,8 @@ public class TapToPayPlugin: CAPPlugin {
         // }
         // ─────────────────────────────────────────────────────────────────────────────
 
-        // Stub — remove this block once WCPaymentSDK is integrated
+        // Stub — simulates an approved NFC tap after 1.5 s.
+        // Replace with the WCPaymentSDK block above once the SDK is installed.
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             call.resolve([
                 "approved": true,
