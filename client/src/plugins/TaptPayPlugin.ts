@@ -15,9 +15,10 @@ const TaptPayPlugin = registerPlugin<{
 }>("TaptPay");
 
 // Expose as window.TaptPay for direct access in terminal component bridge checks.
+// Window.TaptPay is already declared in client/src/lib/native.ts so no cast is needed.
 // The native.ts canTapToPay() guard confirms the platform is iOS before use.
 if (typeof window !== "undefined") {
-  (window as any).TaptPay = TaptPayPlugin;
+  window.TaptPay = TaptPayPlugin;
 }
 
 export { TaptPayPlugin };
