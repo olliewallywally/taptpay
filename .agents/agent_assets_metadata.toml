@@ -6,3 +6,9 @@ id = "d-_suBMyENzCD09gZlyGW"
 uri = "file://client/public/qr-taptpay-info.png"
 type = "image"
 title = "TaptPay Info QR Code — transparent background"
+
+[[outputs]]
+id = "dxmwfboCom0O4I3i20BeL"
+uri = "file://taptpay-ios.zip"
+type = "unspecified"
+title = "TaptPay iOS Xcode Project"
