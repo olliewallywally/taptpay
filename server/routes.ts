@@ -1033,7 +1033,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   // Tap to Pay (Windcave attended / Tap to Pay on iPhone)
-  // Accepts {merchantId, amount, windcaveToken} — itemName is optional and falls back to active transaction.
+  // Required: {merchantId, amount, windcaveToken (when Windcave is configured)}
+  // Optional: {transactionId} — ID of the pending transaction to finalize; if omitted, uses the
+  //   merchant's current active pending transaction. Amount is always taken from the pending
+  //   transaction's stored price to guarantee ledger/processor consistency.
+  // "Paywave" is the NZ contactless payment brand used in the UI; the underlying protocol is
+  //   Windcave's attended Tap to Pay on iPhone (WCPaymentSDK + server-side session flow).
   app.post("/api/transactions/tap-to-pay", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const { merchantId, transactionId, amount, windcaveToken } = req.body;
