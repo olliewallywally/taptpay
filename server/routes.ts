@@ -5362,9 +5362,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
 
-      const { cardNumber, expiry } = req.body;
-      if (!cardNumber || !expiry) {
-        return res.status(400).json({ message: "Card number and expiry are required" });
+      const { cardNumber, expiry, cvc } = req.body;
+      if (!cardNumber || !expiry || !cvc) {
+        return res.status(400).json({ message: "Card number, expiry and CVC are required" });
       }
 
       const raw = String(cardNumber).replace(/\s+/g, '');
@@ -5374,6 +5374,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!/^\d{2}\/\d{2}$/.test(String(expiry).trim())) {
         return res.status(400).json({ message: "Expiry must be in MM/YY format" });
       }
+      if (!/^\d{3,4}$/.test(String(cvc))) {
+        return res.status(400).json({ message: "Invalid CVC" });
+      }
+      // CVC validated above but intentionally NOT stored — Windcave will tokenise when live.
 
       const last4 = raw.slice(-4);
       const firstDigit = raw[0];
