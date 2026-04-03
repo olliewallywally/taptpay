@@ -58,3 +58,7 @@ WINDCAVE_GOOGLE_PAY_MERCHANT_ID = "c765be1e082b1c5b01ef55608fdd550c0290d779"
 
 [userenv.production]
 PRODUCTION_DOMAIN = "taptpay.co.nz"
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 60000

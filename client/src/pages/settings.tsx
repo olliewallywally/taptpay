@@ -102,7 +102,6 @@ export default function Settings() {
   // Billing card state
   const [cardNumber, setCardNumber] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvc, setCardCvc] = useState('');
   const [showCardForm, setShowCardForm] = useState(false);
   const [cardSaving, setCardSaving] = useState(false);
   const [cardRemoving, setCardRemoving] = useState(false);
@@ -580,30 +579,26 @@ export default function Settings() {
       toast({ title: "Please enter expiry in MM/YY format", variant: "destructive" });
       return;
     }
-    if (cardCvc.length < 3) {
-      toast({ title: "Please enter a valid CVC", variant: "destructive" });
-      return;
-    }
     setCardSaving(true);
     try {
       const authToken = localStorage.getItem("authToken");
       const resp = await fetch('/api/billing/card', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-        body: JSON.stringify({ cardNumber: rawNumber, expiry: cardExpiry, cvc: cardCvc }),
+        body: JSON.stringify({ cardNumber: rawNumber, expiry: cardExpiry }),
       });
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
-        throw new Error(err.message || 'Failed to save card');
+        throw new Error((err as { message?: string }).message || 'Failed to save card');
       }
       queryClient.invalidateQueries({ queryKey: ['/api/merchants', merchantId] });
       setShowCardForm(false);
       setCardNumber('');
       setCardExpiry('');
-      setCardCvc('');
       toast({ title: "Card saved successfully" });
-    } catch (error: any) {
-      toast({ title: error.message || "Failed to save card", variant: "destructive" });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "Failed to save card";
+      toast({ title: msg, variant: "destructive" });
     } finally {
       setCardSaving(false);
     }
@@ -1049,39 +1044,24 @@ export default function Settings() {
                       data-testid="input-card-number"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label className="text-xs text-gray-600 mb-1 block">Expiry (MM/YY)</Label>
-                      <Input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="MM/YY"
-                        value={cardExpiry}
-                        onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
-                        className="border-[#0055FF] focus:border-[#00E5CC] font-mono"
-                        maxLength={5}
-                        data-testid="input-card-expiry"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs text-gray-600 mb-1 block">CVC</Label>
-                      <Input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="123"
-                        value={cardCvc}
-                        onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                        className="border-[#0055FF] focus:border-[#00E5CC] font-mono"
-                        maxLength={4}
-                        data-testid="input-card-cvc"
-                      />
-                    </div>
+                  <div>
+                    <Label className="text-xs text-gray-600 mb-1 block">Expiry (MM/YY)</Label>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="MM/YY"
+                      value={cardExpiry}
+                      onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
+                      className="border-[#0055FF] focus:border-[#00E5CC] font-mono"
+                      maxLength={5}
+                      data-testid="input-card-expiry"
+                    />
                   </div>
                   <div className="flex gap-2">
                     {showCardForm && (
                       <Button
                         variant="outline"
-                        onClick={() => { setShowCardForm(false); setCardNumber(''); setCardExpiry(''); setCardCvc(''); }}
+                        onClick={() => { setShowCardForm(false); setCardNumber(''); setCardExpiry(''); }}
                         className="flex-1"
                       >
                         Cancel
