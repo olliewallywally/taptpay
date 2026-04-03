@@ -1,5 +1,5 @@
 {
-  "name": "TaptPay - Payment Terminal",
+  "name": "TaptPay",
   "short_name": "TaptPay",
   "description": "Accept payments anywhere with QR codes, NFC, and digital wallets",
   "start_url": "/",
