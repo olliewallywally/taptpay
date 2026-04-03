@@ -68,7 +68,7 @@ function loadScript(src: string): Promise<void> {
 
 // Windcave HPP domain pattern — matches any *.windcave.com host.
 // Broadened from uat|sec to cover any future subdomain Windcave may use.
-const WINDCAVE_HPP_RE = /^https?:\/\/[a-z0-9-]*\.windcave\.com/i;
+const WINDCAVE_HPP_RE = /^https?:\/\/[a-z0-9-]+\.windcave\.com/i;
 
 function CheckoutInner() {
   const { transactionId } = useParams<{ transactionId: string }>();
