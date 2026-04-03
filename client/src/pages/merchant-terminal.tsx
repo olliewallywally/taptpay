@@ -19,6 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useDeviceStatusMonitoring, useSSEConnectionMonitoring } from "@/components/notification-system";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { Send, Loader2, CheckCircle, Clock, XCircle, Eye, Copy, Check, QrCode, Smartphone, Waves, CreditCard, X, Edit, MoreHorizontal, ChevronDown, Tag, Share, Link2, Mail, MessageCircle } from "lucide-react";
+import { isNativeIOS } from "@/lib/native";
 import { Switch } from "@/components/ui/switch";
 import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
 import { Link } from "wouter";
@@ -51,6 +52,10 @@ export default function MerchantTerminal() {
   
   const [splitEnabled, setSplitEnabled] = useState(false);
   const [copiedPaymentLink, setCopiedPaymentLink] = useState(false);
+
+  // Tap to Pay (iOS only)
+  const [tapToPayStatus, setTapToPayStatus] = useState<"idle" | "waiting" | "processing" | "completed" | "failed">("idle");
+  const [showTapToPayOverlay, setShowTapToPayOverlay] = useState(false);
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -171,6 +176,70 @@ export default function MerchantTerminal() {
     if (activeTransaction?.id && activeTransaction?.status === "pending") {
       updateSplitEnabledMutation.mutate({ id: activeTransaction.id, splitEnabled: value });
     }
+  };
+
+  // Tap to Pay (iOS native bridge)
+  const startTapToPayPayment = async () => {
+    const transaction = currentTransaction || activeTransaction;
+    if (!transaction) {
+      toast({ title: "No Transaction", description: "Create a transaction first.", variant: "destructive" });
+      return;
+    }
+
+    setTapToPayStatus("waiting");
+    setShowTapToPayOverlay(true);
+
+    try {
+      let bridgeResult: { approved: boolean; token?: string; cancelled?: boolean; error?: string };
+
+      if (typeof window.TaptPay?.startTapToPay === "function") {
+        bridgeResult = await window.TaptPay.startTapToPay({
+          amount: parseFloat(transaction.price),
+          currency: "NZD",
+          merchantName: merchant?.businessName || "TaptPay",
+        });
+      } else {
+        await new Promise(r => setTimeout(r, 2000));
+        bridgeResult = { approved: true, token: `SIM_TOKEN_${Date.now()}` };
+      }
+
+      if (bridgeResult.cancelled) {
+        setTapToPayStatus("idle");
+        setShowTapToPayOverlay(false);
+        toast({ title: "Cancelled", description: "Tap to Pay was cancelled." });
+        return;
+      }
+
+      setTapToPayStatus("processing");
+      const authToken = localStorage.getItem("authToken");
+      const response = await fetch("/api/transactions/tap-to-pay", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({
+          merchantId,
+          amount: parseFloat(transaction.price),
+          windcaveToken: bridgeResult.token,
+          itemName: transaction.itemName,
+        }),
+      });
+
+      const data = await response.json();
+      setTapToPayStatus(data.approved ? "completed" : "failed");
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
+
+      setTimeout(() => {
+        setShowTapToPayOverlay(false);
+        setTapToPayStatus("idle");
+      }, 3500);
+    } catch (err) {
+      console.error("Tap to Pay error:", err);
+      setTapToPayStatus("failed");
+    }
+  };
+
+  const closeTapToPayOverlay = () => {
+    setShowTapToPayOverlay(false);
+    setTapToPayStatus("idle");
   };
 
   // Filter stock items based on search input
@@ -560,7 +629,9 @@ function ActionsToolbar({
   stockTaggingComponent, 
   itemFormComponent,
   form,
-  setActiveAction 
+  setActiveAction,
+  onTapToPay,
+  tapToPayStatus,
 }: {
   activeAction: string | null;
   handleActionClick: (action: string) => void;
@@ -568,12 +639,17 @@ function ActionsToolbar({
   itemFormComponent: React.ReactNode;
   form: any;
   setActiveAction: (action: string) => void;
+  onTapToPay?: () => void;
+  tapToPayStatus?: string;
 }) {
-  const actionButtons = [
+  const baseButtons = [
     { id: "edit", icon: Edit, label: "New Payment", testId: "button-new-payment" },
     { id: "send", icon: Send, label: "Share Link", testId: "button-share-link" },
     { id: "quick", icon: Tag, label: "Quick Amounts", testId: "button-quick-amounts" }
   ];
+  const actionButtons = isNativeIOS()
+    ? [...baseButtons, { id: "tap-to-pay", icon: Waves, label: "Paywave", testId: "button-tap-to-pay" }]
+    : baseButtons;
 
   return (
     <div className="bg-gray-800/50 rounded-2xl p-4" data-testid="actions-toolbar">
@@ -731,6 +807,37 @@ function ActionsToolbar({
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {activeAction === "tap-to-pay" && isNativeIOS() && (
+            <div className="space-y-3" data-testid="tap-to-pay-panel">
+              <div className="flex items-center gap-2">
+                <Waves size={16} style={{ color: '#00FF66' }} />
+                <h3 className="text-sm font-semibold text-white">Paywave</h3>
+              </div>
+              <p className="text-xs text-gray-400">
+                Hold the top of your iPhone near the customer's card or device to collect payment.
+              </p>
+              <button
+                onClick={onTapToPay}
+                disabled={tapToPayStatus === "waiting" || tapToPayStatus === "processing"}
+                className="w-full py-3 rounded-xl text-black font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-60"
+                style={{ backgroundColor: '#00FF66' }}
+                data-testid="button-start-tap-to-pay"
+              >
+                {tapToPayStatus === "waiting" || tapToPayStatus === "processing" ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    {tapToPayStatus === "waiting" ? "Waiting for card..." : "Processing..."}
+                  </>
+                ) : (
+                  <>
+                    <CreditCard size={16} />
+                    Start Paywave Payment
+                  </>
+                )}
+              </button>
             </div>
           )}
         </div>
@@ -1119,7 +1226,94 @@ function PaymentStatus({ transaction }: { transaction: any }) {
                 }
                 form={form}
                 setActiveAction={setActiveAction}
+                onTapToPay={startTapToPayPayment}
+                tapToPayStatus={tapToPayStatus}
               />
+
+              {/* Tap to Pay Overlay (iOS only) */}
+              {showTapToPayOverlay && (
+                <div
+                  className="fixed inset-0 z-50 flex items-center justify-center"
+                  style={{ backgroundColor: '#0a0a0a' }}
+                >
+                  <button
+                    onClick={closeTapToPayOverlay}
+                    className="absolute top-6 right-6 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-10"
+                  >
+                    <X className="h-4 w-4 text-white/70" />
+                  </button>
+
+                  <div
+                    className="backdrop-blur-xl rounded-3xl p-12 max-w-sm w-full mx-8 text-center shadow-2xl"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(0, 255, 102, 0.12) 0%, rgba(0, 255, 102, 0.05) 100%)',
+                      border: '1px solid rgba(0, 255, 102, 0.3)',
+                      boxShadow: '0 25px 50px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(0, 255, 102, 0.2)',
+                    }}
+                  >
+                    {tapToPayStatus === "waiting" && (
+                      <div className="space-y-8">
+                        <div
+                          className="mx-auto w-24 h-24 rounded-full flex items-center justify-center"
+                          style={{ border: '2px solid rgba(0,255,102,0.4)', background: 'rgba(0,255,102,0.08)' }}
+                        >
+                          <Waves className="w-10 h-10 animate-pulse" style={{ color: '#00FF66' }} />
+                        </div>
+                        <div className="space-y-2">
+                          <div className="text-2xl font-light text-white">Hold to Card</div>
+                          <div className="text-white/60 text-base">Hold the top of your iPhone near the customer's card or device</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {tapToPayStatus === "processing" && (
+                      <div className="space-y-8">
+                        <div className="mx-auto w-16 h-16 rounded-full bg-white/10 border border-white/20 flex items-center justify-center">
+                          <Loader2 className="h-8 w-8 text-white/80 animate-spin" />
+                        </div>
+                        <div className="space-y-2">
+                          <div className="text-2xl font-light text-white">Processing</div>
+                          <div className="text-white/60 text-base">Please wait...</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {tapToPayStatus === "completed" && (
+                      <div className="space-y-8">
+                        <div
+                          className="mx-auto w-16 h-16 rounded-full flex items-center justify-center"
+                          style={{ background: 'rgba(0, 255, 102, 0.2)', border: '1px solid rgba(0, 255, 102, 0.4)' }}
+                        >
+                          <CheckCircle className="h-8 w-8" style={{ color: '#00FF66' }} />
+                        </div>
+                        <div className="space-y-2">
+                          <div className="text-2xl font-light text-white">Payment Approved</div>
+                          <div className="text-white/60 text-base">Transaction complete</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {tapToPayStatus === "failed" && (
+                      <div className="space-y-8">
+                        <div className="mx-auto w-16 h-16 rounded-full bg-red-500/20 border border-red-500/30 flex items-center justify-center">
+                          <XCircle className="h-8 w-8 text-red-400" />
+                        </div>
+                        <div className="space-y-2">
+                          <div className="text-2xl font-light text-white">Payment Declined</div>
+                          <div className="text-white/60 text-base">Please try again or use another method</div>
+                        </div>
+                        <button
+                          onClick={closeTapToPayOverlay}
+                          className="w-full py-4 px-6 rounded-2xl text-white/90 text-sm font-light"
+                          style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)' }}
+                        >
+                          Try Again
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Right Pane: QR Code & Payment Status */}
