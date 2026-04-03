@@ -3,7 +3,7 @@ import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema } from "@shared/schema";
-import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, simulateCreateSession, simulateQuerySession, getWindcaveEnv, submitGooglePayToken, submitAttendedTapToPayToken, simulateAttendedTapToPay } from "./windcave";
+import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, simulateCreateSession, simulateQuerySession, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, simulateAttendedTapToPay } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, createUser, getUserByEmail, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
 import { generateBusinessReportPdf } from "./report-generator";
@@ -1033,12 +1033,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   // Tap to Pay (Windcave attended / Tap to Pay on iPhone)
+  // Accepts {merchantId, amount, windcaveToken} — itemName is optional and falls back to active transaction.
   app.post("/api/transactions/tap-to-pay", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
-      const { merchantId, amount, windcaveToken, itemName } = req.body;
+      const { merchantId, amount, windcaveToken, itemName: bodyItemName } = req.body;
 
-      if (!merchantId || !amount || !itemName) {
-        return res.status(400).json({ message: "merchantId, amount, and itemName are required" });
+      if (!merchantId || !amount) {
+        return res.status(400).json({ message: "merchantId and amount are required" });
       }
       if (!checkMerchantOwnership(req, parseInt(merchantId))) {
         return res.status(403).json({ message: "Access denied" });
@@ -1049,12 +1050,33 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(400).json({ message: "Invalid amount" });
       }
 
-      const merchantRef = `TAPTP-${Date.now()}`;
+      // Resolve item name: prefer explicit, fall back to active transaction
+      let itemName = bodyItemName;
+      if (!itemName) {
+        const activeTx = await storage.getActiveTransactionByMerchant(parseInt(merchantId));
+        itemName = activeTx?.itemName || "Tap to Pay Sale";
+      }
 
+      const merchantRef = `TAPTP-${Date.now()}`;
       let result;
-      if (windcaveToken && isWindcaveConfigured()) {
-        result = await submitAttendedTapToPayToken(windcaveToken, priceNum.toFixed(2), merchantRef);
+
+      if (isWindcaveConfigured()) {
+        // Require a real NFC token when Windcave credentials are configured.
+        // Fail closed — never simulate a payment when credentials are present.
+        if (!windcaveToken) {
+          return res.status(400).json({ message: "windcaveToken is required when Windcave is configured" });
+        }
+
+        // Step 1: Create an attended session on Windcave
+        const sessionResult = await createAttendedSession(priceNum.toFixed(2), merchantRef);
+        if (!sessionResult.success || !sessionResult.sessionId) {
+          return res.status(502).json({ message: `Failed to create attended session: ${sessionResult.error}` });
+        }
+
+        // Step 2: Submit the NFC token captured by the iOS SDK against the session
+        result = await submitTapToPayToken(sessionResult.sessionId, windcaveToken);
       } else {
+        // Dev/staging environment — no real credentials configured
         result = simulateAttendedTapToPay(merchantRef);
       }
 
