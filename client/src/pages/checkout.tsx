@@ -189,7 +189,10 @@ function CheckoutInner() {
     const origWindowOpen  = window.open.bind(window);
 
     function blockHPP(url: string | URL | null | undefined, via: string): boolean {
-      const urlStr = url == null ? "" : String(url);
+      const raw = (url == null ? "" : String(url)).trim();
+      // Normalise scheme-relative URLs (//sec.windcave.com/…) so the regex
+      // can match them even without an explicit http/https scheme prefix.
+      const urlStr = raw.startsWith("//") ? `https:${raw}` : raw;
       if (WINDCAVE_HPP_RE.test(urlStr)) {
         if (import.meta.env.DEV) {
           console.warn(
