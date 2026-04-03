@@ -1,7 +1,7 @@
 import { useLocation } from "wouter";
 import { useState, useEffect, useRef } from "react";
 import { motion, useScroll, useTransform, AnimatePresence } from "motion/react";
-import { ArrowRight, CheckCircle, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ArrowRight, CheckCircle, ChevronLeft, ChevronRight, X, Volume2, VolumeX } from "lucide-react";
 import { SEOHead } from "@/components/SEOHead";
 import { useScrambleText } from "@/hooks/use-scramble-text";
 import logoImage from "@assets/logo_1762915255857.png";
@@ -11,7 +11,7 @@ import paymentBoardMockup from "@assets/payment_board_3d_v2_1774674925840.png";
 import paymentPageMockup from "@assets/payment_page_1774675283693.png";
 import terminalMockup from "@assets/terminal_3d_1774258691270.png";
 import welcomeVideo from "@assets/welcome_to_tapt_-_web_1774671768422.mp4";
-import welcomeVideoMobile from "@assets/welcome_to_tapt_-_mobile_1774685803328.mp4";
+import welcomeVideoMobile from "@assets/welcome_to_tapt_-_mobile_clean_version_1775256304347.mp4";
 import featureSplitPayment from "@assets/split_payment_1774675808091.png";
 import featureMerchantSplit from "@assets/merchant_split_payment_1774675808089.png";
 import featureSharePayment from "@assets/share_payment_1774675808091.png";
@@ -235,9 +235,21 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
 
 function VideoCard() {
   const isMobile = useIsMobile();
+  const [muted, setMuted] = useState(true);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  const toggleMute = () => {
+    setMuted(prev => {
+      const next = !prev;
+      if (videoRef.current) videoRef.current.muted = next;
+      return next;
+    });
+  };
+
   return (
     <div className="h-full w-full relative overflow-hidden">
       <video
+        ref={videoRef}
         key={isMobile ? "mobile" : "desktop"}
         className="absolute inset-0 w-full h-full object-cover"
         src={isMobile ? welcomeVideoMobile : welcomeVideo}
@@ -246,6 +258,14 @@ function VideoCard() {
         playsInline
         muted
       />
+      <button
+        onClick={toggleMute}
+        aria-label={muted ? "Unmute video" : "Mute video"}
+        className="absolute bottom-4 right-4 z-10 flex items-center gap-1.5 bg-black/40 hover:bg-black/60 backdrop-blur-sm text-white rounded-full px-3 py-1.5 text-xs font-medium transition-all duration-200"
+      >
+        {muted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+        {muted ? "Unmute" : "Mute"}
+      </button>
     </div>
   );
 }
