@@ -1036,12 +1036,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Accepts {merchantId, amount, windcaveToken} — itemName is optional and falls back to active transaction.
   app.post("/api/transactions/tap-to-pay", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
-      const { merchantId, amount, windcaveToken, itemName: bodyItemName } = req.body;
+      const { merchantId, transactionId, amount, windcaveToken } = req.body;
 
       if (!merchantId || !amount) {
         return res.status(400).json({ message: "merchantId and amount are required" });
       }
-      if (!checkMerchantOwnership(req, parseInt(merchantId))) {
+      const mid = parseInt(merchantId);
+      if (!checkMerchantOwnership(req, mid)) {
         return res.status(403).json({ message: "Access denied" });
       }
 
@@ -1050,15 +1051,23 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(400).json({ message: "Invalid amount" });
       }
 
-      // Resolve item name: prefer explicit, fall back to active transaction
-      let itemName = bodyItemName;
-      if (!itemName) {
-        const activeTx = await storage.getActiveTransactionByMerchant(parseInt(merchantId));
-        itemName = activeTx?.itemName || "Tap to Pay Sale";
+      // Resolve the pending transaction to finalize.
+      // Prefer the explicitly supplied transactionId, otherwise use the merchant's active pending one.
+      let pendingTransaction: Awaited<ReturnType<typeof storage.getTransaction>> | undefined;
+      if (transactionId) {
+        pendingTransaction = await storage.getTransaction(parseInt(transactionId));
+        if (!pendingTransaction || pendingTransaction.merchantId !== mid) {
+          return res.status(404).json({ message: "Transaction not found" });
+        }
+        if (pendingTransaction.status !== "pending") {
+          return res.status(409).json({ message: "Transaction is no longer pending" });
+        }
+      } else {
+        pendingTransaction = await storage.getActiveTransactionByMerchant(mid);
       }
 
-      const merchantRef = `TAPTP-${Date.now()}`;
-      let result;
+      const merchantRef = `TAPTP-${pendingTransaction?.id ?? Date.now()}`;
+      let paymentResult;
 
       if (isWindcaveConfigured()) {
         // Require a real NFC token when Windcave credentials are configured.
@@ -1074,36 +1083,52 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         }
 
         // Step 2: Submit the NFC token captured by the iOS SDK against the session
-        result = await submitTapToPayToken(sessionResult.sessionId, windcaveToken);
+        paymentResult = await submitTapToPayToken(sessionResult.sessionId, windcaveToken);
+
+        // A false `success` means a processor/network error — not a card decline.
+        // Return upstream error without persisting a transaction outcome.
+        if (!paymentResult.success) {
+          return res.status(502).json({ message: `Payment processor error: ${paymentResult.error}` });
+        }
       } else {
         // Dev/staging environment — no real credentials configured
-        result = simulateAttendedTapToPay(merchantRef);
+        paymentResult = simulateAttendedTapToPay(merchantRef);
       }
 
-      const transaction = await storage.createTransaction({
-        merchantId: parseInt(merchantId),
-        itemName,
-        price: priceNum.toFixed(2),
-        status: result.approved ? "completed" : "failed",
-        paymentMethod: "tap_to_pay",
-        windcaveTransactionId: result.windcaveTransactionId || null,
-        windcaveFeeRate: "0.0000",
-        windcaveFeeAmount: "0.00",
-        platformFeeRate: "0.0000",
-        platformFeeAmount: "0.10",
-        merchantNet: priceNum.toFixed(2),
-        splitEnabled: false,
-      } as any);
+      const finalStatus = paymentResult.approved ? "completed" : "failed";
 
-      if (result.approved) {
-        broadcastToStone(transaction.merchantId!, transaction.taptStoneId, {
+      let transaction;
+      if (pendingTransaction) {
+        // Finalize the existing pending transaction in place
+        transaction = await storage.updateTransactionStatus(
+          pendingTransaction.id,
+          finalStatus,
+          paymentResult.windcaveTransactionId ?? undefined
+        );
+        await storage.updateTransactionPaymentMethod(pendingTransaction.id, "tap_to_pay");
+        transaction = transaction ?? pendingTransaction;
+      } else {
+        // No pending transaction exists — create a fresh completed record
+        transaction = await storage.createTransaction({
+          merchantId: mid,
+          itemName: "Tap to Pay Sale",
+          price: priceNum.toFixed(2),
+          status: finalStatus,
+          paymentMethod: "tap_to_pay",
+          windcaveTransactionId: paymentResult.windcaveTransactionId ?? null,
+          splitEnabled: false,
+        });
+      }
+
+      if (paymentResult.approved) {
+        broadcastToStone(transaction!.merchantId!, transaction!.taptStoneId, {
           type: "transaction_updated",
           transaction: { ...transaction, paymentMethod: "tap_to_pay" },
         });
-        sendPushToMerchant(transaction.merchantId!, "completed", transaction.itemName, transaction.price, transaction.id).catch(() => {});
+        sendPushToMerchant(transaction!.merchantId!, "completed", transaction!.itemName, transaction!.price, transaction!.id).catch(() => {});
       }
 
-      res.json({ approved: result.approved ?? false, transactionId: transaction.id });
+      res.json({ approved: paymentResult.approved ?? false, transactionId: transaction!.id });
     } catch (error) {
       console.error("Tap to Pay error:", error);
       res.status(500).json({ message: "Tap to Pay processing failed" });
