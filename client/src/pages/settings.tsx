@@ -10,7 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
-import { isNativeApp } from "@/lib/native";
+import { isNativeApp, isNativeIOS } from "@/lib/native";
 import { Switch } from "@/components/ui/switch";
 import { 
   Upload, CheckCircle, XCircle, LogOut, AlertCircle, Bell, BellOff, ChevronDown, Printer, ArrowRight
@@ -103,14 +103,35 @@ export default function Settings() {
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
   const [pushSupported, setPushSupported] = useState(false);
+  const [vapidAvailable, setVapidAvailable] = useState(true);
 
   useEffect(() => {
-    const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
-    setPushSupported(supported);
-    if (supported) {
-      checkPushStatus();
+    if (isNativeIOS()) {
+      setPushSupported(true);
+      checkNativePushStatus();
+    } else {
+      const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+      setPushSupported(supported);
+      if (supported) {
+        fetch('/api/push/vapid-key')
+          .then(r => {
+            setVapidAvailable(r.ok);
+            if (r.ok) checkPushStatus();
+          })
+          .catch(() => setVapidAvailable(false));
+      }
     }
   }, []);
+
+  async function checkNativePushStatus() {
+    try {
+      const { PushNotifications } = await import('@capacitor/push-notifications');
+      const { receive } = await PushNotifications.checkPermissions();
+      setPushEnabled(receive === 'granted');
+    } catch {
+      setPushSupported(false);
+    }
+  }
 
   async function checkPushStatus() {
     try {
@@ -123,6 +144,70 @@ export default function Settings() {
   }
 
   async function togglePushNotifications(enable: boolean) {
+    if (isNativeIOS()) {
+      return toggleNativePushNotifications(enable);
+    }
+    return toggleWebPushNotifications(enable);
+  }
+
+  async function toggleNativePushNotifications(enable: boolean) {
+    setPushLoading(true);
+    try {
+      const { PushNotifications } = await import('@capacitor/push-notifications');
+      if (enable) {
+        const permStatus = await PushNotifications.requestPermissions();
+        if (permStatus.receive !== 'granted') {
+          toast({ title: "Notification permission denied", description: "Please enable in iOS Settings > TaptPay", variant: "destructive" });
+          setPushLoading(false);
+          return;
+        }
+        await new Promise<void>((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error('Registration timed out')), 15000);
+          const regHandle = PushNotifications.addListener('registration', async (token) => {
+            clearTimeout(timer);
+            regHandle.then(h => h.remove());
+            errHandle.then(h => h.remove());
+            try {
+              const authToken = localStorage.getItem("authToken");
+              const resp = await fetch('/api/push/native-subscribe', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+                body: JSON.stringify({ deviceToken: token.value }),
+              });
+              if (resp.ok) {
+                setPushEnabled(true);
+                toast({ title: "Notifications enabled", description: "You'll receive alerts for transaction updates" });
+                resolve();
+              } else {
+                reject(new Error("Server rejected device token"));
+              }
+            } catch (e) { reject(e); }
+          });
+          const errHandle = PushNotifications.addListener('registrationError', async (err) => {
+            clearTimeout(timer);
+            regHandle.then(h => h.remove());
+            errHandle.then(h => h.remove());
+            reject(new Error(err.error));
+          });
+          PushNotifications.register();
+        });
+      } else {
+        const authToken = localStorage.getItem("authToken");
+        await fetch('/api/push/native-unsubscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+        });
+        setPushEnabled(false);
+        toast({ title: "Notifications disabled" });
+      }
+    } catch (error) {
+      console.error("Native push toggle error:", error);
+      toast({ title: "Failed to update notification settings", variant: "destructive" });
+    }
+    setPushLoading(false);
+  }
+
+  async function toggleWebPushNotifications(enable: boolean) {
     setPushLoading(true);
     try {
       if (enable) {
@@ -135,7 +220,12 @@ export default function Settings() {
 
         const registration = await navigator.serviceWorker.ready;
         const vapidResponse = await fetch('/api/push/vapid-key');
+        if (!vapidResponse.ok) {
+          setVapidAvailable(false);
+          throw new Error("VAPID key unavailable — push notifications not configured on server");
+        }
         const { publicKey } = await vapidResponse.json();
+        if (!publicKey) throw new Error("Invalid VAPID public key received from server");
 
         const subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
@@ -878,21 +968,30 @@ export default function Settings() {
         <SettingsSection title="Transaction Notifications" isOpen={openSections.has('notifications')} onToggle={() => toggle('notifications')}>
           <div className="mt-1">
             {pushSupported ? (
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">
-                    {pushEnabled 
-                      ? "You'll receive alerts when payments are received, failed, or refunded" 
-                      : "Enable to get real-time alerts for transaction updates"}
+              !vapidAvailable ? (
+                <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                  <BellOff className="text-amber-500 shrink-0 mt-0.5" size={18} />
+                  <p className="text-sm text-amber-700">
+                    Push notifications are not yet configured. Please contact support to enable this feature.
                   </p>
                 </div>
-                <Switch
-                  checked={pushEnabled}
-                  onCheckedChange={togglePushNotifications}
-                  disabled={pushLoading}
-                  className="ml-4"
-                />
-              </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">
+                      {pushEnabled 
+                        ? "You'll receive alerts when payments are received, failed, or refunded" 
+                        : "Enable to get real-time alerts for transaction updates"}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={pushEnabled}
+                    onCheckedChange={togglePushNotifications}
+                    disabled={pushLoading}
+                    className="ml-4"
+                  />
+                </div>
+              )
             ) : (
               <p className="text-sm text-gray-500">Push notifications are not supported in this browser.</p>
             )}

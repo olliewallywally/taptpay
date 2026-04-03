@@ -4360,6 +4360,56 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
+  // Register native iOS device token (Capacitor @capacitor/push-notifications APNs)
+  app.post("/api/push/native-subscribe", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { deviceToken } = req.body;
+      if (!deviceToken || typeof deviceToken !== "string" || deviceToken.trim().length < 8) {
+        return res.status(400).json({ message: "Invalid device token" });
+      }
+
+      const merchantId = req.merchantId;
+      if (!merchantId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const endpoint = `apns://${deviceToken.trim()}`;
+      const sub = await storage.createPushSubscription({
+        merchantId,
+        endpoint,
+        p256dh: "",
+        auth: "",
+        userAgent: req.headers["user-agent"] || undefined,
+      });
+
+      res.json({ success: true, subscription: sub });
+    } catch (error) {
+      console.error("Native push subscribe error:", error);
+      res.status(500).json({ message: "Failed to save device token" });
+    }
+  });
+
+  // Remove native iOS device token (unsubscribe)
+  app.post("/api/push/native-unsubscribe", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.merchantId;
+      if (!merchantId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const subs = await storage.getPushSubscriptionsByMerchant(merchantId);
+      const nativeSubs = subs.filter((s: any) => s.endpoint.startsWith("apns://"));
+      await Promise.all(
+        nativeSubs.map((s: any) => storage.deactivatePushSubscriptionByEndpoint(s.endpoint))
+      );
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Native push unsubscribe error:", error);
+      res.status(500).json({ message: "Failed to remove device token" });
+    }
+  });
+
   // Get push notification status for current merchant
   app.get("/api/push/status", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
