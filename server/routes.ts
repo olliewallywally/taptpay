@@ -5359,12 +5359,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Save billing card (masked stub — Windcave billing API integration ready)
   app.post("/api/billing/card", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
-      const merchantId = req.user?.merchantId || req.merchantId;
+      const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
 
-      const { cardNumber, expiry, cvc } = req.body;
-      if (!cardNumber || !expiry || !cvc) {
-        return res.status(400).json({ message: "Card number, expiry and CVC are required" });
+      const { cardNumber, expiry } = req.body;
+      if (!cardNumber || !expiry) {
+        return res.status(400).json({ message: "Card number and expiry are required" });
       }
 
       const raw = String(cardNumber).replace(/\s+/g, '');
@@ -5404,7 +5404,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Remove billing card
   app.delete("/api/billing/card", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
-      const merchantId = req.user?.merchantId || req.merchantId;
+      const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
 
       await storage.updateMerchantBillingCard(merchantId, null);
