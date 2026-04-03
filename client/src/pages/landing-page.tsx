@@ -77,11 +77,12 @@ function ScrambleHeading({ text, className, tag: Tag = "h2" }: { text: string; c
   return <div ref={ref} className="cursor-default"><Tag className={className}>{displayText}</Tag></div>;
 }
 
-function StickyCard({ children, index, backgroundColor = "#ffffff", isDouble = false }: {
+function StickyCard({ children, index, backgroundColor = "#ffffff", isDouble = false, cardClassName }: {
   children: React.ReactNode;
   index: number;
   backgroundColor?: string;
   isDouble?: boolean;
+  cardClassName?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
@@ -93,7 +94,7 @@ function StickyCard({ children, index, backgroundColor = "#ffffff", isDouble = f
     <div ref={ref} className="sticky top-0 h-screen flex items-center justify-center px-3 md:px-4" style={{ paddingTop: `${index * (isMobile ? 12 : 28)}px` }}>
       <motion.div
         style={{ scale, opacity, backgroundColor }}
-        className={`w-full max-w-7xl rounded-3xl shadow-2xl overflow-hidden ${isDouble ? "h-[95vh]" : "h-[90vh]"}`}
+        className={cardClassName ?? `w-full max-w-7xl rounded-3xl shadow-2xl overflow-hidden ${isDouble ? "h-[95vh]" : "h-[90vh]"}`}
       >
         {children}
       </motion.div>
@@ -246,13 +247,38 @@ function VideoCard() {
     });
   };
 
+  if (isMobile) {
+    return (
+      <div className="w-full relative">
+        <video
+          ref={videoRef}
+          key="mobile"
+          className="w-full h-auto block"
+          src={welcomeVideoMobile}
+          autoPlay
+          loop
+          playsInline
+          muted
+        />
+        <button
+          onClick={toggleMute}
+          aria-label={muted ? "Unmute video" : "Mute video"}
+          className="absolute bottom-4 right-4 z-10 flex items-center gap-1.5 bg-black/40 hover:bg-black/60 backdrop-blur-sm text-white rounded-full px-3 py-1.5 text-xs font-medium transition-all duration-200"
+        >
+          {muted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+          {muted ? "Unmute" : "Mute"}
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full w-full relative overflow-hidden">
       <video
         ref={videoRef}
-        key={isMobile ? "mobile" : "desktop"}
-        className={`absolute inset-0 w-full h-full ${isMobile ? "object-contain" : "object-cover"}`}
-        src={isMobile ? welcomeVideoMobile : welcomeVideo}
+        key="desktop"
+        className="absolute inset-0 w-full h-full object-cover"
+        src={welcomeVideo}
         autoPlay
         loop
         playsInline
@@ -656,7 +682,7 @@ export function LandingPage() {
         </div>
 
         {/* Video */}
-        <StickyCard index={0} backgroundColor="#000000">
+        <StickyCard index={0} backgroundColor="#000000" cardClassName="w-full max-w-7xl rounded-3xl shadow-2xl overflow-hidden md:h-[90vh]">
           <VideoCard />
         </StickyCard>
 
