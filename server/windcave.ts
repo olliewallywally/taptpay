@@ -379,6 +379,12 @@ export function simulateQuerySession(sessionId: string): QuerySessionResult {
 
 // ── Attended (Tap to Pay on iPhone) ──────────────────────────────────────────
 
+export interface AttendedSessionResult {
+  success: boolean;
+  sessionId?: string;
+  error?: string;
+}
+
 export interface AttendedPaymentResult {
   success: boolean;
   approved?: boolean;
@@ -387,26 +393,88 @@ export interface AttendedPaymentResult {
 }
 
 /**
- * Submit an NFC payment token obtained from the Windcave iOS SDK
- * (WCPaymentSDK.startTapToPaySession) to Windcave's attended transactions API.
+ * Step 1: Create a Windcave attended session for Tap to Pay on iPhone.
  *
- * The iOS native plugin captures the card token and passes it to the JS bridge.
- * This function forwards it server-side so credentials are never exposed to
- * the client app.
+ * This session is created server-side before the iOS SDK starts the NFC
+ * capture. The returned sessionId is passed to the iOS plugin via the JS
+ * bridge so the SDK can bind card data to this specific payment intent.
+ *
+ * Windcave attended sessions use `type: "purchase"` with an additional
+ * `attended: true` flag and no callback URLs (the result is polled server-side
+ * using the session query endpoint after the token is submitted).
  */
-export async function submitAttendedTapToPayToken(
-  windcaveToken: string,
+export async function createAttendedSession(
   amount: string,
-  merchantReference: string
-): Promise<AttendedPaymentResult> {
+  merchantReference: string,
+  retries = 0
+): Promise<AttendedSessionResult> {
   const xId = crypto.randomBytes(8).toString("hex");
-  logAudit("TAP_TO_PAY_SUBMIT", { merchantReference, amount, xId });
+  logAudit("ATTENDED_SESSION_CREATE", { merchantReference, amount, xId, retries });
 
   const body = {
     type: "purchase",
     amount,
     currency: "NZD",
     merchantReference,
+    attended: true,
+  };
+
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(SESSION_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: buildAuthHeader(),
+        "X-ID": xId,
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (err: any) {
+    logAudit("ATTENDED_SESSION_NETWORK_ERROR", { xId, error: err.message });
+    if (retries < RETRY_LIMIT) {
+      await delay(5000);
+      return createAttendedSession(amount, merchantReference, retries + 1);
+    }
+    return { success: false, error: err.message };
+  }
+
+  const text = await response.text();
+  logAudit("ATTENDED_SESSION_RESPONSE", { status: response.status, body: text.slice(0, 400) });
+
+  if (response.status === 200 || response.status === 202) {
+    let data: any = {};
+    try { data = JSON.parse(text); } catch {}
+    if (data.id) {
+      return { success: true, sessionId: data.id };
+    }
+  }
+
+  if (response.status >= 500 && retries < RETRY_LIMIT) {
+    await delay(5000);
+    return createAttendedSession(amount, merchantReference, retries + 1);
+  }
+
+  return { success: false, error: `Windcave ${response.status}: ${text.slice(0, 200)}` };
+}
+
+/**
+ * Step 2: Submit the NFC payment token captured by the Windcave iOS SDK
+ * (WCPaymentSDK.startTapToPaySession) against an existing attended session.
+ *
+ * The token is submitted to Windcave's transactions endpoint. Windcave
+ * evaluates the contactless card data and returns an authorisation decision.
+ */
+export async function submitTapToPayToken(
+  sessionId: string,
+  windcaveToken: string
+): Promise<AttendedPaymentResult> {
+  const xId = crypto.randomBytes(8).toString("hex");
+  logAudit("TAP_TO_PAY_SUBMIT", { sessionId, xId });
+
+  const body = {
+    type: "purchase",
+    sessionId,
     method: "contactless",
     token: windcaveToken,
   };
@@ -439,6 +507,10 @@ export async function submitAttendedTapToPayToken(
   }
 }
 
+/**
+ * Simulation-only helper — only called when Windcave credentials are NOT configured.
+ * Never used in production (isWindcaveConfigured() guards all real paths).
+ */
 export function simulateAttendedTapToPay(merchantReference: string): AttendedPaymentResult {
   const approved = !merchantReference.includes("decline");
   logAudit("SIMULATE_TAP_TO_PAY", { merchantReference, approved });
