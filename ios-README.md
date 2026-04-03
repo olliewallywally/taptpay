@@ -12,7 +12,7 @@ App Store re-submissions are only required when updating native code (Swift plug
 
 - macOS with Xcode 15+ installed
 - Apple Developer account (enrolled in the Apple Developer Program)
-- Node.js 18+ installed
+- Node.js 22+ installed (required by Capacitor CLI v8)
 - CocoaPods installed (`sudo gem install cocoapods`)
 
 ---
