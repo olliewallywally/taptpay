@@ -4292,10 +4292,34 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     });
   });
 
+  // Push capabilities — reports which delivery paths are ready on this server
+  app.get("/api/push/capabilities", (_req, res) => {
+    const vapidPublic = process.env.VAPID_PUBLIC_KEY || "";
+    const vapidPrivate = process.env.VAPID_PRIVATE_KEY || "";
+    const webPushReady = !!(vapidPublic && vapidPrivate);
+
+    const apnsKey = process.env.APNS_KEY_P8 || "";
+    const apnsKeyId = process.env.APNS_KEY_ID || "";
+    const apnsTeamId = process.env.APNS_TEAM_ID || "";
+    const nativePushReady = !!(apnsKey && apnsKeyId && apnsTeamId);
+
+    res.json({
+      webPush: {
+        available: webPushReady,
+        reason: webPushReady ? undefined : "VAPID credentials not configured",
+      },
+      nativePush: {
+        available: nativePushReady,
+        reason: nativePushReady ? undefined : "APNs credentials not configured",
+      },
+    });
+  });
+
   // Get VAPID public key for push notification subscription
   app.get("/api/push/vapid-key", (req, res) => {
     const vapidKey = process.env.VAPID_PUBLIC_KEY || "";
-    if (!vapidKey) {
+    const vapidPrivate = process.env.VAPID_PRIVATE_KEY || "";
+    if (!vapidKey || !vapidPrivate) {
       return res.status(503).json({ message: "Push notifications not configured" });
     }
     res.json({ publicKey: vapidKey });

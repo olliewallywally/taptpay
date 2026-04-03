@@ -108,15 +108,25 @@ export default function Settings() {
   useEffect(() => {
     if (isNativeIOS()) {
       setPushSupported(true);
-      checkNativePushStatus();
+      fetch('/api/push/capabilities')
+        .then(r => r.json())
+        .then(caps => {
+          setVapidAvailable(!!caps?.nativePush?.available);
+          checkNativePushStatus();
+        })
+        .catch(() => {
+          setVapidAvailable(false);
+        });
     } else {
       const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
       setPushSupported(supported);
       if (supported) {
-        fetch('/api/push/vapid-key')
-          .then(r => {
-            setVapidAvailable(r.ok);
-            if (r.ok) checkPushStatus();
+        fetch('/api/push/capabilities')
+          .then(r => r.json())
+          .then(caps => {
+            const webReady = !!caps?.webPush?.available;
+            setVapidAvailable(webReady);
+            if (webReady) checkPushStatus();
           })
           .catch(() => setVapidAvailable(false));
       }
