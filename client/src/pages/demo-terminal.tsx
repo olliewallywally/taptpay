@@ -1377,6 +1377,19 @@ export default function DemoTerminal() {
             <p className="text-[#00E5CC]/60 text-xs mt-2">Sale recorded • Receipt ready</p>
           </div>
 
+          <div className="flex flex-col items-center gap-2 w-full">
+            <div className="bg-[#0A1628] border border-[#00E5CC]/20 rounded-2xl p-4 w-full flex flex-col items-center gap-3">
+              <div className="w-52 h-52 bg-[#0A1628] rounded-xl flex items-center justify-center overflow-hidden">
+                <img
+                  src={`/api/transactions/${cashSaleTransaction.id}/receipt-qr?size=300`}
+                  alt="Receipt QR code"
+                  className="w-full h-full object-contain"
+                />
+              </div>
+              <p className="text-[#00E5CC]/80 text-xs text-center">Customer can scan to view their receipt</p>
+            </div>
+          </div>
+
           <div className="flex flex-col gap-3 w-full">
             <button
               onClick={async () => {

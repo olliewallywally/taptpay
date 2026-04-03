@@ -1895,6 +1895,43 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
+  // Generate QR code linking to receipt page (public — customer scans on their own device)
+  app.get("/api/transactions/:id/receipt-qr", async (req, res) => {
+    try {
+      const transactionId = parseInt(req.params.id);
+      if (isNaN(transactionId)) {
+        return res.status(400).json({ message: "Invalid transaction ID" });
+      }
+
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+
+      const size = Math.min(parseInt(req.query.size as string) || 300, 800);
+      const receiptUrl = `${getBaseUrl(req)}/receipt/${transactionId}`;
+
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'public, max-age=604800'); // 7 days
+
+      const qrBuffer = await QRCode.toBuffer(receiptUrl, {
+        type: 'png',
+        width: size,
+        margin: 2,
+        color: {
+          dark: '#00E5CC',
+          light: '#00000000',
+        },
+        errorCorrectionLevel: 'M',
+      });
+
+      res.send(qrBuffer);
+    } catch (error) {
+      console.error("Receipt QR generation error:", error);
+      res.status(500).json({ message: "Failed to generate receipt QR code" });
+    }
+  });
+
   // Get merchant analytics
   app.get("/api/merchants/:id/analytics", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
