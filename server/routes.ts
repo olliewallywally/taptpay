@@ -3,7 +3,7 @@ import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema } from "@shared/schema";
-import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, simulateCreateSession, simulateQuerySession, getWindcaveEnv, submitGooglePayToken } from "./windcave";
+import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, simulateCreateSession, simulateQuerySession, getWindcaveEnv, submitGooglePayToken, submitAttendedTapToPayToken, simulateAttendedTapToPay } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, createUser, getUserByEmail, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
 import { generateBusinessReportPdf } from "./report-generator";
@@ -1029,6 +1029,62 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     } catch (error) {
       console.error("Cash sale error:", error);
       res.status(500).json({ message: "Failed to record cash sale" });
+    }
+  });
+
+  // Tap to Pay (Windcave attended / Tap to Pay on iPhone)
+  app.post("/api/transactions/tap-to-pay", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { merchantId, amount, windcaveToken, itemName } = req.body;
+
+      if (!merchantId || !amount || !itemName) {
+        return res.status(400).json({ message: "merchantId, amount, and itemName are required" });
+      }
+      if (!checkMerchantOwnership(req, parseInt(merchantId))) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const priceNum = parseFloat(amount);
+      if (isNaN(priceNum) || priceNum <= 0) {
+        return res.status(400).json({ message: "Invalid amount" });
+      }
+
+      const merchantRef = `TAPTP-${Date.now()}`;
+
+      let result;
+      if (windcaveToken && isWindcaveConfigured()) {
+        result = await submitAttendedTapToPayToken(windcaveToken, priceNum.toFixed(2), merchantRef);
+      } else {
+        result = simulateAttendedTapToPay(merchantRef);
+      }
+
+      const transaction = await storage.createTransaction({
+        merchantId: parseInt(merchantId),
+        itemName,
+        price: priceNum.toFixed(2),
+        status: result.approved ? "completed" : "failed",
+        paymentMethod: "tap_to_pay",
+        windcaveTransactionId: result.windcaveTransactionId || null,
+        windcaveFeeRate: "0.0000",
+        windcaveFeeAmount: "0.00",
+        platformFeeRate: "0.0000",
+        platformFeeAmount: "0.10",
+        merchantNet: priceNum.toFixed(2),
+        splitEnabled: false,
+      } as any);
+
+      if (result.approved) {
+        broadcastToStone(transaction.merchantId!, transaction.taptStoneId, {
+          type: "transaction_updated",
+          transaction: { ...transaction, paymentMethod: "tap_to_pay" },
+        });
+        sendPushToMerchant(transaction.merchantId!, "completed", transaction.itemName, transaction.price, transaction.id).catch(() => {});
+      }
+
+      res.json({ approved: result.approved ?? false, transactionId: transaction.id });
+    } catch (error) {
+      console.error("Tap to Pay error:", error);
+      res.status(500).json({ message: "Tap to Pay processing failed" });
     }
   });
 

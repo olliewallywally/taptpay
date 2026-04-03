@@ -377,6 +377,78 @@ export function simulateQuerySession(sessionId: string): QuerySessionResult {
   };
 }
 
+// ── Attended (Tap to Pay on iPhone) ──────────────────────────────────────────
+
+export interface AttendedPaymentResult {
+  success: boolean;
+  approved?: boolean;
+  windcaveTransactionId?: string;
+  error?: string;
+}
+
+/**
+ * Submit an NFC payment token obtained from the Windcave iOS SDK
+ * (WCPaymentSDK.startTapToPaySession) to Windcave's attended transactions API.
+ *
+ * The iOS native plugin captures the card token and passes it to the JS bridge.
+ * This function forwards it server-side so credentials are never exposed to
+ * the client app.
+ */
+export async function submitAttendedTapToPayToken(
+  windcaveToken: string,
+  amount: string,
+  merchantReference: string
+): Promise<AttendedPaymentResult> {
+  const xId = crypto.randomBytes(8).toString("hex");
+  logAudit("TAP_TO_PAY_SUBMIT", { merchantReference, amount, xId });
+
+  const body = {
+    type: "purchase",
+    amount,
+    currency: "NZD",
+    merchantReference,
+    method: "contactless",
+    token: windcaveToken,
+  };
+
+  try {
+    const response = await fetchWithTimeout(TRANSACTION_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: buildAuthHeader(),
+        "X-ID": xId,
+      },
+      body: JSON.stringify(body),
+    });
+
+    const text = await response.text();
+    logAudit("TAP_TO_PAY_RESPONSE", { status: response.status, body: text.slice(0, 400) });
+
+    if (response.ok) {
+      let data: any = {};
+      try { data = JSON.parse(text); } catch {}
+      const approved = data.authorised === true || data.approved === true || data.responseCode === "00";
+      return { success: true, approved, windcaveTransactionId: data.id || data.transactionId };
+    }
+
+    return { success: false, error: `Windcave ${response.status}: ${text.slice(0, 200)}` };
+  } catch (err: any) {
+    logAudit("TAP_TO_PAY_ERROR", { error: err.message });
+    return { success: false, error: err.message };
+  }
+}
+
+export function simulateAttendedTapToPay(merchantReference: string): AttendedPaymentResult {
+  const approved = !merchantReference.includes("decline");
+  logAudit("SIMULATE_TAP_TO_PAY", { merchantReference, approved });
+  return {
+    success: true,
+    approved,
+    windcaveTransactionId: approved ? `SIMTXN_TTP_${Date.now()}` : undefined,
+  };
+}
+
 // Legacy service wrapper kept for backward compatibility with NFC routes
 export class WindcaveService {
   isConfigured(): boolean {
