@@ -223,7 +223,9 @@ function CheckoutInner() {
             configurable: true,
           });
         }
-      } catch {}
+      } catch (e) {
+        if (import.meta.env.DEV) console.warn("[Checkout] location.href guard failed:", e);
+      }
 
       // 2. assign
       try {
@@ -234,7 +236,9 @@ function CheckoutInner() {
           guardFns.add(assignGuard);
           Location.prototype.assign = assignGuard;
         }
-      } catch {}
+      } catch (e) {
+        if (import.meta.env.DEV) console.warn("[Checkout] location.assign guard failed:", e);
+      }
 
       // 3. replace
       try {
@@ -245,7 +249,9 @@ function CheckoutInner() {
           guardFns.add(replaceGuard);
           Location.prototype.replace = replaceGuard;
         }
-      } catch {}
+      } catch (e) {
+        if (import.meta.env.DEV) console.warn("[Checkout] location.replace guard failed:", e);
+      }
 
       // 4. history.pushState
       try {
@@ -260,7 +266,9 @@ function CheckoutInner() {
           guardFns.add(pushStateGuard);
           History.prototype.pushState = pushStateGuard;
         }
-      } catch {}
+      } catch (e) {
+        if (import.meta.env.DEV) console.warn("[Checkout] history.pushState guard failed:", e);
+      }
 
       // 5. history.replaceState
       try {
@@ -275,7 +283,9 @@ function CheckoutInner() {
           guardFns.add(replStateGuard);
           History.prototype.replaceState = replStateGuard;
         }
-      } catch {}
+      } catch (e) {
+        if (import.meta.env.DEV) console.warn("[Checkout] history.replaceState guard failed:", e);
+      }
 
       // 6. window.open
       try {
@@ -287,13 +297,16 @@ function CheckoutInner() {
           guardFns.add(openGuard);
           window.open = openGuard;
         }
-      } catch {}
+      } catch (e) {
+        if (import.meta.env.DEV) console.warn("[Checkout] window.open guard failed:", e);
+      }
 
       // 7. document.location setter — legacy path some webviews support.
       // In modern browsers document.location is the same Location object as
       // window.location, so setting .href/.assign()/.replace() on it is already
       // covered by guards 1-3.  This additionally intercepts the direct
-      // `document.location = url` assignment form.
+      // `document.location = url` assignment form (read-only in many browsers,
+      // but patchable in some Capacitor webviews).
       try {
         const curDocLoc = Object.getOwnPropertyDescriptor(Document.prototype, "location");
         if (origDocLocDesc?.set && !guardFns.has(curDocLoc?.set ?? Function.prototype)) {
@@ -308,7 +321,31 @@ function CheckoutInner() {
             configurable: true,
           });
         }
-      } catch {}
+      } catch (e) {
+        if (import.meta.env.DEV) console.warn("[Checkout] document.location guard failed:", e);
+      }
+
+      // 8. window.location (Window-level) setter — some environments expose a
+      // direct setter on the Window prototype separate from Location.prototype.
+      // In most browsers this is read-only / throws, but the attempt is wrapped
+      // in try/catch so a browser rejection has no effect.
+      try {
+        const winLocDesc = Object.getOwnPropertyDescriptor(Window.prototype, "location");
+        if (winLocDesc?.set && !guardFns.has(winLocDesc.set)) {
+          const origWinLocSet = winLocDesc.set;
+          function winLocGuard(this: Window, url: string) {
+            if (!blockHPP(url, "window.location")) origWinLocSet.call(this, url);
+          }
+          guardFns.add(winLocGuard);
+          Object.defineProperty(Window.prototype, "location", {
+            ...winLocDesc,
+            set: winLocGuard,
+            configurable: true,
+          });
+        }
+      } catch (e) {
+        if (import.meta.env.DEV) console.warn("[Checkout] window.location guard failed (expected in most browsers):", e);
+      }
     }
 
     // Install immediately on mount, then re-assert every 2 s in case a
