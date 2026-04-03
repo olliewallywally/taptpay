@@ -251,7 +251,7 @@ function VideoCard() {
       <video
         ref={videoRef}
         key={isMobile ? "mobile" : "desktop"}
-        className="absolute inset-0 w-full h-full object-cover"
+        className={`absolute inset-0 w-full h-full ${isMobile ? "object-contain" : "object-cover"}`}
         src={isMobile ? welcomeVideoMobile : welcomeVideo}
         autoPlay
         loop
