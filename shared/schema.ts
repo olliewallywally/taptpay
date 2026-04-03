@@ -378,6 +378,7 @@ export const insertTransactionSchema = createInsertSchema(transactions).omit({
   merchantId: z.number(),
   price: z.string().regex(/^\d+(\.\d{2})?$/, "Price must be a valid decimal"),
   status: z.enum(["pending", "processing", "completed", "failed"]).default("pending"),
+  paymentMethod: z.enum(["qr_code", "nfc_tap", "card_reader", "manual", "cash", "tap_to_pay"]).default("qr_code"),
   selectedStoneId: z.number().optional(),
   splitEnabled: z.boolean().optional().default(false),
 });
