@@ -560,7 +560,7 @@ export default function Settings() {
   };
 
   const formatCardNumber = (value: string) => {
-    const digits = value.replace(/\D/g, '').slice(0, 16);
+    const digits = value.replace(/\D/g, '').slice(0, 19);
     return digits.replace(/(.{4})/g, '$1 ').trim();
   };
 
@@ -1046,7 +1046,7 @@ export default function Settings() {
                       value={cardNumber}
                       onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
                       className="border-[#0055FF] focus:border-[#00E5CC] font-mono"
-                      maxLength={19}
+                      maxLength={23}
                       data-testid="input-card-number"
                     />
                   </div>
