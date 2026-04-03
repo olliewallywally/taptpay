@@ -66,9 +66,10 @@ function loadScript(src: string): Promise<void> {
   });
 }
 
-// Windcave HPP domain pattern — matches any *.windcave.com host.
-// Broadened from uat|sec to cover any future subdomain Windcave may use.
-const WINDCAVE_HPP_RE = /^https?:\/\/(?:[a-z0-9-]+\.)*windcave\.com/i;
+// Windcave / PaymentExpress HPP domain patterns.
+// Covers windcave.com (current) and paymentexpress.com (Windcave's legacy domain
+// still referenced in some SDK redirect fallbacks).  Also catches any subdomain.
+const WINDCAVE_HPP_RE = /^https?:\/\/(?:[a-z0-9-]+\.)*(?:windcave|paymentexpress)\.com/i;
 
 function CheckoutInner() {
   const { transactionId } = useParams<{ transactionId: string }>();
@@ -161,39 +162,52 @@ function CheckoutInner() {
       });
   }, [envData, cardOpen]);
 
-  // ── Navigation guard (prototype-level) ──────────────────────────────────
-  // Intercepts ALL three paths Windcave SDKs use to redirect to the HPP:
-  //   • window.location.href = url  (the href *setter* on Location.prototype)
-  //   • window.location.assign(url)
-  //   • window.location.replace(url)
-  // The previous instance-property approach missed the href setter entirely
-  // because it lives on Location.prototype, not on the window.location instance.
-  // Object.defineProperty on the prototype catches every caller uniformly and
-  // is the only approach that works reliably across Chrome, Safari, and Firefox.
+  // ── Navigation guard (prototype-level, comprehensive) ───────────────────
+  // Intercepts every path Windcave SDKs may use to redirect to the HPP:
+  //   1. window.location.href = url     (Location.prototype href setter)
+  //   2. window.location.assign(url)    (Location.prototype.assign)
+  //   3. window.location.replace(url)   (Location.prototype.replace)
+  //   4. history.pushState(…, url)      (History.prototype.pushState)
+  //   5. history.replaceState(…, url)   (History.prototype.replaceState)
+  //   6. window.open(url, …)            (window.open)
+  //
+  // Each vector is patched in its own try/catch so a failure in one does not
+  // prevent the others from being installed (partial guard > no guard).
   useEffect(() => {
     let origHrefDesc: PropertyDescriptor | undefined;
     let origAssign: typeof Location.prototype.assign | undefined;
     let origReplace: typeof Location.prototype.replace | undefined;
-    let hrefPatched = false;
-    let methodsPatched = false;
+    let origPushState: typeof History.prototype.pushState | undefined;
+    let origReplaceState: typeof History.prototype.replaceState | undefined;
+    let origWindowOpen: typeof window.open | undefined;
 
-    function blockHPP(url: string, via: string): boolean {
-      if (WINDCAVE_HPP_RE.test(url)) {
-        console.error(`[Checkout] Blocked Windcave HPP navigation (location.${via}):`, url);
+    let hrefPatched       = false;
+    let methodsPatched    = false;
+    let historyPatched    = false;
+    let windowOpenPatched = false;
+
+    function blockHPP(url: string | URL | null | undefined, via: string): boolean {
+      const urlStr = url == null ? "" : String(url);
+      if (WINDCAVE_HPP_RE.test(urlStr)) {
+        // Always log — even in production — so future regressions are visible in console.
+        console.error(
+          `[Checkout] ⚠ Blocked Windcave HPP redirect attempt (${via}):`,
+          urlStr.slice(0, 200),
+          { timestamp: new Date().toISOString() }
+        );
         return true;
       }
       return false;
     }
 
-    // Patch href setter in its own try so a failure here does NOT prevent
-    // assign/replace from being patched (partial guard is better than none).
+    // 1 & 2: href setter
     try {
       origHrefDesc = Object.getOwnPropertyDescriptor(Location.prototype, "href");
       if (origHrefDesc?.set) {
         const origSet = origHrefDesc.set;
         Object.defineProperty(Location.prototype, "href", {
           ...origHrefDesc,
-          set(url: string) { if (!blockHPP(url, "href")) origSet.call(this, url); },
+          set(url: string) { if (!blockHPP(url, "location.href")) origSet.call(this, url); },
           configurable: true,
         });
         hrefPatched = true;
@@ -202,19 +216,49 @@ function CheckoutInner() {
       console.warn("[Checkout] href guard not installed:", e);
     }
 
-    // Patch assign / replace in a separate try for the same reason.
+    // 3 & 4: assign / replace
     try {
       origAssign  = Location.prototype.assign;
       origReplace = Location.prototype.replace;
-      Location.prototype.assign = function guardAssign(url: string) {
-        if (!blockHPP(url, "assign")) origAssign!.call(this, url);
+      Location.prototype.assign = function guardAssign(url: string | URL) {
+        if (!blockHPP(url, "location.assign")) origAssign!.call(this, url as string);
       };
-      Location.prototype.replace = function guardReplace(url: string) {
-        if (!blockHPP(url, "replace")) origReplace!.call(this, url);
+      Location.prototype.replace = function guardReplace(url: string | URL) {
+        if (!blockHPP(url, "location.replace")) origReplace!.call(this, url as string);
       };
       methodsPatched = true;
     } catch (e) {
       console.warn("[Checkout] assign/replace guard not installed:", e);
+    }
+
+    // 5 & 6: history.pushState / replaceState — Windcave SDKs can use the
+    // History API for soft redirects that bypass Location entirely.
+    try {
+      origPushState    = History.prototype.pushState;
+      origReplaceState = History.prototype.replaceState;
+      History.prototype.pushState = function guardPushState(data: any, unused: string, url?: string | URL | null) {
+        if (blockHPP(url, "history.pushState")) return;
+        origPushState!.call(this, data, unused, url as any);
+      };
+      History.prototype.replaceState = function guardReplaceState(data: any, unused: string, url?: string | URL | null) {
+        if (blockHPP(url, "history.replaceState")) return;
+        origReplaceState!.call(this, data, unused, url as any);
+      };
+      historyPatched = true;
+    } catch (e) {
+      console.warn("[Checkout] history guard not installed:", e);
+    }
+
+    // 7: window.open — some HPP flows try to open a popup window.
+    try {
+      origWindowOpen = window.open.bind(window);
+      window.open = function guardWindowOpen(url?: string | URL, target?: string, ...rest: any[]) {
+        if (blockHPP(url, "window.open")) return null;
+        return origWindowOpen!(url as string, target, ...rest);
+      };
+      windowOpenPatched = true;
+    } catch (e) {
+      console.warn("[Checkout] window.open guard not installed:", e);
     }
 
     return () => {
@@ -224,6 +268,11 @@ function CheckoutInner() {
           if (origAssign)  Location.prototype.assign  = origAssign;
           if (origReplace) Location.prototype.replace = origReplace;
         }
+        if (historyPatched) {
+          if (origPushState)    History.prototype.pushState    = origPushState;
+          if (origReplaceState) History.prototype.replaceState = origReplaceState;
+        }
+        if (windowOpenPatched && origWindowOpen) window.open = origWindowOpen;
       } catch {}
     };
   }, []);
