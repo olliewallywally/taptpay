@@ -19,7 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useDeviceStatusMonitoring, useSSEConnectionMonitoring } from "@/components/notification-system";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { Send, Loader2, CheckCircle, Clock, XCircle, Eye, Copy, Check, QrCode, Smartphone, Waves, CreditCard, X, Edit, MoreHorizontal, ChevronDown, Tag, Share, Link2, Mail, MessageCircle } from "lucide-react";
-import { isNativeIOS } from "@/lib/native";
+import { isNativeIOS, canTapToPay } from "@/lib/native";
 import { Switch } from "@/components/ui/switch";
 import taptLogoPath from "@assets/IMG_6592_1755070818452.png";
 import { Link } from "wouter";
@@ -192,8 +192,8 @@ export default function MerchantTerminal() {
     try {
       let bridgeResult: { approved: boolean; token?: string; cancelled?: boolean; error?: string };
 
-      if (typeof window.TaptPay?.startTapToPay === "function") {
-        bridgeResult = await window.TaptPay.startTapToPay({
+      if (canTapToPay()) {
+        bridgeResult = await window.TaptPay!.startTapToPay({
           amount: parseFloat(transaction.price),
           currency: "NZD",
           merchantName: merchant?.businessName || "TaptPay",
@@ -230,6 +230,11 @@ export default function MerchantTerminal() {
         }),
       });
 
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || `Processor error (${response.status})`);
+      }
+
       const data = await response.json();
       setTapToPayStatus(data.approved ? "completed" : "failed");
       queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
@@ -238,9 +243,10 @@ export default function MerchantTerminal() {
         setShowTapToPayOverlay(false);
         setTapToPayStatus("idle");
       }, 3500);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Tap to Pay error:", err);
       setTapToPayStatus("failed");
+      toast({ title: "Payment error", description: err?.message || "Tap to Pay failed", variant: "destructive" });
     }
   };
 

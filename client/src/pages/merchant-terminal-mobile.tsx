@@ -16,7 +16,7 @@ import { useDeviceStatusMonitoring, useSSEConnectionMonitoring } from "@/compone
 import { getCurrentMerchantId } from "@/lib/auth";
 import { Send, Loader2, CheckCircle, Clock, XCircle, QrCode, Smartphone, Edit, Split, MoreHorizontal, Menu, X, Waves, ChevronDown, Copy, CreditCard } from "lucide-react";
 import { Link } from "wouter";
-import { isNativeIOS } from "@/lib/native";
+import { isNativeIOS, canTapToPay } from "@/lib/native";
 
 const transactionFormSchema = z.object({
   itemName: z.string().min(1, "Item name is required"),
@@ -372,8 +372,8 @@ export default function MerchantTerminalMobile() {
     try {
       let bridgeResult: { approved: boolean; token?: string; cancelled?: boolean; error?: string };
 
-      if (typeof window.TaptPay?.startTapToPay === "function") {
-        bridgeResult = await window.TaptPay.startTapToPay({
+      if (canTapToPay()) {
+        bridgeResult = await window.TaptPay!.startTapToPay({
           amount: parseFloat(transaction.price),
           currency: "NZD",
           merchantName: merchant?.businessName || "TaptPay",
@@ -410,6 +410,11 @@ export default function MerchantTerminalMobile() {
         }),
       });
 
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || `Processor error (${response.status})`);
+      }
+
       const data = await response.json();
       setTapToPayApproved(data.approved);
       setTapToPayStatus(data.approved ? "completed" : "failed");
@@ -420,10 +425,11 @@ export default function MerchantTerminalMobile() {
         setTapToPayStatus("idle");
         setTapToPayApproved(null);
       }, 3500);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Tap to Pay error:", err);
       setTapToPayStatus("failed");
       setTapToPayApproved(false);
+      toast({ title: "Payment error", description: err?.message || "Tap to Pay failed", variant: "destructive" });
     }
   };
 
