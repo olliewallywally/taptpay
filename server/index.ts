@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import fs from "fs";
 import path from "path";
 import helmet from "helmet";
+import { spawnSync } from "child_process";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { seedDatabase } from "./seed";
@@ -128,6 +129,42 @@ app.use((req, res, next) => {
       } else {
         console.warn('⚠️  Database live-query check failed (continuing in dev mode):', error);
       }
+    }
+  }
+
+  // ── Schema push (drizzle-kit push) ───────────────────────────────────────
+  // Run drizzle-kit push before routes are registered so any new tables or
+  // columns defined in shared/schema.ts are applied to the live database on
+  // every startup. Non-fatal: if the push fails, log a warning and continue
+  // (the running schema may be stale, but we shouldn't block startup over it).
+  // --force bypasses interactive confirmation prompts so this can run headless.
+  if (isDatabaseConnected()) {
+    log('Running schema push to sync database...');
+    try {
+      const drizzleConfigPath = path.resolve(process.cwd(), 'drizzle.config.ts');
+      const configExists = fs.existsSync(drizzleConfigPath);
+      if (configExists) {
+        const push = spawnSync(
+          'npx',
+          ['drizzle-kit', 'push', `--config=${drizzleConfigPath}`, '--force'],
+          {
+            stdio: 'pipe',
+            encoding: 'utf8',
+            timeout: 30_000,
+            env: { ...process.env },
+          }
+        );
+        if (push.status === 0) {
+          log('✅ Schema: database schema is up to date');
+        } else {
+          const output = (push.stdout || '') + (push.stderr || '');
+          log(`⚠️  Schema push warning (non-fatal) — continuing: ${output.slice(0, 300)}`);
+        }
+      } else {
+        log('⚠️  drizzle.config.ts not found at project root — skipping schema push');
+      }
+    } catch (err) {
+      log(`⚠️  Schema push threw an error (non-fatal): ${err}`);
     }
   }
 
