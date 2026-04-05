@@ -1259,7 +1259,7 @@ export default function DemoTerminal() {
         {/* Split Bill + Cancel Payment row */}
         <div className="flex gap-3 w-full">
           {/* Split Bill pill — half width */}
-          <div className="flex-1 bg-[#00E5CC] text-[#0055FF] rounded-full py-6 flex items-center justify-between px-5">
+          <div className="flex-1 bg-[#00E5CC] text-[#0055FF] rounded-2xl py-4 flex items-center justify-between px-5">
             <span className="text-base font-medium">split bill</span>
             <button
               onClick={() => setSplitEnabled(prev => !prev)}
@@ -1286,7 +1286,7 @@ export default function DemoTerminal() {
               }
             }}
             disabled={!currentTransaction || currentTransaction.status !== 'pending' || cancelTransactionMutation.isPending}
-            className="flex-1 bg-[#E8E5E0] text-[#0055FF] rounded-full py-6 flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-50 relative z-50"
+            className="flex-1 bg-[#E8E5E0] text-[#0055FF] rounded-2xl py-4 flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-50 relative z-50"
             data-testid="button-cancel"
           >
             <span className="text-base font-medium">cancel payment</span>
