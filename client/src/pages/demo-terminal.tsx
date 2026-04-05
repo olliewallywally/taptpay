@@ -1119,25 +1119,6 @@ export default function DemoTerminal() {
           {status.icon}
         </button>
 
-        {/* Split Bill Toggle Pill */}
-        <div className="w-full bg-[#00E5CC] text-[#0055FF] rounded-full py-5 md:py-6 mb-4 flex items-center justify-between px-8 md:px-10">
-          <span className="text-xl">split bill</span>
-          <button
-            onClick={() => setSplitEnabled(prev => !prev)}
-            data-testid="toggle-split-bill"
-            aria-label="Toggle split bill"
-            className={`relative w-14 h-8 rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 overflow-hidden ${
-              splitEnabled ? 'bg-[#0055FF]' : 'bg-red-500'
-            }`}
-          >
-            <span
-              className={`absolute top-0 bottom-0 my-auto left-1 w-6 h-6 bg-white rounded-full shadow transition-transform duration-200 ${
-                splitEnabled ? 'translate-x-6' : 'translate-x-0'
-              }`}
-            />
-          </button>
-        </div>
-
         {/* Payment Stones Button */}
         <button 
           onClick={() => setShowStones(!showStones)}
@@ -1275,20 +1256,42 @@ export default function DemoTerminal() {
           </div>
         </div>
 
-        {/* Cancel Payment Button */}
-        <button
-          onClick={() => {
-            setIsNfcOverlayActive(false);
-            if (currentTransaction) {
-              cancelTransactionMutation.mutate();
-            }
-          }}
-          disabled={!currentTransaction || currentTransaction.status !== 'pending' || cancelTransactionMutation.isPending}
-          className="w-full bg-[#E8E5E0] text-[#0055FF] rounded-full py-6 flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-50 relative z-50"
-          data-testid="button-cancel"
-        >
-          <span className="text-xl">cancel payment</span>
-        </button>
+        {/* Split Bill + Cancel Payment row */}
+        <div className="flex gap-3 w-full">
+          {/* Split Bill pill — half width */}
+          <div className="flex-1 bg-[#00E5CC] text-[#0055FF] rounded-full py-6 flex items-center justify-between px-5">
+            <span className="text-base font-medium">split bill</span>
+            <button
+              onClick={() => setSplitEnabled(prev => !prev)}
+              data-testid="toggle-split-bill"
+              aria-label="Toggle split bill"
+              className={`relative w-12 h-7 rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 overflow-hidden ${
+                splitEnabled ? 'bg-[#0055FF]' : 'bg-red-500'
+              }`}
+            >
+              <span
+                className={`absolute top-0 bottom-0 my-auto left-1 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${
+                  splitEnabled ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Cancel Payment pill — half width */}
+          <button
+            onClick={() => {
+              setIsNfcOverlayActive(false);
+              if (currentTransaction) {
+                cancelTransactionMutation.mutate();
+              }
+            }}
+            disabled={!currentTransaction || currentTransaction.status !== 'pending' || cancelTransactionMutation.isPending}
+            className="flex-1 bg-[#E8E5E0] text-[#0055FF] rounded-full py-6 flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-50 relative z-50"
+            data-testid="button-cancel"
+          >
+            <span className="text-base font-medium">cancel payment</span>
+          </button>
+        </div>
       </div>
 
       {/* NFC Overlay */}
