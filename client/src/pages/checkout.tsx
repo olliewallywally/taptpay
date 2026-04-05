@@ -130,11 +130,24 @@ function CheckoutInner() {
   useEffect(() => {
     if (!envData) return;
 
-    // Apple Pay availability: checked using the native browser API — no Windcave
-    // SDK needed. The SDK is lazy-loaded only when the user taps the Apple Pay
-    // button, which prevents it from auto-initialising without a session and
-    // redirecting to the Windcave HPP fallback URL.
     checkApplePay();
+
+    // Pre-load the Windcave Apple Pay SDK eagerly so the SDK is ready before
+    // the user taps. ApplePaySession.begin() must be called synchronously
+    // within the original tap gesture — any await in between causes Safari to
+    // silently drop the request and show no payment sheet.
+    // The comprehensive navigation guards (href setter, assign, replace,
+    // pushState, replaceState, window.open) already block any HPP redirect the
+    // SDK may attempt when initialised without an active session.
+    if (window.ApplePaySession?.canMakePayments()) {
+      loadScript(`${base}/js/windcavepayments-applepay-v1.js`)
+        .then(() => { applePaySdkLoaded.current = true; })
+        .catch(() => {
+          // SDK failed to load — hide the Apple Pay button so the user
+          // is not presented with a broken payment option.
+          setApplePayAvailable(false);
+        });
+    }
 
     // Google Pay script is safe to load unconditionally — Google's own SDK
     // never redirects; it only shows a native bottom sheet.
@@ -552,23 +565,14 @@ function CheckoutInner() {
     // navigation blocker and gives the UI a processing state for Apple Pay too.
     setPayState("processing");
 
-    // Lazy-load the Windcave Apple Pay SDK on first tap only — never at page
-    // load.  Loading eagerly gave the SDK a chance to auto-initialise without a
-    // session and redirect the browser to the HPP fallback URL.
-    if (!applePaySdkLoaded.current) {
-      try {
-        await loadScript(`${base}/js/windcavepayments-applepay-v1.js`);
-        applePaySdkLoaded.current = true;
-      } catch (e) {
-        console.error("[Checkout] Apple Pay SDK load failed:", e);
-        setPayState("error");
-        setErrorMsg("Apple Pay is not available right now. Please try another payment method.");
-        return;
-      }
-    }
-    if (!window.WindcavePayments?.ApplePay?.create) {
+    // The SDK is pre-loaded at page load (see useEffect above) so that
+    // ApplePay.create() — which internally calls ApplePaySession.begin() —
+    // runs synchronously within this tap gesture. Safari requires begin() to be
+    // called within the original user gesture; any await before it causes the
+    // payment sheet to be silently suppressed.
+    if (!applePaySdkLoaded.current || !window.WindcavePayments?.ApplePay?.create) {
       setPayState("error");
-      setErrorMsg("Apple Pay is not available.");
+      setErrorMsg("Apple Pay is not ready yet. Please try again in a moment.");
       return;
     }
     const opts: any = {
