@@ -1125,7 +1125,7 @@ export default function DemoTerminal() {
           className="w-full bg-[#00E5CC] text-[#0055FF] rounded-full py-6 mb-4 flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
           data-testid="button-payment-stones"
         >
-          <span className="text-xl">payment stones</span>
+          <span className="text-xl">payment board</span>
           <ChevronDown size={28} className={`transition-transform duration-300 ${showStones ? 'rotate-180' : ''}`} />
         </button>
 
