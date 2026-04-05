@@ -96,6 +96,7 @@ function CheckoutInner() {
   const sessionRef = useRef<any>(null);
   const applePayOptions = useRef<any>(null);
   const applePaySdkLoaded = useRef(false);
+  const applePaySdkFailed = useRef(false);
 
   const { data: transaction, isLoading: txLoading } = useQuery({
     queryKey: ["/api/transactions", txId],
@@ -143,8 +144,9 @@ function CheckoutInner() {
       loadScript(`${base}/js/windcavepayments-applepay-v1.js`)
         .then(() => { applePaySdkLoaded.current = true; })
         .catch(() => {
-          // SDK failed to load — hide the Apple Pay button so the user
-          // is not presented with a broken payment option.
+          // Mark failure persistently so checkApplePay() never re-enables the
+          // button even if envData changes or the effect re-runs.
+          applePaySdkFailed.current = true;
           setApplePayAvailable(false);
         });
     }
@@ -468,7 +470,10 @@ function CheckoutInner() {
 
   function checkApplePay() {
     try {
-      if (window.ApplePaySession?.canMakePayments()) setApplePayAvailable(true);
+      // Don't re-enable Apple Pay if the SDK previously failed to load
+      if (!applePaySdkFailed.current && window.ApplePaySession?.canMakePayments()) {
+        setApplePayAvailable(true);
+      }
     } catch {}
   }
 
