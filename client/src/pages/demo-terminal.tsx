@@ -1265,13 +1265,13 @@ export default function DemoTerminal() {
               onClick={() => setSplitEnabled(prev => !prev)}
               data-testid="toggle-split-bill"
               aria-label="Toggle split bill"
-              className={`relative w-10 h-5 rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 overflow-hidden ${
+              className={`relative w-12 h-6 rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 overflow-hidden ${
                 splitEnabled ? 'bg-[#0055FF]' : 'bg-red-500'
               }`}
             >
               <span
                 className={`absolute top-0 bottom-0 my-auto left-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${
-                  splitEnabled ? 'translate-x-4' : 'translate-x-0'
+                  splitEnabled ? 'translate-x-6' : 'translate-x-0'
                 }`}
               />
             </button>
