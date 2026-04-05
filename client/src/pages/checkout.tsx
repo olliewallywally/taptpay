@@ -167,10 +167,23 @@ function CheckoutInner() {
   // and the payment sheet never appears. By pre-creating the session here we
   // have the real ajaxSubmitApplePayUrl ready before the user taps, so
   // create() receives a valid URL immediately (within the user gesture).
+  //
+  // IMPORTANT: dependencies use primitive values (id, env string) rather than
+  // the full React Query objects. React Query refetches in the background produce
+  // new object references on every fetch, which would re-fire this effect, clear
+  // preSessionRef, and create a race where the user taps between the clear and
+  // the new async completing. Using stable primitives stops that churn.
   useEffect(() => {
-    if (!applePayAvailable || !transaction || !envData || !txId) return;
+    if (!applePayAvailable || !transaction?.id || !envData?.env || !txId) return;
     let cancelled = false;
-    preSessionRef.current = null;
+
+    // Clear the stale pre-session only when a payment was attempted — that is,
+    // when preSessionTrigger has incremented. On the initial load (trigger === 0)
+    // we leave any existing session in place so there is never a gap where
+    // preSessionRef.current is null while the async is in flight.
+    if (preSessionTrigger > 0) {
+      preSessionRef.current = null;
+    }
 
     (async () => {
       const body: Record<string, any> = { merchantId: transaction.merchantId };
@@ -188,9 +201,11 @@ function CheckoutInner() {
     })();
 
     return () => { cancelled = true; };
-  // preSessionTrigger increments after each payment attempt to force a fresh session.
-  // overrideAmount ensures the pre-session amount matches any ?amount= query param.
-  }, [applePayAvailable, transaction, envData, txId, overrideAmount, preSessionTrigger]);
+  // Primitive deps: transaction.id and envData.env are stable across background
+  // React Query refetches, so the effect only re-runs when something meaningful
+  // changes (new transaction, different env, overrideAmount param, or a payment
+  // was attempted and preSessionTrigger incremented).
+  }, [applePayAvailable, transaction?.id, envData?.env, txId, overrideAmount, preSessionTrigger]);
 
   // Lazy-load Windcave Hosted Fields scripts only when the card tab is first
   // opened — loading them at page load causes the HF SDK to auto-initialise
@@ -674,10 +689,17 @@ function CheckoutInner() {
         }
       },
       (stage: string, msg: string) => {
-        // SDK error/cancel callback. Stages in the whitelist are informational
-        // (no sheet shown yet); all others are terminal failures or cancellations.
+        // SDK error callback. Distinguish early-stage failures (sheet never
+        // appeared) from later failures (payment was in progress).
         console.error("Apple Pay:", stage, msg);
-        if (!["setup", "pre-submit", "payment-start"].includes(stage)) {
+        const beforeSheet = ["setup", "pre-submit"].includes(stage);
+        if (beforeSheet) {
+          // Error before the payment sheet appeared — reset to idle so the
+          // user can tap again. Without this the UI stays stuck on the spinner.
+          setPayState("idle");
+          setPreSessionTrigger(t => t + 1);
+        } else {
+          // Error during or after the sheet — show error state.
           setPayState("error");
           setErrorMsg("Apple Pay payment failed.");
           setPreSessionTrigger(t => t + 1);
