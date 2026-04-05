@@ -2923,7 +2923,40 @@ export class DatabaseStorage implements IStorage {
 
 }
 
-// Use database storage if available, fall back to memory storage
-export const storage: IStorage & { clearAllMerchants?: () => void } = isDatabaseConnected() 
-  ? new DatabaseStorage() 
+// ── Storage selection ────────────────────────────────────────────────────────
+// In production, a database connection is mandatory. If DATABASE_URL is missing
+// or the Neon client could not be initialised, fail fast so the deployment logs
+// surface a clear error instead of silently running on in-memory storage where
+// every restart would permanently lose all merchant and transaction data.
+const _isProduction = process.env.NODE_ENV === 'production';
+if (_isProduction && !isDatabaseConnected()) {
+  console.error('');
+  console.error('╔══════════════════════════════════════════════════════════╗');
+  console.error('║  FATAL: No database connection in production             ║');
+  console.error('║                                                          ║');
+  console.error('║  DATABASE_URL is not set or the Neon client failed to    ║');
+  console.error('║  initialise. TaptPay cannot run in production without a  ║');
+  console.error('║  database — merchant and transaction data would be lost  ║');
+  console.error('║  on every restart.                                       ║');
+  console.error('║                                                          ║');
+  console.error('║  Fix: ensure DATABASE_URL is set in your deployment      ║');
+  console.error('║  secrets (Replit → Deployments → Secrets).              ║');
+  console.error('╚══════════════════════════════════════════════════════════╝');
+  console.error('');
+  process.exit(1);
+}
+
+export const storage: IStorage & { clearAllMerchants?: () => void } = isDatabaseConnected()
+  ? new DatabaseStorage()
   : new MemStorage();
+
+// Log the active storage backend so every deployment log makes it obvious
+// which backend is in use and confirms data will (or will not) persist.
+if (isDatabaseConnected()) {
+  const rawUrl = process.env.DATABASE_URL || '';
+  // Extract just the host portion — never log credentials.
+  const dbHost = rawUrl.replace(/^[^@]*@/, '').split('/')[0] || 'unknown host';
+  console.log(`✅ Storage: DatabaseStorage (Neon PostgreSQL @ ${dbHost})`);
+} else {
+  console.log('⚠️  Storage: MemStorage — data will NOT persist across restarts (dev mode)');
+}
