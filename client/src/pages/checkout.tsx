@@ -97,6 +97,9 @@ function CheckoutInner() {
   const applePayOptions = useRef<any>(null);
   const applePaySdkLoaded = useRef(false);
   const applePaySdkFailed = useRef(false);
+  const preSessionRef = useRef<any>(null);
+  // Incrementing this triggers the pre-session useEffect to create a fresh session
+  const [preSessionTrigger, setPreSessionTrigger] = useState(0);
 
   const { data: transaction, isLoading: txLoading } = useQuery({
     queryKey: ["/api/transactions", txId],
@@ -157,6 +160,36 @@ function CheckoutInner() {
       .then(() => checkGooglePay())
       .catch(() => {});
   }, [envData]);
+
+  // Pre-create a Windcave session for Apple Pay as soon as the page is ready.
+  // The Windcave ApplePay SDK checks opts.url at the moment ApplePay.create()
+  // is called — if it is null the SDK skips ApplePaySession.begin() entirely
+  // and the payment sheet never appears. By pre-creating the session here we
+  // have the real ajaxSubmitApplePayUrl ready before the user taps, so
+  // create() receives a valid URL immediately (within the user gesture).
+  useEffect(() => {
+    if (!applePayAvailable || !transaction || !envData || !txId) return;
+    let cancelled = false;
+    preSessionRef.current = null;
+
+    (async () => {
+      const body: Record<string, any> = { merchantId: transaction.merchantId };
+      if (transaction.taptStoneId) body.stoneId = transaction.taptStoneId;
+      if (overrideAmount) body.amount = overrideAmount;
+      try {
+        const res = await apiRequest("POST", `/api/transactions/${txId}/pay`, body);
+        if (!cancelled && res.ok) {
+          const data = await res.json();
+          if (data.ajaxSubmitApplePayUrl) {
+            preSessionRef.current = data;
+          }
+        }
+      } catch {}
+    })();
+
+    return () => { cancelled = true; };
+  // preSessionTrigger increments after each payment attempt to force a fresh session
+  }, [applePayAvailable, transaction, envData, txId, preSessionTrigger]);
 
   // Lazy-load Windcave Hosted Fields scripts only when the card tab is first
   // opened — loading them at page load causes the HF SDK to auto-initialise
@@ -565,21 +598,36 @@ function CheckoutInner() {
     );
   }
 
-  async function handleApplePay() {
+  function handleApplePay() {
     // Signal that a payment is in progress — activates the beforeunload/pagehide
     // navigation blocker and gives the UI a processing state for Apple Pay too.
     setPayState("processing");
 
-    // The SDK is pre-loaded at page load (see useEffect above) so that
-    // ApplePay.create() — which internally calls ApplePaySession.begin() —
-    // runs synchronously within this tap gesture. Safari requires begin() to be
-    // called within the original user gesture; any await before it causes the
-    // payment sheet to be silently suppressed.
+    // Guard 1: Windcave Apple Pay SDK must be loaded (pre-loaded at page load).
     if (!applePaySdkLoaded.current || !window.WindcavePayments?.ApplePay?.create) {
       setPayState("error");
       setErrorMsg("Apple Pay is not ready yet. Please try again in a moment.");
       return;
     }
+
+    // Guard 2: The Windcave ApplePay SDK checks opts.url at the moment
+    // ApplePay.create() is called. If url is null it skips ApplePaySession.begin()
+    // entirely and the payment sheet never appears. We pre-create the session in
+    // a useEffect so the real ajaxSubmitApplePayUrl is ready here, before any
+    // await, and well within the original user gesture.
+    const preSession = preSessionRef.current;
+    if (!preSession?.ajaxSubmitApplePayUrl) {
+      setPayState("error");
+      setErrorMsg("Apple Pay is still loading. Please try again in a moment.");
+      setPreSessionTrigger(t => t + 1); // kick off a fresh pre-session
+      return;
+    }
+
+    // Consume the pre-session — a new one will be created by the useEffect
+    // once preSessionTrigger increments (at the end of this payment attempt).
+    sessionRef.current = preSession;
+    preSessionRef.current = null;
+
     const opts: any = {
       merchantId: applePayMerchantId,
       merchantName: merchant?.businessName || "TaptPay",
@@ -587,16 +635,17 @@ function CheckoutInner() {
       currency: "NZD",
       amount: overrideAmount || transaction?.price || "0.00",
       supportedNetworks: ["visa", "masterCard", "amex"],
-      url: null,
+      url: preSession.ajaxSubmitApplePayUrl, // real URL — SDK calls begin() immediately
     };
     applePayOptions.current = opts;
+
     window.WindcavePayments.ApplePay.create(
       opts,
       async (state: string, _url: string, notify: (ok: boolean) => void) => {
         if (state === "done") {
           try {
             const res = await apiRequest("POST", `/api/transactions/${txId}/hosted-fields-complete`, {
-              sessionId: sessionRef.current?.sessionId,
+              sessionId: preSession.sessionId,
               paymentMethod: "apple_pay",
             });
             const result = await res.json();
@@ -607,28 +656,27 @@ function CheckoutInner() {
             } else {
               setPayState("error");
               setErrorMsg("Apple Pay payment was declined.");
+              setPreSessionTrigger(t => t + 1);
             }
-          } catch { notify(false); setPayState("error"); setErrorMsg("Apple Pay failed."); }
+          } catch {
+            notify(false);
+            setPayState("error");
+            setErrorMsg("Apple Pay failed.");
+            setPreSessionTrigger(t => t + 1);
+          }
         }
       },
       (stage: string, msg: string) => {
         console.error("Apple Pay:", stage, msg);
         if (!["setup", "pre-submit", "payment-start"].includes(stage)) {
-          setPayState("error"); setErrorMsg("Apple Pay payment failed.");
+          setPayState("error");
+          setErrorMsg("Apple Pay payment failed.");
+          setPreSessionTrigger(t => t + 1);
         }
       },
       (_: string, next: () => void) => { next(); },
-      async (next: () => void, cancel: () => void) => {
-        const session = await createSession();
-        if (!session?.ajaxSubmitApplePayUrl) {
-          cancel();
-          setPayState("error");
-          setErrorMsg("Could not start Apple Pay. Please try another payment method.");
-          return;
-        }
-        opts.url = session.ajaxSubmitApplePayUrl;
-        next();
-      }
+      // Callback 5 (pre-submit): URL is already in opts.url — just pass through.
+      (next: () => void, _cancel: () => void) => { next(); }
     );
   }
 
