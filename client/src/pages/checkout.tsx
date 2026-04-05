@@ -188,8 +188,9 @@ function CheckoutInner() {
     })();
 
     return () => { cancelled = true; };
-  // preSessionTrigger increments after each payment attempt to force a fresh session
-  }, [applePayAvailable, transaction, envData, txId, preSessionTrigger]);
+  // preSessionTrigger increments after each payment attempt to force a fresh session.
+  // overrideAmount ensures the pre-session amount matches any ?amount= query param.
+  }, [applePayAvailable, transaction, envData, txId, overrideAmount, preSessionTrigger]);
 
   // Lazy-load Windcave Hosted Fields scripts only when the card tab is first
   // opened — loading them at page load causes the HF SDK to auto-initialise
@@ -652,6 +653,7 @@ function CheckoutInner() {
             notify(result.approved === true);
             if (result.approved) {
               setPayState("success");
+              setPreSessionTrigger(t => t + 1); // queue a fresh session for any retry
               setTimeout(() => setLocation(result.redirectPath || `/receipt/${txId}`), 1200);
             } else {
               setPayState("error");
@@ -664,9 +666,16 @@ function CheckoutInner() {
             setErrorMsg("Apple Pay failed.");
             setPreSessionTrigger(t => t + 1);
           }
+        } else {
+          // Any non-"done" state (e.g. "cancel") — user dismissed the sheet.
+          // Reset UI to idle and regenerate the pre-session so the next tap works.
+          setPayState("idle");
+          setPreSessionTrigger(t => t + 1);
         }
       },
       (stage: string, msg: string) => {
+        // SDK error/cancel callback. Stages in the whitelist are informational
+        // (no sheet shown yet); all others are terminal failures or cancellations.
         console.error("Apple Pay:", stage, msg);
         if (!["setup", "pre-submit", "payment-start"].includes(stage)) {
           setPayState("error");
