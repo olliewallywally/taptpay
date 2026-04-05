@@ -5,7 +5,8 @@ import helmet from "helmet";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { seedDatabase } from "./seed";
-import { isDatabaseConnected } from "./database";
+import { isDatabaseConnected, getDb } from "./database";
+import { sql } from "drizzle-orm";
 import { 
   startServerWithPortManagement, 
   setupGracefulShutdown, 
@@ -92,10 +93,42 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Validate JWT_SECRET is set (allow development fallback)
+  // ── JWT_SECRET validation ────────────────────────────────────────────────
   if (!process.env.JWT_SECRET) {
-    console.warn('⚠️  WARNING: JWT_SECRET environment variable is not set. Using development fallback.');
+    if (isProduction) {
+      console.error('');
+      console.error('[SECURITY WARNING] JWT_SECRET is NOT set in production.');
+      console.error('  All existing login sessions will be invalidated on every restart.');
+      console.error('  Set JWT_SECRET in your deployment secrets to a strong random value.');
+      console.error('  Using hardcoded development fallback — THIS IS INSECURE IN PRODUCTION.');
+      console.error('');
+    } else {
+      console.warn('⚠️  JWT_SECRET not set — using development fallback (acceptable in dev only).');
+    }
     process.env.JWT_SECRET = 'dev-secret-key-change-in-production';
+  } else {
+    console.log('✅ JWT_SECRET: configured');
+  }
+
+  // ── Database connectivity verification ───────────────────────────────────
+  // isDatabaseConnected() only checks that the Neon client was initialised.
+  // Do a real query here to confirm the database is actually reachable before
+  // accepting any traffic. Fail fast in production; warn only in development.
+  if (isDatabaseConnected()) {
+    try {
+      const db = getDb();
+      await db!.execute(sql`SELECT 1`);
+      console.log('✅ Database: connection verified (live query succeeded)');
+    } catch (error) {
+      if (isProduction) {
+        console.error('FATAL: Database is unreachable after connection was established:');
+        console.error(error);
+        console.error('Refusing to start — merchant data cannot be read or written.');
+        process.exit(1);
+      } else {
+        console.warn('⚠️  Database live-query check failed (continuing in dev mode):', error);
+      }
+    }
   }
 
   const server = await registerRoutes(app);

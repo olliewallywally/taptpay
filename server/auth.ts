@@ -230,32 +230,47 @@ export function clearAllUsers() {
 
 // Function to recreate auth users for verified merchants
 export async function syncVerifiedMerchants() {
+  let synced = 0;
+  let alreadyPresent = 0;
+  let failed = 0;
   try {
     const { storage } = await import('./storage');
     const allMerchants = await storage.getAllMerchants();
-    
+
     for (const merchant of allMerchants) {
       if (merchant.status === 'verified' && merchant.passwordHash) {
-        // Check if auth user already exists
         const existingUser = getUserByEmail(merchant.email);
         if (!existingUser) {
-          // Create auth user with the password hash from merchant record
-          const id = currentUserId++;
-          const user: User = {
-            id,
-            email: merchant.email,
-            password: merchant.passwordHash,
-            merchantId: merchant.id,
-            role: 'merchant',
-            createdAt: new Date(),
-          };
-          users.set(id, user);
-          console.log(`Recreated auth user for verified merchant: ${merchant.email} (ID: ${merchant.id})`);
+          try {
+            const id = currentUserId++;
+            const user: User = {
+              id,
+              email: merchant.email,
+              password: merchant.passwordHash,
+              merchantId: merchant.id,
+              role: 'merchant',
+              createdAt: new Date(),
+            };
+            users.set(id, user);
+            synced++;
+          } catch {
+            failed++;
+            console.error(`Failed to recreate auth user for merchant: ${merchant.email} (ID: ${merchant.id})`);
+          }
+        } else {
+          alreadyPresent++;
         }
       }
     }
+
+    const total = synced + alreadyPresent + failed;
+    if (failed > 0) {
+      console.error(`⚠️  Auth sync: ${total} verified merchants — ${synced} registered, ${alreadyPresent} already present, ${failed} FAILED`);
+    } else {
+      console.log(`✅ Auth sync: ${total} verified merchants — ${synced} registered, ${alreadyPresent} already present`);
+    }
   } catch (error) {
-    console.error('Error syncing verified merchants:', error);
+    console.error('❌ Auth sync failed entirely — merchants may not be able to log in:', error);
   }
 }
 
