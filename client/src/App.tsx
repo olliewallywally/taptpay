@@ -165,6 +165,13 @@ function GA4PageTracker() {
   return null;
 }
 
+function isPwaStandalone() {
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (window.navigator as any).standalone === true
+  );
+}
+
 function Router() {
   const [location] = useLocation();
 
@@ -172,7 +179,7 @@ function Router() {
     return (
       <>
         <GA4PageTracker />
-        <LandingPage />
+        {isPwaStandalone() ? <AppLogin /> : <LandingPage />}
       </>
     );
   }
