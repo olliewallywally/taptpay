@@ -232,8 +232,23 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Pending account banner */}
+      {merchant && merchant.status !== 'active' && (
+        <div className="max-w-md md:max-w-2xl mx-auto px-3 sm:px-6 md:px-8 mt-[40px] sm:mt-[50px] md:mt-[60px] relative z-10">
+          <div className="bg-amber-50 border border-amber-300 rounded-2xl px-4 py-3 flex items-start gap-3 mb-4">
+            <span className="text-amber-500 text-lg mt-0.5">⏳</span>
+            <div>
+              <p className="text-amber-800 font-semibold text-sm">Account pending activation</p>
+              <p className="text-amber-700 text-xs mt-0.5">
+                Your account is being reviewed and connected to our payment network. You can set up your business details in Settings while you wait. We'll notify you once you're live.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Stats Cards */}
-      <div className="max-w-md md:max-w-2xl mx-auto px-3 sm:px-6 md:px-8 mt-[40px] sm:mt-[50px] md:mt-[60px] relative z-10">
+      <div className={`max-w-md md:max-w-2xl mx-auto px-3 sm:px-6 md:px-8 relative z-10 ${merchant && merchant.status !== 'active' ? '' : 'mt-[40px] sm:mt-[50px] md:mt-[60px]'}`}>
         <div className="grid grid-cols-2 gap-3 sm:gap-5 md:gap-6 mb-4 sm:mb-6 md:mb-8">
           {/* Monthly Stats Widget with Circle Graph */}
           <div className="bg-white rounded-2xl sm:rounded-3xl md:rounded-[28px] p-3 sm:p-6 md:p-8 col-span-1 row-span-2 flex flex-col min-h-[320px] sm:min-h-[420px] md:min-h-[480px] shadow-lg transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] cursor-pointer" data-testid="card-monthly-stats">

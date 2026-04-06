@@ -621,9 +621,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.get("/api/auth/me", authenticateToken, async (req: AuthenticatedRequest, res) => {
     const merchantId = req.user!.merchantId;
     let onboardingCompleted = true; // default for non-merchant users
+    let merchantStatus: string | null = null;
     if (merchantId) {
       const merchant = await storage.getMerchant(merchantId);
       onboardingCompleted = merchant?.onboardingCompleted ?? false;
+      merchantStatus = merchant?.status ?? null;
     }
     res.json({
       user: {
@@ -632,6 +634,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         merchantId: req.user!.merchantId,
         role: req.user!.role,
         onboardingCompleted,
+        merchantStatus,
       },
     });
   });
@@ -2414,6 +2417,24 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
+  // Admin set merchant status to 'active' (Windcave onboarding complete)
+  app.post("/api/admin/merchants/:id/set-active", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) return res.status(404).json({ message: "Merchant not found" });
+      if (merchant.status === 'active') return res.status(400).json({ message: "Merchant is already active" });
+
+      const updated = await storage.updateMerchantStatus(merchantId, 'active');
+      if (!updated) return res.status(500).json({ message: "Failed to activate merchant" });
+
+      res.json({ message: "Merchant activated successfully", merchant: { id: updated.id, status: updated.status } });
+    } catch (error) {
+      console.error("Admin activate merchant error:", error);
+      res.status(500).json({ message: "Failed to activate merchant" });
+    }
+  });
+
   app.get("/api/admin/merchants/:id/transactions", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = parseInt(req.params.id);
@@ -3937,7 +3958,16 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const merchant = await storage.getMerchantByToken(token);
       if (!merchant) return res.status(400).json({ message: "Invalid or expired verification token" });
 
-      await storage.updateMerchant(merchant.id, { emailVerified: true, verificationToken: null });
+      // Mark email verified and promote status to 'verified' so merchant can log in
+      await storage.updateMerchant(merchant.id, {
+        emailVerified: true,
+        verificationToken: null,
+        status: 'verified',
+      });
+
+      // Sync auth store so the merchant can log in immediately
+      const { syncVerifiedMerchants } = await import('./auth');
+      await syncVerifiedMerchants();
 
       res.json({ message: "Email verified", merchantId: merchant.id });
     } catch (error) {

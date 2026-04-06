@@ -1058,12 +1058,22 @@ export default function Settings() {
         {/* Account Section */}
         <SettingsSection title="Account" isOpen={openSections.has('account')} onToggle={() => toggle('account')}>
           <div className="space-y-3 mt-1">
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+            <div className={`flex items-center justify-between p-4 rounded-xl ${merchant?.status === 'active' ? 'bg-green-50' : 'bg-amber-50 border border-amber-200'}`}>
               <div>
                 <p className="text-gray-700 font-medium">Account Status</p>
-                <p className="text-gray-500 text-sm">Your merchant account is active</p>
+                {merchant?.status === 'active' ? (
+                  <p className="text-green-600 text-sm font-medium">Active — fully connected to payment network</p>
+                ) : merchant?.status === 'verified' ? (
+                  <p className="text-amber-600 text-sm">Pending — being reviewed for Windcave onboarding</p>
+                ) : (
+                  <p className="text-amber-600 text-sm capitalize">{merchant?.status ?? 'Pending'} — contact support if you need help</p>
+                )}
               </div>
-              <CheckCircle className="text-green-500" size={24} />
+              {merchant?.status === 'active' ? (
+                <CheckCircle className="text-green-500 shrink-0" size={24} />
+              ) : (
+                <AlertCircle className="text-amber-500 shrink-0" size={24} />
+              )}
             </div>
           </div>
         </SettingsSection>

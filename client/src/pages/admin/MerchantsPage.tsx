@@ -18,9 +18,15 @@ export function MerchantsPage() {
         merchant.email?.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-  const isVerified = (merchant: any) => merchant.status === 'verified';
-  const getStatusColor = (merchant: any) => {
-    return isVerified(merchant) ? 'text-[#4ade80]' : 'text-[#f59e0b]';
+  const getStatusColor = (status: string) => {
+    if (status === 'active') return 'text-[#4ade80]';
+    if (status === 'verified') return 'text-[#00E5CC]';
+    return 'text-[#f59e0b]';
+  };
+  const getStatusLabel = (status: string) => {
+    if (status === 'active') return 'Active';
+    if (status === 'verified') return 'Awaiting Activation';
+    return 'Pending';
   };
 
   return (
@@ -50,20 +56,22 @@ export function MerchantsPage() {
           <p className="text-[#dbdfea] text-2xl">{merchants?.length || 0}</p>
         </div>
         <div className="bg-[#24263a] rounded-lg p-4">
-          <p className="text-[#dbdfea] text-xs opacity-60 mb-1">Verified</p>
+          <p className="text-[#dbdfea] text-xs opacity-60 mb-1">Active</p>
           <p className="text-[#4ade80] text-2xl">
+            {merchants?.filter((m: any) => m.status === 'active').length || 0}
+          </p>
+        </div>
+        <div className="bg-[#24263a] rounded-lg p-4">
+          <p className="text-[#dbdfea] text-xs opacity-60 mb-1">Awaiting Activation</p>
+          <p className="text-[#00E5CC] text-2xl">
             {merchants?.filter((m: any) => m.status === 'verified').length || 0}
           </p>
         </div>
         <div className="bg-[#24263a] rounded-lg p-4">
           <p className="text-[#dbdfea] text-xs opacity-60 mb-1">Pending</p>
           <p className="text-[#fbbf24] text-2xl">
-            {merchants?.filter((m: any) => m.status !== 'verified').length || 0}
+            {merchants?.filter((m: any) => m.status === 'pending').length || 0}
           </p>
-        </div>
-        <div className="bg-[#24263a] rounded-lg p-4">
-          <p className="text-[#dbdfea] text-xs opacity-60 mb-1">Active Today</p>
-          <p className="text-[#0055FF] text-2xl">{merchants?.length || 0}</p>
         </div>
       </div>
 
@@ -109,17 +117,14 @@ export function MerchantsPage() {
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
-                        {isVerified(merchant) ? (
-                          <>
-                            <CheckCircle className="size-4 text-[#4ade80]" />
-                            <span className={getStatusColor(merchant)}>Verified</span>
-                          </>
+                        {merchant.status === 'active' ? (
+                          <CheckCircle className="size-4 text-[#4ade80]" />
+                        ) : merchant.status === 'verified' ? (
+                          <CheckCircle className="size-4 text-[#00E5CC]" />
                         ) : (
-                          <>
-                            <AlertCircle className="size-4 text-[#fbbf24]" />
-                            <span className={getStatusColor(merchant)}>Pending</span>
-                          </>
+                          <AlertCircle className="size-4 text-[#fbbf24]" />
                         )}
+                        <span className={getStatusColor(merchant.status)}>{getStatusLabel(merchant.status)}</span>
                       </div>
                     </td>
                     <td className="p-4 hidden sm:table-cell">
