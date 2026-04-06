@@ -1114,7 +1114,7 @@ export default function DemoTerminal() {
         </div>
 
         {/* Processing Payment Button */}
-        <button className={`w-full rounded-full py-6 mb-4 flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-300 ${status.color}`}>
+        <button className={`w-full rounded-[20px] py-6 mb-4 flex items-center justify-center gap-3 hover:opacity-90 transition-all duration-300 ${status.color}`}>
           <span className="text-xl">{status.text}</span>
           {status.icon}
         </button>
@@ -1122,7 +1122,7 @@ export default function DemoTerminal() {
         {/* Payment Stones Button */}
         <button 
           onClick={() => setShowStones(!showStones)}
-          className="w-full bg-[#00E5CC] text-[#0055FF] rounded-full py-6 mb-4 flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+          className="w-full bg-[#00E5CC] text-[#0055FF] rounded-[20px] py-6 mb-4 flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
           data-testid="button-payment-stones"
         >
           <span className="text-xl">payment board</span>
