@@ -139,6 +139,23 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
     onError: (e: any) => toast({ title: 'Save Failed', description: e.message, variant: 'destructive' }),
   });
 
+  const activateMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/admin/merchants/${merchantId}/set-active`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...ADMIN_HEADERS() },
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.message); }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Merchant Activated', description: 'Account is now fully active.' });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/merchants'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/merchants', merchantId] });
+    },
+    onError: (e: any) => toast({ title: 'Activation Failed', description: e.message, variant: 'destructive' }),
+  });
+
   // ── Receipt helpers ────────────────────────────────────────────────────────
   const fetchPdfBlob = async (txId: number) => {
     const r = await fetch(`/api/transactions/${txId}/receipt-pdf`, { method: 'POST' });
@@ -193,7 +210,7 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
     </div>
   );
 
-  const isVerified = merchant.status === 'verified';
+  const isEmailUnverified = merchant.status === 'pending';
 
   // ── Main render ────────────────────────────────────────────────────────────
   return (
@@ -215,8 +232,8 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
         </div>
       </div>
 
-      {/* ── Pending verification alert ── */}
-      {!isVerified && (
+      {/* ── Pending verification alert (not yet email-verified) ── */}
+      {isEmailUnverified && (
         <div className="bg-[#24263a] border border-[#fbbf24]/30 rounded-xl p-5">
           <div className="flex items-start gap-3 mb-4">
             <AlertTriangle className="size-5 text-[#fbbf24] mt-0.5 shrink-0" />
@@ -245,6 +262,27 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Activate account alert (verified but not yet active) ── */}
+      {merchant.status === 'verified' && (
+        <div className="bg-[#24263a] border border-[#00E5CC]/30 rounded-xl p-5">
+          <div className="flex items-start gap-3 mb-4">
+            <CheckCircle className="size-5 text-[#00E5CC] mt-0.5 shrink-0" />
+            <div>
+              <h3 className="text-[#dbdfea] text-sm font-medium">Ready to Activate</h3>
+              <p className="text-[#dbdfea]/50 text-xs mt-0.5">This merchant has verified their email and completed signup. Once Windcave onboarding is done, click Activate to make them fully live.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => activateMutation.mutate()}
+            disabled={activateMutation.isPending}
+            className="flex items-center gap-2 bg-[#00E5CC] hover:bg-[#00d4bc] text-[#0a1628] px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
+          >
+            <CheckCircle className="size-4" />
+            {activateMutation.isPending ? 'Activating...' : 'Activate Account'}
+          </button>
         </div>
       )}
 
