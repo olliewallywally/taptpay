@@ -756,7 +756,7 @@ export default function BoardBuilder() {
                     ) : (
                       <label className="block border-2 border-dashed border-gray-200 rounded-xl p-3 text-center cursor-pointer hover:border-[#0055FF] hover:bg-[#0055FF]/5 transition-all">
                         <Upload size={16} className="mx-auto text-gray-400 mb-1" />
-                        <p className="text-xs text-gray-500">Upload background image</p>
+                        <p className="text-xs text-gray-500">or upload a background image</p>
                         <p className="text-xs text-gray-400">PNG, JPG · max 10MB</p>
                         <input type="file" accept="image/png,image/jpeg,image/jpg" className="hidden" onChange={handleBgImageUpload} />
                       </label>
