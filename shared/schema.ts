@@ -1,4 +1,4 @@
-import { pgTable, text, serial, decimal, timestamp, boolean, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, decimal, timestamp, boolean, integer, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -428,6 +428,8 @@ export const stockItems = pgTable("stock_items", {
   name: text("name").notNull(),
   description: text("description"),
   cost: decimal("cost", { precision: 10, scale: 2 }).notNull(),
+  emoji: text("emoji"),
+  variations: jsonb("variations"),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -619,16 +621,30 @@ export const insertStockItemSchema = createInsertSchema(stockItems).omit({
   updatedAt: true,
 });
 
+const variationOptionSchema = z.object({
+  label: z.string(),
+  priceModifier: z.number().default(0),
+});
+
+const variationGroupSchema = z.object({
+  name: z.string(),
+  options: z.array(variationOptionSchema),
+});
+
 export const createStockItemSchema = z.object({
   name: z.string().min(1, "Item name is required").max(100, "Name too long"),
   description: z.string().max(500, "Description too long").optional(),
   cost: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid cost format"),
+  emoji: z.string().optional().nullable(),
+  variations: z.array(variationGroupSchema).optional().nullable(),
 });
 
 export const updateStockItemSchema = z.object({
   name: z.string().min(1, "Item name is required").max(100, "Name too long"),
   description: z.string().max(500, "Description too long").optional(),
   cost: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid cost format"),
+  emoji: z.string().optional().nullable(),
+  variations: z.array(variationGroupSchema).optional().nullable(),
 });
 
 // User schemas
