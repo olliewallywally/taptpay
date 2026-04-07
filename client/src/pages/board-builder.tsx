@@ -15,15 +15,11 @@ import {
 } from "lucide-react";
 import jsPDF from "jspdf";
 
-type LayoutKey = "taptpay-a4-portrait" | "taptpay-a4-landscape" | "taptpay-a5-portrait" | "taptpay-a5-landscape" | "taptpay-a6-portrait" | "taptpay-a6-landscape";
+type LayoutKey = "taptpay-a5-portrait" | "taptpay-a5-landscape";
 
 const LAYOUTS: Record<LayoutKey, { label: string; mmW: number; mmH: number; pxW: number; pxH: number; aspect: number }> = {
-  "taptpay-a4-portrait":  { label: "A4 Portrait",  mmW: 210, mmH: 297, pxW: 794,  pxH: 1123, aspect: 297 / 210 },
-  "taptpay-a4-landscape": { label: "A4 Landscape", mmW: 297, mmH: 210, pxW: 1123, pxH: 794,  aspect: 210 / 297 },
   "taptpay-a5-portrait":  { label: "A5 Portrait",  mmW: 148, mmH: 210, pxW: 559,  pxH: 794,  aspect: 210 / 148 },
   "taptpay-a5-landscape": { label: "A5 Landscape", mmW: 210, mmH: 148, pxW: 794,  pxH: 559,  aspect: 148 / 210 },
-  "taptpay-a6-portrait":  { label: "A6 Portrait",  mmW: 105, mmH: 148, pxW: 397,  pxH: 559,  aspect: 148 / 105 },
-  "taptpay-a6-landscape": { label: "A6 Landscape", mmW: 148, mmH: 105, pxW: 559,  pxH: 397,  aspect: 105 / 148 },
 };
 
 const PRESET_COLORS = [
@@ -79,6 +75,7 @@ interface BuildSvgOpts {
   layout: LayoutKey;
   primaryColor: string;
   backgroundColor: string;
+  backgroundImageDataUrl?: string;
   textColor: string;
   iconColor: string;
   businessName: string;
@@ -121,8 +118,8 @@ function hexToIconFilter(hex: string): string {
 
 function buildModifiedSvg(opts: BuildSvgOpts): string {
   const {
-    svgTemplate, layout, primaryColor, backgroundColor, textColor, iconColor,
-    businessName, tagline, instructions,
+    svgTemplate, layout, primaryColor, backgroundColor, backgroundImageDataUrl = "",
+    textColor, iconColor, businessName, tagline, instructions,
     footer, qrDataUrl, logoDataUrl, selectedFont, customFontDataUrl, forCapture = false,
   } = opts;
 
@@ -142,6 +139,22 @@ function buildModifiedSvg(opts: BuildSvgOpts): string {
   if (!defsEl) {
     defsEl = doc.createElementNS("http://www.w3.org/2000/svg", "defs");
     svg.insertBefore(defsEl, svg.firstChild);
+  }
+
+  // Background image — injected as the very first child so it sits behind everything
+  const existingBgImg = doc.getElementById("bg-image");
+  if (existingBgImg) existingBgImg.parentNode?.removeChild(existingBgImg);
+  if (backgroundImageDataUrl) {
+    const bgImg = doc.createElementNS("http://www.w3.org/2000/svg", "image");
+    bgImg.id = "bg-image";
+    bgImg.setAttribute("x", "0");
+    bgImg.setAttribute("y", "0");
+    bgImg.setAttribute("width", "100%");
+    bgImg.setAttribute("height", "100%");
+    bgImg.setAttribute("preserveAspectRatio", "xMidYMid slice");
+    bgImg.setAttribute("href", backgroundImageDataUrl);
+    bgImg.setAttributeNS("http://www.w3.org/1999/xlink", "href", backgroundImageDataUrl);
+    svg.insertBefore(bgImg, defsEl.nextSibling);
   }
 
   // Get or create #font-style element
@@ -298,11 +311,12 @@ export default function BoardBuilder() {
   });
 
   // Board state
-  const [layout, setLayout] = useState<LayoutKey>("taptpay-a4-portrait");
+  const [layout, setLayout] = useState<LayoutKey>("taptpay-a5-portrait");
   const [primaryColor, setPrimaryColor] = useState("#00f1d7");
   const [hexInput, setHexInput] = useState("#00f1d7");
   const [backgroundColor, setBackgroundColor] = useState("#0055FF");
   const [bgHexInput, setBgHexInput] = useState("#0055FF");
+  const [backgroundImageDataUrl, setBackgroundImageDataUrl] = useState("");
   const [textColor, setTextColor] = useState("#888888");
   const [textHexInput, setTextHexInput] = useState("#888888");
   const [iconColor, setIconColor] = useState("");
@@ -353,16 +367,12 @@ export default function BoardBuilder() {
     }
   }, [selectedFont, customFontDataUrl]);
 
-  // Pre-populate business name from merchant record (not used in TaptPay layout)
+  // Pre-populate business name from merchant record
   useEffect(() => {
-    if (layout === "taptpay-a4-portrait" || layout === "taptpay-a4-landscape") {
-      setBusinessName("");
-      return;
-    }
     if (merchantQuery.data?.businessName && !businessName) {
       setBusinessName(merchantQuery.data.businessName);
     }
-  }, [merchantQuery.data, layout]);
+  }, [merchantQuery.data]);
 
   // Fetch QR code as data URL when stone selection changes
   useEffect(() => {
@@ -383,6 +393,7 @@ export default function BoardBuilder() {
     layout,
     primaryColor,
     backgroundColor,
+    backgroundImageDataUrl,
     textColor,
     iconColor,
     businessName,
@@ -398,7 +409,7 @@ export default function BoardBuilder() {
   // Memoized preview SVG (scaled to fit container)
   const previewSvg = useMemo(
     () => buildModifiedSvg({ ...svgOpts, forCapture: false }),
-    [svgTemplate, layout, primaryColor, backgroundColor, textColor, iconColor, businessName, tagline, instructions, footer, qrDataUrl, logoDataUrl, selectedFont, customFontDataUrl]
+    [svgTemplate, layout, primaryColor, backgroundColor, backgroundImageDataUrl, textColor, iconColor, businessName, tagline, instructions, footer, qrDataUrl, logoDataUrl, selectedFont, customFontDataUrl]
   );
 
   const dim = LAYOUTS[layout];
@@ -422,6 +433,14 @@ export default function BoardBuilder() {
     if (!file) return;
     const reader = new FileReader();
     reader.onloadend = () => setLogoDataUrl(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const handleBgImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => setBackgroundImageDataUrl(reader.result as string);
     reader.readAsDataURL(file);
   };
 
@@ -638,33 +657,29 @@ export default function BoardBuilder() {
 
             <ControlSection icon={<Layout size={16} />} title="Layout" isOpen={openSection === "layout"} onToggle={() => toggle("layout")}>
               <div className="space-y-3">
-                {(["a4", "a5", "a6"] as const).map((size) => (
-                  <div key={size}>
-                    <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-1.5">{size.toUpperCase()}</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {(["portrait", "landscape"] as const).map((orientation) => {
-                        const key = `taptpay-${size}-${orientation}` as LayoutKey;
-                        const isPortrait = orientation === "portrait";
-                        const active = layout === key;
-                        return (
-                          <button
-                            key={key}
-                            onClick={() => setLayout(key)}
-                            className={`relative border-2 rounded-xl p-3 flex flex-col items-center gap-2 transition-all ${active ? "border-[#00f1d7] bg-[#00f1d7]/5" : "border-gray-200 hover:border-gray-300"}`}
-                          >
-                            <div className={`border-2 rounded mx-auto flex-shrink-0 ${isPortrait ? "w-7 h-9" : "w-9 h-7"} ${active ? "border-[#00f1d7]" : "border-gray-300"}`} />
-                            <div className={`text-[11px] font-semibold leading-tight ${active ? "text-[#00f1d7]" : "text-gray-700"}`}>
-                              {isPortrait ? "Portrait" : "Landscape"}
-                            </div>
-                            {key === "taptpay-a4-portrait" && (
-                              <span className="text-[9px] bg-[#00f1d7]/15 text-[#00b8a9] px-1.5 py-0.5 rounded-full font-medium">Recommended</span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
+                <p className="text-xs text-gray-500">A5 size (148×210mm)</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {(["portrait", "landscape"] as const).map((orientation) => {
+                    const key: LayoutKey = `taptpay-a5-${orientation}`;
+                    const isPortrait = orientation === "portrait";
+                    const active = layout === key;
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => setLayout(key)}
+                        className={`relative border-2 rounded-xl p-3 flex flex-col items-center gap-2 transition-all ${active ? "border-[#00f1d7] bg-[#00f1d7]/5" : "border-gray-200 hover:border-gray-300"}`}
+                      >
+                        <div className={`border-2 rounded mx-auto flex-shrink-0 ${isPortrait ? "w-7 h-9" : "w-9 h-7"} ${active ? "border-[#00f1d7]" : "border-gray-300"}`} />
+                        <div className={`text-[11px] font-semibold leading-tight ${active ? "text-[#00f1d7]" : "text-gray-700"}`}>
+                          {isPortrait ? "Portrait" : "Landscape"}
+                        </div>
+                        {isPortrait && (
+                          <span className="text-[9px] bg-[#00f1d7]/15 text-[#00b8a9] px-1.5 py-0.5 rounded-full font-medium">Recommended</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </ControlSection>
 
@@ -694,27 +709,50 @@ export default function BoardBuilder() {
                 {/* Background colour */}
                 <div>
                   <Label className="text-xs text-gray-500 mb-2 block">Background</Label>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {/* None / transparent option */}
-                    <button
-                      title="None (transparent)"
-                      onClick={() => { setBackgroundColor(""); setBgHexInput(""); }}
-                      className={`w-7 h-7 rounded-full border-2 transition-all ${backgroundColor === "" ? "border-gray-900 scale-110" : "border-gray-200"}`}
-                      style={{ backgroundImage: "linear-gradient(45deg,#ccc 25%,transparent 25%,transparent 75%,#ccc 75%),linear-gradient(45deg,#ccc 25%,transparent 25%,transparent 75%,#ccc 75%)", backgroundSize: "8px 8px", backgroundPosition: "0 0,4px 4px" }}
-                    />
-                    {PRESET_COLORS.map((c) => (
+                  <div className={`space-y-2 ${backgroundImageDataUrl ? "opacity-40 pointer-events-none" : ""}`}>
+                    <div className="flex flex-wrap gap-2">
+                      {/* None / transparent option */}
                       <button
-                        key={c.value}
-                        title={c.label}
-                        onClick={() => { setBackgroundColor(c.value); setBgHexInput(c.value); }}
-                        className={`w-7 h-7 rounded-full border-2 transition-all ${backgroundColor === c.value ? "border-gray-900 scale-110" : "border-transparent"}`}
-                        style={{ backgroundColor: c.value }}
+                        title="None (transparent)"
+                        onClick={() => { setBackgroundColor(""); setBgHexInput(""); }}
+                        className={`w-7 h-7 rounded-full border-2 transition-all ${backgroundColor === "" ? "border-gray-900 scale-110" : "border-gray-200"}`}
+                        style={{ backgroundImage: "linear-gradient(45deg,#ccc 25%,transparent 25%,transparent 75%,#ccc 75%),linear-gradient(45deg,#ccc 25%,transparent 25%,transparent 75%,#ccc 75%)", backgroundSize: "8px 8px", backgroundPosition: "0 0,4px 4px" }}
                       />
-                    ))}
+                      {PRESET_COLORS.map((c) => (
+                        <button
+                          key={c.value}
+                          title={c.label}
+                          onClick={() => { setBackgroundColor(c.value); setBgHexInput(c.value); }}
+                          className={`w-7 h-7 rounded-full border-2 transition-all ${backgroundColor === c.value ? "border-gray-900 scale-110" : "border-transparent"}`}
+                          style={{ backgroundColor: c.value }}
+                        />
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full border border-gray-200 flex-shrink-0" style={{ backgroundColor: backgroundColor || "transparent" }} />
+                      <Input value={bgHexInput} onChange={(e) => { setBgHexInput(e.target.value); if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value) || e.target.value === "") setBackgroundColor(e.target.value); }} placeholder="None" className="font-mono text-xs border-gray-200 focus:border-[#0055FF]" maxLength={7} />
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full border border-gray-200 flex-shrink-0" style={{ backgroundColor: backgroundColor || "transparent" }} />
-                    <Input value={bgHexInput} onChange={(e) => { setBgHexInput(e.target.value); if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value) || e.target.value === "") setBackgroundColor(e.target.value); }} placeholder="None" className="font-mono text-xs border-gray-200 focus:border-[#0055FF]" maxLength={7} />
+
+                  {/* Background image upload */}
+                  <div className="mt-3">
+                    {backgroundImageDataUrl ? (
+                      <div className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
+                        <img src={backgroundImageDataUrl} className="h-10 w-16 object-cover rounded border border-gray-200 flex-shrink-0" alt="Background preview" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-gray-600 font-medium">Background image set</p>
+                          <p className="text-[10px] text-gray-400">Image overrides colour</p>
+                        </div>
+                        <Button variant="ghost" size="sm" className="text-gray-500 text-xs flex-shrink-0" onClick={() => setBackgroundImageDataUrl("")}>Remove</Button>
+                      </div>
+                    ) : (
+                      <label className="block border-2 border-dashed border-gray-200 rounded-xl p-3 text-center cursor-pointer hover:border-[#0055FF] hover:bg-[#0055FF]/5 transition-all">
+                        <Upload size={16} className="mx-auto text-gray-400 mb-1" />
+                        <p className="text-xs text-gray-500">Upload background image</p>
+                        <p className="text-xs text-gray-400">PNG, JPG · max 10MB</p>
+                        <input type="file" accept="image/png,image/jpeg,image/jpg" className="hidden" onChange={handleBgImageUpload} />
+                      </label>
+                    )}
                   </div>
                 </div>
 
@@ -794,12 +832,10 @@ export default function BoardBuilder() {
 
             <ControlSection icon={<Type size={16} />} title="Text" isOpen={openSection === "text"} onToggle={() => toggle("text")}>
               <div className="space-y-3">
-                {layout !== "taptpay-a4-portrait" && layout !== "taptpay-a4-landscape" && (
-                  <div>
-                    <Label className="text-xs text-gray-500 mb-1 block">Business Name</Label>
-                    <Input value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Your Business Name" className="border-gray-200 focus:border-[#0055FF]" />
-                  </div>
-                )}
+                <div>
+                  <Label className="text-xs text-gray-500 mb-1 block">Business Name</Label>
+                  <Input value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Your Business Name" className="border-gray-200 focus:border-[#0055FF]" />
+                </div>
                 <div>
                   <Label className="text-xs text-gray-500 mb-1 block">Tagline (optional)</Label>
                   <Input value={tagline} onChange={(e) => setTagline(e.target.value)} placeholder="e.g. Fresh coffee · Thorndon" className="border-gray-200 focus:border-[#0055FF]" />
