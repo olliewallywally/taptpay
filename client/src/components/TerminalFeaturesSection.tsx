@@ -93,6 +93,7 @@ export function TerminalFeaturesSection() {
                   <img
                     src={terminalFeatures[currentSlide].image}
                     alt={terminalFeatures[currentSlide].title}
+                    loading="lazy"
                     style={{ width: '100%', height: 'auto', display: 'block' }}
                   />
                 </div>

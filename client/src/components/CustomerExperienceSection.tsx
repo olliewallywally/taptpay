@@ -42,6 +42,7 @@ export function CustomerExperienceSection() {
           <img
             src={paymentStonesImage}
             alt="taptpay payment stones - scan or tap to pay"
+            loading="lazy"
             style={{ 
               width: '100%', 
               height: 'auto',
@@ -129,6 +130,7 @@ export function CustomerExperienceSection() {
             <img
               src={customerPhoneImage}
               alt="taptpay customer payment page"
+              loading="lazy"
               style={{ width: '100%', height: 'auto', display: 'block', maxWidth: '140px' }}
             />
           </div>
@@ -151,6 +153,7 @@ export function CustomerExperienceSection() {
           <img
             src={paymentStonesImage}
             alt="taptpay payment stones - scan or tap to pay"
+            loading="lazy"
             style={{ 
               width: '100%', 
               height: '100%', 
@@ -253,6 +256,7 @@ export function CustomerExperienceSection() {
                 <img
                   src={customerPhoneImage}
                   alt="taptpay customer payment page"
+                  loading="lazy"
                   style={{ width: '100%', height: 'auto', display: 'block', objectFit: 'contain' }}
                 />
               </div>

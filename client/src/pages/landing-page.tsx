@@ -259,6 +259,7 @@ function VideoCard() {
           loop
           playsInline
           muted
+          preload="metadata"
         />
         <button
           onClick={toggleMute}
@@ -283,6 +284,7 @@ function VideoCard() {
         loop
         playsInline
         muted
+        preload="metadata"
       />
       <button
         onClick={toggleMute}
@@ -405,6 +407,7 @@ function FeatureSection({
             <img
               src={image}
               alt={title}
+              loading="lazy"
               className={`h-auto object-contain ${imageScale === "large" ? "w-full max-w-[70%] md:max-w-none mx-auto md:mx-0 lg:translate-x-8" : "w-full max-w-xs md:max-w-sm"}`}
               style={imageStyle}
             />
@@ -528,7 +531,7 @@ function FeaturesCard() {
               transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
               className="absolute inset-0 flex items-center justify-center p-4 md:p-6"
             >
-              <img src={FEATURES[activeIndex].image} alt={FEATURES[activeIndex].title} className="w-full h-full object-contain" />
+              <img src={FEATURES[activeIndex].image} alt={FEATURES[activeIndex].title} loading="lazy" className="w-full h-full object-contain" />
             </motion.div>
           </AnimatePresence>
           <div className="absolute inset-0 bg-[#0055ff]/0 hover:bg-[#0055ff]/5 transition-colors rounded-2xl" />
@@ -591,7 +594,7 @@ function FeaturesCard() {
                 <X className="w-4 h-4 text-[#000a36]" />
               </button>
               <div className="flex items-center justify-center p-6 md:p-8 bg-gray-50 lg:flex-1">
-                <img src={FEATURES[expandedIndex].image} alt={FEATURES[expandedIndex].title} className="w-auto h-auto max-h-40 md:max-h-56 lg:max-h-full object-contain" />
+                <img src={FEATURES[expandedIndex].image} alt={FEATURES[expandedIndex].title} loading="lazy" className="w-auto h-auto max-h-40 md:max-h-56 lg:max-h-full object-contain" />
               </div>
               <div className="flex flex-col justify-center p-6 md:p-12 gap-4 lg:flex-1">
                 <h3 className="text-2xl md:text-4xl font-medium text-[#000a36] leading-tight">{FEATURES[expandedIndex].title}</h3>

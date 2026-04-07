@@ -18,7 +18,6 @@ export async function apiRequest(
     headers["Content-Type"] = "application/json";
   }
   
-  // Add auth token if available - use admin token for admin routes
   const isAdminRoute = url.startsWith("/api/admin");
   const token = isAdminRoute 
     ? localStorage.getItem("adminAuthToken")
@@ -47,7 +46,6 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const headers: Record<string, string> = {};
     
-    // Add auth token if available - use admin token for admin routes
     const url = queryKey[0] as string;
     const isAdminRoute = url.startsWith("/api/admin");
     const token = isAdminRoute 
@@ -77,7 +75,10 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: 30000, // 30 seconds instead of Infinity to prevent stale auth data
+      // 5 minutes: stable data (merchant profile, analytics, stock) won't
+      // re-fetch on every component mount; auth-sensitive routes override
+      // this with a shorter staleTime where needed.
+      staleTime: 5 * 60 * 1000,
       retry: false,
     },
     mutations: {
