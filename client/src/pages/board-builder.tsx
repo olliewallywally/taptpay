@@ -141,7 +141,8 @@ function buildModifiedSvg(opts: BuildSvgOpts): string {
     svg.insertBefore(defsEl, svg.firstChild);
   }
 
-  // Background image — injected as the very first child so it sits behind everything
+  // Background image — injected immediately after #bg-fill so it covers the
+  // colour rect and the template's own background image layers.
   const existingBgImg = doc.getElementById("bg-image");
   if (existingBgImg) existingBgImg.parentNode?.removeChild(existingBgImg);
   if (backgroundImageDataUrl) {
@@ -154,7 +155,13 @@ function buildModifiedSvg(opts: BuildSvgOpts): string {
     bgImg.setAttribute("preserveAspectRatio", "xMidYMid slice");
     bgImg.setAttribute("href", backgroundImageDataUrl);
     bgImg.setAttributeNS("http://www.w3.org/1999/xlink", "href", backgroundImageDataUrl);
-    svg.insertBefore(bgImg, defsEl.nextSibling);
+    // Insert after #bg-fill so the uploaded image sits on top of colour fills
+    const bgFillEl = doc.getElementById("bg-fill");
+    if (bgFillEl?.parentNode) {
+      bgFillEl.parentNode.insertBefore(bgImg, bgFillEl.nextSibling);
+    } else {
+      svg.appendChild(bgImg);
+    }
   }
 
   // Get or create #font-style element
@@ -168,7 +175,8 @@ function buildModifiedSvg(opts: BuildSvgOpts): string {
   };
 
   const styleEl = getOrCreate("font-style", "style", defsEl);
-  const bgVar = backgroundColor ? `--background: ${backgroundColor};` : "";
+  // When an image is uploaded it covers bg-fill, so force --background to transparent
+  const bgVar = (backgroundColor && !backgroundImageDataUrl) ? `--background: ${backgroundColor};` : `--background: transparent;`;
   const txtVar = textColor ? `--text: ${textColor};` : "";
   if (customFontDataUrl) {
     styleEl.textContent = `
