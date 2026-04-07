@@ -77,8 +77,8 @@ function buildTransactionPayload(
 
   return {
     ...msg,
-    icon: "/favicon.ico",
-    badge: "/favicon.ico",
+    icon: "/icons/icon-192x192.png",
+    badge: "/icons/icon-192x192.png",
     tag: `transaction-${transactionId}`,
     data: { transactionId, status, url: "/" },
   };
