@@ -1,8 +1,8 @@
-const CACHE_NAME = 'taptpay-v1';
-const STATIC_CACHE = 'taptpay-static-v1';
+const CACHE_NAME = 'taptpay-v2';
+const STATIC_CACHE = 'taptpay-static-v2';
 
 const STATIC_ASSETS = [
-  '/favicon.ico',
+  '/icons/icon-192x192.png',
   '/og-image.png'
 ];
 
@@ -38,8 +38,8 @@ self.addEventListener('push', (event) => {
 
   const options = {
     body: payload.body || '',
-    icon: payload.icon || '/favicon.ico',
-    badge: payload.badge || '/favicon.ico',
+    icon: payload.icon || '/icons/icon-192x192.png',
+    badge: payload.badge || '/icons/icon-192x192.png',
     tag: payload.tag || 'taptpay-notification',
     data: payload.data || {},
     vibrate: [100, 50, 100],
