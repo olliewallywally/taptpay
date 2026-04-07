@@ -4,10 +4,11 @@ import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentMerchantId } from "@/lib/auth";
 import {
+  type LucideIcon,
   Search, Plus, Package, Trash2, X, ChevronDown, ChevronUp,
   ArrowUpAZ, ArrowDownAZ, ArrowUp01, ArrowDown01,
 } from "lucide-react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -476,7 +477,7 @@ export default function StockManagement() {
     0
   );
 
-  const sortButtons: { key: SortKey; icon: any; label: string }[] = [
+  const sortButtons: { key: SortKey; icon: LucideIcon; label: string }[] = [
     { key: "az", icon: ArrowUpAZ, label: "A–Z" },
     { key: "za", icon: ArrowDownAZ, label: "Z–A" },
     { key: "price-asc", icon: ArrowUp01, label: "Price ↑" },
@@ -644,9 +645,12 @@ export default function StockManagement() {
         )}
       </div>
 
-      {/* Product sheet dialog */}
-      <Dialog open={!!sheetItem} onOpenChange={(open) => !open && setSheetItem(null)}>
-        <DialogContent className="bg-white rounded-3xl w-[calc(100%-2rem)] max-w-md mx-auto p-0 max-h-[92dvh] flex flex-col overflow-hidden">
+      {/* Product bottom-sheet */}
+      <Sheet open={!!sheetItem} onOpenChange={(open) => !open && setSheetItem(null)}>
+        <SheetContent
+          side="bottom"
+          className="bg-white rounded-t-3xl p-0 h-[92dvh] flex flex-col overflow-hidden [&>button]:hidden"
+        >
           {sheetItem && (
             <ProductSheet
               item={sheetItem}
@@ -658,8 +662,8 @@ export default function StockManagement() {
               isDeleting={deleteItemMutation.isPending}
             />
           )}
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
