@@ -14,6 +14,7 @@ import { BottomNavigation } from "@/components/bottom-navigation";
 import { LandingPage } from "@/pages/landing-page";
 import Login from "@/pages/login";
 import AppLogin from "@/pages/app-login";
+import MerchantSignup from "@/pages/merchant-signup";
 
 // ── All other pages — lazy-loaded on demand ──────────────────────────────────
 const NotFound              = lazy(() => import("@/pages/not-found"));
@@ -26,7 +27,6 @@ const Dashboard             = lazy(() => import("@/pages/dashboard"));
 const Settings              = lazy(() => import("@/pages/settings"));
 const Transactions          = lazy(() => import("@/pages/transactions"));
 const NFCPayment            = lazy(() => import("@/pages/nfc-payment"));
-const MerchantSignup        = lazy(() => import("@/pages/merchant-signup"));
 const ForgotPassword        = lazy(() => import("@/pages/forgot-password"));
 const ResetPassword         = lazy(() => import("@/pages/reset-password"));
 const NewAdminDashboard     = lazy(() => import("@/pages/admin/AdminDashboard"));

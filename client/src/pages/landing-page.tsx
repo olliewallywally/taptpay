@@ -259,7 +259,7 @@ function VideoCard() {
           loop
           playsInline
           muted
-          preload="metadata"
+          preload="none"
         />
         <button
           onClick={toggleMute}
@@ -284,7 +284,7 @@ function VideoCard() {
         loop
         playsInline
         muted
-        preload="metadata"
+        preload="none"
       />
       <button
         onClick={toggleMute}
