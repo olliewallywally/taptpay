@@ -40,29 +40,43 @@ const EMOJI_OPTIONS = [
 ];
 
 function EmojiPicker({ value, onChange }: { value: string; onChange: (e: string) => void }) {
+  const [open, setOpen] = useState(false);
   return (
     <div>
-      <Label className="text-gray-700 font-medium text-sm mb-2 block">Icon</Label>
-      <div className="grid grid-cols-10 gap-1 bg-gray-50 rounded-xl p-2 border border-gray-200">
-        {EMOJI_OPTIONS.map((e) => (
-          <button
-            key={e}
-            type="button"
-            onClick={() => onChange(e)}
-            className={`text-xl p-1 rounded-lg transition-colors hover:bg-blue-50 ${value === e ? "bg-blue-100 ring-2 ring-[#0055FF]" : ""}`}
-          >
-            {e}
-          </button>
-        ))}
-      </div>
-      {value && (
-        <button
-          type="button"
-          onClick={() => onChange("")}
-          className="mt-1 text-xs text-gray-400 hover:text-gray-600"
-        >
-          Clear icon
-        </button>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-2 text-sm text-gray-700 font-medium hover:text-[#0055FF] transition-colors"
+      >
+        <span className="text-xl leading-none">{value || "🏷️"}</span>
+        <span>{value ? "Change icon" : "Add icon"}</span>
+        <ChevronDown size={14} className={`text-gray-400 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="mt-2 space-y-1">
+          <div className="grid grid-cols-10 gap-1 bg-gray-50 rounded-xl p-2 border border-gray-200">
+            {EMOJI_OPTIONS.map((e) => (
+              <button
+                key={e}
+                type="button"
+                onClick={() => { onChange(e); setOpen(false); }}
+                className={`text-xl p-1 rounded-lg transition-colors hover:bg-blue-50 ${value === e ? "bg-blue-100 ring-2 ring-[#0055FF]" : ""}`}
+              >
+                {e}
+              </button>
+            ))}
+          </div>
+          {value && (
+            <button
+              type="button"
+              onClick={() => { onChange(""); setOpen(false); }}
+              className="text-xs text-gray-400 hover:text-gray-600"
+            >
+              Clear icon
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
