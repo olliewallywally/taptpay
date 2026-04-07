@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import fs from "fs";
 import path from "path";
 import helmet from "helmet";
+import compression from "compression";
 import { spawnSync } from "child_process";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
@@ -51,6 +52,9 @@ app.use(helmet({
   dnsPrefetchControl: { allow: false },
   crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
 }));
+
+// Gzip/Brotli compression for all responses (skips already-compressed assets)
+app.use(compression());
 
 // Skip JSON parsing for webhook routes to preserve raw body for signature verification
 app.use((req, res, next) => {
@@ -133,12 +137,9 @@ app.use((req, res, next) => {
   }
 
   // ── Schema push (drizzle-kit push) ───────────────────────────────────────
-  // Run drizzle-kit push before routes are registered so any new tables or
-  // columns defined in shared/schema.ts are applied to the live database on
-  // every startup. Non-fatal: if the push fails, log a warning and continue
-  // (the running schema may be stale, but we shouldn't block startup over it).
-  // --force bypasses interactive confirmation prompts so this can run headless.
-  if (isDatabaseConnected()) {
+  // Only run in development — production schema is managed via deployment
+  // migrations. Skipping in production removes a ~10s cold-start penalty.
+  if (isDatabaseConnected() && !isProduction) {
     log('Running schema push to sync database...');
     try {
       const drizzleConfigPath = path.resolve(process.cwd(), 'drizzle.config.ts');

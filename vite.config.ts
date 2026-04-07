@@ -27,6 +27,21 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+          if (id.includes("motion") || id.includes("framer-motion")) return "vendor-motion";
+          if (id.includes("@tanstack")) return "vendor-query";
+          if (id.includes("@radix-ui") || id.includes("radix-ui")) return "vendor-radix";
+          if (id.includes("lucide-react")) return "vendor-lucide";
+          if (id.includes("react-dom") || id.includes("react/jsx-runtime") || id.includes("react/jsx-dev-runtime")) return "vendor-react";
+          if (id.includes("wouter")) return "vendor-router";
+          if (id.includes("zod") || id.includes("drizzle-zod") || id.includes("@hookform")) return "vendor-forms";
+          return "vendor";
+        },
+      },
+    },
   },
   server: {
     fs: {

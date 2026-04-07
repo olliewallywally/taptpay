@@ -1,46 +1,56 @@
 import { Switch, Route, useLocation } from "wouter";
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { queryClient } from "./lib/queryClient";
 import "@/plugins/TaptPayPlugin";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { NotificationProvider } from "@/components/notification-system";
-import NotFound from "@/pages/not-found";
-import MerchantTerminalMobile from "@/pages/merchant-terminal-mobile";
-import MerchantTerminal from "@/pages/merchant-terminal";
-import DemoTerminal from "@/pages/demo-terminal";
-import CustomerPayment from "@/pages/customer-payment";
-import Receipt from "@/pages/receipt";
-import Dashboard from "@/pages/dashboard";
-import Settings from "@/pages/settings";
-import Transactions from "@/pages/transactions";
-import NFCPayment from "@/pages/nfc-payment";
-
-import Login from "@/pages/login";
-import MerchantSignup from "@/pages/merchant-signup";
-import ForgotPassword from "@/pages/forgot-password";
-import ResetPassword from "@/pages/reset-password";
-import NewAdminDashboard from "@/pages/admin/AdminDashboard";
-import CreateMerchant from "@/pages/create-merchant";
-import VerifyMerchant from "@/pages/verify-merchant";
-import StockManagement from "@/pages/stock-management";
-import { LandingPage } from "@/pages/landing-page";
-import LegalPage from "@/pages/legal";
-import InfoPage from "@/pages/info";
-import BusinessDetails from "@/pages/business-details";
-import CheckEmail from "@/pages/check-email";
-import ConfirmEmail from "@/pages/confirm-email";
-import MerchantOnboarding from "@/pages/merchant-onboarding";
-import SplitPayment from "@/pages/split-payment";
-import PaymentResult from "@/pages/payment-result";
-import Checkout from "@/pages/checkout";
-import BoardBuilder from "@/pages/board-builder";
-import AppLogin from "@/pages/app-login";
 
 import { PageTransition } from "@/components/page-transition";
 import { BottomNavigation } from "@/components/bottom-navigation";
 
+// ── Critical-path pages — loaded eagerly ──────────────────────────────────────
+import { LandingPage } from "@/pages/landing-page";
+import Login from "@/pages/login";
+import AppLogin from "@/pages/app-login";
+
+// ── All other pages — lazy-loaded on demand ──────────────────────────────────
+const NotFound              = lazy(() => import("@/pages/not-found"));
+const MerchantTerminalMobile = lazy(() => import("@/pages/merchant-terminal-mobile"));
+const MerchantTerminal      = lazy(() => import("@/pages/merchant-terminal"));
+const DemoTerminal          = lazy(() => import("@/pages/demo-terminal"));
+const CustomerPayment       = lazy(() => import("@/pages/customer-payment"));
+const Receipt               = lazy(() => import("@/pages/receipt"));
+const Dashboard             = lazy(() => import("@/pages/dashboard"));
+const Settings              = lazy(() => import("@/pages/settings"));
+const Transactions          = lazy(() => import("@/pages/transactions"));
+const NFCPayment            = lazy(() => import("@/pages/nfc-payment"));
+const MerchantSignup        = lazy(() => import("@/pages/merchant-signup"));
+const ForgotPassword        = lazy(() => import("@/pages/forgot-password"));
+const ResetPassword         = lazy(() => import("@/pages/reset-password"));
+const NewAdminDashboard     = lazy(() => import("@/pages/admin/AdminDashboard"));
+const CreateMerchant        = lazy(() => import("@/pages/create-merchant"));
+const VerifyMerchant        = lazy(() => import("@/pages/verify-merchant"));
+const StockManagement       = lazy(() => import("@/pages/stock-management"));
+const LegalPage             = lazy(() => import("@/pages/legal"));
+const InfoPage              = lazy(() => import("@/pages/info"));
+const BusinessDetails       = lazy(() => import("@/pages/business-details"));
+const CheckEmail            = lazy(() => import("@/pages/check-email"));
+const ConfirmEmail          = lazy(() => import("@/pages/confirm-email"));
+const MerchantOnboarding    = lazy(() => import("@/pages/merchant-onboarding"));
+const SplitPayment          = lazy(() => import("@/pages/split-payment"));
+const PaymentResult         = lazy(() => import("@/pages/payment-result"));
+const Checkout              = lazy(() => import("@/pages/checkout"));
+const BoardBuilder          = lazy(() => import("@/pages/board-builder"));
+
+function PageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="w-8 h-8 border-2 border-[#0055FF] border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
 
 function ProtectedRoute({ children, skipOnboardingCheck = false }: { children: React.ReactNode; skipOnboardingCheck?: boolean }) {
   const [, setLocation] = useLocation();
@@ -67,7 +77,6 @@ function ProtectedRoute({ children, skipOnboardingCheck = false }: { children: R
         if (response.ok) {
           const data = await response.json();
           setIsAuthenticated(true);
-          // Redirect to onboarding if not yet completed (merchant users only)
           if (
             !skipOnboardingCheck &&
             data?.user?.merchantId &&
@@ -146,7 +155,7 @@ function AdminProtectedRoute({ children }: { children: React.ReactNode }) {
   }, []);
 
   if (isChecking) {
-    return <div>Loading...</div>;
+    return <PageLoader />;
   }
 
   return isAuthenticated ? <>{children}</> : null;
@@ -187,76 +196,77 @@ function Router() {
   return (
     <PageTransition>
       <GA4PageTracker />
-      <Switch>
-        <Route path="/" component={LandingPage} />
-        <Route path="/info" component={InfoPage} />
-        <Route path="/business-details" component={BusinessDetails} />
-        <Route path="/check-email" component={CheckEmail} />
-        <Route path="/confirm-email" component={ConfirmEmail} />
-        <Route path="/login" component={Login} />
-        <Route path="/signup" component={MerchantSignup} />
-        <Route path="/forgot-password" component={ForgotPassword} />
-        <Route path="/reset-password" component={ResetPassword} />
-        <Route path="/terminal">
-          <ProtectedRoute>
-            <DemoTerminal />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/dashboard">
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/settings">
-          <ProtectedRoute>
-            <Settings />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/transactions">
-          <ProtectedRoute>
-            <Transactions />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/stock">
-          <ProtectedRoute>
-            <StockManagement />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/nfc">
-          <ProtectedRoute>
-            <NFCPayment />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/board-builder">
-          <ProtectedRoute>
-            <BoardBuilder />
-          </ProtectedRoute>
-        </Route>
-        <Route path="/onboarding">
-          <ProtectedRoute skipOnboardingCheck={true}>
-            <MerchantOnboarding />
-          </ProtectedRoute>
-        </Route>
-        
-        {/* New Admin Portal with sub-routing */}
-        <Route path="/admin" nest>
-          <AdminProtectedRoute>
-            <NewAdminDashboard />
-          </AdminProtectedRoute>
-        </Route>
-        
-        <Route path="/app-login" component={AppLogin} />
-        <Route path="/terms" component={LegalPage} />
-        <Route path="/privacy" component={LegalPage} />
-        <Route path="/verify-merchant" component={VerifyMerchant} />
-        <Route path="/pay/:merchantId" component={CustomerPayment} />
-        <Route path="/pay/:merchantId/stone/:stoneId" component={CustomerPayment} />
-        <Route path="/checkout/:transactionId" component={Checkout} />
-        <Route path="/split/:transactionId" component={SplitPayment} />
-        <Route path="/payment/result/:transactionId" component={PaymentResult} />
-        <Route path="/receipt/:transactionId" component={Receipt} />
-        <Route component={NotFound} />
-      </Switch>
+      <Suspense fallback={<PageLoader />}>
+        <Switch>
+          <Route path="/" component={LandingPage} />
+          <Route path="/info" component={InfoPage} />
+          <Route path="/business-details" component={BusinessDetails} />
+          <Route path="/check-email" component={CheckEmail} />
+          <Route path="/confirm-email" component={ConfirmEmail} />
+          <Route path="/login" component={Login} />
+          <Route path="/signup" component={MerchantSignup} />
+          <Route path="/forgot-password" component={ForgotPassword} />
+          <Route path="/reset-password" component={ResetPassword} />
+          <Route path="/terminal">
+            <ProtectedRoute>
+              <DemoTerminal />
+            </ProtectedRoute>
+          </Route>
+          <Route path="/dashboard">
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          </Route>
+          <Route path="/settings">
+            <ProtectedRoute>
+              <Settings />
+            </ProtectedRoute>
+          </Route>
+          <Route path="/transactions">
+            <ProtectedRoute>
+              <Transactions />
+            </ProtectedRoute>
+          </Route>
+          <Route path="/stock">
+            <ProtectedRoute>
+              <StockManagement />
+            </ProtectedRoute>
+          </Route>
+          <Route path="/nfc">
+            <ProtectedRoute>
+              <NFCPayment />
+            </ProtectedRoute>
+          </Route>
+          <Route path="/board-builder">
+            <ProtectedRoute>
+              <BoardBuilder />
+            </ProtectedRoute>
+          </Route>
+          <Route path="/onboarding">
+            <ProtectedRoute skipOnboardingCheck={true}>
+              <MerchantOnboarding />
+            </ProtectedRoute>
+          </Route>
+          
+          <Route path="/admin" nest>
+            <AdminProtectedRoute>
+              <NewAdminDashboard />
+            </AdminProtectedRoute>
+          </Route>
+          
+          <Route path="/app-login" component={AppLogin} />
+          <Route path="/terms" component={LegalPage} />
+          <Route path="/privacy" component={LegalPage} />
+          <Route path="/verify-merchant" component={VerifyMerchant} />
+          <Route path="/pay/:merchantId" component={CustomerPayment} />
+          <Route path="/pay/:merchantId/stone/:stoneId" component={CustomerPayment} />
+          <Route path="/checkout/:transactionId" component={Checkout} />
+          <Route path="/split/:transactionId" component={SplitPayment} />
+          <Route path="/payment/result/:transactionId" component={PaymentResult} />
+          <Route path="/receipt/:transactionId" component={Receipt} />
+          <Route component={NotFound} />
+        </Switch>
+      </Suspense>
     </PageTransition>
   );
 }
