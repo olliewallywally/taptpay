@@ -53,8 +53,9 @@ app.use(helmet({
   crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
 }));
 
-// Gzip/Brotli compression for all responses (skips already-compressed assets)
-app.use(compression());
+// Gzip compression for all responses — skips already-compressed assets and
+// very small payloads (< 1 KB) where compression overhead outweighs savings.
+app.use(compression({ threshold: 1024 }));
 
 // Skip JSON parsing for webhook routes to preserve raw body for signature verification
 app.use((req, res, next) => {
@@ -137,9 +138,12 @@ app.use((req, res, next) => {
   }
 
   // ── Schema push (drizzle-kit push) ───────────────────────────────────────
-  // Only run in development — production schema is managed via deployment
-  // migrations. Skipping in production removes a ~10s cold-start penalty.
-  if (isDatabaseConnected() && !isProduction) {
+  // Runs automatically in development. Skipped in production to eliminate the
+  // ~10s cold-start penalty on every restart/deploy. To apply schema changes
+  // in production, either set RUN_MIGRATIONS=true in the environment for a
+  // single controlled run, or execute `npm run db:push` manually.
+  const runMigrations = !isProduction || process.env.RUN_MIGRATIONS === 'true';
+  if (isDatabaseConnected() && runMigrations) {
     log('Running schema push to sync database...');
     try {
       const drizzleConfigPath = path.resolve(process.cwd(), 'drizzle.config.ts');
