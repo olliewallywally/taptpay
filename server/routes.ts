@@ -3405,6 +3405,71 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
+  // GA4 detailed metrics — chart + countries (range: 7d | 14d | 30d | all)
+  app.get("/api/admin/ga4-detailed", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    const propertyId = process.env.GOOGLE_ANALYTICS_PROPERTY_ID;
+    const serviceAccountRaw = process.env.GOOGLE_ANALYTICS_SERVICE_ACCOUNT;
+    if (!propertyId || !serviceAccountRaw) return res.json({ configured: false });
+
+    const range = (req.query.range as string) || '7d';
+    const startDate = range === '14d' ? '14daysAgo' : range === '30d' ? '30daysAgo' : range === 'all' ? '2024-01-01' : '7daysAgo';
+
+    try {
+      const { BetaAnalyticsDataClient } = await import('@google-analytics/data');
+      const credentials = JSON.parse(serviceAccountRaw);
+      const client = new BetaAnalyticsDataClient({ credentials });
+
+      const [dailyResp, countryResp, newVsReturnResp] = await Promise.all([
+        client.runReport({
+          property: `properties/${propertyId}`,
+          dateRanges: [{ startDate, endDate: 'today' }],
+          metrics: [{ name: 'totalUsers' }, { name: 'sessions' }, { name: 'screenPageViews' }],
+          dimensions: [{ name: 'date' }],
+          orderBys: [{ dimension: { dimensionName: 'date' }, desc: false }],
+        }),
+        client.runReport({
+          property: `properties/${propertyId}`,
+          dateRanges: [{ startDate, endDate: 'today' }],
+          metrics: [{ name: 'totalUsers' }],
+          dimensions: [{ name: 'countryId' }],
+          orderBys: [{ metric: { metricName: 'totalUsers' }, desc: true }],
+          limit: 50,
+        }),
+        client.runReport({
+          property: `properties/${propertyId}`,
+          dateRanges: [{ startDate, endDate: 'today' }],
+          metrics: [{ name: 'totalUsers' }, { name: 'newUsers' }],
+          dimensions: [],
+        }),
+      ]);
+
+      const daily = (dailyResp[0].rows || []).map(r => {
+        const raw = r.dimensionValues?.[0]?.value || '';
+        const label = raw.length === 8 ? `${raw.slice(6,8)}/${raw.slice(4,6)}` : raw;
+        return {
+          date: label,
+          users: parseInt(r.metricValues?.[0]?.value || '0'),
+          sessions: parseInt(r.metricValues?.[1]?.value || '0'),
+          pageViews: parseInt(r.metricValues?.[2]?.value || '0'),
+        };
+      });
+
+      const countries = (countryResp[0].rows || []).map(r => ({
+        code: r.dimensionValues?.[0]?.value || '',
+        users: parseInt(r.metricValues?.[0]?.value || '0'),
+      }));
+
+      const nvr = newVsReturnResp[0].rows?.[0];
+      const totalUsers = parseInt(nvr?.metricValues?.[0]?.value || '0');
+      const newUsers = parseInt(nvr?.metricValues?.[1]?.value || '0');
+
+      res.json({ configured: true, daily, countries, newUsers, returningUsers: Math.max(0, totalUsers - newUsers) });
+    } catch (error: any) {
+      console.error("GA4 detailed error:", error?.message);
+      res.status(500).json({ configured: true, error: error?.message });
+    }
+  });
+
   // GA4 metrics for admin portal
   app.get("/api/admin/ga4-metrics", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     const propertyId = process.env.GOOGLE_ANALYTICS_PROPERTY_ID;

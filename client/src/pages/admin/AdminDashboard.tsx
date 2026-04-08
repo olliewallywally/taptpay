@@ -8,7 +8,6 @@ import { MerchantsPage } from './MerchantsPage';
 import { MerchantDetail } from './MerchantDetail';
 import { APIManagement } from './APIManagement';
 import { Analytics } from './Analytics';
-import { WebsiteAnalytics } from './WebsiteAnalytics';
 
 export default function AdminDashboard() {
   const [location, setLocation] = useLocation();
@@ -166,7 +165,7 @@ export default function AdminDashboard() {
           </Route>
           <Route path="/api" component={APIManagement} />
           <Route path="/analytics" component={Analytics} />
-          <Route path="/web-analytics" component={WebsiteAnalytics} />
+          <Route path="/web-analytics" component={Analytics} />
           <Route path="/settings">
             <div className="flex items-center justify-center h-screen text-[#dbdfea]">
               <div className="text-center">
