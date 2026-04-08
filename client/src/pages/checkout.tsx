@@ -245,14 +245,18 @@ function CheckoutInner() {
 
     // Stash the true original methods once — never overwrite these during
     // re-assertion, so the chain always terminates at the real browser impl.
-    const origHrefDesc    = Object.getOwnPropertyDescriptor(Location.prototype, "href");
-    const origDocLocDesc  = Object.getOwnPropertyDescriptor(Document.prototype, "location");
-    const origAssign      = Location.prototype.assign;
-    const origReplace     = Location.prototype.replace;
-    const origPushState   = History.prototype.pushState;
-    const origReplState   = History.prototype.replaceState;
-    // Store the raw reference (not a bound wrapper) so restoration is exact.
-    const origWindowOpen  = window.open;
+    const origHrefDesc      = Object.getOwnPropertyDescriptor(Location.prototype, "href");
+    const origDocLocDesc    = Object.getOwnPropertyDescriptor(Document.prototype, "location");
+    const origAssign        = Location.prototype.assign;
+    const origReplace       = Location.prototype.replace;
+    const origPushState     = History.prototype.pushState;
+    const origReplState     = History.prototype.replaceState;
+    const origWindowOpen    = window.open;
+    // Form submission — the primary bypass used by Windcave's HPP fallback.
+    // HTMLFormElement.prototype.submit is a native method that navigates the
+    // browser without touching location.href/assign/replace/pushState/open,
+    // so it bypasses all previous guards.
+    const origFormSubmit    = HTMLFormElement.prototype.submit;
 
     function blockHPP(url: string | URL | null | undefined, via: string): boolean {
       const raw = (url == null ? "" : String(url)).trim();
@@ -260,16 +264,56 @@ function CheckoutInner() {
       // can match them even without an explicit http/https scheme prefix.
       const urlStr = raw.startsWith("//") ? `https:${raw}` : raw;
       if (WINDCAVE_HPP_RE.test(urlStr)) {
-        if (import.meta.env.DEV) {
-          console.warn(
-            `[Checkout] Blocked Windcave HPP redirect (${via}):`,
-            urlStr.slice(0, 200)
-          );
-        }
+        // Always log — not just in DEV — so production incidents are visible
+        // in browser console captures and bug reports.
+        console.warn(
+          `[Checkout] Blocked Windcave HPP redirect (${via}):`,
+          urlStr.slice(0, 200)
+        );
         return true;
       }
       return false;
     }
+
+    // ── MutationObserver: neutralise Windcave forms the moment they are
+    // injected into the DOM, before any JS can call .submit() on them.
+    // Clearing `action` means even a non-guarded .submit() path navigates to
+    // the current page (a no-op) rather than to the Windcave HPP.
+    const formObserver = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const node of Array.from(mutation.addedNodes)) {
+          const forms: HTMLFormElement[] = [];
+          if (node instanceof HTMLFormElement) {
+            forms.push(node);
+          } else if (node instanceof Element) {
+            forms.push(...Array.from(node.querySelectorAll("form")));
+          }
+          for (const form of forms) {
+            const action = form.getAttribute("action") || "";
+            if (blockHPP(action, "MutationObserver/form.action")) {
+              form.setAttribute("action", "#");
+            }
+          }
+        }
+      }
+    });
+    try {
+      formObserver.observe(document.body, { childList: true, subtree: true });
+    } catch {}
+
+    // ── document-level submit event listener: backup for any form that
+    // already exists in the DOM when the guard installs, or for submit events
+    // dispatched via requestSubmit() rather than .submit().
+    function onDocumentSubmit(e: Event) {
+      const form = e.target as HTMLFormElement;
+      if (!(form instanceof HTMLFormElement)) return;
+      const action = form.getAttribute("action") || "";
+      if (blockHPP(action, "document.submit-event")) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      }
+    }
+    document.addEventListener("submit", onDocumentSubmit, true); // capture phase
 
     function installGuards() {
       // 1. href setter
@@ -366,11 +410,6 @@ function CheckoutInner() {
       }
 
       // 7. document.location setter — legacy path some webviews support.
-      // In modern browsers document.location is the same Location object as
-      // window.location, so setting .href/.assign()/.replace() on it is already
-      // covered by guards 1-3.  This additionally intercepts the direct
-      // `document.location = url` assignment form (read-only in many browsers,
-      // but patchable in some Capacitor webviews).
       try {
         const curDocLoc = Object.getOwnPropertyDescriptor(Document.prototype, "location");
         if (origDocLocDesc?.set && !guardFns.has(curDocLoc?.set ?? Function.prototype)) {
@@ -389,10 +428,7 @@ function CheckoutInner() {
         if (import.meta.env.DEV) console.warn("[Checkout] document.location guard failed:", e);
       }
 
-      // 8. window.location (Window-level) setter — some environments expose a
-      // direct setter on the Window prototype separate from Location.prototype.
-      // In most browsers this is read-only / throws, but the attempt is wrapped
-      // in try/catch so a browser rejection has no effect.
+      // 8. window.location (Window-level) setter.
       try {
         const winLocDesc = Object.getOwnPropertyDescriptor(Window.prototype, "location");
         if (winLocDesc?.set && !guardFns.has(winLocDesc.set)) {
@@ -410,6 +446,26 @@ function CheckoutInner() {
       } catch (e) {
         if (import.meta.env.DEV) console.warn("[Checkout] window.location guard failed (expected in most browsers):", e);
       }
+
+      // 9. HTMLFormElement.prototype.submit — THE primary bypass vector.
+      // Payment SDKs typically call form.submit() (not requestSubmit()) on a
+      // hidden form whose action points to the HPP. This is invisible to all
+      // the guards above because native form navigation does not go through
+      // location.href/assign/replace/pushState/open. We override the prototype
+      // method so every .submit() call is checked before the browser navigates.
+      try {
+        if (!guardFns.has(HTMLFormElement.prototype.submit)) {
+          function formSubmitGuard(this: HTMLFormElement) {
+            const action = this.getAttribute("action") || this.action || "";
+            if (blockHPP(action, "HTMLFormElement.submit")) return; // block navigation
+            origFormSubmit.call(this);
+          }
+          guardFns.add(formSubmitGuard);
+          HTMLFormElement.prototype.submit = formSubmitGuard;
+        }
+      } catch (e) {
+        if (import.meta.env.DEV) console.warn("[Checkout] HTMLFormElement.submit guard failed:", e);
+      }
     }
 
     // Install immediately on mount, then re-assert every 2 s in case a
@@ -419,6 +475,8 @@ function CheckoutInner() {
 
     return () => {
       clearInterval(reassertInterval);
+      formObserver.disconnect();
+      document.removeEventListener("submit", onDocumentSubmit, true);
       try {
         if (origHrefDesc) Object.defineProperty(Location.prototype, "href", origHrefDesc);
         if (origDocLocDesc) Object.defineProperty(Document.prototype, "location", origDocLocDesc);
@@ -427,6 +485,7 @@ function CheckoutInner() {
         History.prototype.pushState    = origPushState;
         History.prototype.replaceState = origReplState;
         window.open = origWindowOpen;
+        HTMLFormElement.prototype.submit = origFormSubmit;
       } catch {}
     };
   }, []);
