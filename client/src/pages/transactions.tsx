@@ -369,52 +369,47 @@ export default function Transactions() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-200 pb-24">
-      {/* Header Section */}
-      <div className="relative">
-        <div className="absolute left-0 right-0 h-[80px] sm:h-[106px] bg-[#00E5CC] rounded-b-[60px] sm:rounded-b-[100px] z-0" style={{ bottom: '-20px' }}></div>
+    <div className="min-h-screen bg-[#0055FF]">
+      {/* Header — sits directly on the blue background */}
+      <div className="max-w-4xl mx-auto px-3 sm:px-6 pt-10 sm:pt-12 pb-8 sm:pb-10">
+        <h1 className="text-[#00E5CC] text-center text-xl sm:text-2xl md:text-3xl mb-6 sm:mb-8">analytics & reports</h1>
         
-        <div className="bg-[#0055FF] pt-6 sm:pt-8 pb-10 sm:pb-12 rounded-b-[60px] sm:rounded-b-[100px] relative z-10">
-          <div className="max-w-4xl mx-auto px-3 sm:px-6">
-            <h1 className="text-[#00E5CC] text-center text-xl sm:text-2xl md:text-3xl mb-6 sm:mb-8">analytics & reports</h1>
-            
-            {/* Stats Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 max-w-full">
-              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg sm:rounded-xl p-2 sm:p-2.5 md:p-3 min-w-0">
-                <div className="flex items-center gap-1 sm:gap-1.5 mb-0.5 sm:mb-1">
-                  <DollarSign className="text-[#00E5CC] flex-shrink-0" size={12} />
-                  <div className="text-[#00E5CC]/70 text-[9px] sm:text-[10px] md:text-xs truncate">Revenue</div>
-                </div>
-                <div className="text-white text-xs sm:text-sm md:text-base truncate" data-testid="stat-revenue">${totalRevenue.toFixed(2)}</div>
-              </div>
-              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg sm:rounded-xl p-2 sm:p-2.5 md:p-3 min-w-0">
-                <div className="flex items-center gap-1 sm:gap-1.5 mb-0.5 sm:mb-1">
-                  <CreditCard className="text-[#00E5CC] flex-shrink-0" size={12} />
-                  <div className="text-[#00E5CC]/70 text-[9px] sm:text-[10px] md:text-xs truncate">Transactions</div>
-                </div>
-                <div className="text-white text-xs sm:text-sm md:text-base truncate" data-testid="stat-transactions">{totalTransactions}</div>
-              </div>
-              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg sm:rounded-xl p-2 sm:p-2.5 md:p-3 min-w-0">
-                <div className="flex items-center gap-1 sm:gap-1.5 mb-0.5 sm:mb-1">
-                  <TrendingUp className="text-[#00E5CC] flex-shrink-0" size={12} />
-                  <div className="text-[#00E5CC]/70 text-[9px] sm:text-[10px] md:text-xs truncate">Avg. Sale</div>
-                </div>
-                <div className="text-white text-xs sm:text-sm md:text-base truncate" data-testid="stat-avg">${avgTransaction.toFixed(2)}</div>
-              </div>
-              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg sm:rounded-xl p-2 sm:p-2.5 md:p-3 min-w-0">
-                <div className="flex items-center gap-1 sm:gap-1.5 mb-0.5 sm:mb-1">
-                  <ArrowUpDown className="text-[#00E5CC] flex-shrink-0" size={12} />
-                  <div className="text-[#00E5CC]/70 text-[9px] sm:text-[10px] md:text-xs truncate">Success Rate</div>
-                </div>
-                <div className="text-white text-xs sm:text-sm md:text-base truncate" data-testid="stat-success">{successRate.toFixed(1)}%</div>
-              </div>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 max-w-full">
+          <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg sm:rounded-xl p-2 sm:p-2.5 md:p-3 min-w-0">
+            <div className="flex items-center gap-1 sm:gap-1.5 mb-0.5 sm:mb-1">
+              <DollarSign className="text-[#00E5CC] flex-shrink-0" size={12} />
+              <div className="text-[#00E5CC]/70 text-[9px] sm:text-[10px] md:text-xs truncate">Revenue</div>
             </div>
+            <div className="text-white text-xs sm:text-sm md:text-base truncate" data-testid="stat-revenue">${totalRevenue.toFixed(2)}</div>
+          </div>
+          <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg sm:rounded-xl p-2 sm:p-2.5 md:p-3 min-w-0">
+            <div className="flex items-center gap-1 sm:gap-1.5 mb-0.5 sm:mb-1">
+              <CreditCard className="text-[#00E5CC] flex-shrink-0" size={12} />
+              <div className="text-[#00E5CC]/70 text-[9px] sm:text-[10px] md:text-xs truncate">Transactions</div>
+            </div>
+            <div className="text-white text-xs sm:text-sm md:text-base truncate" data-testid="stat-transactions">{totalTransactions}</div>
+          </div>
+          <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg sm:rounded-xl p-2 sm:p-2.5 md:p-3 min-w-0">
+            <div className="flex items-center gap-1 sm:gap-1.5 mb-0.5 sm:mb-1">
+              <TrendingUp className="text-[#00E5CC] flex-shrink-0" size={12} />
+              <div className="text-[#00E5CC]/70 text-[9px] sm:text-[10px] md:text-xs truncate">Avg. Sale</div>
+            </div>
+            <div className="text-white text-xs sm:text-sm md:text-base truncate" data-testid="stat-avg">${avgTransaction.toFixed(2)}</div>
+          </div>
+          <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg sm:rounded-xl p-2 sm:p-2.5 md:p-3 min-w-0">
+            <div className="flex items-center gap-1 sm:gap-1.5 mb-0.5 sm:mb-1">
+              <ArrowUpDown className="text-[#00E5CC] flex-shrink-0" size={12} />
+              <div className="text-[#00E5CC]/70 text-[9px] sm:text-[10px] md:text-xs truncate">Success Rate</div>
+            </div>
+            <div className="text-white text-xs sm:text-sm md:text-base truncate" data-testid="stat-success">{successRate.toFixed(1)}%</div>
           </div>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-6xl mx-auto px-3 sm:px-6 mt-[40px] sm:mt-[50px] relative z-10 space-y-4 sm:space-y-6">
+      {/* White rounded-top overlay — main content sits on this */}
+      <div className="bg-white rounded-t-[40px] sm:rounded-t-[48px] min-h-screen pb-32">
+        <div className="max-w-6xl mx-auto px-3 sm:px-6 pt-6 sm:pt-8 space-y-4 sm:space-y-6">
         {/* Chart Section */}
         <div className="bg-white rounded-[15px] p-4 sm:p-8 shadow-[0px_23px_28.6px_rgba(0,0,0,0.03)]">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 mb-6 sm:mb-8">
@@ -593,6 +588,7 @@ export default function Transactions() {
               ))}
             </div>
           )}
+        </div>
         </div>
       </div>
 
