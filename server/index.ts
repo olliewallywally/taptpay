@@ -172,7 +172,7 @@ app.use((req, res, next) => {
           const output = (push.stdout || '') + (push.stderr || '');
           // Non-zero exit most likely means a destructive change was blocked.
           // The server continues safely — no data was modified.
-          log(`⚠️  Schema push blocked (possible destructive change) — data untouched. Run \`npm run db:push\` manually to review: ${output.slice(0, 300)}`);
+          log(`⚠️  Schema has destructive changes — run \`npm run db:push\` manually to review before applying. Data untouched. Details: ${output.slice(0, 200)}`);
         }
       } else {
         log('⚠️  drizzle.config.ts not found at project root — skipping schema push');
