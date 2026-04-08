@@ -291,7 +291,10 @@ function CheckoutInner() {
           for (const form of forms) {
             const action = form.getAttribute("action") || "";
             if (blockHPP(action, "MutationObserver/form.action")) {
-              form.setAttribute("action", "#");
+              // Remove the action attribute entirely so the form targets the
+              // current page on any subsequent submit — this is a cleaner
+              // no-op than setting action="#" which still triggers navigation.
+              form.removeAttribute("action");
             }
           }
         }
@@ -307,7 +310,10 @@ function CheckoutInner() {
     function onDocumentSubmit(e: Event) {
       const form = e.target as HTMLFormElement;
       if (!(form instanceof HTMLFormElement)) return;
-      const action = form.getAttribute("action") || "";
+      // Check both the attribute and the resolved .action property so that
+      // property-only assignments (form.action = "https://...") are caught even
+      // when the attribute was not set.
+      const action = form.getAttribute("action") || form.action || "";
       if (blockHPP(action, "document.submit-event")) {
         e.preventDefault();
         e.stopImmediatePropagation();
