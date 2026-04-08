@@ -195,58 +195,60 @@ export default function Dashboard() {
 
   if (analyticsLoading) {
     return (
-      <div className="min-h-screen bg-[#0055FF] flex items-center justify-center">
-        <div className="text-[#00E5CC] text-xl">Loading dashboard...</div>
+      <div className="min-h-screen bg-gray-200 flex items-center justify-center">
+        <div className="text-[#0055FF] text-xl">Loading dashboard...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0055FF]">
-      {/* Header — sits directly on the blue background */}
-      <div className="max-w-md md:max-w-2xl mx-auto px-4 sm:px-6 md:px-8 pt-8 sm:pt-10 md:pt-12 pb-8 sm:pb-10">
-        <h1 className="text-[#00E5CC] text-center text-xl sm:text-2xl md:text-3xl mb-8 sm:mb-12 md:mb-16">active transactions</h1>
+    <div className="min-h-screen bg-gray-200 pb-24">
+      {/* Header Section with Active Transactions */}
+      <div className="relative">
+        <div className="absolute left-0 right-0 h-[80px] sm:h-[106px] md:h-[120px] bg-[#00E5CC] rounded-b-[60px] sm:rounded-b-[100px] md:rounded-b-[120px] z-0" style={{ bottom: '-20px' }}></div>
         
-        <div className="relative flex items-center justify-center mb-6 sm:mb-8 md:mb-10">
-          <SemiCircularProgress 
-            percentage={dailyPercentage} 
-            size={chartSize} 
-            strokeWidth={16} 
-            color="#00E5CC"
-            backgroundColor="rgba(0, 229, 204, 0.2)"
-          />
-          <div className="absolute text-center" style={{ bottom: '10px' }}>
-            <div className="text-[#00E5CC] text-4xl sm:text-5xl md:text-6xl mb-1">
-              ${todayRevenue.toFixed(2)}
-            </div>
-            <div className="text-[#00E5CC] text-sm sm:text-lg md:text-xl">
-              {todayTransactionCount} transaction{todayTransactionCount !== 1 ? 's' : ''} today
+        <div className="bg-[#0055FF] pt-6 sm:pt-8 md:pt-10 pb-5 sm:pb-7 md:pb-9 rounded-b-[60px] sm:rounded-b-[100px] md:rounded-b-[120px] relative z-10">
+          <div className="max-w-md md:max-w-2xl mx-auto px-4 sm:px-6 md:px-8">
+            <h1 className="text-[#00E5CC] text-center text-xl sm:text-2xl md:text-3xl mb-8 sm:mb-12 md:mb-16">active transactions</h1>
+            
+            <div className="relative flex items-center justify-center mb-6 sm:mb-8 md:mb-10">
+              <SemiCircularProgress 
+                percentage={dailyPercentage} 
+                size={chartSize} 
+                strokeWidth={16} 
+                color="#00E5CC"
+                backgroundColor="rgba(0, 229, 204, 0.2)"
+              />
+              <div className="absolute text-center" style={{ bottom: '10px' }}>
+                <div className="text-[#00E5CC] text-4xl sm:text-5xl md:text-6xl mb-1">
+                  ${todayRevenue.toFixed(2)}
+                </div>
+                <div className="text-[#00E5CC] text-sm sm:text-lg md:text-xl">
+                  {todayTransactionCount} transaction{todayTransactionCount !== 1 ? 's' : ''} today
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* White rounded-top overlay — stat cards sit on this */}
-      <div className="bg-white rounded-t-[40px] sm:rounded-t-[48px] min-h-screen pb-32">
-        <div className="max-w-md md:max-w-2xl mx-auto px-3 sm:px-6 md:px-8 pt-6 sm:pt-8">
-
-        {/* Pending account banner */}
-        {merchant && merchant.status !== 'active' && (
-          <div className="mb-4">
-            <div className="bg-amber-50 border border-amber-300 rounded-2xl px-4 py-3 flex items-start gap-3">
-              <span className="text-amber-500 text-lg mt-0.5">⏳</span>
-              <div>
-                <p className="text-amber-800 font-semibold text-sm">Account pending activation</p>
-                <p className="text-amber-700 text-xs mt-0.5">
-                  Your account is being reviewed and connected to our payment network. You can set up your business details in Settings while you wait. We'll notify you once you're live.
-                </p>
-              </div>
+      {/* Pending account banner */}
+      {merchant && merchant.status !== 'active' && (
+        <div className="max-w-md md:max-w-2xl mx-auto px-3 sm:px-6 md:px-8 mt-[40px] sm:mt-[50px] md:mt-[60px] relative z-10">
+          <div className="bg-amber-50 border border-amber-300 rounded-2xl px-4 py-3 flex items-start gap-3 mb-4">
+            <span className="text-amber-500 text-lg mt-0.5">⏳</span>
+            <div>
+              <p className="text-amber-800 font-semibold text-sm">Account pending activation</p>
+              <p className="text-amber-700 text-xs mt-0.5">
+                Your account is being reviewed and connected to our payment network. You can set up your business details in Settings while you wait. We'll notify you once you're live.
+              </p>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Stats Cards */}
-        <div>
+      {/* Stats Cards */}
+      <div className={`max-w-md md:max-w-2xl mx-auto px-3 sm:px-6 md:px-8 relative z-10 ${merchant && merchant.status !== 'active' ? '' : 'mt-[40px] sm:mt-[50px] md:mt-[60px]'}`}>
         <div className="grid grid-cols-2 gap-3 sm:gap-5 md:gap-6 mb-4 sm:mb-6 md:mb-8">
           {/* Monthly Stats Widget with Circle Graph */}
           <div className="bg-white rounded-2xl sm:rounded-3xl md:rounded-[28px] p-3 sm:p-6 md:p-8 col-span-1 row-span-2 flex flex-col min-h-[320px] sm:min-h-[420px] md:min-h-[480px] shadow-lg transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] cursor-pointer" data-testid="card-monthly-stats">
@@ -370,8 +372,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        </div>
-        </div>
       </div>
     </div>
   );
