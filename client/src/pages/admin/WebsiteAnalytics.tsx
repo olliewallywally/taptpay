@@ -1,5 +1,5 @@
 import { useLocation } from 'wouter';
-import { Globe, ArrowLeft, Users, Eye, MousePointer, Clock, ExternalLink, Smartphone, Monitor, Tablet, AlertCircle, TrendingUp, Activity } from 'lucide-react';
+import { ArrowLeft, Users, Eye, Clock, Smartphone, Monitor, Tablet, AlertCircle, TrendingUp, Activity } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
@@ -73,15 +73,6 @@ export function WebsiteAnalytics() {
             <p className="text-sm text-[#dbdfea]/60">Real-time traffic and user behaviour — last 7 days</p>
           </div>
           <div className="flex items-center gap-3">
-            <a
-              href="https://analytics.google.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 bg-[#0055FF] hover:bg-[#0044CC] text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-            >
-              <ExternalLink className="size-4" />
-              Open Google Analytics
-            </a>
             <button
               onClick={() => setLocation('/analytics')}
               className="flex items-center gap-2 text-[#0055FF] hover:text-[#00E5CC] transition-colors"
@@ -276,24 +267,6 @@ export function WebsiteAnalytics() {
               </div>
             </div>
 
-            {/* Link to full GA4 */}
-            <div className="bg-[#24263a] border border-[#0055FF]/20 rounded-xl p-5 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Globe className="size-5 text-[#0055FF]" />
-                <div>
-                  <p className="text-[#dbdfea] text-sm font-medium">Full Analytics Dashboard</p>
-                  <p className="text-[#dbdfea]/50 text-xs">Audience segments, funnels, acquisition, and more</p>
-                </div>
-              </div>
-              <a
-                href="https://analytics.google.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 text-[#0055FF] hover:text-[#00E5CC] text-sm transition-colors"
-              >
-                Open GA4 <ExternalLink className="size-4" />
-              </a>
-            </div>
           </div>
         )}
       </div>
