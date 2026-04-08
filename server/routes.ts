@@ -4033,15 +4033,17 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const safeName = name.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       const safeEmail = email.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-      // Fire-and-forget notification to Oliver — do not block the response
-      const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@taptpay.co.nz';
+      // Fire-and-forget notification — do not block the response
       sendEmail({
         to: 'oliverleonard@taptpay.co.nz',
-        from: fromEmail,
+        from: 'noreply@taptpay.co.nz',
         subject: `New info pack request from ${name}`,
         html: `<p><strong>Name:</strong> ${safeName}</p><p><strong>Email:</strong> <a href="mailto:${safeEmail}">${safeEmail}</a></p><p>They have just unlocked the TaptPay info pack on taptpay.co.nz/info.</p>`,
         text: `New info pack request\n\nName: ${name}\nEmail: ${email}\n\nThey have just unlocked the TaptPay info pack on taptpay.co.nz/info.`,
-      }).catch((e) => console.error("Info pack lead notification failed:", e));
+      }).then((ok) => {
+        if (!ok) console.error("Info pack lead notification failed: Resend returned false");
+        else console.log(`✅ Info pack lead notification sent for ${email}`);
+      }).catch((e) => console.error("Info pack lead notification error:", e));
 
       return res.status(201).json({ id: lead.id });
     } catch (error) {
