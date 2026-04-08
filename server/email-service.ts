@@ -94,7 +94,7 @@ Tapt Payment Team
 
   return await sendEmail({
     to: email,
-    from: 'onboarding@resend.dev',
+    from: 'noreply@taptpay.co.nz',
     subject: 'Reset Your Tapt Payment Password',
     text: textContent,
     html: htmlContent,
