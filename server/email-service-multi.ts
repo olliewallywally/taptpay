@@ -13,7 +13,7 @@ const EMAIL_CONFIG = {
   provider: process.env.EMAIL_PROVIDER || 'resend',
   resend: {
     apiKey: process.env.RESEND_API_KEY,
-    fromEmail: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
+    fromEmail: process.env.RESEND_FROM_EMAIL || 'noreply@taptpay.co.nz',
   },
   smtp: {
     host: process.env.SMTP_HOST,
