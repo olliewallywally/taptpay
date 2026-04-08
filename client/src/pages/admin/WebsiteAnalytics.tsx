@@ -104,7 +104,7 @@ export function WebsiteAnalytics() {
                 <div>
                   <h3 className="text-[#dbdfea] font-semibold mb-2">Connect Google Analytics Data API</h3>
                   <p className="text-[#dbdfea]/60 text-sm mb-4">
-                    Your GA4 tracking is already live and collecting data (Measurement ID: G-VBGBY5E8HW). 
+                    Your GA4 tracking is already live and collecting data (Measurement ID: G-0MBNS0C2L5). 
                     To display real-time metrics in this panel, complete the steps below.
                   </p>
                   <div className="space-y-4">
