@@ -1,4 +1,4 @@
-import { MailService } from '@sendgrid/mail';
+import { Resend } from 'resend';
 import nodemailer from 'nodemailer';
 
 interface EmailParams {
@@ -9,12 +9,11 @@ interface EmailParams {
   html?: string;
 }
 
-// Email service configuration with multiple provider support
 const EMAIL_CONFIG = {
-  provider: process.env.EMAIL_PROVIDER || 'gmail', // 'sendgrid', 'gmail', 'outlook', 'smtp'
-  sendgrid: {
-    apiKey: process.env.SENDGRID_API_KEY,
-    fromEmail: process.env.SENDGRID_FROM_EMAIL || 'noreply@tapt.co.nz',
+  provider: process.env.EMAIL_PROVIDER || 'resend',
+  resend: {
+    apiKey: process.env.RESEND_API_KEY,
+    fromEmail: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
   },
   smtp: {
     host: process.env.SMTP_HOST,
@@ -27,7 +26,7 @@ const EMAIL_CONFIG = {
   },
   gmail: {
     user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_APP_PASSWORD, // App-specific password
+    pass: process.env.GMAIL_APP_PASSWORD,
   },
   outlook: {
     user: process.env.OUTLOOK_USER,
@@ -35,65 +34,51 @@ const EMAIL_CONFIG = {
   },
 };
 
-// Initialize SendGrid if available
-let sendGridService: MailService | null = null;
-if (EMAIL_CONFIG.sendgrid.apiKey) {
-  sendGridService = new MailService();
-  sendGridService.setApiKey(EMAIL_CONFIG.sendgrid.apiKey);
-}
+const resendClient = EMAIL_CONFIG.resend.apiKey
+  ? new Resend(EMAIL_CONFIG.resend.apiKey)
+  : null;
 
-// Create SMTP transporter based on provider
-function createTransporter() {
+function createSmtpTransporter() {
   switch (EMAIL_CONFIG.provider) {
     case 'gmail':
-      return nodemailer.createTransport({
-        service: 'gmail',
-        auth: EMAIL_CONFIG.gmail,
-      });
-    
+      return nodemailer.createTransport({ service: 'gmail', auth: EMAIL_CONFIG.gmail });
     case 'outlook':
-      return nodemailer.createTransport({
-        service: 'outlook',
-        auth: EMAIL_CONFIG.outlook,
-      });
-    
+      return nodemailer.createTransport({ service: 'outlook', auth: EMAIL_CONFIG.outlook });
     case 'smtp':
       return nodemailer.createTransport(EMAIL_CONFIG.smtp);
-    
     default:
       return null;
   }
 }
 
-async function sendWithSendGrid(params: EmailParams): Promise<boolean> {
-  if (!sendGridService) {
-    console.log('SendGrid not configured');
+async function sendWithResend(params: EmailParams): Promise<boolean> {
+  if (!resendClient) {
+    console.log('Resend not configured');
     return false;
   }
-  
   try {
-    await sendGridService.send({
+    const { error } = await resendClient.emails.send({
       to: params.to,
       from: params.from,
       subject: params.subject,
       text: params.text,
       html: params.html,
     });
-    console.log('Email sent successfully via SendGrid');
+    if (error) {
+      console.error('Resend email error:', error);
+      return false;
+    }
+    console.log('✅ Email sent via Resend');
     return true;
   } catch (error) {
-    console.error('SendGrid email error:', error);
+    console.error('Resend email exception:', error);
     return false;
   }
 }
 
-async function sendWithSMTP(params: EmailParams): Promise<boolean> {
-  const transporter = createTransporter();
-  if (!transporter) {
-    console.log('SMTP transporter not configured');
-    return false;
-  }
-  
+async function sendWithSmtp(params: EmailParams): Promise<boolean> {
+  const transporter = createSmtpTransporter();
+  if (!transporter) return false;
   try {
     await transporter.sendMail({
       from: params.from,
@@ -102,7 +87,7 @@ async function sendWithSMTP(params: EmailParams): Promise<boolean> {
       text: params.text,
       html: params.html,
     });
-    console.log(`Email sent successfully via ${EMAIL_CONFIG.provider}`);
+    console.log(`✅ Email sent via ${EMAIL_CONFIG.provider}`);
     return true;
   } catch (error) {
     console.error(`${EMAIL_CONFIG.provider} email error:`, error);
@@ -115,106 +100,63 @@ function simulateEmail(params: EmailParams): boolean {
   console.log(`To: ${params.to}`);
   console.log(`From: ${params.from}`);
   console.log(`Subject: ${params.subject}`);
-  if (params.html) {
-    console.log('HTML content provided');
-  }
-  if (params.text) {
-    console.log(`Text: ${params.text.substring(0, 100)}${params.text.length > 100 ? '...' : ''}`);
-  }
+  if (params.text) console.log(`Text: ${params.text.substring(0, 100)}...`);
   console.log('=====================\n');
   return true;
 }
 
 export async function sendEmailMulti(params: EmailParams): Promise<boolean> {
-  console.log(`Attempting to send email via ${EMAIL_CONFIG.provider}`);
-  
-  // Try primary provider first
+  console.log(`Sending email via ${EMAIL_CONFIG.provider}`);
+
   let success = false;
-  
-  if (EMAIL_CONFIG.provider === 'sendgrid') {
-    success = await sendWithSendGrid(params);
+
+  if (EMAIL_CONFIG.provider === 'resend') {
+    success = await sendWithResend(params);
   } else if (EMAIL_CONFIG.provider !== 'simulation') {
-    success = await sendWithSMTP(params);
-  }
-  
-  // Fallback to alternative providers if primary fails
-  if (!success) {
-    console.log('Primary email provider failed, trying fallbacks...');
-    
-    // Try SendGrid as fallback if not primary
-    if (EMAIL_CONFIG.provider !== 'sendgrid' && sendGridService) {
-      console.log('Trying SendGrid as fallback...');
-      success = await sendWithSendGrid(params);
-    }
-    
-    // Try Gmail as fallback if not primary
-    if (!success && EMAIL_CONFIG.provider !== 'gmail' && EMAIL_CONFIG.gmail.user) {
-      console.log('Trying Gmail as fallback...');
-      const transporter = nodemailer.createTransporter({
-        service: 'gmail',
-        auth: EMAIL_CONFIG.gmail,
-      });
-      
-      try {
-        await transporter.sendMail({
-          from: params.from,
-          to: params.to,
-          subject: params.subject,
-          text: params.text,
-          html: params.html,
-        });
-        console.log('Email sent successfully via Gmail fallback');
-        success = true;
-      } catch (error) {
-        console.error('Gmail fallback error:', error);
-      }
+    success = await sendWithSmtp(params);
+    // Resend as fallback
+    if (!success && resendClient) {
+      console.log('SMTP failed, falling back to Resend...');
+      success = await sendWithResend(params);
     }
   }
-  
-  // Final fallback to simulation for development
+
   if (!success) {
-    console.log('All email providers failed, using simulation mode');
+    console.log('All providers failed, using simulation mode');
     success = simulateEmail(params);
   }
-  
+
   return success;
 }
 
 export async function sendMerchantVerificationEmail(
-  email: string, 
-  token: string, 
+  email: string,
+  token: string,
   merchantName: string,
   baseUrl?: string
 ): Promise<boolean> {
-  // Use proper domain for verification URL
-  const properBaseUrl = baseUrl || (process.env.REPLIT_DOMAINS ? 
-    `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` : 
-    'http://localhost:5000');
+  const properBaseUrl = baseUrl || (process.env.REPLIT_DOMAINS
+    ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+    : 'http://localhost:5000');
   const confirmUrl = `${properBaseUrl}/confirm-email?token=${token}`;
 
   const html = `
     <div style="font-family: 'Outfit', Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #060e42; padding: 32px 20px;">
       <div style="background-color: #0d1147; border: 1px solid rgba(255,255,255,0.08); padding: 40px 36px; border-radius: 20px;">
-
         <div style="text-align: center; margin-bottom: 32px;">
           <p style="font-size: 22px; font-weight: 700; color: #ffffff; margin: 0; letter-spacing: -0.5px;">TaptPay</p>
           <p style="color: rgba(255,255,255,0.5); margin: 6px 0 0 0; font-size: 14px;">Merchant Account Verification</p>
         </div>
-
-        <p style="color: rgba(255,255,255,0.85); font-size: 15px; line-height: 1.6; margin: 0 0 12px 0;">
-          Hi ${merchantName},
-        </p>
+        <p style="color: rgba(255,255,255,0.85); font-size: 15px; line-height: 1.6; margin: 0 0 12px 0;">Hi ${merchantName},</p>
         <p style="color: rgba(255,255,255,0.65); font-size: 14px; line-height: 1.7; margin: 0 0 28px 0;">
           Thanks for signing up. Please confirm your email address to continue setting up your TaptPay merchant account.
         </p>
-
         <div style="text-align: center; margin: 32px 0;">
           <a href="${confirmUrl}"
              style="background-color: #00f1d7; color: #000a36; padding: 14px 36px; text-decoration: none; border-radius: 50px; display: inline-block; font-weight: 700; font-size: 15px; letter-spacing: 0.2px;">
             Confirm email address
           </a>
         </div>
-
         <p style="color: rgba(255,255,255,0.35); font-size: 12px; line-height: 1.6; margin: 28px 0 0 0; text-align: center;">
           If you didn't create a TaptPay account, you can safely ignore this email.
         </p>
@@ -225,8 +167,7 @@ export async function sendMerchantVerificationEmail(
     </div>
   `;
 
-  const textContent = `
-Hi ${merchantName},
+  const textContent = `Hi ${merchantName},
 
 Please confirm your email address to continue setting up your TaptPay merchant account:
 
@@ -234,21 +175,17 @@ ${confirmUrl}
 
 If you didn't create a TaptPay account, ignore this email.
 
-Need help? Contact us at support@taptpay.co.nz
-  `;
-
-  const fromEmail = EMAIL_CONFIG.provider === 'gmail' ? EMAIL_CONFIG.gmail.user : EMAIL_CONFIG.sendgrid.fromEmail;
+Need help? Contact us at support@taptpay.co.nz`;
 
   return sendEmailMulti({
     to: email,
-    from: fromEmail || 'noreply@taptpay.co.nz',
+    from: EMAIL_CONFIG.resend.fromEmail,
     subject: 'Confirm your TaptPay email address',
     html,
-    text: textContent
+    text: textContent,
   });
 }
 
-// Board Builder email with PDF attachment
 export async function sendBoardBuilderEmail(params: {
   pdfBase64: string;
   businessName: string;
@@ -258,9 +195,7 @@ export async function sendBoardBuilderEmail(params: {
   layout: string;
 }): Promise<boolean> {
   const PRINT_TARGET = 'oliverleonard@taptpay.co.nz';
-  const fromEmail = EMAIL_CONFIG.sendgrid.apiKey
-    ? EMAIL_CONFIG.sendgrid.fromEmail
-    : EMAIL_CONFIG.gmail.user || EMAIL_CONFIG.outlook.user || EMAIL_CONFIG.smtp.auth.user || 'noreply@taptpay.co.nz';
+  const from = EMAIL_CONFIG.resend.fromEmail;
 
   const subject = `New Payment Board — ${params.businessName} (${params.layout})`;
   const html = `
@@ -275,52 +210,51 @@ export async function sendBoardBuilderEmail(params: {
     <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
     <p style="color:#9ca3af;font-size:12px;">Sent via TaptPay Board Builder</p>
   `;
+  const filename = `payment-board-${params.businessName.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}.pdf`;
 
-  const attachment = {
-    filename: `payment-board-${params.businessName.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}.pdf`,
-    content: params.pdfBase64,
-  };
-
-  if (sendGridService) {
+  // Try Resend first (supports attachments natively)
+  if (resendClient) {
     try {
-      await sendGridService.send({
+      const { error } = await resendClient.emails.send({
         to: PRINT_TARGET,
-        from: fromEmail as string,
+        from,
         subject,
         html,
         text: `Payment Board Print Request from ${params.businessName} submitted by ${params.submitterName}.`,
         attachments: [{
-          content: params.pdfBase64,
-          filename: attachment.filename,
-          type: 'application/pdf',
-          disposition: 'attachment',
+          filename,
+          content: Buffer.from(params.pdfBase64, 'base64'),
         }],
       });
-      console.log('Board builder email sent via SendGrid');
-      return true;
-    } catch (error) {
-      console.error('SendGrid board builder email error:', error);
+      if (!error) {
+        console.log('✅ Board builder email sent via Resend');
+        return true;
+      }
+      console.error('Resend board builder error:', error);
+    } catch (err) {
+      console.error('Resend board builder exception:', err);
     }
   }
 
-  const transporter = createTransporter();
+  // SMTP fallback
+  const transporter = createSmtpTransporter();
   if (transporter) {
     try {
       await transporter.sendMail({
-        from: fromEmail as string,
+        from,
         to: PRINT_TARGET,
         subject,
         html,
         attachments: [{
-          filename: attachment.filename,
+          filename,
           content: Buffer.from(params.pdfBase64, 'base64'),
           contentType: 'application/pdf',
         }],
       });
-      console.log('Board builder email sent via SMTP');
+      console.log('✅ Board builder email sent via SMTP');
       return true;
-    } catch (error) {
-      console.error('SMTP board builder email error:', error);
+    } catch (err) {
+      console.error('SMTP board builder error:', err);
     }
   }
 
@@ -328,22 +262,18 @@ export async function sendBoardBuilderEmail(params: {
   return true;
 }
 
-// Email service status check
 export function getEmailServiceStatus() {
-  const status = {
+  return {
     provider: EMAIL_CONFIG.provider,
-    sendgridConfigured: !!EMAIL_CONFIG.sendgrid.apiKey,
+    resendConfigured: !!EMAIL_CONFIG.resend.apiKey,
     smtpConfigured: !!(EMAIL_CONFIG.smtp.host && EMAIL_CONFIG.smtp.auth.user),
     gmailConfigured: !!(EMAIL_CONFIG.gmail.user && EMAIL_CONFIG.gmail.pass),
     outlookConfigured: !!(EMAIL_CONFIG.outlook.user && EMAIL_CONFIG.outlook.pass),
-    availableProviders: [] as string[],
+    availableProviders: [
+      EMAIL_CONFIG.resend.apiKey ? 'resend' : null,
+      EMAIL_CONFIG.gmail.user && EMAIL_CONFIG.gmail.pass ? 'gmail' : null,
+      EMAIL_CONFIG.outlook.user && EMAIL_CONFIG.outlook.pass ? 'outlook' : null,
+      EMAIL_CONFIG.smtp.host ? 'smtp' : null,
+    ].filter(Boolean),
   };
-  
-  if (status.sendgridConfigured) status.availableProviders.push('sendgrid');
-  if (status.gmailConfigured) status.availableProviders.push('gmail');
-  if (status.outlookConfigured) status.availableProviders.push('outlook');
-  if (status.smtpConfigured) status.availableProviders.push('smtp');
-  
-  console.log('Email service status:', status);
-  return status;
 }
