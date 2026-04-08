@@ -238,7 +238,7 @@ export async function syncVerifiedMerchants() {
     const allMerchants = await storage.getAllMerchants();
 
     for (const merchant of allMerchants) {
-      if (merchant.status === 'verified' && merchant.passwordHash) {
+      if ((merchant.status === 'verified' || merchant.status === 'active') && merchant.passwordHash) {
         const existingUser = getUserByEmail(merchant.email);
         if (!existingUser) {
           try {
