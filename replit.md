@@ -75,6 +75,12 @@ The application adopts a monorepo structure, separating client, server, and shar
     -   Multi-stone support: Supports unlimited payment stones per merchant with complete isolation; stone renaming safe (uses immutable IDs).
 -   Deployment: `npm run dev` for development, `npm run build` for production, Drizzle Kit for database migrations.
 
+## Data Safety Policy
+
+- **Never use `--force` in the auto schema push.** The server startup runs `drizzle-kit push` (without `--force`) so that destructive schema changes (column drops, table drops) are blocked automatically and require a deliberate `npm run db:push` in the terminal.
+- **Never truncate or seed over live data.** The `seedDatabase()` function in `server/seed.ts` has a guard that exits immediately if any merchants exist. This guard must never be removed. Stock items, transactions, and merchant records must never be deleted or replaced by any startup routine.
+- **Schema drift rule.** When a new column is added to `shared/schema.ts`, the auto-push on the next dev restart will add it safely. If a column must be removed, run `npm run db:push` manually after reviewing what will be dropped.
+
 ## External Dependencies
 
 **Core Frameworks:**

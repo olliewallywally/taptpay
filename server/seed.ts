@@ -10,7 +10,11 @@ export async function seedDatabase() {
   }
 
   try {
-    // Check if merchants already exist
+    // DATA SAFETY GUARD — do not remove this check.
+    // This function only runs once (on a fresh empty database). If any merchants
+    // already exist, we bail out immediately to ensure live merchant data,
+    // stock_items, and transactions are NEVER truncated, overwritten, or replaced
+    // by seed data. Never add DELETE/TRUNCATE statements above or below this guard.
     const existingMerchants = await db.select().from(merchants).limit(1);
     if (existingMerchants.length > 0) {
       console.log('Database already seeded');

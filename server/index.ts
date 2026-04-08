@@ -142,6 +142,13 @@ app.use((req, res, next) => {
   // ~10s cold-start penalty on every restart/deploy. To apply schema changes
   // in production, either set RUN_MIGRATIONS=true in the environment for a
   // single controlled run, or execute `npm run db:push` manually.
+  //
+  // DATA SAFETY: --force is intentionally omitted. Without --force, drizzle-kit
+  // refuses to apply destructive changes (column drops, table drops) and returns
+  // a non-zero exit code instead of silently destroying live data. Only additive
+  // changes (new tables, new columns) are applied automatically. If you need to
+  // apply a destructive schema change, run `npm run db:push` manually in the
+  // terminal after reviewing exactly what will be dropped.
   const runMigrations = !isProduction || process.env.RUN_MIGRATIONS === 'true';
   if (isDatabaseConnected() && runMigrations) {
     log('Running schema push to sync database...');
@@ -151,7 +158,7 @@ app.use((req, res, next) => {
       if (configExists) {
         const push = spawnSync(
           'npx',
-          ['drizzle-kit', 'push', `--config=${drizzleConfigPath}`, '--force'],
+          ['drizzle-kit', 'push', `--config=${drizzleConfigPath}`],
           {
             stdio: 'pipe',
             encoding: 'utf8',
@@ -163,7 +170,9 @@ app.use((req, res, next) => {
           log('✅ Schema: database schema is up to date');
         } else {
           const output = (push.stdout || '') + (push.stderr || '');
-          log(`⚠️  Schema push warning (non-fatal) — continuing: ${output.slice(0, 300)}`);
+          // Non-zero exit most likely means a destructive change was blocked.
+          // The server continues safely — no data was modified.
+          log(`⚠️  Schema push blocked (possible destructive change) — data untouched. Run \`npm run db:push\` manually to review: ${output.slice(0, 300)}`);
         }
       } else {
         log('⚠️  drizzle.config.ts not found at project root — skipping schema push');
