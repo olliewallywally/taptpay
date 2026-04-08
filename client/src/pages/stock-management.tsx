@@ -499,67 +499,60 @@ export default function StockManagement() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-100 pb-28">
-      {/* Header */}
-      <div className="relative">
-        <div
-          className="absolute left-0 right-0 h-[80px] sm:h-[106px] bg-[#00E5CC] rounded-b-[60px] sm:rounded-b-[100px] z-0"
-          style={{ bottom: "-20px" }}
-        />
-        <div className="bg-[#0055FF] pt-6 sm:pt-8 pb-10 sm:pb-12 rounded-b-[60px] sm:rounded-b-[100px] relative z-10">
-          <div className="max-w-3xl mx-auto px-4 sm:px-6">
-            <h1 className="text-[#00E5CC] text-center text-xl sm:text-2xl md:text-3xl mb-6">
-              inventory
-            </h1>
+    <div className="min-h-screen bg-[#0055FF]">
+      {/* Header — sits directly on the blue background */}
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-10 sm:pt-12 pb-8 sm:pb-10">
+        <h1 className="text-[#00E5CC] text-center text-xl sm:text-2xl md:text-3xl mb-6">
+          inventory
+        </h1>
 
-            {/* Search */}
-            <div className="relative mb-4">
-              <input
-                type="text"
-                placeholder="Search products…"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-white/10 backdrop-blur-sm border border-[#00E5CC]/30 rounded-full px-5 py-3 pl-12 text-white placeholder-[#00E5CC]/60 focus:outline-none focus:border-[#00E5CC]"
-                data-testid="input-search"
-              />
-              <Search
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-[#00E5CC]"
-                size={18}
-              />
-            </div>
+        {/* Search */}
+        <div className="relative mb-4">
+          <input
+            type="text"
+            placeholder="Search products…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-white/10 backdrop-blur-sm border border-[#00E5CC]/30 rounded-full px-5 py-3 pl-12 text-white placeholder-[#00E5CC]/60 focus:outline-none focus:border-[#00E5CC]"
+            data-testid="input-search"
+          />
+          <Search
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-[#00E5CC]"
+            size={18}
+          />
+        </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-2 sm:gap-3">
-              {[
-                { label: "Total items", value: stockItems.length, color: "text-[#00E5CC]" },
-                {
-                  label: "Total value",
-                  value: `$${totalValue.toFixed(2)}`,
-                  color: "text-yellow-300",
-                },
-                {
-                  label: "Showing",
-                  value: filteredAndSorted.length,
-                  color: "text-[#00E5CC]",
-                },
-              ].map(({ label, value, color }) => (
-                <div
-                  key={label}
-                  className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-3 sm:p-4 text-center"
-                >
-                  <div className={`${color} text-xl sm:text-2xl font-semibold`} data-testid={label === "Total items" ? "text-total-items" : undefined}>
-                    {value}
-                  </div>
-                  <div className="text-[#00E5CC]/70 text-[11px] sm:text-xs mt-0.5">{label}</div>
-                </div>
-              ))}
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+          {[
+            { label: "Total items", value: stockItems.length, color: "text-[#00E5CC]" },
+            {
+              label: "Total value",
+              value: `$${totalValue.toFixed(2)}`,
+              color: "text-yellow-300",
+            },
+            {
+              label: "Showing",
+              value: filteredAndSorted.length,
+              color: "text-[#00E5CC]",
+            },
+          ].map(({ label, value, color }) => (
+            <div
+              key={label}
+              className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-3 sm:p-4 text-center"
+            >
+              <div className={`${color} text-xl sm:text-2xl font-semibold`} data-testid={label === "Total items" ? "text-total-items" : undefined}>
+                {value}
+              </div>
+              <div className="text-[#00E5CC]/70 text-[11px] sm:text-xs mt-0.5">{label}</div>
             </div>
-          </div>
+          ))}
         </div>
       </div>
 
-      {/* Content */}
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 mt-10 sm:mt-12 relative z-10">
+      {/* White rounded-top overlay — content sits on this */}
+      <div className="bg-white rounded-t-[40px] sm:rounded-t-[48px] min-h-screen pb-32">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8">
         {/* Toolbar: sort + add */}
         <div className="flex items-center gap-2 mb-4 flex-wrap">
           <div className="flex items-center gap-1 flex-1 flex-wrap">
@@ -657,6 +650,7 @@ export default function StockManagement() {
             })}
           </div>
         )}
+        </div>
       </div>
 
       {/* Product bottom-sheet */}

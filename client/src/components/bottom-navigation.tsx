@@ -18,21 +18,24 @@ export function BottomNavigation() {
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-[#2C2C2E] rounded-t-[24px] sm:rounded-t-[32px] md:rounded-t-[40px] px-4 sm:px-8 md:px-12 py-3 sm:py-4 md:py-5 z-50">
-      <div className="max-w-md md:max-w-2xl mx-auto flex items-center justify-between gap-2 md:gap-4">
+    <div className="fixed bottom-4 sm:bottom-6 left-4 right-4 z-50 flex justify-center pointer-events-none">
+      <div
+        className="pointer-events-auto bg-[#2C2C2E] rounded-full px-5 sm:px-8 py-3 sm:py-4 shadow-2xl flex items-center gap-4 sm:gap-6 md:gap-8"
+        style={{ minWidth: 'min(360px, 100%)', maxWidth: '480px' }}
+      >
         {navItems.map(({ path, icon: Icon, label }) => (
           <button
             key={path}
             onClick={() => setLocation(path)}
-            className={`flex flex-col items-center justify-center gap-1 sm:gap-1.5 md:gap-2 transition-all flex-1 ${
+            className={`flex flex-col items-center justify-center gap-1 transition-all flex-1 ${
               location === path
                 ? 'text-[#00E5CC]'
                 : 'text-white/60 hover:text-white/80'
             }`}
             data-testid={`nav-${label.toLowerCase()}`}
           >
-            <Icon className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7" />
-            <span className="text-[10px] sm:text-xs md:text-sm font-medium">{label}</span>
+            <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
+            <span className="text-[10px] sm:text-xs font-medium">{label}</span>
           </button>
         ))}
       </div>
