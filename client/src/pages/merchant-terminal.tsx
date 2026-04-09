@@ -54,6 +54,7 @@ export default function MerchantTerminal() {
   const [copiedPaymentLink, setCopiedPaymentLink] = useState(false);
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const prevTransactionStatusRef = useRef<string | null>(null);
+  const successOverlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const playSuccessChime = () => {
     try {
@@ -421,9 +422,13 @@ export default function MerchantTerminal() {
     if (status === 'completed' && prev && prev !== 'completed') {
       playSuccessChime();
       setShowSuccessOverlay(true);
-      setTimeout(() => setShowSuccessOverlay(false), 2500);
+      if (successOverlayTimerRef.current) clearTimeout(successOverlayTimerRef.current);
+      successOverlayTimerRef.current = setTimeout(() => setShowSuccessOverlay(false), 2500);
     }
     prevTransactionStatusRef.current = status ?? null;
+    return () => {
+      if (successOverlayTimerRef.current) clearTimeout(successOverlayTimerRef.current);
+    };
   }, [currentTransaction?.status]);
 
   const onSubmit = (data: TransactionFormData) => {
