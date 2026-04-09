@@ -101,6 +101,11 @@ function CheckoutInner() {
   // Incrementing this triggers the pre-session useEffect to create a fresh session
   const [preSessionTrigger, setPreSessionTrigger] = useState(0);
 
+  // Google Pay pre-session — mirrors Apple Pay's approach so the Windcave session
+  // is ready the moment the user approves Google Pay (no blocking network call).
+  const googlePreSessionRef = useRef<any>(null);
+  const [googlePreSessionTrigger, setGooglePreSessionTrigger] = useState(0);
+
   const { data: transaction, isLoading: txLoading } = useQuery({
     queryKey: ["/api/transactions", txId],
     queryFn: async () => {
@@ -157,8 +162,10 @@ function CheckoutInner() {
         });
     }
 
-    // Google Pay script is safe to load unconditionally — Google's own SDK
-    // never redirects; it only shows a native bottom sheet.
+    // Google Pay script — load unconditionally so the client is ready before tap.
+    // In TEST mode (default) it shows a native bottom sheet without domain registration.
+    // In PRODUCTION mode it requires domain registration at console.googlepay.com
+    // (controlled via GOOGLE_PAY_ENV server env var).
     loadScript("https://pay.google.com/gp/p/js/pay.js")
       .then(() => checkGooglePay())
       .catch(() => {});
@@ -209,6 +216,36 @@ function CheckoutInner() {
   // changes (new transaction, different env, overrideAmount param, or a payment
   // was attempted and preSessionTrigger incremented).
   }, [applePayAvailable, transaction?.id, envData?.env, txId, overrideAmount, preSessionTrigger]);
+
+  // Pre-create a Windcave session for Google Pay so it is ready the instant
+  // the user approves — eliminates the createSession() network call that
+  // previously happened after loadPaymentData() resolved, which added latency
+  // at the most sensitive moment.  Same pattern as the Apple Pay pre-session.
+  useEffect(() => {
+    if (!googlePayAvailable || !transaction?.id || !envData?.env || !txId) return;
+    let cancelled = false;
+
+    if (googlePreSessionTrigger > 0) {
+      googlePreSessionRef.current = null;
+    }
+
+    (async () => {
+      const body: Record<string, unknown> = { merchantId: transaction.merchantId };
+      if (transaction.taptStoneId) body.stoneId = transaction.taptStoneId;
+      if (overrideAmount) body.amount = overrideAmount;
+      try {
+        const res = await apiRequest("POST", `/api/transactions/${txId}/pay`, body);
+        if (!cancelled && res.ok) {
+          const data = await res.json();
+          if (data?.sessionId) {
+            googlePreSessionRef.current = data;
+          }
+        }
+      } catch {}
+    })();
+
+    return () => { cancelled = true; };
+  }, [googlePayAvailable, transaction?.id, envData?.env, txId, overrideAmount, googlePreSessionTrigger]);
 
   // Lazy-load Windcave Hosted Fields scripts only when the card tab is first
   // opened — loading them at page load causes the HF SDK to auto-initialise
@@ -813,8 +850,13 @@ function CheckoutInner() {
       });
       const rawToken = paymentData?.paymentMethodData?.tokenizationData?.token || "{}";
       const googlePayToken = typeof rawToken === "string" ? JSON.parse(rawToken) : rawToken;
-      const session = await createSession();
+      // Use pre-created session if available (no blocking network call).
+      // Fall back to creating a new session if the pre-session wasn't ready.
+      const session = googlePreSessionRef.current || await createSession();
+      googlePreSessionRef.current = null; // consume the session
       if (!session) { setPayState("error"); setErrorMsg("Unable to start payment."); return; }
+      // Trigger a new pre-session for retry after failed/cancelled payment
+      setGooglePreSessionTrigger(t => t + 1);
       // NOTE: ajaxSubmitGooglePayUrl is intentionally NOT sent — the backend looks it
       // up from its server-side cache to prevent SSRF attacks.
       const res = await apiRequest("POST", `/api/transactions/${txId}/googlepay-complete`, {
