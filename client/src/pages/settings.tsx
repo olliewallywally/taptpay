@@ -111,7 +111,7 @@ export default function Settings() {
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
   const [pushSupported, setPushSupported] = useState(false);
-  const [vapidAvailable, setVapidAvailable] = useState(true);
+  const [vapidAvailable, setVapidAvailable] = useState(false);
 
   useEffect(() => {
     if (isNativeIOS()) {
