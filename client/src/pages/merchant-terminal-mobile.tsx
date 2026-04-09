@@ -54,7 +54,10 @@ export default function MerchantTerminalMobile() {
 
   const playSuccessChime = () => {
     try {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioCtx: typeof AudioContext =
+        window.AudioContext ||
+        (window as Window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = new AudioCtx();
       const playTone = (freq: number, startTime: number, duration: number, gain: number) => {
         const osc = ctx.createOscillator();
         const gainNode = ctx.createGain();
@@ -147,8 +150,8 @@ export default function MerchantTerminalMobile() {
       return response.json();
     },
     refetchInterval: (query) => {
-      const status = (query.state.data as any)?.status;
-      return status === 'pending' || status === 'processing' ? 3000 : false;
+      const data = query.state.data as { status?: string } | null | undefined;
+      return data?.status === 'pending' || data?.status === 'processing' ? 3000 : false;
     },
   });
 
@@ -517,6 +520,37 @@ export default function MerchantTerminalMobile() {
   if (isMobile) {
     return (
       <>
+        {/* Payment success overlay */}
+        {showSuccessOverlay && (
+          <div
+            className="fixed inset-0 z-[999] flex items-center justify-center pointer-events-none"
+            style={{ background: 'rgba(0,0,0,0.55)' }}
+          >
+            <div
+              className="flex flex-col items-center gap-4"
+              style={{ animation: 'successPop 0.35s cubic-bezier(0.34,1.56,0.64,1) both' }}
+            >
+              <div
+                className="rounded-full flex items-center justify-center"
+                style={{ width: 120, height: 120, background: 'linear-gradient(135deg,#00E5CC,#0055FF)', boxShadow: '0 0 60px rgba(0,229,204,0.5)' }}
+              >
+                <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
+                  <path
+                    d="M12 30 L24 42 L48 18"
+                    stroke="white" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"
+                    style={{ animation: 'drawTick 0.4s 0.15s ease-out both', strokeDasharray: 60, strokeDashoffset: 0 }}
+                  />
+                </svg>
+              </div>
+              <p className="text-white text-xl font-semibold tracking-wide" style={{ textShadow: '0 2px 12px rgba(0,0,0,0.5)' }}>Payment Received</p>
+            </div>
+            <style>{`
+              @keyframes successPop { from { opacity:0; transform:scale(0.6); } to { opacity:1; transform:scale(1); } }
+              @keyframes drawTick { from { stroke-dashoffset:60; } to { stroke-dashoffset:0; } }
+            `}</style>
+          </div>
+        )}
+
         {/* Menu Backdrop */}
         <div 
           className={`fixed inset-0 bg-black/60 z-40 transition-opacity duration-300 ${
