@@ -129,6 +129,9 @@ function CheckoutInner() {
   const env: "uat" | "sec" = envData?.env || "uat";
   const applePayMerchantId: string = envData?.applePayMerchantId || "";
   const googlePayMerchantId: string = envData?.googlePayMerchantId || "";
+  // googlePayEnv is controlled independently via GOOGLE_PAY_ENV server env var.
+  // Defaults to "TEST" until the domain is registered at console.googlepay.com.
+  const googlePayEnv: "TEST" | "PRODUCTION" = envData?.googlePayEnv || "TEST";
   const base = `https://${env}.windcave.com`;
 
   useEffect(() => {
@@ -596,8 +599,11 @@ function CheckoutInner() {
       // Never show Google Pay on iOS — Apple Pay is the correct wallet there
       if (inAppEnv.isIOS) return;
       if (!window.google?.payments?.api?.PaymentsClient) return;
+      // Use googlePayEnv (server-controlled via GOOGLE_PAY_ENV env var) rather
+      // than deriving from Windcave env.  Switching to "PRODUCTION" requires
+      // domain registration at console.googlepay.com; default is "TEST".
       const client = new window.google.payments.api.PaymentsClient({
-        environment: env === "sec" ? "PRODUCTION" : "TEST",
+        environment: googlePayEnv,
       });
       const { result } = await client.isReadyToPay({
         apiVersion: 2, apiVersionMinor: 0,

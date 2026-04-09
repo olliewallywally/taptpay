@@ -1717,10 +1717,16 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
   // ── Windcave environment info (for frontend Hosted Fields init) ─────────────
   app.get("/api/windcave/env", (_req, res) => {
+    // googlePayEnv is independent of Windcave's env — it requires domain registration
+    // at console.googlepay.com before switching to "PRODUCTION".
+    // Set GOOGLE_PAY_ENV=PRODUCTION once the domain is registered.
+    const googlePayEnv: "TEST" | "PRODUCTION" =
+      process.env.GOOGLE_PAY_ENV === "PRODUCTION" ? "PRODUCTION" : "TEST";
     res.json({
       env: getWindcaveEnv(),
       applePayMerchantId: process.env.WINDCAVE_APPLE_PAY_MERCHANT_ID || "",
       googlePayMerchantId: process.env.WINDCAVE_GOOGLE_PAY_MERCHANT_ID || "",
+      googlePayEnv,
     });
   });
 
