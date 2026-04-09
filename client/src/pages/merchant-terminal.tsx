@@ -57,7 +57,10 @@ export default function MerchantTerminal() {
 
   const playSuccessChime = () => {
     try {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioCtx: typeof AudioContext =
+        window.AudioContext ||
+        (window as Window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = new AudioCtx();
       const playTone = (freq: number, startTime: number, duration: number, gain: number) => {
         const osc = ctx.createOscillator();
         const gainNode = ctx.createGain();
@@ -117,8 +120,8 @@ export default function MerchantTerminal() {
       return response.json();
     },
     refetchInterval: (query) => {
-      const status = (query.state.data as any)?.status;
-      return status === 'pending' || status === 'processing' ? 3000 : false;
+      const data = query.state.data as { status?: string } | null | undefined;
+      return data?.status === 'pending' || data?.status === 'processing' ? 3000 : false;
     },
   });
 
