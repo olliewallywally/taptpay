@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -52,6 +52,29 @@ export default function MerchantTerminal() {
   
   const [splitEnabled, setSplitEnabled] = useState(false);
   const [copiedPaymentLink, setCopiedPaymentLink] = useState(false);
+  const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
+  const prevTransactionStatusRef = useRef<string | null>(null);
+
+  const playSuccessChime = () => {
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const playTone = (freq: number, startTime: number, duration: number, gain: number) => {
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, startTime);
+        gainNode.gain.setValueAtTime(0, startTime);
+        gainNode.gain.linearRampToValueAtTime(gain, startTime + 0.02);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
+      playTone(880, ctx.currentTime, 0.4, 0.4);
+      playTone(1100, ctx.currentTime + 0.18, 0.5, 0.35);
+    } catch {}
+  };
 
   // Tap to Pay (iOS only)
   const [tapToPayStatus, setTapToPayStatus] = useState<"idle" | "waiting" | "processing" | "completed" | "failed">("idle");
@@ -85,13 +108,17 @@ export default function MerchantTerminal() {
     },
   });
 
-  // Get active transaction
+  // Get active transaction — poll every 3s as SSE fallback when payment is in-flight
   const { data: activeTransaction } = useQuery({
     queryKey: ["/api/merchants", merchantId, "active-transaction"],
     queryFn: async () => {
       const response = await fetch(`/api/merchants/${merchantId}/active-transaction`);
       if (!response.ok) throw new Error("Failed to fetch active transaction");
       return response.json();
+    },
+    refetchInterval: (query) => {
+      const status = (query.state.data as any)?.status;
+      return status === 'pending' || status === 'processing' ? 3000 : false;
     },
   });
 
@@ -383,6 +410,18 @@ export default function MerchantTerminal() {
       setSplitEnabled(!!activeTransaction.splitEnabled);
     }
   }, [activeTransaction]);
+
+  // Detect payment completion → play ding + show tick overlay
+  useEffect(() => {
+    const status = currentTransaction?.status;
+    const prev = prevTransactionStatusRef.current;
+    if (status === 'completed' && prev && prev !== 'completed') {
+      playSuccessChime();
+      setShowSuccessOverlay(true);
+      setTimeout(() => setShowSuccessOverlay(false), 2500);
+    }
+    prevTransactionStatusRef.current = status ?? null;
+  }, [currentTransaction?.status]);
 
   const onSubmit = (data: TransactionFormData) => {
     createTransactionMutation.mutate(data);
@@ -1168,6 +1207,37 @@ function PaymentStatus({ transaction }: { transaction: any }) {
       extraSmallCirclePosition="bottom-[200px] right-[250px]"
     >
       <div className="relative z-10 min-h-screen text-white">
+
+        {/* Payment success overlay */}
+        {showSuccessOverlay && (
+          <div
+            className="fixed inset-0 z-[999] flex items-center justify-center pointer-events-none"
+            style={{ background: 'rgba(0,0,0,0.55)' }}
+          >
+            <div
+              className="flex flex-col items-center gap-4"
+              style={{ animation: 'successPop 0.35s cubic-bezier(0.34,1.56,0.64,1) both' }}
+            >
+              <div
+                className="rounded-full flex items-center justify-center"
+                style={{ width: 120, height: 120, background: 'linear-gradient(135deg,#00E5CC,#0055FF)', boxShadow: '0 0 60px rgba(0,229,204,0.5)' }}
+              >
+                <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
+                  <path
+                    d="M12 30 L24 42 L48 18"
+                    stroke="white" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"
+                    style={{ animation: 'drawTick 0.4s 0.15s ease-out both', strokeDasharray: 60, strokeDashoffset: 0 }}
+                  />
+                </svg>
+              </div>
+              <p className="text-white text-xl font-semibold tracking-wide" style={{ textShadow: '0 2px 12px rgba(0,0,0,0.5)' }}>Payment Received</p>
+            </div>
+            <style>{`
+              @keyframes successPop { from { opacity:0; transform:scale(0.6); } to { opacity:1; transform:scale(1); } }
+              @keyframes drawTick { from { stroke-dashoffset:60; } to { stroke-dashoffset:0; } }
+            `}</style>
+          </div>
+        )}
 
         {/* Two-Pane Layout Container */}
         <div className="max-w-5xl mx-auto px-3 sm:px-6 pt-4 sm:pt-6">
