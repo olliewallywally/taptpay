@@ -280,28 +280,32 @@ export default function MerchantTerminalMobile() {
   useDeviceStatusMonitoring();
   useSSEConnectionMonitoring(merchantId);
 
-  // Update current transaction from active transaction query
+  // Sync active transaction → currentTransaction and detect payment completion
   useEffect(() => {
-    if (activeTransaction) {
-      setCurrentTransaction(activeTransaction);
-    }
-  }, [activeTransaction]);
-
-  // Detect payment completion → play ding + show tick overlay
-  useEffect(() => {
-    const status = currentTransaction?.status;
     const prev = prevTransactionStatusRef.current;
+    const status = activeTransaction?.status ?? null;
+
     if (status === 'completed' && prev && prev !== 'completed') {
+      // Payment just completed — fire chime, reset form immediately, clear state
       playSuccessChime();
+      form.reset();
+      setCurrentTransaction(null);
+      // Wipe the cached query data so polling stops and the completed transaction
+      // never re-populates the form after the overlay closes
+      queryClient.setQueryData(["/api/merchants", merchantId, "active-transaction"], null);
       setShowSuccessOverlay(true);
       if (successOverlayTimerRef.current) clearTimeout(successOverlayTimerRef.current);
-      successOverlayTimerRef.current = setTimeout(() => setShowSuccessOverlay(false), 2500);
+      successOverlayTimerRef.current = setTimeout(() => setShowSuccessOverlay(false), 5000);
+      prevTransactionStatusRef.current = 'completed';
+      return;
     }
-    prevTransactionStatusRef.current = status ?? null;
-    return () => {
-      if (successOverlayTimerRef.current) clearTimeout(successOverlayTimerRef.current);
-    };
-  }, [currentTransaction?.status]);
+
+    // Don't let a completed transaction re-populate the form
+    if (!activeTransaction || status === 'completed') return;
+
+    setCurrentTransaction(activeTransaction);
+    prevTransactionStatusRef.current = status;
+  }, [activeTransaction]);
 
   const onSubmit = (data: TransactionFormData) => {
     console.log('Form submitted with data:', data);
