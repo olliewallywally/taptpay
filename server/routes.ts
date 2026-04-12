@@ -92,14 +92,20 @@ function broadcastToStone(merchantId: number, stoneId: number | null | undefined
   const merchantConnections = sseConnections.get(merchantId);
   if (!merchantConnections) return;
 
-  // Broadcast to the specific stone's connections
   const targetStoneId = stoneId === undefined ? null : stoneId;
+  const payload = `data: ${JSON.stringify(data)}\n\n`;
+  const sent = new Set<any>();
+
   const stoneConnections = merchantConnections.get(targetStoneId);
-  
   if (stoneConnections) {
-    stoneConnections.forEach(conn => {
-      conn.write(`data: ${JSON.stringify(data)}\n\n`);
-    });
+    stoneConnections.forEach(conn => { conn.write(payload); sent.add(conn); });
+  }
+
+  if (targetStoneId !== null) {
+    const merchantWide = merchantConnections.get(null);
+    if (merchantWide) {
+      merchantWide.forEach(conn => { if (!sent.has(conn)) conn.write(payload); });
+    }
   }
 }
 
