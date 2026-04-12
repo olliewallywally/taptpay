@@ -122,7 +122,7 @@ export default function MerchantTerminal() {
     },
     refetchInterval: (query) => {
       const data = query.state.data as { status?: string } | null | undefined;
-      return data?.status === 'pending' || data?.status === 'processing' ? 3000 : false;
+      return data?.status === 'pending' || data?.status === 'processing' ? 1000 : false;
     },
   });
 
@@ -408,11 +408,11 @@ export default function MerchantTerminal() {
 
   // Update current transaction from active transaction query
   useEffect(() => {
-    if (activeTransaction && currentTransaction?.id !== activeTransaction.id) {
-      setCurrentTransaction(activeTransaction);
-      // Sync split toggle with what's stored in DB
-      setSplitEnabled(!!activeTransaction.splitEnabled);
-    }
+    if (!activeTransaction) return;
+    // Always sync — not just on ID change — so status transitions (pending→completed)
+    // are immediately reflected in currentTransaction and trigger the success overlay.
+    setCurrentTransaction(activeTransaction);
+    setSplitEnabled(!!activeTransaction.splitEnabled);
   }, [activeTransaction]);
 
   // Detect payment completion → play ding + show tick overlay

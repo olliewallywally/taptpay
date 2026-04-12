@@ -152,7 +152,7 @@ export default function MerchantTerminalMobile() {
     },
     refetchInterval: (query) => {
       const data = query.state.data as { status?: string } | null | undefined;
-      return data?.status === 'pending' || data?.status === 'processing' ? 3000 : false;
+      return data?.status === 'pending' || data?.status === 'processing' ? 1000 : false;
     },
   });
 
