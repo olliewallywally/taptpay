@@ -551,10 +551,12 @@ export default function MerchantTerminalMobile() {
     );
   };
 
-  const txToShow = currentTransaction
-    ?? (activeTransaction?.status === 'pending' || activeTransaction?.status === 'processing'
-      ? activeTransaction
-      : null);
+  const txToShow = showSuccessOverlay
+    ? null
+    : (currentTransaction
+      ?? (activeTransaction?.status === 'pending' || activeTransaction?.status === 'processing'
+        ? activeTransaction
+        : null));
 
   if (isMobile) {
     return (

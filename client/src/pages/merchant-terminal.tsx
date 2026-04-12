@@ -1289,13 +1289,12 @@ function PaymentStatus({ transaction, merchantId }: { transaction: any; merchant
   );
 }
 
-  // Safe UI transaction: currentTransaction is the source of truth.
-  // Fall back to activeTransaction only if it is still pending/processing
-  // (never show a completed transaction after we've already fired the overlay).
-  const txToShow = currentTransaction
-    ?? (activeTransaction?.status === 'pending' || activeTransaction?.status === 'processing'
-      ? activeTransaction
-      : null);
+  const txToShow = showSuccessOverlay
+    ? null
+    : (currentTransaction
+      ?? (activeTransaction?.status === 'pending' || activeTransaction?.status === 'processing'
+        ? activeTransaction
+        : null));
 
   return (
     <AnimatedBrandBackground
