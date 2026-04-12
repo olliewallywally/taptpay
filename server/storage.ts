@@ -1,6 +1,6 @@
 import { merchants, transactions, merchantSettlements, platformFees, refunds, splitPayments, taptStones, stockItems, cryptoTransactions, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type CryptoTransaction, type InsertCryptoTransaction, type MerchantSubscription, type SubscriptionBillingHistory } from "@shared/schema";
 import { getDb, isDatabaseConnected } from "./database";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, inArray, gte } from "drizzle-orm";
 
 export interface IStorage {
   // Merchant operations
@@ -436,24 +436,37 @@ export class MemStorage implements IStorage {
       return this.activeTransactionCache.get(cacheKey) || undefined;
     }
     
-    // Optimized search - convert to array first for faster iteration
+    // Return pending/processing first, then recently-completed (within 3 min) so the
+    // terminal can detect the status transition and show the success overlay.
+    const cutoff = new Date(Date.now() - 3 * 60 * 1000);
     let activeTransaction: Transaction | undefined;
+    let recentlyCompleted: Transaction | undefined;
+
     const transactionArray = Array.from(this.transactions.values());
     for (let i = 0; i < transactionArray.length; i++) {
       const transaction = transactionArray[i];
       const matchesMerchant = transaction.merchantId === merchantId;
       const matchesStone = taptStoneId === undefined || transaction.taptStoneId === taptStoneId;
-      const isPending = transaction.status === "pending";
-      
-      if (matchesMerchant && matchesStone && isPending) {
+      if (!matchesMerchant || !matchesStone) continue;
+
+      if (transaction.status === "pending" || transaction.status === "processing") {
         activeTransaction = transaction;
-        break; // Exit immediately when found
+        break;
+      }
+      if (
+        transaction.status === "completed" &&
+        transaction.createdAt &&
+        new Date(transaction.createdAt) >= cutoff &&
+        (!recentlyCompleted || new Date(transaction.createdAt) > new Date(recentlyCompleted.createdAt!))
+      ) {
+        recentlyCompleted = transaction;
       }
     }
-    
+
+    const result = activeTransaction ?? recentlyCompleted;
     // Cache for immediate future lookups
-    this.activeTransactionCache.set(cacheKey, activeTransaction || null);
-    return activeTransaction;
+    this.activeTransactionCache.set(cacheKey, result || null);
+    return result;
   }
 
   async getTransactionByNfcSession(nfcSessionId: string): Promise<Transaction | undefined> {
@@ -1762,24 +1775,41 @@ export class DatabaseStorage implements IStorage {
 
   async getActiveTransactionByMerchant(merchantId: number, taptStoneId?: number): Promise<Transaction | undefined> {
     if (!this.db) throw new Error('Database not available');
-    
-    const conditions = [
+
+    // 1. Prefer pending/processing (in-flight) transactions
+    const activeConditions = [
       eq(transactions.merchantId, merchantId),
-      eq(transactions.status, 'pending')
+      inArray(transactions.status, ['pending', 'processing']),
     ];
-    
-    // Add stone filter if provided
     if (taptStoneId !== undefined) {
-      conditions.push(eq(transactions.taptStoneId, taptStoneId));
+      activeConditions.push(eq(transactions.taptStoneId, taptStoneId));
     }
-    
-    const result = await this.db
+    const activeResult = await this.db
       .select()
       .from(transactions)
-      .where(and(...conditions))
+      .where(and(...activeConditions))
       .orderBy(desc(transactions.createdAt))
       .limit(1);
-    return result[0];
+    if (activeResult[0]) return activeResult[0];
+
+    // 2. Fall back to the most-recently completed transaction (within last 3 min)
+    // so the terminal can detect the pending→completed transition and show the overlay.
+    const cutoff = new Date(Date.now() - 3 * 60 * 1000);
+    const completedConditions = [
+      eq(transactions.merchantId, merchantId),
+      eq(transactions.status, 'completed'),
+      gte(transactions.createdAt, cutoff),
+    ];
+    if (taptStoneId !== undefined) {
+      completedConditions.push(eq(transactions.taptStoneId, taptStoneId));
+    }
+    const completedResult = await this.db
+      .select()
+      .from(transactions)
+      .where(and(...completedConditions))
+      .orderBy(desc(transactions.createdAt))
+      .limit(1);
+    return completedResult[0];
   }
 
   async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
