@@ -1148,7 +1148,23 @@ function StockTagging({
 }
 
 // PaymentStatus Component
-function PaymentStatus({ transaction }: { transaction: any }) {
+function PaymentStatus({ transaction, merchantId }: { transaction: any; merchantId: number }) {
+  const { data: allTransactions = [] } = useQuery<any[]>({
+    queryKey: ["/api/merchants", merchantId, "transactions"],
+    queryFn: async () => {
+      const res = await fetch(`/api/merchants/${merchantId}/transactions`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+      });
+      return res.json();
+    },
+    refetchInterval: 3000,
+    enabled: !!merchantId && !!transaction?.status,
+  });
+
+  const pendingTransactions = allTransactions.filter(
+    (t) => t.status === "pending" || t.status === "processing"
+  );
+
   if (!transaction?.status) return null;
 
   const statusConfig = {
@@ -1194,39 +1210,84 @@ function PaymentStatus({ transaction }: { transaction: any }) {
   if (!config) return null;
 
   const IconComponent = config.icon;
+  const hasPending = pendingTransactions.length > 0;
+  const dropdownMaxHeight = hasPending ? `${pendingTransactions.length * 58 + 12}px` : "0px";
 
   return (
-    <div 
-      className={`flex flex-col items-center space-y-1 sm:space-y-3 p-4 sm:p-6 backdrop-blur-sm rounded-2xl border ${config.bgColor} ${config.borderColor}`}
+    <div
+      className={`rounded-2xl border overflow-hidden ${config.borderColor}`}
       data-testid={`payment-status-${transaction.status}`}
     >
-      <div className="flex items-center space-x-2 sm:space-x-3">
-        <IconComponent 
-          className={`w-5 h-5 sm:w-6 sm:h-6 ${config.iconColor} ${transaction.status === 'processing' ? 'animate-spin' : ''}`} 
-        />
-        <span className={`text-base sm:text-lg font-medium ${config.textColor}`}>
-          {config.title}
-        </span>
-      </div>
-      
-      {transaction.isSplit ? (
-        <div className="text-center space-y-1">
-          <p className={`text-xs sm:text-sm ${config.iconColor}`}>Split Bill Payment</p>
-          <div className="flex items-center justify-center space-x-2">
-            <span className={`text-sm font-bold ${config.textColor}`}>
-              {transaction.completedSplits + 1} of {transaction.totalSplits}
-            </span>
-            <span className={`text-xs ${config.iconColor}`}>payments</span>
-          </div>
-          <p className={`text-xs ${config.iconColor}`}>
-            ${parseFloat(transaction.splitAmount).toFixed(2)} per person
-          </p>
+      {/* Pill */}
+      <div className={`flex flex-col items-center space-y-1 sm:space-y-3 p-4 sm:p-6 backdrop-blur-sm ${config.bgColor}`}>
+        <div className="flex items-center space-x-2 sm:space-x-3">
+          <IconComponent
+            className={`w-5 h-5 sm:w-6 sm:h-6 ${config.iconColor} ${transaction.status === 'processing' ? 'animate-spin' : ''}`}
+          />
+          <span className={`text-base sm:text-lg font-medium ${config.textColor}`}>
+            {config.title}
+          </span>
         </div>
-      ) : (
-        <p className={`text-xs sm:text-sm ${config.iconColor} text-center`}>
-          {config.description}
-        </p>
-      )}
+
+        {transaction.isSplit ? (
+          <div className="text-center space-y-1">
+            <p className={`text-xs sm:text-sm ${config.iconColor}`}>Split Bill Payment</p>
+            <div className="flex items-center justify-center space-x-2">
+              <span className={`text-sm font-bold ${config.textColor}`}>
+                {transaction.completedSplits + 1} of {transaction.totalSplits}
+              </span>
+              <span className={`text-xs ${config.iconColor}`}>payments</span>
+            </div>
+            <p className={`text-xs ${config.iconColor}`}>
+              ${parseFloat(transaction.splitAmount).toFixed(2)} per person
+            </p>
+          </div>
+        ) : (
+          <p className={`text-xs sm:text-sm ${config.iconColor} text-center`}>
+            {config.description}
+          </p>
+        )}
+      </div>
+
+      {/* Connected pending-transactions dropdown — slides down slowly */}
+      <div
+        style={{
+          maxHeight: dropdownMaxHeight,
+          overflow: "hidden",
+          transition: "max-height 0.65s cubic-bezier(0.4, 0, 0.2, 1)",
+          background: "#010646",
+        }}
+      >
+        {/* Thin separator so the pill colour doesn't bleed into the dropdown */}
+        <div style={{ height: 1, background: "rgba(255,255,255,0.08)" }} />
+        {pendingTransactions.map((tx, i) => (
+          <div
+            key={tx.id}
+            className="flex items-center justify-between px-4 py-3"
+            style={{
+              borderTop: i > 0 ? "1px solid rgba(255,255,255,0.06)" : undefined,
+            }}
+          >
+            <span className="text-white text-sm font-medium truncate max-w-[55%]">
+              {tx.itemName || "Payment"}
+            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-white font-bold text-sm">
+                ${parseFloat(tx.price).toFixed(2)}
+              </span>
+              <span
+                className="text-xs px-2 py-0.5 rounded-full font-medium"
+                style={{
+                  background: tx.status === "pending" ? "rgba(96,165,250,0.18)" : "rgba(251,146,60,0.18)",
+                  color: tx.status === "pending" ? "#93c5fd" : "#fdba74",
+                }}
+              >
+                {tx.status}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1437,7 +1498,7 @@ function PaymentStatus({ transaction }: { transaction: any }) {
             <div className="space-y-4 sm:space-y-6 w-full max-w-2xl mx-auto lg:mx-0">
               {/* Payment Status */}
               {(currentTransaction || activeTransaction) && (
-                <PaymentStatus transaction={currentTransaction || activeTransaction} />
+                <PaymentStatus transaction={currentTransaction || activeTransaction} merchantId={merchantId} />
               )}
 
               {/* Stones Section */}
