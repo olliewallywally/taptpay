@@ -90,11 +90,11 @@ export default function Dashboard() {
     const updateChartSize = () => {
       const width = window.innerWidth;
       if (width >= 1024) {
-        setChartSize(340);
+        setChartSize(220);
       } else if (width >= 640) {
-        setChartSize(280);
+        setChartSize(260);
       } else {
-        setChartSize(Math.min(260, width - 80));
+        setChartSize(Math.min(240, width - 80));
       }
     };
 
@@ -205,25 +205,25 @@ export default function Dashboard() {
     <div className="min-h-screen bg-gray-200 pb-24">
       {/* Header Section with Active Transactions */}
       <div className="relative">
-        <div className="absolute left-0 right-0 h-[80px] sm:h-[106px] md:h-[120px] bg-[#00E5CC] rounded-b-[60px] sm:rounded-b-[100px] md:rounded-b-[120px] z-0" style={{ bottom: '-20px' }}></div>
-        
-        <div className="bg-[#0055FF] pt-6 sm:pt-8 md:pt-10 pb-5 sm:pb-7 md:pb-9 rounded-b-[60px] sm:rounded-b-[100px] md:rounded-b-[120px] relative z-10">
-          <div className="max-w-md md:max-w-2xl mx-auto px-4 sm:px-6 md:px-8">
-            <h1 className="text-[#00E5CC] text-center text-xl sm:text-2xl md:text-3xl mb-8 sm:mb-12 md:mb-16">active transactions</h1>
-            
-            <div className="relative flex items-center justify-center mb-6 sm:mb-8 md:mb-10">
-              <SemiCircularProgress 
-                percentage={dailyPercentage} 
-                size={chartSize} 
-                strokeWidth={16} 
+        <div className="absolute left-0 right-0 h-[80px] sm:h-[106px] bg-[#00E5CC] rounded-b-[60px] sm:rounded-b-[100px] z-0" style={{ bottom: '-20px' }}></div>
+
+        <div className="bg-[#0055FF] pt-6 sm:pt-8 pb-5 sm:pb-7 rounded-b-[60px] sm:rounded-b-[100px] relative z-10">
+          <div className="max-w-md lg:max-w-lg mx-auto px-4 sm:px-6">
+            <h1 className="text-[#00E5CC] text-center text-xl sm:text-2xl mb-6 sm:mb-10">active transactions</h1>
+
+            <div className="relative flex items-center justify-center mb-4 sm:mb-6">
+              <SemiCircularProgress
+                percentage={dailyPercentage}
+                size={chartSize}
+                strokeWidth={14}
                 color="#00E5CC"
                 backgroundColor="rgba(0, 229, 204, 0.2)"
               />
-              <div className="absolute text-center" style={{ bottom: '10px' }}>
-                <div className="text-[#00E5CC] text-4xl sm:text-5xl md:text-6xl mb-1">
+              <div className="absolute text-center" style={{ bottom: '8px' }}>
+                <div className="text-[#00E5CC] text-3xl sm:text-4xl lg:text-4xl mb-0.5">
                   ${todayRevenue.toFixed(2)}
                 </div>
-                <div className="text-[#00E5CC] text-sm sm:text-lg md:text-xl">
+                <div className="text-[#00E5CC] text-sm sm:text-base">
                   {todayTransactionCount} transaction{todayTransactionCount !== 1 ? 's' : ''} today
                 </div>
               </div>
@@ -234,7 +234,7 @@ export default function Dashboard() {
 
       {/* Pending account banner */}
       {merchant && merchant.status !== 'active' && (
-        <div className="max-w-md md:max-w-2xl mx-auto px-3 sm:px-6 md:px-8 mt-[40px] sm:mt-[50px] md:mt-[60px] relative z-10">
+        <div className="max-w-md lg:max-w-5xl mx-auto px-3 sm:px-6 mt-[40px] sm:mt-[50px] relative z-10">
           <div className="bg-amber-50 border border-amber-300 rounded-2xl px-4 py-3 flex items-start gap-3 mb-4">
             <span className="text-amber-500 text-lg mt-0.5">⏳</span>
             <div>
@@ -248,127 +248,111 @@ export default function Dashboard() {
       )}
 
       {/* Stats Cards */}
-      <div className={`max-w-md md:max-w-2xl mx-auto px-3 sm:px-6 md:px-8 relative z-10 ${merchant && merchant.status !== 'active' ? '' : 'mt-[40px] sm:mt-[50px] md:mt-[60px]'}`}>
-        <div className="grid grid-cols-2 gap-3 sm:gap-5 md:gap-6 mb-4 sm:mb-6 md:mb-8">
+      <div className={`max-w-md lg:max-w-5xl mx-auto px-3 sm:px-6 relative z-10 ${merchant && merchant.status !== 'active' ? '' : 'mt-[40px] sm:mt-[50px]'}`}>
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 lg:gap-5 mb-4 sm:mb-5">
+
           {/* Monthly Stats Widget with Circle Graph */}
-          <div className="bg-white rounded-2xl sm:rounded-3xl md:rounded-[28px] p-3 sm:p-6 md:p-8 col-span-1 row-span-2 flex flex-col min-h-[320px] sm:min-h-[420px] md:min-h-[480px] shadow-lg transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] cursor-pointer" data-testid="card-monthly-stats">
-            <div className="relative flex items-center justify-center mb-6 sm:mb-8 md:mb-10">
-              <svg 
-                width="174" 
-                height="174" 
-                viewBox="0 0 174 174" 
-                className="transform -rotate-90 w-[140px] h-[140px] sm:w-[160px] sm:h-[160px] md:w-[174px] md:h-[174px]"
+          <div className="bg-white rounded-2xl sm:rounded-3xl p-3 sm:p-5 col-span-1 row-span-2 lg:row-span-1 flex flex-col min-h-[280px] sm:min-h-[380px] lg:min-h-0 shadow-lg transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] cursor-pointer" data-testid="card-monthly-stats">
+            <div className="relative flex items-center justify-center mb-4 sm:mb-6 lg:mb-4">
+              <svg
+                width="174"
+                height="174"
+                viewBox="0 0 174 174"
+                className="transform -rotate-90 w-[120px] h-[120px] sm:w-[145px] sm:h-[145px] lg:w-[120px] lg:h-[120px]"
               >
+                <circle cx="87" cy="87" r="78.87" stroke="#E6E6EC" strokeWidth="16.26" fill="none" />
                 <circle
-                  cx="87"
-                  cy="87"
-                  r="78.87"
-                  stroke="#E6E6EC"
-                  strokeWidth="16.26"
-                  fill="none"
-                />
-                <circle
-                  cx="87"
-                  cy="87"
-                  r="78.87"
-                  stroke="#0055FF"
-                  strokeWidth="16.26"
-                  fill="none"
+                  cx="87" cy="87" r="78.87" stroke="#0055FF" strokeWidth="16.26" fill="none"
                   strokeDasharray={`${2 * Math.PI * 78.87}`}
                   strokeDashoffset={`${2 * Math.PI * 78.87 * 0.35}`}
                 />
-                
+                <circle cx="87" cy="87" r="55" stroke="#E6E6EC" strokeWidth="16" fill="none" />
                 <circle
-                  cx="87"
-                  cy="87"
-                  r="55"
-                  stroke="#E6E6EC"
-                  strokeWidth="16"
-                  fill="none"
-                />
-                <circle
-                  cx="87"
-                  cy="87"
-                  r="55"
-                  stroke="#00E5CC"
-                  strokeWidth="16"
-                  fill="none"
+                  cx="87" cy="87" r="55" stroke="#00E5CC" strokeWidth="16" fill="none"
                   strokeDasharray={`${2 * Math.PI * 55}`}
                   strokeDashoffset={`${2 * Math.PI * 55 * 0.35}`}
                 />
               </svg>
             </div>
 
-            <div className="w-full mb-6 sm:mb-8 md:mb-10">
-              <div className="flex items-center justify-between mb-1 sm:mb-2">
-                <div className="text-[#3B3D53] text-xl sm:text-2xl md:text-3xl">${monthlyRevenue.toFixed(2)}</div>
-              </div>
-              <div className="text-[#161A41] opacity-44 text-xs sm:text-base md:text-lg mb-2 sm:mb-3">Monthly Revenue</div>
-              <div className="w-20 sm:w-24 md:w-28 h-[3px] bg-[#0055FF]"></div>
+            <div className="w-full mb-4 sm:mb-6">
+              <div className="text-[#3B3D53] text-lg sm:text-2xl">${monthlyRevenue.toFixed(2)}</div>
+              <div className="text-[#161A41] opacity-44 text-xs sm:text-sm mb-2">Monthly Revenue</div>
+              <div className="w-16 sm:w-20 h-[3px] bg-[#0055FF]"></div>
             </div>
 
             <div className="w-full">
-              <div className="flex items-center justify-between mb-1 sm:mb-2">
-                <div className="text-[#3B3D53] text-xl sm:text-2xl md:text-3xl">{monthlyTransactionCount}</div>
-              </div>
-              <div className="text-[#161A41] opacity-44 text-xs sm:text-base md:text-lg mb-2 sm:mb-3">Monthly Transactions</div>
-              <div className="w-20 sm:w-24 md:w-28 h-[3px] bg-[#00E5CC]"></div>
+              <div className="text-[#3B3D53] text-lg sm:text-2xl">{monthlyTransactionCount}</div>
+              <div className="text-[#161A41] opacity-44 text-xs sm:text-sm mb-2">Monthly Transactions</div>
+              <div className="w-16 sm:w-20 h-[3px] bg-[#00E5CC]"></div>
             </div>
           </div>
 
           {/* Average Trans Card */}
-          <div className="bg-[#0055FF] rounded-2xl sm:rounded-3xl md:rounded-[28px] p-3 sm:p-7 md:p-8 flex flex-col justify-between min-h-[90px] sm:min-h-[115px] md:min-h-[135px] transition-all duration-300 hover:shadow-2xl hover:scale-[1.05] cursor-pointer" data-testid="card-avg-transaction">
-            <h3 className="text-[#00E5CC] text-[10px] sm:text-sm md:text-base">Average Transaction</h3>
-            
-            <div className="w-[100px] h-[45px] sm:w-[140px] sm:h-[60px] flex items-end justify-between gap-[4px] sm:gap-[6px] mx-auto my-1 sm:my-2">
+          <div className="bg-[#0055FF] rounded-2xl sm:rounded-3xl p-3 sm:p-5 flex flex-col justify-between min-h-[90px] sm:min-h-[110px] lg:min-h-0 transition-all duration-300 hover:shadow-2xl hover:scale-[1.05] cursor-pointer" data-testid="card-avg-transaction">
+            <h3 className="text-[#00E5CC] text-[10px] sm:text-sm">Average Transaction</h3>
+
+            <div className="w-full h-[35px] sm:h-[45px] flex items-end justify-between gap-[3px] sm:gap-[5px] my-1 sm:my-2 px-1">
               {last30DaysAvg.map((avg, index) => {
                 const height = maxAvgTrans > 0 ? (avg / maxAvgTrans) * 100 : 15;
                 const isMostRecent = index === 6;
                 return (
-                  <div 
+                  <div
                     key={index}
-                    className={`${isMostRecent ? 'bg-[#00E5CC]' : 'bg-[#00E5CC]/40'} rounded-[3px] sm:rounded-[4px] w-[10px] sm:w-[14px]`}
+                    className={`${isMostRecent ? 'bg-[#00E5CC]' : 'bg-[#00E5CC]/40'} rounded-[3px] flex-1`}
                     style={{ height: `${Math.max(height, 15)}%` }}
                   />
                 );
               })}
             </div>
-            
-            <div className="text-[#00E5CC] text-xl sm:text-3xl md:text-4xl">${averageTransaction.toFixed(2)}</div>
+
+            <div className="text-[#00E5CC] text-xl sm:text-2xl">${averageTransaction.toFixed(2)}</div>
           </div>
 
           {/* Last 7 Days Revenue Card */}
-          <div className="bg-[#00E5CC] rounded-2xl sm:rounded-3xl md:rounded-[28px] p-3 sm:p-7 md:p-8 flex flex-col justify-between min-h-[90px] sm:min-h-[115px] md:min-h-[135px] transition-all duration-300 hover:shadow-2xl hover:scale-[1.05] cursor-pointer" data-testid="card-weekly-revenue">
-            <h3 className="text-[#0055FF] text-[10px] sm:text-sm md:text-base">7 Days Revenue</h3>
-            
-            <div className="w-[100px] h-[45px] sm:w-[140px] sm:h-[60px] flex items-end justify-between gap-[4px] sm:gap-[6px] mx-auto my-1 sm:my-2">
+          <div className="bg-[#00E5CC] rounded-2xl sm:rounded-3xl p-3 sm:p-5 flex flex-col justify-between min-h-[90px] sm:min-h-[110px] lg:min-h-0 transition-all duration-300 hover:shadow-2xl hover:scale-[1.05] cursor-pointer" data-testid="card-weekly-revenue">
+            <h3 className="text-[#0055FF] text-[10px] sm:text-sm">7 Days Revenue</h3>
+
+            <div className="w-full h-[35px] sm:h-[45px] flex items-end justify-between gap-[3px] sm:gap-[5px] my-1 sm:my-2 px-1">
               {last7DaysRevenueData.map((revenue, index) => {
                 const height = maxLast7DaysRevenue > 0 ? (revenue / maxLast7DaysRevenue) * 100 : 15;
                 const isMostRecent = index === 6;
                 return (
-                  <div 
+                  <div
                     key={index}
-                    className={`${isMostRecent ? 'bg-[#0055FF]' : 'bg-[#0055FF]/40'} rounded-[3px] sm:rounded-[4px] w-[10px] sm:w-[14px]`}
+                    className={`${isMostRecent ? 'bg-[#0055FF]' : 'bg-[#0055FF]/40'} rounded-[3px] flex-1`}
                     style={{ height: `${Math.max(height, 15)}%` }}
                   />
                 );
               })}
             </div>
-            
-            <div className="text-[#0055FF] text-xl sm:text-3xl md:text-4xl">${last7DaysRevenue.toFixed(2)}</div>
+
+            <div className="text-[#0055FF] text-xl sm:text-2xl">${last7DaysRevenue.toFixed(2)}</div>
+          </div>
+
+          {/* Total Revenue — 4th column on desktop, hidden on mobile (shown below instead) */}
+          <div className="bg-white rounded-2xl sm:rounded-3xl p-3 sm:p-5 hidden lg:flex flex-col justify-between shadow-lg hover:shadow-2xl hover:scale-[1.02] cursor-pointer transition-all duration-300" data-testid="card-total-revenue-desktop">
+            <div>
+              <div className="text-[#161A41] opacity-50 text-xs sm:text-sm mb-1">Total Revenue</div>
+              <div className="text-[#3B3D53] text-xl sm:text-2xl">${totalRevenue.toFixed(2)}</div>
+            </div>
+            <div className="w-full h-[3px] bg-gray-100 my-2"></div>
+            <div>
+              <div className="text-[#161A41] opacity-50 text-xs sm:text-sm mb-1">Total Transactions</div>
+              <div className="text-[#3B3D53] text-xl sm:text-2xl">{analytics?.completedTransactions || 0}</div>
+            </div>
           </div>
         </div>
 
-        {/* Total Revenue Block */}
-        <div className="bg-white rounded-2xl sm:rounded-3xl md:rounded-[28px] p-4 sm:p-8 md:p-10 flex items-center justify-between shadow-lg mb-4 sm:mb-6 transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] cursor-pointer" data-testid="card-total-revenue">
+        {/* Total Revenue Block — mobile/tablet only */}
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 flex items-center justify-between shadow-lg mb-4 sm:mb-6 transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] cursor-pointer lg:hidden" data-testid="card-total-revenue">
           <div className="flex-1">
-            <div className="text-[#3B3D53] text-2xl sm:text-4xl md:text-5xl mb-1 sm:mb-2">${totalRevenue.toFixed(2)}</div>
-            <div className="text-[#161A41] opacity-50 text-xs sm:text-base md:text-lg">Total Revenue</div>
+            <div className="text-[#3B3D53] text-2xl sm:text-3xl mb-1">${totalRevenue.toFixed(2)}</div>
+            <div className="text-[#161A41] opacity-50 text-xs sm:text-sm">Total Revenue</div>
           </div>
-          
           <div className="text-right">
-            <div className="text-[#3B3D53] text-xl sm:text-2xl md:text-3xl">{analytics?.completedTransactions || 0}</div>
-            <div className="text-[#161A41] opacity-50 text-xs sm:text-base">Transactions</div>
+            <div className="text-[#3B3D53] text-xl sm:text-2xl">{analytics?.completedTransactions || 0}</div>
+            <div className="text-[#161A41] opacity-50 text-xs sm:text-sm">Transactions</div>
           </div>
         </div>
 
