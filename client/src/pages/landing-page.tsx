@@ -16,6 +16,8 @@ import featureSplitPayment from "@assets/split_payment_1774675808091.png";
 import featureMerchantSplit from "@assets/merchant_split_payment_1774675808089.png";
 import featureSharePayment from "@assets/share_payment_1774675808091.png";
 import featureReceipt from "@assets/recipt_generation_1774675808090.png";
+import infoPackWeb from "@assets/info_pack_web_page_1775960769611.png";
+import infoPackMobile from "@assets/info_pack_mobile_1775960769610.png";
 
 function MagneticButton({ children, className, onClick, style, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   const elRef = useRef<HTMLButtonElement>(null);
@@ -230,6 +232,36 @@ function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
 
       </div>
 
+    </div>
+  );
+}
+
+function InfoPackCard() {
+  return (
+    <div className="relative w-full h-full">
+      {/* Mobile image */}
+      <img
+        src={infoPackMobile}
+        className="block md:hidden w-full h-full object-cover object-center"
+        alt="TaptPay Information Pack"
+      />
+      {/* Tablet/desktop image */}
+      <img
+        src={infoPackWeb}
+        className="hidden md:block w-full h-full object-cover object-center"
+        alt="TaptPay Information Pack"
+      />
+      {/* Light-blue pill button */}
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 md:bottom-10 md:right-12 md:left-auto md:translate-x-0">
+        <a
+          href="https://taptpay.co.nz/info"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block px-8 py-3 rounded-full bg-[#aad4ff] text-[#000a36] font-semibold text-sm tracking-wide hover:bg-white transition-colors duration-200 whitespace-nowrap"
+        >
+          get the info pack
+        </a>
+      </div>
     </div>
   );
 }
@@ -681,13 +713,18 @@ export function LandingPage() {
           </div>
         </div>
 
+        {/* Information Pack */}
+        <StickyCard index={0} backgroundColor="#000a1f" cardClassName="w-full max-w-7xl rounded-3xl shadow-2xl overflow-hidden md:h-[90vh]">
+          <InfoPackCard />
+        </StickyCard>
+
         {/* Video */}
-        <StickyCard index={0} backgroundColor="#000000" cardClassName="w-full max-w-7xl rounded-3xl shadow-2xl overflow-hidden md:h-[90vh]">
+        <StickyCard index={1} backgroundColor="#000000" cardClassName="w-full max-w-7xl rounded-3xl shadow-2xl overflow-hidden md:h-[90vh]">
           <VideoCard />
         </StickyCard>
 
         {/* Digital Terminal */}
-        <StickyCard index={1} backgroundColor="#00f1d7">
+        <StickyCard index={2} backgroundColor="#00f1d7">
           <FeatureSection
             title="the terminal"
             image={terminalMockup}
@@ -708,7 +745,7 @@ export function LandingPage() {
         </StickyCard>
 
         {/* Payment Board */}
-        <StickyCard index={2} backgroundColor="#000a36">
+        <StickyCard index={3} backgroundColor="#000a36">
           <FeatureSection
             title="the payment board"
             image={paymentBoardMockup}
@@ -729,7 +766,7 @@ export function LandingPage() {
         </StickyCard>
 
         {/* Customer Payment Page */}
-        <StickyCard index={3} backgroundColor="#0055ff">
+        <StickyCard index={4} backgroundColor="#0055ff">
           <FeatureSection
             title="the payment page"
             image={paymentPageMockup}
@@ -753,7 +790,7 @@ export function LandingPage() {
         </StickyCard>
 
         {/* Dashboard */}
-        <StickyCard index={4} backgroundColor="#000a36">
+        <StickyCard index={5} backgroundColor="#000a36">
           <FeatureSection
             title="dashboard"
             image={dashboardMockup}
