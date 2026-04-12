@@ -385,13 +385,9 @@ export default function MerchantTerminal() {
     sseClient.connect(merchantId);
     
     sseClient.subscribe("transaction_updated", (message) => {
-      // Update cache directly instead of invalidating to prevent feedback loop
-      queryClient.setQueryData(["/api/merchants", merchantId, "active-transaction"], message.transaction);
-      
-      // Only update state if transaction actually changed (efficient comparison)
-      setCurrentTransaction((prev: any) => 
-        hasTransactionChanged(prev, message.transaction) ? message.transaction : prev
-      );
+      // Route through the query cache only — the [activeTransaction] effect
+      // handles all state transitions including completion detection & cleanup.
+      queryClient.setQueryData(["/api/merchants", merchantId, "active-transaction"], message.transaction ?? null);
     });
 
     // Add specific handler for split payment updates
