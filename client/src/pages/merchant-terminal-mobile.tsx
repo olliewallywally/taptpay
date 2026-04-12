@@ -100,7 +100,7 @@ export default function MerchantTerminalMobile() {
       };
       playTone(880, ctx.currentTime, 0.4, 0.4);
       playTone(1100, ctx.currentTime + 0.18, 0.5, 0.35);
-    } catch {}
+    } catch (e) { console.warn('Chime failed:', e); }
   };
 
   const queryClient = useQueryClient();
@@ -176,10 +176,7 @@ export default function MerchantTerminalMobile() {
       if (!response.ok) throw new Error("Failed to fetch active transaction");
       return response.json();
     },
-    refetchInterval: (query) => {
-      const data = query.state.data as { status?: string } | null | undefined;
-      return data?.status === 'pending' || data?.status === 'processing' ? 1000 : false;
-    },
+    refetchInterval: 3000,
   });
 
   // Get tapt stones for this merchant
@@ -291,9 +288,6 @@ export default function MerchantTerminalMobile() {
       playSuccessChime();
       form.reset();
       setCurrentTransaction(null);
-      // Wipe the cached query data so polling stops and the completed transaction
-      // never re-populates the form after the overlay closes
-      queryClient.setQueryData(["/api/merchants", merchantId, "active-transaction"], null);
       setShowSuccessOverlay(true);
       if (successOverlayTimerRef.current) clearTimeout(successOverlayTimerRef.current);
       successOverlayTimerRef.current = setTimeout(() => setShowSuccessOverlay(false), 5000);
@@ -332,7 +326,9 @@ export default function MerchantTerminalMobile() {
       return;
     }
 
-    const transaction = currentTransaction || activeTransaction;
+    const transaction = currentTransaction
+      ?? (activeTransaction?.status === 'pending' || activeTransaction?.status === 'processing'
+        ? activeTransaction : null);
     setNfcPaymentStatus("creating");
     
     try {
@@ -435,7 +431,9 @@ export default function MerchantTerminalMobile() {
 
   // Tap to Pay (Paywave) — iOS native bridge
   const startTapToPayPayment = async () => {
-    const transaction = currentTransaction || activeTransaction;
+    const transaction = currentTransaction
+      ?? (activeTransaction?.status === 'pending' || activeTransaction?.status === 'processing'
+        ? activeTransaction : null);
     if (!transaction) {
       toast({ title: "No Transaction", description: "Create a transaction first.", variant: "destructive" });
       return;
@@ -552,6 +550,11 @@ export default function MerchantTerminalMobile() {
       </div>
     );
   };
+
+  const txToShow = currentTransaction
+    ?? (activeTransaction?.status === 'pending' || activeTransaction?.status === 'processing'
+      ? activeTransaction
+      : null);
 
   if (isMobile) {
     return (
@@ -701,9 +704,9 @@ export default function MerchantTerminalMobile() {
 
         {/* Enhanced Payment Status */}
         <div className="px-6 mb-6">
-          {currentTransaction || activeTransaction ? (
+          {txToShow ? (
             <EnhancedPaymentStatus 
-              transaction={currentTransaction || activeTransaction}
+              transaction={txToShow}
               className="border-2 border-green-400"
             />
           ) : (
@@ -909,14 +912,14 @@ export default function MerchantTerminalMobile() {
                     // NFC Payment Options
                     <div className="space-y-2">
                       <p className="text-gray-300 mb-4">Start contactless payment for current transaction</p>
-                      {currentTransaction || activeTransaction ? (
+                      {txToShow ? (
                         <div className="space-y-3">
                           <div className="bg-gray-700 rounded-lg p-3 mb-4">
                             <p className="text-white text-xs font-medium">
-                              {(currentTransaction || activeTransaction).itemName}
+                              {txToShow.itemName}
                             </p>
                             <p className="text-gray-300 text-lg font-bold">
-                              ${(currentTransaction || activeTransaction).price}
+                              ${txToShow.price}
                             </p>
                           </div>
                           <Button
@@ -1141,7 +1144,7 @@ export default function MerchantTerminalMobile() {
                   ))}
 
                   {/* Add Tapt Stone Button - Show when transaction exists and less than 10 stones */}
-                  {(currentTransaction || activeTransaction) && taptStones.length < 10 && (
+                  {txToShow && taptStones.length < 10 && (
                     <button
                       onClick={() => createTaptStoneMutation.mutate()}
                       disabled={createTaptStoneMutation.isPending}
@@ -1277,13 +1280,13 @@ export default function MerchantTerminalMobile() {
               </div>
 
               <div className="bg-white rounded-xl p-6">
-                {(currentTransaction || activeTransaction) ? (
+                {txToShow ? (
                   <div className="text-center space-y-4">
                     <div className="text-gray-500 text-sm font-medium">
-                      {(currentTransaction || activeTransaction).itemName}
+                      {txToShow.itemName}
                     </div>
                     <div className="text-4xl font-bold text-black">
-                      ${parseFloat((currentTransaction || activeTransaction).price).toFixed(2)}
+                      ${parseFloat(txToShow.price).toFixed(2)}
                     </div>
                     <p className="text-gray-500 text-sm leading-relaxed">
                       Hold your iPhone near the customer's card or device to collect payment.
@@ -1584,9 +1587,9 @@ export default function MerchantTerminalMobile() {
 
         {/* Enhanced Payment Status - Mobile */}
         <div className="px-6 mb-6">
-          {currentTransaction || activeTransaction ? (
+          {txToShow ? (
             <EnhancedPaymentStatus 
-              transaction={currentTransaction || activeTransaction}
+              transaction={txToShow}
               className="border-2 border-green-400"
             />
           ) : (
@@ -1844,14 +1847,14 @@ export default function MerchantTerminalMobile() {
                     // NFC Payment Options
                     <div className="space-y-2">
                       <p className="text-gray-300 text-sm mb-4">Start contactless payment for current transaction</p>
-                      {currentTransaction || activeTransaction ? (
+                      {txToShow ? (
                         <div className="space-y-3">
                           <div className="bg-gray-700 rounded-lg p-3 mb-4">
                             <p className="text-white text-xs font-medium">
-                              {(currentTransaction || activeTransaction).itemName}
+                              {txToShow.itemName}
                             </p>
                             <p className="text-gray-300 text-lg font-bold">
-                              ${(currentTransaction || activeTransaction).price}
+                              ${txToShow.price}
                             </p>
                           </div>
                           <Button

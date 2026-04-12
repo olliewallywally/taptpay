@@ -104,7 +104,7 @@ export default function MerchantTerminal() {
       };
       playTone(880, ctx.currentTime, 0.4, 0.4);
       playTone(1100, ctx.currentTime + 0.18, 0.5, 0.35);
-    } catch {}
+    } catch (e) { console.warn('Chime failed:', e); }
   };
 
   // Tap to Pay (iOS only)
