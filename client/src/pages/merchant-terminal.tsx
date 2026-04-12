@@ -147,10 +147,7 @@ export default function MerchantTerminal() {
       if (!response.ok) throw new Error("Failed to fetch active transaction");
       return response.json();
     },
-    refetchInterval: (query) => {
-      const data = query.state.data as { status?: string } | null | undefined;
-      return data?.status === 'pending' || data?.status === 'processing' ? 1000 : false;
-    },
+    refetchInterval: 3000,
   });
 
   // Get tapt stones for this merchant
@@ -238,7 +235,9 @@ export default function MerchantTerminal() {
 
   // Tap to Pay (iOS native bridge)
   const startTapToPayPayment = async () => {
-    const transaction = currentTransaction || activeTransaction;
+    const transaction = currentTransaction
+      ?? (activeTransaction?.status === 'pending' || activeTransaction?.status === 'processing'
+        ? activeTransaction : null);
     if (!transaction) {
       toast({ title: "No Transaction", description: "Create a transaction first.", variant: "destructive" });
       return;
@@ -439,9 +438,6 @@ export default function MerchantTerminal() {
       playSuccessChime();
       form.reset();
       setCurrentTransaction(null);
-      // Wipe the cached query data so polling stops and the completed transaction
-      // never re-populates the form after the overlay closes
-      queryClient.setQueryData(["/api/merchants", merchantId, "active-transaction"], null);
       setShowSuccessOverlay(true);
       if (successOverlayTimerRef.current) clearTimeout(successOverlayTimerRef.current);
       successOverlayTimerRef.current = setTimeout(() => setShowSuccessOverlay(false), 5000);
@@ -452,6 +448,7 @@ export default function MerchantTerminal() {
     // Don't let a completed transaction re-populate the form
     if (!activeTransaction || status === 'completed') return;
 
+    // New pending/processing transaction — show it
     setCurrentTransaction(activeTransaction);
     setSplitEnabled(!!activeTransaction.splitEnabled);
     prevTransactionStatusRef.current = status;
@@ -1292,6 +1289,14 @@ function PaymentStatus({ transaction, merchantId }: { transaction: any; merchant
   );
 }
 
+  // Safe UI transaction: currentTransaction is the source of truth.
+  // Fall back to activeTransaction only if it is still pending/processing
+  // (never show a completed transaction after we've already fired the overlay).
+  const txToShow = currentTransaction
+    ?? (activeTransaction?.status === 'pending' || activeTransaction?.status === 'processing'
+      ? activeTransaction
+      : null);
+
   return (
     <AnimatedBrandBackground
       backgroundColor="#1a1a1a"
@@ -1342,7 +1347,7 @@ function PaymentStatus({ transaction, merchantId }: { transaction: any; merchant
             <div className="space-y-4 sm:space-y-6 w-full max-w-2xl mx-auto lg:mx-0">
               {/* Amount Box */}
               <div>
-                {currentTransaction || activeTransaction ? (
+                {txToShow ? (
                   <div 
                     className="rounded-2xl p-4 sm:p-6 text-center"
                     style={{ backgroundColor: '#00FF66' }}
@@ -1350,10 +1355,10 @@ function PaymentStatus({ transaction, merchantId }: { transaction: any; merchant
                   >
                     <div className="text-black text-base sm:text-lg font-medium mb-1 sm:mb-2">Total</div>
                     <div className="text-black text-3xl sm:text-4xl font-bold">
-                      ${parseFloat((currentTransaction || activeTransaction).price).toFixed(2)}
+                      ${parseFloat(txToShow.price).toFixed(2)}
                     </div>
                     <div className="text-black text-xs sm:text-sm mt-1 sm:mt-2">
-                      {(currentTransaction || activeTransaction).itemName}
+                      {txToShow.itemName}
                     </div>
                   </div>
                 ) : (
@@ -1497,8 +1502,8 @@ function PaymentStatus({ transaction, merchantId }: { transaction: any; merchant
             {/* Right Pane: QR Code & Payment Status */}
             <div className="space-y-4 sm:space-y-6 w-full max-w-2xl mx-auto lg:mx-0">
               {/* Payment Status */}
-              {(currentTransaction || activeTransaction) && (
-                <PaymentStatus transaction={currentTransaction || activeTransaction} merchantId={merchantId} />
+              {txToShow && (
+                <PaymentStatus transaction={txToShow} merchantId={merchantId} />
               )}
 
               {/* Stones Section */}
