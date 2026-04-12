@@ -263,7 +263,7 @@ function InfoPackCard() {
         </a>
       </div>
       {/* Light-blue pill button — desktop/tablet: below "information pack" text (right side) */}
-      <div className="absolute hidden md:block" style={{ top: "62%", right: "31%" }}>
+      <div className="absolute hidden md:block" style={{ top: "57%", right: "31%" }}>
         <a
           href="https://taptpay.co.nz/info"
           target="_blank"
