@@ -317,7 +317,10 @@ export default function MerchantTerminalMobile() {
 
   // NFC Payment Functions
   const createNFCPayment = async () => {
-    if (!currentTransaction && !activeTransaction) {
+    const transaction = currentTransaction
+      ?? (activeTransaction?.status === 'pending' || activeTransaction?.status === 'processing'
+        ? activeTransaction : null);
+    if (!transaction) {
       toast({
         title: "No Transaction",
         description: "Create a transaction first to enable NFC payment.",
@@ -326,9 +329,6 @@ export default function MerchantTerminalMobile() {
       return;
     }
 
-    const transaction = currentTransaction
-      ?? (activeTransaction?.status === 'pending' || activeTransaction?.status === 'processing'
-        ? activeTransaction : null);
     setNfcPaymentStatus("creating");
     
     try {
