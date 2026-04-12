@@ -53,12 +53,38 @@ export default function MerchantTerminalMobile() {
   const prevTransactionStatusRef = useRef<string | null>(null);
   const successOverlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const playSuccessChime = () => {
+  // Persistent AudioContext — created once and unlocked on first user gesture so
+  // the chime can play even when the payment completion arrives via polling.
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  useEffect(() => {
+    const AudioCtx: typeof AudioContext =
+      window.AudioContext ||
+      (window as Window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    audioCtxRef.current = ctx;
+
+    const unlock = () => {
+      if (ctx.state === 'suspended') ctx.resume();
+    };
+    window.addEventListener('click', unlock, { once: false });
+    window.addEventListener('touchstart', unlock, { once: false });
+    window.addEventListener('keydown', unlock, { once: false });
+
+    return () => {
+      window.removeEventListener('click', unlock);
+      window.removeEventListener('touchstart', unlock);
+      window.removeEventListener('keydown', unlock);
+      ctx.close();
+    };
+  }, []);
+
+  const playSuccessChime = async () => {
     try {
-      const AudioCtx: typeof AudioContext =
-        window.AudioContext ||
-        (window as Window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      const ctx = new AudioCtx();
+      const ctx = audioCtxRef.current;
+      if (!ctx) return;
+      if (ctx.state === 'suspended') await ctx.resume();
       const playTone = (freq: number, startTime: number, duration: number, gain: number) => {
         const osc = ctx.createOscillator();
         const gainNode = ctx.createGain();
