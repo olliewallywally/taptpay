@@ -16,7 +16,7 @@ import featureSplitPayment from "@assets/split_payment_1774675808091.png";
 import featureMerchantSplit from "@assets/merchant_split_payment_1774675808089.png";
 import featureSharePayment from "@assets/share_payment_1774675808091.png";
 import featureReceipt from "@assets/recipt_generation_1774675808090.png";
-import infoPackWeb from "@assets/info_pack_web_page_1775960769611.png";
+import infoPackWeb from "@assets/info_pack_web_page_1775961149926.png";
 import infoPackMobile from "@assets/info_pack_mobile_1775960769610.png";
 
 function MagneticButton({ children, className, onClick, style, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
