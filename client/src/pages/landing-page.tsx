@@ -257,7 +257,7 @@ function InfoPackCard() {
           href="https://taptpay.co.nz/info"
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-block px-6 py-2.5 rounded-full bg-[#aad4ff] text-[#000a36] font-semibold text-sm tracking-wide hover:bg-white transition-colors duration-200 whitespace-nowrap"
+          className="inline-block px-6 py-2.5 rounded-full bg-[#0055ff] text-white font-semibold text-sm tracking-wide hover:bg-white hover:text-[#0055ff] transition-colors duration-200 whitespace-nowrap"
         >
           get the info pack
         </a>
@@ -268,7 +268,7 @@ function InfoPackCard() {
           href="https://taptpay.co.nz/info"
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-block px-8 py-3 rounded-full bg-[#aad4ff] text-[#000a36] font-semibold text-sm tracking-wide hover:bg-white transition-colors duration-200 whitespace-nowrap"
+          className="inline-block px-8 py-3 rounded-full bg-[#0055ff] text-white font-semibold text-sm tracking-wide hover:bg-white hover:text-[#0055ff] transition-colors duration-200 whitespace-nowrap"
         >
           get the info pack
         </a>
