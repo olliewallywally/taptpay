@@ -251,8 +251,19 @@ function InfoPackCard() {
         className="hidden md:block w-full h-full object-cover object-center"
         alt="TaptPay Information Pack"
       />
-      {/* Light-blue pill button */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 md:bottom-10 md:right-12 md:left-auto md:translate-x-0">
+      {/* Light-blue pill button — mobile: below "information pack" text (top-left) */}
+      <div className="absolute block md:hidden" style={{ top: "30%", left: "7%" }}>
+        <a
+          href="https://taptpay.co.nz/info"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block px-6 py-2.5 rounded-full bg-[#aad4ff] text-[#000a36] font-semibold text-sm tracking-wide hover:bg-white transition-colors duration-200 whitespace-nowrap"
+        >
+          get the info pack
+        </a>
+      </div>
+      {/* Light-blue pill button — desktop/tablet: below "information pack" text (right side) */}
+      <div className="absolute hidden md:block" style={{ top: "62%", right: "8%" }}>
         <a
           href="https://taptpay.co.nz/info"
           target="_blank"
