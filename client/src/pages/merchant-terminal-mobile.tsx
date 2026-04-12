@@ -267,8 +267,9 @@ export default function MerchantTerminalMobile() {
     sseClient.connect(merchantId);
     
     sseClient.subscribe("transaction_updated", (message) => {
-      setCurrentTransaction(message.transaction);
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
+      // Route through the query cache only — the [activeTransaction] effect
+      // handles all state transitions including completion detection & cleanup.
+      queryClient.setQueryData(["/api/merchants", merchantId, "active-transaction"], message.transaction ?? null);
     });
 
     return () => {
