@@ -3171,9 +3171,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
             type: 'transaction_updated',
             transaction: { ...transaction, status: 'failed' }
           });
+          return res.redirect(`/payment/result/${txnId}?status=cancelled`);
         } else if (!sessionMatches) {
+          // Mismatched or absent sessionId — possible DoS probe, not a real browser redirect.
+          // Do not update state; redirect neutrally so the notification handler resolves it.
           console.warn(`[WINDCAVE_CALLBACK] Ignoring cancel for txn ${txnId} — sessionId mismatch (got=${cancelSessionId}, expected=${transaction.windcaveSessionId})`);
+          return res.redirect(`/payment/result/${txnId}?status=pending`);
         }
+        // Already processed (not pending) — show the existing result
         return res.redirect(`/payment/result/${txnId}?status=cancelled`);
       }
 
