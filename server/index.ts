@@ -103,15 +103,15 @@ app.use((req, res, next) => {
   if (!process.env.JWT_SECRET) {
     if (isProduction) {
       console.error('');
-      console.error('[SECURITY WARNING] JWT_SECRET is NOT set in production.');
-      console.error('  All existing login sessions will be invalidated on every restart.');
+      console.error('[FATAL] JWT_SECRET is NOT set in production.');
       console.error('  Set JWT_SECRET in your deployment secrets to a strong random value.');
-      console.error('  Using hardcoded development fallback — THIS IS INSECURE IN PRODUCTION.');
+      console.error('  Refusing to start — running without JWT_SECRET in production is insecure.');
       console.error('');
+      process.exit(1);
     } else {
       console.warn('⚠️  JWT_SECRET not set — using development fallback (acceptable in dev only).');
+      process.env.JWT_SECRET = 'dev-secret-key-change-in-production';
     }
-    process.env.JWT_SECRET = 'dev-secret-key-change-in-production';
   } else {
     console.log('✅ JWT_SECRET: configured');
   }
