@@ -14,6 +14,7 @@ export default function SplitPayment() {
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentTransaction, setCurrentTransaction] = useState<any>(null);
+  const [splitError, setSplitError] = useState<string | null>(null);
 
   // First-person state
   const [splitCount, setSplitCount] = useState(2);
@@ -104,6 +105,7 @@ export default function SplitPayment() {
 
   const handlePay = async () => {
     if (!txn) return;
+    setSplitError(null);
     setIsProcessing(true);
     try {
       if (!isSplitSetup) {
@@ -115,24 +117,17 @@ export default function SplitPayment() {
           setCurrentTransaction(data.transaction);
           queryClient.setQueryData(["/api/transactions", txnId], data.transaction);
         }
+        // Always pass ?amount so checkout displays and charges the exact split amount
         const payAmt = parseFloat(displayAmount);
-        const defaultAmt = parseFloat(equalShare);
-        if (Math.abs(payAmt - defaultAmt) > 0.001) {
-          setLocation(`/checkout/${txnId}?amount=${payAmt.toFixed(2)}`);
-        } else {
-          setLocation(`/checkout/${txnId}`);
-        }
+        setLocation(`/checkout/${txnId}?amount=${payAmt.toFixed(2)}`);
       } else {
+        // Always pass ?amount so checkout displays and charges the exact split amount
         const payAmt = parseFloat(subDisplay);
-        const defaultAmt = parseFloat(subsequentShare);
-        if (Math.abs(payAmt - defaultAmt) > 0.001) {
-          setLocation(`/checkout/${txnId}?amount=${payAmt.toFixed(2)}`);
-        } else {
-          setLocation(`/checkout/${txnId}`);
-        }
+        setLocation(`/checkout/${txnId}?amount=${payAmt.toFixed(2)}`);
       }
     } catch (err) {
       console.error("Split payment error:", err);
+      setSplitError("Couldn't set up the split. Please try again.");
       setIsProcessing(false);
     }
   };
@@ -241,7 +236,7 @@ export default function SplitPayment() {
                     </p>
                   )}
                   <button
-                    onClick={() => { setEditValue(confirmedCustom ?? equalShare); setEditMode(true); }}
+                    onClick={() => { setEditValue(confirmedCustom ?? totalAmount.toFixed(2)); setEditMode(true); }}
                     className="text-white/40 text-xs underline underline-offset-2 hover:text-white/60 transition-colors"
                   >
                     {confirmedCustom ? "change amount" : "enter different amount"}
@@ -311,7 +306,7 @@ export default function SplitPayment() {
                 <>
                   <p className="text-[#00E5CC] text-5xl font-bold mb-3">${subDisplay}</p>
                   <button
-                    onClick={() => { setSubEditValue(subDisplay); setSubEditMode(true); }}
+                    onClick={() => { setSubEditValue(subConfirmed ?? remaining.toFixed(2)); setSubEditMode(true); }}
                     className="text-white/40 text-xs underline underline-offset-2 hover:text-white/60 transition-colors"
                   >
                     {subConfirmed ? "change amount" : "enter different amount"}
@@ -374,6 +369,10 @@ export default function SplitPayment() {
             >
               done
             </Button>
+          )}
+
+          {splitError && (
+            <p className="text-red-700 text-sm text-center mb-3 font-medium">{splitError}</p>
           )}
 
           {!allDone && !isProcessing && !isSplitSetup && (
