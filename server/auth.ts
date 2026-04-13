@@ -205,7 +205,7 @@ const users: Map<number, User> = new Map();
 let currentUserId = 1;
 
 // Create admin user
-const adminHashedPassword = bcrypt.hashSync('123456', 10);
+const adminHashedPassword = bcrypt.hashSync('123456', 12);
 users.set(1, {
   id: 1,
   email: 'oliverleonard.professional@gmail.com',
@@ -359,7 +359,7 @@ export async function createUser(email: string, password: string, merchantId: nu
     throw new Error(`User with email ${email} already exists`);
   }
 
-  const hashedPassword = await bcrypt.hash(password, 10);
+  const hashedPassword = await bcrypt.hash(password, 12);
   const id = currentUserId++;
   
   const user: User = {
@@ -437,7 +437,7 @@ export async function resetPassword(token: string, newPassword: string): Promise
       return false;
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
     
     await storage.updateMerchant(merchant.id, {
       passwordHash: hashedPassword,

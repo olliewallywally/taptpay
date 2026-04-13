@@ -2494,7 +2494,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(400).json({ message: "Merchant already verified" });
       }
 
-      const passwordHash = await bcrypt.hash(password, 10);
+      const passwordHash = await bcrypt.hash(password, 12);
       const updatedMerchant = await storage.verifyMerchant(merchant.verificationToken || '', passwordHash);
 
       if (!updatedMerchant) {
@@ -2592,7 +2592,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       // Hash new password and update
-      const newPasswordHash = await bcrypt.hash(newPassword, 10);
+      const newPasswordHash = await bcrypt.hash(newPassword, 12);
       const updatedMerchant = await storage.verifyMerchant(merchant.verificationToken || '', newPasswordHash);
 
       if (!updatedMerchant) {
@@ -3155,15 +3155,24 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       const txnId = transaction.id;
 
-      // Handle cancelled — don't charge, just update status
+      // Handle cancelled — don't charge, just update status.
+      // Guard: only trust the cancel signal if the sessionId in the URL matches what
+      // we stored for this transaction, preventing a DoS where an attacker fires
+      // ?transactionId=X&result=cancelled with an arbitrary/missing sessionId.
       if (resultParam === 'cancelled') {
-        if (transaction.windcaveSessionState === 'pending') {
+        const cancelSessionId = req.query.sessionid as string || req.query.sessionId as string;
+        const sessionMatches =
+          cancelSessionId && transaction.windcaveSessionId &&
+          cancelSessionId === transaction.windcaveSessionId;
+        if (sessionMatches && transaction.windcaveSessionState === 'pending') {
           await storage.updateTransactionStatus(txnId, 'failed');
           await storage.updateTransactionSessionState(txnId, 'declined');
           broadcastToStone(transaction.merchantId!, transaction.taptStoneId, {
             type: 'transaction_updated',
             transaction: { ...transaction, status: 'failed' }
           });
+        } else if (!sessionMatches) {
+          console.warn(`[WINDCAVE_CALLBACK] Ignoring cancel for txn ${txnId} — sessionId mismatch (got=${cancelSessionId}, expected=${transaction.windcaveSessionId})`);
         }
         return res.redirect(`/payment/result/${txnId}?status=cancelled`);
       }
@@ -3975,7 +3984,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       // Hash the password
-      const passwordHash = await bcrypt.hash(password, 10);
+      const passwordHash = await bcrypt.hash(password, 12);
 
       // Verify the merchant
       const merchant = await storage.verifyMerchant(token, passwordHash);
@@ -4154,7 +4163,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       // Hash password for storage
-      const passwordHash = await bcrypt.hash(password, 10);
+      const passwordHash = await bcrypt.hash(password, 12);
 
       // Generate verification token
       const verificationToken = crypto.randomBytes(32).toString('hex');
@@ -4300,7 +4309,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       // Hash the password
-      const passwordHash = await bcrypt.hash(password, 10);
+      const passwordHash = await bcrypt.hash(password, 12);
 
       // Generate URLs for the merchant
       const tempMerchantId = Date.now(); // Temporary ID for URL generation
@@ -4361,7 +4370,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       // Hash password and verify merchant
-      const passwordHash = await bcrypt.hash(password, 10);
+      const passwordHash = await bcrypt.hash(password, 12);
       
       const verifiedMerchant = await storage.verifyMerchant(token, passwordHash);
       if (!verifiedMerchant) {
