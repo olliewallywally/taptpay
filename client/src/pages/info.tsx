@@ -245,7 +245,7 @@ export default function InfoPage() {
           <p className="text-white font-semibold text-base mb-3">Oliver Leonard</p>
           <div className="space-y-2">
             <a
-              href="tel:+6421094672"
+              href="tel:+64212094672"
               className="flex items-center gap-3 text-white/80 hover:text-white text-sm transition-colors"
             >
               <Phone className="w-4 h-4 text-[#00f1d7] flex-shrink-0" />
