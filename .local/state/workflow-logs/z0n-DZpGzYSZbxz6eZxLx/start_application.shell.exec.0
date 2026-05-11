@@ -1,0 +1,20 @@
+[1G[0K⠙[1G[0K
+> rest-express@1.0.0 dev
+> NODE_ENV=development tsx server/index.ts
+
+[1G[0K⠙[1G[0KDatabase connection established
+✅ Storage: DatabaseStorage (Neon PostgreSQL @ ep-mute-grass-af2foouy.c-2.us-west-2.aws.neon.tech)
+✅ JWT_SECRET: configured
+✅ Auth sync: 2 verified merchants — 2 registered, 0 already present
+✅ Database: connection verified (live query succeeded)
+8:00:00 AM [express] Running schema push to sync database...
+8:00:20 AM [express] ✅ Schema: database schema is up to date
+Database already seeded
+✅ Auth sync: 2 verified merchants — 0 registered, 2 already present
+8:00:20 AM [express] ✅ info_pack_leads table ready
+8:00:21 AM [express] ✅ Existing verified merchants marked as onboarding completed
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+🔍 Checking port 5000 availability...
+✅ Server successfully started on 0.0.0.0:5000
+8:00:22 AM [express] ✅ Server successfully running on 0.0.0.0:5000
+8:00:22 AM [express] ✅ Database keep-alive ping started (every 4 minutes)

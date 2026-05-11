@@ -1,0 +1,10 @@
+[1G[0K⠙[1G[0K
+> rest-express@1.0.0 dev
+> NODE_ENV=development tsx server/index.ts
+
+[1G[0K⠙[1G[0KDatabase connection established
+✅ Storage: DatabaseStorage (Neon PostgreSQL @ ep-mute-grass-af2foouy.c-2.us-west-2.aws.neon.tech)
+✅ JWT_SECRET: configured
+✅ Auth sync: 2 verified merchants — 2 registered, 0 already present
+✅ Database: connection verified (live query succeeded)
+3:49:36 AM [express] Running schema push to sync database...

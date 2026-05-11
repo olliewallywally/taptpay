@@ -1,0 +1,369 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan to Pay - Merchant Terminal & Customer Payment</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'merchant-teal': '#2D5A4A',
+                        'slider-orange': '#E8B894',
+                        'bg-light': '#F8F9FA'
+                    },
+                    fontFamily: {
+                        'inter': ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        };
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-bg-light font-inter min-h-screen">
+    
+    <!-- @COMPONENT: AppContainer [Main application wrapper] -->
+    <div class="min-h-screen">
+        
+        <!-- Navigation/Toggle -->
+        <div class="bg-white shadow-sm border-b border-gray-200">
+            <div class="max-w-6xl mx-auto px-4 py-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 bg-merchant-teal rounded flex items-center justify-center">
+                            <i class="fas fa-qrcode text-white text-sm"></i>
+                        </div>
+                        <h1 class="text-xl font-bold text-gray-900">Scan to Pay Terminal</h1>
+                    </div>
+                    <div class="flex bg-gray-100 rounded-lg p-1">
+                        <button id="merchantTab" class="px-4 py-2 text-sm font-medium rounded-md bg-white text-merchant-teal shadow-sm transition-all">
+                            Merchant
+                        </button>
+                        <button id="customerTab" class="px-4 py-2 text-sm font-medium rounded-md text-gray-600 hover:text-gray-900 transition-all">
+                            Customer View
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Merchant Interface -->
+        <!-- @COMPONENT: MerchantTerminal [Staff interface for item entry] -->
+        <div id="merchantInterface" class="max-w-4xl mx-auto px-4 py-8">
+            <div class="grid lg:grid-cols-2 gap-8">
+                
+                <!-- Transaction Entry Card -->
+                <div class="bg-white rounded-2xl shadow-lg p-8">
+                    <div class="mb-6">
+                        <h2 class="text-2xl font-bold text-gray-900 mb-2">New Transaction</h2>
+                        <p class="text-gray-600">Enter item details to generate customer payment link</p>
+                    </div>
+
+                    <!-- @COMPONENT: TransactionForm [Item and price entry] -->
+                    <form class="space-y-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Item Name</label>
+                            <input 
+                                type="text" 
+                                id="itemName"
+                                placeholder="e.g., Cappuccino"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-merchant-teal focus:border-transparent transition-all text-lg"
+                                data-bind="transaction.itemName"
+                            />
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Price</label>
+                            <div class="relative">
+                                <span class="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 text-lg font-medium">$</span>
+                                <input 
+                                    type="number" 
+                                    id="itemPrice"
+                                    placeholder="0.00"
+                                    step="0.01"
+                                    min="0"
+                                    class="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-merchant-teal focus:border-transparent transition-all text-lg"
+                                    data-bind="transaction.price"
+                                />
+                            </div>
+                        </div>
+
+                        <button 
+                            type="submit"
+                            data-event="click:sendToCustomer"
+                            data-implementation="Should validate form and update customer interface"
+                            class="w-full bg-merchant-teal text-white py-4 px-6 rounded-xl font-semibold text-lg hover:bg-opacity-90 transition-all transform hover:scale-[1.02] active:scale-[0.98]"
+                        >
+                            <i class="fas fa-paper-plane mr-2"></i>
+                            Send to Customer
+                        </button>
+                    </form>
+                </div>
+
+                <!-- QR Code & Status Card -->
+                <div class="bg-white rounded-2xl shadow-lg p-8">
+                    <div class="text-center">
+                        <h3 class="text-xl font-bold text-gray-900 mb-4">Customer Payment QR</h3>
+                        
+                        <!-- @COMPONENT: QRCodeDisplay [Generated QR code] -->
+                        <div class="bg-gray-50 rounded-2xl p-8 mb-6">
+                            <!-- @FUNCTIONALITY: QR code should be generated dynamically with unique payment link -->
+                            <div class="w-48 h-48 mx-auto bg-white rounded-xl shadow-inner flex items-center justify-center border-2 border-dashed border-gray-300">
+                                <div class="text-center">
+                                    <i class="fas fa-qrcode text-4xl text-gray-400 mb-2"></i>
+                                    <p class="text-sm text-gray-500">QR Code will appear<br>when transaction is created</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Static Link Display -->
+                        <div class="bg-gray-50 rounded-xl p-4 mb-6">
+                            <p class="text-xs text-gray-500 mb-1">Payment Link:</p>
+                            <code class="text-sm text-merchant-teal font-mono break-all" data-bind="transaction.paymentLink">
+                                https://pay.merchant.com/t/abc123def456
+                            </code>
+                        </div>
+
+                        <!-- @COMPONENT: TransactionStatus [Current status display] -->
+                        <!-- @STATE: transactionStatus:string = 'waiting' -->
+                        <div class="flex items-center justify-center space-x-2 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                            <div class="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+                            <span class="text-sm font-medium text-yellow-700" data-bind="transaction.status">Waiting for customer</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: MerchantTerminal -->
+
+        <!-- Customer Payment Interface -->
+        <!-- @COMPONENT: CustomerPayment [Customer-facing payment interface] -->
+        <div id="customerInterface" class="hidden">
+            <div class="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+                <div class="w-full max-w-sm">
+                    
+                    <!-- Main Payment Card (matches provided design) -->
+                    <div class="bg-white rounded-3xl shadow-2xl p-8 text-center">
+                        
+                        <!-- Merchant Branding -->
+                        <div class="flex items-center justify-between mb-8">
+                            <div class="flex items-center space-x-3">
+                                <!-- QR Code Icon (matching design) -->
+                                <div class="w-12 h-12 bg-merchant-teal rounded-lg flex items-center justify-center">
+                                    <div class="grid grid-cols-3 gap-0.5">
+                                        <div class="w-1.5 h-1.5 bg-white rounded-sm"></div>
+                                        <div class="w-1.5 h-1.5 bg-transparent"></div>
+                                        <div class="w-1.5 h-1.5 bg-white rounded-sm"></div>
+                                        <div class="w-1.5 h-1.5 bg-transparent"></div>
+                                        <div class="w-1.5 h-1.5 bg-white rounded-sm"></div>
+                                        <div class="w-1.5 h-1.5 bg-transparent"></div>
+                                        <div class="w-1.5 h-1.5 bg-white rounded-sm"></div>
+                                        <div class="w-1.5 h-1.5 bg-transparent"></div>
+                                        <div class="w-1.5 h-1.5 bg-white rounded-sm"></div>
+                                    </div>
+                                </div>
+                                <span class="text-lg font-bold text-gray-700 tracking-wide">MERCHANT</span>
+                            </div>
+                        </div>
+
+                        <!-- Item Name -->
+                        <h2 class="text-4xl font-bold text-gray-900 mb-2" data-bind="transaction.itemName" data-mock="true">
+                            Cappuccino
+                        </h2>
+
+                        <!-- Price -->
+                        <div class="text-6xl font-bold text-gray-900 mb-12" data-bind="transaction.price" data-mock="true">
+                            $4.50
+                        </div>
+
+                        <!-- @COMPONENT: SlideToPayWidget [Main payment interaction] -->
+                        <div class="mb-8">
+                            <!-- @STATE: isSliding:boolean = false, slideProgress:number = 0 -->
+                            <div class="relative bg-merchant-teal rounded-full h-16 overflow-hidden">
+                                <!-- Slide Track -->
+                                <div class="absolute inset-0 flex items-center justify-center">
+                                    <span class="text-white font-medium opacity-75">Slide to Pay</span>
+                                </div>
+                                
+                                <!-- Slider Handle -->
+                                <!-- @FUNCTIONALITY: Should implement touch/mouse drag interaction with smooth animation -->
+                                <div 
+                                    class="absolute left-2 top-2 w-12 h-12 bg-slider-orange rounded-full shadow-lg cursor-pointer transform transition-transform hover:scale-105"
+                                    data-event="drag:handleSlidePayment"
+                                    data-implementation="Should trigger Windcave payment process when slid to end"
+                                ></div>
+                            </div>
+                            
+                            <p class="text-gray-500 text-sm mt-4">Slide the circle to complete payment</p>
+                        </div>
+
+                        <!-- Security Badges -->
+                        <div class="flex items-center justify-center space-x-6 pt-4 border-t border-gray-100">
+                            <div class="flex items-center space-x-2">
+                                <i class="fas fa-shield-alt text-merchant-teal"></i>
+                                <span class="text-xs font-medium text-gray-600">PCI DSS</span>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <i class="fas fa-lock text-merchant-teal"></i>
+                                <span class="text-xs font-medium text-gray-600">SECURE PAYMENT</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Payment Status Messages -->
+                    <!-- @COMPONENT: PaymentStatusDisplay [Payment progress and results] -->
+                    <div class="mt-6 space-y-4">
+                        
+                        <!-- Processing State -->
+                        <div id="processingState" class="hidden bg-blue-50 border border-blue-200 rounded-2xl p-4 text-center">
+                            <div class="animate-spin w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto mb-2"></div>
+                            <p class="text-blue-700 font-medium">Processing Payment...</p>
+                        </div>
+
+                        <!-- Success State -->
+                        <div id="successState" class="hidden bg-green-50 border border-green-200 rounded-2xl p-4 text-center">
+                            <i class="fas fa-check-circle text-green-600 text-2xl mb-2"></i>
+                            <p class="text-green-700 font-medium">Payment Successful!</p>
+                            <p class="text-green-600 text-sm">Thank you for your purchase</p>
+                        </div>
+
+                        <!-- Error State -->
+                        <div id="errorState" class="hidden bg-red-50 border border-red-200 rounded-2xl p-4 text-center">
+                            <i class="fas fa-exclamation-circle text-red-600 text-2xl mb-2"></i>
+                            <p class="text-red-700 font-medium">Payment Failed</p>
+                            <p class="text-red-600 text-sm">Please try again or contact staff</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: CustomerPayment -->
+
+    </div>
+    <!-- @END_COMPONENT: AppContainer -->
+
+    <script>
+        // Interface switching functionality
+        (function() {
+            const merchantTab = document.getElementById('merchantTab');
+            const customerTab = document.getElementById('customerTab');
+            const merchantInterface = document.getElementById('merchantInterface');
+            const customerInterface = document.getElementById('customerInterface');
+
+            function showMerchant() {
+                merchantInterface.classList.remove('hidden');
+                customerInterface.classList.add('hidden');
+                merchantTab.classList.add('bg-white', 'text-merchant-teal', 'shadow-sm');
+                merchantTab.classList.remove('text-gray-600');
+                customerTab.classList.remove('bg-white', 'text-merchant-teal', 'shadow-sm');
+                customerTab.classList.add('text-gray-600');
+            }
+
+            function showCustomer() {
+                merchantInterface.classList.add('hidden');
+                customerInterface.classList.remove('hidden');
+                customerTab.classList.add('bg-white', 'text-merchant-teal', 'shadow-sm');
+                customerTab.classList.remove('text-gray-600');
+                merchantTab.classList.remove('bg-white', 'text-merchant-teal', 'shadow-sm');
+                merchantTab.classList.add('text-gray-600');
+            }
+
+            merchantTab.addEventListener('click', showMerchant);
+            customerTab.addEventListener('click', showCustomer);
+
+            // Demo slide-to-pay interaction
+            const slider = document.querySelector('[data-event="drag:handleSlidePayment"]');
+            if (slider) {
+                let isDragging = false;
+                let startX = 0;
+                let currentX = 0;
+
+                slider.addEventListener('mousedown', startDrag);
+                slider.addEventListener('touchstart', startDrag);
+
+                function startDrag(e) {
+                    isDragging = true;
+                    startX = e.type === 'mousedown' ? e.clientX : e.touches[0].clientX;
+                    
+                    document.addEventListener('mousemove', drag);
+                    document.addEventListener('touchmove', drag);
+                    document.addEventListener('mouseup', endDrag);
+                    document.addEventListener('touchend', endDrag);
+                }
+
+                function drag(e) {
+                    if (!isDragging) return;
+                    
+                    e.preventDefault();
+                    currentX = (e.type === 'mousemove' ? e.clientX : e.touches[0].clientX) - startX;
+                    const maxX = slider.parentElement.offsetWidth - slider.offsetWidth - 16;
+                    const newX = Math.max(0, Math.min(currentX, maxX));
+                    
+                    slider.style.transform = `translateX(${newX}px)`;
+                    
+                    // Check if slid to end (80% of track)
+                    if (newX > maxX * 0.8) {
+                        endDrag();
+                        // TODO: Implement Windcave payment integration
+                        simulatePayment();
+                    }
+                }
+
+                function endDrag() {
+                    if (!isDragging) return;
+                    isDragging = false;
+                    
+                    // Reset slider position if not completed
+                    slider.style.transform = 'translateX(0)';
+                    
+                    document.removeEventListener('mousemove', drag);
+                    document.removeEventListener('touchmove', drag);
+                    document.removeEventListener('mouseup', endDrag);
+                    document.removeEventListener('touchend', endDrag);
+                }
+            }
+
+            // Demo payment simulation
+            function simulatePayment() {
+                const processingState = document.getElementById('processingState');
+                const successState = document.getElementById('successState');
+                
+                processingState.classList.remove('hidden');
+                
+                setTimeout(() => {
+                    processingState.classList.add('hidden');
+                    successState.classList.remove('hidden');
+                    
+                    // TODO: Implement real payment confirmation and receipt generation
+                }, 2000);
+            }
+
+            // Demo merchant form handling
+            const form = document.querySelector('form');
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    
+                    const itemName = document.getElementById('itemName').value;
+                    const itemPrice = document.getElementById('itemPrice').value;
+                    
+                    if (itemName && itemPrice) {
+                        // TODO: Implement QR code generation and real-time updates
+                        console.log('Transaction created:', { itemName, itemPrice });
+                        
+                        // Update customer interface (demo)
+                        document.querySelector('[data-bind="transaction.itemName"]').textContent = itemName;
+                        document.querySelector('[data-bind="transaction.price"]').textContent = `$${parseFloat(itemPrice).toFixed(2)}`;
+                        
+                        alert('Transaction sent to customer interface!');
+                    }
+                });
+            }
+        })();
+    </script>
+
+</body>
+</html>

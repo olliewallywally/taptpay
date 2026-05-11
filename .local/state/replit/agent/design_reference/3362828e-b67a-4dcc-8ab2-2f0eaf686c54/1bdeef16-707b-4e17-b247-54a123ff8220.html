@@ -1,0 +1,464 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ScanPay - QR Payment Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'trust-blue': '#2563EB',
+                        'success-green': '#10B981',
+                        'warning-amber': '#F59E0B',
+                        'alert-red': '#EF4444'
+                    },
+                    fontFamily: {
+                        'inter': ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        };
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-50 font-inter min-h-screen">
+    <!-- @COMPONENT: Header -->
+    <header class="bg-white shadow-sm border-b border-slate-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 bg-trust-blue rounded-lg flex items-center justify-center">
+                        <i class="fas fa-qrcode text-white text-sm"></i>
+                    </div>
+                    <h1 class="text-xl font-semibold text-slate-900">ScanPay</h1>
+                </div>
+                <nav class="hidden md:flex items-center space-x-6">
+                    <a href="#" class="text-slate-600 hover:text-trust-blue transition-colors">Dashboard</a>
+                    <a href="#" class="text-slate-600 hover:text-trust-blue transition-colors">Transactions</a>
+                    <a href="#" class="text-slate-600 hover:text-trust-blue transition-colors">Settings</a>
+                </nav>
+                <button class="md:hidden p-2">
+                    <i class="fas fa-bars text-slate-600"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+    <!-- @END_COMPONENT: Header -->
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- @COMPONENT: MainContent -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+            <!-- @COMPONENT: PaymentForm -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-semibold text-slate-900 mb-2">Create Payment QR Code</h2>
+                    <p class="text-slate-600">Generate a secure payment link and QR code for your customers</p>
+                </div>
+
+                <form class="space-y-6" data-implementation="Form should validate and generate QR code">
+                    <!-- Payment Details Section -->
+                    <div class="space-y-4">
+                        <div>
+                            <label for="amount" class="block text-sm font-medium text-slate-700 mb-2">
+                                Payment Amount <span class="text-alert-red">*</span>
+                            </label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <span class="text-slate-500 text-lg">$</span>
+                                </div>
+                                <input 
+                                    type="number" 
+                                    id="amount" 
+                                    name="amount"
+                                    placeholder="0.00"
+                                    step="0.01"
+                                    min="0.01"
+                                    class="block w-full pl-8 pr-3 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-trust-blue focus:border-trust-blue transition-colors text-lg"
+                                    data-bind="paymentData.amount"
+                                    data-mock="true"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="description" class="block text-sm font-medium text-slate-700 mb-2">
+                                Payment Description
+                            </label>
+                            <input 
+                                type="text" 
+                                id="description" 
+                                name="description"
+                                placeholder="e.g., Coffee Shop Purchase, Service Payment"
+                                class="block w-full px-3 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-trust-blue focus:border-trust-blue transition-colors"
+                                data-bind="paymentData.description"
+                                data-mock="true"
+                            />
+                        </div>
+
+                        <div>
+                            <label for="reference" class="block text-sm font-medium text-slate-700 mb-2">
+                                Reference Number (Optional)
+                            </label>
+                            <input 
+                                type="text" 
+                                id="reference" 
+                                name="reference"
+                                placeholder="Invoice #, Order ID, etc."
+                                class="block w-full px-3 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-trust-blue focus:border-trust-blue transition-colors"
+                                data-bind="paymentData.reference"
+                                data-mock="true"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Advanced Options -->
+                    <div class="border-t border-slate-200 pt-6">
+                        <button type="button" class="flex items-center space-x-2 text-trust-blue hover:text-blue-700 transition-colors mb-4" data-event="click:toggleAdvanced">
+                            <i class="fas fa-chevron-down text-xs"></i>
+                            <span class="text-sm font-medium">Advanced Options</span>
+                        </button>
+                        
+                        <div class="hidden space-y-4" data-state="advancedOpen">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="expires" class="block text-sm font-medium text-slate-700 mb-2">
+                                        Expires In
+                                    </label>
+                                    <select class="block w-full px-3 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-trust-blue focus:border-trust-blue transition-colors">
+                                        <option>1 Hour</option>
+                                        <option>24 Hours</option>
+                                        <option>7 Days</option>
+                                        <option>30 Days</option>
+                                        <option>Never</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="currency" class="block text-sm font-medium text-slate-700 mb-2">
+                                        Currency
+                                    </label>
+                                    <select class="block w-full px-3 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-trust-blue focus:border-trust-blue transition-colors">
+                                        <option>USD ($)</option>
+                                        <option>EUR (€)</option>
+                                        <option>GBP (£)</option>
+                                        <option>NZD ($)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Generate Button -->
+                    <button 
+                        type="submit" 
+                        class="w-full bg-trust-blue hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
+                        data-event="click:generateQRCode"
+                        data-implementation="Should validate form and generate QR code with unique payment ID"
+                    >
+                        <i class="fas fa-qrcode"></i>
+                        <span>Generate QR Code & Payment Link</span>
+                    </button>
+                </form>
+            </div>
+            <!-- @END_COMPONENT: PaymentForm -->
+
+            <!-- @COMPONENT: QRCodeDisplay -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-semibold text-slate-900 mb-2">Generated QR Code</h2>
+                    <p class="text-slate-600">Share this QR code or payment link with your customer</p>
+                </div>
+
+                <!-- QR Code Container -->
+                <div class="text-center mb-6">
+                    <div class="inline-block p-6 bg-slate-50 rounded-xl border-2 border-dashed border-slate-300">
+                        <!-- Placeholder QR Code - In real implementation, this would be generated dynamically -->
+                        <div class="w-48 h-48 bg-white border-2 border-slate-200 rounded-lg flex items-center justify-center mx-auto mb-4">
+                            <div class="text-center">
+                                <i class="fas fa-qrcode text-4xl text-slate-400 mb-2"></i>
+                                <p class="text-sm text-slate-500" data-mock="true">QR Code will appear here</p>
+                            </div>
+                        </div>
+                        <!-- @FUNCTIONALITY: QR code should be generated using a QR code library like qrcode.js -->
+                        <p class="text-xs text-slate-500">Scan with any QR code reader</p>
+                    </div>
+                </div>
+
+                <!-- Payment Details -->
+                <div class="bg-slate-50 rounded-lg p-4 mb-6" data-implementation="Should populate with actual payment data">
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-slate-600">Amount:</span>
+                            <span class="font-semibold text-lg" data-bind="generatedPayment.amount" data-mock="true">$25.00</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-slate-600">Payment ID:</span>
+                            <span class="font-mono text-sm" data-bind="generatedPayment.id" data-mock="true">PAY_XH8K9L2M</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-slate-600">Status:</span>
+                            <span class="inline-flex items-center space-x-1">
+                                <div class="w-2 h-2 bg-warning-amber rounded-full"></div>
+                                <span class="text-sm font-medium text-warning-amber">Awaiting Payment</span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Payment Link -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Payment Link</label>
+                    <div class="flex">
+                        <input 
+                            type="text" 
+                            readonly 
+                            value="https://pay.scanpay.app/PAY_XH8K9L2M" 
+                            class="flex-1 px-3 py-2 border border-slate-300 rounded-l-lg bg-slate-50 text-sm font-mono"
+                            data-bind="generatedPayment.url"
+                            data-mock="true"
+                        />
+                        <button 
+                            class="px-4 py-2 bg-slate-200 hover:bg-slate-300 border border-l-0 border-slate-300 rounded-r-lg transition-colors"
+                            data-event="click:copyToClipboard"
+                            data-implementation="Should copy payment URL to clipboard"
+                        >
+                            <i class="fas fa-copy text-slate-600"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="grid grid-cols-2 gap-3">
+                    <button 
+                        class="flex items-center justify-center space-x-2 px-4 py-3 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                        data-event="click:downloadQR"
+                        data-implementation="Should generate and download QR code image"
+                    >
+                        <i class="fas fa-download"></i>
+                        <span>Download QR</span>
+                    </button>
+                    <button 
+                        class="flex items-center justify-center space-x-2 px-4 py-3 bg-trust-blue hover:bg-blue-700 text-white rounded-lg transition-colors"
+                        data-event="click:sharePayment"
+                        data-implementation="Should open share dialog with payment link"
+                    >
+                        <i class="fas fa-share"></i>
+                        <span>Share Link</span>
+                    </button>
+                </div>
+            </div>
+            <!-- @END_COMPONENT: QRCodeDisplay -->
+        </div>
+
+        <!-- @COMPONENT: RecentPayments -->
+        <div class="mt-12">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-slate-200">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg font-semibold text-slate-900">Recent Payment Requests</h3>
+                        <button class="text-trust-blue hover:text-blue-700 text-sm font-medium">View All</button>
+                    </div>
+                </div>
+                
+                <!-- @MAP: recentPayments.map(payment => ( -->
+                <div class="divide-y divide-slate-200">
+                    <div class="px-6 py-4 hover:bg-slate-50 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-4">
+                                <div class="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-qrcode text-slate-600"></i>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-slate-900" data-mock="true">Coffee Shop Purchase</p>
+                                    <p class="text-sm text-slate-600" data-mock="true">PAY_XH8K9L2M • 2 hours ago</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <p class="font-semibold text-slate-900" data-mock="true">$25.00</p>
+                                <div class="flex items-center space-x-1">
+                                    <div class="w-2 h-2 bg-success-green rounded-full"></div>
+                                    <span class="text-sm text-success-green">Completed</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="px-6 py-4 hover:bg-slate-50 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-4">
+                                <div class="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-qrcode text-slate-600"></i>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-slate-900" data-mock="true">Service Payment</p>
+                                    <p class="text-sm text-slate-600" data-mock="true">PAY_KL7N3M9P • 4 hours ago</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <p class="font-semibold text-slate-900" data-mock="true">$150.00</p>
+                                <div class="flex items-center space-x-1">
+                                    <div class="w-2 h-2 bg-warning-amber rounded-full"></div>
+                                    <span class="text-sm text-warning-amber">Pending</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="px-6 py-4 hover:bg-slate-50 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-4">
+                                <div class="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-qrcode text-slate-600"></i>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-slate-900" data-mock="true">Product Sale</p>
+                                    <p class="text-sm text-slate-600" data-mock="true">PAY_RT5B8X4Q • 1 day ago</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <p class="font-semibold text-slate-900" data-mock="true">$89.99</p>
+                                <div class="flex items-center space-x-1">
+                                    <div class="w-2 h-2 bg-success-green rounded-full"></div>
+                                    <span class="text-sm text-success-green">Completed</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- @END_MAP )) -->
+            </div>
+        </div>
+        <!-- @END_COMPONENT: RecentPayments -->
+
+        <!-- @COMPONENT: StatsCards -->
+        <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-slate-600">Total Payments</p>
+                        <p class="text-2xl font-semibold text-slate-900" data-mock="true">47</p>
+                    </div>
+                    <div class="w-12 h-12 bg-trust-blue/10 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-credit-card text-trust-blue"></i>
+                    </div>
+                </div>
+                <div class="mt-4 flex items-center space-x-1">
+                    <i class="fas fa-arrow-up text-success-green text-xs"></i>
+                    <span class="text-sm text-success-green">+12% from last month</span>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-slate-600">Total Amount</p>
+                        <p class="text-2xl font-semibold text-slate-900" data-mock="true">$3,249</p>
+                    </div>
+                    <div class="w-12 h-12 bg-success-green/10 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-dollar-sign text-success-green"></i>
+                    </div>
+                </div>
+                <div class="mt-4 flex items-center space-x-1">
+                    <i class="fas fa-arrow-up text-success-green text-xs"></i>
+                    <span class="text-sm text-success-green">+8% from last month</span>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-slate-600">Success Rate</p>
+                        <p class="text-2xl font-semibold text-slate-900" data-mock="true">94.2%</p>
+                    </div>
+                    <div class="w-12 h-12 bg-warning-amber/10 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-chart-line text-warning-amber"></i>
+                    </div>
+                </div>
+                <div class="mt-4 flex items-center space-x-1">
+                    <i class="fas fa-arrow-down text-alert-red text-xs"></i>
+                    <span class="text-sm text-alert-red">-2% from last month</span>
+                </div>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: StatsCards -->
+        <!-- @END_COMPONENT: MainContent -->
+    </main>
+
+    <!-- @COMPONENT: Footer -->
+    <footer class="bg-white border-t border-slate-200 mt-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="flex items-center space-x-3 mb-4 md:mb-0">
+                    <div class="w-6 h-6 bg-trust-blue rounded flex items-center justify-center">
+                        <i class="fas fa-qrcode text-white text-xs"></i>
+                    </div>
+                    <span class="text-slate-900 font-medium">ScanPay</span>
+                </div>
+                <div class="flex items-center space-x-6 text-sm text-slate-600">
+                    <a href="#" class="hover:text-trust-blue transition-colors">Privacy Policy</a>
+                    <a href="#" class="hover:text-trust-blue transition-colors">Terms of Service</a>
+                    <a href="#" class="hover:text-trust-blue transition-colors">Support</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+    <!-- @END_COMPONENT: Footer -->
+
+    <script>
+        // TODO: Implement QR code generation using qrcode.js library
+        // TODO: Integrate with Windcave payment API
+        // TODO: Add form validation and error handling
+        // TODO: Implement real-time payment status updates
+        // TODO: Add copy to clipboard functionality
+        // TODO: Implement payment link sharing
+        // TODO: Add QR code download functionality
+        
+        (function() {
+            // Mock interaction handlers for demonstration
+            document.addEventListener('DOMContentLoaded', function() {
+                // Form submission handler
+                const form = document.querySelector('form');
+                if (form) {
+                    form.addEventListener('submit', function(e) {
+                        e.preventDefault();
+                        console.log('Generate QR Code clicked - implement Windcave integration');
+                        // TODO: Validate form data and generate unique payment ID
+                        // TODO: Create QR code with payment URL
+                        // TODO: Display generated QR code and payment details
+                    });
+                }
+
+                // Copy to clipboard handler
+                const copyButtons = document.querySelectorAll('[data-event*="copyToClipboard"]');
+                copyButtons.forEach(button => {
+                    button.addEventListener('click', function() {
+                        console.log('Copy to clipboard clicked');
+                        // TODO: Copy payment URL to clipboard
+                    });
+                });
+
+                // Download QR handler
+                const downloadButtons = document.querySelectorAll('[data-event*="downloadQR"]');
+                downloadButtons.forEach(button => {
+                    button.addEventListener('click', function() {
+                        console.log('Download QR clicked');
+                        // TODO: Generate and download QR code image
+                    });
+                });
+
+                // Share payment handler
+                const shareButtons = document.querySelectorAll('[data-event*="sharePayment"]');
+                shareButtons.forEach(button => {
+                    button.addEventListener('click', function() {
+                        console.log('Share payment clicked');
+                        // TODO: Open native share dialog or copy to clipboard
+                    });
+                });
+            });
+        })();
+    </script>
+</body>
+</html>

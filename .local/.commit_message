@@ -1,0 +1,3 @@
+Fix tel: link on info page — missing digit in phone number href
+
+The tel: href had +6421094672 (missing the 2 after 21), correct is +64212094672 matching the displayed 021 209 4672.

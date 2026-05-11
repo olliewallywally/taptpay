@@ -1,0 +1,23 @@
+[1G[0K⠙[1G[0K
+> rest-express@1.0.0 dev
+> NODE_ENV=development tsx server/index.ts
+
+[1G[0K⠙[1G[0KDatabase connection established
+✅ Storage: DatabaseStorage (Neon PostgreSQL @ ep-mute-grass-af2foouy.c-2.us-west-2.aws.neon.tech)
+✅ JWT_SECRET: configured
+✅ Auth sync: 2 verified merchants — 2 registered, 0 already present
+✅ Database: connection verified (live query succeeded)
+3:10:08 AM [express] Running schema push to sync database...
+3:10:30 AM [express] ✅ Schema: database schema is up to date
+Database already seeded
+✅ Auth sync: 2 verified merchants — 0 registered, 2 already present
+3:10:30 AM [express] ✅ info_pack_leads table ready
+3:10:30 AM [express] ✅ Existing verified merchants marked as onboarding completed
+🔍 Checking port 5000 availability...
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+✅ Server successfully started on 0.0.0.0:5000
+3:10:31 AM [express] ✅ Server successfully running on 0.0.0.0:5000
+3:10:31 AM [express] ✅ Database keep-alive ping started (every 4 minutes)
+Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme

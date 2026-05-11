@@ -1,0 +1,541 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ScanPay - QR Payment Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#2F5233',
+                        secondary: '#CD9777',
+                        background: '#F5F5F5'
+                    },
+                    fontFamily: {
+                        'inter': ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        };
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .slide-to-pay {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .slide-button {
+            transition: transform 0.3s ease;
+            cursor: grab;
+        }
+        
+        .slide-button:active {
+            cursor: grabbing;
+        }
+        
+        .slide-progress {
+            transition: width 0.3s ease;
+        }
+        
+        .qr-code-placeholder {
+            background: repeating-conic-gradient(#2F5233 0% 25%, transparent 0% 50%) 50% / 20px 20px;
+        }
+        
+        .floating-animation {
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-background min-h-screen">
+    <!-- @COMPONENT: App -->
+    <div id="app" class="min-h-screen">
+        
+        <!-- @COMPONENT: DashboardView -->
+        <div id="dashboard-view" class="container mx-auto px-4 py-8 max-w-6xl">
+            <!-- Header -->
+            <header class="text-center mb-12">
+                <div class="flex items-center justify-center mb-4">
+                    <div class="w-12 h-12 bg-primary rounded-lg flex items-center justify-center mr-3">
+                        <i class="fas fa-qrcode text-white text-xl"></i>
+                    </div>
+                    <h1 class="text-3xl font-bold text-gray-900">ScanPay Dashboard</h1>
+                </div>
+                <p class="text-gray-600 max-w-2xl mx-auto">Generate QR codes for seamless payments. Create unique payment links and manage your transactions with ease.</p>
+            </header>
+
+            <!-- Quick Stats -->
+            <div class="grid md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-white rounded-xl p-6 shadow-lg">
+                    <div class="flex items-center">
+                        <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mr-4">
+                            <i class="fas fa-chart-line text-green-600 text-xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-gray-600 text-sm">Total QR Codes</p>
+                            <p class="text-2xl font-bold text-gray-900" data-bind="stats.totalCodes">127</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl p-6 shadow-lg">
+                    <div class="flex items-center">
+                        <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
+                            <i class="fas fa-dollar-sign text-blue-600 text-xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-gray-600 text-sm">Total Revenue</p>
+                            <p class="text-2xl font-bold text-gray-900" data-bind="stats.totalRevenue">$2,849</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl p-6 shadow-lg">
+                    <div class="flex items-center">
+                        <div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mr-4">
+                            <i class="fas fa-clock text-orange-600 text-xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-gray-600 text-sm">Active Today</p>
+                            <p class="text-2xl font-bold text-gray-900" data-bind="stats.activeToday">23</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- QR Code Generator -->
+            <div class="bg-white rounded-xl p-8 shadow-lg mb-8">
+                <h2 class="text-2xl font-semibold text-gray-900 mb-6">Generate New QR Code</h2>
+                
+                <div class="grid md:grid-cols-2 gap-8">
+                    <!-- Form Section -->
+                    <div>
+                        <form id="qr-generator-form" class="space-y-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Merchant Name</label>
+                                <input type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Coffee Shop" data-bind="form.merchantName">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Item Name</label>
+                                <input type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Cappuccino" data-bind="form.itemName">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Price</label>
+                                <div class="relative">
+                                    <span class="absolute left-3 top-3 text-gray-500">$</span>
+                                    <input type="number" step="0.01" class="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="4.50" data-bind="form.price">
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="w-full bg-primary text-white py-3 px-6 rounded-lg font-medium hover:bg-opacity-90 transition-all duration-200" data-event="click:generateQRCode">
+                                <i class="fas fa-qrcode mr-2"></i>
+                                Generate QR Code
+                            </button>
+                        </form>
+                    </div>
+                    
+                    <!-- QR Code Preview -->
+                    <div class="flex flex-col items-center justify-center">
+                        <div id="qr-preview" class="w-48 h-48 bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center mb-4">
+                            <div class="text-center text-gray-500">
+                                <i class="fas fa-qrcode text-4xl mb-2"></i>
+                                <p>QR Code Preview</p>
+                            </div>
+                        </div>
+                        <div class="flex space-x-3">
+                            <button class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-200 transition-colors" data-event="click:copyQRCode">
+                                <i class="fas fa-copy mr-2"></i>Copy
+                            </button>
+                            <button class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-200 transition-colors" data-event="click:downloadQRCode">
+                                <i class="fas fa-download mr-2"></i>Download
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- QR Code Management -->
+            <div class="bg-white rounded-xl p-8 shadow-lg">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-semibold text-gray-900">Recent QR Codes</h2>
+                    <button class="text-primary hover:text-opacity-80 font-medium" data-event="click:viewAllCodes">
+                        View All <i class="fas fa-arrow-right ml-1"></i>
+                    </button>
+                </div>
+                
+                <!-- @MAP: recentCodes.map(code => ( -->
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 qr-code-placeholder rounded-lg mr-4"></div>
+                            <div>
+                                <h3 class="font-medium text-gray-900" data-bind="code.itemName">Cappuccino</h3>
+                                <p class="text-sm text-gray-600">
+                                    <span data-bind="code.merchantName">Coffee Corner</span> • 
+                                    <span data-bind="code.price">$4.50</span> • 
+                                    <span data-bind="code.createdAt">2 hours ago</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800" data-bind="code.status">Active</span>
+                            <button class="text-gray-400 hover:text-gray-600" data-event="click:viewQRCode">
+                                <i class="fas fa-external-link-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 qr-code-placeholder rounded-lg mr-4"></div>
+                            <div>
+                                <h3 class="font-medium text-gray-900" data-bind="code.itemName">Croissant</h3>
+                                <p class="text-sm text-gray-600">
+                                    <span data-bind="code.merchantName">Bakery Delights</span> • 
+                                    <span data-bind="code.price">$3.25</span> • 
+                                    <span data-bind="code.createdAt">5 hours ago</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800" data-bind="code.status">Active</span>
+                            <button class="text-gray-400 hover:text-gray-600" data-event="click:viewQRCode">
+                                <i class="fas fa-external-link-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 qr-code-placeholder rounded-lg mr-4"></div>
+                            <div>
+                                <h3 class="font-medium text-gray-900" data-bind="code.itemName">Sandwich</h3>
+                                <p class="text-sm text-gray-600">
+                                    <span data-bind="code.merchantName">Deli Express</span> • 
+                                    <span data-bind="code.price">$8.75</span> • 
+                                    <span data-bind="code.createdAt">1 day ago</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800" data-bind="code.status">Expired</span>
+                            <button class="text-gray-400 hover:text-gray-600" data-event="click:viewQRCode">
+                                <i class="fas fa-external-link-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <!-- @END_MAP )) -->
+            </div>
+            
+            <!-- Demo Button -->
+            <div class="text-center mt-8">
+                <button id="view-payment-demo" class="bg-secondary text-white py-3 px-6 rounded-lg font-medium hover:bg-opacity-90 transition-all duration-200" data-event="click:showPaymentDemo">
+                    <i class="fas fa-mobile-alt mr-2"></i>
+                    View Payment Demo
+                </button>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: DashboardView -->
+
+        <!-- @COMPONENT: PaymentLandingView -->
+        <div id="payment-view" class="hidden min-h-screen bg-background flex items-center justify-center p-4">
+            <div class="max-w-sm mx-auto">
+                <!-- Payment Card -->
+                <div class="bg-white rounded-2xl p-8 shadow-2xl relative overflow-hidden">
+                    <!-- Subtle background pattern -->
+                    <div class="absolute inset-0 opacity-5">
+                        <div class="w-full h-full" style="background: repeating-linear-gradient(45deg, #2F5233 0px, #2F5233 1px, transparent 1px, transparent 15px);"></div>
+                    </div>
+                    
+                    <!-- Merchant Header -->
+                    <div class="flex items-center justify-center mb-8 relative z-10">
+                        <div class="w-10 h-10 bg-primary rounded-lg flex items-center justify-center mr-3">
+                            <i class="fas fa-qrcode text-white text-lg"></i>
+                        </div>
+                        <span class="text-primary font-semibold text-lg tracking-wide" data-bind="merchant.name">MERCHANT</span>
+                    </div>
+                    
+                    <!-- Item Details -->
+                    <div class="text-center mb-8 relative z-10">
+                        <h1 class="text-3xl font-semibold text-gray-900 mb-4" data-bind="payment.itemName">Cappuccino</h1>
+                        <div class="text-5xl font-bold text-gray-900" data-bind="payment.price">$4.50</div>
+                    </div>
+                    
+                    <!-- Slide to Pay Component -->
+                    <div class="mb-8 relative z-10">
+                        <div class="slide-to-pay bg-primary rounded-full h-16 relative overflow-hidden" data-implementation="Implement touch/mouse drag functionality">
+                            <div class="slide-progress bg-primary bg-opacity-20 h-full w-0 absolute left-0 top-0 transition-all duration-300"></div>
+                            <div class="slide-button absolute right-2 top-2 w-12 h-12 bg-secondary rounded-full shadow-lg flex items-center justify-center transform transition-transform duration-300 hover:scale-105">
+                                <i class="fas fa-chevron-right text-white text-sm"></i>
+                            </div>
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <span class="text-white font-medium text-lg">Slide to Pay</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Security Badges -->
+                    <div class="flex items-center justify-center space-x-6 text-gray-500 relative z-10">
+                        <div class="flex items-center">
+                            <div class="w-8 h-6 bg-primary rounded-sm flex items-center justify-center mr-2">
+                                <span class="text-white text-xs font-bold">PCI</span>
+                            </div>
+                            <span class="text-xs font-medium">DSS</span>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-shield-alt text-primary mr-2"></i>
+                            <span class="text-xs font-medium">SECURE PAYMENT</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Back to Dashboard -->
+                <div class="text-center mt-6">
+                    <button id="back-to-dashboard" class="text-gray-600 hover:text-gray-800 font-medium" data-event="click:showDashboard">
+                        <i class="fas fa-arrow-left mr-2"></i>
+                        Back to Dashboard
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: PaymentLandingView -->
+
+        <!-- @COMPONENT: PaymentSuccessModal -->
+        <div id="payment-success-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-2xl p-8 max-w-sm mx-auto text-center fade-in">
+                <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <i class="fas fa-check text-green-600 text-3xl"></i>
+                </div>
+                <h2 class="text-2xl font-semibold text-gray-900 mb-4">Payment Successful!</h2>
+                <p class="text-gray-600 mb-6">Your payment has been processed successfully.</p>
+                <div class="space-y-3">
+                    <button class="w-full bg-primary text-white py-3 px-6 rounded-lg font-medium hover:bg-opacity-90 transition-colors" data-event="click:closeSuccessModal">
+                        Done
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: PaymentSuccessModal -->
+
+        <!-- @COMPONENT: Toast Notifications -->
+        <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-3"></div>
+        <!-- @END_COMPONENT: Toast Notifications -->
+
+    </div>
+    <!-- @END_COMPONENT: App -->
+
+    <script>
+        // TODO: Implement business logic, API calls, and state management
+        (function() {
+            // App state
+            let currentView = 'dashboard';
+            let isSliding = false;
+            let slideProgress = 0;
+            
+            // DOM elements
+            const dashboardView = document.getElementById('dashboard-view');
+            const paymentView = document.getElementById('payment-view');
+            const viewPaymentDemo = document.getElementById('view-payment-demo');
+            const backToDashboard = document.getElementById('back-to-dashboard');
+            const qrGeneratorForm = document.getElementById('qr-generator-form');
+            const paymentSuccessModal = document.getElementById('payment-success-modal');
+            const toastContainer = document.getElementById('toast-container');
+            
+            // View switching
+            function showDashboard() {
+                dashboardView.classList.remove('hidden');
+                paymentView.classList.add('hidden');
+                currentView = 'dashboard';
+            }
+            
+            function showPaymentView() {
+                dashboardView.classList.add('hidden');
+                paymentView.classList.remove('hidden');
+                currentView = 'payment';
+            }
+            
+            // Toast notifications
+            function showToast(message, type = 'success') {
+                const toast = document.createElement('div');
+                toast.className = `px-6 py-4 rounded-lg shadow-lg flex items-center space-x-3 ${
+                    type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+                } fade-in`;
+                
+                toast.innerHTML = `
+                    <i class="fas fa-${type === 'success' ? 'check' : 'exclamation-triangle'}"></i>
+                    <span>${message}</span>
+                `;
+                
+                toastContainer.appendChild(toast);
+                
+                setTimeout(() => {
+                    toast.remove();
+                }, 3000);
+            }
+            
+            // QR Code generation
+            function generateQRCode(event) {
+                event.preventDefault();
+                
+                const formData = new FormData(qrGeneratorForm);
+                const merchantName = formData.get('merchantName') || 'MERCHANT';
+                const itemName = formData.get('itemName') || 'Item';
+                const price = formData.get('price') || '0.00';
+                
+                // Simulate QR code generation
+                const qrPreview = document.getElementById('qr-preview');
+                qrPreview.innerHTML = `
+                    <div class="w-48 h-48 qr-code-placeholder rounded-xl flex items-center justify-center">
+                        <div class="text-center text-white">
+                            <i class="fas fa-qrcode text-4xl mb-2"></i>
+                            <p class="text-sm">QR Generated</p>
+                        </div>
+                    </div>
+                `;
+                
+                showToast('QR Code generated successfully!');
+                
+                // TODO: Implement actual QR code generation and unique link creation
+                // TODO: Store in database with unique ID
+                // TODO: Create payment link structure: /pay/{uniqueId}?item=${itemName}&price=${price}
+            }
+            
+            // Slide to pay functionality
+            function initializeSlideToPlay() {
+                const slideContainer = document.querySelector('.slide-to-pay');
+                const slideButton = document.querySelector('.slide-button');
+                const slideProgress = document.querySelector('.slide-progress');
+                
+                if (!slideContainer || !slideButton || !slideProgress) return;
+                
+                let startX = 0;
+                let currentX = 0;
+                let isDragging = false;
+                
+                function handleStart(e) {
+                    isDragging = true;
+                    startX = e.type === 'mousedown' ? e.clientX : e.touches[0].clientX;
+                    slideButton.style.transition = 'none';
+                }
+                
+                function handleMove(e) {
+                    if (!isDragging) return;
+                    
+                    currentX = (e.type === 'mousemove' ? e.clientX : e.touches[0].clientX) - startX;
+                    const maxDistance = slideContainer.offsetWidth - slideButton.offsetWidth - 16;
+                    const progress = Math.max(0, Math.min(currentX, maxDistance));
+                    const progressPercentage = (progress / maxDistance) * 100;
+                    
+                    slideButton.style.transform = `translateX(${progress}px)`;
+                    slideProgress.style.width = `${progressPercentage}%`;
+                    
+                    // Complete payment if slid far enough
+                    if (progressPercentage > 85) {
+                        completePayment();
+                        isDragging = false;
+                    }
+                }
+                
+                function handleEnd() {
+                    if (!isDragging) return;
+                    isDragging = false;
+                    
+                    slideButton.style.transition = 'transform 0.3s ease';
+                    slideButton.style.transform = 'translateX(0)';
+                    slideProgress.style.width = '0%';
+                }
+                
+                function completePayment() {
+                    slideButton.style.transform = 'translateX(0)';
+                    slideProgress.style.width = '0%';
+                    
+                    // Show success modal
+                    setTimeout(() => {
+                        paymentSuccessModal.classList.remove('hidden');
+                    }, 300);
+                    
+                    // TODO: Integrate with Windcave payment processor
+                    // TODO: Send payment data to backend
+                    // TODO: Handle payment confirmation
+                }
+                
+                // Mouse events
+                slideButton.addEventListener('mousedown', handleStart);
+                document.addEventListener('mousemove', handleMove);
+                document.addEventListener('mouseup', handleEnd);
+                
+                // Touch events
+                slideButton.addEventListener('touchstart', handleStart);
+                document.addEventListener('touchmove', handleMove);
+                document.addEventListener('touchend', handleEnd);
+            }
+            
+            // Event listeners
+            viewPaymentDemo.addEventListener('click', showPaymentView);
+            backToDashboard.addEventListener('click', showDashboard);
+            qrGeneratorForm.addEventListener('submit', generateQRCode);
+            
+            // Close success modal
+            paymentSuccessModal.addEventListener('click', (e) => {
+                if (e.target === paymentSuccessModal || e.target.closest('[data-event="click:closeSuccessModal"]')) {
+                    paymentSuccessModal.classList.add('hidden');
+                }
+            });
+            
+            // Initialize slide to pay when payment view is shown
+            document.addEventListener('DOMContentLoaded', () => {
+                initializeSlideToPlay();
+            });
+            
+            // URL parameter handling for payment page
+            function handlePaymentURL() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const item = urlParams.get('item');
+                const price = urlParams.get('price');
+                
+                if (item || price) {
+                    // Update payment view with URL parameters
+                    if (item) {
+                        const itemElement = document.querySelector('[data-bind="payment.itemName"]');
+                        if (itemElement) itemElement.textContent = item;
+                    }
+                    
+                    if (price) {
+                        const priceElement = document.querySelector('[data-bind="payment.price"]');
+                        if (priceElement) priceElement.textContent = `$${price}`;
+                    }
+                    
+                    showPaymentView();
+                }
+            }
+            
+            // Initialize
+            handlePaymentURL();
+        })();
+    </script>
+</body>
+</html>
