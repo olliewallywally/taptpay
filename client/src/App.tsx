@@ -10,15 +10,14 @@ import { NotificationProvider } from "@/components/notification-system";
 import { PageTransition } from "@/components/page-transition";
 import { BottomNavigation } from "@/components/bottom-navigation";
 
-// ── Critical-path pages — loaded eagerly ──────────────────────────────────────
 import { LandingPage } from "@/pages/landing-page";
 import Login from "@/pages/login";
 import AppLogin from "@/pages/app-login";
 import MerchantSignup from "@/pages/merchant-signup";
 
-// ── All other pages — lazy-loaded on demand ──────────────────────────────────
 const NotFound              = lazy(() => import("@/pages/not-found"));
-const MerchantTerminalMobile = lazy(() => import("@/pages/merchant-terminal-mobile"));
+const MerchantTerminalMobile = lazy(() => import("@/pages/merchant-terminal-mobile-v2"));
+const PaymentStack           = lazy(() => import("@/pages/payment-stack"));
 const MerchantTerminal      = lazy(() => import("@/pages/merchant-terminal"));
 const DemoTerminal          = lazy(() => import("@/pages/demo-terminal"));
 const CustomerPayment       = lazy(() => import("@/pages/customer-payment"));
@@ -46,8 +45,8 @@ const BoardBuilder          = lazy(() => import("@/pages/board-builder"));
 
 function PageLoader() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="w-8 h-8 border-2 border-[#0055FF] border-t-transparent rounded-full animate-spin" />
+    <div className="min-h-screen flex items-center justify-center" style={{ background: "#060D1F" }}>
+      <div className="w-8 h-8 border-2 border-[#00DFC8] border-t-transparent rounded-full animate-spin" />
     </div>
   );
 }
@@ -66,14 +65,10 @@ function ProtectedRoute({ children, skipOnboardingCheck = false }: { children: R
         setLocation(`/login?returnTo=${returnTo}`);
         return;
       }
-      
       try {
         const response = await fetch('/api/auth/me', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
+          headers: { 'Authorization': `Bearer ${token}` },
         });
-        
         if (response.ok) {
           const data = await response.json();
           setIsAuthenticated(true);
@@ -96,10 +91,8 @@ function ProtectedRoute({ children, skipOnboardingCheck = false }: { children: R
         console.log('Auth check failed, keeping existing token');
         setIsAuthenticated(true);
       }
-      
       setIsChecking(false);
     };
-
     checkAuthStatus();
   }, [setLocation, skipOnboardingCheck]);
 
@@ -127,12 +120,10 @@ function AdminProtectedRoute({ children }: { children: React.ReactNode }) {
         window.location.href = "/login";
         return;
       }
-
       try {
         const response = await fetch("/api/admin/auth/me", {
           headers: { Authorization: `Bearer ${token}` },
         });
-        
         if (response.ok) {
           setIsAuthenticated(true);
         } else {
@@ -147,17 +138,12 @@ function AdminProtectedRoute({ children }: { children: React.ReactNode }) {
         setIsAuthenticated(false);
         window.location.href = "/login";
       }
-      
       setIsChecking(false);
     };
-
     checkAdminAuth();
   }, []);
 
-  if (isChecking) {
-    return <PageLoader />;
-  }
-
+  if (isChecking) return <PageLoader />;
   return isAuthenticated ? <>{children}</> : null;
 }
 
@@ -208,52 +194,35 @@ function Router() {
           <Route path="/forgot-password" component={ForgotPassword} />
           <Route path="/reset-password" component={ResetPassword} />
           <Route path="/terminal">
-            <ProtectedRoute>
-              <DemoTerminal />
-            </ProtectedRoute>
+            <ProtectedRoute><MerchantTerminalMobile /></ProtectedRoute>
+          </Route>
+          <Route path="/stack">
+            <ProtectedRoute><PaymentStack /></ProtectedRoute>
           </Route>
           <Route path="/dashboard">
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
+            <ProtectedRoute><Dashboard /></ProtectedRoute>
           </Route>
           <Route path="/settings">
-            <ProtectedRoute>
-              <Settings />
-            </ProtectedRoute>
+            <ProtectedRoute><Settings /></ProtectedRoute>
           </Route>
           <Route path="/transactions">
-            <ProtectedRoute>
-              <Transactions />
-            </ProtectedRoute>
+            <ProtectedRoute><Transactions /></ProtectedRoute>
           </Route>
           <Route path="/stock">
-            <ProtectedRoute>
-              <StockManagement />
-            </ProtectedRoute>
+            <ProtectedRoute><StockManagement /></ProtectedRoute>
           </Route>
           <Route path="/nfc">
-            <ProtectedRoute>
-              <NFCPayment />
-            </ProtectedRoute>
+            <ProtectedRoute><NFCPayment /></ProtectedRoute>
           </Route>
           <Route path="/board-builder">
-            <ProtectedRoute>
-              <BoardBuilder />
-            </ProtectedRoute>
+            <ProtectedRoute><BoardBuilder /></ProtectedRoute>
           </Route>
           <Route path="/onboarding">
-            <ProtectedRoute skipOnboardingCheck={true}>
-              <MerchantOnboarding />
-            </ProtectedRoute>
+            <ProtectedRoute skipOnboardingCheck={true}><MerchantOnboarding /></ProtectedRoute>
           </Route>
-          
           <Route path="/admin" nest>
-            <AdminProtectedRoute>
-              <NewAdminDashboard />
-            </AdminProtectedRoute>
+            <AdminProtectedRoute><NewAdminDashboard /></AdminProtectedRoute>
           </Route>
-          
           <Route path="/app-login" component={AppLogin} />
           <Route path="/terms" component={LegalPage} />
           <Route path="/privacy" component={LegalPage} />
@@ -270,8 +239,6 @@ function Router() {
     </PageTransition>
   );
 }
-
-
 
 function App() {
   return (

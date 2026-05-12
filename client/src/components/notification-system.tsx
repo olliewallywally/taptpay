@@ -1,5 +1,6 @@
-import { useState, useEffect, createContext, useContext, useCallback, useMemo, useRef } from "react";
-import { X, Wifi, WifiOff, AlertTriangle, CheckCircle, Info, Smartphone, Monitor } from "lucide-react";
+import { useState, useEffect, useRef, createContext, useContext, useCallback, useMemo } from "react";
+import { AnimatePresence, motion, useMotionValue, useTransform } from "framer-motion";
+import { X, WifiOff, AlertTriangle, CheckCircle, Info, Smartphone } from "lucide-react";
 import { sseClient } from "@/lib/sse-client";
 
 interface Notification {
@@ -7,7 +8,7 @@ interface Notification {
   type: "success" | "error" | "warning" | "info" | "device";
   title: string;
   message: string;
-  duration?: number; // milliseconds, 0 for persistent
+  duration?: number;
   actions?: Array<{
     label: string;
     onClick: () => void;
@@ -26,9 +27,7 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 
 export function useNotifications() {
   const context = useContext(NotificationContext);
-  if (!context) {
-    throw new Error("useNotifications must be used within a NotificationProvider");
-  }
+  if (!context) throw new Error("useNotifications must be used within a NotificationProvider");
   return context;
 }
 
@@ -38,66 +37,40 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const notificationIds = useRef<Set<string>>(new Set());
 
   const addNotification = useCallback((notification: Omit<Notification, "id">) => {
-    // Create unique key for deduplication
     const dedupeKey = `${notification.type}-${notification.title}-${notification.message}`;
-    
-    // Skip if duplicate notification is already shown (for persistent ones)
-    if (notification.duration === 0 && notificationIds.current.has(dedupeKey)) {
-      return;
-    }
+    if (notification.duration === 0 && notificationIds.current.has(dedupeKey)) return;
 
     const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
-    const newNotification = { ...notification, id };
-    
-    // Track this notification
     notificationIds.current.add(dedupeKey);
-    
-    setNotifications(prev => [...prev, newNotification]);
+    setNotifications(prev => [...prev, { ...notification, id }]);
 
-    // Auto-remove after duration (default 5 seconds)
     if (notification.duration !== 0) {
       const timeout = notification.duration || 5000;
-      const timeoutId = setTimeout(() => {
-        removeNotification(id);
-      }, timeout);
+      const timeoutId = setTimeout(() => removeNotification(id), timeout);
       notificationTimeouts.current.set(id, timeoutId);
     }
-
-    return id; // Return ID for tracking
+    return id;
   }, []);
 
   const removeNotification = useCallback((id: string) => {
     setNotifications(prev => {
-      const notification = prev.find(n => n.id === id);
-      if (notification) {
-        // Remove from deduplication tracking
-        const dedupeKey = `${notification.type}-${notification.title}-${notification.message}`;
-        notificationIds.current.delete(dedupeKey);
-      }
+      const n = prev.find(n => n.id === id);
+      if (n) notificationIds.current.delete(`${n.type}-${n.title}-${n.message}`);
       return prev.filter(n => n.id !== id);
     });
-    
-    // Clear any pending timeout
-    const timeoutId = notificationTimeouts.current.get(id);
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-      notificationTimeouts.current.delete(id);
-    }
+    const t = notificationTimeouts.current.get(id);
+    if (t) { clearTimeout(t); notificationTimeouts.current.delete(id); }
   }, []);
 
   const clearAll = useCallback(() => {
-    // Clear all timeouts
-    notificationTimeouts.current.forEach(timeout => clearTimeout(timeout));
+    notificationTimeouts.current.forEach(clearTimeout);
     notificationTimeouts.current.clear();
     notificationIds.current.clear();
     setNotifications([]);
   }, []);
 
   const contextValue = useMemo(() => ({
-    notifications,
-    addNotification,
-    removeNotification,
-    clearAll
+    notifications, addNotification, removeNotification, clearAll,
   }), [notifications, addNotification, removeNotification, clearAll]);
 
   return (
@@ -108,128 +81,139 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   );
 }
 
+const TYPE_CONFIG = {
+  success: { icon: CheckCircle, color: "#00DFC8", label: "TaptPay" },
+  error:   { icon: AlertTriangle, color: "#FF4D4D", label: "Alert"   },
+  warning: { icon: AlertTriangle, color: "#F59E0B", label: "Warning" },
+  info:    { icon: Info,          color: "#60A5FA", label: "Info"    },
+  device:  { icon: Smartphone,   color: "#A78BFA", label: "Device"  },
+} as const;
+
 function NotificationContainer() {
   const { notifications, removeNotification } = useNotifications();
-
-  if (notifications.length === 0) return null;
-
   return (
-    <div 
-      className="fixed top-4 right-4 z-50 space-y-3 max-w-sm"
-      data-testid="notification-container"
+    <div
+      className="fixed top-0 left-0 right-0 z-[9999] flex flex-col items-center pointer-events-none"
+      style={{ paddingTop: "max(env(safe-area-inset-top, 10px), 10px)" }}
     >
-      {notifications.map((notification) => (
-        <NotificationCard
-          key={notification.id}
-          notification={notification}
-          onRemove={() => removeNotification(notification.id)}
-        />
-      ))}
+      <AnimatePresence mode="popLayout">
+        {notifications.map((notification) => (
+          <motion.div
+            key={notification.id}
+            layout
+            initial={{ opacity: 0, y: -70, scale: 0.86 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.88, y: -16, transition: { duration: 0.16, ease: "easeIn" } }}
+            transition={{ type: "spring", stiffness: 480, damping: 36 }}
+            drag="y"
+            dragDirectionLock
+            dragConstraints={{ top: 0, bottom: 20 }}
+            dragElastic={{ top: 0.9, bottom: 0.05 }}
+            onDragEnd={(_, info) => {
+              if (info.offset.y < -24) removeNotification(notification.id);
+            }}
+            className="pointer-events-auto mb-2 w-full px-3"
+            style={{ maxWidth: 440 }}
+          >
+            <NotificationCard
+              notification={notification}
+              onRemove={() => removeNotification(notification.id)}
+            />
+          </motion.div>
+        ))}
+      </AnimatePresence>
     </div>
   );
 }
 
-function NotificationCard({ 
-  notification, 
-  onRemove 
-}: { 
-  notification: Notification;
-  onRemove: () => void;
-}) {
-  const getNotificationStyles = () => {
-    switch (notification.type) {
-      case "success":
-        return {
-          icon: CheckCircle,
-          bgColor: "bg-green-500/10",
-          borderColor: "border-green-400/30",
-          iconColor: "text-green-400",
-          titleColor: "text-green-200",
-          textColor: "text-green-300"
-        };
-      case "error":
-        return {
-          icon: AlertTriangle,
-          bgColor: "bg-red-500/10",
-          borderColor: "border-red-400/30",
-          iconColor: "text-red-400",
-          titleColor: "text-red-200",
-          textColor: "text-red-300"
-        };
-      case "warning":
-        return {
-          icon: AlertTriangle,
-          bgColor: "bg-orange-500/10",
-          borderColor: "border-orange-400/30",
-          iconColor: "text-orange-400",
-          titleColor: "text-orange-200",
-          textColor: "text-orange-300"
-        };
-      case "device":
-        return {
-          icon: Smartphone,
-          bgColor: "bg-blue-500/10",
-          borderColor: "border-blue-400/30",
-          iconColor: "text-blue-400",
-          titleColor: "text-blue-200",
-          textColor: "text-blue-300"
-        };
-      default:
-        return {
-          icon: Info,
-          bgColor: "bg-gray-500/10",
-          borderColor: "border-gray-400/30",
-          iconColor: "text-gray-400",
-          titleColor: "text-gray-200",
-          textColor: "text-gray-300"
-        };
-    }
-  };
+function NotificationCard({ notification, onRemove }: { notification: Notification; onRemove: () => void }) {
+  const cfg = TYPE_CONFIG[notification.type] ?? TYPE_CONFIG.info;
+  const Icon = cfg.icon;
+  const duration = notification.duration ?? 5000;
+  const [progress, setProgress] = useState(100);
 
-  const styles = getNotificationStyles();
-  const Icon = styles.icon;
+  useEffect(() => {
+    if (duration === 0) return;
+    const start = Date.now();
+    const tick = () => {
+      const pct = Math.max(0, 100 - ((Date.now() - start) / duration) * 100);
+      setProgress(pct);
+      if (pct > 0) requestAnimationFrame(tick);
+    };
+    const raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [duration]);
 
   return (
-    <div 
-      className={`backdrop-blur-xl border rounded-2xl p-4 shadow-2xl animate-in slide-in-from-right-full duration-300 ${styles.bgColor} ${styles.borderColor}`}
-      data-testid={`notification-${notification.type}`}
+    <div
+      className="relative rounded-[18px] overflow-hidden"
+      style={{
+        background: "rgba(6,13,31,0.96)",
+        backdropFilter: "blur(28px) saturate(1.8)",
+        WebkitBackdropFilter: "blur(28px) saturate(1.8)",
+        border: `1px solid rgba(255,255,255,0.09)`,
+        boxShadow: `0 12px 40px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06)`,
+      }}
     >
-      <div className="flex items-start space-x-3">
-        <Icon className={`w-5 h-5 mt-0.5 flex-shrink-0 ${styles.iconColor}`} />
-        
+      {duration > 0 && (
+        <div className="absolute top-0 left-0 right-0 h-[2px] rounded-full overflow-hidden"
+          style={{ background: "rgba(255,255,255,0.06)" }}>
+          <motion.div
+            className="h-full rounded-full origin-left"
+            style={{ backgroundColor: cfg.color }}
+            animate={{ scaleX: progress / 100 }}
+            transition={{ duration: 0.05, ease: "linear" }}
+          />
+        </div>
+      )}
+
+      <div className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full"
+        style={{ backgroundColor: cfg.color }} />
+
+      <div className="flex items-start gap-3 px-4 py-3.5 pl-5">
+        <motion.div
+          initial={{ scale: 0, rotate: -20 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{ type: "spring", stiffness: 500, damping: 22, delay: 0.05 }}
+          className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center mt-0.5"
+          style={{ backgroundColor: `${cfg.color}1a`, border: `1px solid ${cfg.color}30` }}
+        >
+          <Icon className="w-4 h-4" style={{ color: cfg.color }} />
+        </motion.div>
+
         <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between">
-            <h4 className={`text-sm font-semibold ${styles.titleColor}`} data-testid="notification-title">
-              {notification.title}
-            </h4>
-            <button
+          <div className="flex items-center justify-between gap-2 mb-0.5">
+            <span className="text-[10px] font-bold uppercase tracking-[0.1em]"
+              style={{ color: `${cfg.color}88` }}>
+              {cfg.label}
+            </span>
+            <motion.button
+              whileTap={{ scale: 0.8 }}
               onClick={onRemove}
-              className={`ml-2 p-0.5 rounded-md hover:bg-white/10 transition-colors ${styles.iconColor}`}
-              data-testid="notification-close"
+              className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center transition-colors"
+              style={{ background: "rgba(255,255,255,0.06)" }}
             >
-              <X className="w-4 h-4" />
-            </button>
+              <X className="w-3 h-3 text-white/40" />
+            </motion.button>
           </div>
-          
-          <p className={`text-sm mt-1 ${styles.textColor}`} data-testid="notification-message">
-            {notification.message}
-          </p>
-          
+          <p className="text-white text-sm font-semibold leading-snug">{notification.title}</p>
+          {notification.message && (
+            <p className="text-white/45 text-xs mt-0.5 leading-relaxed">{notification.message}</p>
+          )}
           {notification.actions && notification.actions.length > 0 && (
-            <div className="flex space-x-2 mt-3">
-              {notification.actions.map((action, index) => (
-                <button
-                  key={index}
+            <div className="flex gap-2 mt-2.5">
+              {notification.actions.map((action, i) => (
+                <motion.button
+                  key={i}
+                  whileTap={{ scale: 0.94 }}
                   onClick={action.onClick}
-                  className={`px-3 py-1 text-xs rounded-lg font-medium transition-colors ${
-                    action.variant === "primary"
-                      ? `bg-white/20 ${styles.titleColor} hover:bg-white/30`
-                      : `bg-white/10 ${styles.textColor} hover:bg-white/20`
-                  }`}
-                  data-testid={`notification-action-${index}`}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                  style={action.variant === "primary"
+                    ? { backgroundColor: cfg.color, color: "#000" }
+                    : { background: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)" }}
                 >
                   {action.label}
-                </button>
+                </motion.button>
               ))}
             </div>
           )}
@@ -239,51 +223,30 @@ function NotificationCard({
   );
 }
 
-// Device status monitoring hook
 export function useDeviceStatusMonitoring() {
   const { addNotification, removeNotification } = useNotifications();
   const offlineNotificationId = useRef<string | null>(null);
-  const statusRefs = useRef({
-    onlineStatusNotified: false,
-    visibilityNotified: false,
-    isInitialized: false
-  });
+  const statusRefs = useRef({ onlineStatusNotified: false, visibilityNotified: false, isInitialized: false });
 
   const handleOnline = useCallback(() => {
-    // Remove persistent offline notification if it exists
     if (offlineNotificationId.current) {
       removeNotification(offlineNotificationId.current);
       offlineNotificationId.current = null;
     }
-
-    // Show restoration message only if we were previously offline
     if (statusRefs.current.onlineStatusNotified && statusRefs.current.isInitialized) {
-      addNotification({
-        type: "success",
-        title: "Connection Restored",
-        message: "Your device is back online and payments can be processed.",
-        duration: 4000
-      });
+      addNotification({ type: "success", title: "Connection Restored", message: "Your device is back online and payments can be processed.", duration: 4000 });
     }
     statusRefs.current.onlineStatusNotified = true;
     statusRefs.current.isInitialized = true;
   }, [addNotification, removeNotification]);
 
   const handleOffline = useCallback(() => {
-    // Only add notification if we don't already have one
     if (!offlineNotificationId.current) {
       const id = addNotification({
-        type: "error",
-        title: "Connection Lost",
+        type: "error", title: "Connection Lost",
         message: "No internet connection. Payments cannot be processed until connection is restored.",
-        duration: 0, // Persistent until connection restored
-        actions: [
-          {
-            label: "Retry",
-            onClick: () => window.location.reload(),
-            variant: "primary"
-          }
-        ]
+        duration: 0,
+        actions: [{ label: "Retry", onClick: () => window.location.reload(), variant: "primary" }],
       });
       offlineNotificationId.current = id || null;
     }
@@ -294,16 +257,10 @@ export function useDeviceStatusMonitoring() {
   const handleVisibilityChange = useCallback(() => {
     if (document.hidden) {
       if (!statusRefs.current.visibilityNotified) {
-        addNotification({
-          type: "device",
-          title: "Device Inactive",
-          message: "Payment terminal may miss transactions when the app is not active.",
-          duration: 6000
-        });
+        addNotification({ type: "device", title: "Device Inactive", message: "Payment terminal may miss transactions when the app is not active.", duration: 6000 });
         statusRefs.current.visibilityNotified = true;
       }
     } else {
-      // Reset when coming back
       statusRefs.current.visibilityNotified = false;
     }
   }, [addNotification]);
@@ -318,102 +275,53 @@ export function useDeviceStatusMonitoring() {
   }, []);
 
   useEffect(() => {
-    // Add event listeners
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    // Check initial online status
-    if (!navigator.onLine) {
-      handleOffline();
-    } else {
-      statusRefs.current.isInitialized = true;
-    }
-
-    // Cleanup
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    if (!navigator.onLine) handleOffline();
+    else statusRefs.current.isInitialized = true;
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, [handleOnline, handleOffline, handleVisibilityChange, handleBeforeUnload]);
 }
 
-// SSE connection monitoring hook
 export function useSSEConnectionMonitoring(merchantId: number) {
   const { addNotification, removeNotification } = useNotifications();
   const sseNotificationId = useRef<string | null>(null);
-  const statusRefs = useRef({
-    connectionLostNotified: false,
-    lastConnectionState: true,
-    isInitialized: false
-  });
+  const statusRefs = useRef({ connectionLostNotified: false, lastConnectionState: true, isInitialized: false });
 
   const checkSSEConnection = useCallback(() => {
-    // Check SSE connection state - simplified check until we have public method
-    // TODO: Add a public method to SSEClient to check connection status
-    const sseConnected = navigator.onLine; // Basic check - can be enhanced later
-    
-    // Only proceed if the connection state has changed
-    if (sseConnected === statusRefs.current.lastConnectionState && statusRefs.current.isInitialized) {
-      return;
-    }
-    
+    const sseConnected = navigator.onLine;
+    if (sseConnected === statusRefs.current.lastConnectionState && statusRefs.current.isInitialized) return;
+
     if (!sseConnected && !statusRefs.current.connectionLostNotified) {
-      // Remove any existing notification first
-      if (sseNotificationId.current) {
-        removeNotification(sseNotificationId.current);
-      }
-      
+      if (sseNotificationId.current) removeNotification(sseNotificationId.current);
       const id = addNotification({
-        type: "warning",
-        title: "Real-time Updates Disconnected",
+        type: "warning", title: "Real-time Updates Disconnected",
         message: "Payment status updates may be delayed. Reconnecting...",
         duration: 0,
-        actions: [
-          {
-            label: "Refresh",
-            onClick: () => window.location.reload(),
-            variant: "primary"
-          }
-        ]
+        actions: [{ label: "Refresh", onClick: () => window.location.reload(), variant: "primary" }],
       });
       sseNotificationId.current = id || null;
       statusRefs.current.connectionLostNotified = true;
     } else if (sseConnected && statusRefs.current.connectionLostNotified) {
-      // Remove persistent disconnection notification
-      if (sseNotificationId.current) {
-        removeNotification(sseNotificationId.current);
-        sseNotificationId.current = null;
-      }
-      
-      // Show restoration message
-      addNotification({
-        type: "success",
-        title: "Real-time Updates Restored",
-        message: "Payment status updates are working normally.",
-        duration: 3000
-      });
+      if (sseNotificationId.current) { removeNotification(sseNotificationId.current); sseNotificationId.current = null; }
+      addNotification({ type: "success", title: "Real-time Updates Restored", message: "Payment status updates are working normally.", duration: 3000 });
       statusRefs.current.connectionLostNotified = false;
     }
-    
+
     statusRefs.current.lastConnectionState = sseConnected;
     statusRefs.current.isInitialized = true;
   }, [addNotification, removeNotification]);
 
   useEffect(() => {
-    // Initial check
     checkSSEConnection();
-    
-    // Check SSE connection every 30 seconds
-    const reconnectionTimer = setInterval(checkSSEConnection, 30000);
-
-    return () => {
-      if (reconnectionTimer) {
-        clearInterval(reconnectionTimer);
-      }
-    };
+    const timer = setInterval(checkSSEConnection, 30000);
+    return () => clearInterval(timer);
   }, [merchantId, checkSSEConnection]);
 }
