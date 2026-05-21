@@ -23,39 +23,40 @@ const SUBBAR_ROUTE = { 0: 'stock', 1: 'split', 2: 'share', 3: 'cash' };
 
 /* ═══ ICONS ═══ */
 const Ic = {
-  X:      ({ sz = 18, sw = 2.4 }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none"><path d="M5 5l14 14M19 5L5 19" stroke="currentColor" strokeWidth={sw} strokeLinecap="round"/></svg>,
-  Check:  ({ sz = 20, sw = 2.4 }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none"><path d="M4 12.5l5 5L20 6.5" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round"/></svg>,
-  Plus:   ({ sz = 28, sw = 3   }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none"><path d="M12 4v16M4 12h16" stroke="currentColor" strokeWidth={sw} strokeLinecap="round"/></svg>,
-  Minus:  ({ sz = 22, sw = 3   }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none"><path d="M5 12h14" stroke="currentColor" strokeWidth={sw} strokeLinecap="round"/></svg>,
-  Back:   ({ sz = 22           }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-  ChevR:  ({ sz = 16, sw = 2.2 }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round"/></svg>,
-  Arrow:  ()                       => <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke={NAVY} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg>,
-  Expand: ({ sz = 15 }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>,
-  Mail:   ({ sz = 20, c = 'currentColor' }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 7l10 7 10-7"/></svg>,
-  Msg:    ({ sz = 20, c = 'currentColor' }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>,
-  DL:     ({ sz = 20, c = 'currentColor' }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>,
-  Grid:   ({ sz = 20, c }) => <svg width={sz} height={sz} viewBox="0 0 20 20" fill={c}><rect x="1" y="1" width="7" height="7" rx="2"/><rect x="12" y="1" width="7" height="7" rx="2"/><rect x="1" y="12" width="7" height="7" rx="2"/><rect x="12" y="12" width="7" height="7" rx="2"/></svg>,
-  Split:  ({ sz = 20, c }) => <svg width={sz} height={sz} viewBox="0 0 20 20" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round"><line x1="10" y1="3" x2="10" y2="10"/><path d="M10 10Q10 14 5 17"/><path d="M10 10Q10 14 15 17"/><circle cx="10" cy="3" r="1.5" fill={c} stroke="none"/><circle cx="5" cy="17" r="1.5" fill={c} stroke="none"/><circle cx="15" cy="17" r="1.5" fill={c} stroke="none"/></svg>,
-  Share:  ({ sz = 20, c }) => <svg width={sz} height={sz} viewBox="0 0 20 20" fill={c}><circle cx="14" cy="4" r="2.5"/><circle cx="14" cy="16" r="2.5"/><circle cx="5" cy="10" r="2.5"/><rect x="6.5" y="5.5" width="6" height="1.8" rx="0.9" transform="rotate(-25 9.5 6.5)"/><rect x="6.5" y="12.5" width="6" height="1.8" rx="0.9" transform="rotate(25 9.5 13.5)"/></svg>,
-  Coins:  ({ sz = 20, c }) => <svg width={sz} height={sz} viewBox="0 0 20 20" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round"><line x1="10" y1="2" x2="10" y2="18"/><path d="M14 5.5C14 5.5 12.5 4 10 4C7.5 4 5.5 5.5 5.5 7C5.5 8.5 7 9.5 10 10C13 10.5 14.5 11.5 14.5 13C14.5 14.5 12.5 16 10 16C7.5 16 6 14.5 6 14.5"/></svg>,
-  DkHome: ({ sz = 22, c }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1.5 1.5 0 01-1.5 1.5h-15A1.5 1.5 0 013 20V9.5z"/><path d="M9 21.5V14h6v7.5"/></svg>,
-  DkCat:  ({ sz = 22, c }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none"><rect x="3.5" y="3.5" width="7.5" height="7.5" rx="1.7" stroke={c} strokeWidth="1.7"/><rect x="13" y="3.5" width="7.5" height="7.5" rx="1.7" stroke={c} strokeWidth="1.7"/><rect x="3.5" y="13" width="7.5" height="7.5" rx="1.7" stroke={c} strokeWidth="1.7"/><rect x="13" y="13" width="7.5" height="7.5" rx="1.7" stroke={c} strokeWidth="1.7"/></svg>,
-  DkTerm: ({ sz = 22, c }) => <svg width={sz} height={sz} viewBox="0 0 32 22" fill="none"><path d="M4 4l6 7-6 7" stroke={c} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/><path d="M15 18h13" stroke={c} strokeWidth="2.6" strokeLinecap="round"/></svg>,
-  DkAnal: ({ sz = 22, c }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none"><rect x="3.5" y="3.5" width="17" height="17" rx="4" stroke={c} strokeWidth="1.7"/><path d="M8 16.5V11" stroke={c} strokeWidth="1.7" strokeLinecap="round"/><path d="M12 16.5V7.5" stroke={c} strokeWidth="1.7" strokeLinecap="round"/><path d="M16 16.5v-3.5" stroke={c} strokeWidth="1.7" strokeLinecap="round"/></svg>,
-  DkSet:  ({ sz = 22, c }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="2.6"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.32 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>,
-  QRBig:  ({ sz = 140 }) => (
-    <svg width={sz} height={sz} viewBox="0 0 60 60" fill="none">
-      <path d="M6 14V8a2 2 0 012-2h6" stroke={BLUE} strokeWidth="3" strokeLinecap="round"/>
-      <path d="M54 14V8a2 2 0 00-2-2h-6" stroke={BLUE} strokeWidth="3" strokeLinecap="round"/>
-      <path d="M6 46v6a2 2 0 002 2h6" stroke={BLUE} strokeWidth="3" strokeLinecap="round"/>
-      <path d="M54 46v6a2 2 0 01-2 2h-6" stroke={BLUE} strokeWidth="3" strokeLinecap="round"/>
-      <rect x="18" y="18" width="9" height="9" rx="1.5" fill={BLUE}/>
-      <rect x="33" y="18" width="9" height="9" rx="1.5" fill={BLUE}/>
-      <rect x="18" y="33" width="9" height="9" rx="1.5" fill={BLUE}/>
-      <rect x="33" y="33" width="3" height="3" fill={BLUE}/>
-      <rect x="38" y="33" width="3" height="3" fill={BLUE}/>
-      <rect x="33" y="38" width="3" height="3" fill={BLUE}/>
-      <rect x="38" y="38" width="3" height="3" fill={BLUE}/>
+  X:        ({ sz = 18, sw = 2.4 }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none"><path d="M5 5l14 14M19 5L5 19" stroke="currentColor" strokeWidth={sw} strokeLinecap="round"/></svg>,
+  Check:    ({ sz = 20, sw = 2.4 }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none"><path d="M4 12.5l5 5L20 6.5" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  Plus:     ({ sz = 28, sw = 3   }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none"><path d="M12 4v16M4 12h16" stroke="currentColor" strokeWidth={sw} strokeLinecap="round"/></svg>,
+  Minus:    ({ sz = 22, sw = 3   }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none"><path d="M5 12h14" stroke="currentColor" strokeWidth={sw} strokeLinecap="round"/></svg>,
+  Back:     ({ sz = 22           }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  ChevR:    ({ sz = 16, sw = 2.2 }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  Arrow:    ()                       => <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke={NAVY} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg>,
+  Expand:   ({ sz = 15 }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>,
+  Mail:     ({ sz = 20, c = 'currentColor' }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 7l10 7 10-7"/></svg>,
+  Msg:      ({ sz = 20, c = 'currentColor' }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>,
+  DL:       ({ sz = 20, c = 'currentColor' }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>,
+  Grid:     ({ sz = 20, c }) => <svg width={sz} height={sz} viewBox="0 0 20 20" fill={c}><rect x="1" y="1" width="7" height="7" rx="2"/><rect x="12" y="1" width="7" height="7" rx="2"/><rect x="1" y="12" width="7" height="7" rx="2"/><rect x="12" y="12" width="7" height="7" rx="2"/></svg>,
+  Split:    ({ sz = 20, c }) => <svg width={sz} height={sz} viewBox="0 0 20 20" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round"><line x1="10" y1="3" x2="10" y2="10"/><path d="M10 10Q10 14 5 17"/><path d="M10 10Q10 14 15 17"/><circle cx="10" cy="3" r="1.5" fill={c} stroke="none"/><circle cx="5" cy="17" r="1.5" fill={c} stroke="none"/><circle cx="15" cy="17" r="1.5" fill={c} stroke="none"/></svg>,
+  Share:    ({ sz = 20, c }) => <svg width={sz} height={sz} viewBox="0 0 20 20" fill={c}><circle cx="14" cy="4" r="2.5"/><circle cx="14" cy="16" r="2.5"/><circle cx="5" cy="10" r="2.5"/><rect x="6.5" y="5.5" width="6" height="1.8" rx="0.9" transform="rotate(-25 9.5 6.5)"/><rect x="6.5" y="12.5" width="6" height="1.8" rx="0.9" transform="rotate(25 9.5 13.5)"/></svg>,
+  Coins:    ({ sz = 20, c }) => <svg width={sz} height={sz} viewBox="0 0 20 20" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round"><line x1="10" y1="2" x2="10" y2="18"/><path d="M14 5.5C14 5.5 12.5 4 10 4C7.5 4 5.5 5.5 5.5 7C5.5 8.5 7 9.5 10 10C13 10.5 14.5 11.5 14.5 13C14.5 14.5 12.5 16 10 16C7.5 16 6 14.5 6 14.5"/></svg>,
+  DkHome:   ({ sz = 22, c }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1.5 1.5 0 01-1.5 1.5h-15A1.5 1.5 0 013 20V9.5z"/><path d="M9 21.5V14h6v7.5"/></svg>,
+  DkCat:    ({ sz = 22, c }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none"><rect x="3.5" y="3.5" width="7.5" height="7.5" rx="1.7" stroke={c} strokeWidth="1.7"/><rect x="13" y="3.5" width="7.5" height="7.5" rx="1.7" stroke={c} strokeWidth="1.7"/><rect x="3.5" y="13" width="7.5" height="7.5" rx="1.7" stroke={c} strokeWidth="1.7"/><rect x="13" y="13" width="7.5" height="7.5" rx="1.7" stroke={c} strokeWidth="1.7"/></svg>,
+  DkTerm:   ({ sz = 22, c }) => <svg width={sz} height={sz} viewBox="0 0 32 22" fill="none"><path d="M4 4l6 7-6 7" stroke={c} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/><path d="M15 18h13" stroke={c} strokeWidth="2.6" strokeLinecap="round"/></svg>,
+  DkAnal:   ({ sz = 22, c }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none"><rect x="3.5" y="3.5" width="17" height="17" rx="4" stroke={c} strokeWidth="1.7"/><path d="M8 16.5V11" stroke={c} strokeWidth="1.7" strokeLinecap="round"/><path d="M12 16.5V7.5" stroke={c} strokeWidth="1.7" strokeLinecap="round"/><path d="M16 16.5v-3.5" stroke={c} strokeWidth="1.7" strokeLinecap="round"/></svg>,
+  DkSet:    ({ sz = 22, c }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="2.6"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.32 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>,
+  QRBig:    ({ sz = 140 }) => (
+    <svg width={sz} height={sz} viewBox="0 0 100 100" fill="none">
+      <path d="M7,24 L7,7 L24,7"   stroke={BLUE} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M76,7 L93,7 L93,24" stroke={BLUE} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M7,76 L7,93 L24,93" stroke={BLUE} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M76,93 L93,93 L93,76" stroke={BLUE} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round"/>
+      <rect x="13" y="13" width="34" height="34" rx="5" fill={BLUE}/>
+      <rect x="56" y="13" width="34" height="34" rx="5" fill={BLUE}/>
+      <rect x="13" y="56" width="34" height="34" rx="5" fill={BLUE}/>
+      <rect x="56" y="56" width="10" height="10" rx="1.5" fill={BLUE}/>
+      <rect x="80" y="56" width="10" height="10" rx="1.5" fill={BLUE}/>
+      <rect x="68" y="68" width="10" height="10" rx="1.5" fill={BLUE}/>
+      <rect x="56" y="80" width="10" height="10" rx="1.5" fill={BLUE}/>
+      <rect x="80" y="80" width="10" height="10" rx="1.5" fill={BLUE}/>
     </svg>
   ),
 };
@@ -310,10 +311,12 @@ function PendingTerminal({ state, go, paywaveOn, togglePaywave, onItemClick, sho
 
 function Keypad({ state, go, onCommit }) {
   const [digits, setDigits] = useState('');
+  const [splitOn, setSplitOn] = useState(false);
   const cents = parseInt(digits || '0', 10);
   const press = d => { if (digits.length < 7) setDigits(p => p === '' && d === '0' ? '' : p + d); };
   const back  = () => setDigits(p => p.slice(0, -1));
   const commit = () => { if (cents === 0) return; onCommit(cents); };
+  const handleSplit = () => { setSplitOn(s => !s); };
 
   return (
     <div className="tp-screen" style={{ background: NAVY }}>
@@ -321,7 +324,7 @@ function Keypad({ state, go, onCommit }) {
         <SubHead onCancel={() => go('cancel')} onCommit={commit} />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
           <div className="tp-amount" style={{ fontSize: 88, color: cents === 0 ? 'rgba(4,13,109,0.32)' : NAVY, marginTop: 18 }}>{fmt(cents)}</div>
-          <button className="tp-pill" style={{ alignSelf: 'flex-start', background: 'transparent', color: NAVY, border: `1.5px solid ${NAVY}`, padding: '8px 16px' }}>split bill</button>
+          <button className={`tp-pill${splitOn ? ' solid' : ''}`} style={{ alignSelf: 'flex-start', ...(splitOn ? {} : { background: 'transparent', color: NAVY, boxShadow: `inset 0 0 0 1px rgba(4,13,109,0.5)` }), padding: '8px 16px' }} onClick={handleSplit}>split bill</button>
         </div>
         <div style={{ height: 52 }} />
       </div>
@@ -342,8 +345,8 @@ function Keypad({ state, go, onCommit }) {
   );
 }
 
-function SplitScreen({ state, go }) {
-  const total = state.items.reduce((s, i) => s + i.amount, 0) || state.pending?.amount || 1899;
+function SplitPayment({ state, go }) {
+  const total = state.pending?.amount || state.items.reduce((s, i) => s + i.amount, 0) || 0;
   const [parts, setParts] = useState(2);
   const partAmount = Math.round(total / parts);
   return (
@@ -372,6 +375,7 @@ function SplitScreen({ state, go }) {
   );
 }
 
+/* picks is Map<stockId, qty> */
 function ChooseStock({ state, go, onCommitStock }) {
   const total = state.items.reduce((s, i) => s + i.amount, 0) || 0;
   const [picks, setPicks] = useState(new Map());
@@ -402,29 +406,33 @@ function ChooseStock({ state, go, onCommitStock }) {
         </div>
         <div style={{ height: 52 }} />
       </div>
-      <div style={{ flex: 1, background: NAVY, padding: '40px 22px 28px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div style={{ color: BLUE, fontWeight: 500, fontSize: 18, textAlign: 'center' }}>choose from stock</div>
+      <div style={{ flex: 1, background: NAVY, padding: '52px 22px 0', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <div style={{ color: BLUE, fontWeight: 500, fontSize: 18, textAlign: 'center', flexShrink: 0 }}>choose from stock</div>
         <div
           ref={scrollRef}
           className={`tp-thin-scroll${scrolling ? ' scrolling' : ''}`}
           onScroll={() => { setScrolling(true); clearTimeout(stRef.current); stRef.current = setTimeout(() => setScrolling(false), 800); }}
-          style={{ marginTop: 18, flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, overflow: 'auto', paddingBottom: 80, paddingRight: 6 }}
+          style={{ marginTop: 14, flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, overflowY: 'auto', overflowX: 'hidden', paddingRight: 4, minHeight: 0 }}
         >
           {STOCK_ITEMS.map(s => {
             const qty = picks.get(s.id) || 0;
             return (
               <button key={s.id} className={`tp-stock-tile${qty > 0 ? ' selected' : ''}`} onClick={() => tap(s.id)}
                 style={{ position: 'relative', padding: 10, textAlign: 'left', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-                {qty > 0 && <div className="tp-stock-qty">{qty}</div>}
+                {qty > 0 && (
+                  <div className="tp-stock-qty">{qty}</div>
+                )}
                 <div style={{ fontWeight: 700, fontSize: 13, color: NAVY, lineHeight: 1.15 }}>{s.name}</div>
                 <div style={{ fontWeight: 500, fontSize: 12, color: BLUE }}>{fmt(s.amount)}</div>
               </button>
             );
           })}
         </div>
-        <button className="tp-cta" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 24 }} onClick={commit}>
-          confirm{totalPicks > 0 ? ` · ${totalPicks}` : ''}
-        </button>
+        <div style={{ flexShrink: 0, padding: '12px 0 20px', display: 'flex', justifyContent: 'center' }}>
+          <button className="tp-cta" onClick={commit}>
+            confirm{totalPicks > 0 ? ` · ${totalPicks}` : ''}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -456,6 +464,47 @@ function EnterDetails({ state, go, onCommitDetails }) {
         <div style={{ color: BLUE, fontWeight: 500, fontSize: 18, textAlign: 'center' }}>enter transaction details</div>
         <div style={{ marginTop: 22, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <input className="tp-field" placeholder="item name"   value={name}   onChange={e => setName(e.target.value)} />
+          <input className="tp-field" placeholder="amount"      value={amount} onChange={e => setAmount(e.target.value.replace(/[^\d.]/g,''))} inputMode="decimal" />
+          <input className="tp-field" placeholder="description" value={desc}   onChange={e => setDesc(e.target.value)} />
+        </div>
+        <div style={{ marginTop: 22, display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ color: BLUE, fontWeight: 700, fontSize: 20 }}>quantity</div>
+          <button className="tp-stepper" style={{ width: 32, height: 32 }} onClick={() => setQty(q => Math.max(1, q-1))}><Ic.Minus sz={14} sw={3.5} /></button>
+          <div style={{ color: BLUE, fontWeight: 700, fontSize: 22, minWidth: 22, textAlign: 'center' }}>{qty}</div>
+          <button className="tp-stepper" style={{ width: 32, height: 32 }} onClick={() => setQty(q => Math.min(99, q+1))}><Ic.Plus sz={14} sw={3.5} /></button>
+        </div>
+        <div style={{ flex: 1 }} />
+        <div style={{ display: 'flex', justifyContent: 'center' }}><button className="tp-cta" onClick={commit}>confirm</button></div>
+      </div>
+    </div>
+  );
+}
+
+function CashEntry({ go, onCommitCash }) {
+  const [name, setName]     = useState('');
+  const [amount, setAmount] = useState('');
+  const [desc, setDesc]     = useState('');
+  const [qty, setQty]       = useState(1);
+  const cents = Math.round(parseFloat(amount || '0') * 100);
+
+  const commit = () => {
+    if (!name || cents === 0) return;
+    onCommitCash({ name: qty > 1 ? `${name} x${qty}` : name, amount: cents * qty });
+  };
+
+  return (
+    <div className="tp-screen" style={{ background: NAVY }}>
+      <div className="stagger" style={{ background: OFFW, color: NAVY, height: '50%', display: 'flex', flexDirection: 'column' }}>
+        <SubHead onCancel={() => go('cancel')} onCommit={commit} />
+        <div style={{ flex: 1, padding: '8px 28px 12px', display: 'flex', alignItems: 'center' }}>
+          <div className="tp-amount" style={{ fontSize: 88 }}>{fmt(cents * qty)}</div>
+        </div>
+        <div style={{ height: 52 }} />
+      </div>
+      <div style={{ flex: 1, background: NAVY, padding: '40px 28px 28px', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ color: BLUE, fontWeight: 500, fontSize: 18, textAlign: 'center' }}>cash payment</div>
+        <div style={{ marginTop: 22, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <input className="tp-field" placeholder="item name"   value={name}   onChange={e => setName(e.target.value)} />
           <input className="tp-field" placeholder="amount"      value={amount} onChange={e => setAmount(e.target.value.replace(/[^\d.]/g, ''))} inputMode="decimal" />
           <input className="tp-field" placeholder="description" value={desc}   onChange={e => setDesc(e.target.value)} />
         </div>
@@ -466,7 +515,9 @@ function EnterDetails({ state, go, onCommitDetails }) {
           <button className="tp-stepper" style={{ width: 32, height: 32 }} onClick={() => setQty(q => Math.min(99, q + 1))}><Ic.Plus sz={14} sw={3.5} /></button>
         </div>
         <div style={{ flex: 1 }} />
-        <div style={{ display: 'flex', justifyContent: 'center' }}><button className="tp-cta" onClick={commit}>confirm</button></div>
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <button className="tp-cta" onClick={commit}>confirm</button>
+        </div>
       </div>
     </div>
   );
@@ -475,7 +526,7 @@ function EnterDetails({ state, go, onCommitDetails }) {
 const QR_SVG_CONTENT = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 60 60" fill="none"><rect width="60" height="60" fill="#040D6D"/><path d="M6 14V8a2 2 0 012-2h6" stroke="#58ABFF" stroke-width="3" stroke-linecap="round"/><path d="M54 14V8a2 2 0 00-2-2h-6" stroke="#58ABFF" stroke-width="3" stroke-linecap="round"/><path d="M6 46v6a2 2 0 002 2h6" stroke="#58ABFF" stroke-width="3" stroke-linecap="round"/><path d="M54 46v6a2 2 0 01-2 2h-6" stroke="#58ABFF" stroke-width="3" stroke-linecap="round"/><rect x="18" y="18" width="9" height="9" rx="1.5" fill="#58ABFF"/><rect x="33" y="18" width="9" height="9" rx="1.5" fill="#58ABFF"/><rect x="18" y="33" width="9" height="9" rx="1.5" fill="#58ABFF"/><rect x="33" y="33" width="3" height="3" fill="#58ABFF"/><rect x="38" y="33" width="3" height="3" fill="#58ABFF"/><rect x="33" y="38" width="3" height="3" fill="#58ABFF"/><rect x="38" y="38" width="3" height="3" fill="#58ABFF"/></svg>`;
 
 function SharePayment({ state, go, toast, onExpandQR, onConfirmPayment, livePayLink, qrElement }) {
-  const total = state.items.reduce((s, i) => s + i.amount, 0) || state.pending?.amount || 1899;
+  const total = state.pending?.amount || state.items.reduce((s, i) => s + i.amount, 0) || 0;
   const payLink = livePayLink || 'https://pay.taptpay.com/p/demo-abc123';
 
   const copyLink = () => {
@@ -518,20 +569,19 @@ function SharePayment({ state, go, toast, onExpandQR, onConfirmPayment, livePayL
         </div>
         <div style={{ height: 52 }} />
       </div>
-      <div style={{ flex: 1, background: NAVY, padding: '44px 28px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <div style={{ color: BLUE, fontWeight: 500, fontSize: 18 }}>share payment</div>
-        <div style={{ position: 'relative', marginTop: 14 }}>
+      <div style={{ flex: 1, background: NAVY, padding: '52px 28px 22px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div style={{ position: 'relative' }}>
           <div className="tp-qr-card">
-            {qrElement || <Ic.QRBig sz={150} />}
+            <Ic.QRBig sz={150} />
           </div>
           <button className="tp-qr-expand" onClick={onExpandQR} aria-label="expand QR code">
             <Ic.Expand sz={14} />
           </button>
         </div>
         <div style={{ flex: 1 }} />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignSelf: 'stretch' }}>
-          <button className="tp-cta" style={{ width: '100%' }} onClick={copyLink}>copy link</button>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '11px 26px', borderRadius: 999, border: `1.5px solid ${BLUE}` }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignSelf: 'stretch' }}>
+          <button className="tp-cta" style={{ alignSelf: 'center', minWidth: 180 }} onClick={copyLink}>copy link</button>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '10px 36px', borderRadius: 999, border: `1px solid rgba(88,171,255,0.5)` }}>
             <button className="tp-share-btn" onClick={downloadQR} aria-label="download QR"><Ic.DL sz={20} c={BLUE} /></button>
             <div style={{ width: 1, height: 20, background: 'rgba(88,171,255,0.3)' }} />
             <button className="tp-share-btn" onClick={shareSMS} aria-label="share via SMS"><Ic.Msg sz={20} c={BLUE} /></button>
@@ -545,12 +595,12 @@ function SharePayment({ state, go, toast, onExpandQR, onConfirmPayment, livePayL
 }
 
 function CashSuccess({ state, go, setState, toast }) {
-  const total = state.items.reduce((s, i) => s + i.amount, 0) || state.pending?.amount || 1099;
+  const total = state.pending?.amount || state.items.reduce((s, i) => s + i.amount, 0) || 0;
   const clear = () => { setState(s => ({ ...s, items: [], pending: null })); go('home-pop'); };
 
   const copyLink = () => { navigator.clipboard?.writeText('https://pay.taptpay.com/p/demo-abc123').catch(() => {}); toast('receipt link copied'); };
   const shareEmail = () => window.open(`mailto:?subject=${encodeURIComponent('Your Receipt')}&body=${encodeURIComponent('Your receipt: https://pay.taptpay.com/p/demo-abc123')}`);
-  const shareSMS = () => { const isMac = /Mac|iPhone|iPad/.test(navigator.userAgent); window.open(`sms:${isMac ? '&' : '?'}body=${encodeURIComponent('Your receipt: https://pay.taptpay.com/p/demo-abc123')}`); };
+  const shareSMS = () => { const isMac = /Mac|iPhone|iPad/.test(navigator.userAgent); window.open(`sms:${isMac?'&':'?'}body=${encodeURIComponent('Your receipt: https://pay.taptpay.com/p/demo-abc123')}`); };
   const downloadQR = () => {
     const blob = new Blob([QR_SVG_CONTENT], { type: 'image/svg+xml' });
     const url = URL.createObjectURL(blob);
@@ -568,14 +618,13 @@ function CashSuccess({ state, go, setState, toast }) {
         </div>
         <div style={{ height: 52 }} />
       </div>
-      <div style={{ flex: 1, background: NAVY, padding: '40px 28px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <div style={{ color: BLUE, fontWeight: 500, fontSize: 18 }}>cash transaction</div>
-        <div style={{ marginTop: 14, color: BLUE, fontWeight: 900, fontSize: 64, letterSpacing: '-0.04em' }}>success</div>
-        <div className="tp-success-check tp-pulse" style={{ marginTop: 14 }}><Ic.Check sz={48} sw={3.6} /></div>
+      <div style={{ flex: 1, background: NAVY, padding: '52px 28px 22px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div style={{ color: BLUE, fontWeight: 900, fontSize: 46, letterSpacing: '-0.04em' }}>success</div>
+        <div className="tp-success-check tp-pulse" style={{ marginTop: 10 }}><Ic.Check sz={40} sw={3.2} /></div>
         <div style={{ flex: 1 }} />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignSelf: 'stretch' }}>
-          <button className="tp-cta" style={{ width: '100%' }} onClick={copyLink}>copy receipt link</button>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '11px 26px', borderRadius: 999, border: `1.5px solid ${BLUE}` }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignSelf: 'stretch' }}>
+          <button className="tp-cta" style={{ alignSelf: 'center', minWidth: 180 }} onClick={copyLink}>copy receipt link</button>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '10px 36px', borderRadius: 999, border: `1px solid rgba(88,171,255,0.5)` }}>
             <button className="tp-share-btn" onClick={downloadQR}><Ic.DL sz={20} c={BLUE} /></button>
             <div style={{ width: 1, height: 20, background: 'rgba(88,171,255,0.3)' }} />
             <button className="tp-share-btn" onClick={shareSMS}><Ic.Msg sz={20} c={BLUE} /></button>
@@ -741,6 +790,7 @@ export default function App({
     setDockRaw('terminal');
   };
 
+  /* Keypad ✓ commit */
   const handleCommit = cents => {
     if (isLive) {
       onLiveCommit?.(cents);
@@ -752,6 +802,7 @@ export default function App({
     setDockRaw('terminal');
   };
 
+  /* Stock commit — builds one combined pending */
   const handleStockCommit = picks => {
     if (isLive) {
       onLiveStockCommit?.(picks);
@@ -763,6 +814,7 @@ export default function App({
     go('home-pop');
   };
 
+  /* Details commit */
   const handleDetailsCommit = ({ name, amount }) => {
     if (isLive) {
       onLiveDetailsCommit?.({ name, amount });
@@ -772,6 +824,7 @@ export default function App({
     go('home-pop');
   };
 
+  /* Send: go to share screen (QR flow), or trigger paywave */
   const handleSend = () => {
     if (!state.pending) return;
     if (paywaveOn) {
@@ -787,6 +840,7 @@ export default function App({
     setDockRaw('terminal');
   };
 
+  /* Share screen ✓ confirm */
   const handleShareConfirm = () => {
     if (isLive) {
       triggerConveyor('share', 'down');
@@ -804,6 +858,19 @@ export default function App({
     }
   };
 
+  /* Cash entry commit → success screen */
+  const handleCashCommit = ({ name, amount }) => {
+    if (isLive) {
+      onLiveDetailsCommit?.({ name, amount });
+    } else {
+      setState(s => ({ ...s, pending: { id: 'i' + Date.now(), name, amount } }));
+    }
+    triggerConveyor('cash', 'up');
+    setScreen('cash-success');
+    setDockRaw('terminal');
+  };
+
+  /* Hold item restore (demo only) */
   const handleStackItemClick = item => {
     if (item.status !== 'hold' || isLive) return;
     setState(s => ({ ...s, items: s.items.filter(i => i.id !== item.id), pending: { ...item } }));
@@ -815,18 +882,19 @@ export default function App({
     if (id === 'home') return state.pending
       ? <PendingTerminal state={state} go={go} paywaveOn={paywaveOn} togglePaywave={() => setPaywaveOn(v => !v)} onItemClick={handleStackItemClick} showPaywave={showPaywave} />
       : <MainTerminal    state={state} go={go} paywaveOn={paywaveOn} togglePaywave={() => setPaywaveOn(v => !v)} onItemClick={handleStackItemClick} showPaywave={showPaywave} />;
-    if (id === 'keypad')  return <Keypad       state={state} go={go} onCommit={handleCommit} />;
-    if (id === 'split')   return <SplitScreen  state={state} go={go} />;
-    if (id === 'stock')   return <ChooseStock  state={state} go={go} onCommitStock={handleStockCommit} />;
-    if (id === 'details') return <EnterDetails state={state} go={go} onCommitDetails={handleDetailsCommit} />;
-    if (id === 'share')   return <SharePayment state={state} go={go} toast={toast} onExpandQR={() => setShowQRModal(true)} onConfirmPayment={handleShareConfirm} livePayLink={livePayLink} qrElement={qrElement} />;
-    if (id === 'cash')    return <CashSuccess  state={state} go={go} setState={setState} toast={toast} />;
+    if (id === 'keypad')       return <Keypad       state={state} go={go} onCommit={handleCommit} />;
+    if (id === 'split')        return <SplitPayment state={state} go={go} />;
+    if (id === 'stock')        return <ChooseStock  state={state} go={go} onCommitStock={handleStockCommit} />;
+    if (id === 'details')      return <EnterDetails state={state} go={go} onCommitDetails={handleDetailsCommit} />;
+    if (id === 'share')        return <SharePayment state={state} go={go} toast={toast} onExpandQR={() => setShowQRModal(true)} onConfirmPayment={handleShareConfirm} livePayLink={livePayLink} qrElement={qrElement} />;
+    if (id === 'cash')         return <CashEntry    go={go} onCommitCash={handleCashCommit} />;
+    if (id === 'cash-success') return <CashSuccess  state={state} go={go} setState={setState} toast={toast} />;
     return null;
   };
 
   const onTerminal      = dockActive === 'terminal';
   const onHome          = onTerminal && screen === 'home';
-  const fabVisible      = onTerminal && !isKeypadScreen && !showBoards;
+  const fabVisible      = onHome && !showBoards;
   const subbarVisible   = onTerminal && !showBoards;
   const subbarActiveIdx = onTerminal && SCREEN_TO_SUBBAR[screen] !== undefined ? SCREEN_TO_SUBBAR[screen] : -1;
   const dockVisible     = !showBoards && (onHome || !onTerminal);
@@ -942,7 +1010,7 @@ const TP_CSS = `
 }
 .tp-pill:active { transform: scale(0.96); }
 .tp-pill.solid   { background: #58ABFF; color: #040D6D; }
-.tp-pill.outline { background: transparent; color: #58ABFF; box-shadow: inset 0 0 0 1.5px #58ABFF; }
+.tp-pill.outline { background: transparent; color: #58ABFF; box-shadow: inset 0 0 0 1px rgba(88,171,255,0.7); }
 
 /* ── SubBar ── */
 .tp-subbar-wrap { display: flex; justify-content: center; }
@@ -1176,12 +1244,12 @@ const TP_CSS = `
 .tp-pfab.hide { opacity: 0; transform: translate(-50%, -50%) translateY(8px) scale(0.7); pointer-events: none; }
 .tp-pfab.show { opacity: 1; }
 .tp-psubbar {
-  position: absolute; top: 50%; left: 50%; transform: translate(-50%, 4px);
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, 38px);
   display: flex; align-items: center; gap: 8px;
   transition: opacity 220ms cubic-bezier(0,0,0.2,1), transform 480ms cubic-bezier(0.34,1.56,0.64,1);
   will-change: opacity, transform;
 }
-.tp-psubbar.hide   { opacity: 0; transform: translate(-50%, 4px) scale(0.92); pointer-events: none; }
+.tp-psubbar.hide   { opacity: 0; transform: translate(-50%, 38px) scale(0.92); pointer-events: none; }
 .tp-psubbar.show   { opacity: 1; }
 .tp-psubbar.keypad { transform: translate(-50%, -28px); }
 .tp-send-slot {
