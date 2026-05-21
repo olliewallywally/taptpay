@@ -42,6 +42,7 @@ const SplitPayment          = lazy(() => import("@/pages/split-payment"));
 const PaymentResult         = lazy(() => import("@/pages/payment-result"));
 const Checkout              = lazy(() => import("@/pages/checkout"));
 const BoardBuilder          = lazy(() => import("@/pages/board-builder"));
+const SmartTerminal         = lazy(() => import("@/components/SmartTransitions"));
 
 function PageLoader() {
   return (
@@ -217,6 +218,7 @@ function Router() {
           <Route path="/board-builder">
             <ProtectedRoute><BoardBuilder /></ProtectedRoute>
           </Route>
+          <Route path="/smart-terminal" component={SmartTerminal} />
           <Route path="/onboarding">
             <ProtectedRoute skipOnboardingCheck={true}><MerchantOnboarding /></ProtectedRoute>
           </Route>
