@@ -8,7 +8,7 @@ export function BottomNavigation() {
   const [location, setLocation] = useLocation();
   const merchantId = getCurrentMerchantId();
 
-  const showNav = ['/dashboard', '/stock', '/transactions', '/settings', '/terminal', '/stack'].includes(location);
+  const showNav = ['/dashboard', '/stock', '/transactions', '/settings', '/stack'].includes(location);
 
   const { data: allTransactions = [] } = useQuery({
     queryKey: ["/api/merchants", merchantId, "transactions"],
