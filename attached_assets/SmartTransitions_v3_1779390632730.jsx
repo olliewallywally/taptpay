@@ -42,16 +42,19 @@ const Ic = {
   DkCat:    ({ sz = 22, c }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none"><rect x="3.5" y="3.5" width="7.5" height="7.5" rx="1.7" stroke={c} strokeWidth="1.7"/><rect x="13" y="3.5" width="7.5" height="7.5" rx="1.7" stroke={c} strokeWidth="1.7"/><rect x="3.5" y="13" width="7.5" height="7.5" rx="1.7" stroke={c} strokeWidth="1.7"/><rect x="13" y="13" width="7.5" height="7.5" rx="1.7" stroke={c} strokeWidth="1.7"/></svg>,
   DkTerm:   ({ sz = 22, c }) => <svg width={sz} height={sz} viewBox="0 0 32 22" fill="none"><path d="M4 4l6 7-6 7" stroke={c} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/><path d="M15 18h13" stroke={c} strokeWidth="2.6" strokeLinecap="round"/></svg>,
   DkAnal:   ({ sz = 22, c }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none"><rect x="3.5" y="3.5" width="17" height="17" rx="4" stroke={c} strokeWidth="1.7"/><path d="M8 16.5V11" stroke={c} strokeWidth="1.7" strokeLinecap="round"/><path d="M12 16.5V7.5" stroke={c} strokeWidth="1.7" strokeLinecap="round"/><path d="M16 16.5v-3.5" stroke={c} strokeWidth="1.7" strokeLinecap="round"/></svg>,
-  DkSet:    ({ sz = 22, c }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="2.6"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>,
+  DkSet:    ({ sz = 22, c }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="2.6"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.32 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>,
   QRBig:    ({ sz = 140 }) => (
     <svg width={sz} height={sz} viewBox="0 0 100 100" fill="none">
+      {/* Corner scan brackets */}
       <path d="M7,24 L7,7 L24,7"   stroke={BLUE} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round"/>
       <path d="M76,7 L93,7 L93,24" stroke={BLUE} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round"/>
       <path d="M7,76 L7,93 L24,93" stroke={BLUE} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round"/>
       <path d="M76,93 L93,93 L93,76" stroke={BLUE} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round"/>
+      {/* Three large filled squares */}
       <rect x="13" y="13" width="34" height="34" rx="5" fill={BLUE}/>
       <rect x="56" y="13" width="34" height="34" rx="5" fill={BLUE}/>
       <rect x="13" y="56" width="34" height="34" rx="5" fill={BLUE}/>
+      {/* Pixel data grid — bottom-right quadrant */}
       <rect x="56" y="56" width="10" height="10" rx="1.5" fill={BLUE}/>
       <rect x="80" y="56" width="10" height="10" rx="1.5" fill={BLUE}/>
       <rect x="68" y="68" width="10" height="10" rx="1.5" fill={BLUE}/>
@@ -316,7 +319,9 @@ function Keypad({ state, go, onCommit }) {
   const press = d => { if (digits.length < 7) setDigits(p => p === '' && d === '0' ? '' : p + d); };
   const back  = () => setDigits(p => p.slice(0, -1));
   const commit = () => { if (cents === 0) return; onCommit(cents); };
-  const handleSplit = () => { setSplitOn(s => !s); };
+  const handleSplit = () => {
+    setSplitOn(s => !s);
+  };
 
   return (
     <div className="tp-screen" style={{ background: NAVY }}>
@@ -729,17 +734,17 @@ export default function App({
   const state    = isLive ? liveState : demoState;
   const setState = fn => { if (!isLive) setDemoState(fn); };
 
-  const [screen, setScreen]           = useState('home');
-  const [dockActive, setDockRaw]      = useState('terminal');
-  const [showBoards, setShowBoards]   = useState(false);
+  const [screen, setScreen]         = useState('home');
+  const [dockActive, setDockRaw]    = useState('terminal');
+  const [showBoards, setShowBoards] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
-  const [toastMsg, setToastMsg]       = useState(null);
-  const [paywaveOn, setPaywaveOn]     = useState(false);
-  const [conveyor, setConveyor]       = useState(null);
-  const [contentKey, setContentKey]   = useState(0);
+  const [toastMsg, setToastMsg]     = useState(null);
+  const [paywaveOn, setPaywaveOn]   = useState(false);
+  const [conveyor, setConveyor]     = useState(null);
+  const [contentKey, setContentKey] = useState(0);
   const conveyorTimer = useRef(null);
 
-  const currentId = dockActive !== 'terminal' ? 'dock-' + dockActive : screen;
+  const currentId      = dockActive !== 'terminal' ? 'dock-' + dockActive : screen;
 
   const triggerConveyor = (prevId, dir) => {
     setConveyor({ prevId, dir });
@@ -843,10 +848,12 @@ export default function App({
   /* Share screen ✓ confirm */
   const handleShareConfirm = () => {
     if (isLive) {
+      // payment link shared — go home and wait for SSE
       triggerConveyor('share', 'down');
       setScreen('home');
       setDockRaw('terminal');
     } else {
+      // demo: mark as sent immediately
       setState(s => ({
         ...s,
         sent: [{ ...s.pending, status: 'sent' }, ...(s.sent || [])],
@@ -916,6 +923,7 @@ export default function App({
       </div>
 
       <div className="tp-overlay">
+        {/* Success notification — slides down from top */}
         <TopBanner notification={successNotification} />
 
         <div className={`tp-pfab${fabVisible ? ' show' : ' hide'}`}>
