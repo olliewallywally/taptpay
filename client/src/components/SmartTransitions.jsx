@@ -1049,7 +1049,7 @@ const TP_CSS = `
   box-shadow: 0 16px 48px rgba(4,13,109,0.2), 0 4px 12px rgba(4,13,109,0.1), inset 0 1px 0 rgba(255,255,255,0.25);
 }
 .tp-subbar-ind {
-  position: absolute; top: 5px; height: 34px; background: #040D6D; border-radius: 17px;
+  position: absolute; top: 5px; height: 27px; background: #040D6D; border-radius: 16px;
   box-shadow: 0 4px 16px rgba(4,13,109,0.4); pointer-events: none; z-index: 0; opacity: 0;
   will-change: left, width, opacity;
 }
