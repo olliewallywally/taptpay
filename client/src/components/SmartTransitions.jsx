@@ -288,7 +288,14 @@ function PendingTerminal({ state, go, paywaveOn, togglePaywave, onItemClick, sho
   const total   = pending?.amount || 0;
   return (
     <div className="tp-screen">
-      <div className="stagger" style={{ background: NAVY, height: '50%', padding: '100px 28px 28px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
+      <div className="stagger" style={{ background: NAVY, height: '50%', padding: '100px 28px 28px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', position: 'relative' }}>
+        <button onClick={() => go('cancel')} aria-label="cancel transaction" style={{ position: 'absolute', top: 18, left: 20, width: 44, height: 44, borderRadius: 999, border: `2px solid ${BLUE}`, color: BLUE, background: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'transform 120ms, background 120ms' }}
+          onMouseDown={e => e.currentTarget.style.transform = 'scale(0.92)'}
+          onMouseUp={e => e.currentTarget.style.transform = ''}
+          onMouseLeave={e => e.currentTarget.style.transform = ''}
+          onTouchStart={e => e.currentTarget.style.transform = 'scale(0.92)'}
+          onTouchEnd={e => e.currentTarget.style.transform = ''}
+        ><Ic.X sz={16} sw={2.4} /></button>
         <div className="tp-amount" style={{ fontSize: 88, color: BLUE }}>{fmt(total)}</div>
         <div style={{ display: 'flex', gap: 8, marginTop: 22 }}>
           {showPaywave && (
