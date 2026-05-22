@@ -364,7 +364,7 @@ function SplitPayment({ state, go }) {
   return (
     <div className="tp-screen" style={{ background: NAVY }}>
       <div className="stagger" style={{ background: OFFW, color: NAVY, height: '50%', display: 'flex', flexDirection: 'column' }}>
-        <SubHead onCancel={() => go('cancel')} onCommit={() => go('share')} />
+        <SubHead onCancel={() => go('cancel')} onCommit={() => go('home')} />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div className="tp-amount" style={{ fontSize: 88, textAlign: 'center' }}>{fmt(partAmount)}</div>
           <div style={{ marginTop: 18, textAlign: 'center', fontWeight: 500, fontSize: 19, color: NAVY, lineHeight: 1.4 }}>
@@ -381,7 +381,7 @@ function SplitPayment({ state, go }) {
           <button className="tp-stepper" onClick={() => setParts(p => Math.min(12, p + 1))}><Ic.Plus sz={22} /></button>
         </div>
         <button onClick={() => go('keypad')} style={{ color: BLUE, fontWeight: 500, fontSize: 16, textDecoration: 'underline', textUnderlineOffset: 4, marginBottom: 22, background: 'none', border: 'none', cursor: 'pointer' }}>enter amount</button>
-        <button className="tp-cta" onClick={() => go('share')}>confirm</button>
+        <button className="tp-cta" onClick={() => go('home')}>confirm</button>
       </div>
     </div>
   );
