@@ -935,7 +935,7 @@ export default function App({
       if (isLive && next === 'cancel' && liveState?.pending) {
         onLiveCancel?.();
       }
-      triggerConveyor(screen, 'down');
+      if (screen !== 'home') triggerConveyor(screen, 'down');
       setScreen('home');
       setDockRaw('terminal');
       return;
