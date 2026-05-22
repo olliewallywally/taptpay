@@ -1235,7 +1235,7 @@ const TP_CSS = `
 
 /* ── Send ── */
 .tp-send {
-  display: flex; align-items: center; gap: 6px; padding: 4px 14px 4px 4px; border-radius: 16px;
+  display: flex; align-items: center; gap: 6px; padding: 4px 14px 4px 4px; border-radius: 26px;
   background: #040D6D; border: none; cursor: pointer; box-shadow: 0 4px 16px rgba(4,13,109,0.25);
   transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
   -webkit-tap-highlight-color: transparent; flex-shrink: 0; height: 37px;
