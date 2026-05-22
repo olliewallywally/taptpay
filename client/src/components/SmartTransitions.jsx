@@ -1033,9 +1033,9 @@ const TP_CSS = `
 /* ── Pills ── */
 .tp-pill {
   display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 999px; padding: 3px 12px;
+  border-radius: 999px; padding: 1px 7px;
   font-family: 'Outfit', system-ui; font-weight: 500; font-size: 11px;
-  transition: transform 120ms, background 120ms; line-height: 1.4; cursor: pointer; border: none;
+  transition: transform 120ms, background 120ms; line-height: 1.2; cursor: pointer; border: none;
 }
 .tp-pill:active { transform: scale(0.96); }
 .tp-pill.solid   { background: #58ABFF; color: #040D6D; }
