@@ -279,7 +279,7 @@ function MainTerminal({ state, go, paywaveOn, togglePaywave, onItemClick, showPa
         <div style={{ marginTop: 33, color: BLUE, fontWeight: 500, fontSize: 18 }}>{line || 'no items yet'}</div>
       </div>
       <div className="stagger" style={{ flex: 1, background: OFFW, padding: '154px 22px 90px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div style={{ flex: 1, overflow: 'auto', paddingRight: 2 }}>
+        <div className="tp-stack-scroll" style={{ flex: 1, overflow: 'auto', paddingRight: 2 }}>
           <ActiveStack items={state.sent || []} status="sent" onItemClick={onItemClick} />
         </div>
       </div>
@@ -313,7 +313,7 @@ function PendingTerminal({ state, go, paywaveOn, togglePaywave, onItemClick, sho
         </div>
       </div>
       <div className="stagger" style={{ flex: 1, background: OFFW, padding: '154px 22px 90px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div style={{ flex: 1, overflow: 'auto', paddingRight: 2 }}>
+        <div className="tp-stack-scroll" style={{ flex: 1, overflow: 'auto', paddingRight: 2 }}>
           <ActiveStack items={state.sent || []} status="sent" onItemClick={onItemClick} />
         </div>
       </div>
@@ -1434,6 +1434,12 @@ const TP_CSS = `
 .tp-thin-scroll::-webkit-scrollbar { width: 3px; }
 .tp-thin-scroll::-webkit-scrollbar-thumb { background-color: rgba(88,171,255,0); border-radius: 999px; }
 .tp-thin-scroll.scrolling::-webkit-scrollbar-thumb { background-color: #58ABFF; }
+/* Stack scroll — navy thumb, no track, no arrows */
+.tp-stack-scroll { scrollbar-width: thin; scrollbar-color: #040D6D transparent; }
+.tp-stack-scroll::-webkit-scrollbar { width: 4px; background: transparent; }
+.tp-stack-scroll::-webkit-scrollbar-track { background: transparent; }
+.tp-stack-scroll::-webkit-scrollbar-thumb { background: #040D6D; border-radius: 999px; }
+.tp-stack-scroll::-webkit-scrollbar-button { display: none; height: 0; width: 0; }
 
 /* ── Toast ── */
 .tp-toast {
