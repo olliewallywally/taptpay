@@ -895,6 +895,31 @@ export default function App({
   const onTerminal      = dockActive === 'terminal';
   const onHome          = onTerminal && screen === 'home';
   const isFeatureScreen = onTerminal && screen !== 'home';
+  const viewportRef = useRef(null);
+  const [boundaryDelta, setBoundaryDelta] = useState(0);
+
+  useEffect(() => {
+    if (!isFeatureScreen) { setBoundaryDelta(0); return; }
+    const stage = viewportRef.current;
+    if (!stage) return;
+    const measure = () => {
+      const layers = stage.querySelectorAll('.tp-layer');
+      const entering = layers[layers.length - 1];
+      if (!entering) return;
+      const topPanel = entering.querySelector('.stagger');
+      if (!topPanel) return;
+      const stageRect = stage.getBoundingClientRect();
+      const panelRect = topPanel.getBoundingClientRect();
+      const bottomPx = panelRect.bottom - stageRect.top;
+      const midPx = stageRect.height / 2;
+      setBoundaryDelta(bottomPx - midPx);
+    };
+    measure();
+    const raf = requestAnimationFrame(measure);
+    const ro = new ResizeObserver(measure);
+    stage.querySelectorAll('.tp-layer .stagger').forEach(el => ro.observe(el));
+    return () => { cancelAnimationFrame(raf); ro.disconnect(); };
+  }, [isFeatureScreen, screen, conveyor]);
   const fabVisible      = onHome && !showBoards;
   const subbarVisible   = onTerminal && !showBoards;
   const subbarActiveIdx = onTerminal && SCREEN_TO_SUBBAR[screen] !== undefined ? SCREEN_TO_SUBBAR[screen] : -1;
@@ -903,7 +928,7 @@ export default function App({
   const conveyorDir     = conveyor?.dir || 'up';
 
   return (
-    <div className="tp-viewport">
+    <div className="tp-viewport" ref={viewportRef}>
       <style>{TP_CSS}</style>
 
       {conveyor && (
@@ -922,7 +947,10 @@ export default function App({
           <FabBtn onClick={() => go('keypad')} />
         </div>
 
-        <div className={`tp-psubbar${subbarVisible ? ' show' : ' hide'}${isFeatureScreen ? ' feature' : ''}`}>
+        <div
+          className={`tp-psubbar${subbarVisible ? ' show' : ' hide'}${isFeatureScreen ? ' feature' : ''}`}
+          style={isFeatureScreen ? { transform: `translate(-50%, calc(${boundaryDelta}px - 100% - 20px))` } : undefined}
+        >
           <SubBar activeIdx={subbarActiveIdx} onPick={i => go(SUBBAR_ROUTE[i])} />
           <div className={`tp-send-slot${sendVisible ? ' show' : ''}`}>
             <SendBtn onClick={handleSend} />
