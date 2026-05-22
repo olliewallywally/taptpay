@@ -166,6 +166,41 @@ export default function MerchantTerminalMobile() {
     },
   });
 
+  const createStoneMutation = useMutation({
+    mutationFn: async () => {
+      const stoneNumber = ((taptStones as any[])?.length || 0) + 1;
+      const r = await apiRequest("POST", `/api/merchants/${merchantId}/tapt-stones`, {
+        name: `Stone ${stoneNumber}`,
+        stoneNumber,
+      });
+      return r.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "tapt-stones"] });
+    },
+  });
+
+  const renameStoneMutation = useMutation({
+    mutationFn: async ({ stoneId, name }: { stoneId: number; name: string }) => {
+      const r = await apiRequest("PUT", `/api/merchants/${merchantId}/tapt-stones/${stoneId}`, { name });
+      return r.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "tapt-stones"] });
+    },
+  });
+
+  const deleteStoneMutation = useMutation({
+    mutationFn: async (stoneId: number) => {
+      const r = await apiRequest("DELETE", `/api/merchants/${merchantId}/tapt-stones/${stoneId}`);
+      return r.ok ? {} : r.json();
+    },
+    onSuccess: (_data, stoneId) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "tapt-stones"] });
+      if (selectedStoneId === stoneId) setSelectedStoneId(null);
+    },
+  });
+
   const cancelTransactionMutation = useMutation({
     mutationFn: async (transactionId: number) => {
       const r = await apiRequest("POST", `/api/transactions/${transactionId}/cancel`, {});
@@ -327,6 +362,10 @@ export default function MerchantTerminalMobile() {
         onLiveCancel={handleLiveCancel}
         onLivePaywave={startTapToPayPayment}
         onBoardSelect={(stoneId: number) => setSelectedStoneId(stoneId)}
+        selectedStoneId={selectedStoneId}
+        onStoneCreate={() => createStoneMutation.mutateAsync()}
+        onStoneRename={(stoneId: number, name: string) => renameStoneMutation.mutateAsync({ stoneId, name })}
+        onStoneDelete={(stoneId: number) => deleteStoneMutation.mutateAsync(stoneId)}
         liveStones={liveStones}
         livePayLink={livePayLink}
         qrElement={qrElement}

@@ -31,6 +31,8 @@ const Ic = {
   ChevR:    ({ sz = 16, sw = 2.2 }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round"/></svg>,
   Arrow:    ()                       => <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke={NAVY} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg>,
   Expand:   ({ sz = 15 }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>,
+  Pencil:   ({ sz = 16, sw = 1.8 }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>,
+  Trash:    ({ sz = 16, sw = 1.8 }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>,
   Mail:     ({ sz = 20, c = 'currentColor' }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 7l10 7 10-7"/></svg>,
   Msg:      ({ sz = 20, c = 'currentColor' }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>,
   DL:       ({ sz = 20, c = 'currentColor' }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>,
@@ -636,27 +638,161 @@ function CashSuccess({ state, go, setState, toast }) {
   );
 }
 
-function BoardsModal({ onClose, toast, stones, onStoneSelect }) {
+function BoardsModal({ onClose, toast, stones, selectedStoneId, onStoneSelect, onStoneCreate, onStoneRename, onStoneDelete, isLive }) {
   const items = stones?.length
-    ? stones.map(s => ({ id: s.id, label: s.name || `Board #${s.stoneNumber}`, isReal: true }))
-    : [{ id: 'm1', label: 'board #042' }, { id: 'm2', label: 'board #099' }, { id: 'm3', label: 'board #117' }];
+    ? stones.map(s => ({ id: s.id, name: s.name || `Stone ${s.stoneNumber}`, stoneNumber: s.stoneNumber, isReal: true }))
+    : [
+        { id: 'm1', name: 'Stone 1', stoneNumber: 1, isReal: false },
+        { id: 'm2', name: 'Stone 2', stoneNumber: 2, isReal: false },
+        { id: 'm3', name: 'Stone 3', stoneNumber: 3, isReal: false },
+      ];
+
+  const [editingId, setEditingId] = useState(null);
+  const [editName, setEditName]   = useState('');
+  const [busyId, setBusyId]       = useState(null);
+  const [creating, setCreating]   = useState(false);
+
+  const showCrud = isLive && stones != null;
+
+  const beginEdit = (item) => { setEditingId(item.id); setEditName(item.name); };
+  const cancelEdit = () => { setEditingId(null); setEditName(''); };
+
+  const saveEdit = async (item) => {
+    const next = editName.trim();
+    if (!next || next === item.name) { cancelEdit(); return; }
+    setBusyId(item.id);
+    try {
+      await onStoneRename?.(item.id, next);
+      toast('stone renamed');
+      cancelEdit();
+    } catch (e) {
+      toast('rename failed');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const deleteStone = async (item) => {
+    setBusyId(item.id);
+    try {
+      await onStoneDelete?.(item.id);
+      toast('stone deleted');
+      cancelEdit();
+    } catch (e) {
+      toast('delete failed');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const createStone = async () => {
+    if (creating) return;
+    setCreating(true);
+    try {
+      await onStoneCreate?.();
+      toast('stone created');
+      onClose();
+    } catch (e) {
+      toast('create failed');
+    } finally {
+      setCreating(false);
+    }
+  };
 
   return (
-    <div style={{ position: 'absolute', inset: 0, background: 'rgba(4,13,109,0.6)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
-      <button onClick={onClose} style={{ position: 'absolute', top: 18, right: 22, width: 36, height: 36, borderRadius: 999, border: `1.5px solid ${BLUE}`, color: BLUE, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', cursor: 'pointer' }}><Ic.X sz={14} /></button>
-      <div style={{ width: 260, background: BLUE, borderRadius: 28, padding: 22, boxShadow: '0 10px 30px rgba(4,13,109,0.4), 0 0 0 6px rgba(4,13,109,1)' }}>
-        <div style={{ color: '#fff', fontWeight: 500, fontSize: 17, textAlign: 'center', marginBottom: 18, position: 'absolute', top: 28, left: 0, right: 0 }}>payment boards</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {items.map(item => (
-            <button key={item.id} onClick={() => { onStoneSelect?.(item.id); toast(`paired with ${item.label}`); onClose(); }}
-              style={{ background: '#fff', borderRadius: 14, padding: '14px 18px', textAlign: 'left', color: NAVY, fontWeight: 500, fontSize: 15, border: 'none', cursor: 'pointer' }}>
-              {item.label}
-            </button>
-          ))}
-        </div>
-        <div style={{ marginTop: 18, display: 'flex', justifyContent: 'center' }}>
-          <button className="tp-cta" style={{ background: NAVY, color: OFFW }} onClick={() => { toast('confirmed'); onClose(); }}>confirm</button>
-        </div>
+    <div style={{ position: 'absolute', inset: 0, background: 'rgba(4,13,109,0.6)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', zIndex: 10, display: 'flex', flexDirection: 'column' }}>
+      <button onClick={onClose} aria-label="close" style={{ position: 'absolute', top: 18, right: 22, width: 36, height: 36, borderRadius: 999, border: `1.5px solid ${BLUE}`, color: BLUE, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', cursor: 'pointer', zIndex: 2 }}><Ic.X sz={14} /></button>
+
+      <div style={{ color: '#fff', fontWeight: 600, fontSize: 18, textAlign: 'center', paddingTop: 28, letterSpacing: '0.2px' }}>payment boards</div>
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: '22px 22px 28px', display: 'flex', flexDirection: 'column', gap: 12, marginTop: 14 }}>
+        {items.map(item => {
+          const selected = selectedStoneId != null && selectedStoneId === item.id;
+          const isEditing = editingId === item.id;
+          const label = `${item.name}${item.stoneNumber ? ` - Stone ${item.stoneNumber}` : ''}`;
+
+          if (isEditing) {
+            return (
+              <div key={item.id} style={{ background: 'rgba(88,171,255,0.12)', border: `1px solid ${BLUE}`, borderRadius: 18, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <input
+                  autoFocus
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') saveEdit(item); if (e.key === 'Escape') cancelEdit(); }}
+                  placeholder="stone name"
+                  style={{ background: 'rgba(0,0,0,0.25)', border: `1px solid ${BLUE}`, color: '#fff', borderRadius: 12, padding: '10px 14px', fontSize: 15, fontWeight: 500, outline: 'none', fontFamily: 'inherit' }}
+                />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => saveEdit(item)} disabled={busyId === item.id}
+                    style={{ flex: 1, background: BLUE, color: OFFW, borderRadius: 12, padding: '10px 0', fontSize: 14, fontWeight: 600, border: 'none', cursor: 'pointer', opacity: busyId === item.id ? 0.6 : 1 }}>save</button>
+                  <button onClick={() => deleteStone(item)} disabled={busyId === item.id}
+                    style={{ flex: 1, background: 'rgba(255,80,80,0.15)', color: '#ff8585', borderRadius: 12, padding: '10px 0', fontSize: 14, fontWeight: 600, border: '1px solid rgba(255,80,80,0.4)', cursor: 'pointer', opacity: busyId === item.id ? 0.6 : 1 }}>delete</button>
+                  <button onClick={cancelEdit} disabled={busyId === item.id}
+                    style={{ flex: 1, background: 'transparent', color: BLUE, borderRadius: 12, padding: '10px 0', fontSize: 14, fontWeight: 600, border: `1px solid ${BLUE}`, cursor: 'pointer', opacity: busyId === item.id ? 0.6 : 1 }}>cancel</button>
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div key={item.id} style={{ position: 'relative' }}>
+              <button
+                onClick={() => { onStoneSelect?.(item.id); toast(`paired with ${item.name}`); onClose(); }}
+                style={{
+                  width: '100%',
+                  background: selected ? BLUE : 'rgba(88,171,255,0.10)',
+                  color: selected ? OFFW : BLUE,
+                  border: `1.5px solid ${BLUE}`,
+                  borderRadius: 18,
+                  padding: showCrud ? '16px 52px 16px 18px' : '16px 18px',
+                  textAlign: 'left',
+                  fontWeight: 600,
+                  fontSize: 15,
+                  letterSpacing: '0.2px',
+                  cursor: 'pointer',
+                  transition: 'background 0.18s ease, color 0.18s ease',
+                }}
+              >
+                {label}
+              </button>
+              {showCrud && item.isReal && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); beginEdit(item); }}
+                  aria-label="edit stone"
+                  style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', width: 32, height: 32, borderRadius: 999, background: selected ? 'rgba(255,255,255,0.2)' : 'rgba(88,171,255,0.18)', color: selected ? OFFW : BLUE, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                >
+                  <Ic.Pencil sz={15} />
+                </button>
+              )}
+            </div>
+          );
+        })}
+
+        {showCrud && (
+          <button
+            onClick={createStone}
+            disabled={creating}
+            style={{
+              marginTop: 4,
+              background: 'rgba(88,171,255,0.08)',
+              color: BLUE,
+              border: `2px dashed ${BLUE}`,
+              borderRadius: 18,
+              padding: '16px 18px',
+              fontSize: 15,
+              fontWeight: 600,
+              letterSpacing: '0.2px',
+              cursor: creating ? 'wait' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              opacity: creating ? 0.6 : 1,
+            }}
+          >
+            <Ic.Plus sz={18} sw={2.4} /> Create Stone
+          </button>
+        )}
       </div>
     </div>
   );
@@ -711,6 +847,10 @@ export default function App({
   onLiveCancel        = null,
   onLivePaywave       = null,
   onBoardSelect       = null,
+  selectedStoneId     = null,
+  onStoneCreate       = null,
+  onStoneRename       = null,
+  onStoneDelete       = null,
   liveStones          = null,
   livePayLink         = null,
   qrElement           = null,
@@ -966,7 +1106,12 @@ export default function App({
           onClose={() => setShowBoards(false)}
           toast={toast}
           stones={liveStones}
+          selectedStoneId={selectedStoneId}
           onStoneSelect={onBoardSelect}
+          onStoneCreate={onStoneCreate}
+          onStoneRename={onStoneRename}
+          onStoneDelete={onStoneDelete}
+          isLive={isLive}
         />
       )}
 
