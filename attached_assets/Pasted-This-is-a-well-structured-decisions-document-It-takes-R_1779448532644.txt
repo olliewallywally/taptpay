@@ -1,0 +1,45 @@
+This is a well-structured decisions document. It takes Replit's 16 concerns, resolves each one explicitly, and gives engineers a clear "here's what we're actually doing" for every ambiguous point. A few observations before you finalize it.
+
+---
+
+## What's Working
+
+The document does exactly what it needs to — it bridges the spec and the codebase. Every decision is traceable back to a specific concern, and the codebase actions are concrete enough that a developer can act on them without guessing intent.
+
+**Point 11 is the most important decision in the document.** The hard rule that Mark as Paid (External) and Void Invoice never touch the legacy transactions table is the kind of thing that, if left ambiguous, would result in one developer writing it one way and another developer writing it differently. Having it stated explicitly here prevents a financial integrity bug.
+
+**Point 5 is the second most important.** Rejecting the queue architecture and extending the existing Windcave handler is the pragmatic call. It keeps the integration surface small and avoids introducing infrastructure (Redis, BullMQ) that the team would then need to maintain for a single use case.
+
+**The Phase 2 expansion to 5 weeks** is honest sizing. Windcave integration, webhook branching, and testing against a payment gateway sandbox is genuinely complex work, and under-estimating it would have created pressure to cut corners on the payment flow — which is the one place you absolutely cannot cut corners.
+
+---
+
+## Items Worth Tightening
+
+**Point 4 needs one more sentence about what fields the bridged transactions row contains.** You've said it must link back via `invoice_id`, but the developer writing this will also need to know: does it use the tenant's name as the customer reference? Does the amount come from the invoice or the Windcave response? Does it carry the property address anywhere? A brief note like "the bridged row populates amount, merchant_id, and payment_method from the Windcave response, with invoice_id as a foreign key and the tenant's name as the customer reference string" removes the last bit of ambiguity.
+
+**Point 7 should include a note in the spec itself, not just this decisions doc.** The original product spec repeatedly describes "OS detection" and "dynamically surfacing Apple Pay buttons" in language that reads like native PaymentRequest. A developer who reads the spec but not this decisions doc could easily implement the wrong thing. I'd add a one-line annotation to the spec's checkout section: "Note: All wallet payments route through Windcave HPP. The OS detection language in this section refers to Windcave's native handling, not browser-level PaymentRequest API."
+
+**Point 16's email alert needs a defined recipient.** "A designated, continually monitored support inbox" is the right idea, but if nobody sets up that inbox or adds it to the email dispatch config, the alert doesn't exist. Specify the address (even if it's just ops@taptpay.co.nz or whatever the team uses) so Sprint 4 has a concrete value to configure.
+
+**The Phase 2 deliverables column in the table should explicitly list the token-level rate limiter** (Point 13). It's mentioned in the decisions matrix but doesn't appear in the phase breakdown. It's a small middleware task but it needs to land alongside the checkout route, not as an afterthought in Phase 3.
+
+---
+
+## One Structural Suggestion
+
+Consider adding a single "Risks & Watch Items" section at the bottom. Three things belong there:
+
+First, Twilio account provisioning. Even with long-codes, the Twilio account setup, NZ number purchase, and compliance verification take time. This should start on day one of Phase 1, not when Phase 3 begins, or you'll hit a blocker.
+
+Second, Windcave sandbox access for webhook testing. Replit flagged this — the team needs to align on a testing strategy at the start of Phase 2. If sandbox credentials or test card numbers aren't available, Phase 2 stalls.
+
+Third, Task #10 completion date. Phase 1 is blocked on it. If #10 slips, the entire 11-week timeline shifts. Worth having a fallback plan (e.g., proceed with backend schema work while waiting on the frontend sector flag).
+
+---
+
+## Bottom Line
+
+This document does its job. It translates architectural decisions into codebase-specific actions, preserves financial integrity where it matters most, and sizes the work honestly. Tighten up the four items above, add the risk register, and this plus the product spec gives your team everything they need to start Phase 1 the day Task #10 lands.
+
+Want me to produce the final consolidated version of this document as a Word file to sit alongside the spec?
