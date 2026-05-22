@@ -1045,12 +1045,12 @@ const TP_CSS = `
 .tp-subbar-wrap { display: flex; justify-content: center; }
 .tp-subbar {
   position: relative; display: inline-flex; align-items: center; justify-content: center;
-  background: #58ABFF; border-radius: 26px; padding: 6px 8px; gap: 4px;
+  background: #58ABFF; border-radius: 26px; padding: 5px 8px; gap: 4px;
   border: 1px solid rgba(255,255,255,0.3);
   box-shadow: 0 16px 48px rgba(4,13,109,0.2), 0 4px 12px rgba(4,13,109,0.1), inset 0 1px 0 rgba(255,255,255,0.25);
 }
 .tp-subbar-ind {
-  position: absolute; top: 6px; height: 40px; background: #040D6D; border-radius: 20px;
+  position: absolute; top: 5px; height: 34px; background: #040D6D; border-radius: 17px;
   box-shadow: 0 4px 16px rgba(4,13,109,0.4); pointer-events: none; z-index: 0; opacity: 0;
   will-change: left, width, opacity;
 }
@@ -1059,7 +1059,7 @@ const TP_CSS = `
   transition: left 0.45s cubic-bezier(0.34,1.56,0.64,1), width 0.45s cubic-bezier(0.34,1.56,0.64,1), opacity 0.25s ease;
 }
 .tp-subbar-btn {
-  position: relative; z-index: 1; height: 32px; padding: 0 12px;
+  position: relative; z-index: 1; height: 27px; padding: 0 12px;
   display: flex; align-items: center; justify-content: center; gap: 6px;
   border-radius: 16px; border: none; cursor: pointer; background: transparent; color: rgba(4,13,109,0.55);
   transition: padding 0.45s cubic-bezier(0.34,1.56,0.64,1), color 0.3s ease, transform 0.18s ease;
@@ -1278,7 +1278,7 @@ const TP_CSS = `
   display: flex; align-items: center; gap: 8px;
   transition: opacity 220ms cubic-bezier(0,0,0.2,1), transform 500ms cubic-bezier(0.34,1.56,0.64,1);
   will-change: opacity, transform;
-  height: 32px;
+  height: 27px;
 }
 .tp-psubbar.hide    { opacity: 0; transform: translate(-50%, 42px) scale(0.92); pointer-events: none; }
 .tp-psubbar.show    { opacity: 1; }
@@ -1286,7 +1286,7 @@ const TP_CSS = `
 .tp-send-slot {
   display: flex; align-items: center; overflow: hidden; max-width: 0; opacity: 0;
   transition: max-width 420ms cubic-bezier(0.34,1.56,0.64,1), opacity 280ms ease 80ms;
-  height: 32px;
+  height: 27px;
 }
 .tp-send-slot.show { max-width: 130px; opacity: 1; }
 .tp-pdock {
