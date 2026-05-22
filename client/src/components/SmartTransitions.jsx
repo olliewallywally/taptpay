@@ -70,7 +70,7 @@ const SUBBAR_ITEMS = [
   { id: 'cash',  label: 'cash',  Icon: Ic.Coins },
 ];
 
-function SubBar({ activeIdx = -1, onPick }) {
+function SubBar({ activeIdx = -1, onPick, compact = false }) {
   const trackRef   = useRef(null);
   const btnRefs    = useRef([]);
   const mountedRef = useRef(false);
@@ -101,7 +101,7 @@ function SubBar({ activeIdx = -1, onPick }) {
 
   return (
     <div className="tp-subbar-wrap">
-      <div className="tp-subbar" ref={trackRef}>
+      <div className={`tp-subbar${compact ? ' compact' : ''}`} ref={trackRef}>
         <div className={`tp-subbar-ind${animate ? ' animate' : ''}${ind.on ? ' on' : ''}`} style={{ left: ind.x, width: ind.w }} />
         {SUBBAR_ITEMS.map(({ id, label, Icon }, i) => {
           const active = activeIdx === i;
@@ -1105,7 +1105,7 @@ export default function App({
           className={`tp-psubbar${subbarVisible ? ' show' : ' hide'}${isFeatureScreen ? ' feature' : ''}`}
           style={isFeatureScreen ? { transform: `translate(-50%, calc(${boundaryDelta}px - 100% - 20px))` } : undefined}
         >
-          <SubBar activeIdx={subbarActiveIdx} onPick={i => go(SUBBAR_ROUTE[i])} />
+          <SubBar activeIdx={subbarActiveIdx} onPick={i => go(SUBBAR_ROUTE[i])} compact={sendVisible} />
           <div className={`tp-send-slot${sendVisible ? ' show' : ''}`}>
             <SendBtn onClick={handleSend} />
           </div>
@@ -1221,11 +1221,12 @@ const TP_CSS = `
   position: relative; z-index: 1; height: 27px; padding: 0 25px;
   display: flex; align-items: center; justify-content: center; gap: 6px;
   border-radius: 16px; border: none; cursor: pointer; background: transparent; color: rgba(4,13,109,0.55);
-  transition: color 0.3s ease, transform 0.18s ease;
+  transition: padding 0.45s cubic-bezier(0.34,1.56,0.64,1), color 0.3s ease, transform 0.18s ease;
   -webkit-tap-highlight-color: transparent; flex-shrink: 0;
 }
 .tp-subbar-btn:active { transform: scale(0.92); }
 .tp-subbar-btn.active { background: transparent !important; box-shadow: none !important; color: #58ABFF; }
+.tp-subbar.compact .tp-subbar-btn { padding: 0 13px; }
 .tp-subbar-label {
   font-family: 'Outfit', system-ui; font-weight: 600; font-size: 12px;
   letter-spacing: 0.4px; color: #58ABFF; white-space: nowrap; animation: tp-labelIn 0.3s ease-out;
