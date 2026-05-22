@@ -45,18 +45,17 @@ const Ic = {
   DkSet:    ({ sz = 22, c }) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="2.6"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>,
   QRBig:    ({ sz = 140 }) => (
     <svg width={sz} height={sz} viewBox="0 0 100 100" fill="none">
-      <path d="M7,24 L7,7 L24,7"   stroke={BLUE} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round"/>
-      <path d="M76,7 L93,7 L93,24" stroke={BLUE} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round"/>
-      <path d="M7,76 L7,93 L24,93" stroke={BLUE} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round"/>
-      <path d="M76,93 L93,93 L93,76" stroke={BLUE} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round"/>
-      <rect x="13" y="13" width="34" height="34" rx="5" fill={BLUE}/>
-      <rect x="56" y="13" width="34" height="34" rx="5" fill={BLUE}/>
-      <rect x="13" y="56" width="34" height="34" rx="5" fill={BLUE}/>
-      <rect x="56" y="56" width="10" height="10" rx="1.5" fill={BLUE}/>
-      <rect x="80" y="56" width="10" height="10" rx="1.5" fill={BLUE}/>
-      <rect x="68" y="68" width="10" height="10" rx="1.5" fill={BLUE}/>
-      <rect x="56" y="80" width="10" height="10" rx="1.5" fill={BLUE}/>
-      <rect x="80" y="80" width="10" height="10" rx="1.5" fill={BLUE}/>
+      <path d="M8,22 L8,8 L22,8"   stroke={BLUE} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M78,8 L92,8 L92,22" stroke={BLUE} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M8,78 L8,92 L22,92" stroke={BLUE} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M78,92 L92,92 L92,78" stroke={BLUE} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/>
+      <rect x="20" y="20" width="22" height="22" rx="4" fill={BLUE}/>
+      <rect x="58" y="20" width="22" height="22" rx="4" fill={BLUE}/>
+      <rect x="20" y="58" width="22" height="22" rx="4" fill={BLUE}/>
+      <rect x="58" y="58" width="9"  height="9"  rx="1.5" fill={BLUE}/>
+      <rect x="71" y="58" width="9"  height="9"  rx="1.5" fill={BLUE}/>
+      <rect x="58" y="71" width="9"  height="9"  rx="1.5" fill={BLUE}/>
+      <rect x="71" y="71" width="9"  height="9"  rx="1.5" fill={BLUE}/>
     </svg>
   ),
 };
@@ -579,9 +578,9 @@ function SharePayment({ state, go, toast, onExpandQR, onConfirmPayment, livePayL
           </button>
         </div>
         <div style={{ flex: 1 }} />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignSelf: 'stretch' }}>
-          <button className="tp-cta" style={{ alignSelf: 'center', minWidth: 180 }} onClick={copyLink}>copy link</button>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '10px 36px', borderRadius: 999, border: `1px solid rgba(88,171,255,0.5)` }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, alignSelf: 'stretch' }}>
+          <button className="tp-cta" style={{ minWidth: 180 }} onClick={copyLink}>copy link</button>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '8px 20px', borderRadius: 999, border: `1px solid rgba(88,171,255,0.5)`, minWidth: 180 }}>
             <button className="tp-share-btn" onClick={downloadQR} aria-label="download QR"><Ic.DL sz={20} c={BLUE} /></button>
             <div style={{ width: 1, height: 20, background: 'rgba(88,171,255,0.3)' }} />
             <button className="tp-share-btn" onClick={shareSMS} aria-label="share via SMS"><Ic.Msg sz={20} c={BLUE} /></button>
@@ -622,9 +621,9 @@ function CashSuccess({ state, go, setState, toast }) {
         <div style={{ color: BLUE, fontWeight: 900, fontSize: 46, letterSpacing: '-0.04em' }}>success</div>
         <div className="tp-success-check tp-pulse" style={{ marginTop: 10 }}><Ic.Check sz={40} sw={3.2} /></div>
         <div style={{ flex: 1 }} />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignSelf: 'stretch' }}>
-          <button className="tp-cta" style={{ alignSelf: 'center', minWidth: 180 }} onClick={copyLink}>copy receipt link</button>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '10px 36px', borderRadius: 999, border: `1px solid rgba(88,171,255,0.5)` }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, alignSelf: 'stretch' }}>
+          <button className="tp-cta" style={{ minWidth: 180 }} onClick={copyLink}>copy receipt link</button>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '8px 20px', borderRadius: 999, border: `1px solid rgba(88,171,255,0.5)`, minWidth: 180 }}>
             <button className="tp-share-btn" onClick={downloadQR}><Ic.DL sz={20} c={BLUE} /></button>
             <div style={{ width: 1, height: 20, background: 'rgba(88,171,255,0.3)' }} />
             <button className="tp-share-btn" onClick={shareSMS}><Ic.Msg sz={20} c={BLUE} /></button>
