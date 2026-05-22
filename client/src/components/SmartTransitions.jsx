@@ -639,20 +639,20 @@ function CashSuccess({ state, go, setState, toast }) {
 }
 
 function BoardsModal({ onClose, toast, stones, selectedStoneId, onStoneSelect, onStoneCreate, onStoneRename, onStoneDelete, isLive }) {
-  const items = stones?.length
-    ? stones.map(s => ({ id: s.id, name: s.name || `Stone ${s.stoneNumber}`, stoneNumber: s.stoneNumber, isReal: true }))
+  const items = isLive
+    ? (stones || []).map(s => ({ id: s.id, name: s.name || `Stone ${s.stoneNumber}`, stoneNumber: s.stoneNumber, isReal: true }))
     : [
         { id: 'm1', name: 'Stone 1', stoneNumber: 1, isReal: false },
         { id: 'm2', name: 'Stone 2', stoneNumber: 2, isReal: false },
         { id: 'm3', name: 'Stone 3', stoneNumber: 3, isReal: false },
       ];
 
+  const showCrud = isLive;
+
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName]   = useState('');
   const [busyId, setBusyId]       = useState(null);
   const [creating, setCreating]   = useState(false);
-
-  const showCrud = isLive && stones != null;
 
   const beginEdit = (item) => { setEditingId(item.id); setEditName(item.name); };
   const cancelEdit = () => { setEditingId(null); setEditName(''); };
