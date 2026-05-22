@@ -1245,7 +1245,7 @@ const TP_CSS = `
 
 /* ── FAB ── */
 .tp-fab {
-  width: 64px; height: 64px; border-radius: 999px; background: #58ABFF; color: #040D6D;
+  width: 70px; height: 70px; border-radius: 999px; background: #58ABFF; color: #040D6D;
   display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 18px rgba(4,13,109,0.25);
   border: none; cursor: pointer; transition: transform 140ms; -webkit-tap-highlight-color: transparent;
 }
