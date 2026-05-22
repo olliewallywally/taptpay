@@ -138,12 +138,15 @@ function FabBtn({ onClick }) {
 }
 
 const DOCK_ITEMS = [
-  { id: 'home',      I: Ic.DkHome },
-  { id: 'stock',     I: Ic.DkCat  },
-  { id: 'terminal',  I: Ic.DkTerm },
-  { id: 'analytics', I: Ic.DkAnal },
-  { id: 'settings',  I: Ic.DkSet  },
+  { id: 'home',      img: '/dock-home.png'      },
+  { id: 'stock',     img: '/dock-option.png'    },
+  { id: 'terminal',  img: '/dock-terminal.png'  },
+  { id: 'analytics', img: '/dock-analytics.png' },
+  { id: 'settings',  img: '/dock-settings.png'  },
 ];
+/* CSS filter that turns pure-black PNG icons → #58ABFF light-blue */
+const DOCK_FILTER_ACTIVE  = 'brightness(0) saturate(100%) invert(68%) sepia(45%) saturate(762%) hue-rotate(183deg) brightness(103%)';
+const DOCK_FILTER_DIMMED  = 'brightness(0) saturate(100%) invert(68%) sepia(45%) saturate(762%) hue-rotate(183deg) brightness(103%) opacity(0.45)';
 
 function Dock({ active = 'terminal', onPick }) {
   const trackRef   = useRef(null);
@@ -176,13 +179,14 @@ function Dock({ active = 'terminal', onPick }) {
     <div className="tp-dock-wrap">
       <div className="tp-dock" ref={trackRef}>
         <div className={`tp-dock-ind${animate ? ' animate' : ''}`} style={{ left }} />
-        {DOCK_ITEMS.map(({ id, I }, i) => {
+        {DOCK_ITEMS.map(({ id, img }, i) => {
           const isActive = active === id;
           return (
             <button key={id} ref={el => (btnRefs.current[i] = el)}
               className={`tp-dock-btn${isActive ? ' active' : ''}`}
               onClick={() => onPick?.(id)} aria-label={id}>
-              <I sz={id === 'terminal' ? 22 : 19} c={isActive ? BLUE : 'rgba(88,171,255,0.45)'} />
+              <img src={img} alt={id} width={22} height={22}
+                style={{ filter: isActive ? DOCK_FILTER_ACTIVE : DOCK_FILTER_DIMMED, display: 'block', objectFit: 'contain' }} />
             </button>
           );
         })}
