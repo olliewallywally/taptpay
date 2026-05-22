@@ -1033,13 +1033,13 @@ const TP_CSS = `
 /* ── Pills ── */
 .tp-pill {
   display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 999px; padding: 1px 7px;
-  font-family: 'Outfit', system-ui; font-weight: 500; font-size: 11px;
+  border-radius: 9999px; padding: 8px 22px;
+  font-family: 'Outfit', system-ui; font-weight: 500; font-size: 14px;
   transition: transform 120ms, background 120ms; line-height: 1.2; cursor: pointer; border: none;
 }
 .tp-pill:active { transform: scale(0.96); }
 .tp-pill.solid   { background: #58ABFF; color: #040D6D; }
-.tp-pill.outline { background: transparent; color: #58ABFF; box-shadow: inset 0 0 0 1px rgba(88,171,255,0.7); }
+.tp-pill.outline { background: transparent; color: #58ABFF; box-shadow: inset 0 0 0 2px #58ABFF; }
 
 /* ── SubBar ── */
 .tp-subbar-wrap { display: flex; justify-content: center; }
