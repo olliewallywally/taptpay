@@ -97,7 +97,10 @@ export default function MerchantTerminalMobile() {
   const { data: taptStones = [] } = useQuery({
     queryKey: ["/api/merchants", merchantId, "tapt-stones"],
     queryFn: async () => {
-      const r = await fetch(`/api/merchants/${merchantId}/tapt-stones`);
+      const authToken = localStorage.getItem("authToken");
+      const r = await fetch(`/api/merchants/${merchantId}/tapt-stones`, {
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+      });
       if (!r.ok) throw new Error("Failed to fetch tapt stones");
       return r.json();
     },
