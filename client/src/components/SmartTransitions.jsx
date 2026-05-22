@@ -1033,7 +1033,7 @@ const TP_CSS = `
 /* ── Pills ── */
 .tp-pill {
   display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 12px; padding: 8px 16px;
+  border-radius: 12px; padding: 6px 12px;
   font-family: 'Outfit', system-ui; font-weight: 500; font-size: 11px;
   transition: transform 120ms, background 120ms; line-height: 1.4; cursor: pointer; border: none;
 }
