@@ -110,7 +110,10 @@ export default function MerchantTerminalMobile() {
   const { data: allTransactions = [] } = useQuery({
     queryKey: ["/api/merchants", merchantId, "transactions"],
     queryFn: async () => {
-      const r = await fetch(`/api/merchants/${merchantId}/transactions`);
+      const authToken = localStorage.getItem("authToken");
+      const r = await fetch(`/api/merchants/${merchantId}/transactions`, {
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+      });
       if (!r.ok) throw new Error("Failed to fetch transactions");
       return r.json();
     },
