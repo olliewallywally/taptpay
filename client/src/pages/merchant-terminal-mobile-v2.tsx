@@ -217,8 +217,9 @@ export default function MerchantTerminalMobile() {
     },
   });
 
-  const startTapToPayPayment = async () => {
-    if (!activeTransaction) {
+  const startTapToPayPayment = async (txOverride?: any) => {
+    const tx = txOverride ?? activeTransaction;
+    if (!tx) {
       toast({ title: "No Transaction", description: "Create a transaction first.", variant: "destructive" });
       return;
     }
@@ -229,7 +230,7 @@ export default function MerchantTerminalMobile() {
       let bridgeResult: { approved: boolean; token?: string; cancelled?: boolean; error?: string };
       if (canTapToPay()) {
         bridgeResult = await (window as any).TaptPay!.startTapToPay({
-          amount: parseFloat(activeTransaction.price),
+          amount: parseFloat(tx.price),
           currency: "NZD",
           merchantName: merchant?.businessName || "TaptPay",
         });
@@ -255,8 +256,8 @@ export default function MerchantTerminalMobile() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
         body: JSON.stringify({
           merchantId,
-          transactionId: activeTransaction.id,
-          amount: parseFloat(activeTransaction.price),
+          transactionId: tx.id,
+          amount: parseFloat(tx.price),
           windcaveToken: bridgeResult.token,
         }),
       });
@@ -323,30 +324,18 @@ export default function MerchantTerminalMobile() {
     />
   );
 
-  const handleLiveCommit = (cents: number) => {
-    createTransactionMutation.mutate({
-      itemName: "Payment",
-      price: (cents / 100).toFixed(2),
+  const handleLiveSend = async (
+    draft: { name: string; amount: number },
+    options: { paywave?: boolean } = {}
+  ) => {
+    const newTx = await createTransactionMutation.mutateAsync({
+      itemName: draft.name,
+      price: (draft.amount / 100).toFixed(2),
       selectedStoneId: selectedStoneId ?? undefined,
     });
-  };
-
-  const handleLiveDetailsCommit = ({ name, amount }: { name: string; amount: number }) => {
-    createTransactionMutation.mutate({
-      itemName: name,
-      price: (amount / 100).toFixed(2),
-      selectedStoneId: selectedStoneId ?? undefined,
-    });
-  };
-
-  const handleLiveStockCommit = (picks: { id: any; name: string; amount: number; qty: number }[]) => {
-    const name = picks.map(p => p.qty > 1 ? `${p.name} x${p.qty}` : p.name).join(", ");
-    const total = picks.reduce((s, p) => s + p.amount * p.qty, 0);
-    createTransactionMutation.mutate({
-      itemName: name,
-      price: (total / 100).toFixed(2),
-      selectedStoneId: selectedStoneId ?? undefined,
-    });
+    if (options.paywave) {
+      startTapToPayPayment(newTx);
+    }
   };
 
   const handleLiveCancel = () => {
@@ -359,9 +348,7 @@ export default function MerchantTerminalMobile() {
     <div style={{ position: "fixed", inset: 0 }}>
       <SmartTransitions
         liveState={liveState}
-        onLiveCommit={handleLiveCommit}
-        onLiveStockCommit={handleLiveStockCommit}
-        onLiveDetailsCommit={handleLiveDetailsCommit}
+        onLiveSend={handleLiveSend}
         onLiveCancel={handleLiveCancel}
         onLivePaywave={startTapToPayPayment}
         onBoardSelect={(stoneId: number) => setSelectedStoneId(stoneId)}

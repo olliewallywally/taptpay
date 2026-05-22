@@ -872,6 +872,7 @@ export default function App({
   onLiveDetailsCommit = null,
   onLiveCancel        = null,
   onLivePaywave       = null,
+  onLiveSend          = null,
   onBoardSelect       = null,
   selectedStoneId     = null,
   onStoneCreate       = null,
@@ -891,7 +892,10 @@ export default function App({
     sent:    [],
   });
 
-  const state    = isLive ? liveState : demoState;
+  const [localDraft, setLocalDraft] = useState(null);
+
+  const effectivePending = isLive ? (localDraft ?? liveState?.pending ?? null) : demoState.pending;
+  const state    = isLive ? { ...liveState, pending: effectivePending } : demoState;
   const setState = fn => { if (!isLive) setDemoState(fn); };
 
   const [screen, setScreen]           = useState('home');
@@ -936,8 +940,12 @@ export default function App({
       return;
     }
     if (next === 'cancel' || next === 'home') {
-      if (isLive && next === 'cancel' && liveState?.pending) {
-        onLiveCancel?.();
+      if (isLive && next === 'cancel') {
+        if (localDraft) {
+          setLocalDraft(null);
+        } else if (liveState?.pending) {
+          onLiveCancel?.();
+        }
       }
       if (screen !== 'home') triggerConveyor(screen, 'down');
       setScreen('home');
@@ -958,7 +966,7 @@ export default function App({
   /* Keypad ✓ commit */
   const handleCommit = cents => {
     if (isLive) {
-      onLiveCommit?.(cents);
+      setLocalDraft({ name: 'Payment', amount: cents });
     } else {
       setState(s => ({ ...s, pending: { id: 'i' + Date.now(), name: 'custom item', amount: cents } }));
     }
@@ -969,11 +977,11 @@ export default function App({
 
   /* Stock commit — builds one combined pending */
   const handleStockCommit = picks => {
+    const name = picks.map(p => p.qty > 1 ? `${p.name} x${p.qty}` : p.name).join(', ');
+    const amount = picks.reduce((s, p) => s + p.amount * p.qty, 0);
     if (isLive) {
-      onLiveStockCommit?.(picks);
+      setLocalDraft({ name, amount });
     } else {
-      const name = picks.map(p => p.qty > 1 ? `${p.name} x${p.qty}` : p.name).join(', ');
-      const amount = picks.reduce((s, p) => s + p.amount * p.qty, 0);
       setState(s => ({ ...s, pending: { id: 'i' + Date.now(), name, amount } }));
     }
     go('home-pop');
@@ -982,21 +990,45 @@ export default function App({
   /* Details commit */
   const handleDetailsCommit = ({ name, amount }) => {
     if (isLive) {
-      onLiveDetailsCommit?.({ name, amount });
+      setLocalDraft({ name, amount });
     } else {
       setState(s => ({ ...s, pending: { id: 'i' + Date.now(), name, amount } }));
     }
     go('home-pop');
   };
 
-  /* Send: go to share screen (QR flow), or trigger paywave */
-  const handleSend = () => {
+  /* Send: create transaction (live) or go to share screen (demo) */
+  const handleSend = async () => {
     if (!state.pending) return;
     if (paywaveOn) {
       if (isLive) {
-        onLivePaywave?.();
+        if (localDraft) {
+          try {
+            await onLiveSend?.(localDraft, { paywave: true });
+            setLocalDraft(null);
+          } catch {
+            /* draft preserved — error shown by parent */
+          }
+        } else {
+          onLivePaywave?.();
+        }
       } else {
         toast('tap-to-pay (demo only)');
+      }
+      return;
+    }
+    if (isLive) {
+      if (localDraft) {
+        try {
+          await onLiveSend?.(localDraft, { paywave: false });
+          setLocalDraft(null);
+        } catch {
+          /* draft preserved — error shown by parent */
+        }
+      } else {
+        setContentKey(k => k + 1);
+        setScreen('share');
+        setDockRaw('terminal');
       }
       return;
     }
