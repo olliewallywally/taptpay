@@ -280,7 +280,7 @@ function MainTerminal({ state, go, paywaveOn, togglePaywave, onItemClick, showPa
       </div>
       <div className="stagger" style={{ flex: 1, background: OFFW, padding: '154px 22px 90px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ flex: 1, overflow: 'auto', paddingRight: 2 }}>
-          <ActiveStack items={state.items} status="pending" onItemClick={onItemClick} />
+          <ActiveStack items={state.sent || []} status="sent" onItemClick={onItemClick} />
         </div>
       </div>
     </div>
