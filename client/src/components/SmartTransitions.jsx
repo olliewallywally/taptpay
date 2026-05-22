@@ -895,6 +895,16 @@ export default function App({
   const onTerminal      = dockActive === 'terminal';
   const onHome          = onTerminal && screen === 'home';
   const isFeatureScreen = onTerminal && screen !== 'home';
+  const [featureReady, setFeatureReady] = useState(false);
+
+  useEffect(() => {
+    if (isFeatureScreen) {
+      const t = setTimeout(() => setFeatureReady(true), 80);
+      return () => clearTimeout(t);
+    } else {
+      setFeatureReady(false);
+    }
+  }, [isFeatureScreen]);
   const fabVisible      = onHome && !showBoards;
   const subbarVisible   = onTerminal && !showBoards;
   const subbarActiveIdx = onTerminal && SCREEN_TO_SUBBAR[screen] !== undefined ? SCREEN_TO_SUBBAR[screen] : -1;
@@ -922,7 +932,7 @@ export default function App({
           <FabBtn onClick={() => go('keypad')} />
         </div>
 
-        <div className={`tp-psubbar${subbarVisible ? ' show' : ' hide'}${isFeatureScreen ? ' feature' : ''}`}>
+        <div className={`tp-psubbar${subbarVisible ? ' show' : ' hide'}${featureReady ? ' feature' : ''}`}>
           <SubBar activeIdx={subbarActiveIdx} onPick={i => go(SUBBAR_ROUTE[i])} />
           <div className={`tp-send-slot${sendVisible ? ' show' : ''}`}>
             <SendBtn onClick={handleSend} />
@@ -1254,7 +1264,7 @@ const TP_CSS = `
 }
 .tp-psubbar.hide    { opacity: 0; transform: translate(-50%, 42px) scale(0.92); pointer-events: none; }
 .tp-psubbar.show    { opacity: 1; }
-.tp-psubbar.feature { transform: translate(-50%, -130px); }
+.tp-psubbar.feature { transform: translate(-50%, -26px); }
 .tp-send-slot {
   display: flex; align-items: center; overflow: hidden; max-width: 0; opacity: 0;
   transition: max-width 420ms cubic-bezier(0.34,1.56,0.64,1), opacity 280ms ease 80ms;
