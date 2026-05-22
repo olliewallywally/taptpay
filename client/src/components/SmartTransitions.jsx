@@ -1039,7 +1039,7 @@ const TP_CSS = `
 }
 .tp-pill:active { transform: scale(0.96); }
 .tp-pill.solid   { background: #58ABFF; color: #040D6D; }
-.tp-pill.outline { background: transparent; color: #58ABFF; box-shadow: inset 0 0 0 2px #58ABFF; }
+.tp-pill.outline { background: transparent; color: #58ABFF; box-shadow: inset 0 0 0 1px #58ABFF; }
 
 /* ── SubBar ── */
 .tp-subbar-wrap { display: flex; justify-content: center; }
