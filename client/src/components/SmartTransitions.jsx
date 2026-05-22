@@ -1031,14 +1031,14 @@ const TP_CSS = `
   transition: left 0.45s cubic-bezier(0.34,1.56,0.64,1), width 0.45s cubic-bezier(0.34,1.56,0.64,1), opacity 0.25s ease;
 }
 .tp-subbar-btn {
-  position: relative; z-index: 1; height: 40px; padding: 0 14px;
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  border-radius: 20px; border: none; cursor: pointer; background: transparent; color: rgba(4,13,109,0.55);
+  position: relative; z-index: 1; height: 32px; padding: 0 12px;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  border-radius: 16px; border: none; cursor: pointer; background: transparent; color: rgba(4,13,109,0.55);
   transition: padding 0.45s cubic-bezier(0.34,1.56,0.64,1), color 0.3s ease, transform 0.18s ease;
   -webkit-tap-highlight-color: transparent; flex-shrink: 0;
 }
 .tp-subbar-btn:active { transform: scale(0.92); }
-.tp-subbar-btn.active { background: transparent !important; box-shadow: none !important; color: #58ABFF; padding: 0 22px; }
+.tp-subbar-btn.active { background: transparent !important; box-shadow: none !important; color: #58ABFF; padding: 0 18px; }
 .tp-subbar-label {
   font-family: 'Outfit', system-ui; font-weight: 600; font-size: 12px;
   letter-spacing: 0.4px; color: #58ABFF; white-space: nowrap; animation: tp-labelIn 0.3s ease-out;
@@ -1047,14 +1047,14 @@ const TP_CSS = `
 
 /* ── Send ── */
 .tp-send {
-  display: flex; align-items: center; gap: 8px; padding: 8px 16px 8px 8px; border-radius: 22px;
+  display: flex; align-items: center; gap: 6px; padding: 4px 12px 4px 4px; border-radius: 16px;
   background: #040D6D; border: none; cursor: pointer; box-shadow: 0 4px 16px rgba(4,13,109,0.25);
   transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
-  -webkit-tap-highlight-color: transparent; flex-shrink: 0; height: 38px;
+  -webkit-tap-highlight-color: transparent; flex-shrink: 0; height: 32px;
 }
 .tp-send:active { transform: scale(0.94); }
-.tp-send-circle { width: 24px; height: 24px; border-radius: 50%; background: #58ABFF; display: flex; align-items: center; justify-content: center; }
-.tp-send-label { font-size: 12px; font-weight: 700; color: #58ABFF; letter-spacing: 0.3px; }
+.tp-send-circle { width: 20px; height: 20px; border-radius: 50%; background: #58ABFF; display: flex; align-items: center; justify-content: center; }
+.tp-send-label { font-size: 11px; font-weight: 700; color: #58ABFF; letter-spacing: 0.3px; }
 
 /* ── FAB ── */
 .tp-fab {
@@ -1226,6 +1226,7 @@ const TP_CSS = `
 
 /* ── popIn ── */
 @keyframes tp-popIn { from { opacity:0; transform:translateY(16px) scale(0.96); } to { opacity:1; transform:translateY(0) scale(1); } }
+.stagger { transition: height 0.55s cubic-bezier(0.34,1.56,0.64,1); }
 .stagger > * { animation: tp-popIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both; }
 .stagger > *:nth-child(1) { animation-delay: 0s; }
 .stagger > *:nth-child(2) { animation-delay: 0.06s; }
@@ -1249,13 +1250,15 @@ const TP_CSS = `
   display: flex; align-items: center; gap: 8px;
   transition: opacity 220ms cubic-bezier(0,0,0.2,1), transform 500ms cubic-bezier(0.34,1.56,0.64,1);
   will-change: opacity, transform;
+  height: 32px;
 }
 .tp-psubbar.hide    { opacity: 0; transform: translate(-50%, 42px) scale(0.92); pointer-events: none; }
 .tp-psubbar.show    { opacity: 1; }
-.tp-psubbar.feature { transform: translate(-50%, -26px); }
+.tp-psubbar.feature { transform: translate(-50%, -130px); }
 .tp-send-slot {
   display: flex; align-items: center; overflow: hidden; max-width: 0; opacity: 0;
   transition: max-width 420ms cubic-bezier(0.34,1.56,0.64,1), opacity 280ms ease 80ms;
+  height: 32px;
 }
 .tp-send-slot.show { max-width: 130px; opacity: 1; }
 .tp-pdock {
