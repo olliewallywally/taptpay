@@ -111,7 +111,7 @@ function SubBar({ activeIdx = -1, onPick }) {
               className={`tp-subbar-btn${active ? ' active' : ''}`}
               onClick={() => onPick?.(i)} aria-label={label}>
               <Icon sz={20} c={ic} />
-              {active && <span className="tp-subbar-label">{label}</span>}
+              <span className="tp-subbar-label" style={{ opacity: active ? 1 : 0, maxWidth: active ? 60 : 60, overflow: 'hidden', animation: 'none' }}>{label}</span>
             </button>
           );
         })}
