@@ -269,7 +269,7 @@ function MainTerminal({ state, go, paywaveOn, togglePaywave, onItemClick, showPa
           {showPaywave && (
             <button className={`tp-pill${paywaveOn ? ' solid' : ' outline'}`} onClick={togglePaywave}>paywave</button>
           )}
-          <button className="tp-pill outline" onClick={() => go('boards')}>boards</button>
+          <button className="tp-pill outline" style={{ marginLeft: 10 }} onClick={() => go('boards')}>boards</button>
         </div>
         <div style={{ marginTop: 22, color: BLUE, fontWeight: 500, fontSize: 18 }}>{line || 'no items yet'}</div>
       </div>
@@ -293,7 +293,7 @@ function PendingTerminal({ state, go, paywaveOn, togglePaywave, onItemClick, sho
           {showPaywave && (
             <button className={`tp-pill${paywaveOn ? ' solid' : ' outline'}`} onClick={togglePaywave}>paywave</button>
           )}
-          <button className="tp-pill outline" onClick={() => go('boards')}>boards</button>
+          <button className="tp-pill outline" style={{ marginLeft: 10 }} onClick={() => go('boards')}>boards</button>
         </div>
         <div style={{ marginTop: 22, fontWeight: 500, fontSize: 18, color: BLUE, lineHeight: 1.25 }}>
           {pending?.name || '—'}

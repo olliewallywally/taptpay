@@ -1,0 +1,53 @@
+Replit's second pass is sharp. Every one of those 10 items is a legitimate gap that would have caused an executor to either guess wrong or stop and ask — both of which cost time. And the revised plan that came back is comprehensive. Let me give you the final assessment.
+
+---
+
+## Replit's 10 Catches — Verification
+
+All 10 are valid and correctly resolved in the updated plan:
+
+**SSE not websocket** — small word, big consequence. An executor seeing "websocket" would look for a ws dependency or try to set one up. Fixed correctly.
+
+**Unauthenticated /r/:token** — this is the kind of thing that works perfectly in local dev (where auth might be relaxed) and then breaks in production when global middleware kicks in. The explicit callout that no auth middleware may be applied to this route is exactly what's needed.
+
+**The transactions table column mapping** — Replit correctly identified that `customer_reference` might not exist. The revised plan solves this more elegantly by reusing the existing `itemName` column with a formatted string ("Rent – [name] – [address]"), which avoids adding a column that only one vertical uses. The `invoiceId` nullable UUID column is the only addition needed, and it's explicitly nullable so retail rows are unaffected. Clean solution.
+
+**payment-stack.tsx reuse** — now explicitly stated as "extend, do not build a parallel component." No ambiguity.
+
+**pause_next_cycle location** — specified as living in the schedule section of the tenant profile side-drawer. An executor knows exactly where to put it.
+
+**external_payment_reference field** — now defined as a nullable text field on invoices_rent_requests, included in the Phase 1 schema migration. The Mark as Paid modal prompts for it optionally.
+
+**Phase 2 sandbox stall mitigation** — the plan now includes a swap contingency: if Windcave sandbox access is delayed, begin Phase 3 automation logic (which has no Windcave dependency) and return to Phase 2 once unblocked. That's a practical fallback that keeps the team productive.
+
+**CSV template** — now specified as a static file at `client/public/tenant-import-template.csv` with headers only.
+
+**Cron setup** — explicitly noted that the Replit Scheduled Deployment must be configured manually in the dashboard after merge, with the required URL and header documented in replit.md.
+
+---
+
+## Assessment of the Final Plan
+
+This is ready. Here's why:
+
+**It's executor-grade.** Every phase has concrete deliverables, every field mapping is specified, every ambiguous architectural choice is resolved with an explicit decision and rationale. An engineer can pick up Phase 1 on Monday morning and know exactly what to build, what files to touch, and what constraints to respect.
+
+**The financial integrity model is airtight.** The bridged transactions row has a defined field mapping. Mark as Paid and Void are explicitly walled off from the transactions table. The idempotency constraint is documented with a "do not fix" warning. Platform fees and Xero exports won't break.
+
+**The risk register is honest.** Twilio provisioning, Windcave sandbox access, Task #10 dependency, Replit Scheduled Deployment availability, SMS cost model, and alphanumeric sender approval are all called out with specific mitigations or escalation points. No hidden surprises.
+
+**The phasing is independently shippable.** Each phase delivers usable functionality behind the sector flag. If the project gets paused after Phase 2, you still have a working tenant directory and a functional payment collection flow — just without automation.
+
+---
+
+## Three Final Notes
+
+**First**, the `last_reminder_sent_at` timestamp on invoices_rent_requests is mentioned in the Phase 1 schema step, which is correct — but make sure the 24-hour cooldown check in the Send Reminder API (Phase 3) compares against this field using the merchant's local timezone, not UTC. A reminder sent at 11 PM NZ time shouldn't become re-sendable at midnight UTC.
+
+**Second**, the plan mentions SSE broadcast to the landlord when a payment completes. Make sure the SSE connection is scoped to the merchant's session — you don't want payment events leaking across merchants. This is probably already handled by the existing SSE infrastructure, but worth verifying during Phase 2.
+
+**Third**, the CSV import's "single atomic transaction per row" is the right approach (one bad row doesn't roll back the whole file), but make sure the dry-run preview and the actual commit use the same validation logic. If the preview says "24 rows valid" and the commit then rejects 3 of them due to a stricter code path, landlords will lose trust in the import tool.
+
+---
+
+This plan has been through four spec iterations, a 16-point codebase reality check, a decisions document, and a 10-point executor-readiness review. It's solid. Ship it.
