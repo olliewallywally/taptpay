@@ -325,7 +325,7 @@ function Keypad({ state, go, onCommit }) {
         <SubHead onCancel={() => go('cancel')} onCommit={commit} />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
           <div className="tp-amount" style={{ fontSize: 88, color: cents === 0 ? 'rgba(4,13,109,0.32)' : NAVY, marginTop: 18 }}>{fmt(cents)}</div>
-          <button className={`tp-pill${splitOn ? ' solid' : ''}`} style={{ alignSelf: 'flex-start', ...(splitOn ? {} : { background: 'transparent', color: NAVY, boxShadow: `inset 0 0 0 1px rgba(4,13,109,0.5)` }), padding: '8px 16px' }} onClick={handleSplit}>split bill</button>
+          <button className="tp-pill" style={{ alignSelf: 'flex-start', padding: '8px 16px', background: splitOn ? NAVY : 'transparent', color: splitOn ? BLUE : NAVY, boxShadow: splitOn ? 'none' : `inset 0 0 0 1px rgba(4,13,109,0.5)`, transition: 'background 0.18s ease, color 0.18s ease' }} onClick={handleSplit}>split bill</button>
         </div>
         <div style={{ height: 52 }} />
       </div>
