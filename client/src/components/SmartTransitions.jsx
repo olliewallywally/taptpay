@@ -906,6 +906,7 @@ export default function App({
   const [paywaveOn, setPaywaveOn]     = useState(false);
   const [conveyor, setConveyor]       = useState(null);
   const [contentKey, setContentKey]   = useState(0);
+  const [subbarSnap, setSubbarSnap]   = useState(false);
   const conveyorTimer = useRef(null);
 
   const currentId = dockActive !== 'terminal' ? 'dock-' + dockActive : screen;
@@ -934,6 +935,8 @@ export default function App({
           setState(s => ({ ...s, items: [{ ...s.pending, status: 'hold' }, ...s.items], pending: null }));
         }
         triggerConveyor(currentId, 'up');
+        setSubbarSnap(true);
+        requestAnimationFrame(() => requestAnimationFrame(() => setSubbarSnap(false)));
       }
       setScreen('keypad');
       setDockRaw('terminal');
@@ -1145,7 +1148,7 @@ export default function App({
         </div>
 
         <div
-          className={`tp-psubbar${subbarVisible ? ' show' : ' hide'}${isFeatureScreen ? ' feature' : ''}`}
+          className={`tp-psubbar${subbarVisible ? ' show' : ' hide'}${isFeatureScreen ? ' feature' : ''}${subbarSnap ? ' snap' : ''}`}
           style={isFeatureScreen ? { transform: `translate(-50%, calc(${boundaryDelta}px - 100% - 20px))` } : undefined}
         >
           <SubBar activeIdx={subbarActiveIdx} onPick={i => go(SUBBAR_ROUTE[i])} compact={sendVisible} />
@@ -1492,6 +1495,7 @@ const TP_CSS = `
 .tp-psubbar.hide    { opacity: 0; transform: translate(-50%, 67px) scale(0.92); pointer-events: none; }
 .tp-psubbar.show    { opacity: 1; }
 .tp-psubbar.feature { transform: translate(-50%, calc(-100% - 20px)); }
+.tp-psubbar.snap    { transition: opacity 220ms cubic-bezier(0,0,0.2,1); }
 .tp-send-slot {
   display: flex; align-items: center; overflow: hidden; max-width: 0; opacity: 0;
   transition: max-width 420ms cubic-bezier(0.34,1.56,0.64,1), opacity 280ms ease 80ms;
