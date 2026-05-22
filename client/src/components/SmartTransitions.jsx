@@ -1203,14 +1203,14 @@ const TP_CSS = `
   transition: left 0.45s cubic-bezier(0.34,1.56,0.64,1), width 0.45s cubic-bezier(0.34,1.56,0.64,1), opacity 0.25s ease;
 }
 .tp-subbar-btn {
-  position: relative; z-index: 1; height: 27px; padding: 0 16px;
+  position: relative; z-index: 1; height: 27px; padding: 0 25px;
   display: flex; align-items: center; justify-content: center; gap: 6px;
   border-radius: 16px; border: none; cursor: pointer; background: transparent; color: rgba(4,13,109,0.55);
-  transition: padding 0.45s cubic-bezier(0.34,1.56,0.64,1), color 0.3s ease, transform 0.18s ease;
+  transition: color 0.3s ease, transform 0.18s ease;
   -webkit-tap-highlight-color: transparent; flex-shrink: 0;
 }
 .tp-subbar-btn:active { transform: scale(0.92); }
-.tp-subbar-btn.active { background: transparent !important; box-shadow: none !important; color: #58ABFF; padding: 0 25px; }
+.tp-subbar-btn.active { background: transparent !important; box-shadow: none !important; color: #58ABFF; }
 .tp-subbar-label {
   font-family: 'Outfit', system-ui; font-weight: 600; font-size: 12px;
   letter-spacing: 0.4px; color: #58ABFF; white-space: nowrap; animation: tp-labelIn 0.3s ease-out;
