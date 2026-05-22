@@ -264,15 +264,15 @@ function MainTerminal({ state, go, paywaveOn, togglePaywave, onItemClick, showPa
   const line  = state.items.map(i => i.name).join(', ');
   return (
     <div className="tp-screen">
-      <div className="stagger" style={{ background: NAVY, height: '50%', padding: '60px 28px 28px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
+      <div className="stagger" style={{ background: NAVY, height: '50%', padding: '100px 28px 28px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
         <div className="tp-amount" style={{ fontSize: 88, color: BLUE }}>{fmt(total)}</div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+        <div style={{ display: 'flex', gap: 8, marginTop: 22 }}>
           {showPaywave && (
             <button className={`tp-pill${paywaveOn ? ' solid' : ' outline'}`} onClick={togglePaywave}>paywave</button>
           )}
           <button className="tp-pill outline" style={{ marginLeft: 10 }} onClick={() => go('boards')}>boards</button>
         </div>
-        <div style={{ marginTop: 30, color: BLUE, fontWeight: 500, fontSize: 18 }}>{line || 'no items yet'}</div>
+        <div style={{ marginTop: 33, color: BLUE, fontWeight: 500, fontSize: 18 }}>{line || 'no items yet'}</div>
       </div>
       <div className="stagger" style={{ flex: 1, background: OFFW, padding: '154px 22px 90px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ flex: 1, overflow: 'auto', paddingRight: 2 }}>
@@ -288,15 +288,15 @@ function PendingTerminal({ state, go, paywaveOn, togglePaywave, onItemClick, sho
   const total   = pending?.amount || 0;
   return (
     <div className="tp-screen">
-      <div className="stagger" style={{ background: NAVY, height: '50%', padding: '60px 28px 28px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
+      <div className="stagger" style={{ background: NAVY, height: '50%', padding: '100px 28px 28px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
         <div className="tp-amount" style={{ fontSize: 88, color: BLUE }}>{fmt(total)}</div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+        <div style={{ display: 'flex', gap: 8, marginTop: 22 }}>
           {showPaywave && (
             <button className={`tp-pill${paywaveOn ? ' solid' : ' outline'}`} onClick={togglePaywave}>paywave</button>
           )}
           <button className="tp-pill outline" style={{ marginLeft: 10 }} onClick={() => go('boards')}>boards</button>
         </div>
-        <div style={{ marginTop: 30, fontWeight: 500, fontSize: 18, color: BLUE, lineHeight: 1.25 }}>
+        <div style={{ marginTop: 33, fontWeight: 500, fontSize: 18, color: BLUE, lineHeight: 1.25 }}>
           {pending?.name || '—'}
           <div style={{ marginTop: 6, color: '#fff', fontWeight: 600, fontSize: 14 }}>tap send to share payment</div>
         </div>
