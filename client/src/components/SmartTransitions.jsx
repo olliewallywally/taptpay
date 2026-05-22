@@ -273,7 +273,7 @@ function MainTerminal({ state, go, paywaveOn, togglePaywave, onItemClick, showPa
         </div>
         <div style={{ marginTop: 30, color: BLUE, fontWeight: 500, fontSize: 18 }}>{line || 'no items yet'}</div>
       </div>
-      <div className="stagger" style={{ flex: 1, background: OFFW, padding: '106px 22px 90px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="stagger" style={{ flex: 1, background: OFFW, padding: '127px 22px 90px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ flex: 1, overflow: 'auto', paddingRight: 2 }}>
           <ActiveStack items={state.items} status="pending" onItemClick={onItemClick} />
         </div>
@@ -300,7 +300,7 @@ function PendingTerminal({ state, go, paywaveOn, togglePaywave, onItemClick, sho
           <div style={{ marginTop: 6, color: '#fff', fontWeight: 600, fontSize: 14 }}>tap send to share payment</div>
         </div>
       </div>
-      <div className="stagger" style={{ flex: 1, background: OFFW, padding: '106px 22px 90px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="stagger" style={{ flex: 1, background: OFFW, padding: '127px 22px 90px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ flex: 1, overflow: 'auto', paddingRight: 2 }}>
           <ActiveStack items={state.sent || []} status="sent" onItemClick={onItemClick} />
         </div>
@@ -1274,13 +1274,13 @@ const TP_CSS = `
 .tp-pfab.hide { opacity: 0; transform: translate(-50%, -50%) translateY(8px) scale(0.7); pointer-events: none; }
 .tp-pfab.show { opacity: 1; }
 .tp-psubbar {
-  position: absolute; top: 50%; left: 50%; transform: translate(-50%, 46px);
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, 55px);
   display: flex; align-items: center; gap: 8px;
   transition: opacity 220ms cubic-bezier(0,0,0.2,1), transform 500ms cubic-bezier(0.34,1.56,0.64,1);
   will-change: opacity, transform;
   height: 27px;
 }
-.tp-psubbar.hide    { opacity: 0; transform: translate(-50%, 46px) scale(0.92); pointer-events: none; }
+.tp-psubbar.hide    { opacity: 0; transform: translate(-50%, 55px) scale(0.92); pointer-events: none; }
 .tp-psubbar.show    { opacity: 1; }
 .tp-psubbar.feature { transform: translate(-50%, calc(-100% - 20px)); }
 .tp-send-slot {
