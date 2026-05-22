@@ -131,7 +131,20 @@ export default function MerchantTerminalMobile() {
     if (!merchantId) return;
     sseClient.connect(merchantId);
     sseClient.subscribe("transaction_updated", (message) => {
-      queryClient.setQueryData(["/api/merchants", merchantId, "active-transaction"], message.transaction ?? null);
+      const tx = message.transaction ?? null;
+      queryClient.setQueryData(["/api/merchants", merchantId, "active-transaction"], tx);
+      // Instantly push completed/failed/cancelled transactions into the allTransactions cache
+      if (tx && ["completed", "failed", "cancelled"].includes(tx.status)) {
+        queryClient.setQueryData<any[]>(
+          ["/api/merchants", merchantId, "transactions"],
+          (prev: any[] = []) => {
+            const exists = prev.some((t: any) => t.id === tx.id);
+            return exists
+              ? prev.map((t: any) => (t.id === tx.id ? tx : t))
+              : [tx, ...prev];
+          }
+        );
+      }
     });
     return () => { sseClient.disconnect(); };
   }, [merchantId, queryClient]);
@@ -166,6 +179,7 @@ export default function MerchantTerminalMobile() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "transactions"] });
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to create transaction", variant: "destructive" });
@@ -214,6 +228,7 @@ export default function MerchantTerminalMobile() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "transactions"] });
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to cancel transaction", variant: "destructive" });
