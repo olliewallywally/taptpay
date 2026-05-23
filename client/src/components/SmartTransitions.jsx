@@ -1097,6 +1097,7 @@ export default function App({
 
   useEffect(() => {
     if (!isFeatureScreen) { setBoundaryDelta(0); return; }
+    if (conveyor) return;
     const stage = viewportRef.current;
     if (!stage) return;
     const measure = () => {
