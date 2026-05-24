@@ -12,3 +12,9 @@ id = "dxmwfboCom0O4I3i20BeL"
 uri = "file://taptpay-ios.zip"
 type = "unspecified"
 title = "TaptPay iOS Xcode Project"
+
+[[outputs]]
+id = "Y_SWle-dI1VC2yw3qUbjE"
+uri = "file://attached_assets/taptpay-property-management-v2.zip"
+type = "unspecified"
+title = "TaptPay Property Management v2 (SMS fix applied)"

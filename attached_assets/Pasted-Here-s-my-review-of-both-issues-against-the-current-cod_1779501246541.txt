@@ -1,0 +1,29 @@
+Here's my review of both issues against the current code:
+
+---
+
+## #51 — Hide SMS (quick fix, low risk)
+
+**Tenant form** (`TenantForm`, line 234): iterates `["email", "sms"]` and renders both as selectable buttons. Remove `"sms"` from that array — one line change.
+
+**Schedule form** (`ScheduleSection`, line 374): same pattern, same fix.
+
+**Cron dispatch pass** (`property-cron.ts`, line 231): already only sends email — it checks `!tenant.email` and falls through to `result.failed++` if missing. The `invoice.deliveryChannel` field is never actually checked in the dispatch logic; it hardcodes `channel: "email"` in the log payload (line 265). So SMS invoices would silently fall through as "failed" rather than being sent. The fix is just a warning log there, not functional breakage.
+
+**Verdict**: Easy, safe, 3-line change across 2 files. No backend work needed.
+
+---
+
+## #52 — Pagination (more involved, worth thinking through)
+
+**Storage layer**: `getTenantProfilesByMerchant` (storage.ts ~line 3245) returns all rows with no limit. Adding `limit`/`offset` is straightforward Drizzle — `.limit(limit).offset(offset)` — but you'd also need a separate `COUNT(*)` query to return `total`, which means 2 DB round-trips per page load.
+
+**Tenant directory**: Currently uses `useQuery`. Switching to `useInfiniteQuery` requires restructuring the query key, the `queryFn`, and the render loop. The intersection observer for auto-load adds another `useRef` + `useEffect`. It's the most complex part of this change.
+
+**Property dashboard**: The dashboard already only shows `recent.slice(0, 8)` (line 98 of property-dashboard.tsx) — it's already capped client-side. The "load more" would just need to fetch a second page of invoices, which is simpler than infinite scroll.
+
+**Verdict**: #52 is a meaningful improvement but not urgent — the current code is correct, just not optimised for scale. #51 should ship first since it fixes a functional bug (tenants silently getting no invoice dispatch). #52 is a good next sprint item.
+
+---
+
+**Recommended order**: Fix #51 now (10 mins), implement #52 once the feature is live and you have real tenant volume to justify it.
