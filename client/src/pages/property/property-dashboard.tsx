@@ -135,7 +135,7 @@ export default function PropertyDashboard() {
     { label: 'tenants',     v: activeTenants, Ico: STAT_ICONS[0] },
     { label: 'outstanding', v: overdueCount,  Ico: STAT_ICONS[1] },
     { label: 'queued',      v: queuedCount,   Ico: STAT_ICONS[2] },
-    { label: 'paused',      v: schedules.filter((s: any) => s.status === 'active' && s.pauseNextCycle).length, Ico: STAT_ICONS[3] },
+    { label: 'paused',      v: schedules.filter((s: any) => s.status === 'paused').length, Ico: STAT_ICONS[3] },
   ];
 
   return (

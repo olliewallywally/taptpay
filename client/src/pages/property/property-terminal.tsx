@@ -38,6 +38,10 @@ const Ic = {
   Search:  ({ sz = 18, c = NAVY }: any) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-3.5-3.5"/></svg>,
   Mail:    ({ sz = 18, c = BLUE }: any) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 7l10 7 10-7"/></svg>,
   Msg:     ({ sz = 18, c = BLUE }: any) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>,
+  Repeat:  ({ sz = 20, c = NAVY }: any) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M17 2l3 3-3 3"/><path d="M3 11V9a4 4 0 014-4h13"/><path d="M7 22l-3-3 3-3"/><path d="M21 13v2a4 4 0 01-4 4H4"/></svg>,
+  Pause:   ({ sz = 18, c = NAVY }: any) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill={c}><rect x="6" y="4.5" width="4" height="15" rx="1.4"/><rect x="14" y="4.5" width="4" height="15" rx="1.4"/></svg>,
+  Play:    ({ sz = 18, c = NAVY }: any) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill={c}><path d="M7 4.5l12 7.5-12 7.5z"/></svg>,
+  Trash:   ({ sz = 18, c = NAVY }: any) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13"/></svg>,
 };
 
 /* ═══ SUBBAR ═══ */
@@ -46,9 +50,33 @@ const SUBBAR_ITEMS = [
   { id: 'batch',    label: 'batch',    Icon: Ic.People   },
   { id: 'send',     label: 'send',     Icon: Ic.Send     },
   { id: 'external', label: 'external', Icon: Ic.External },
+  { id: 'automate', label: 'auto',     Icon: Ic.Repeat   },
 ];
-const SCREEN_TO_SUBBAR: Record<string, number> = { tenants: 0, batch: 1, send: 2, external: 3 };
-const SUBBAR_ROUTE: Record<number, string> = { 0: 'tenants', 1: 'batch', 2: 'send', 3: 'external' };
+const SCREEN_TO_SUBBAR: Record<string, number> = { tenants: 0, batch: 1, send: 2, external: 3, automate: 4 };
+const SUBBAR_ROUTE: Record<number, string> = { 0: 'tenants', 1: 'batch', 2: 'send', 3: 'external', 4: 'automate' };
+
+/* ═══ FREQUENCY ═══ */
+const FREQ_OPTIONS = [
+  { id: 'once',        label: 'once'   },
+  { id: 'weekly',      label: 'weekly' },
+  { id: 'fortnightly', label: 'fortn.' },
+  { id: 'monthly',     label: 'monthly'},
+];
+const FREQ_LABEL: Record<string, string> = { weekly: 'weekly', fortnightly: 'fortnightly', monthly: 'monthly' };
+
+/* Advance a date by one billing interval — mirrors server computeNextRunDate */
+function addInterval(from: Date, frequency: string): Date {
+  const d = new Date(from);
+  if (frequency === 'weekly')           d.setDate(d.getDate() + 7);
+  else if (frequency === 'fortnightly') d.setDate(d.getDate() + 14);
+  else                                  d.setMonth(d.getMonth() + 1);
+  return d;
+}
+
+function fmtDate(d: any): string {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+}
 
 function SubBar({ activeIdx = -1, onPick, compact = false }: any) {
   const trackRef  = useRef<HTMLDivElement>(null);
@@ -300,9 +328,11 @@ function RentAmount({ go, selectedTenant, onCommit }: any) {
 }
 
 /* ═══ SCREEN: SendRentLink ═══ */
-function SendRentLink({ go, selectedTenant, amount, onSend, sending }: any) {
+function SendRentLink({ go, selectedTenant, amount, onSend, sending, frequency, setFrequency }: any) {
   const channel = selectedTenant?.preferredChannel || 'email';
   const dest    = channel === 'email' ? selectedTenant?.email : selectedTenant?.phone;
+  const recurring = frequency && frequency !== 'once';
+  const firstAuto = recurring ? addInterval(new Date(), frequency) : null;
 
   return (
     <div className="tp-screen" style={{ background: NAVY }}>
@@ -319,9 +349,9 @@ function SendRentLink({ go, selectedTenant, amount, onSend, sending }: any) {
         </div>
         <div style={{ height: 52 }} />
       </div>
-      <div className="stagger" style={{ flex: 1, background: NAVY, padding: '52px 28px 100px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <div className="stagger" style={{ flex: 1, background: NAVY, padding: '40px 28px 100px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         {/* Channel badge */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '18px 24px', background: 'rgba(88,171,255,0.08)', border: `1px solid rgba(88,171,255,0.2)`, borderRadius: 20, width: '100%', boxSizing: 'border-box' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 22px', background: 'rgba(88,171,255,0.08)', border: `1px solid rgba(88,171,255,0.2)`, borderRadius: 20, width: '100%', boxSizing: 'border-box' }}>
           {channel === 'email' ? <Ic.Mail sz={22} c={BLUE} /> : <Ic.Msg sz={22} c={BLUE} />}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 4 }}>sending via {channel}</div>
@@ -329,12 +359,38 @@ function SendRentLink({ go, selectedTenant, amount, onSend, sending }: any) {
               {dest || `tenant's ${channel}`}
             </div>
           </div>
+          <button onClick={() => go('amount')} style={{ color: 'rgba(88,171,255,0.7)', fontWeight: 600, fontSize: 12, background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, textDecoration: 'underline', textUnderlineOffset: 2 }}>
+            edit
+          </button>
         </div>
 
-        {/* Adjust amount */}
-        <button onClick={() => go('amount')} style={{ marginTop: 18, color: 'rgba(88,171,255,0.55)', fontWeight: 500, fontSize: 14, textDecoration: 'underline', textUnderlineOffset: 3, background: 'none', border: 'none', cursor: 'pointer' }}>
-          adjust amount
-        </button>
+        {/* Frequency selector */}
+        <div style={{ width: '100%', marginTop: 18 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <Ic.Repeat sz={15} c="rgba(88,171,255,0.7)" />
+            <span style={{ fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>repeat</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
+            {FREQ_OPTIONS.map(({ id, label }) => {
+              const on = frequency === id;
+              return (
+                <button key={id} onClick={() => setFrequency(id)}
+                  style={{ padding: '12px 4px', borderRadius: 14, border: `1.5px solid ${on ? BLUE : 'rgba(88,171,255,0.18)'}`, background: on ? BLUE : 'rgba(255,255,255,0.05)', color: on ? NAVY : BLUE, fontWeight: 700, fontSize: 12.5, cursor: 'pointer', transition: 'all 0.18s ease', fontFamily: 'Outfit, system-ui' }}>
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Recurring summary */}
+        <div style={{ width: '100%', marginTop: 14, minHeight: 34 }}>
+          {recurring && (
+            <div style={{ fontSize: 12.5, color: 'rgba(88,171,255,0.7)', lineHeight: 1.5, textAlign: 'center' }}>
+              first request now, then <strong style={{ color: BLUE }}>{FREQ_LABEL[frequency]}</strong> from {fmtDate(firstAuto)}
+            </div>
+          )}
+        </div>
 
         <div style={{ flex: 1 }} />
 
@@ -344,8 +400,79 @@ function SendRentLink({ go, selectedTenant, amount, onSend, sending }: any) {
           disabled={sending}
           style={{ minWidth: 220, opacity: sending ? 0.65 : 1 }}
         >
-          {sending ? 'sending…' : 'send rent request'}
+          {sending ? 'sending…' : recurring ? 'send & automate' : 'send rent request'}
         </button>
+      </div>
+    </div>
+  );
+}
+
+/* ═══ SCREEN: Automate (manage schedules) ═══ */
+function AutomateScreen({ go, schedules, tenants, onPauseResume, onCancel, busyId }: any) {
+  const tenantById = (id: string) => (tenants as any[]).find((t: any) => t.id === id);
+  const live = (schedules as any[]).filter((s: any) => s.status !== 'terminated');
+
+  return (
+    <div className="tp-screen" style={{ background: NAVY }}>
+      <div className="stagger" style={{ background: OFFW, color: NAVY, height: '50%', display: 'flex', flexDirection: 'column' }}>
+        <SubHead onCancel={() => go('home', 'down')} onCommit={() => go('home', 'down')} />
+        <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <div className="tp-amount" style={{ fontSize: 64 }}>{live.length}</div>
+          <div style={{ marginTop: 10, fontWeight: 500, fontSize: 15, color: 'rgba(4,13,109,0.5)' }}>
+            active automation{live.length !== 1 ? 's' : ''}
+          </div>
+        </div>
+        <div style={{ height: 52 }} />
+      </div>
+      <div className="stagger" style={{ flex: 1, background: NAVY, padding: '52px 22px 0', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <div style={{ color: BLUE, fontWeight: 500, fontSize: 18, textAlign: 'center', marginBottom: 16, flexShrink: 0 }}>recurring rent</div>
+        <div className="tp-thin-scroll" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 110 }}>
+          {live.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '32px 16px', color: 'rgba(88,171,255,0.5)', fontSize: 13, lineHeight: 1.6 }}>
+              no automations yet — choose a repeat frequency when sending a rent request to set one up
+            </div>
+          ) : live.map((s: any) => {
+            const t = tenantById(s.tenantProfileId);
+            const paused = s.status === 'paused';
+            const busy = busyId === s.id;
+            return (
+              <div key={s.id} style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${paused ? 'rgba(255,176,46,0.4)' : 'rgba(88,171,255,0.15)'}`, borderRadius: 18, padding: '14px 16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 999, background: BLUE, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, fontWeight: 800, color: NAVY }}>
+                    {t ? tenantInitials(t) : '—'}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: BLUE, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textTransform: 'capitalize' }}>{t ? tenantName(t) : 'unknown tenant'}</div>
+                    <div style={{ fontWeight: 400, fontSize: 11.5, color: 'rgba(88,171,255,0.55)', marginTop: 2 }}>
+                      {fmt(s.amountCents)} · {FREQ_LABEL[s.frequency] || s.frequency}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 9px', borderRadius: 8, background: paused ? 'rgba(255,176,46,0.18)' : 'rgba(19,194,154,0.16)', color: paused ? '#FFB02E' : GREEN, fontWeight: 700, fontSize: 9.5, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                      {paused ? 'paused' : 'active'}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(88,171,255,0.12)' }}>
+                  <div style={{ fontSize: 11, color: 'rgba(88,171,255,0.5)' }}>
+                    next {paused ? '—' : fmtDate(s.nextRunDate)}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => !busy && onPauseResume(s)} disabled={busy}
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 999, border: '1px solid rgba(88,171,255,0.3)', background: 'rgba(88,171,255,0.1)', color: BLUE, fontWeight: 600, fontSize: 12, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1, fontFamily: 'Outfit, system-ui' }}>
+                      {paused ? <Ic.Play sz={12} c={BLUE} /> : <Ic.Pause sz={12} c={BLUE} />}
+                      {paused ? 'resume' : 'pause'}
+                    </button>
+                    <button onClick={() => !busy && onCancel(s)} disabled={busy}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 999, border: '1px solid rgba(255,59,78,0.3)', background: 'rgba(255,59,78,0.08)', color: RED, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }} aria-label="cancel automation">
+                      <Ic.Trash sz={14} c={RED} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -501,6 +628,8 @@ export default function PropertyTerminal() {
   const [banner, setBanner]               = useState<string | null>(null);
   const [successLabel, setSuccessLabel]   = useState('');
   const [boundaryDelta, setBoundaryDelta] = useState(0);
+  const [frequency, setFrequency]         = useState('once');
+  const [busyScheduleId, setBusyScheduleId] = useState<string | null>(null);
   const conveyorTimer = useRef<ReturnType<typeof setTimeout>>();
   const viewportRef = useRef<HTMLDivElement>(null);
 
@@ -517,24 +646,64 @@ export default function PropertyTerminal() {
     staleTime: 30000, retry: false,
   });
 
+  const { data: schedules = [] } = useQuery<any[]>({
+    queryKey: ['/api/property/schedules'],
+    queryFn: () => fetch('/api/property/schedules', { credentials: 'include' }).then(r => r.ok ? r.json() : []),
+    staleTime: 30000, retry: false,
+  });
+
   /* Mutations */
   const sendMutation = useMutation({
-    mutationFn: async ({ tenantId, amountCents, channel }: any) => {
-      const due = new Date(); due.setDate(due.getDate() + 7);
+    mutationFn: async ({ tenantId, amountCents, channel, freq }: any) => {
+      const now = new Date();
+      const due = new Date(now); due.setDate(due.getDate() + 7);
+      // 1. Send the first request immediately
       const r = await fetch('/api/property/invoices', {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tenantProfileId: tenantId, amountCents, deliveryChannel: channel, dueAt: due.toISOString() }),
       });
       if (!r.ok) throw new Error('Failed to send');
-      return r.json();
+      const invoice = await r.json();
+      // 2. If recurring, set up the automation starting one interval from now
+      if (freq && freq !== 'once') {
+        const startDate = addInterval(now, freq);
+        const sr = await fetch(`/api/property/tenants/${tenantId}/schedules`, {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amountCents, frequency: freq, deliveryChannel: channel, startDate: startDate.toISOString() }),
+        });
+        if (!sr.ok) throw new Error('Sent, but failed to set up automation');
+      }
+      return invoice;
     },
-    onSuccess: (_, vars) => {
+    onSuccess: (_, vars: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/property/invoices'] });
+      if (vars?.freq && vars.freq !== 'once') queryClient.invalidateQueries({ queryKey: ['/api/property/schedules'] });
       setSuccessLabel(selectedTenant?.email || selectedTenant?.phone || '');
       setContentKey(k => k + 1);
       setScreen('success');
+      setFrequency('once');
     },
+    onError: (err: any) => { toast(err?.message || 'Failed to send'); },
+  });
+
+  const scheduleActionMutation = useMutation({
+    mutationFn: async ({ id, action, status }: any) => {
+      setBusyScheduleId(id);
+      const r = action === 'cancel'
+        ? await fetch(`/api/property/schedules/${id}`, { method: 'DELETE', credentials: 'include' })
+        : await fetch(`/api/property/schedules/${id}`, {
+            method: 'PUT', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status }),
+          });
+      if (!r.ok) throw new Error('Action failed');
+      return r.json();
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/property/schedules'] }); },
+    onError: () => { toast('Could not update automation'); },
+    onSettled: () => { setBusyScheduleId(null); },
   });
 
   const markMutation = useMutation({
@@ -595,6 +764,7 @@ export default function PropertyTerminal() {
       setScreen('home');
       setSelectedTenant(null);
       setAmount(0);
+      setFrequency('once');
       return;
     }
     if ((next === 'send' || next === 'external') && !selectedTenant) {
@@ -630,7 +800,7 @@ export default function PropertyTerminal() {
 
   const handleSend = () => {
     if (!selectedTenant || amount === 0) { toast('set an amount first'); return; }
-    sendMutation.mutate({ tenantId: selectedTenant.id, amountCents: amount, channel: selectedTenant.preferredChannel || 'email' });
+    sendMutation.mutate({ tenantId: selectedTenant.id, amountCents: amount, channel: selectedTenant.preferredChannel || 'email', freq: frequency });
   };
 
   const handleMark = (invoiceId: string, ref: string) => {
@@ -639,6 +809,14 @@ export default function PropertyTerminal() {
 
   const handleBatch = (ids: string[]) => {
     batchMutation.mutate(ids);
+  };
+
+  const handlePauseResume = (s: any) => {
+    scheduleActionMutation.mutate({ id: s.id, action: 'status', status: s.status === 'paused' ? 'active' : 'paused' });
+  };
+
+  const handleCancelSchedule = (s: any) => {
+    scheduleActionMutation.mutate({ id: s.id, action: 'cancel' });
   };
 
   /* Subbar → go shortcut (only when no tenant → redirect to tenants) */
@@ -683,9 +861,10 @@ export default function PropertyTerminal() {
     if (id === 'home')     return <RequestsHome invoices={invoices} tenants={tenants} outstanding={outstanding} go={go} onRowTap={handleRowTap} />;
     if (id === 'tenants')  return <ChooseTenant tenants={tenants} invoices={invoices} go={go} onSelect={handleTenantSelect} />;
     if (id === 'amount')   return <RentAmount go={go} selectedTenant={selectedTenant} onCommit={(c: number) => { setAmount(c); go('send'); }} />;
-    if (id === 'send')     return <SendRentLink go={go} selectedTenant={selectedTenant} amount={amount} onSend={handleSend} sending={sendMutation.isPending} />;
+    if (id === 'send')     return <SendRentLink go={go} selectedTenant={selectedTenant} amount={amount} onSend={handleSend} sending={sendMutation.isPending} frequency={frequency} setFrequency={setFrequency} />;
     if (id === 'external') return <MarkExternal go={go} selectedTenant={selectedTenant} amount={amount} invoices={invoices} onMark={handleMark} marking={markMutation.isPending} />;
     if (id === 'batch')    return <BatchSend go={go} tenants={tenants} invoices={invoices} onBatchSend={handleBatch} sending={batchMutation.isPending} />;
+    if (id === 'automate') return <AutomateScreen go={go} schedules={schedules} tenants={tenants} onPauseResume={handlePauseResume} onCancel={handleCancelSchedule} busyId={busyScheduleId} />;
     if (id === 'success')  return <SentSuccess amount={amount} label={successLabel} go={go} />;
     return null;
   };
