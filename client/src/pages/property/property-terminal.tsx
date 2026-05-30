@@ -532,7 +532,7 @@ export default function PropertyTerminal() {
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ['/api/property/invoices'] });
       setSuccessLabel(selectedTenant?.email || selectedTenant?.phone || '');
-      triggerConveyor(screen, 'up');
+      setContentKey(k => k + 1);
       setScreen('success');
     },
   });
@@ -598,12 +598,14 @@ export default function PropertyTerminal() {
       return;
     }
     if ((next === 'send' || next === 'external') && !selectedTenant) {
-      triggerConveyor(screen, 'up');
+      // Redirect to tenant picker — conveyor only if leaving home
+      if (screen === 'home') triggerConveyor(screen, 'up');
       setContentKey(k => k + 1);
       setScreen('tenants');
       return;
     }
-    triggerConveyor(screen, dir);
+    // Feature → feature: pop-in only; conveyor only when leaving home
+    if (screen === 'home') triggerConveyor(screen, dir);
     setContentKey(k => k + 1);
     setScreen(next);
   };
@@ -611,7 +613,6 @@ export default function PropertyTerminal() {
   const handleTenantSelect = (t: any, preAmount: number) => {
     setSelectedTenant(t);
     setAmount(preAmount);
-    triggerConveyor('tenants', 'up');
     setContentKey(k => k + 1);
     setScreen('send');
   };
