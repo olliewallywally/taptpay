@@ -1,14 +1,23 @@
 # Property Management — Remediation Plan
 
-Tracks the outstanding items from the integration review. The recurring-rent
-automation UI (C2) is **done** (commit `ffbf049`). The items below remain.
+Tracks the outstanding items from the integration review.
+
+**Done:** C2 recurring-rent automation UI (`ffbf049`), C1 payment completion +
+L1 dead-code removal (`b1f44fa`). The items below remain.
 
 Ordered by priority. Each item lists the problem, the fix, files touched, and
 how to verify.
 
 ---
 
-## C1 — 🔴 Card payments never mark an invoice paid (BLOCKER)
+## C1 — ✅ DONE (commit `b1f44fa`) — Card payments never marked an invoice paid
+
+Implemented: `createWindcaveSession` now takes an optional `callbacks` override;
+rent checkout uses dedicated `/api/checkout/callback` (browser) and
+`/api/windcave/rent-notification` (server) routes; `finalizeRentInvoice()`
+settles invoices idempotently (sets `paid`/`paidAt`/`windcaveTransactionId`,
+logs `Payment_Received`); `simulateRentSession` handles sim mode. The original
+analysis is kept below for reference.
 
 **Problem.** `/api/checkout/pay` creates a Windcave session but passes
 `null as any` as the `transactionId` (`server/routes.ts:5957`), so the
@@ -212,8 +221,8 @@ Then run a no-op `drizzle-kit generate` to confirm zero drift.
 
 ## Low / polish
 
-- **L1.** Remove the dead `callbackUrl` computed at `routes.ts:5954` (subsumed
-  by the C1 work).
+- **L1.** ✅ DONE (`b1f44fa`) — removed the dead `callbackUrl` in
+  `/api/checkout/pay`.
 - **L2.** Compare the cron secret with `crypto.timingSafeEqual` instead of
   `!==` (`routes.ts:5987`).
 - **L3.** `computeNextRunDate` uses server-local `setMonth/setDate` and can
@@ -228,9 +237,8 @@ Then run a no-op `drizzle-kit generate` to confirm zero drift.
 
 ## Suggested sequencing
 
-1. **C1** — unblocks the actual payment rail. Nothing else matters until rent
-   can be paid by card.
+1. ~~**C1**~~ ✅ done — the payment rail now records card payments.
 2. **H1** — one-line fix, immediate correctness win for automation.
 3. **H3 / L4** — decide SMS in-or-out and stop infinite dispatch retries.
 4. **H2 / M1** — resolve duplicate-invoice semantics (batch + resend together).
-5. **M2 / M3 / L1–L3** — cleanups; fold into the above PRs where they overlap.
+5. **M2 / M3 / L2–L3** — cleanups; fold into the above PRs where they overlap.
