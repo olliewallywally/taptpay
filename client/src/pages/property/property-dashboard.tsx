@@ -106,6 +106,13 @@ export default function PropertyDashboard() {
     retry: false,
   });
 
+  const { data: schedules = [] } = useQuery<any[]>({
+    queryKey: ['/api/property/schedules'],
+    queryFn: () => fetch('/api/property/schedules', { credentials: 'include' }).then(r => r.ok ? r.json() : []),
+    staleTime: 60000,
+    retry: false,
+  });
+
   /* Derived stats */
   const activeTenants   = tenants.filter((t: any) => t.status !== 'archived').length;
   const overdueCount    = invoices.filter((i: any) => i.status === 'overdue').length;
@@ -128,12 +135,12 @@ export default function PropertyDashboard() {
     { label: 'tenants',     v: activeTenants, Ico: STAT_ICONS[0] },
     { label: 'outstanding', v: overdueCount,  Ico: STAT_ICONS[1] },
     { label: 'queued',      v: queuedCount,   Ico: STAT_ICONS[2] },
-    { label: 'paused',      v: 0,             Ico: STAT_ICONS[3] },
+    { label: 'paused',      v: schedules.filter((s: any) => s.status === 'active' && s.pauseNextCycle).length, Ico: STAT_ICONS[3] },
   ];
 
   return (
     <div style={{ background: C.white, minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
-    <div style={{ width: '100%', maxWidth: 390, minHeight: '100svh', background: C.white, paddingBottom: 120, fontFamily: "'Outfit', system-ui, sans-serif" }}>
+    <div style={{ width: '100%', maxWidth: 390, minHeight: '100svh', background: '#F4F4F4', paddingBottom: 120, fontFamily: "'Outfit', system-ui, sans-serif" }}>
       <div style={{ height: 54 }} />
 
       {/* 1 — Active transaction hero */}

@@ -1,4 +1,4 @@
-import { pgTable, text, serial, decimal, timestamp, boolean, integer, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, decimal, timestamp, boolean, integer, jsonb, uuid, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -745,3 +745,147 @@ export type InsertBillingHistory = z.infer<typeof insertBillingHistorySchema>;
 // Push Subscription types
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 export type InsertPushSubscription = z.infer<typeof insertPushSubscriptionSchema>;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROPERTY MANAGEMENT VERTICAL
+// Invoice statuses: pending_dispatch | dispatched | paid | overdue | voided | paid_external
+// Schedule statuses: active | paused | terminated
+// Tenant profile statuses: active | archived
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const tenantProfiles = pgTable("tenant_profiles", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  merchantId: integer("merchant_id").references(() => merchants.id).notNull(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  propertyAddress: text("property_address").notNull(),
+  coTenantsText: text("co_tenants_text"),
+  preferredChannel: text("preferred_channel").notNull().default("email"),
+  status: text("status").notNull().default("active"),
+  archivedAt: timestamp("archived_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const activeSchedules = pgTable("active_schedules", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  merchantId: integer("merchant_id").references(() => merchants.id).notNull(),
+  tenantProfileId: uuid("tenant_profile_id").references(() => tenantProfiles.id).notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  frequency: text("frequency").notNull(),
+  deliveryChannel: text("delivery_channel").notNull().default("email"),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date"),
+  nextRunDate: timestamp("next_run_date").notNull(),
+  lastRunDate: timestamp("last_run_date"),
+  pauseNextCycle: boolean("pause_next_cycle").notNull().default(false),
+  status: text("status").notNull().default("active"),
+  terminatedAt: timestamp("terminated_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+  nextRunDateIdx: index("active_schedules_next_run_date_idx").on(t.nextRunDate),
+  merchantStatusIdx: index("active_schedules_merchant_status_idx").on(t.merchantId, t.status),
+}));
+
+export const invoicesRentRequests = pgTable("invoices_rent_requests", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  merchantId: integer("merchant_id").references(() => merchants.id).notNull(),
+  tenantProfileId: uuid("tenant_profile_id").references(() => tenantProfiles.id).notNull(),
+  scheduleId: uuid("schedule_id").references(() => activeSchedules.id),
+  amountCents: integer("amount_cents").notNull(),
+  token: text("token").notNull().unique(),
+  deliveryChannel: text("delivery_channel").notNull(),
+  billingPeriodStart: timestamp("billing_period_start"),
+  status: text("status").notNull().default("pending_dispatch"),
+  dueAt: timestamp("due_at").notNull(),
+  dispatchedAt: timestamp("dispatched_at"),
+  sentAt: timestamp("sent_at"),
+  paidAt: timestamp("paid_at"),
+  voidedAt: timestamp("voided_at"),
+  externalPaymentReference: text("external_payment_reference"),
+  lastReminderSentAt: timestamp("last_reminder_sent_at"),
+  windcaveSessionId: text("windcave_session_id"),
+  windcaveTransactionId: text("windcave_transaction_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+  scheduleBillingPeriodUnique: uniqueIndex("invoices_schedule_billing_period_unique")
+    .on(t.scheduleId, t.billingPeriodStart),
+  statusDueIdx: index("invoices_status_due_idx").on(t.status, t.dueAt),
+  merchantStatusIdx: index("invoices_merchant_status_idx").on(t.merchantId, t.status),
+  tokenIdx: index("invoices_token_idx").on(t.token),
+}));
+
+export const transactionEvents = pgTable("transaction_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  merchantId: integer("merchant_id").references(() => merchants.id).notNull(),
+  tenantProfileId: uuid("tenant_profile_id").references(() => tenantProfiles.id),
+  invoiceId: uuid("invoice_id").references(() => invoicesRentRequests.id),
+  scheduleId: uuid("schedule_id").references(() => activeSchedules.id),
+  eventType: text("event_type").notNull(),
+  payload: jsonb("payload"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  tenantCreatedIdx: index("transaction_events_tenant_created_idx").on(t.tenantProfileId, t.createdAt),
+  merchantCreatedIdx: index("transaction_events_merchant_created_idx").on(t.merchantId, t.createdAt),
+}));
+
+// Property management Zod schemas
+const propertyAddressSchema = z.string().trim().min(1, "Property address is required").max(200);
+const personNameSchema = z.string().trim().min(1).max(80);
+const optionalEmailSchema = z.string().trim().email().max(200).optional().or(z.literal("")).transform(v => v || undefined);
+const optionalPhoneSchema = z.string().trim().min(1).max(40).optional().or(z.literal("")).transform(v => v || undefined);
+
+const tenantProfileFields = z.object({
+  firstName: personNameSchema,
+  lastName: personNameSchema,
+  email: optionalEmailSchema,
+  phone: optionalPhoneSchema,
+  propertyAddress: propertyAddressSchema,
+  coTenantsText: z.string().max(1000).optional().or(z.literal("")).transform(v => v || undefined),
+  preferredChannel: z.enum(["sms", "email"]).default("email"),
+});
+
+export const createTenantProfileSchema = tenantProfileFields;
+export const updateTenantProfileSchema = tenantProfileFields.partial();
+
+export const createActiveScheduleSchema = z.object({
+  tenantProfileId: z.string().uuid(),
+  amountCents: z.number().int().positive().max(100_000_000),
+  frequency: z.enum(["weekly", "fortnightly", "monthly"]),
+  deliveryChannel: z.enum(["sms", "email"]),
+  startDate: z.string().datetime().or(z.date()).transform(v => new Date(v as any)),
+  endDate: z.string().datetime().or(z.date()).optional().transform(v => v ? new Date(v as any) : undefined),
+});
+
+export const updateActiveScheduleSchema = z.object({
+  amountCents: z.number().int().positive().max(100_000_000).optional(),
+  frequency: z.enum(["weekly", "fortnightly", "monthly"]).optional(),
+  deliveryChannel: z.enum(["sms", "email"]).optional(),
+  pauseNextCycle: z.boolean().optional(),
+  status: z.enum(["active", "paused", "terminated"]).optional(),
+});
+
+export const createAdHocInvoiceSchema = z.object({
+  tenantProfileId: z.string().uuid(),
+  amountCents: z.number().int().positive().max(100_000_000),
+  deliveryChannel: z.enum(["sms", "email"]),
+  dueAt: z.string().datetime().or(z.date()).transform(v => new Date(v as any)),
+});
+
+export const markInvoicePaidExternalSchema = z.object({
+  externalPaymentReference: z.string().trim().max(200).optional().or(z.literal("")).transform(v => v || undefined),
+});
+
+// Property management types
+export type TenantProfile = typeof tenantProfiles.$inferSelect;
+export type InsertTenantProfile = typeof tenantProfiles.$inferInsert;
+export type ActiveSchedule = typeof activeSchedules.$inferSelect;
+export type InsertActiveSchedule = typeof activeSchedules.$inferInsert;
+export type InvoiceRentRequest = typeof invoicesRentRequests.$inferSelect;
+export type InsertInvoiceRentRequest = typeof invoicesRentRequests.$inferInsert;
+export type TransactionEvent = typeof transactionEvents.$inferSelect;
+export type InsertTransactionEvent = typeof transactionEvents.$inferInsert;

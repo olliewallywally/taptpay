@@ -319,7 +319,7 @@ function SendRentLink({ go, selectedTenant, amount, onSend, sending }: any) {
         </div>
         <div style={{ height: 52 }} />
       </div>
-      <div className="stagger" style={{ flex: 1, background: NAVY, padding: '52px 28px 22px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <div className="stagger" style={{ flex: 1, background: NAVY, padding: '52px 28px 100px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         {/* Channel badge */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '18px 24px', background: 'rgba(88,171,255,0.08)', border: `1px solid rgba(88,171,255,0.2)`, borderRadius: 20, width: '100%', boxSizing: 'border-box' }}>
           {channel === 'email' ? <Ic.Mail sz={22} c={BLUE} /> : <Ic.Msg sz={22} c={BLUE} />}
@@ -372,7 +372,7 @@ function MarkExternal({ go, selectedTenant, amount, invoices, onMark, marking }:
         </div>
         <div style={{ height: 52 }} />
       </div>
-      <div className="stagger" style={{ flex: 1, background: NAVY, padding: '40px 28px 28px', display: 'flex', flexDirection: 'column' }}>
+      <div className="stagger" style={{ flex: 1, background: NAVY, padding: '40px 28px 100px', display: 'flex', flexDirection: 'column' }}>
         <div style={{ color: BLUE, fontWeight: 500, fontSize: 18, textAlign: 'center' }}>mark as received externally</div>
         {!pendingInvoice && (
           <div style={{ marginTop: 16, textAlign: 'center', color: 'rgba(88,171,255,0.5)', fontSize: 13 }}>no outstanding invoice found for this tenant</div>
@@ -424,7 +424,7 @@ function BatchSend({ go, tenants, invoices, onBatchSend, sending }: any) {
   return (
     <div className="tp-screen" style={{ background: NAVY }}>
       <div className="stagger" style={{ background: OFFW, color: NAVY, height: '50%', display: 'flex', flexDirection: 'column' }}>
-        <SubHead onCancel={() => go('home', 'down')} onCommit={() => selected.size > 0 && onBatchSend([...selected])} />
+        <SubHead onCancel={() => go('home', 'down')} onCommit={() => selected.size > 0 && onBatchSend(Array.from(selected))} />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div className="tp-amount" style={{ fontSize: 82, color: totalCents === 0 ? 'rgba(4,13,109,0.25)' : NAVY, marginTop: 18 }}>{fmt(totalCents)}</div>
           <div style={{ marginTop: 10, fontWeight: 500, fontSize: 15, color: 'rgba(4,13,109,0.5)' }}>
@@ -453,7 +453,7 @@ function BatchSend({ go, tenants, invoices, onBatchSend, sending }: any) {
           })}
         </div>
         <div style={{ flexShrink: 0, padding: '12px 0 20px', display: 'flex', justifyContent: 'center' }}>
-          <button className="tp-cta" onClick={() => selected.size > 0 && onBatchSend([...selected])} disabled={selected.size === 0 || sending}
+          <button className="tp-cta" onClick={() => selected.size > 0 && onBatchSend(Array.from(selected))} disabled={selected.size === 0 || sending}
             style={{ opacity: selected.size === 0 ? 0.4 : 1 }}>
             {sending ? 'sending…' : `send to ${selected.size || 'selected'}`}
           </button>
@@ -475,7 +475,7 @@ function SentSuccess({ amount, label, go }: any) {
         </div>
         <div style={{ height: 52 }} />
       </div>
-      <div className="stagger" style={{ flex: 1, background: NAVY, padding: '52px 28px 22px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <div className="stagger" style={{ flex: 1, background: NAVY, padding: '52px 28px 100px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <div style={{ color: BLUE, fontWeight: 900, fontSize: 42, letterSpacing: '-0.04em' }}>sent</div>
         <div className="tp-success-check tp-pulse" style={{ marginTop: 14 }}><Ic.Check sz={40} sw={3.2} /></div>
         {label && <div style={{ marginTop: 18, color: 'rgba(88,171,255,0.6)', fontWeight: 500, fontSize: 14 }}>{label}</div>}

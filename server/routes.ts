@@ -2,7 +2,7 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema } from "@shared/schema";
+import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema } from "@shared/schema";
 import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, simulateCreateSession, simulateQuerySession, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, simulateAttendedTapToPay } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, createUser, getUserByEmail, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
@@ -5663,6 +5663,336 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.get("/nfc/:merchantId/stone/:stoneId", (req, res, next) =>
     handleHppRedirect(req, res, next, parseInt(req.params.merchantId), parseInt(req.params.stoneId))
   );
+
+  // ===========================================================================
+  // PROPERTY MANAGEMENT VERTICAL
+  // ===========================================================================
+
+  // Per-token rate limiter for checkout (10 req/min per token)
+  const tokenRateMap = new Map<string, { count: number; windowStart: number }>();
+  function tokenRateLimit(token: string): boolean {
+    const now = Date.now(), window = 60_000, limit = 10;
+    const entry = tokenRateMap.get(token);
+    if (!entry || now - entry.windowStart > window) { tokenRateMap.set(token, { count: 1, windowStart: now }); return true; }
+    if (entry.count >= limit) return false;
+    entry.count++; return true;
+  }
+  setInterval(() => { const c = Date.now() - 120_000; tokenRateMap.forEach((v, k) => { if (v.windowStart < c) tokenRateMap.delete(k); }); }, 300_000);
+
+  function generateInvoiceToken(): string { return crypto.randomBytes(20).toString("base64url"); }
+
+  // ── Tenant Profiles ──────────────────────────────────────────────────────
+
+  app.get("/api/property/tenants", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const search = typeof req.query.search === "string" ? req.query.search : undefined;
+      const includeArchived = req.query.includeArchived === "true";
+      const tenants = await storage.getTenantProfilesByMerchant(merchantId, { search, includeArchived });
+      res.json(tenants);
+    } catch (err) { console.error("[PROP_TENANTS_LIST]", err); res.status(500).json({ message: "Failed to fetch tenants" }); }
+  });
+
+  app.post("/api/property/tenants", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const data = createTenantProfileSchema.parse(req.body);
+      const tenant = await storage.createTenantProfile({ ...data, merchantId });
+      await storage.logTransactionEvent({ merchantId, tenantProfileId: tenant.id, eventType: "Tenant_Created", payload: { firstName: tenant.firstName, lastName: tenant.lastName, propertyAddress: tenant.propertyAddress } });
+      res.status(201).json(tenant);
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
+      console.error("[PROP_TENANT_CREATE]", err); res.status(500).json({ message: "Failed to create tenant" });
+    }
+  });
+
+  app.get("/api/property/tenants/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const tenant = await storage.getTenantProfile(req.params.id);
+      if (!tenant) return res.status(404).json({ message: "Tenant not found" });
+      if (!checkMerchantOwnership(req, tenant.merchantId)) return res.status(403).json({ message: "Access denied" });
+      res.json(tenant);
+    } catch (err) { console.error("[PROP_TENANT_GET]", err); res.status(500).json({ message: "Failed to fetch tenant" }); }
+  });
+
+  app.put("/api/property/tenants/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const existing = await storage.getTenantProfile(req.params.id);
+      if (!existing) return res.status(404).json({ message: "Tenant not found" });
+      if (!checkMerchantOwnership(req, existing.merchantId)) return res.status(403).json({ message: "Access denied" });
+      const data = updateTenantProfileSchema.parse(req.body);
+      const tenant = await storage.updateTenantProfile(req.params.id, data);
+      res.json(tenant);
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
+      console.error("[PROP_TENANT_UPDATE]", err); res.status(500).json({ message: "Failed to update tenant" });
+    }
+  });
+
+  app.post("/api/property/tenants/:id/archive", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const existing = await storage.getTenantProfile(req.params.id);
+      if (!existing) return res.status(404).json({ message: "Tenant not found" });
+      if (!checkMerchantOwnership(req, existing.merchantId)) return res.status(403).json({ message: "Access denied" });
+      const tenant = await storage.archiveTenantProfile(req.params.id);
+      await storage.logTransactionEvent({ merchantId, tenantProfileId: req.params.id, eventType: "Tenant_Archived", payload: {} });
+      res.json(tenant);
+    } catch (err) { console.error("[PROP_TENANT_ARCHIVE]", err); res.status(500).json({ message: "Failed to archive tenant" }); }
+  });
+
+  app.get("/api/property/tenants/:id/events", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const tenant = await storage.getTenantProfile(req.params.id);
+      if (!tenant) return res.status(404).json({ message: "Tenant not found" });
+      if (!checkMerchantOwnership(req, tenant.merchantId)) return res.status(403).json({ message: "Access denied" });
+      const limit = Math.min(parseInt(String(req.query.limit ?? "50")), 200);
+      const events = await storage.getTransactionEventsByTenant(req.params.id, limit);
+      res.json(events);
+    } catch (err) { console.error("[PROP_EVENTS]", err); res.status(500).json({ message: "Failed to fetch events" }); }
+  });
+
+  // ── Schedules ────────────────────────────────────────────────────────────
+
+  app.get("/api/property/schedules", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      res.json(await storage.getActiveSchedulesByMerchant(merchantId));
+    } catch (err) { console.error("[PROP_SCHEDULES_MERCHANT]", err); res.status(500).json({ message: "Failed to fetch schedules" }); }
+  });
+
+  app.get("/api/property/tenants/:tenantId/schedules", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const tenant = await storage.getTenantProfile(req.params.tenantId);
+      if (!tenant) return res.status(404).json({ message: "Tenant not found" });
+      if (!checkMerchantOwnership(req, tenant.merchantId)) return res.status(403).json({ message: "Access denied" });
+      res.json(await storage.getActiveSchedulesByTenant(req.params.tenantId));
+    } catch (err) { console.error("[PROP_SCHEDULES_LIST]", err); res.status(500).json({ message: "Failed to fetch schedules" }); }
+  });
+
+  app.post("/api/property/tenants/:tenantId/schedules", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const tenant = await storage.getTenantProfile(req.params.tenantId);
+      if (!tenant) return res.status(404).json({ message: "Tenant not found" });
+      if (!checkMerchantOwnership(req, tenant.merchantId)) return res.status(403).json({ message: "Access denied" });
+      const data = createActiveScheduleSchema.parse({ ...req.body, tenantProfileId: req.params.tenantId });
+      const schedule = await storage.createActiveSchedule({ ...data, merchantId, nextRunDate: data.startDate });
+      await storage.logTransactionEvent({ merchantId, tenantProfileId: req.params.tenantId, scheduleId: schedule.id, eventType: "Schedule_Created", payload: { amountCents: schedule.amountCents, frequency: schedule.frequency } });
+      res.status(201).json(schedule);
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
+      console.error("[PROP_SCHEDULE_CREATE]", err); res.status(500).json({ message: "Failed to create schedule" });
+    }
+  });
+
+  app.put("/api/property/schedules/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const existing = await storage.getActiveSchedule(req.params.id);
+      if (!existing) return res.status(404).json({ message: "Schedule not found" });
+      if (!checkMerchantOwnership(req, existing.merchantId)) return res.status(403).json({ message: "Access denied" });
+      const data = updateActiveScheduleSchema.parse(req.body);
+      const schedule = await storage.updateActiveSchedule(req.params.id, data);
+      if (data.pauseNextCycle !== undefined) {
+        await storage.logTransactionEvent({ merchantId, tenantProfileId: existing.tenantProfileId, scheduleId: req.params.id, eventType: data.pauseNextCycle ? "Schedule_Paused" : "Schedule_Resumed", payload: {} });
+      }
+      res.json(schedule);
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
+      console.error("[PROP_SCHEDULE_UPDATE]", err); res.status(500).json({ message: "Failed to update schedule" });
+    }
+  });
+
+  app.delete("/api/property/schedules/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const existing = await storage.getActiveSchedule(req.params.id);
+      if (!existing) return res.status(404).json({ message: "Schedule not found" });
+      if (!checkMerchantOwnership(req, existing.merchantId)) return res.status(403).json({ message: "Access denied" });
+      const schedule = await storage.terminateActiveSchedule(req.params.id);
+      await storage.logTransactionEvent({ merchantId, tenantProfileId: existing.tenantProfileId, scheduleId: req.params.id, eventType: "Schedule_Terminated", payload: {} });
+      res.json(schedule);
+    } catch (err) { console.error("[PROP_SCHEDULE_DELETE]", err); res.status(500).json({ message: "Failed to terminate schedule" }); }
+  });
+
+  // ── Invoices ─────────────────────────────────────────────────────────────
+
+  app.get("/api/property/invoices", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const tenantProfileId = typeof req.query.tenantProfileId === "string" ? req.query.tenantProfileId : undefined;
+      const status = typeof req.query.status === "string" ? req.query.status : undefined;
+      const invoices = await storage.getInvoiceRentRequestsByMerchant(merchantId, { status, tenantProfileId });
+      // Enrich with tenant display name and address
+      const cache = new Map<string, { tenantName: string; propertyAddress: string }>();
+      const enriched = await Promise.all(invoices.map(async (inv: any) => {
+        if (!cache.has(inv.tenantProfileId)) {
+          const t = await storage.getTenantProfile(inv.tenantProfileId).catch(() => null);
+          cache.set(inv.tenantProfileId, t
+            ? { tenantName: `${t.firstName} ${t.lastName}`, propertyAddress: t.propertyAddress }
+            : { tenantName: "—", propertyAddress: "—" });
+        }
+        return { ...inv, ...cache.get(inv.tenantProfileId) };
+      }));
+      res.json(enriched);
+    } catch (err) { console.error("[PROP_INVOICES_LIST]", err); res.status(500).json({ message: "Failed to fetch invoices" }); }
+  });
+
+  app.post("/api/property/invoices", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const tenant = await storage.getTenantProfile(req.body.tenantProfileId);
+      if (!tenant) return res.status(404).json({ message: "Tenant not found" });
+      if (!checkMerchantOwnership(req, tenant.merchantId)) return res.status(403).json({ message: "Access denied" });
+      const data = createAdHocInvoiceSchema.parse(req.body);
+      const invoice = await storage.createInvoiceRentRequest({ ...data, merchantId, token: generateInvoiceToken(), status: "pending_dispatch" });
+      await storage.logTransactionEvent({ merchantId, tenantProfileId: data.tenantProfileId, invoiceId: invoice.id, eventType: "Invoice_Generated", payload: { amountCents: invoice.amountCents, channel: invoice.deliveryChannel } });
+      res.status(201).json(invoice);
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
+      console.error("[PROP_INVOICE_CREATE]", err); res.status(500).json({ message: "Failed to create invoice" });
+    }
+  });
+
+  app.get("/api/property/invoices/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const invoice = await storage.getInvoiceRentRequest(req.params.id);
+      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+      if (!checkMerchantOwnership(req, invoice.merchantId)) return res.status(403).json({ message: "Access denied" });
+      res.json(invoice);
+    } catch (err) { console.error("[PROP_INVOICE_GET]", err); res.status(500).json({ message: "Failed to fetch invoice" }); }
+  });
+
+  app.post("/api/property/invoices/:id/void", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const invoice = await storage.getInvoiceRentRequest(req.params.id);
+      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+      if (!checkMerchantOwnership(req, invoice.merchantId)) return res.status(403).json({ message: "Access denied" });
+      if (["paid", "paid_external"].includes(invoice.status)) return res.status(400).json({ message: "Cannot void a paid invoice" });
+      const updated = await storage.updateInvoiceRentRequest(req.params.id, { status: "voided", voidedAt: new Date() });
+      await storage.logTransactionEvent({ merchantId, tenantProfileId: invoice.tenantProfileId, invoiceId: req.params.id, eventType: "Invoice_Voided", payload: {} });
+      res.json(updated);
+    } catch (err) { console.error("[PROP_INVOICE_VOID]", err); res.status(500).json({ message: "Failed to void invoice" }); }
+  });
+
+  app.post("/api/property/invoices/:id/mark-paid-external", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const invoice = await storage.getInvoiceRentRequest(req.params.id);
+      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+      if (!checkMerchantOwnership(req, invoice.merchantId)) return res.status(403).json({ message: "Access denied" });
+      if (invoice.status === "paid" || invoice.status === "paid_external") return res.status(400).json({ message: "Invoice is already paid" });
+      const { externalPaymentReference } = markInvoicePaidExternalSchema.parse(req.body);
+      const updated = await storage.updateInvoiceRentRequest(req.params.id, { status: "paid_external", paidAt: new Date(), externalPaymentReference: externalPaymentReference ?? null });
+      await storage.logTransactionEvent({ merchantId, tenantProfileId: invoice.tenantProfileId, invoiceId: req.params.id, eventType: "Payment_External", payload: { externalPaymentReference } });
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
+      console.error("[PROP_INVOICE_MARK_PAID]", err); res.status(500).json({ message: "Failed to mark invoice paid" });
+    }
+  });
+
+  // ── Hosted checkout (public, unauthenticated) ─────────────────────────────
+
+  app.get("/api/checkout/resolve/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      if (!tokenRateLimit(token)) return res.status(429).json({ message: "Too many requests" });
+      const invoice = await storage.getInvoiceRentRequestByToken(token);
+      if (!invoice) return res.status(404).json({ message: "Payment link not found" });
+      if (invoice.status === "voided") return res.status(410).json({ message: "This payment link has been voided" });
+      if (invoice.status === "paid" || invoice.status === "paid_external") return res.status(200).json({ alreadyPaid: true, amountCents: invoice.amountCents });
+      const [merchant, tenant] = await Promise.all([storage.getMerchant(invoice.merchantId), storage.getTenantProfile(invoice.tenantProfileId)]);
+      if (!merchant || !tenant) return res.status(404).json({ message: "Payment details unavailable" });
+      res.json({
+        invoiceId: invoice.id, amountCents: invoice.amountCents, dueAt: invoice.dueAt, status: invoice.status,
+        merchantName: merchant.businessName || merchant.name,
+        propertyAddress: tenant.propertyAddress,
+        tenantName: `${tenant.firstName} ${tenant.lastName}`,
+        coTenantsText: tenant.coTenantsText ?? null,
+      });
+    } catch (err) { console.error("[CHECKOUT_RESOLVE]", err); res.status(500).json({ message: "Failed to load payment details" }); }
+  });
+
+  app.post("/api/checkout/pay", async (req, res) => {
+    try {
+      const { token } = req.body as { token?: string };
+      if (!token) return res.status(400).json({ message: "token required" });
+      if (!tokenRateLimit(token)) return res.status(429).json({ message: "Too many requests" });
+      const invoice = await storage.getInvoiceRentRequestByToken(token);
+      if (!invoice) return res.status(404).json({ message: "Payment link not found" });
+      if (["voided", "paid", "paid_external"].includes(invoice.status)) return res.status(409).json({ message: "Invoice is not payable" });
+      const [merchant, tenant] = await Promise.all([storage.getMerchant(invoice.merchantId), storage.getTenantProfile(invoice.tenantProfileId)]);
+      if (!merchant || !tenant) return res.status(500).json({ message: "Invoice data unavailable" });
+      const baseUrl = getBaseUrl(req);
+      const amountStr = (invoice.amountCents / 100).toFixed(2);
+      const merchantRef = `RENT-${invoice.id.slice(0, 8).toUpperCase()}`;
+      const xId = crypto.randomBytes(16).toString("hex");
+      const callbackUrl = `${baseUrl}/r/${token}`;
+      let sessionResult: any;
+      if (isWindcaveConfigured()) {
+        sessionResult = await createWindcaveSession(xId, amountStr, merchantRef, tenant.email ?? "tenant@taptpay.co.nz", baseUrl, null as any);
+      } else {
+        sessionResult = simulateCreateSession(merchantRef, baseUrl);
+      }
+      if (!sessionResult.success || !sessionResult.hppUrl) return res.status(502).json({ message: "Payment gateway error. Please try again." });
+      await storage.updateInvoiceRentRequest(invoice.id, { windcaveSessionId: sessionResult.sessionId });
+      res.json({ hppUrl: sessionResult.hppUrl });
+    } catch (err) { console.error("[CHECKOUT_PAY]", err); res.status(500).json({ message: "Failed to initiate payment" }); }
+  });
+
+  // ── Merchant sector + timezone ────────────────────────────────────────────
+
+  app.put("/api/merchants/:merchantId/sector", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = parseInt(req.params.merchantId);
+      if (!checkMerchantOwnership(req, merchantId)) return res.status(403).json({ message: "Access denied" });
+      const { sector } = z.object({ sector: z.enum(["retail", "propertyManagement"]) }).parse(req.body);
+      const merchant = await storage.updateMerchant(merchantId, { sector } as any);
+      res.json({ sector: (merchant as any)?.sector });
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
+      console.error("[PROP_SECTOR]", err); res.status(500).json({ message: "Failed to update sector" });
+    }
+  });
+
+  // ── Cron endpoint ─────────────────────────────────────────────────────────
+
+  app.post("/api/internal/cron", async (req, res) => {
+    const cronSecret = process.env.CRON_SECRET;
+    if (!cronSecret) return res.status(503).json({ message: "Cron not configured" });
+    if (req.headers["x-cron-secret"] !== cronSecret) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const { runGeneratePass, runDispatchPass, runOverduePass } = await import("./property-cron");
+      const now = new Date();
+      const [gen, disp, overdue] = await Promise.all([runGeneratePass(now), runDispatchPass(getBaseUrl(req)), runOverduePass(now)]);
+      console.log(`[CRON] generate=${JSON.stringify(gen)} dispatch=${JSON.stringify(disp)} overdue=${JSON.stringify(overdue)}`);
+      res.json({ ok: true, ranAt: now.toISOString(), generate: gen, dispatch: disp, overdue });
+    } catch (err) { console.error("[CRON]", err); res.status(500).json({ message: "Cron run failed" }); }
+  });
 
   const httpServer = createServer(app);
   return httpServer;

@@ -1,6 +1,6 @@
-import { merchants, transactions, merchantSettlements, platformFees, refunds, splitPayments, taptStones, stockItems, cryptoTransactions, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type CryptoTransaction, type InsertCryptoTransaction, type MerchantSubscription, type SubscriptionBillingHistory } from "@shared/schema";
+import { merchants, transactions, merchantSettlements, platformFees, refunds, splitPayments, taptStones, stockItems, cryptoTransactions, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, tenantProfiles, activeSchedules, invoicesRentRequests, transactionEvents, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type CryptoTransaction, type InsertCryptoTransaction, type MerchantSubscription, type SubscriptionBillingHistory } from "@shared/schema";
 import { getDb, isDatabaseConnected } from "./database";
-import { eq, desc, and, inArray, gte } from "drizzle-orm";
+import { eq, desc, and, inArray, gte, lte, or, ilike, sql } from "drizzle-orm";
 
 export interface IStorage {
   // Merchant operations
@@ -177,6 +177,34 @@ export interface IStorage {
   getSplitPaymentById(id: number): Promise<any | undefined>;
   updateSplitPaymentStatus(id: number, status: string, windcaveTransactionId?: string): Promise<any>;
   getNextPendingSplit(transactionId: number): Promise<any | undefined>;
+
+  // ── Property management vertical ──────────────────────────────────────────
+  createTenantProfile(data: any): Promise<any>;
+  getTenantProfile(id: string): Promise<any | undefined>;
+  getTenantProfilesByMerchant(merchantId: number, opts?: { search?: string; includeArchived?: boolean }): Promise<any[]>;
+  updateTenantProfile(id: string, updates: any): Promise<any | undefined>;
+  archiveTenantProfile(id: string): Promise<any | undefined>;
+
+  createActiveSchedule(data: any): Promise<any>;
+  getActiveSchedule(id: string): Promise<any | undefined>;
+  getActiveSchedulesByTenant(tenantProfileId: string): Promise<any[]>;
+  getActiveSchedulesByMerchant(merchantId: number): Promise<any[]>;
+  updateActiveSchedule(id: string, updates: any): Promise<any | undefined>;
+  terminateActiveSchedule(id: string): Promise<any | undefined>;
+  getDueActiveSchedules(now: Date): Promise<any[]>;
+
+  createInvoiceRentRequest(data: any): Promise<any>;
+  getInvoiceRentRequest(id: string): Promise<any | undefined>;
+  getInvoiceRentRequestByToken(token: string): Promise<any | undefined>;
+  getInvoiceRentRequestByWindcaveSessionId(sessionId: string): Promise<any | undefined>;
+  getInvoiceRentRequestsByMerchant(merchantId: number, opts?: { status?: string; tenantProfileId?: string }): Promise<any[]>;
+  updateInvoiceRentRequest(id: string, updates: any): Promise<any | undefined>;
+  getPendingDispatchInvoices(): Promise<any[]>;
+  getOverdueEligibleInvoices(now: Date): Promise<any[]>;
+
+  logTransactionEvent(data: any): Promise<any>;
+  getTransactionEventsByTenant(tenantProfileId: string, limit?: number): Promise<any[]>;
+  getTransactionEventsByInvoice(invoiceId: string): Promise<any[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -1553,6 +1581,31 @@ export class MemStorage implements IStorage {
   async resetUnbilledTransactions(merchantId: number): Promise<void> {
     // No-op in memory storage
   }
+
+  // ── Property management — MemStorage stubs (DB-only feature) ────────────────
+  async createTenantProfile(data: any): Promise<any> { throw new Error("Property management requires database"); }
+  async getTenantProfile(id: string): Promise<any> { return undefined; }
+  async getTenantProfilesByMerchant(merchantId: number, opts?: any): Promise<any[]> { return []; }
+  async updateTenantProfile(id: string, updates: any): Promise<any> { return undefined; }
+  async archiveTenantProfile(id: string): Promise<any> { return undefined; }
+  async createActiveSchedule(data: any): Promise<any> { throw new Error("Property management requires database"); }
+  async getActiveSchedule(id: string): Promise<any> { return undefined; }
+  async getActiveSchedulesByTenant(tenantProfileId: string): Promise<any[]> { return []; }
+  async getActiveSchedulesByMerchant(merchantId: number): Promise<any[]> { return []; }
+  async updateActiveSchedule(id: string, updates: any): Promise<any> { return undefined; }
+  async terminateActiveSchedule(id: string): Promise<any> { return undefined; }
+  async getDueActiveSchedules(now: Date): Promise<any[]> { return []; }
+  async createInvoiceRentRequest(data: any): Promise<any> { throw new Error("Property management requires database"); }
+  async getInvoiceRentRequest(id: string): Promise<any> { return undefined; }
+  async getInvoiceRentRequestByToken(token: string): Promise<any> { return undefined; }
+  async getInvoiceRentRequestByWindcaveSessionId(sessionId: string): Promise<any> { return undefined; }
+  async getInvoiceRentRequestsByMerchant(merchantId: number, opts?: any): Promise<any[]> { return []; }
+  async updateInvoiceRentRequest(id: string, updates: any): Promise<any> { return undefined; }
+  async getPendingDispatchInvoices(): Promise<any[]> { return []; }
+  async getOverdueEligibleInvoices(now: Date): Promise<any[]> { return []; }
+  async logTransactionEvent(data: any): Promise<any> { return {}; }
+  async getTransactionEventsByTenant(tenantProfileId: string, limit?: number): Promise<any[]> { return []; }
+  async getTransactionEventsByInvoice(invoiceId: string): Promise<any[]> { return []; }
 
 }
 
@@ -2949,6 +3002,115 @@ export class DatabaseStorage implements IStorage {
         updatedAt: new Date()
       })
       .where(eq(merchantSubscriptions.merchantId, merchantId));
+  }
+
+  // ── Property management — DatabaseStorage implementations ──────────────────
+  async createTenantProfile(data: any): Promise<any> {
+    const db = getDb(); if (!db) throw new Error('No database');
+    const [r] = await db.insert(tenantProfiles).values(data).returning(); return r;
+  }
+  async getTenantProfile(id: string): Promise<any> {
+    const db = getDb(); if (!db) return undefined;
+    const [r] = await db.select().from(tenantProfiles).where(eq(tenantProfiles.id, id)).limit(1); return r;
+  }
+  async getTenantProfilesByMerchant(merchantId: number, opts: { search?: string; includeArchived?: boolean } = {}): Promise<any[]> {
+    const db = getDb(); if (!db) return [];
+    const conds: any[] = [eq(tenantProfiles.merchantId, merchantId)];
+    if (!opts.includeArchived) conds.push(eq(tenantProfiles.status, "active"));
+    if (opts.search?.trim()) {
+      const p = `%${opts.search.trim()}%`;
+      conds.push(or(ilike(tenantProfiles.firstName, p), ilike(tenantProfiles.lastName, p), ilike(tenantProfiles.propertyAddress, p)));
+    }
+    return db.select().from(tenantProfiles).where(and(...conds)).orderBy(desc(tenantProfiles.createdAt));
+  }
+  async updateTenantProfile(id: string, updates: any): Promise<any> {
+    const db = getDb(); if (!db) return undefined;
+    const [r] = await db.update(tenantProfiles).set({ ...updates, updatedAt: new Date() }).where(eq(tenantProfiles.id, id)).returning(); return r;
+  }
+  async archiveTenantProfile(id: string): Promise<any> {
+    const db = getDb(); if (!db) return undefined;
+    const now = new Date();
+    const [r] = await db.update(tenantProfiles).set({ status: "archived", archivedAt: now, updatedAt: now }).where(eq(tenantProfiles.id, id)).returning();
+    await db.update(activeSchedules).set({ status: "terminated", terminatedAt: now, updatedAt: now }).where(and(eq(activeSchedules.tenantProfileId, id), sql`${activeSchedules.status} <> 'terminated'`));
+    return r;
+  }
+  async createActiveSchedule(data: any): Promise<any> {
+    const db = getDb(); if (!db) throw new Error('No database');
+    const [r] = await db.insert(activeSchedules).values(data).returning(); return r;
+  }
+  async getActiveSchedule(id: string): Promise<any> {
+    const db = getDb(); if (!db) return undefined;
+    const [r] = await db.select().from(activeSchedules).where(eq(activeSchedules.id, id)).limit(1); return r;
+  }
+  async getActiveSchedulesByTenant(tenantProfileId: string): Promise<any[]> {
+    const db = getDb(); if (!db) return [];
+    return db.select().from(activeSchedules).where(eq(activeSchedules.tenantProfileId, tenantProfileId));
+  }
+  async getActiveSchedulesByMerchant(merchantId: number): Promise<any[]> {
+    const db = getDb(); if (!db) return [];
+    return db.select().from(activeSchedules).where(eq(activeSchedules.merchantId, merchantId));
+  }
+  async updateActiveSchedule(id: string, updates: any): Promise<any> {
+    const db = getDb(); if (!db) return undefined;
+    const [r] = await db.update(activeSchedules).set({ ...updates, updatedAt: new Date() }).where(eq(activeSchedules.id, id)).returning(); return r;
+  }
+  async terminateActiveSchedule(id: string): Promise<any> {
+    return this.updateActiveSchedule(id, { status: "terminated", terminatedAt: new Date() });
+  }
+  async getDueActiveSchedules(now: Date): Promise<any[]> {
+    const db = getDb(); if (!db) return [];
+    return db.select().from(activeSchedules).where(and(eq(activeSchedules.status, "active"), lte(activeSchedules.nextRunDate, now)));
+  }
+  async createInvoiceRentRequest(data: any): Promise<any> {
+    const db = getDb(); if (!db) throw new Error('No database');
+    if (data.scheduleId && data.billingPeriodStart) {
+      const existing = await db.select().from(invoicesRentRequests).where(and(eq(invoicesRentRequests.scheduleId, data.scheduleId), eq(invoicesRentRequests.billingPeriodStart, data.billingPeriodStart))).limit(1);
+      if (existing[0]) return existing[0];
+    }
+    const [r] = await db.insert(invoicesRentRequests).values(data).returning(); return r;
+  }
+  async getInvoiceRentRequest(id: string): Promise<any> {
+    const db = getDb(); if (!db) return undefined;
+    const [r] = await db.select().from(invoicesRentRequests).where(eq(invoicesRentRequests.id, id)).limit(1); return r;
+  }
+  async getInvoiceRentRequestByToken(token: string): Promise<any> {
+    const db = getDb(); if (!db) return undefined;
+    const [r] = await db.select().from(invoicesRentRequests).where(eq(invoicesRentRequests.token, token)).limit(1); return r;
+  }
+  async getInvoiceRentRequestByWindcaveSessionId(sessionId: string): Promise<any> {
+    const db = getDb(); if (!db) return undefined;
+    const [r] = await db.select().from(invoicesRentRequests).where(eq(invoicesRentRequests.windcaveSessionId, sessionId)).limit(1); return r;
+  }
+  async getInvoiceRentRequestsByMerchant(merchantId: number, opts: { status?: string; tenantProfileId?: string } = {}): Promise<any[]> {
+    const db = getDb(); if (!db) return [];
+    const conds: any[] = [eq(invoicesRentRequests.merchantId, merchantId)];
+    if (opts.status) conds.push(eq(invoicesRentRequests.status, opts.status));
+    if (opts.tenantProfileId) conds.push(eq(invoicesRentRequests.tenantProfileId, opts.tenantProfileId));
+    return db.select().from(invoicesRentRequests).where(and(...conds)).orderBy(desc(invoicesRentRequests.createdAt));
+  }
+  async updateInvoiceRentRequest(id: string, updates: any): Promise<any> {
+    const db = getDb(); if (!db) return undefined;
+    const [r] = await db.update(invoicesRentRequests).set({ ...updates, updatedAt: new Date() }).where(eq(invoicesRentRequests.id, id)).returning(); return r;
+  }
+  async getPendingDispatchInvoices(): Promise<any[]> {
+    const db = getDb(); if (!db) return [];
+    return db.select().from(invoicesRentRequests).where(eq(invoicesRentRequests.status, "pending_dispatch")).orderBy(invoicesRentRequests.createdAt);
+  }
+  async getOverdueEligibleInvoices(now: Date): Promise<any[]> {
+    const db = getDb(); if (!db) return [];
+    return db.select().from(invoicesRentRequests).where(and(eq(invoicesRentRequests.status, "dispatched"), lte(invoicesRentRequests.dueAt, now)));
+  }
+  async logTransactionEvent(data: any): Promise<any> {
+    const db = getDb(); if (!db) return {};
+    const [r] = await db.insert(transactionEvents).values(data).returning(); return r;
+  }
+  async getTransactionEventsByTenant(tenantProfileId: string, limit = 100): Promise<any[]> {
+    const db = getDb(); if (!db) return [];
+    return db.select().from(transactionEvents).where(eq(transactionEvents.tenantProfileId, tenantProfileId)).orderBy(desc(transactionEvents.createdAt)).limit(limit);
+  }
+  async getTransactionEventsByInvoice(invoiceId: string): Promise<any[]> {
+    const db = getDb(); if (!db) return [];
+    return db.select().from(transactionEvents).where(eq(transactionEvents.invoiceId, invoiceId)).orderBy(desc(transactionEvents.createdAt));
   }
 
 }

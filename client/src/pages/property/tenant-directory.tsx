@@ -132,7 +132,7 @@ function AddTenantSheet({ onClose, onSave, saving, saveError }: {
       {/* Sheet — slides up from bottom */}
       <div style={{
         width: '100%', maxWidth: 390,
-        background: C.white,
+        background: '#F4F4F4',
         borderRadius: '28px 28px 0 0',
         maxHeight: '92vh',
         overflowY: 'auto',
@@ -336,7 +336,7 @@ export default function TenantDirectory() {
 
   return (
     <div style={{ background: C.white, minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
-    <div style={{ width: '100%', maxWidth: 390, minHeight: '100svh', background: C.white, paddingBottom: 120, fontFamily: "'Outfit', system-ui, sans-serif" }}>
+    <div style={{ width: '100%', maxWidth: 390, minHeight: '100svh', background: '#F4F4F4', paddingBottom: 120, fontFamily: "'Outfit', system-ui, sans-serif" }}>
       <div style={{ height: 54 }} />
 
       {/* Hero */}

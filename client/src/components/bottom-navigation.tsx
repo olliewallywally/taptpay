@@ -41,7 +41,8 @@ const PROPERTY_ITEMS = [
   { id: 'settings',  path: '/settings',           Icon: IcoSettings },
 ];
 
-const RETAIL_NAV_PATHS = ['/dashboard', '/stock', '/terminal', '/transactions', '/settings'];
+/* /terminal is intentionally excluded — SmartTransitions has its own internal dock */
+const RETAIL_NAV_PATHS = ['/dashboard', '/stock', '/transactions', '/settings'];
 
 function readMode(): 'retail' | 'property' {
   try { return (localStorage.getItem('taptMode') as 'retail' | 'property') || 'retail'; } catch { return 'retail'; }
@@ -64,7 +65,7 @@ export function BottomNavigation() {
   useEffect(() => {
     if (location.startsWith('/property')) {
       saveMode('property'); setModeState('property');
-    } else if (RETAIL_NAV_PATHS.includes(location) && location !== '/terminal' && location !== '/settings') {
+    } else if (RETAIL_NAV_PATHS.includes(location) && location !== '/settings') {
       saveMode('retail'); setModeState('retail');
     }
   }, [location]);
