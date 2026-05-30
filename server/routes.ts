@@ -3,7 +3,7 @@ import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema } from "@shared/schema";
-import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, simulateCreateSession, simulateQuerySession, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, simulateAttendedTapToPay } from "./windcave";
+import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, simulateCreateSession, simulateQuerySession, simulateRentSession, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, simulateAttendedTapToPay } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, createUser, getUserByEmail, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
 import { generateBusinessReportPdf } from "./report-generator";
@@ -5681,6 +5681,31 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
   function generateInvoiceToken(): string { return crypto.randomBytes(20).toString("base64url"); }
 
+  // Idempotently finalize a rent invoice from a Windcave payment outcome.
+  // Safe to call from both the browser callback and the server notification —
+  // already-finalized invoices (paid/paid_external/voided) are left untouched.
+  async function finalizeRentInvoice(invoiceId: string, approved: boolean, windcaveTransactionId?: string): Promise<any> {
+    const inv = await storage.getInvoiceRentRequest(invoiceId);
+    if (!inv) return null;
+    if (["paid", "paid_external", "voided"].includes(inv.status)) return inv; // already settled
+    if (approved) {
+      const updated = await storage.updateInvoiceRentRequest(invoiceId, {
+        status: "paid", paidAt: new Date(), windcaveTransactionId: windcaveTransactionId ?? null,
+      });
+      await storage.logTransactionEvent({
+        merchantId: inv.merchantId, tenantProfileId: inv.tenantProfileId, invoiceId,
+        eventType: "Payment_Received", payload: { channel: "card", amountCents: inv.amountCents, windcaveTransactionId: windcaveTransactionId ?? null },
+      });
+      return updated;
+    }
+    // Declined — leave the invoice payable so the tenant can retry; just record the attempt.
+    await storage.logTransactionEvent({
+      merchantId: inv.merchantId, tenantProfileId: inv.tenantProfileId, invoiceId,
+      eventType: "Payment_Declined", payload: { channel: "card" },
+    });
+    return inv;
+  }
+
   // ── Tenant Profiles ──────────────────────────────────────────────────────
 
   app.get("/api/property/tenants", authenticateToken, async (req: AuthenticatedRequest, res) => {
@@ -5951,17 +5976,76 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const amountStr = (invoice.amountCents / 100).toFixed(2);
       const merchantRef = `RENT-${invoice.id.slice(0, 8).toUpperCase()}`;
       const xId = crypto.randomBytes(16).toString("hex");
-      const callbackUrl = `${baseUrl}/r/${token}`;
       let sessionResult: any;
       if (isWindcaveConfigured()) {
-        sessionResult = await createWindcaveSession(xId, amountStr, merchantRef, tenant.email ?? "tenant@taptpay.co.nz", baseUrl, null as any);
+        sessionResult = await createWindcaveSession(
+          xId, amountStr, merchantRef, tenant.email ?? "tenant@taptpay.co.nz", baseUrl, 0, 0,
+          { callbackBase: `${baseUrl}/api/checkout/callback?token=${token}`, notificationUrl: `${baseUrl}/api/windcave/rent-notification` },
+        );
       } else {
-        sessionResult = simulateCreateSession(merchantRef, baseUrl);
+        sessionResult = simulateRentSession(token, baseUrl);
       }
-      if (!sessionResult.success || !sessionResult.hppUrl) return res.status(502).json({ message: "Payment gateway error. Please try again." });
-      await storage.updateInvoiceRentRequest(invoice.id, { windcaveSessionId: sessionResult.sessionId });
+      if (!sessionResult.success) return res.status(502).json({ message: "Payment gateway error. Please try again." });
+      if (sessionResult.sessionId) await storage.updateInvoiceRentRequest(invoice.id, { windcaveSessionId: sessionResult.sessionId });
+      // Duplicate X-ID — Windcave reports the session already completed; finalize now
+      // and bounce the payer back to the checkout page to see the result.
+      if (sessionResult.alreadyComplete) {
+        await finalizeRentInvoice(invoice.id, !!sessionResult.approved, sessionResult.windcaveTransactionId);
+        return res.json({ hppUrl: `${baseUrl}/r/${token}` });
+      }
+      if (!sessionResult.hppUrl) return res.status(502).json({ message: "Payment gateway error. Please try again." });
       res.json({ hppUrl: sessionResult.hppUrl });
     } catch (err) { console.error("[CHECKOUT_PAY]", err); res.status(500).json({ message: "Failed to initiate payment" }); }
+  });
+
+  // Browser return after the tenant pays on the Windcave HPP. Confirms the real
+  // outcome by querying the session (never trusts the result param alone), then
+  // redirects back to /r/:token which renders the paid/declined state.
+  app.get("/api/checkout/callback", async (req, res) => {
+    try {
+      const token = req.query.token as string;
+      const result = req.query.result as string;
+      const isSim = req.query.sim === "1";
+      if (!token) return res.redirect("/");
+      const invoice = await storage.getInvoiceRentRequestByToken(token);
+      if (!invoice) return res.redirect("/");
+      const back = `/r/${token}`;
+
+      // Already settled, or tenant cancelled (no charge) — just show the page
+      if (["paid", "paid_external", "voided"].includes(invoice.status)) return res.redirect(back);
+      if (result === "cancelled") return res.redirect(back);
+
+      const sessionId = invoice.windcaveSessionId;
+      let queryResult: any;
+      if (isWindcaveConfigured() && !isSim && sessionId) {
+        queryResult = await queryWindcaveSession(sessionId);
+      } else {
+        // Simulation — honor the result embedded in the callback URL
+        queryResult = { success: true, approved: result === "approved", windcaveTransactionId: result === "approved" ? `SIMTXN_${Date.now()}` : undefined };
+      }
+      if (queryResult.success) {
+        await finalizeRentInvoice(invoice.id, !!queryResult.approved, queryResult.windcaveTransactionId);
+      }
+      return res.redirect(back);
+    } catch (err) { console.error("[CHECKOUT_CALLBACK]", err); return res.redirect("/"); }
+  });
+
+  // Server-to-server notification from Windcave for rent sessions. Looks up the
+  // invoice by session id and finalizes idempotently (the browser callback may
+  // have already done so).
+  app.all("/api/windcave/rent-notification", express.urlencoded({ extended: true }), express.json(), async (req, res) => {
+    res.status(200).send("OK"); // respond fast so Windcave stops retrying
+    try {
+      const sessionId = (req.query?.sessionid as string) || (req.query?.sessionId as string) || req.body?.sessionId || req.body?.sessionid;
+      if (!sessionId) { console.warn("[RENT_NOTIF] No sessionId", req.query); return; }
+      const invoice = await storage.getInvoiceRentRequestByWindcaveSessionId(sessionId);
+      if (!invoice) { console.warn(`[RENT_NOTIF] No invoice for session ${sessionId}`); return; }
+      if (["paid", "paid_external", "voided"].includes(invoice.status)) return; // already settled
+      const queryResult = isWindcaveConfigured() ? await queryWindcaveSession(sessionId) : simulateQuerySession(sessionId);
+      if (!queryResult.success) { console.error(`[RENT_NOTIF] query failed for ${sessionId}:`, queryResult.error); return; }
+      await finalizeRentInvoice(invoice.id, !!queryResult.approved, queryResult.windcaveTransactionId);
+      console.log(`[RENT_NOTIF] invoice ${invoice.id} → ${queryResult.approved ? "paid" : "declined"}`);
+    } catch (err) { console.error("[RENT_NOTIF] Error:", err); }
   });
 
   // ── Merchant sector + timezone ────────────────────────────────────────────
