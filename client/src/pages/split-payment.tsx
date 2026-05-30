@@ -108,6 +108,7 @@ export default function SplitPayment() {
     setSplitError(null);
     setIsProcessing(true);
     try {
+      let payAmt: number;
       if (!isSplitSetup) {
         const response = await apiRequest("POST", `/api/transactions/${txnId}/split`, {
           totalSplits: splitCount,
@@ -117,14 +118,25 @@ export default function SplitPayment() {
           setCurrentTransaction(data.transaction);
           queryClient.setQueryData(["/api/transactions", txnId], data.transaction);
         }
-        // Always pass ?amount so checkout displays and charges the exact split amount
-        const payAmt = parseFloat(displayAmount);
-        setLocation(`/checkout/${txnId}?amount=${payAmt.toFixed(2)}`);
+        payAmt = parseFloat(displayAmount);
       } else {
-        // Always pass ?amount so checkout displays and charges the exact split amount
-        const payAmt = parseFloat(subDisplay);
-        setLocation(`/checkout/${txnId}?amount=${payAmt.toFixed(2)}`);
+        payAmt = parseFloat(subDisplay);
       }
+
+      const payRes = await fetch(`/api/transactions/${txnId}/pay`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ merchantId: txn.merchantId, amount: payAmt.toFixed(2) }),
+      });
+      if (payRes.ok) {
+        const payData = await payRes.json();
+        if (payData.hppUrl) {
+          window.location.href = payData.hppUrl;
+          return;
+        }
+      }
+      // Fallback if HPP URL unavailable
+      setLocation(`/checkout/${txnId}?amount=${payAmt.toFixed(2)}`);
     } catch (err) {
       console.error("Split payment error:", err);
       setSplitError("Couldn't set up the split. Please try again.");
@@ -284,7 +296,20 @@ export default function SplitPayment() {
               {/* Escape hatch — skip split and pay the full amount */}
               {!editMode && (
                 <button
-                  onClick={() => setLocation(`/checkout/${txnId}`)}
+                  onClick={async () => {
+                    try {
+                      const payRes = await fetch(`/api/transactions/${txnId}/pay`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ merchantId: txn.merchantId }),
+                      });
+                      if (payRes.ok) {
+                        const payData = await payRes.json();
+                        if (payData.hppUrl) { window.location.href = payData.hppUrl; return; }
+                      }
+                    } catch {}
+                    setLocation(`/checkout/${txnId}`);
+                  }}
                   className="mt-4 text-white/30 text-xs underline underline-offset-2 hover:text-white/50 transition-colors"
                 >
                   pay full amount instead

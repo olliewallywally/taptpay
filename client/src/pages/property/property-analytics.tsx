@@ -1,0 +1,271 @@
+import { useState, useEffect, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
+
+/* ── Design tokens (matches AnalyticsScreen_(2)) ── */
+const C = {
+  base:     '#040D6D',
+  accent:   '#58ABFF',
+  accentDim:'rgba(88,171,255,0.3)',
+  white:    '#FFFFFF',
+  sheet:    '#F4F4F4',
+  handle:   'rgba(0,0,0,0.08)',
+  textDark: '#1a1a1a',
+  textMuted:'rgba(0,0,0,0.35)',
+  green:    '#22C55E',
+  red:      '#EF4444',
+};
+
+type Timeframe = 'day' | 'week' | 'month' | 'year';
+
+/* ── SVG chart helpers ── */
+function toSmooth(pts: number[], W: number, H: number, pad = 8) {
+  const n = pts.length;
+  const sx = (W - pad * 2) / (n - 1);
+  const coords = pts.map((v, i) => ({ x: pad + i * sx, y: pad + ((100 - v) / 100) * (H - pad * 2) }));
+  let d = `M${coords[0].x},${coords[0].y}`;
+  for (let i = 1; i < coords.length; i++) {
+    const prev = coords[i - 1], curr = coords[i];
+    const cpx = (prev.x + curr.x) / 2;
+    d += ` C${cpx},${prev.y} ${cpx},${curr.y} ${curr.x},${curr.y}`;
+  }
+  return { d, coords };
+}
+function toArea(pts: number[], W: number, H: number, pad = 8) {
+  const { d } = toSmooth(pts, W, H, pad);
+  return d + ` L${W - pad},${H} L${pad},${H} Z`;
+}
+
+/* ── Revenue chart ── */
+function RevenueChart({ primary, secondary, tipIdx, animKey }: { primary: number[]; secondary: number[]; tipIdx: number; animKey: string }) {
+  const W = 342, H = 100, pad = 8;
+  const [reveal, setReveal] = useState(false);
+
+  useEffect(() => {
+    setReveal(false);
+    const t = setTimeout(() => setReveal(true), 80);
+    return () => clearTimeout(t);
+  }, [animKey]);
+
+  const { d: pLine, coords: pCoords } = toSmooth(primary, W, H, pad);
+  const { d: sLine } = toSmooth(secondary, W, H, pad);
+  const pArea = toArea(primary, W, H, pad);
+  const sArea = toArea(secondary, W, H, pad);
+  const tipPt = pCoords[tipIdx];
+
+  return (
+    <div style={{ position: 'relative', margin: '8px 0 4px', padding: '0 4px' }}>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="auto" style={{ display: 'block' }}>
+        <defs>
+          <linearGradient id="pa1" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={C.accent} stopOpacity="0.22" />
+            <stop offset="100%" stopColor={C.accent} stopOpacity="0.01" />
+          </linearGradient>
+          <linearGradient id="pa2" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={C.accent} stopOpacity="0.08" />
+            <stop offset="100%" stopColor={C.accent} stopOpacity="0.0" />
+          </linearGradient>
+          <clipPath id="prc">
+            <rect x="0" y="0" width={reveal ? W : 0} height={H}
+              style={{ transition: 'width 1.6s cubic-bezier(0.22,1,0.36,1)' }} />
+          </clipPath>
+        </defs>
+        {[20, 40, 60, 80].map(y => (
+          <line key={y} x1="0" y1={y} x2={W} y2={y} stroke="rgba(88,171,255,0.06)" strokeWidth="0.5" />
+        ))}
+        <g clipPath="url(#prc)">
+          <path d={sArea} fill="url(#pa2)" />
+          <path d={sLine} fill="none" stroke={C.accentDim} strokeWidth="1.5" strokeLinecap="round" />
+          <path d={pArea} fill="url(#pa1)" />
+          <path d={pLine} fill="none" stroke={C.accent} strokeWidth="2.2" strokeLinecap="round" />
+          <line x1={tipPt.x} y1={tipPt.y} x2={tipPt.x} y2={H} stroke="rgba(255,255,255,0.15)" strokeWidth="0.5" strokeDasharray="2 2" />
+          <circle cx={tipPt.x} cy={tipPt.y} r="8" fill="rgba(88,171,255,0.15)" />
+          <circle cx={tipPt.x} cy={tipPt.y} r="4" fill={C.white} stroke={C.accent} strokeWidth="2" />
+        </g>
+      </svg>
+      {/* Tooltip */}
+      <div style={{ position: 'absolute', left: `${(tipPt.x / W) * 100}%`, top: `${(tipPt.y / H) * 100 - 18}%`, transform: 'translate(-50%, -100%)', background: C.accent, color: C.base, padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', boxShadow: '0 4px 12px rgba(88,171,255,0.3)', opacity: reveal ? 1 : 0, transition: 'opacity 0.5s ease 1.2s' }}>
+        {/* tip label set by parent */}
+      </div>
+      <div style={{ position: 'absolute', left: `${(tipPt.x / W) * 100}%`, bottom: -6, transform: 'translateX(-50%)', width: 12, height: 12, borderRadius: '50%', background: C.white, boxShadow: '0 2px 8px rgba(0,0,0,0.3)', opacity: reveal ? 1 : 0, transition: 'opacity 0.3s ease 1s' }} />
+    </div>
+  );
+}
+
+/* ── Transaction row ── */
+function TxRow({ inv, delay = 0 }: { inv: any; delay?: number }) {
+  const [vis, setVis] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setVis(true), 400 + delay); return () => clearTimeout(t); }, [delay]);
+
+  const name    = inv.tenantName || inv.propertyAddress || 'Rent payment';
+  const initials = name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
+  const isPaid  = inv.status === 'paid' || inv.status === 'paid_external';
+  const isOverdue = inv.status === 'overdue';
+  const amount  = inv.amountCents ? `${isPaid ? '+' : ''}$${(inv.amountCents / 100).toFixed(2)}` : '—';
+  const label   = isPaid ? 'Paid' : isOverdue ? 'Overdue' : inv.status === 'pending_dispatch' ? 'Queued' : 'Sent';
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 0', borderBottom: '1px solid rgba(0,0,0,0.04)', opacity: vis ? 1 : 0, transform: vis ? 'translateY(0) scale(1)' : 'translateY(8px) scale(0.98)', transition: 'all 0.5s cubic-bezier(0.34,1.56,0.64,1)' }}>
+      <div style={{ width: 40, height: 40, borderRadius: 12, background: C.sheet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: C.base, flexShrink: 0 }}>{initials}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontSize: 14, fontWeight: 600, color: C.textDark, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</p>
+        <p style={{ fontSize: 11, color: C.textMuted, margin: 0, marginTop: 2 }}>{inv.propertyAddress || (inv.dueAt ? new Date(inv.dueAt).toLocaleDateString('en-NZ') : '')}</p>
+      </div>
+      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+        <p style={{ fontSize: 15, fontWeight: 700, color: isPaid ? C.green : isOverdue ? C.red : C.textDark, margin: 0, fontVariantNumeric: 'tabular-nums' }}>{amount}</p>
+        <p style={{ fontSize: 10, color: C.textMuted, margin: 0, marginTop: 1 }}>{label}</p>
+      </div>
+    </div>
+  );
+}
+
+/* ── Compute chart series from invoices ── */
+function buildChartData(invoices: any[], tf: Timeframe) {
+  const now = new Date();
+  let buckets: number;
+  let getKey: (d: Date) => number;
+
+  if (tf === 'day') {
+    buckets = 10; getKey = d => Math.floor((now.getTime() - d.getTime()) / (2.4 * 3600000));
+  } else if (tf === 'week') {
+    buckets = 10; getKey = d => Math.floor((now.getTime() - d.getTime()) / (16.8 * 3600000));
+  } else if (tf === 'month') {
+    buckets = 10; getKey = d => Math.floor((now.getTime() - d.getTime()) / (72 * 3600000));
+  } else {
+    buckets = 10; getKey = d => Math.floor((now.getTime() - d.getTime()) / (876 * 3600000));
+  }
+
+  const paid: number[] = Array(buckets).fill(0);
+  const outstanding: number[] = Array(buckets).fill(0);
+
+  invoices.forEach((inv: any) => {
+    const date = new Date(inv.paidAt ?? inv.createdAt);
+    const bucket = Math.max(0, Math.min(buckets - 1, getKey(date)));
+    const val = Math.round((inv.amountCents ?? 0) / 100);
+    if (inv.status === 'paid' || inv.status === 'paid_external') paid[buckets - 1 - bucket] += val;
+    else outstanding[buckets - 1 - bucket] += val;
+  });
+
+  const maxVal = Math.max(...paid, ...outstanding, 1);
+  const norm = (arr: number[]) => arr.map(v => Math.round((v / maxVal) * 90) + 5);
+
+  return { primary: norm(paid), secondary: norm(outstanding) };
+}
+
+export default function PropertyAnalytics() {
+  const [tf, setTf] = useState<Timeframe>('week');
+  const [totVis, setTotVis] = useState(true);
+
+  const { data: invoices = [] } = useQuery<any[]>({
+    queryKey: ['/api/property/invoices'],
+    queryFn: () => fetch('/api/property/invoices', { credentials: 'include' }).then(r => r.ok ? r.json() : []),
+    staleTime: 30000,
+    retry: false,
+  });
+
+  /* Filter invoices by timeframe */
+  const now = new Date();
+  const cutoff = {
+    day:   new Date(now.getTime() - 24 * 3600000),
+    week:  new Date(now.getTime() - 7 * 86400000),
+    month: new Date(now.getTime() - 30 * 86400000),
+    year:  new Date(now.getTime() - 365 * 86400000),
+  }[tf];
+
+  const filtered = invoices.filter((i: any) => new Date(i.createdAt) >= cutoff);
+
+  /* Revenue total */
+  const totalRevenue = filtered
+    .filter((i: any) => i.status === 'paid' || i.status === 'paid_external')
+    .reduce((s: number, i: any) => s + (i.amountCents ?? 0), 0);
+  const totalStr = '$' + (totalRevenue / 100).toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  /* Chart — only built from real property invoice data, never retail transactions */
+  const FLAT = [5, 5, 5, 5, 5, 5, 5, 5, 5, 5];
+  const chart = invoices.length > 0
+    ? buildChartData(invoices, tf)
+    : { primary: FLAT, secondary: FLAT };
+  const tipIdx = 7;
+
+  /* Switch timeframe */
+  const switchTf = (p: Timeframe) => {
+    if (p === tf) return;
+    setTotVis(false);
+    setTimeout(() => { setTf(p); setTotVis(true); }, 150);
+  };
+
+  /* Transaction groups */
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+
+  const todayInvoices = filtered.filter((i: any) => new Date(i.createdAt) >= today);
+  const recentInvoices = filtered.filter((i: any) => new Date(i.createdAt) >= yesterday && new Date(i.createdAt) < today).slice(0, 5);
+
+  return (
+    <div style={{ background: C.base, minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
+    <div style={{ width: '100%', maxWidth: 390, height: '100svh', display: 'flex', flexDirection: 'column', fontFamily: "'Outfit', system-ui, sans-serif", background: C.base, position: 'relative', overflow: 'hidden' }}>
+
+      {/* ── Dark top ── */}
+      <div style={{ padding: '52px 24px 0', flexShrink: 0 }}>
+        {/* Status bar */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: C.white }}>analytics</span>
+          <svg width={22} height={11} viewBox="0 0 28 13"><rect x="0" y="1" width="24" height="11" rx="3" stroke="rgba(255,255,255,0.35)" strokeWidth="1" fill="none"/><rect x="25" y="4" width="2" height="5" rx="1" fill="rgba(255,255,255,0.2)"/><rect x="1.5" y="2.5" width="18" height="8" rx="2" fill={C.green}/></svg>
+        </div>
+
+        {/* Header */}
+        <h1 style={{ fontSize: 22, fontWeight: 800, color: C.white, margin: '0 0 24px', letterSpacing: '-0.5px' }}>Rent Revenue</h1>
+
+        {/* Period pills */}
+        <div style={{ display: 'flex', gap: 0, background: 'rgba(255,255,255,0.06)', borderRadius: 999, padding: 3, marginBottom: 20 }}>
+          {(['day', 'week', 'month', 'year'] as Timeframe[]).map(p => (
+            <button key={p} onClick={() => switchTf(p)} style={{ flex: 1, padding: '8px 0', borderRadius: 999, border: 'none', fontSize: 13, fontWeight: tf === p ? 600 : 500, textTransform: 'capitalize', background: tf === p ? C.accent : 'transparent', color: tf === p ? C.base : 'rgba(255,255,255,0.4)', transition: 'all 0.3s cubic-bezier(0.34,1.56,0.64,1)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+              {p}
+            </button>
+          ))}
+        </div>
+
+        {/* Total */}
+        <div style={{ textAlign: 'center', marginBottom: 4 }}>
+          <p style={{ fontSize: 13, fontWeight: 400, color: 'rgba(255,255,255,0.4)', margin: 0, letterSpacing: '0.04em' }}>Total Revenue</p>
+          <p style={{ fontSize: 46, fontWeight: 700, color: C.white, margin: 0, letterSpacing: '-2px', marginTop: 6, fontVariantNumeric: 'tabular-nums', opacity: totVis ? 1 : 0, transform: totVis ? 'translateY(0)' : 'translateY(6px)', transition: 'all 0.45s cubic-bezier(0.34,1.56,0.64,1)' }}>
+            {totalStr}
+          </p>
+        </div>
+
+        {/* Chart */}
+        <RevenueChart primary={chart.primary} secondary={chart.secondary} tipIdx={tipIdx} animKey={tf} />
+      </div>
+
+      {/* ── White sheet ── */}
+      <div style={{ flex: 1, background: C.sheet, borderRadius: '32px 32px 0 0', marginTop: 12, padding: '0 24px 100px', overflowY: 'auto', overflowX: 'hidden', msOverflowStyle: 'none', scrollbarWidth: 'none' }}>
+        {/* Handle */}
+        <div style={{ width: 40, height: 5, borderRadius: 3, background: C.handle, margin: '14px auto 22px' }} />
+
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: C.textDark, margin: 0, letterSpacing: '-0.4px' }}>Payment History</h2>
+        </div>
+
+        {filtered.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '48px 0', color: C.textMuted, fontSize: 13 }}>no payments in this period</div>
+        ) : (
+          <>
+            {todayInvoices.length > 0 && (
+              <>
+                <p style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.14em', marginBottom: 6 }}>Today</p>
+                {todayInvoices.map((inv: any, i: number) => <TxRow key={inv.id} inv={inv} delay={i * 55} />)}
+              </>
+            )}
+            {recentInvoices.length > 0 && (
+              <>
+                <p style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.14em', marginBottom: 6, marginTop: 20 }}>Recent</p>
+                {recentInvoices.map((inv: any, i: number) => <TxRow key={inv.id} inv={inv} delay={(i + 3) * 55} />)}
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+    </div>
+  );
+}

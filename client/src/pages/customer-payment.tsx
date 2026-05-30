@@ -115,14 +115,13 @@ export default function CustomerPayment() {
 
     hasRedirected.current = true;
 
-    // If split is enabled by merchant → go to split page
-    if (currentTransaction.splitEnabled && !currentTransaction.isSplit) {
-      setLocation(`/split/${currentTransaction.id}`);
-      return;
-    }
-
-    // → Go to branded Hosted Fields checkout page
-    setLocation(`/checkout/${currentTransaction.id}`);
+    // Trigger a full-page navigation back to /pay/:merchantId (with stone if set).
+    // The server route will now find the active transaction, create a Windcave
+    // session, and redirect straight to the HPP — no TaptPay page shown.
+    const path = stoneNumber
+      ? `/pay/${id}/stone/${stoneNumber}`
+      : `/pay/${id}`;
+    window.location.href = path;
   }, [currentTransaction]);
 
   const handleRetry = () => {

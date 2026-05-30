@@ -43,6 +43,11 @@ const PaymentResult         = lazy(() => import("@/pages/payment-result"));
 const Checkout              = lazy(() => import("@/pages/checkout"));
 const BoardBuilder          = lazy(() => import("@/pages/board-builder"));
 const SmartTerminal         = lazy(() => import("@/components/SmartTransitions"));
+const PropertyDashboard     = lazy(() => import("@/pages/property/property-dashboard"));
+const TenantDirectory       = lazy(() => import("@/pages/property/tenant-directory"));
+const TenantProfile         = lazy(() => import("@/pages/property/tenant-profile"));
+const PropertyAnalytics     = lazy(() => import("@/pages/property/property-analytics"));
+const RentCheckout          = lazy(() => import("@/pages/property/rent-checkout"));
 
 function PageLoader() {
   return (
@@ -219,6 +224,21 @@ function Router() {
             <ProtectedRoute><BoardBuilder /></ProtectedRoute>
           </Route>
           <Route path="/smart-terminal" component={SmartTerminal} />
+          {/* ── Property management section ── */}
+          <Route path="/property">
+            <ProtectedRoute><PropertyDashboard /></ProtectedRoute>
+          </Route>
+          <Route path="/property/tenants">
+            <ProtectedRoute><TenantDirectory /></ProtectedRoute>
+          </Route>
+          <Route path="/property/tenants/:id">
+            <ProtectedRoute><TenantProfile /></ProtectedRoute>
+          </Route>
+          <Route path="/property/analytics">
+            <ProtectedRoute><PropertyAnalytics /></ProtectedRoute>
+          </Route>
+          {/* Public rent checkout — no auth required */}
+          <Route path="/r/:token" component={RentCheckout} />
           <Route path="/onboarding">
             <ProtectedRoute skipOnboardingCheck={true}><MerchantOnboarding /></ProtectedRoute>
           </Route>

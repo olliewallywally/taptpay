@@ -1631,17 +1631,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       return res.json({
         sessionId: sessionResult.sessionId,
-        // Card URL: sent to frontend — Hosted Fields SDK submits directly from browser.
+        hppUrl: sessionResult.hppUrl,
         ajaxSubmitCardUrl: sessionResult.ajaxSubmitCardUrl,
-        // Apple Pay URL: sent to frontend — Windcave ApplePay SDK submits directly from
-        // browser using Apple's own auth flow (no backend credentials involved).
         ajaxSubmitApplePayUrl: sessionResult.ajaxSubmitApplePayUrl,
-        // Google Pay URL: included for spec completeness but the backend ignores any
-        // client-supplied value; it uses the server-side cached URL instead.
         ajaxSubmitGooglePayUrl: sessionResult.ajaxSubmitGooglePayUrl,
-        // hppUrl intentionally omitted — the native Google Pay / Apple Pay /
-        // Hosted Fields flows never use it, and exposing it to the browser risks
-        // an accidental or SDK-triggered redirect to the Windcave HPP.
       });
     } catch (error) {
       console.error("Payment processing error:", error);
@@ -5608,6 +5601,68 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
   // Serve static uploads
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
+  // ── Customer HPP redirect ────────────────────────────────────────────────────
+  // When a customer opens a payment link (/pay/:merchantId or the stone variant),
+  // the server creates a Windcave session immediately and sends a 302 to the
+  // branded HPP — the customer never sees an intermediate TaptPay page.
+  // Falls back to the React waiting screen if no active transaction exists yet
+  // or if session creation fails.
+  async function handleHppRedirect(
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction,
+    merchantId: number,
+    stoneId: number | null
+  ) {
+    if (isNaN(merchantId)) return next();
+    try {
+      const transaction = await storage.getActiveMerchantTransaction(merchantId, stoneId);
+      if (!transaction || transaction.status !== "pending") return next();
+
+      // Split-enabled transactions → send customer to split selection page first
+      if (transaction.splitEnabled && !transaction.isSplit) {
+        return res.redirect(`/split/${transaction.id}`);
+      }
+
+      const baseUrl = getBaseUrl(req);
+      const xId = crypto.randomBytes(8).toString("hex");
+      const merchant = await storage.getMerchant(merchantId);
+      const customerEmail = merchant?.email || "customer@taptpay.co.nz";
+      const merchantReference = `TXN_${transaction.id}`;
+
+      const sessionResult = isWindcaveConfigured()
+        ? await createWindcaveSession(xId, transaction.price, merchantReference, customerEmail, baseUrl, transaction.id)
+        : simulateCreateSession(merchantReference, baseUrl);
+
+      if (!sessionResult.success || !sessionResult.hppUrl) return next();
+
+      await storage.updateTransactionWindcaveSession(transaction.id, sessionResult.sessionId!, "pending", xId);
+      sessionAjaxUrlCache.set(transaction.id, {
+        ajaxSubmitCardUrl: sessionResult.ajaxSubmitCardUrl,
+        ajaxSubmitApplePayUrl: sessionResult.ajaxSubmitApplePayUrl,
+        ajaxSubmitGooglePayUrl: sessionResult.ajaxSubmitGooglePayUrl,
+      });
+
+      return res.redirect(sessionResult.hppUrl);
+    } catch (err) {
+      console.error("[HPP_REDIRECT]", err);
+      return next();
+    }
+  }
+
+  app.get("/pay/:merchantId", (req, res, next) =>
+    handleHppRedirect(req, res, next, parseInt(req.params.merchantId), null)
+  );
+  app.get("/pay/:merchantId/stone/:stoneId", (req, res, next) =>
+    handleHppRedirect(req, res, next, parseInt(req.params.merchantId), parseInt(req.params.stoneId))
+  );
+  app.get("/nfc/:merchantId", (req, res, next) =>
+    handleHppRedirect(req, res, next, parseInt(req.params.merchantId), null)
+  );
+  app.get("/nfc/:merchantId/stone/:stoneId", (req, res, next) =>
+    handleHppRedirect(req, res, next, parseInt(req.params.merchantId), parseInt(req.params.stoneId))
+  );
 
   const httpServer = createServer(app);
   return httpServer;

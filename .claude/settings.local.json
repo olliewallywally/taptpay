@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(awk 'NR>=1230 && NR<=1240 {print NR\": \"$0}' /home/runner/workspace/client/src/components/SmartTransitions.jsx)",
+      "Bash(awk 'NR>=1524 && NR<=1530 {print NR\": \"$0}' /home/runner/workspace/client/src/components/SmartTransitions.jsx)",
+      "Bash(npx --yes acorn --ecma2020 --module client/src/components/SmartTransitions.jsx)",
+      "Bash(node --input-type=module --eval \"import\\('./client/src/components/SmartTransitions.jsx'\\)\")",
+      "Bash(npx tsc *)",
+      "Bash(npx vite *)",
+      "Bash(npm run *)",
+      "Bash(echo \"PID: $!\")",
+      "Bash(curl -s http://localhost:5000/api/merchants/1)",
+      "Bash(python3 -m json.tool)",
+      "Bash(curl -s http://localhost:5000/)",
+      "Bash(curl -s http://localhost:5000/api/admin/merchants)",
+      "Bash(curl -s -X POST http://localhost:5000/api/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"oliverleonard.professional@gmail.com\",\"password\":\"test\"}')",
+      "Bash(curl -s -X POST http://localhost:5000/api/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"demo@taptpay.co.nz\",\"password\":\"demo123\"}')",
+      "Bash(curl -s -X POST http://localhost:5000/api/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"demo@tapt.co.nz\",\"password\":\"demo123\"}')",
+      "Bash(npx tsx *)",
+      "Read(//tmp/**)",
+      "Bash(unzip -o /home/runner/workspace/attached_assets/taptpay-property-management-v2.zip -d prop-mgmt-v2)",
+      "Bash(python3 *)",
+      "Bash(unzip -o /home/runner/workspace/attached_assets/tapt_pay_UI_redesign_\\\\\\(1\\\\\\)_1780110362373.zip -d tapt_ui_redesign)",
+      "Bash(node *)"
+    ]
+  }
+}

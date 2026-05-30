@@ -133,8 +133,9 @@ export default function MerchantTerminalMobile() {
     sseClient.subscribe("transaction_updated", (message) => {
       const tx = message.transaction ?? null;
       queryClient.setQueryData(["/api/merchants", merchantId, "active-transaction"], tx);
-      // Instantly push completed/failed/cancelled transactions into the allTransactions cache
-      if (tx && ["completed", "failed", "cancelled"].includes(tx.status)) {
+      // Keep allTransactions cache in sync for all updates so split progress,
+      // status changes, and completedSplits increments appear immediately.
+      if (tx) {
         queryClient.setQueryData<any[]>(
           ["/api/merchants", merchantId, "transactions"],
           (prev: any[] = []) => {
@@ -167,13 +168,14 @@ export default function MerchantTerminalMobile() {
   }, [activeTransaction?.status]);
 
   const createTransactionMutation = useMutation({
-    mutationFn: async (data: { itemName: string; price: string; selectedStoneId?: number }) => {
+    mutationFn: async (data: { itemName: string; price: string; selectedStoneId?: number; splitEnabled?: boolean }) => {
       const r = await apiRequest("POST", "/api/transactions", {
         merchantId,
         itemName: data.itemName,
         price: data.price,
         status: "pending",
         selectedStoneId: data.selectedStoneId,
+        splitEnabled: data.splitEnabled ?? false,
       });
       return r.json();
     },
@@ -306,26 +308,29 @@ export default function MerchantTerminalMobile() {
     return <div>Redirecting...</div>;
   }
 
-  const pending = activeTransaction &&
-    (activeTransaction.status === "pending" || activeTransaction.status === "processing")
-    ? {
-        id: activeTransaction.id,
-        name: activeTransaction.itemName,
-        amount: Math.round(parseFloat(activeTransaction.price) * 100),
-      }
-    : null;
-
+  // Terminal always resets to $0.00 after send — sent transactions live in the stack, not the pending display
   const sent = (allTransactions as any[])
-    .filter((tx: any) => tx.status === "completed")
+    .filter((tx: any) => ["pending", "processing", "completed", "failed"].includes(tx.status))
     .slice(0, 10)
-    .map((tx: any) => ({
-      id: tx.id,
-      name: tx.itemName,
-      amount: Math.round(parseFloat(tx.price) * 100),
-      status: "sent",
-    }));
+    .map((tx: any) => {
+      let displayStatus: string;
+      if (tx.status === "completed") displayStatus = "paid";
+      else if (tx.status === "failed") displayStatus = "declined";
+      else if (tx.status === "processing") displayStatus = "processing";
+      else displayStatus = "awaiting payment";
+      return {
+        id: tx.id,
+        name: tx.itemName,
+        amount: Math.round(parseFloat(tx.price) * 100),
+        status: displayStatus,
+        splitEnabled: !!tx.splitEnabled,
+        isSplit: !!tx.isSplit,
+        completedSplits: tx.completedSplits != null ? Number(tx.completedSplits) : 0,
+        totalSplits: tx.totalSplits != null ? Number(tx.totalSplits) : 1,
+      };
+    });
 
-  const liveState = { items: [], pending, sent };
+  const liveState = { items: [], pending: null, sent };
 
   const liveStones = (taptStones as any[]).map((s: any) => ({
     id: s.id,
@@ -343,14 +348,24 @@ export default function MerchantTerminalMobile() {
   );
 
   const handleLiveSend = async (
-    draft: { name: string; amount: number },
+    draft: { name: string; amount: number; splitEnabled?: boolean },
     options: { paywave?: boolean } = {}
   ) => {
     const newTx = await createTransactionMutation.mutateAsync({
       itemName: draft.name,
       price: (draft.amount / 100).toFixed(2),
       selectedStoneId: selectedStoneId ?? undefined,
+      splitEnabled: draft.splitEnabled,
     });
+    // Push the new transaction into the list cache immediately so it appears in the
+    // active stack before the next background poll fires.
+    queryClient.setQueryData<any[]>(
+      ["/api/merchants", merchantId, "transactions"],
+      (prev: any[] = []) => {
+        const exists = prev.some((t: any) => t.id === newTx.id);
+        return exists ? prev : [newTx, ...prev];
+      }
+    );
     if (options.paywave) {
       startTapToPayPayment(newTx);
     }

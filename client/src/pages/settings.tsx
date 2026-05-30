@@ -1123,6 +1123,36 @@ export default function Settings() {
           </Button>
         </div>
 
+        {/* Switch to Property Management */}
+        <div className="mb-5">
+          <button
+            onClick={() => setLocation('/property')}
+            style={{
+              width: '100%',
+              background: '#040D6D',
+              borderRadius: 16,
+              padding: '20px 24px',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 16,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 14, background: 'rgba(88,171,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="#58ABFF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1.5 1.5 0 01-1.5 1.5h-15A1.5 1.5 0 013 20V9.5z"/><path d="M9 21.5V14h6v7.5"/></svg>
+              </div>
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ fontWeight: 700, fontSize: 16, color: '#FFFFFF', letterSpacing: '-0.2px' }}>Property Management</div>
+                <div style={{ fontWeight: 400, fontSize: 13, color: 'rgba(88,171,255,0.7)', marginTop: 2 }}>tenants · rent · invoices</div>
+              </div>
+            </div>
+            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="rgba(88,171,255,0.6)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+          </button>
+        </div>
+
         {/* Logout Button */}
         <div className="mb-8">
           <Button

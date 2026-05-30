@@ -204,7 +204,7 @@ function SubHead({ onCancel, onCommit }) {
   );
 }
 
-function ActiveStack({ items, status = 'pending', onItemClick }) {
+function ActiveStack({ items, status = 'awaiting payment', onItemClick }) {
   return (
     <div>
       <div className="tp-stack-hdr">
@@ -213,20 +213,63 @@ function ActiveStack({ items, status = 'pending', onItemClick }) {
       </div>
       <div className="tp-stack-card">
         {items.length === 0 ? (
-          <div className="tp-stack-empty">{status === 'pending' ? 'tap + to add an item' : 'nothing sent yet'}</div>
+          <div className="tp-stack-empty">tap + to add an item</div>
         ) : items.map(it => {
           const st = it.status || status;
-          const dotCls = st === 'sent' ? 'sent' : st === 'hold' ? 'hold' : 'pending';
-          const isHold = st === 'hold';
+          const isHold = st === 'hold'; // demo-mode hold-and-resume
+
+          const dotCls =
+            st === 'paid'             ? 'paid' :
+            st === 'declined'         ? 'declined' :
+            st === 'processing'       ? 'payment-sent' :
+            st === 'awaiting payment' ? 'awaiting' :
+            st === 'hold'             ? 'hold' :
+            st === 'sent'             ? 'paid' :
+            'awaiting';
+
+          // Three ways a tile is a split:
+          //  1. splitEnabled=true  → merchant flagged it, customer hasn't set up yet
+          //  2. isSplit=true       → customer called /split and set it up
+          //  3. totalSplits>1      → the only field that is guaranteed >1 after createBillSplit
+          //                          (covers old transactions where splitEnabled stayed false)
+          const isSplitTx  = !!(it.splitEnabled || it.isSplit || (it.totalSplits > 1));
+          const splitSetup = (it.totalSplits ?? 0) > 1;
+          const allPaid    = splitSetup && (it.completedSplits ?? 0) >= (it.totalSplits ?? 1);
+
           return (
             <div key={it.id} className={`tp-stack-row${isHold ? ' holdable' : ''}`} onClick={() => isHold && onItemClick?.(it)}>
-              <div>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="tp-stack-name">{it.name}</div>
-                <div className="tp-stack-meta">
-                  <span className={`tp-dot ${dotCls}`} />
-                  <span className="tp-stack-status">{st}</span>
-                  {isHold && <span className="tp-hold-hint">tap to resume</span>}
-                </div>
+                {isSplitTx ? (
+                  <div className="tp-stack-split">
+                    <span className="tp-stack-split-label">split bill</span>
+                    {splitSetup ? (
+                      <>
+                        <div className="tp-stack-split-bars">
+                          {Array.from({ length: it.totalSplits }).map((_, i) => (
+                            <div key={i} className={`tp-split-bar${i < (it.completedSplits ?? 0) ? ' filled' : ''}`} />
+                          ))}
+                        </div>
+                        <div className="tp-stack-split-dots">
+                          {Array.from({ length: it.totalSplits }).map((_, i) => (
+                            <div key={i} className={`tp-split-dot${i < (it.completedSplits ?? 0) ? ' filled' : ''}`} />
+                          ))}
+                        </div>
+                        <span className="tp-stack-split-count">
+                          {allPaid ? 'all paid' : `${it.completedSplits ?? 0} of ${it.totalSplits} paid`}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="tp-stack-split-count">awaiting customer setup</span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="tp-stack-meta">
+                    <span className={`tp-dot ${dotCls}`} />
+                    <span className="tp-stack-status">{st}</span>
+                    {isHold && <span className="tp-hold-hint">tap to resume</span>}
+                  </div>
+                )}
               </div>
               <div className="tp-stack-price">{fmt(it.amount)}</div>
             </div>
@@ -327,7 +370,7 @@ function Keypad({ state, go, onCommit }) {
   const cents = parseInt(digits || '0', 10);
   const press = d => { if (digits.length < 7) setDigits(p => p === '' && d === '0' ? '' : p + d); };
   const back  = () => setDigits(p => p.slice(0, -1));
-  const commit = () => { if (cents === 0) return; onCommit(cents); };
+  const commit = () => { if (cents === 0) return; onCommit(cents, splitOn); };
   const handleSplit = () => { setSplitOn(s => !s); };
 
   return (
@@ -340,11 +383,8 @@ function Keypad({ state, go, onCommit }) {
         </div>
         <div style={{ height: 52 }} />
       </div>
-      <div style={{ flex: 1, background: NAVY, padding: '38px 28px 28px', display: 'flex', flexDirection: 'column' }}>
-        <button onClick={() => go('details')} style={{ alignSelf: 'center', color: BLUE, fontWeight: 500, fontSize: 18, textDecoration: 'underline', textUnderlineOffset: 4, marginBottom: 12, background: 'none', border: 'none', cursor: 'pointer' }}>
-          enter transaction details
-        </button>
-        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, alignItems: 'center', justifyItems: 'center', marginTop: 4 }}>
+      <div className="stagger" style={{ flex: 1, background: NAVY, padding: '38px 28px 28px', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, alignItems: 'center', justifyItems: 'center' }}>
           {['1','2','3','4','5','6','7','8','9'].map(d => (
             <button key={d} className="tp-kp" onClick={() => press(d)}>{d}</button>
           ))}
@@ -357,14 +397,23 @@ function Keypad({ state, go, onCommit }) {
   );
 }
 
-function SplitPayment({ state, go }) {
+function SplitPayment({ state, go, onCommitSplit }) {
   const total = state.pending?.amount || state.items.reduce((s, i) => s + i.amount, 0) || 0;
   const [parts, setParts] = useState(2);
   const partAmount = Math.round(total / parts);
+
+  const commit = () => {
+    if (total === 0) return;
+    // Use the real item name and send the TOTAL price — the split setup page
+    // handles dividing it. splitEnabled flags this for the split payment flow.
+    const name = state.pending?.name || state.items.map(i => i.name).join(', ') || 'split bill';
+    onCommitSplit({ name, amount: total, splitEnabled: true });
+  };
+
   return (
     <div className="tp-screen" style={{ background: NAVY }}>
       <div className="stagger" style={{ background: OFFW, color: NAVY, height: '50%', display: 'flex', flexDirection: 'column' }}>
-        <SubHead onCancel={() => go('cancel')} onCommit={() => go('home')} />
+        <SubHead onCancel={() => go('cancel')} onCommit={commit} />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div className="tp-amount" style={{ fontSize: 88, textAlign: 'center' }}>{fmt(partAmount)}</div>
           <div style={{ marginTop: 18, textAlign: 'center', fontWeight: 500, fontSize: 19, color: NAVY, lineHeight: 1.4 }}>
@@ -373,7 +422,7 @@ function SplitPayment({ state, go }) {
         </div>
         <div style={{ height: 52 }} />
       </div>
-      <div style={{ flex: 1, background: NAVY, color: BLUE, padding: '56px 28px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <div className="stagger" style={{ flex: 1, background: NAVY, color: BLUE, padding: '56px 28px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <div style={{ fontWeight: 700, fontSize: 22 }}>split bill</div>
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 36 }}>
           <button className="tp-stepper" onClick={() => setParts(p => Math.max(2, p - 1))}><Ic.Minus /></button>
@@ -381,7 +430,7 @@ function SplitPayment({ state, go }) {
           <button className="tp-stepper" onClick={() => setParts(p => Math.min(12, p + 1))}><Ic.Plus sz={22} /></button>
         </div>
         <button onClick={() => go('keypad')} style={{ color: BLUE, fontWeight: 500, fontSize: 16, textDecoration: 'underline', textUnderlineOffset: 4, marginBottom: 22, background: 'none', border: 'none', cursor: 'pointer' }}>enter amount</button>
-        <button className="tp-cta" onClick={() => go('home')}>confirm</button>
+        <button className="tp-cta" onClick={commit}>confirm</button>
       </div>
     </div>
   );
@@ -418,7 +467,7 @@ function ChooseStock({ state, go, onCommitStock }) {
         </div>
         <div style={{ height: 52 }} />
       </div>
-      <div style={{ flex: 1, background: NAVY, padding: '52px 22px 0', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <div className="stagger" style={{ flex: 1, background: NAVY, padding: '52px 22px 0', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <div style={{ color: BLUE, fontWeight: 500, fontSize: 18, textAlign: 'center', flexShrink: 0 }}>choose from stock</div>
         <div
           ref={scrollRef}
@@ -450,12 +499,12 @@ function ChooseStock({ state, go, onCommitStock }) {
   );
 }
 
-function EnterDetails({ state, go, onCommitDetails }) {
-  const total = state.items.reduce((s, i) => s + i.amount, 0) || 0;
+function EnterDetails({ state, go, onCommitDetails, initialAmount = 0 }) {
   const [name, setName]     = useState('');
-  const [amount, setAmount] = useState('');
+  const [amount, setAmount] = useState(initialAmount ? (initialAmount / 100).toFixed(2) : '');
   const [desc, setDesc]     = useState('');
   const [qty, setQty]       = useState(1);
+  const centsPreview = Math.round(parseFloat(amount || '0') * 100) * qty;
 
   const commit = () => {
     const cents = Math.round(parseFloat(amount || '0') * 100);
@@ -468,11 +517,11 @@ function EnterDetails({ state, go, onCommitDetails }) {
       <div className="stagger" style={{ background: OFFW, color: NAVY, height: '50%', display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={() => go('cancel')} onCommit={commit} />
         <div style={{ flex: 1, padding: '8px 28px 12px', display: 'flex', alignItems: 'center' }}>
-          <div className="tp-amount" style={{ fontSize: 88 }}>{fmt(total)}</div>
+          <div className="tp-amount" style={{ fontSize: 88 }}>{fmt(centsPreview || initialAmount)}</div>
         </div>
         <div style={{ height: 52 }} />
       </div>
-      <div style={{ flex: 1, background: NAVY, padding: '40px 28px 28px', display: 'flex', flexDirection: 'column' }}>
+      <div className="stagger" style={{ flex: 1, background: NAVY, padding: '40px 28px 28px', display: 'flex', flexDirection: 'column' }}>
         <div style={{ color: BLUE, fontWeight: 500, fontSize: 18, textAlign: 'center' }}>enter transaction details</div>
         <div style={{ marginTop: 22, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <input className="tp-field" placeholder="item name"   value={name}   onChange={e => setName(e.target.value)} />
@@ -513,7 +562,7 @@ function CashEntry({ go, onCommitCash }) {
         </div>
         <div style={{ height: 52 }} />
       </div>
-      <div style={{ flex: 1, background: NAVY, padding: '40px 28px 28px', display: 'flex', flexDirection: 'column' }}>
+      <div className="stagger" style={{ flex: 1, background: NAVY, padding: '40px 28px 28px', display: 'flex', flexDirection: 'column' }}>
         <div style={{ color: BLUE, fontWeight: 500, fontSize: 18, textAlign: 'center' }}>cash payment</div>
         <div style={{ marginTop: 22, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <input className="tp-field" placeholder="item name"   value={name}   onChange={e => setName(e.target.value)} />
@@ -581,7 +630,7 @@ function SharePayment({ state, go, toast, onExpandQR, onConfirmPayment, livePayL
         </div>
         <div style={{ height: 52 }} />
       </div>
-      <div style={{ flex: 1, background: NAVY, padding: '52px 28px 22px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <div className="stagger" style={{ flex: 1, background: NAVY, padding: '52px 28px 22px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <div style={{ position: 'relative' }}>
           <div className="tp-qr-card">
             <Ic.QRBig sz={150} />
@@ -630,7 +679,7 @@ function CashSuccess({ state, go, setState, toast }) {
         </div>
         <div style={{ height: 52 }} />
       </div>
-      <div style={{ flex: 1, background: NAVY, padding: '52px 28px 22px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <div className="stagger" style={{ flex: 1, background: NAVY, padding: '52px 28px 22px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <div style={{ color: BLUE, fontWeight: 900, fontSize: 46, letterSpacing: '-0.04em' }}>success</div>
         <div className="tp-success-check tp-pulse" style={{ marginTop: 10 }}><Ic.Check sz={40} sw={3.2} /></div>
         <div style={{ flex: 1 }} />
@@ -906,6 +955,8 @@ export default function App({
   const [paywaveOn, setPaywaveOn]     = useState(false);
   const [conveyor, setConveyor]       = useState(null);
   const [contentKey, setContentKey]   = useState(0);
+  const [keypadCents, setKeypadCents] = useState(0);
+  const [pendingSplitEnabled, setPendingSplitEnabled] = useState(false);
   const conveyorTimer = useRef(null);
 
   const currentId = dockActive !== 'terminal' ? 'dock-' + dockActive : screen;
@@ -963,15 +1014,15 @@ export default function App({
     setDockRaw('terminal');
   };
 
-  /* Keypad ✓ commit */
-  const handleCommit = cents => {
-    if (isLive) {
-      setLocalDraft({ name: 'Payment', amount: cents });
-    } else {
-      setState(s => ({ ...s, pending: { id: 'i' + Date.now(), name: 'custom item', amount: cents } }));
-    }
-    triggerConveyor('keypad', 'down');
-    setScreen('home');
+  /* Keypad ✓ commit — morph into details, panels stay still */
+  const handleCommit = (cents, splitEnabled = false) => {
+    setKeypadCents(cents);
+    setPendingSplitEnabled(splitEnabled);
+    setContentKey(k => k + 1);
+    setConveyor({ prevId: 'keypad', dir: 'morph' });
+    clearTimeout(conveyorTimer.current);
+    conveyorTimer.current = setTimeout(() => setConveyor(null), 420);
+    setScreen('details');
     setDockRaw('terminal');
   };
 
@@ -987,17 +1038,28 @@ export default function App({
     go('home-pop');
   };
 
-  /* Details commit */
-  const handleDetailsCommit = ({ name, amount }) => {
+  /* Split commit */
+  const handleSplitCommit = ({ name, amount, splitEnabled = false }) => {
     if (isLive) {
-      setLocalDraft({ name, amount });
+      setLocalDraft({ name, amount, splitEnabled });
     } else {
       setState(s => ({ ...s, pending: { id: 'i' + Date.now(), name, amount } }));
     }
     go('home-pop');
   };
 
-  /* Send: create transaction (live) or go to share screen (demo) */
+  /* Details commit */
+  const handleDetailsCommit = ({ name, amount }) => {
+    if (isLive) {
+      setLocalDraft({ name, amount, splitEnabled: pendingSplitEnabled });
+      setPendingSplitEnabled(false);
+    } else {
+      setState(s => ({ ...s, pending: { id: 'i' + Date.now(), name, amount } }));
+    }
+    go('home-pop');
+  };
+
+  /* Send: open customer payment page (live) or share screen (demo) */
   const handleSend = async () => {
     if (!state.pending) return;
     if (paywaveOn) {
@@ -1025,13 +1087,11 @@ export default function App({
         } catch {
           /* draft preserved — error shown by parent */
         }
-      } else {
-        setContentKey(k => k + 1);
-        setScreen('share');
-        setDockRaw('terminal');
       }
       return;
     }
+    // demo: show share screen
+    triggerConveyor('home', 'up');
     setContentKey(k => k + 1);
     setScreen('share');
     setDockRaw('terminal');
@@ -1080,9 +1140,9 @@ export default function App({
       ? <PendingTerminal state={state} go={go} paywaveOn={paywaveOn} togglePaywave={() => setPaywaveOn(v => !v)} onItemClick={handleStackItemClick} showPaywave={showPaywave} />
       : <MainTerminal    state={state} go={go} paywaveOn={paywaveOn} togglePaywave={() => setPaywaveOn(v => !v)} onItemClick={handleStackItemClick} showPaywave={showPaywave} />;
     if (id === 'keypad')  return <Keypad       state={state} go={go} onCommit={handleCommit} />;
-    if (id === 'split')   return <SplitPayment state={state} go={go} />;
+    if (id === 'split')   return <SplitPayment state={state} go={go} onCommitSplit={handleSplitCommit} />;
     if (id === 'stock')   return <ChooseStock  state={state} go={go} onCommitStock={handleStockCommit} />;
-    if (id === 'details') return <EnterDetails state={state} go={go} onCommitDetails={handleDetailsCommit} />;
+    if (id === 'details') return <EnterDetails state={state} go={go} onCommitDetails={handleDetailsCommit} initialAmount={keypadCents} />;
     if (id === 'share')   return <SharePayment state={state} go={go} toast={toast} onExpandQR={() => setShowQRModal(true)} onConfirmPayment={handleShareConfirm} livePayLink={livePayLink} qrElement={qrElement} />;
     if (id === 'cash')         return <CashEntry   go={go} onCommitCash={handleCashCommit} />;
     if (id === 'cash-success') return <CashSuccess state={state} go={go} setState={setState} toast={toast} />;
@@ -1241,7 +1301,7 @@ const TP_CSS = `
 }
 .tp-pill:active { transform: scale(0.96); }
 .tp-pill.solid   { background: #58ABFF; color: #040D6D; }
-.tp-pill.outline { background: transparent; color: #58ABFF; box-shadow: inset 0 0 0 0.2px #58ABFF; }
+.tp-pill.outline { background: transparent; color: #58ABFF; box-shadow: inset 0 0 0 0.1px #58ABFF; }
 
 /* ── SubBar ── */
 .tp-subbar-wrap { display: flex; justify-content: center; }
@@ -1318,8 +1378,9 @@ const TP_CSS = `
 .tp-stack-hdr { display: flex; justify-content: space-between; align-items: center; padding: 0 4px; margin-bottom: 12px; }
 .tp-stack-title { font-weight: 700; font-size: 14px; color: #040D6D; letter-spacing: -0.2px; }
 .tp-stack-card { border-radius: 14px; background: #fff; overflow: hidden; box-shadow: 0 2px 12px rgba(4,13,109,0.06); border: 1px solid rgba(4,13,109,0.04); }
-.tp-stack-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; }
+.tp-stack-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; animation: tp-stackIn 0.38s cubic-bezier(0.34,1.56,0.64,1) both; }
 .tp-stack-row + .tp-stack-row { border-top: 1px solid rgba(4,13,109,0.05); }
+@keyframes tp-stackIn { from { opacity:0; transform:translateY(-12px) scale(0.97); } to { opacity:1; transform:translateY(0) scale(1); } }
 .tp-stack-row.holdable { cursor: pointer; background: rgba(255,159,67,0.04); }
 .tp-stack-row.holdable:active { background: rgba(255,159,67,0.1); }
 .tp-stack-name   { font-weight: 600; font-size: 14px; color: #040D6D; margin-bottom: 1px; }
@@ -1329,10 +1390,21 @@ const TP_CSS = `
 .tp-stack-empty  { padding: 14px 16px; font-size: 13px; color: rgba(4,13,109,0.4); text-align: center; }
 .tp-hold-hint    { font-size: 10px; font-weight: 600; color: #FF9F43; }
 .tp-dot { width: 5px; height: 5px; border-radius: 50%; animation: tp-pulse 2s ease-in-out infinite; }
-.tp-dot.pending { background: #58ABFF; }
-.tp-dot.sent    { background: #1BBF85; }
-.tp-dot.hold    { background: #FF9F43; }
+.tp-dot.awaiting     { background: #58ABFF; }
+.tp-dot.payment-sent { background: #58ABFF; }
+.tp-dot.paid         { background: #1BBF85; animation: none; opacity: 1; }
+.tp-dot.declined     { background: #FF5B5B; animation: none; opacity: 1; }
+.tp-dot.hold         { background: #FF9F43; }
 @keyframes tp-pulse { 0%,100% { opacity:0.4; } 50% { opacity:1; } }
+.tp-stack-split       { display: flex; flex-direction: column; gap: 5px; margin-top: 5px; padding: 6px 8px; background: rgba(4,13,109,0.04); border-radius: 8px; border-left: 3px solid #58ABFF; }
+.tp-stack-split-label { font-size: 9px; font-weight: 800; color: #58ABFF; letter-spacing: 0.6px; text-transform: uppercase; }
+.tp-stack-split-bars  { display: flex; gap: 4px; align-items: center; }
+.tp-split-bar         { height: 7px; flex: 1; border-radius: 4px; background: rgba(4,13,109,0.1); }
+.tp-split-bar.filled  { background: #1BBF85; }
+.tp-stack-split-dots  { display: flex; gap: 5px; align-items: center; }
+.tp-split-dot         { width: 8px; height: 8px; border-radius: 50%; background: rgba(4,13,109,0.12); border: 1.5px solid rgba(4,13,109,0.15); }
+.tp-split-dot.filled  { background: #1BBF85; border-color: #1BBF85; }
+.tp-stack-split-count { font-size: 12px; font-weight: 700; color: #040D6D; }
 
 /* ── Stock tiles ── */
 .tp-stock-tile {
@@ -1452,10 +1524,12 @@ const TP_CSS = `
 
 /* ── Conveyor ── */
 .tp-layer { position: absolute; inset: 0; display: flex; flex-direction: column; overflow: hidden; will-change: transform; z-index: 0; }
-.tp-layer.leaving.up   { animation: tp-outUp   0.55s cubic-bezier(0.34,1.56,0.64,1) both; z-index: 1; }
-.tp-layer.leaving.down { animation: tp-outDown 0.55s cubic-bezier(0.34,1.56,0.64,1) both; z-index: 1; }
-.tp-layer.entering.up   { animation: tp-inUp   0.55s cubic-bezier(0.34,1.56,0.64,1) both; }
-.tp-layer.entering.down { animation: tp-inDown 0.55s cubic-bezier(0.34,1.56,0.64,1) both; }
+.tp-layer.leaving.up   { animation: tp-outUp   0.48s cubic-bezier(0.4,0,0.2,1) both; z-index: 1; }
+.tp-layer.leaving.down { animation: tp-outDown 0.48s cubic-bezier(0.4,0,0.2,1) both; z-index: 1; }
+.tp-layer.entering.up   { animation: tp-inUp   0.48s cubic-bezier(0.16,1,0.3,1) both; }
+.tp-layer.entering.down { animation: tp-inDown 0.48s cubic-bezier(0.16,1,0.3,1) both; }
+.tp-layer.leaving.morph { animation: tp-outMorph 0.22s ease-out both; z-index: 1; }
+@keyframes tp-outMorph { from { opacity: 1; } to { opacity: 0; } }
 @keyframes tp-inUp    { from { transform: translateY(100%);  } to { transform: translateY(0); } }
 @keyframes tp-outUp   { from { transform: translateY(0);     } to { transform: translateY(-100%); } }
 @keyframes tp-inDown  { from { transform: translateY(-100%); } to { transform: translateY(0); } }
