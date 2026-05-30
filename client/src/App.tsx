@@ -48,6 +48,7 @@ const TenantDirectory       = lazy(() => import("@/pages/property/tenant-directo
 const TenantProfile         = lazy(() => import("@/pages/property/tenant-profile"));
 const PropertyAnalytics     = lazy(() => import("@/pages/property/property-analytics"));
 const RentCheckout          = lazy(() => import("@/pages/property/rent-checkout"));
+const PropertyTerminal      = lazy(() => import("@/pages/property/property-terminal"));
 
 function PageLoader() {
   return (
@@ -236,6 +237,9 @@ function Router() {
           </Route>
           <Route path="/property/analytics">
             <ProtectedRoute><PropertyAnalytics /></ProtectedRoute>
+          </Route>
+          <Route path="/property/terminal">
+            <ProtectedRoute><PropertyTerminal /></ProtectedRoute>
           </Route>
           {/* Public rent checkout — no auth required */}
           <Route path="/r/:token" component={RentCheckout} />

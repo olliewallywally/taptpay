@@ -5617,7 +5617,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   ) {
     if (isNaN(merchantId)) return next();
     try {
-      const transaction = await storage.getActiveMerchantTransaction(merchantId, stoneId);
+      const transaction = await storage.getActiveTransactionByMerchant(merchantId, stoneId ?? undefined);
       if (!transaction || transaction.status !== "pending") return next();
 
       // Split-enabled transactions → send customer to split selection page first

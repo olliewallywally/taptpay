@@ -39,55 +39,210 @@ function StatusBox({ status }: { status: string }) {
   );
 }
 
+/* ── Shared field input ── */
+function Field({ label, value, onChange, placeholder, required, type = 'text' }: any) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: C.sky, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>
+        {label}{required ? ' *' : ''}
+      </div>
+      <input
+        type={type}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{ width: '100%', padding: '14px 16px', borderRadius: 14, background: C.gray, border: 'none', outline: 'none', color: C.navy, fontSize: 15, fontWeight: 500, boxSizing: 'border-box', fontFamily: 'inherit' }}
+      />
+    </div>
+  );
+}
+
 /* ── Add Tenant Sheet ── */
-function AddTenantSheet({ onClose, onSave }: { onClose: () => void; onSave: (data: any) => void }) {
-  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', phone: '', propertyAddress: '', coTenantsText: '', preferredChannel: 'email' });
-  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
-  const valid = form.firstName && form.lastName && form.propertyAddress;
+function AddTenantSheet({ onClose, onSave, saving, saveError }: {
+  onClose: () => void;
+  onSave: (data: any) => void;
+  saving: boolean;
+  saveError: string | null;
+}) {
+  const [form, setForm] = useState({
+    firstName: '', lastName: '', email: '', phone: '',
+    propertyAddress: '', preferredChannel: 'email' as 'email' | 'sms',
+  });
+  const [subtenants, setSubtenants] = useState<{ name: string; email: string; phone: string }[]>([]);
+  const [subForm, setSubForm]       = useState({ name: '', email: '', phone: '' });
+  const [subOpen, setSubOpen]       = useState(false);
+  const [closing, setClosing]       = useState(false);
+
+  const set    = (k: string) => (v: string) => setForm(f => ({ ...f, [k]: v }));
+  const setSub = (k: string) => (v: string) => setSubForm(f => ({ ...f, [k]: v }));
+
+  const valid = form.firstName.trim() && form.lastName.trim() && form.propertyAddress.trim();
+
+  const handleClose = () => {
+    setClosing(true);
+    setTimeout(onClose, 320);
+  };
+
+  const confirmSubtenant = () => {
+    if (!subForm.name.trim()) return;
+    setSubtenants(p => [...p, { ...subForm }]);
+    setSubForm({ name: '', email: '', phone: '' });
+    setSubOpen(false);
+  };
+
+  const handleSave = () => {
+    if (!valid || saving) return;
+    const coTenantsText = subtenants.length > 0
+      ? subtenants.map(s => {
+          const detail = [s.email, s.phone].filter(Boolean).join(', ');
+          return detail ? `${s.name} (${detail})` : s.name;
+        }).join('\n')
+      : '';
+    onSave({ ...form, coTenantsText });
+  };
+
+  const ANIM_IN  = 'atSlideUp 0.38s cubic-bezier(0.16,1,0.3,1) both';
+  const ANIM_OUT = 'atSlideDown 0.32s cubic-bezier(0.4,0,0.2,1) both';
+  const FD_IN    = 'atFdIn 0.28s ease both';
+  const FD_OUT   = 'atFdOut 0.28s ease both';
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(4,13,109,0.55)', backdropFilter: 'blur(8px)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>
-      <div style={{ width: '100%', background: C.white, borderRadius: '28px 28px 0 0', padding: '24px 24px 48px', maxHeight: '90vh', overflowY: 'auto' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-          <span style={{ fontWeight: 700, fontSize: 18, color: C.navy }}>add tenant</span>
-          <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: 999, background: C.gray, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="2.4" strokeLinecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 100 }}>
+      <style>{`
+        @keyframes atSlideUp   { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        @keyframes atSlideDown { from { transform: translateY(0); } to { transform: translateY(100%); } }
+        @keyframes atFdIn      { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes atFdOut     { from { opacity: 1; } to { opacity: 0; } }
+      `}</style>
+
+      {/* Backdrop */}
+      <div
+        onClick={handleClose}
+        style={{
+          position: 'absolute', inset: 0,
+          background: 'rgba(4,13,109,0.55)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          animation: closing ? FD_OUT : FD_IN,
+        }}
+      />
+
+      {/* Centering wrapper — keeps sheet at 390px on desktop */}
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', justifyContent: 'center' }}>
+      {/* Sheet — slides up from bottom */}
+      <div style={{
+        width: '100%', maxWidth: 390,
+        background: C.white,
+        borderRadius: '28px 28px 0 0',
+        maxHeight: '92vh',
+        overflowY: 'auto',
+        animation: closing ? ANIM_OUT : ANIM_IN,
+      }}>
+        {/* Pull handle */}
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '14px 0 2px' }}>
+          <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.1)' }} />
+        </div>
+
+        <div style={{ padding: '12px 24px 52px' }}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+            <span style={{ fontWeight: 700, fontSize: 20, color: C.navy, letterSpacing: '-0.3px' }}>add tenant</span>
+            <button onClick={handleClose} style={{ width: 32, height: 32, borderRadius: 999, background: C.gray, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="2.4" strokeLinecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>
+            </button>
+          </div>
+
+          {/* Main tenant fields */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
+            <Field label="first name" value={form.firstName} onChange={set('firstName')} required />
+            <Field label="last name"  value={form.lastName}  onChange={set('lastName')}  required />
+          </div>
+          <Field label="property address" value={form.propertyAddress} onChange={set('propertyAddress')} required />
+          <Field label="email" value={form.email} onChange={set('email')} type="email" />
+          <Field label="phone" value={form.phone} onChange={set('phone')} type="tel" />
+
+          {/* Preferred channel */}
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: C.sky, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>send rent link via</div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              {(['email', 'sms'] as const).map(ch => (
+                <button key={ch} onClick={() => setForm(f => ({ ...f, preferredChannel: ch }))}
+                  style={{ flex: 1, padding: '13px 0', borderRadius: 14, border: 'none', background: form.preferredChannel === ch ? C.navy : C.gray, color: form.preferredChannel === ch ? C.white : C.navy, fontWeight: 600, fontSize: 14, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em', transition: 'background 0.18s, color 0.18s' }}>
+                  {ch}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Subtenants ── */}
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: C.sky, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 10 }}>subtenants</div>
+
+            {/* Added subtenants list */}
+            {subtenants.map((s, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', marginBottom: 8, borderRadius: 14, background: C.gray }}>
+                <div style={{ width: 30, height: 30, borderRadius: 999, background: C.navy, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 11, fontWeight: 700, color: C.sky }}>
+                  {s.name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: C.navy }}>{s.name}</div>
+                  {(s.email || s.phone) && (
+                    <div style={{ fontWeight: 400, fontSize: 12, color: C.mute, marginTop: 1 }}>
+                      {[s.email, s.phone].filter(Boolean).join(' · ')}
+                    </div>
+                  )}
+                </div>
+                <button onClick={() => setSubtenants(p => p.filter((_, j) => j !== i))}
+                  style={{ width: 26, height: 26, borderRadius: 999, background: 'rgba(4,13,109,0.08)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="2.4" strokeLinecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>
+                </button>
+              </div>
+            ))}
+
+            {/* Add subtenant toggle button */}
+            <button
+              onClick={() => setSubOpen(o => !o)}
+              style={{ width: '100%', padding: '13px 0', borderRadius: 14, border: `1.5px dashed ${subOpen ? C.sky : 'rgba(4,13,109,0.18)'}`, background: subOpen ? 'rgba(88,171,255,0.06)' : 'transparent', color: C.navy, fontWeight: 600, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all 0.22s ease' }}>
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={C.sky} strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              <span style={{ color: C.navy }}>add subtenant</span>
+            </button>
+
+            {/* Expandable subtenant form — smooth slide */}
+            <div style={{
+              overflow: 'hidden',
+              maxHeight: subOpen ? '320px' : '0px',
+              transition: 'max-height 0.38s cubic-bezier(0.16,1,0.3,1)',
+            }}>
+              <div style={{ paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <Field label="name" value={subForm.name} onChange={setSub('name')} required />
+                <Field label="email" value={subForm.email} onChange={setSub('email')} type="email" />
+                <Field label="phone" value={subForm.phone} onChange={setSub('phone')} type="tel" />
+                <button
+                  onClick={confirmSubtenant}
+                  disabled={!subForm.name.trim()}
+                  style={{ padding: '13px 0', borderRadius: 14, background: subForm.name.trim() ? C.navy : C.gray, color: subForm.name.trim() ? C.white : C.mute, fontWeight: 600, fontSize: 14, border: 'none', cursor: subForm.name.trim() ? 'pointer' : 'default', transition: 'background 0.18s' }}>
+                  confirm subtenant
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Error */}
+          {saveError && (
+            <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 14, background: 'rgba(255,59,78,0.07)', border: '1px solid rgba(255,59,78,0.18)' }}>
+              <p style={{ color: '#C71A2A', fontSize: 13, fontWeight: 500, margin: 0 }}>{saveError}</p>
+            </div>
+          )}
+
+          {/* Save */}
+          <button
+            onClick={handleSave}
+            disabled={!valid || saving}
+            style={{ width: '100%', padding: '18px 0', borderRadius: 999, background: valid && !saving ? C.navy : C.gray, color: valid && !saving ? C.white : C.mute, fontWeight: 700, fontSize: 16, border: 'none', cursor: valid && !saving ? 'pointer' : 'default', transition: 'background 0.2s, color 0.2s' }}>
+            {saving ? 'adding…' : 'add tenant'}
           </button>
         </div>
-        {[
-          { k: 'firstName', label: 'first name', required: true },
-          { k: 'lastName',  label: 'last name',  required: true },
-          { k: 'propertyAddress', label: 'property address', required: true },
-          { k: 'email',    label: 'email' },
-          { k: 'phone',    label: 'phone' },
-          { k: 'coTenantsText', label: 'co-tenants (optional)' },
-        ].map(({ k, label, required }) => (
-          <div key={k} style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: C.sky, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>{label}{required ? ' *' : ''}</div>
-            <input
-              value={(form as any)[k]}
-              onChange={e => set(k, e.target.value)}
-              style={{ width: '100%', padding: '14px 16px', borderRadius: 14, background: C.gray, border: 'none', outline: 'none', color: C.navy, fontSize: 15, fontWeight: 500, boxSizing: 'border-box' }}
-            />
-          </div>
-        ))}
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: C.sky, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>send rent link via</div>
-          <div style={{ display: 'flex', gap: 10 }}>
-            {(['email', 'sms'] as const).map(ch => (
-              <button key={ch} onClick={() => set('preferredChannel', ch)}
-                style={{ flex: 1, padding: '12px 0', borderRadius: 14, border: `2px solid ${form.preferredChannel === ch ? C.navy : 'transparent'}`, background: form.preferredChannel === ch ? C.navy : C.gray, color: form.preferredChannel === ch ? C.white : C.navy, fontWeight: 600, fontSize: 14, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                {ch}
-              </button>
-            ))}
-          </div>
-        </div>
-        <button
-          onClick={() => valid && onSave(form)}
-          disabled={!valid}
-          style={{ width: '100%', padding: '18px 0', borderRadius: 999, background: valid ? C.navy : C.gray, color: valid ? C.white : C.mute, fontWeight: 700, fontSize: 16, border: 'none', cursor: valid ? 'pointer' : 'default', transition: 'background 0.2s' }}>
-          add tenant
-        </button>
+      </div>
       </div>
     </div>
   );
@@ -126,8 +281,9 @@ function TenantRow({ tenant, nextInvoice, onClick }: { tenant: any; nextInvoice:
 
 export default function TenantDirectory() {
   const [, setLocation] = useLocation();
-  const [search,   setSearch]   = useState('');
-  const [showAdd,  setShowAdd]  = useState(false);
+  const [search,    setSearch]    = useState('');
+  const [showAdd,   setShowAdd]   = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const { data: tenants = [], isLoading } = useQuery<any[]>({
@@ -146,13 +302,24 @@ export default function TenantDirectory() {
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      const r = await fetch('/api/property/tenants', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-      if (!r.ok) throw new Error('Failed to create tenant');
+      const r = await fetch('/api/property/tenants', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!r.ok) {
+        const msg = await r.json().then(d => d.message).catch(() => `Error ${r.status}`);
+        throw new Error(msg);
+      }
       return r.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/property/tenants'] });
+      setSaveError(null);
       setShowAdd(false);
+    },
+    onError: (err: any) => {
+      setSaveError(err?.message || 'Failed to add tenant. The backend may not be connected yet.');
     },
   });
 
@@ -234,8 +401,10 @@ export default function TenantDirectory() {
       {/* Add tenant sheet */}
       {showAdd && (
         <AddTenantSheet
-          onClose={() => setShowAdd(false)}
-          onSave={data => createMutation.mutate(data)}
+          onClose={() => { setShowAdd(false); setSaveError(null); }}
+          onSave={data => { setSaveError(null); createMutation.mutate(data); }}
+          saving={createMutation.isPending}
+          saveError={saveError}
         />
       )}
     </div>

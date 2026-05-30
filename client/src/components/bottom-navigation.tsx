@@ -1,8 +1,10 @@
 import { useLocation } from "wouter";
 import { useRef, useState, useEffect } from "react";
 
-const NAVY = '#040D6D';
-const BLUE = '#58ABFF';
+/* ── Colours ── */
+const DOCK_BG  = '#02093D'; // darker navy bar
+const PILL_BG  = '#02093D'; // indicator pill — same colour, elevation shown by shadow only
+const BLUE     = '#58ABFF';
 const BLUE_DIM = 'rgba(88,171,255,0.45)';
 
 /* ── Icons ── */
@@ -22,7 +24,7 @@ function IcoSettings({ c }: { c: string }) {
   return <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="2.6"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>;
 }
 
-/* ── Nav item definitions ── */
+/* ── Nav items ── */
 const RETAIL_ITEMS = [
   { id: 'home',      path: '/dashboard',    Icon: IcoHome     },
   { id: 'stock',     path: '/stock',        Icon: IcoPerson   },
@@ -34,7 +36,7 @@ const RETAIL_ITEMS = [
 const PROPERTY_ITEMS = [
   { id: 'home',      path: '/property',           Icon: IcoHome     },
   { id: 'tenants',   path: '/property/tenants',   Icon: IcoPerson   },
-  { id: 'terminal',  path: '/terminal',           Icon: IcoTerminal },
+  { id: 'terminal',  path: '/property/terminal',  Icon: IcoTerminal },
   { id: 'analytics', path: '/property/analytics', Icon: IcoAnalytics},
   { id: 'settings',  path: '/settings',           Icon: IcoSettings },
 ];
@@ -42,33 +44,28 @@ const PROPERTY_ITEMS = [
 const RETAIL_NAV_PATHS = ['/dashboard', '/stock', '/terminal', '/transactions', '/settings'];
 
 function readMode(): 'retail' | 'property' {
-  try {
-    return (localStorage.getItem('taptMode') as 'retail' | 'property') || 'retail';
-  } catch {
-    return 'retail';
-  }
+  try { return (localStorage.getItem('taptMode') as 'retail' | 'property') || 'retail'; } catch { return 'retail'; }
 }
-
-function saveMode(m: string) {
-  try { localStorage.setItem('taptMode', m); } catch {}
-}
+function saveMode(m: string) { try { localStorage.setItem('taptMode', m); } catch {} }
 
 export function BottomNavigation() {
   const [location, setLocation] = useLocation();
-  const wrapRef  = useRef<HTMLDivElement>(null); // outer 320px container — used for indicator positioning
+
+  /* dockRef goes on the 280 px bar — identical to SmartTransitions trackRef.
+     The indicator is a child of that bar so its `left` is relative to the bar. */
+  const dockRef  = useRef<HTMLDivElement>(null);
   const btnRefs  = useRef<(HTMLButtonElement | null)[]>([]);
   const mounted  = useRef(false);
   const [indLeft,   setIndLeft]   = useState(0);
   const [animating, setAnimating] = useState(false);
   const [mode,      setModeState] = useState<'retail' | 'property'>(readMode);
 
+  /* Keep stored mode in sync with route */
   useEffect(() => {
     if (location.startsWith('/property')) {
-      saveMode('property');
-      setModeState('property');
+      saveMode('property'); setModeState('property');
     } else if (RETAIL_NAV_PATHS.includes(location) && location !== '/terminal' && location !== '/settings') {
-      saveMode('retail');
-      setModeState('retail');
+      saveMode('retail'); setModeState('retail');
     }
   }, [location]);
 
@@ -85,29 +82,28 @@ export function BottomNavigation() {
     return location === path || location.startsWith(path + '/');
   });
 
-  /* Calculate indicator left relative to the outer wrapRef (320px container).
-     Previously used trackRef (280px bar) which caused a consistent 20px offset. */
+  /* calcLeft measures relative to dockRef (the 280 px bar) — same as SmartTransitions.
+     The indicator is a child of that bar so this gives the correct `left` value. */
   const calcLeft = (idx: number) => {
     const btn  = btnRefs.current[Math.max(0, idx)];
-    const wrap = wrapRef.current;
-    if (!btn || !wrap) return indLeft;
+    const dock = dockRef.current;
+    if (!btn || !dock) return indLeft;
     const b = btn.getBoundingClientRect();
-    const w = wrap.getBoundingClientRect();
-    return b.left - w.left + b.width / 2 - 32.5; // 32.5 = half of 65px indicator width
+    const d = dock.getBoundingClientRect();
+    return b.left - d.left + b.width / 2 - 32.5; // 32.5 = half of 65 px indicator
   };
 
+  /* Exactly mirrors SmartTransitions Dock useEffect */
   useEffect(() => {
     if (!showNav) return;
     const idx = Math.max(0, activeIdx);
     if (!mounted.current) {
-      requestAnimationFrame(() => {
-        setIndLeft(calcLeft(idx));
-        mounted.current = true;
-      });
+      setIndLeft(calcLeft(idx));
+      requestAnimationFrame(() => { mounted.current = true; });
       return;
     }
     setAnimating(true);
-    requestAnimationFrame(() => setIndLeft(calcLeft(idx)));
+    setIndLeft(calcLeft(idx));
     const t = setTimeout(() => setAnimating(false), 550);
     return () => clearTimeout(t);
   }, [location]);
@@ -121,34 +117,18 @@ export function BottomNavigation() {
       paddingBottom: 28, zIndex: 50,
       pointerEvents: 'none',
     }}>
-      {/* wrapRef is on this div — indicator positions are relative to it */}
-      <div ref={wrapRef} style={{
+      {/* 320 px outer wrapper — layout/centering only, no ref needed */}
+      <div style={{
         position: 'relative', width: 320, height: 58,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         pointerEvents: 'auto',
       }}>
-        {/* Sliding indicator */}
-        <div style={{
-          position: 'absolute',
-          left: indLeft,
-          top: -5,
-          width: 65,
-          height: 58,
-          background: NAVY,
-          borderRadius: 29,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.45)',
-          pointerEvents: 'none',
-          willChange: 'left',
-          transition: animating ? 'left 0.45s cubic-bezier(0.34,1.56,0.64,1)' : 'none',
-          zIndex: 0,
-        }} />
-
-        {/* Dock bar */}
-        <div style={{
+        {/* 280 px dock bar — ref goes here, indicator is a child (same as SmartTransitions) */}
+        <div ref={dockRef} style={{
           position: 'relative',
           width: 280,
           height: 48,
-          background: NAVY,
+          background: DOCK_BG,
           borderRadius: 24,
           display: 'flex',
           alignItems: 'center',
@@ -156,6 +136,23 @@ export function BottomNavigation() {
           padding: '0 16px',
           overflow: 'visible',
         }}>
+          {/* Indicator pill — child of dock bar, positioned relative to it */}
+          <div style={{
+            position: 'absolute',
+            left: indLeft,
+            top: -5,      // same as SmartTransitions .tp-dock-ind
+            width: 65,
+            height: 58,
+            background: PILL_BG,
+            borderRadius: 29,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.45)',
+            pointerEvents: 'none',
+            willChange: 'left',
+            transition: animating ? 'left 0.45s cubic-bezier(0.34,1.56,0.64,1)' : 'none',
+            zIndex: 0,
+          }} />
+
+          {/* Nav buttons */}
           {items.map(({ id, path, Icon }, i) => {
             const isActive = i === activeIdx;
             return (
