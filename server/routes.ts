@@ -19,6 +19,7 @@ import path from "path";
 import fs from "fs";
 import { sendPushToMerchant } from "./push";
 import { resendInvoiceEmail } from "./property-cron";
+import { sendGstInvoices, extractEmails } from "./gst-invoice";
 
 // Store SSE connections for real-time updates (merchantId -> stoneId -> Set of connections)
 // stoneId can be null for merchant-level connections
@@ -5682,29 +5683,87 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
   function generateInvoiceToken(): string { return crypto.randomBytes(20).toString("base64url"); }
 
+  // After a rent invoice is fully paid, email a GST tax invoice to the head
+  // tenant plus any co-tenants / split-share payers we have addresses for.
+  async function sendRentGstInvoices(invoice: any): Promise<void> {
+    try {
+      const [merchant, tenant] = await Promise.all([
+        storage.getMerchant(invoice.merchantId),
+        storage.getTenantProfile(invoice.tenantProfileId),
+      ]);
+      if (!merchant || !tenant) return;
+      const recipients = Array.from(new Set(
+        [tenant.email, ...extractEmails(tenant.coTenantsText), ...((invoice.splitPayerEmails) || [])]
+          .filter(Boolean).map((e: string) => e.toLowerCase()),
+      ));
+      if (recipients.length === 0) return;
+      const sent = await sendGstInvoices({
+        recipients,
+        merchantName: merchant.businessName || merchant.name,
+        gstNumber: merchant.gstNumber,
+        tenantName: `${tenant.firstName} ${tenant.lastName}`,
+        propertyAddress: tenant.propertyAddress,
+        amountCents: invoice.amountCents,
+        paidAt: invoice.paidAt ? new Date(invoice.paidAt) : new Date(),
+        reference: `RENT-${invoice.id.slice(0, 8).toUpperCase()}`,
+      });
+      await storage.logTransactionEvent({
+        merchantId: invoice.merchantId, tenantProfileId: invoice.tenantProfileId, invoiceId: invoice.id,
+        eventType: "Gst_Invoice_Sent", payload: { recipients: recipients.length, sent },
+      });
+    } catch (err) { console.error("[GST_INVOICE]", err); }
+  }
+
   // Idempotently finalize a rent invoice from a Windcave payment outcome.
   // Safe to call from both the browser callback and the server notification —
   // already-finalized invoices (paid/paid_external/voided) are left untouched.
-  async function finalizeRentInvoice(invoiceId: string, approved: boolean, windcaveTransactionId?: string): Promise<any> {
+  // For split invoices each call counts one share (deduped by sessionId); the
+  // invoice only flips to paid once every share is in.
+  async function finalizeRentInvoice(invoiceId: string, approved: boolean, windcaveTransactionId?: string, sessionId?: string): Promise<any> {
     const inv = await storage.getInvoiceRentRequest(invoiceId);
     if (!inv) return null;
     if (["paid", "paid_external", "voided"].includes(inv.status)) return inv; // already settled
-    if (approved) {
-      const updated = await storage.updateInvoiceRentRequest(invoiceId, {
-        status: "paid", paidAt: new Date(), windcaveTransactionId: windcaveTransactionId ?? null,
-      });
+
+    if (!approved) {
       await storage.logTransactionEvent({
         merchantId: inv.merchantId, tenantProfileId: inv.tenantProfileId, invoiceId,
-        eventType: "Payment_Received", payload: { channel: "card", amountCents: inv.amountCents, windcaveTransactionId: windcaveTransactionId ?? null },
+        eventType: "Payment_Declined", payload: { channel: "card" },
       });
+      return inv;
+    }
+
+    // Split invoice — count this share, dedupe by session, settle when complete.
+    if (inv.splitEnabled && inv.splitCount && inv.splitCount > 1) {
+      const counted: string[] = inv.splitPaidSessions || [];
+      if (sessionId && counted.includes(sessionId)) return inv; // already counted this share
+      const newPaidCount = (inv.splitPaidCount || 0) + 1;
+      const fullyPaid = newPaidCount >= inv.splitCount;
+      const updates: any = {
+        splitPaidCount: newPaidCount,
+        splitPaidSessions: sessionId ? [...counted, sessionId] : counted,
+        windcaveTransactionId: windcaveTransactionId ?? inv.windcaveTransactionId,
+      };
+      if (fullyPaid) { updates.status = "paid"; updates.paidAt = new Date(); }
+      const updated = await storage.updateInvoiceRentRequest(invoiceId, updates);
+      await storage.logTransactionEvent({
+        merchantId: inv.merchantId, tenantProfileId: inv.tenantProfileId, invoiceId,
+        eventType: fullyPaid ? "Payment_Received" : "Split_Share_Paid",
+        payload: { share: newPaidCount, of: inv.splitCount, channel: "card", windcaveTransactionId: windcaveTransactionId ?? null },
+      });
+      if (fullyPaid) await sendRentGstInvoices(updated);
       return updated;
     }
-    // Declined — leave the invoice payable so the tenant can retry; just record the attempt.
+
+    // Single payment.
+    const updated = await storage.updateInvoiceRentRequest(invoiceId, {
+      status: "paid", paidAt: new Date(), windcaveTransactionId: windcaveTransactionId ?? null,
+    });
     await storage.logTransactionEvent({
       merchantId: inv.merchantId, tenantProfileId: inv.tenantProfileId, invoiceId,
-      eventType: "Payment_Declined", payload: { channel: "card" },
+      eventType: "Payment_Received", payload: { channel: "card", amountCents: inv.amountCents, windcaveTransactionId: windcaveTransactionId ?? null },
     });
-    return inv;
+    await sendRentGstInvoices(updated);
+    return updated;
   }
 
   // ── Tenant Profiles ──────────────────────────────────────────────────────
@@ -5990,13 +6049,33 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         propertyAddress: tenant.propertyAddress,
         tenantName: `${tenant.firstName} ${tenant.lastName}`,
         coTenantsText: tenant.coTenantsText ?? null,
+        splitEnabled: !!invoice.splitEnabled,
+        splitCount: invoice.splitCount ?? null,
+        splitPaidCount: invoice.splitPaidCount ?? 0,
       });
     } catch (err) { console.error("[CHECKOUT_RESOLVE]", err); res.status(500).json({ message: "Failed to load payment details" }); }
   });
 
+  // Tenant chooses how many flatmates to split the rent between (sets splitCount).
+  app.post("/api/checkout/:token/split", async (req, res) => {
+    try {
+      const { token } = req.params;
+      if (!tokenRateLimit(token)) return res.status(429).json({ message: "Too many requests" });
+      const count = parseInt(String(req.body?.count), 10);
+      if (!Number.isInteger(count) || count < 2 || count > 12) return res.status(400).json({ message: "Choose between 2 and 12 people" });
+      const invoice = await storage.getInvoiceRentRequestByToken(token);
+      if (!invoice) return res.status(404).json({ message: "Payment link not found" });
+      if (!invoice.splitEnabled) return res.status(400).json({ message: "Splitting is not enabled for this payment" });
+      if (["voided", "paid", "paid_external"].includes(invoice.status)) return res.status(409).json({ message: "Invoice is not payable" });
+      if ((invoice.splitPaidCount ?? 0) > 0) return res.status(409).json({ message: "A split is already in progress" });
+      await storage.updateInvoiceRentRequest(invoice.id, { splitCount: count });
+      res.json({ splitCount: count, splitPaidCount: 0, shareCents: Math.floor(invoice.amountCents / count) });
+    } catch (err) { console.error("[CHECKOUT_SPLIT]", err); res.status(500).json({ message: "Failed to set up split" }); }
+  });
+
   app.post("/api/checkout/pay", async (req, res) => {
     try {
-      const { token } = req.body as { token?: string };
+      const { token, payerEmail } = req.body as { token?: string; payerEmail?: string };
       if (!token) return res.status(400).json({ message: "token required" });
       if (!tokenRateLimit(token)) return res.status(429).json({ message: "Too many requests" });
       const invoice = await storage.getInvoiceRentRequestByToken(token);
@@ -6005,7 +6084,25 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const [merchant, tenant] = await Promise.all([storage.getMerchant(invoice.merchantId), storage.getTenantProfile(invoice.tenantProfileId)]);
       if (!merchant || !tenant) return res.status(500).json({ message: "Invoice data unavailable" });
       const baseUrl = getBaseUrl(req);
-      const amountStr = (invoice.amountCents / 100).toFixed(2);
+
+      // Determine what to charge: the full amount, or one share of a split.
+      let chargeCents = invoice.amountCents;
+      const isSplit = invoice.splitEnabled && invoice.splitCount && invoice.splitCount > 1;
+      if (isSplit) {
+        const paid = invoice.splitPaidCount ?? 0;
+        if (paid >= invoice.splitCount) return res.status(409).json({ message: "This split is already fully paid" });
+        const base = Math.floor(invoice.amountCents / invoice.splitCount);
+        const isLastShare = paid === invoice.splitCount - 1;
+        chargeCents = isLastShare ? invoice.amountCents - base * (invoice.splitCount - 1) : base;
+        // Record the payer's email (for their GST copy) before sending them to the gateway.
+        if (typeof payerEmail === "string" && /.+@.+\..+/.test(payerEmail)) {
+          const emails: string[] = invoice.splitPayerEmails || [];
+          const lower = payerEmail.toLowerCase();
+          if (!emails.includes(lower)) await storage.updateInvoiceRentRequest(invoice.id, { splitPayerEmails: [...emails, lower] });
+        }
+      }
+
+      const amountStr = (chargeCents / 100).toFixed(2);
       const merchantRef = `RENT-${invoice.id.slice(0, 8).toUpperCase()}`;
       const xId = crypto.randomBytes(16).toString("hex");
       let sessionResult: any;
@@ -6022,7 +6119,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // Duplicate X-ID — Windcave reports the session already completed; finalize now
       // and bounce the payer back to the checkout page to see the result.
       if (sessionResult.alreadyComplete) {
-        await finalizeRentInvoice(invoice.id, !!sessionResult.approved, sessionResult.windcaveTransactionId);
+        await finalizeRentInvoice(invoice.id, !!sessionResult.approved, sessionResult.windcaveTransactionId, sessionResult.sessionId);
         return res.json({ hppUrl: `${baseUrl}/r/${token}` });
       }
       if (!sessionResult.hppUrl) return res.status(502).json({ message: "Payment gateway error. Please try again." });
@@ -6056,7 +6153,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         queryResult = { success: true, approved: result === "approved", windcaveTransactionId: result === "approved" ? `SIMTXN_${Date.now()}` : undefined };
       }
       if (queryResult.success) {
-        await finalizeRentInvoice(invoice.id, !!queryResult.approved, queryResult.windcaveTransactionId);
+        await finalizeRentInvoice(invoice.id, !!queryResult.approved, queryResult.windcaveTransactionId, sessionId);
       }
       return res.redirect(back);
     } catch (err) { console.error("[CHECKOUT_CALLBACK]", err); return res.redirect("/"); }
@@ -6075,7 +6172,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (["paid", "paid_external", "voided"].includes(invoice.status)) return; // already settled
       const queryResult = isWindcaveConfigured() ? await queryWindcaveSession(sessionId) : simulateQuerySession(sessionId);
       if (!queryResult.success) { console.error(`[RENT_NOTIF] query failed for ${sessionId}:`, queryResult.error); return; }
-      await finalizeRentInvoice(invoice.id, !!queryResult.approved, queryResult.windcaveTransactionId);
+      await finalizeRentInvoice(invoice.id, !!queryResult.approved, queryResult.windcaveTransactionId, sessionId);
       console.log(`[RENT_NOTIF] invoice ${invoice.id} → ${queryResult.approved ? "paid" : "declined"}`);
     } catch (err) { console.error("[RENT_NOTIF] Error:", err); }
   });

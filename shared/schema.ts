@@ -817,6 +817,13 @@ export const invoicesRentRequests = pgTable("invoices_rent_requests", {
   reminderCount: integer("reminder_count").notNull().default(0),
   windcaveSessionId: text("windcave_session_id"),
   windcaveTransactionId: text("windcave_transaction_id"),
+  // Split-bill: the merchant enables it; the tenant chooses how many flatmates
+  // share the rent on the checkout page. Each share is paid via the same link.
+  splitEnabled: boolean("split_enabled").notNull().default(false),
+  splitCount: integer("split_count"),                       // chosen number of ways (null until tenant splits)
+  splitPaidCount: integer("split_paid_count").notNull().default(0),
+  splitPaidSessions: text("split_paid_sessions").array(),   // Windcave session ids already counted (idempotency)
+  splitPayerEmails: text("split_payer_emails").array(),     // emails collected from share payers (for GST copies)
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (t) => ({
@@ -891,6 +898,7 @@ export const createAdHocInvoiceSchema = z.object({
   amountCents: z.number().int().positive().max(100_000_000),
   deliveryChannel: z.enum(["sms", "email"]),
   dueAt: z.string().datetime().or(z.date()).transform(v => new Date(v as any)),
+  splitEnabled: z.boolean().optional(),
 });
 
 export const markInvoicePaidExternalSchema = z.object({
