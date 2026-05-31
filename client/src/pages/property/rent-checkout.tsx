@@ -21,6 +21,9 @@ export default function RentCheckout() {
   const [state, setState] = useState<'loading' | 'ready' | 'paying' | 'paid' | 'error' | 'not-found'>('loading');
   const [invoice, setInvoice] = useState<any>(null);
   const [errorMsg, setErrorMsg] = useState('');
+  const [splitChoosing, setSplitChoosing] = useState(false);
+  const [payerEmail, setPayerEmail] = useState('');
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!token) { setState('not-found'); return; }
@@ -43,7 +46,7 @@ export default function RentCheckout() {
       const r = await fetch('/api/checkout/pay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({ token, payerEmail: payerEmail.trim() || undefined }),
       });
       if (!r.ok) { const d = await r.json(); setErrorMsg(d.message || 'Payment failed. Please try again.'); setState('error'); return; }
       const { hppUrl } = await r.json();
@@ -54,7 +57,35 @@ export default function RentCheckout() {
     }
   };
 
+  const setupSplit = async (count: number) => {
+    setBusy(true);
+    try {
+      const r = await fetch(`/api/checkout/${token}/split`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ count }),
+      });
+      if (!r.ok) { const d = await r.json(); setErrorMsg(d.message || 'Could not set up the split.'); setState('error'); return; }
+      const data = await r.json();
+      setInvoice((prev: any) => ({ ...prev, splitCount: data.splitCount, splitPaidCount: data.splitPaidCount }));
+      setSplitChoosing(false);
+    } catch {
+      setErrorMsg('Could not set up the split.'); setState('error');
+    } finally { setBusy(false); }
+  };
+
   const dueDate = invoice?.dueAt ? new Date(invoice.dueAt).toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+
+  /* Split-bill derived values */
+  const total = invoice?.amountCents ?? 0;
+  const splitCount = invoice?.splitCount ?? 0;
+  const splitPaid = invoice?.splitPaidCount ?? 0;
+  const splitActive = !!invoice?.splitEnabled && splitCount > 0;
+  const shareBase = splitCount ? Math.floor(total / splitCount) : 0;
+  const isLastShare = splitCount ? splitPaid === splitCount - 1 : false;
+  const shareCents = splitCount ? (isLastShare ? total - shareBase * (splitCount - 1) : shareBase) : total;
+  const sharesLeft = splitCount ? splitCount - splitPaid : 0;
+  const paying = state === 'paying';
 
   return (
     <div style={{ minHeight: '100svh', background: C.gray, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, fontFamily: "'Outfit', system-ui, sans-serif" }}>
@@ -131,20 +162,79 @@ export default function RentCheckout() {
             </div>
           </div>
 
-          {/* Pay button */}
-          <button
-            onClick={pay}
-            disabled={state === 'paying'}
-            style={{ width: '100%', padding: '20px 0', borderRadius: 999, background: state === 'paying' ? C.sky : C.btn, color: C.navy, fontWeight: 800, fontSize: 17, border: 'none', cursor: state === 'paying' ? 'wait' : 'pointer', letterSpacing: '-0.01em', transition: 'background 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-            {state === 'paying' ? (
-              <>
-                <div style={{ width: 18, height: 18, borderRadius: 999, border: `2.5px solid ${C.navy}`, borderTopColor: 'transparent', animation: 'spin 0.9s linear infinite' }} />
-                processing…
-              </>
-            ) : (
-              `pay ${fmtCents(invoice.amountCents)}`
-            )}
-          </button>
+          {/* Split progress (once a split is under way) */}
+          {splitActive && (
+            <div style={{ background: C.white, border: '1px solid #ECECEC', borderRadius: 18, padding: '16px 18px', marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: C.navy, letterSpacing: '0.04em', textTransform: 'uppercase' }}>split {splitCount} ways</span>
+                <span style={{ fontSize: 12, color: C.mute }}>{splitPaid} of {splitCount} paid</span>
+              </div>
+              <div style={{ display: 'flex', gap: 5 }}>
+                {Array.from({ length: splitCount }).map((_, i) => (
+                  <div key={i} style={{ flex: 1, height: 7, borderRadius: 999, background: i < splitPaid ? C.green : 'rgba(4,13,109,0.1)', transition: 'background 0.3s' }} />
+                ))}
+              </div>
+              <div style={{ marginTop: 12, fontSize: 12.5, color: C.mute, lineHeight: 1.5 }}>
+                {sharesLeft > 0
+                  ? <>each flatmate pays their share with this same link — <strong style={{ color: C.navy }}>{sharesLeft}</strong> share{sharesLeft !== 1 ? 's' : ''} left.</>
+                  : 'all shares paid 🎉'}
+              </div>
+            </div>
+          )}
+
+          {/* Split chooser */}
+          {invoice.splitEnabled && !splitActive && splitChoosing && (
+            <div style={{ background: C.white, border: '1px solid #ECECEC', borderRadius: 18, padding: '18px', marginBottom: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.navy, marginBottom: 4 }}>how many of you are splitting?</div>
+              <div style={{ fontSize: 12, color: C.mute, marginBottom: 14 }}>the rent is divided evenly — everyone pays their share with this link.</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 8 }}>
+                {[2, 3, 4, 5, 6].map(n => (
+                  <button key={n} onClick={() => !busy && setupSplit(n)} disabled={busy}
+                    style={{ padding: '14px 0', borderRadius: 12, border: `1.5px solid ${C.sky}`, background: C.white, color: C.navy, fontWeight: 800, fontSize: 16, cursor: busy ? 'wait' : 'pointer' }}>
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => setSplitChoosing(false)} style={{ marginTop: 12, width: '100%', background: 'none', border: 'none', color: C.mute, fontSize: 13, cursor: 'pointer' }}>cancel</button>
+            </div>
+          )}
+
+          {/* Payer email (for split shares — so each person gets their GST invoice) */}
+          {splitActive && sharesLeft > 0 && (
+            <input
+              type="email"
+              value={payerEmail}
+              onChange={e => setPayerEmail(e.target.value)}
+              placeholder="your email (for your receipt)"
+              style={{ width: '100%', boxSizing: 'border-box', padding: '15px 18px', borderRadius: 14, border: '1px solid #E2E2E2', fontSize: 15, color: C.navy, outline: 'none', marginBottom: 12, fontFamily: 'inherit' }}
+            />
+          )}
+
+          {/* Primary action(s) */}
+          {sharesLeft > 0 || !splitActive ? (
+            <button
+              onClick={pay}
+              disabled={paying}
+              style={{ width: '100%', padding: '20px 0', borderRadius: 999, background: paying ? C.sky : C.btn, color: C.navy, fontWeight: 800, fontSize: 17, border: 'none', cursor: paying ? 'wait' : 'pointer', letterSpacing: '-0.01em', transition: 'background 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+              {paying ? (
+                <>
+                  <div style={{ width: 18, height: 18, borderRadius: 999, border: `2.5px solid ${C.navy}`, borderTopColor: 'transparent', animation: 'spin 0.9s linear infinite' }} />
+                  processing…
+                </>
+              ) : splitActive ? `pay your share ${fmtCents(shareCents)}` : `pay ${fmtCents(total)}`}
+            </button>
+          ) : null}
+
+          {/* Offer to split (only before a split has started) */}
+          {invoice.splitEnabled && !splitActive && !splitChoosing && (
+            <button
+              onClick={() => setSplitChoosing(true)}
+              disabled={paying}
+              style={{ width: '100%', padding: '16px 0', borderRadius: 999, background: 'transparent', color: C.navy, fontWeight: 700, fontSize: 15, border: `1.5px solid ${C.sky}`, cursor: 'pointer', marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="7" r="3.2"/><circle cx="17" cy="8" r="2.4"/><path d="M3 20c0-3.3 2.7-5.8 6-5.8s6 2.5 6 5.8"/><path d="M17.5 14.3c2.1.3 3.7 2 3.7 4.2"/></svg>
+              split with flatmates
+            </button>
+          )}
 
           <p style={{ textAlign: 'center', fontSize: 11, color: C.mute, marginTop: 16, lineHeight: 1.5 }}>
             secured by tapt pay · you'll be redirected to complete payment

@@ -225,8 +225,19 @@ function RequestsHome({ invoices, tenants, outstanding, go, onRowTap }: any) {
   );
 }
 
+/* ═══ Split-bill pill ═══ */
+function SplitPill({ on, onToggle }: any) {
+  return (
+    <button onClick={onToggle} aria-pressed={on}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '8px 14px', borderRadius: 999, border: `1.5px solid ${on ? NAVY : 'rgba(4,13,109,0.22)'}`, background: on ? NAVY : 'transparent', color: on ? BLUE : 'rgba(4,13,109,0.55)', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', fontFamily: 'Outfit, system-ui', transition: 'all 0.18s ease', WebkitTapHighlightColor: 'transparent' }}>
+      <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={on ? BLUE : 'rgba(4,13,109,0.55)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="7" r="3.2"/><circle cx="17" cy="8" r="2.4"/><path d="M3 20c0-3.3 2.7-5.8 6-5.8s6 2.5 6 5.8"/><path d="M17.5 14.3c2.1.3 3.7 2 3.7 4.2"/></svg>
+      split bill
+    </button>
+  );
+}
+
 /* ═══ SCREEN: ChooseTenant ═══ */
-function ChooseTenant({ tenants, invoices, go, onSelect }: any) {
+function ChooseTenant({ tenants, invoices, go, onSelect, splitMode, onToggleSplit }: any) {
   const [q, setQ] = useState('');
   const term = q.trim().toLowerCase();
   const active = tenants.filter((t: any) => t.status !== 'archived');
@@ -246,7 +257,10 @@ function ChooseTenant({ tenants, invoices, go, onSelect }: any) {
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div style={{ color: 'rgba(4,13,109,0.35)', fontWeight: 500, fontSize: 18 }}>choose tenant</div>
         </div>
-        <div style={{ height: 52 }} />
+        {/* Split-bill toggle — left-aligned with the action bar */}
+        <div style={{ height: 52, display: 'flex', alignItems: 'center', padding: '0 22px' }}>
+          <SplitPill on={splitMode} onToggle={onToggleSplit} />
+        </div>
       </div>
       {/* Bottom — NAVY */}
       <div className="stagger" style={{ flex: 1, background: NAVY, padding: '52px 22px 0', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -328,7 +342,7 @@ function RentAmount({ go, selectedTenant, onCommit }: any) {
 }
 
 /* ═══ SCREEN: SendRentLink ═══ */
-function SendRentLink({ go, selectedTenant, amount, onSend, sending, frequency, setFrequency }: any) {
+function SendRentLink({ go, selectedTenant, amount, onSend, sending, frequency, setFrequency, splitMode }: any) {
   const channel = selectedTenant?.preferredChannel || 'email';
   const dest    = channel === 'email' ? selectedTenant?.email : selectedTenant?.phone;
   const recurring = frequency && frequency !== 'once';
@@ -383,11 +397,17 @@ function SendRentLink({ go, selectedTenant, amount, onSend, sending, frequency, 
           </div>
         </div>
 
-        {/* Recurring summary */}
-        <div style={{ width: '100%', marginTop: 14, minHeight: 34 }}>
+        {/* Recurring + split summary */}
+        <div style={{ width: '100%', marginTop: 14, minHeight: 34, display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
           {recurring && (
             <div style={{ fontSize: 12.5, color: 'rgba(88,171,255,0.7)', lineHeight: 1.5, textAlign: 'center' }}>
               first request now, then <strong style={{ color: BLUE }}>{FREQ_LABEL[frequency]}</strong> from {fmtDate(firstAuto)}
+            </div>
+          )}
+          {splitMode && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: BLUE, fontWeight: 600 }}>
+              <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={BLUE} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="7" r="3.2"/><circle cx="17" cy="8" r="2.4"/><path d="M3 20c0-3.3 2.7-5.8 6-5.8s6 2.5 6 5.8"/><path d="M17.5 14.3c2.1.3 3.7 2 3.7 4.2"/></svg>
+              split bill enabled — flatmates can divide it
             </div>
           )}
         </div>
@@ -691,6 +711,7 @@ export default function PropertyTerminal() {
   const [successLabel, setSuccessLabel]   = useState('');
   const [boundaryDelta, setBoundaryDelta] = useState(0);
   const [frequency, setFrequency]         = useState('once');
+  const [splitMode, setSplitMode]         = useState(false);
   const [busyScheduleId, setBusyScheduleId] = useState<string | null>(null);
   const conveyorTimer = useRef<ReturnType<typeof setTimeout>>();
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -722,14 +743,14 @@ export default function PropertyTerminal() {
 
   /* Mutations */
   const sendMutation = useMutation({
-    mutationFn: async ({ tenantId, amountCents, channel, freq }: any) => {
+    mutationFn: async ({ tenantId, amountCents, channel, freq, split }: any) => {
       const now = new Date();
       const due = new Date(now); due.setDate(due.getDate() + 7);
       // 1. Send the first request immediately
       const r = await fetch('/api/property/invoices', {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenantProfileId: tenantId, amountCents, deliveryChannel: channel, dueAt: due.toISOString() }),
+        body: JSON.stringify({ tenantProfileId: tenantId, amountCents, deliveryChannel: channel, dueAt: due.toISOString(), splitEnabled: !!split }),
       });
       if (!r.ok) throw new Error('Failed to send');
       const invoice = await r.json();
@@ -752,6 +773,7 @@ export default function PropertyTerminal() {
       setContentKey(k => k + 1);
       setScreen('success');
       setFrequency('once');
+      setSplitMode(false);
     },
     onError: (err: any) => { toast(err?.message || 'Failed to send'); },
   });
@@ -866,6 +888,7 @@ export default function PropertyTerminal() {
       setSelectedTenant(null);
       setAmount(0);
       setFrequency('once');
+      setSplitMode(false);
       return;
     }
     if ((next === 'send' || next === 'external') && !selectedTenant) {
@@ -901,7 +924,7 @@ export default function PropertyTerminal() {
 
   const handleSend = () => {
     if (!selectedTenant || amount === 0) { toast('set an amount first'); return; }
-    sendMutation.mutate({ tenantId: selectedTenant.id, amountCents: amount, channel: selectedTenant.preferredChannel || 'email', freq: frequency });
+    sendMutation.mutate({ tenantId: selectedTenant.id, amountCents: amount, channel: selectedTenant.preferredChannel || 'email', freq: frequency, split: splitMode });
   };
 
   const handleMark = (invoiceId: string, ref: string) => {
@@ -960,9 +983,9 @@ export default function PropertyTerminal() {
 
   const renderScreen = (id: string) => {
     if (id === 'home')     return <RequestsHome invoices={invoices} tenants={tenants} outstanding={outstanding} go={go} onRowTap={handleRowTap} />;
-    if (id === 'tenants')  return <ChooseTenant tenants={tenants} invoices={invoices} go={go} onSelect={handleTenantSelect} />;
+    if (id === 'tenants')  return <ChooseTenant tenants={tenants} invoices={invoices} go={go} onSelect={handleTenantSelect} splitMode={splitMode} onToggleSplit={() => setSplitMode(m => !m)} />;
     if (id === 'amount')   return <RentAmount go={go} selectedTenant={selectedTenant} onCommit={(c: number) => { setAmount(c); go('send'); }} />;
-    if (id === 'send')     return <SendRentLink go={go} selectedTenant={selectedTenant} amount={amount} onSend={handleSend} sending={sendMutation.isPending} frequency={frequency} setFrequency={setFrequency} />;
+    if (id === 'send')     return <SendRentLink go={go} selectedTenant={selectedTenant} amount={amount} onSend={handleSend} sending={sendMutation.isPending} frequency={frequency} setFrequency={setFrequency} splitMode={splitMode} />;
     if (id === 'external') return <MarkExternal go={go} selectedTenant={selectedTenant} amount={amount} invoices={invoices} onMark={handleMark} marking={markMutation.isPending} />;
     if (id === 'batch')    return <BatchSend go={go} tenants={tenants} invoices={invoices} onBatchSend={handleBatch} sending={batchMutation.isPending} />;
     if (id === 'automate') return <AutomateScreen go={go} schedules={schedules} tenants={tenants} onPauseResume={handlePauseResume} onCancel={handleCancelSchedule} busyId={busyScheduleId} reminderSettings={reminderSettings} onUpdateReminders={(patch: any) => reminderMutation.mutate(patch)} />;
