@@ -1,9 +1,27 @@
 # Property Management — Remediation Plan
 
-Tracks the outstanding items from the integration review.
+Tracks the items from the integration review.
 
-**Done:** C2 recurring-rent automation UI (`ffbf049`), C1 payment completion +
-L1 dead-code removal (`b1f44fa`). The items below remain.
+**All review items are now complete.**
+- C2 recurring-rent automation UI — `ffbf049`
+- C1 payment completion + L1 dead-code removal — `b1f44fa`
+- H1, H3, M2, M3, L2, L3, L4 + overdue reminder auto-resend backend — `a3bba61`
+- Overdue reminder settings UI on the automate page — `c5db2dc`
+- H2 / M1 duplicate-invoice rework — `<pending>` (see below; the only item that
+  still needs a product decision before coding)
+
+The per-item notes below are kept for reference. **H2 + M1 are the only ones
+not yet implemented** — everything else is done and marked inline.
+
+### New since the review: overdue reminder auto-resend
+
+A per-merchant reminder policy (`rentReminderEnabled`, `rentReminderDelayDays`,
+`rentReminderIntervalDays`, `rentReminderMaxCount`; migration `0004`) drives a
+4th cron pass, `runReminderPass`: for each overdue unpaid invoice it sends the
+first reminder once `now ≥ dueAt + delayDays`, then re-emails every
+`intervalDays` up to `maxCount` (0 = unlimited), tracking `lastReminderSentAt`
+and `reminderCount`. Configured from the terminal automate page; read/written
+via `GET|PUT /api/property/reminder-settings`.
 
 Ordered by priority. Each item lists the problem, the fix, files touched, and
 how to verify.
@@ -69,7 +87,7 @@ separate from retail `transactions` to avoid regressing the retail flow.
 
 ---
 
-## H1 — 🟠 Cron passes run concurrently (generate ↛ dispatch same run)
+## H1 — ✅ DONE (`a3bba61`) — Cron passes run concurrently
 
 **Problem.** `routes.ts:5991` runs `Promise.all([generate, dispatch,
 overdue])`. Dispatch reads `pending_dispatch` invoices that generate creates,
@@ -118,7 +136,13 @@ duplicates.
 
 ---
 
-## H3 — 🟠 SMS delivery is selectable but unimplemented
+## H3 — ✅ DONE (`a3bba61`) — SMS selectable but unimplemented
+
+Resolved as email-only: dispatch and reminders always email; an invoice with no
+deliverable email is marked `dispatch_failed` (see L4) rather than retrying
+forever. SMS remains a future provider integration. Original notes below.
+
+## H3 (original) — SMS delivery is selectable but unimplemented
 
 **Problem.** `preferredChannel` / `deliveryChannel` accept `"sms"` and the
 terminal renders "sending via sms", but `runDispatchPass` only calls
@@ -168,7 +192,7 @@ failed, not counted as sent.
 
 ---
 
-## M2 — 🟡 Two competing "pause" models (partly resolved)
+## M2 — ✅ DONE (`a3bba61`) — Two competing "pause" models
 
 **Status.** The shipped automate UI standardizes on `status` (`active` ↔
 `paused`) and the dashboard stat now counts `status === 'paused'`. The
@@ -193,7 +217,7 @@ cron resumes. Confirm no path sets both fields inconsistently.
 
 ---
 
-## M3 — 🟡 Migration diverges from the Drizzle schema
+## M3 — ✅ DONE (`a3bba61`) — Migration diverges from the Drizzle schema
 
 **Problem.** Migration `0003` defines the invoices uniqueness index with a
 partial `WHERE schedule_id IS NOT NULL AND billing_period_start IS NOT NULL`
@@ -223,22 +247,23 @@ Then run a no-op `drizzle-kit generate` to confirm zero drift.
 
 - **L1.** ✅ DONE (`b1f44fa`) — removed the dead `callbackUrl` in
   `/api/checkout/pay`.
-- **L2.** Compare the cron secret with `crypto.timingSafeEqual` instead of
-  `!==` (`routes.ts:5987`).
-- **L3.** `computeNextRunDate` uses server-local `setMonth/setDate` and can
-  drift an hour across DST; document the intent or normalize to a fixed TZ /
-  UTC midday. (`server/property-cron.ts`)
-- **L4.** Give dispatch a failure ceiling: after N failed attempts (or an
-  undeliverable channel), move the invoice out of `pending_dispatch` to a
-  `dispatch_failed` / needs-attention state instead of retrying forever.
-  (`server/property-cron.ts`, status enum)
+- **L2.** ✅ DONE (`a3bba61`) — cron secret now uses `crypto.timingSafeEqual`.
+- **L3.** ✅ DONE (`a3bba61`) — `computeNextRunDate` uses UTC date math.
+- **L4.** ✅ DONE (`a3bba61`) — an undeliverable invoice (no email) is moved to
+  `dispatch_failed` instead of retrying forever. (A full per-attempt ceiling for
+  *transient* send failures is still future work, noted below.)
 
 ---
 
-## Suggested sequencing
+## Remaining work
 
-1. ~~**C1**~~ ✅ done — the payment rail now records card payments.
-2. **H1** — one-line fix, immediate correctness win for automation.
-3. **H3 / L4** — decide SMS in-or-out and stop infinite dispatch retries.
-4. **H2 / M1** — resolve duplicate-invoice semantics (batch + resend together).
-5. **M2 / M3 / L2–L3** — cleanups; fold into the above PRs where they overlap.
+Only **H2 + M1** (duplicate-invoice semantics — terminal always creates a new
+invoice on send; batch reports false success) are left, and they need a product
+decision first: should re-sending an existing invoice *resend* it or always
+mint a new one? Once decided, they're one combined change (a resend endpoint +
+batch skip/dedupe + honest success reporting).
+
+Minor future polish, not from the original review:
+- A per-attempt ceiling for *transient* dispatch failures (L4 covers the
+  permanent no-email case; a flaky SMTP error still retries each run).
+- Real SMS delivery if/when a provider is added (H3 is email-only today).
