@@ -78,7 +78,7 @@ function fmtDate(d: any): string {
   return new Date(d).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-function SubBar({ activeIdx = -1, onPick, compact = false }: any) {
+function SubBar({ activeIdx = -1, onPick, compact = false, hideLabel = false }: any) {
   const trackRef  = useRef<HTMLDivElement>(null);
   const btnRefs   = useRef<(HTMLElement | null)[]>([]);
   const mounted   = useRef(false);
@@ -119,7 +119,7 @@ function SubBar({ activeIdx = -1, onPick, compact = false }: any) {
               className={`tp-subbar-btn${active ? ' active' : ''}`}
               onClick={() => onPick?.(i)} aria-label={label}>
               <Icon sz={18} c={ic} />
-              {active && <span className="tp-subbar-label">{label}</span>}
+              {active && !hideLabel && <span className="tp-subbar-label">{label}</span>}
             </button>
           );
         })}
@@ -1037,7 +1037,7 @@ export default function PropertyTerminal() {
           <div className={`tp-split-slot${screen === 'tenants' ? ' show' : ''}`}>
             <SplitPill on={splitMode} onToggle={() => setSplitMode(m => !m)} />
           </div>
-          <SubBar activeIdx={subbarActiveIdx} onPick={handleSubbarPick} compact={sendVisible} />
+          <SubBar activeIdx={subbarActiveIdx} onPick={handleSubbarPick} compact={sendVisible || screen === 'tenants'} hideLabel={screen === 'tenants'} />
           <div className={`tp-send-slot${sendVisible ? ' show' : ''}`}>
             <SendBtn onClick={handleSend} />
           </div>

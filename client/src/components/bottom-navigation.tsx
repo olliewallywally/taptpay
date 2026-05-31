@@ -141,17 +141,31 @@ export function BottomNavigation() {
         onClick={collapsed ? resetIdle : undefined}
         style={{
           position: 'relative',
-          /* collapsed: 64×4 pill; expanded: 320×58 full dock */
-          width:  collapsed ? 64  : 320,
-          height: collapsed ? 4   : 58,
+          /* Always 320 wide; height animates 58 → 44 (44px = accessible touch target).
+             The visual pill shrinks via the inner dock opacity + a pseudo-pill overlay. */
+          width: 320,
+          height: collapsed ? 44 : 58,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           pointerEvents: 'auto',
-          background: DOCK_BG,
-          borderRadius: 999,
-          transition: 'width 0.5s cubic-bezier(0.34,1.56,0.64,1), height 0.5s cubic-bezier(0.34,1.56,0.64,1)',
-          overflow: 'hidden',
+          transition: 'height 0.5s cubic-bezier(0.34,1.56,0.64,1)',
+          overflow: 'visible',
         }}
       >
+        {/* Collapsed visual pill — a small navy bump centered in the touch area */}
+        <div style={{
+          position: 'absolute',
+          bottom: 10,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: collapsed ? 56 : 0,
+          height: collapsed ? 4 : 0,
+          background: DOCK_BG,
+          borderRadius: 999,
+          opacity: collapsed ? 1 : 0,
+          transition: 'width 0.45s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s ease',
+          pointerEvents: 'none',
+        }} />
+
         {/* 280 px dock bar — ref goes here, indicator is a child (same as SmartTransitions) */}
         <div ref={dockRef} style={{
           position: 'relative',
@@ -165,7 +179,8 @@ export function BottomNavigation() {
           padding: '0 16px',
           overflow: 'visible',
           opacity: collapsed ? 0 : 1,
-          transition: 'opacity 0.3s ease',
+          transform: collapsed ? 'scale(0.85)' : 'scale(1)',
+          transition: 'opacity 0.3s ease, transform 0.45s cubic-bezier(0.34,1.56,0.64,1)',
           pointerEvents: collapsed ? 'none' : 'auto',
         }}>
           {/* Indicator pill — child of dock bar, positioned relative to it */}

@@ -222,7 +222,6 @@ export default function PropertyAnalytics() {
 
   const defaultOffset = sheetOffset ?? 320;
   const snapFull = 0; // fully covers the screen
-  const currentOffset = snapped === 'full' ? snapFull : defaultOffset;
 
   const onTouchStart = useCallback((e: React.TouchEvent) => {
     touchStartY.current   = e.touches[0].clientY;
@@ -285,9 +284,6 @@ export default function PropertyAnalytics() {
       {/* ── Swipeable white sheet ── */}
       <div
         ref={sheetRef}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
         style={{
           position: 'absolute', top: 0, left: 0, right: 0,
           height: '100svh',
@@ -302,10 +298,19 @@ export default function PropertyAnalytics() {
           scrollbarWidth: 'none' as any,
         }}
       >
-        {/* Drag handle */}
-        <div style={{ width: 40, height: 5, borderRadius: 3, background: C.handle, margin: '14px auto 22px', cursor: 'grab', flexShrink: 0 }} />
+        {/* Drag handle — touch events live here only, not on the full sheet,
+            so scrolling the transaction list when expanded works normally */}
+        <div
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+          onTouchCancel={onTouchEnd}
+          style={{ width: '100%', height: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'grab', flexShrink: 0, touchAction: 'none' }}
+        >
+          <div style={{ width: 40, height: 5, borderRadius: 3, background: C.handle }} />
+        </div>
 
-        <div style={{ padding: '0 24px 130px' }}>
+        <div style={{ padding: '0 24px 130px', marginTop: 2 }}>
           {/* Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <h2 style={{ fontSize: 20, fontWeight: 700, color: C.textDark, margin: 0, letterSpacing: '-0.4px' }}>Payment History</h2>
