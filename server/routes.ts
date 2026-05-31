@@ -5653,18 +5653,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   }
 
-  app.get("/pay/:merchantId", (req, res, next) =>
-    handleHppRedirect(req, res, next, parseInt(req.params.merchantId), null)
-  );
-  app.get("/pay/:merchantId/stone/:stoneId", (req, res, next) =>
-    handleHppRedirect(req, res, next, parseInt(req.params.merchantId), parseInt(req.params.stoneId))
-  );
-  app.get("/nfc/:merchantId", (req, res, next) =>
-    handleHppRedirect(req, res, next, parseInt(req.params.merchantId), null)
-  );
-  app.get("/nfc/:merchantId/stone/:stoneId", (req, res, next) =>
-    handleHppRedirect(req, res, next, parseInt(req.params.merchantId), parseInt(req.params.stoneId))
-  );
 
   // ===========================================================================
   // PROPERTY MANAGEMENT VERTICAL

@@ -21,7 +21,12 @@
       "Bash(unzip -o /home/runner/workspace/attached_assets/taptpay-property-management-v2.zip -d prop-mgmt-v2)",
       "Bash(python3 *)",
       "Bash(unzip -o /home/runner/workspace/attached_assets/tapt_pay_UI_redesign_\\\\\\(1\\\\\\)_1780110362373.zip -d tapt_ui_redesign)",
-      "Bash(node *)"
+      "Bash(node *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(echo \"=== total errors: $\\(npx tsc --noEmit -p tsconfig.json 2>&1)",
+      "Bash(git stash *)",
+      "Bash(git commit -q -m ' *)"
     ]
   }
 }

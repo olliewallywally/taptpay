@@ -108,20 +108,21 @@ export default function CustomerPayment() {
     }
   }, [activeTransaction]);
 
-  // Auto-redirect as soon as transaction loads
+  // Route customer to the right page as soon as a transaction appears
   useEffect(() => {
     if (!currentTransaction || hasRedirected.current) return;
     if (currentTransaction.status !== "pending") return;
 
     hasRedirected.current = true;
 
-    // Trigger a full-page navigation back to /pay/:merchantId (with stone if set).
-    // The server route will now find the active transaction, create a Windcave
-    // session, and redirect straight to the HPP — no TaptPay page shown.
-    const path = stoneNumber
-      ? `/pay/${id}/stone/${stoneNumber}`
-      : `/pay/${id}`;
-    window.location.href = path;
+    // Split-enabled → choose how many ways to split first
+    if (currentTransaction.splitEnabled && !currentTransaction.isSplit) {
+      setLocation(`/split/${currentTransaction.id}`);
+      return;
+    }
+
+    // → Branded checkout page (Google Pay / Apple Pay / card details)
+    setLocation(`/checkout/${currentTransaction.id}`);
   }, [currentTransaction]);
 
   const handleRetry = () => {
