@@ -213,7 +213,17 @@ export default function PropertyDashboard() {
                   <div style={{ fontWeight: 400, fontSize: 11, color: C.mute, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inv.propertyAddress || '—'}</div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: C.navy, fontVariantNumeric: 'tabular-nums' }}>{fmtCents(inv.amountCents ?? 0)}</div>
+                  {(() => {
+                    const isSplit = inv.splitEnabled && inv.splitCount > 1;
+                    const paid = inv.splitPaidCount || 0;
+                    const showOwing = isSplit && paid > 0 && invoiceStatus(inv) !== 'paid';
+                    return (
+                      <>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: C.navy, fontVariantNumeric: 'tabular-nums' }}>{fmtCents(showOwing ? (inv.owingCents ?? inv.amountCents) : (inv.amountCents ?? 0))}</div>
+                        {isSplit && <div style={{ fontSize: 9.5, fontWeight: 700, color: '#0B7D63' }}>{paid}/{inv.splitCount} split</div>}
+                      </>
+                    );
+                  })()}
                   <StatusBox status={invoiceStatus(inv)} />
                 </div>
               </div>

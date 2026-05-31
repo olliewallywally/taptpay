@@ -5925,7 +5925,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const tenantProfileId = typeof req.query.tenantProfileId === "string" ? req.query.tenantProfileId : undefined;
       const status = typeof req.query.status === "string" ? req.query.status : undefined;
       const invoices = await storage.getInvoiceRentRequestsByMerchant(merchantId, { status, tenantProfileId });
-      // Enrich with tenant display name and address
+      // Enrich with tenant display name/address and computed split owing.
       const cache = new Map<string, { tenantName: string; propertyAddress: string }>();
       const enriched = await Promise.all(invoices.map(async (inv: any) => {
         if (!cache.has(inv.tenantProfileId)) {
@@ -5934,7 +5934,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
             ? { tenantName: `${t.firstName} ${t.lastName}`, propertyAddress: t.propertyAddress }
             : { tenantName: "—", propertyAddress: "—" });
         }
-        return { ...inv, ...cache.get(inv.tenantProfileId) };
+        const isSplit = inv.splitEnabled && inv.splitCount && inv.splitCount > 1;
+        const base = isSplit ? Math.floor(inv.amountCents / inv.splitCount) : 0;
+        const owingCents = isSplit ? inv.amountCents - (inv.splitPaidCount || 0) * base : inv.amountCents;
+        const sharesLeft = isSplit ? inv.splitCount - (inv.splitPaidCount || 0) : null;
+        return { ...inv, ...cache.get(inv.tenantProfileId), owingCents, sharesLeft };
       }));
       res.json(enriched);
     } catch (err) { console.error("[PROP_INVOICES_LIST]", err); res.status(500).json({ message: "Failed to fetch invoices" }); }

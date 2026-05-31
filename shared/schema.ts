@@ -862,7 +862,7 @@ const tenantProfileFields = z.object({
   phone: optionalPhoneSchema,
   propertyAddress: propertyAddressSchema,
   coTenantsText: z.string().max(1000).optional().or(z.literal("")).transform(v => v || undefined),
-  preferredChannel: z.enum(["sms", "email"]).default("email"),
+  preferredChannel: z.enum(["email", "whatsapp", "sms"]).default("email"),
 });
 
 export const createTenantProfileSchema = tenantProfileFields;
@@ -872,7 +872,7 @@ export const createActiveScheduleSchema = z.object({
   tenantProfileId: z.string().uuid(),
   amountCents: z.number().int().positive().max(100_000_000),
   frequency: z.enum(["weekly", "fortnightly", "monthly"]),
-  deliveryChannel: z.enum(["sms", "email"]),
+  deliveryChannel: z.enum(["email", "whatsapp", "sms"]),
   startDate: z.string().datetime().or(z.date()).transform(v => new Date(v as any)),
   endDate: z.string().datetime().or(z.date()).optional().transform(v => v ? new Date(v as any) : undefined),
 });
@@ -882,7 +882,7 @@ export const createActiveScheduleSchema = z.object({
 export const updateActiveScheduleSchema = z.object({
   amountCents: z.number().int().positive().max(100_000_000).optional(),
   frequency: z.enum(["weekly", "fortnightly", "monthly"]).optional(),
-  deliveryChannel: z.enum(["sms", "email"]).optional(),
+  deliveryChannel: z.enum(["email", "whatsapp", "sms"]).optional(),
   status: z.enum(["active", "paused", "terminated"]).optional(),
 });
 
@@ -896,7 +896,7 @@ export const updateRentReminderSettingsSchema = z.object({
 export const createAdHocInvoiceSchema = z.object({
   tenantProfileId: z.string().uuid(),
   amountCents: z.number().int().positive().max(100_000_000),
-  deliveryChannel: z.enum(["sms", "email"]),
+  deliveryChannel: z.enum(["email", "whatsapp", "sms"]),
   dueAt: z.string().datetime().or(z.date()).transform(v => new Date(v as any)),
   splitEnabled: z.boolean().optional(),
 });

@@ -207,14 +207,31 @@ function RequestsHome({ invoices, tenants, outstanding, go, onRowTap }: any) {
                   <div style={{ width: 34, height: 34, borderRadius: 999, background: NAVY, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 11, fontWeight: 800, color: BLUE, letterSpacing: '0.02em', marginRight: 12 }}>
                     {(inv.tenantName || '??').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()}
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="tp-stack-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inv.tenantName || '—'}</div>
-                    <div className="tp-stack-meta">
-                      <span className={`tp-dot ${dotCls}`} />
-                      <span className="tp-stack-status">{st}</span>
-                    </div>
-                  </div>
-                  <div className="tp-stack-price">{fmt(inv.amountCents ?? 0)}</div>
+                  {(() => {
+                    const isSplit = inv.splitEnabled && inv.splitCount > 1;
+                    const paid = inv.splitPaidCount || 0;
+                    const showOwing = isSplit && paid > 0 && st !== 'paid';
+                    return (
+                      <>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div className="tp-stack-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inv.tenantName || '—'}</div>
+                          <div className="tp-stack-meta">
+                            <span className={`tp-dot ${dotCls}`} />
+                            <span className="tp-stack-status">{st}</span>
+                            {isSplit && (
+                              <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: '#1BBF85', background: 'rgba(27,191,133,0.12)', padding: '1px 6px', borderRadius: 6 }}>
+                                {paid}/{inv.splitCount} split
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                          <div className="tp-stack-price">{fmt(showOwing ? (inv.owingCents ?? inv.amountCents) : (inv.amountCents ?? 0))}</div>
+                          {showOwing && <div style={{ fontSize: 9.5, color: '#8C8C8C', marginTop: 1 }}>left of {fmt(inv.amountCents)}</div>}
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               );
             })}
@@ -873,7 +890,7 @@ export default function PropertyTerminal() {
   const toast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 1600); };
   const outstanding = (invoices as any[])
     .filter((i: any) => ['pending_dispatch', 'dispatched', 'overdue'].includes(i.status))
-    .reduce((s: number, i: any) => s + (i.amountCents ?? 0), 0);
+    .reduce((s: number, i: any) => s + (i.owingCents ?? i.amountCents ?? 0), 0);
 
   const triggerConveyor = (prevId: string, dir: string) => {
     setConveyor({ prevId, dir });
