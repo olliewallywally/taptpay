@@ -18,6 +18,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { sendPushToMerchant } from "./push";
+import { resendInvoiceEmail } from "./property-cron";
 
 // Store SSE connections for real-time updates (merchantId -> stoneId -> Set of connections)
 // stoneId can be null for merchant-level connections
@@ -5888,13 +5889,44 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!tenant) return res.status(404).json({ message: "Tenant not found" });
       if (!checkMerchantOwnership(req, tenant.merchantId)) return res.status(403).json({ message: "Access denied" });
       const data = createAdHocInvoiceSchema.parse(req.body);
+      const baseUrl = getBaseUrl(req);
+
+      // Dedupe: if this tenant already has a live (unpaid) invoice, update its amount
+      // and resend it rather than creating a duplicate.
+      const existing = await storage.getLiveInvoiceByTenant(data.tenantProfileId);
+      if (existing) {
+        if (data.amountCents && data.amountCents !== existing.amountCents) {
+          await storage.updateInvoiceRentRequest(existing.id, { amountCents: data.amountCents });
+        }
+        const delivery = await resendInvoiceEmail(existing.id, baseUrl);
+        const fresh = await storage.getInvoiceRentRequest(existing.id);
+        return res.status(200).json({ ...fresh, resent: true, delivered: delivery.ok, deliveryReason: delivery.reason });
+      }
+
       const invoice = await storage.createInvoiceRentRequest({ ...data, merchantId, token: generateInvoiceToken(), status: "pending_dispatch" });
       await storage.logTransactionEvent({ merchantId, tenantProfileId: data.tenantProfileId, invoiceId: invoice.id, eventType: "Invoice_Generated", payload: { amountCents: invoice.amountCents, channel: invoice.deliveryChannel } });
-      res.status(201).json(invoice);
+      // Send the link immediately; if delivery fails it stays pending and the cron retries.
+      const delivery = await resendInvoiceEmail(invoice.id, baseUrl);
+      const fresh = await storage.getInvoiceRentRequest(invoice.id);
+      res.status(201).json({ ...fresh, resent: false, delivered: delivery.ok, deliveryReason: delivery.reason });
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
       console.error("[PROP_INVOICE_CREATE]", err); res.status(500).json({ message: "Failed to create invoice" });
     }
+  });
+
+  app.post("/api/property/invoices/:id/resend", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const invoice = await storage.getInvoiceRentRequest(req.params.id);
+      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+      if (!checkMerchantOwnership(req, invoice.merchantId)) return res.status(403).json({ message: "Access denied" });
+      if (["paid", "paid_external", "voided"].includes(invoice.status)) return res.status(400).json({ message: "Invoice is not payable" });
+      const delivery = await resendInvoiceEmail(req.params.id, getBaseUrl(req));
+      if (!delivery.ok) return res.status(502).json({ message: "Could not resend", reason: delivery.reason });
+      res.json(delivery.invoice);
+    } catch (err) { console.error("[PROP_INVOICE_RESEND]", err); res.status(500).json({ message: "Failed to resend invoice" }); }
   });
 
   app.get("/api/property/invoices/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {

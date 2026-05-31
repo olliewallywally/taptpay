@@ -202,6 +202,7 @@ export interface IStorage {
   getPendingDispatchInvoices(): Promise<any[]>;
   getOverdueEligibleInvoices(now: Date): Promise<any[]>;
   getReminderEligibleInvoices(): Promise<any[]>;
+  getLiveInvoiceByTenant(tenantProfileId: string): Promise<any | undefined>;
 
   logTransactionEvent(data: any): Promise<any>;
   getTransactionEventsByTenant(tenantProfileId: string, limit?: number): Promise<any[]>;
@@ -1605,6 +1606,7 @@ export class MemStorage implements IStorage {
   async getPendingDispatchInvoices(): Promise<any[]> { return []; }
   async getOverdueEligibleInvoices(now: Date): Promise<any[]> { return []; }
   async getReminderEligibleInvoices(): Promise<any[]> { return []; }
+  async getLiveInvoiceByTenant(tenantProfileId: string): Promise<any> { return undefined; }
   async logTransactionEvent(data: any): Promise<any> { return {}; }
   async getTransactionEventsByTenant(tenantProfileId: string, limit?: number): Promise<any[]> { return []; }
   async getTransactionEventsByInvoice(invoiceId: string): Promise<any[]> { return []; }
@@ -3106,6 +3108,18 @@ export class DatabaseStorage implements IStorage {
     const db = getDb(); if (!db) return [];
     // Overdue, still unpaid — the reminder pass applies the per-merchant timing policy.
     return db.select().from(invoicesRentRequests).where(eq(invoicesRentRequests.status, "overdue")).orderBy(invoicesRentRequests.dueAt);
+  }
+  async getLiveInvoiceByTenant(tenantProfileId: string): Promise<any> {
+    const db = getDb(); if (!db) return undefined;
+    // Most recent unpaid / non-voided invoice for this tenant (the one a "send" should resend).
+    const [r] = await db.select().from(invoicesRentRequests)
+      .where(and(
+        eq(invoicesRentRequests.tenantProfileId, tenantProfileId),
+        inArray(invoicesRentRequests.status, ["pending_dispatch", "dispatched", "overdue", "dispatch_failed"]),
+      ))
+      .orderBy(desc(invoicesRentRequests.createdAt))
+      .limit(1);
+    return r;
   }
   async logTransactionEvent(data: any): Promise<any> {
     const db = getDb(); if (!db) return {};

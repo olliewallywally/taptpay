@@ -595,12 +595,14 @@ function BatchSend({ go, tenants, invoices, onBatchSend, sending }: any) {
 
   const active = tenants.filter((t: any) => t.status !== 'archived');
 
+  const LIVE = ['pending_dispatch', 'dispatched', 'overdue', 'dispatch_failed'];
+  const liveInvoiceFor = (tid: string) => [...invoices]
+    .filter((i: any) => i.tenantProfileId === tid && LIVE.includes(i.status))
+    .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+
   const totalCents = active
     .filter((t: any) => selected.has(t.id))
-    .reduce((s: number, t: any) => {
-      const inv = [...invoices].filter((i: any) => i.tenantProfileId === t.id && ['pending_dispatch', 'dispatched'].includes(i.status))[0];
-      return s + (inv?.amountCents ?? 0);
-    }, 0);
+    .reduce((s: number, t: any) => s + (liveInvoiceFor(t.id)?.amountCents ?? 0), 0);
 
   return (
     <div className="tp-screen" style={{ background: NAVY }}>
@@ -619,6 +621,7 @@ function BatchSend({ go, tenants, invoices, onBatchSend, sending }: any) {
         <div className="tp-thin-scroll" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 110 }}>
           {active.map((t: any) => {
             const on = selected.has(t.id);
+            const inv = liveInvoiceFor(t.id);
             return (
               <button key={t.id} onClick={() => toggle(t.id)}
                 style={{ textAlign: 'left', background: on ? 'rgba(88,171,255,0.18)' : 'rgba(255,255,255,0.05)', border: `1.5px solid ${on ? BLUE : 'rgba(88,171,255,0.12)'}`, borderRadius: 16, padding: '12px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -628,6 +631,11 @@ function BatchSend({ go, tenants, invoices, onBatchSend, sending }: any) {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, fontSize: 14, color: BLUE, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tenantName(t)}</div>
                   <div style={{ fontWeight: 400, fontSize: 11.5, color: 'rgba(88,171,255,0.5)', marginTop: 2 }}>{t.propertyAddress}</div>
+                </div>
+                <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                  {inv
+                    ? <div style={{ fontWeight: 700, fontSize: 13.5, color: BLUE, fontVariantNumeric: 'tabular-nums' }}>{fmt(inv.amountCents)}</div>
+                    : <div style={{ fontSize: 10.5, color: 'rgba(88,171,255,0.4)' }}>no invoice</div>}
                 </div>
               </button>
             );
@@ -810,23 +818,33 @@ export default function PropertyTerminal() {
 
   const batchMutation = useMutation({
     mutationFn: async (tenantIds: string[]) => {
-      const due = new Date(); due.setDate(due.getDate() + 7);
-      await Promise.all(tenantIds.map(tid => {
-        const t = (tenants as any[]).find(x => x.id === tid);
-        const inv = [...(invoices as any[])].filter(i => i.tenantProfileId === tid && ['pending_dispatch', 'dispatched'].includes(i.status))[0];
-        return fetch('/api/property/invoices', {
-          method: 'POST', credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tenantProfileId: tid, amountCents: inv?.amountCents ?? 0, deliveryChannel: t?.preferredChannel || 'email', dueAt: due.toISOString() }),
-        });
+      const LIVE = ['pending_dispatch', 'dispatched', 'overdue', 'dispatch_failed'];
+      const outcomes = await Promise.all(tenantIds.map(async (tid) => {
+        // Resend the tenant's existing live invoice — never create a duplicate.
+        const inv = [...(invoices as any[])]
+          .filter(i => i.tenantProfileId === tid && LIVE.includes(i.status))
+          .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+        if (!inv) return 'skipped';
+        try {
+          const r = await fetch(`/api/property/invoices/${inv.id}/resend`, { method: 'POST', credentials: 'include' });
+          return r.ok ? 'sent' : 'failed';
+        } catch { return 'failed'; }
       }));
+      return outcomes;
     },
-    onSuccess: (_, ids) => {
+    onSuccess: (outcomes: string[]) => {
       queryClient.invalidateQueries({ queryKey: ['/api/property/invoices'] });
-      setBanner(`Sent to ${(ids as string[]).length} tenant${(ids as string[]).length !== 1 ? 's' : ''}`);
+      const sent = outcomes.filter(o => o === 'sent').length;
+      const skipped = outcomes.filter(o => o === 'skipped').length;
+      const failed = outcomes.filter(o => o === 'failed').length;
+      const parts = [`Resent ${sent}`];
+      if (skipped) parts.push(`${skipped} skipped`);
+      if (failed) parts.push(`${failed} failed`);
+      setBanner(parts.join(' · '));
       triggerConveyor(screen, 'down');
       setScreen('home');
     },
+    onError: () => { toast('Batch resend failed'); },
   });
 
   /* Helpers */

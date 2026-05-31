@@ -99,6 +99,49 @@ function buildRentEmail(opts: {
   return { subject, html, text };
 }
 
+// Manually (re)send an invoice's payment-link email immediately. Used by the
+// terminal "send"/resend actions so an existing unpaid invoice is re-delivered
+// rather than duplicated. Refuses already-settled invoices.
+export async function resendInvoiceEmail(invoiceId: string, baseUrl: string): Promise<{ ok: boolean; reason?: string; invoice?: any }> {
+  const invoice = await storage.getInvoiceRentRequest(invoiceId);
+  if (!invoice) return { ok: false, reason: "not_found" };
+  if (["paid", "paid_external", "voided"].includes(invoice.status)) return { ok: false, reason: "not_payable" };
+
+  const [merchant, tenant] = await Promise.all([
+    storage.getMerchant(invoice.merchantId),
+    storage.getTenantProfile(invoice.tenantProfileId),
+  ]);
+  if (!merchant || !tenant) return { ok: false, reason: "missing_data" };
+  if (!tenant.email) return { ok: false, reason: "no_email" };
+
+  const email = buildRentEmail({
+    tenantName: `${tenant.firstName} ${tenant.lastName}`,
+    merchantName: merchant.businessName || merchant.name,
+    propertyAddress: tenant.propertyAddress,
+    amountCents: invoice.amountCents,
+    dueAt: new Date(invoice.dueAt),
+    paymentUrl: `${baseUrl}/r/${invoice.token}`,
+    reminder: invoice.status === "overdue",
+  });
+
+  const sent = await sendEmail({
+    to: tenant.email, from: "noreply@taptpay.co.nz",
+    subject: email.subject, html: email.html, text: email.text,
+  });
+  if (!sent) return { ok: false, reason: "send_failed" };
+
+  const updates: any = { dispatchedAt: new Date(), sentAt: new Date() };
+  // pending/failed invoices move to "dispatched"; dispatched/overdue keep their status.
+  if (invoice.status === "pending_dispatch" || invoice.status === "dispatch_failed") updates.status = "dispatched";
+  const updated = await storage.updateInvoiceRentRequest(invoiceId, updates);
+
+  await storage.logTransactionEvent({
+    merchantId: invoice.merchantId, tenantProfileId: invoice.tenantProfileId,
+    invoiceId, eventType: "Invoice_Resent", payload: { channel: "email", status: updated?.status },
+  });
+  return { ok: true, invoice: updated };
+}
+
 // ── Pass 1: generate invoices for due schedules ───────────────────────────────
 
 export async function runGeneratePass(now: Date = new Date()): Promise<{ generated: number; skipped: number; errors: number }> {
