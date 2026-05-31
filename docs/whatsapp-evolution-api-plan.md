@@ -8,6 +8,16 @@ gateway. This is a plan only — no code is written yet.
 It also closes the gap left by **H3** (delivery is currently email-only because
 no SMS provider exists): WhatsApp becomes the real "non-email" channel.
 
+> **Status (partially implemented).** The core seam is now in the codebase:
+> `server/whatsapp-service.ts` (`isWhatsAppConfigured`, `normalizeNzPhone`,
+> `sendWhatsApp`), channel-aware `deliverInvoice()` in `property-cron.ts` (used
+> by dispatch, reminders and resend), and `"whatsapp"` in the channel enums.
+> Set `EVOLUTION_API_URL` / `EVOLUTION_API_KEY` / `EVOLUTION_INSTANCE` and a
+> tenant with `preferredChannel: "whatsapp"` + a phone will be messaged on
+> WhatsApp (falling back to email). **Still to do:** per-merchant instance
+> onboarding/QR pairing, delivery/read webhooks, the opt-in checkbox + channel
+> picker UI, and the Cloud-API-vs-Baileys production decision (§9).
+
 ---
 
 ## 1. What Evolution API is, and how we run it
