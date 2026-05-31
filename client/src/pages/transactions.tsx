@@ -1,23 +1,16 @@
-import { useState } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { getCurrentMerchantId } from "@/lib/auth";
-import { 
-  Home, Package, BarChart3, SlidersHorizontal, Terminal, 
-  Download, Calendar, TrendingUp, DollarSign, CreditCard, ArrowUpDown,
-  Share2, Receipt, RotateCcw, AlertCircle, FileSpreadsheet
-} from "lucide-react";
+import { Download, FileSpreadsheet, RotateCcw, AlertCircle, Mail, MessageCircle, Link2, Check, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
+import QRCode from "qrcode";
 
 interface Transaction {
   id: number;
@@ -32,36 +25,89 @@ interface Transaction {
   merchantNet?: string;
 }
 
-const CustomTooltip = ({ active, payload }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-[#1F1A5F] rounded-lg px-4 py-2 shadow-lg opacity-90">
-        <p className="text-white text-sm font-medium">${payload[0].value.toFixed(2)}</p>
-      </div>
-    );
-  }
-  return null;
+/* ── Design tokens ── */
+const C = {
+  navy:   '#040D6D',
+  sky:    '#58ABFF',
+  white:  '#FFFFFF',
+  sheet:  '#F4F4F4',
+  handle: 'rgba(0,0,0,0.08)',
+  dark:   '#1a1a1a',
+  muted:  'rgba(0,0,0,0.35)',
 };
 
-const CustomDot = (props: any) => {
-  const { cx, cy } = props;
-  return (
-    <g>
-      <circle cx={cx} cy={cy} r={5} fill="#6976EB" stroke="#fff" strokeWidth={2} />
-    </g>
-  );
-};
+type Timeframe = 'day' | 'week' | 'month' | 'year';
+
+/* ── SVG chart helpers (ported from property-analytics) ── */
+function toSmooth(pts: number[], W: number, H: number, pad = 8) {
+  const n = pts.length;
+  if (n < 2) return { d: '', coords: [] as {x:number;y:number}[] };
+  const sx = (W - pad * 2) / (n - 1);
+  const coords = pts.map((v, i) => ({ x: pad + i * sx, y: pad + ((100 - v) / 100) * (H - pad * 2) }));
+  let d = `M${coords[0].x},${coords[0].y}`;
+  for (let i = 1; i < coords.length; i++) {
+    const prev = coords[i - 1], curr = coords[i];
+    const cpx = (prev.x + curr.x) / 2;
+    d += ` C${cpx},${prev.y} ${cpx},${curr.y} ${curr.x},${curr.y}`;
+  }
+  return { d, coords };
+}
+function toArea(pts: number[], W: number, H: number, pad = 8) {
+  const { d } = toSmooth(pts, W, H, pad);
+  if (!d) return '';
+  return d + ` L${W - pad},${H} L${pad},${H} Z`;
+}
+
+function buildChartData(txs: Transaction[], tf: Timeframe) {
+  const now = new Date();
+  const buckets = 10;
+  let getKey: (d: Date) => number;
+  if (tf === 'day')   getKey = d => Math.floor((now.getTime() - d.getTime()) / (2.4 * 3600000));
+  else if (tf === 'week')  getKey = d => Math.floor((now.getTime() - d.getTime()) / (16.8 * 3600000));
+  else if (tf === 'month') getKey = d => Math.floor((now.getTime() - d.getTime()) / (72 * 3600000));
+  else                     getKey = d => Math.floor((now.getTime() - d.getTime()) / (876 * 3600000));
+
+  const rev: number[] = Array(buckets).fill(0);
+  const cnt: number[] = Array(buckets).fill(0);
+
+  txs.forEach(tx => {
+    if (tx.status !== 'completed') return;
+    const date = new Date(tx.createdAt);
+    const bucket = Math.max(0, Math.min(buckets - 1, getKey(date)));
+    rev[buckets - 1 - bucket] += parseFloat(tx.price);
+    cnt[buckets - 1 - bucket] += 1;
+  });
+
+  const maxVal = Math.max(...rev, 1);
+  const maxCnt = Math.max(...cnt, 1);
+  return {
+    primary:   rev.map(v => Math.round((v / maxVal) * 90) + 5),
+    secondary: cnt.map(v => Math.round((v / maxCnt) * 90) + 5),
+  };
+}
 
 export default function Transactions() {
   const [, setLocation] = useLocation();
-  const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [selectedMetric, setSelectedMetric] = useState('revenue');
+  const [tf, setTf] = useState<Timeframe>('week');
+  const [totVis, setTotVis] = useState(true);
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [isActioning, setIsActioning] = useState(false);
   const [showRefundForm, setShowRefundForm] = useState(false);
   const [refundAmount, setRefundAmount] = useState("");
   const [refundReason, setRefundReason] = useState("");
+  const [showShare, setShowShare] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState('');
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [showDownloads, setShowDownloads] = useState(false);
+
+  /* Swipeable sheet */
+  const topRef    = useRef<HTMLDivElement>(null);
+  const sheetRef  = useRef<HTMLDivElement>(null);
+  const touchStartY   = useRef(0);
+  const touchStartOff = useRef(0);
+  const [sheetOffset, setSheetOffset] = useState<number | null>(null);
+  const [snapped, setSnapped]   = useState<'default' | 'full'>('default');
+  const [dragging, setDragging] = useState(false);
   const { toast } = useToast();
   const merchantId = getCurrentMerchantId();
 
@@ -167,71 +213,87 @@ export default function Transactions() {
     }
   };
 
-  const handleShare = async (tx: Transaction) => {
-    setIsActioning(true);
-    const merchantName = merchant?.businessName || merchant?.name || "Merchant";
-    try {
-      const blob = await fetchPdfBlob(tx.id);
-      const file = new File([blob], `receipt-${tx.id}.pdf`, { type: "application/pdf" });
-      const amount = `$${parseFloat(tx.price).toFixed(2)}`;
-      if (navigator.share && navigator.canShare({ files: [file] })) {
-        await navigator.share({ title: `Receipt from ${merchantName}`, text: `Payment receipt for ${amount}`, files: [file] });
-      } else if (navigator.share) {
-        await navigator.share({ title: `Receipt from ${merchantName}`, text: `Payment receipt for ${amount}`, url: window.location.href });
-      } else {
-        await handleDownload(tx);
-      }
-    } catch (e: any) {
-      if (e.name !== "AbortError") {
-        toast({ title: "Share failed", description: "Could not share receipt.", variant: "destructive" });
-      }
-    } finally {
-      setIsActioning(false);
-    }
-  };
 
-  const filteredTransactions = transactions.filter((tx: Transaction) => {
-    if (!dateRange.from && !dateRange.to) return true;
-    const txDate = new Date(tx.createdAt);
-    txDate.setHours(0, 0, 0, 0);
-    if (dateRange.from) {
-      const fromDate = new Date(dateRange.from);
-      fromDate.setHours(0, 0, 0, 0);
-      if (txDate < fromDate) return false;
-    }
-    if (dateRange.to) {
-      const toDate = new Date(dateRange.to);
-      toDate.setHours(23, 59, 59, 999);
-      if (txDate > toDate) return false;
-    }
-    return true;
-  });
+  /* Timeframe filter */
+  const cutoff = useMemo(() => {
+    const now = new Date();
+    return {
+      day:   new Date(now.getTime() - 24 * 3600000),
+      week:  new Date(now.getTime() - 7 * 86400000),
+      month: new Date(now.getTime() - 30 * 86400000),
+      year:  new Date(now.getTime() - 365 * 86400000),
+    }[tf];
+  }, [tf]);
+
+  const filteredTransactions = useMemo(() =>
+    (transactions as Transaction[]).filter(tx => new Date(tx.createdAt) >= cutoff),
+    [transactions, cutoff]
+  );
 
   const totalRevenue = filteredTransactions
     .filter((tx: Transaction) => tx.status === 'completed')
     .reduce((sum: number, tx: Transaction) => sum + parseFloat(tx.price), 0);
 
   const totalTransactions = filteredTransactions.filter((tx: Transaction) => tx.status === 'completed').length;
-  const avgTransaction = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
-  const successRate = transactions.length > 0 
-    ? (transactions.filter((tx: Transaction) => tx.status === 'completed').length / transactions.length) * 100 
-    : 0;
 
-  // Generate monthly data for chart (current year)
-  const currentYear = new Date().getFullYear();
-  const monthlyData = Array.from({ length: 12 }, (_, i) => {
-    const month = new Date(currentYear, i, 1).toLocaleString('default', { month: 'short' });
-    const monthTransactions = transactions.filter((tx: Transaction) => {
-      const txDate = new Date(tx.createdAt);
-      const txMonth = txDate.getMonth();
-      const txYear = txDate.getFullYear();
-      return txMonth === i && txYear === currentYear && tx.status === 'completed';
-    });
-    const value = monthTransactions.reduce((sum: number, tx: Transaction) => 
-      sum + parseFloat(tx.price), 0
-    );
-    return { month, value: parseFloat(value.toFixed(2)) };
-  });
+  const switchTf = (p: Timeframe) => {
+    if (p === tf) return;
+    setTotVis(false);
+    setTimeout(() => { setTf(p); setTotVis(true); }, 150);
+  };
+
+  const chart = useMemo(() =>
+    (transactions as Transaction[]).length > 0
+      ? buildChartData(transactions as Transaction[], tf)
+      : { primary: Array(10).fill(5), secondary: Array(10).fill(5) },
+    [transactions, tf]
+  );
+
+  /* Sheet drag measurement */
+  useEffect(() => {
+    const measure = () => {
+      if (topRef.current) setSheetOffset(topRef.current.offsetHeight + 12);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (topRef.current) ro.observe(topRef.current);
+    return () => ro.disconnect();
+  }, []);
+
+  const defaultOffset = sheetOffset ?? 340;
+
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartY.current   = e.touches[0].clientY;
+    touchStartOff.current = snapped === 'full' ? 0 : defaultOffset;
+    setDragging(true);
+  }, [snapped, defaultOffset]);
+
+  const onTouchMove = useCallback((e: React.TouchEvent) => {
+    const dy  = e.touches[0].clientY - touchStartY.current;
+    const raw = touchStartOff.current + dy;
+    setSheetOffset(Math.max(-24, Math.min(defaultOffset + 60, raw)));
+  }, [defaultOffset]);
+
+  const onTouchEnd = useCallback(() => {
+    setDragging(false);
+    const effective = sheetOffset ?? defaultOffset;
+    if (effective < defaultOffset / 2) {
+      setSnapped('full');
+      setSheetOffset(0);
+    } else {
+      setSnapped('default');
+      setSheetOffset(defaultOffset);
+    }
+  }, [sheetOffset, defaultOffset]);
+
+  /* QR code for selected transaction */
+  useEffect(() => {
+    if (!selectedTx) { setQrDataUrl(''); return; }
+    const url = `${window.location.origin}/receipt/${selectedTx.id}`;
+    QRCode.toDataURL(url, { width: 200, margin: 2, color: { dark: C.navy, light: '#ffffff' } })
+      .then(setQrDataUrl)
+      .catch(() => {});
+  }, [selectedTx]);
 
   const handleDownloadCSV = () => {
     const headers = ['ID', 'Date', 'Time', 'Item', 'Amount', 'Method', 'Status'];
@@ -309,8 +371,8 @@ export default function Transactions() {
 
     const merchantSlug = (merchant?.businessName || merchant?.name || 'taptpay')
       .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    const fromStr = dateRange.from ? dateRange.from.toISOString().split('T')[0] : 'all';
-    const toStr = dateRange.to ? dateRange.to.toISOString().split('T')[0] : 'today';
+    const fromStr = tf;
+    const toStr = new Date().toISOString().split('T')[0];
     a.download = `${merchantSlug}-xero-${fromStr}_${toStr}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
@@ -369,235 +431,166 @@ export default function Transactions() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0055FF]">
-      {/* Header — sits directly on the blue background */}
-      <div className="max-w-4xl mx-auto px-3 sm:px-6 pt-10 sm:pt-12 pb-8 sm:pb-10">
-        <h1 className="text-[#00E5CC] text-center text-xl sm:text-2xl md:text-3xl mb-6 sm:mb-8">analytics & reports</h1>
-        
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 max-w-full">
-          <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg sm:rounded-xl p-2 sm:p-2.5 md:p-3 min-w-0">
-            <div className="flex items-center gap-1 sm:gap-1.5 mb-0.5 sm:mb-1">
-              <DollarSign className="text-[#00E5CC] flex-shrink-0" size={12} />
-              <div className="text-[#00E5CC]/70 text-[9px] sm:text-[10px] md:text-xs truncate">Revenue</div>
-            </div>
-            <div className="text-white text-xs sm:text-sm md:text-base truncate" data-testid="stat-revenue">${totalRevenue.toFixed(2)}</div>
-          </div>
-          <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg sm:rounded-xl p-2 sm:p-2.5 md:p-3 min-w-0">
-            <div className="flex items-center gap-1 sm:gap-1.5 mb-0.5 sm:mb-1">
-              <CreditCard className="text-[#00E5CC] flex-shrink-0" size={12} />
-              <div className="text-[#00E5CC]/70 text-[9px] sm:text-[10px] md:text-xs truncate">Transactions</div>
-            </div>
-            <div className="text-white text-xs sm:text-sm md:text-base truncate" data-testid="stat-transactions">{totalTransactions}</div>
-          </div>
-          <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg sm:rounded-xl p-2 sm:p-2.5 md:p-3 min-w-0">
-            <div className="flex items-center gap-1 sm:gap-1.5 mb-0.5 sm:mb-1">
-              <TrendingUp className="text-[#00E5CC] flex-shrink-0" size={12} />
-              <div className="text-[#00E5CC]/70 text-[9px] sm:text-[10px] md:text-xs truncate">Avg. Sale</div>
-            </div>
-            <div className="text-white text-xs sm:text-sm md:text-base truncate" data-testid="stat-avg">${avgTransaction.toFixed(2)}</div>
-          </div>
-          <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg sm:rounded-xl p-2 sm:p-2.5 md:p-3 min-w-0">
-            <div className="flex items-center gap-1 sm:gap-1.5 mb-0.5 sm:mb-1">
-              <ArrowUpDown className="text-[#00E5CC] flex-shrink-0" size={12} />
-              <div className="text-[#00E5CC]/70 text-[9px] sm:text-[10px] md:text-xs truncate">Success Rate</div>
-            </div>
-            <div className="text-white text-xs sm:text-sm md:text-base truncate" data-testid="stat-success">{successRate.toFixed(1)}%</div>
-          </div>
+    <div style={{ background: C.navy, minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
+    <div style={{ width: '100%', maxWidth: 430, height: '100svh', fontFamily: "'Outfit', system-ui, sans-serif", background: C.navy, position: 'relative', overflow: 'hidden' }}>
+
+      {/* ── Dark top ── */}
+      <div ref={topRef} style={{ padding: '52px 24px 0' }}>
+        <div style={{ marginBottom: 20 }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: C.white }}>analytics</span>
+        </div>
+
+        {/* Period pills */}
+        <div style={{ display: 'flex', gap: 0, background: 'rgba(255,255,255,0.06)', borderRadius: 999, padding: 3, marginBottom: 20 }}>
+          {(['day', 'week', 'month', 'year'] as Timeframe[]).map(p => (
+            <button key={p} onClick={() => switchTf(p)} style={{ flex: 1, padding: '8px 0', borderRadius: 999, border: 'none', fontSize: 13, fontWeight: tf === p ? 600 : 500, textTransform: 'capitalize', background: tf === p ? C.sky : 'transparent', color: tf === p ? C.navy : 'rgba(255,255,255,0.4)', transition: 'all 0.3s cubic-bezier(0.34,1.56,0.64,1)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+              {p}
+            </button>
+          ))}
+        </div>
+
+        {/* Total */}
+        <div style={{ textAlign: 'center', marginBottom: 4 }}>
+          <p style={{ fontSize: 13, fontWeight: 400, color: 'rgba(255,255,255,0.4)', margin: 0, letterSpacing: '0.04em' }}>Revenue · {totalTransactions} transactions</p>
+          <p style={{ fontSize: 46, fontWeight: 700, color: C.white, margin: 0, letterSpacing: '-2px', marginTop: 6, fontVariantNumeric: 'tabular-nums', opacity: totVis ? 1 : 0, transform: totVis ? 'translateY(0)' : 'translateY(6px)', transition: 'all 0.45s cubic-bezier(0.34,1.56,0.64,1)' as any }}>
+            ${totalRevenue.toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
+        </div>
+
+        {/* SVG Chart */}
+        <div style={{ margin: '8px -24px 4px', overflow: 'visible' }}>
+          {(() => {
+            const W = 342, H = 100, pad = 8;
+            const { d: pLine, coords: pCoords } = toSmooth(chart.primary, W, H, pad);
+            const { d: sLine } = toSmooth(chart.secondary, W, H, pad);
+            const pArea = toArea(chart.primary, W, H, pad);
+            const sArea = toArea(chart.secondary, W, H, pad);
+            const tipPt = pCoords[7] ?? { x: W - pad, y: H / 2 };
+            return (
+              <div style={{ position: 'relative', margin: '8px 0 4px', padding: '0 4px' }}>
+                <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="auto" style={{ display: 'block', overflow: 'visible' }}>
+                  <defs>
+                    <linearGradient id="ra1" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={C.sky} stopOpacity="0.22" />
+                      <stop offset="100%" stopColor={C.sky} stopOpacity="0" />
+                    </linearGradient>
+                    <linearGradient id="ra2" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={C.sky} stopOpacity="0.08" />
+                      <stop offset="100%" stopColor={C.sky} stopOpacity="0" />
+                    </linearGradient>
+                  </defs>
+                  {sArea && <path d={sArea} fill="url(#ra2)" />}
+                  {sLine && <path d={sLine} fill="none" stroke={C.sky} strokeWidth="1.5" strokeOpacity="0.3" strokeDasharray="4 3" />}
+                  {pArea && <path d={pArea} fill="url(#ra1)" />}
+                  {pLine && <path d={pLine} fill="none" stroke={C.sky} strokeWidth="2" />}
+                  <circle cx={tipPt.x} cy={tipPt.y} r="4" fill={C.sky} />
+                  <circle cx={tipPt.x} cy={tipPt.y} r="7" fill={C.sky} fillOpacity="0.22" />
+                </svg>
+              </div>
+            );
+          })()}
         </div>
       </div>
 
-      {/* White rounded-top overlay — main content sits on this */}
-      <div className="bg-white rounded-t-[40px] sm:rounded-t-[48px] min-h-screen pb-32">
-        <div className="max-w-6xl mx-auto px-3 sm:px-6 pt-6 sm:pt-8 space-y-4 sm:space-y-6">
-        {/* Chart Section */}
-        <div className="bg-white rounded-[15px] p-4 sm:p-8 shadow-[0px_23px_28.6px_rgba(0,0,0,0.03)]">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 mb-6 sm:mb-8">
-            <h2 className="text-[#808080] text-base sm:text-lg">Revenue performance</h2>
-            <Select value={selectedMetric} onValueChange={setSelectedMetric}>
-              <SelectTrigger className="w-full sm:w-[170px] border-b border-black/[0.11] rounded-none">
-                <SelectValue placeholder="Select metric" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="revenue">Revenue</SelectItem>
-                <SelectItem value="sales">Sales</SelectItem>
-                <SelectItem value="profit">Profit</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="w-full h-[300px] sm:h-[350px] md:h-[400px]">
-            {isLoading ? (
-              <div className="h-full flex items-center justify-center text-[#3B3D53]">Loading chart...</div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={monthlyData} margin={{ top: 20, right: 20, left: 0, bottom: 20 }}>
-                  <defs>
-                    <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6976EB" stopOpacity={0.1}/>
-                      <stop offset="95%" stopColor="#6976EB" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="0" stroke="rgba(0, 0, 0, 0.06)" vertical={false} />
-                  <XAxis 
-                    dataKey="month" 
-                    stroke="rgba(128, 128, 128, 0.69)"
-                    tick={{ fill: 'rgba(128, 128, 128, 0.69)', fontSize: 12 }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis 
-                    stroke="rgba(128, 128, 128, 0.69)"
-                    tick={{ fill: 'rgba(128, 128, 128, 0.69)', fontSize: 12 }}
-                    axisLine={false}
-                    tickLine={false}
-                    tickFormatter={(value) => value.toString()}
-                  />
-                  <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#6976EB', strokeWidth: 1, strokeDasharray: '4 4' }} />
-                  <Area 
-                    type="monotone" 
-                    dataKey="value" 
-                    stroke="#6976EB" 
-                    strokeWidth={3}
-                    fill="url(#colorValue)"
-                    dot={<CustomDot />}
-                    activeDot={{ r: 8, fill: '#6976EB', stroke: '#fff', strokeWidth: 2 }}
-                    animationDuration={800}
-                    animationEasing="ease-in-out"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            )}
-          </div>
+      {/* ── Swipeable white sheet ── */}
+      <div
+        ref={sheetRef}
+        style={{
+          position: 'absolute', top: 0, left: 0, right: 0,
+          height: '100svh',
+          background: C.sheet,
+          borderRadius: '32px 32px 0 0',
+          transform: `translateY(${sheetOffset ?? defaultOffset}px)`,
+          transition: dragging ? 'none' : 'transform 0.38s cubic-bezier(0.34,1.56,0.64,1)',
+          overflowY: snapped === 'full' ? 'auto' : 'hidden',
+          overflowX: 'hidden',
+          willChange: 'transform',
+        }}
+      >
+        {/* Drag handle */}
+        <div
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+          onTouchCancel={onTouchEnd}
+          style={{ width: '100%', height: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'grab', flexShrink: 0, touchAction: 'none' }}
+        >
+          <div style={{ width: 40, height: 5, borderRadius: 3, background: C.handle }} />
         </div>
 
-        {/* Reports Section */}
-        <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-md">
-          <h2 className="text-[#3B3D53] text-base sm:text-lg mb-4">Download Reports</h2>
-          
-          <div className="flex flex-col sm:flex-row gap-4 mb-4">
-            <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="flex-1 justify-start border-[#0055FF]/30 text-left" data-testid="button-date-range">
-                  <Calendar className="mr-2 h-4 w-4 text-[#0055FF] flex-shrink-0" />
-                  <span className="truncate">
-                    {dateRange.from ? (
-                      dateRange.to ? (
-                        `${dateRange.from.toLocaleDateString()} - ${dateRange.to.toLocaleDateString()}`
-                      ) : (
-                        dateRange.from.toLocaleDateString()
-                      )
-                    ) : (
-                      'Select date range'
-                    )}
-                  </span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <CalendarComponent
-                  mode="range"
-                  defaultMonth={dateRange.from}
-                  selected={dateRange.from && dateRange.to ? { from: dateRange.from, to: dateRange.to } : undefined}
-                  onSelect={(range: any) => {
-                    if (range?.from) {
-                      setDateRange({ from: range.from, to: range.to });
-                      if (range.to) {
-                        setShowDatePicker(false);
-                        toast({ title: `Date range: ${range.from.toLocaleDateString()} - ${range.to.toLocaleDateString()}` });
-                      }
-                    } else {
-                      setDateRange({});
-                    }
-                  }}
-                  numberOfMonths={2}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-
-            {dateRange.from && (
-              <Button 
-                variant="outline" 
-                onClick={() => setDateRange({})}
-                className="border-[#0055FF]/30 text-[#0055FF]"
-                data-testid="button-clear-date"
-              >
-                Clear
-              </Button>
-            )}
+        <div style={{ padding: '0 20px 130px', marginTop: 2 }}>
+          {/* Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <h2 style={{ fontSize: 20, fontWeight: 700, color: C.dark, margin: 0, letterSpacing: '-0.4px' }}>Transaction History</h2>
+            <button
+              onClick={() => setShowDownloads(v => !v)}
+              style={{ fontSize: 12, fontWeight: 600, color: C.sky, background: 'none', border: 'none', cursor: 'pointer' }}
+            >
+              {showDownloads ? 'hide exports' : 'export →'}
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Button onClick={handleDownloadPDF} className="bg-[#0055FF] hover:bg-[#0044DD] text-white" data-testid="button-pdf">
-              <Download className="mr-2 h-4 w-4" />
-              Business Report (PDF)
-            </Button>
-            <Button onClick={handleDownloadCSV} className="bg-[#00E5CC] hover:bg-[#00D4BC] text-white" data-testid="button-csv">
-              <Download className="mr-2 h-4 w-4" />
-              Raw Data (CSV)
-            </Button>
-            <Button onClick={handleDownloadXeroCSV} className="bg-[#13B5EA] hover:bg-[#1099C8] text-white" data-testid="button-xero-csv" title="Download CSV formatted for Xero bank statement import">
-              <FileSpreadsheet className="mr-2 h-4 w-4" />
-              Export for Xero
-            </Button>
-          </div>
-        </div>
-
-        {/* Transactions List */}
-        <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-md">
-          <h2 className="text-[#3B3D53] text-base sm:text-lg mb-4">Transaction History</h2>
-          
-          {isLoading ? (
-            <div className="text-center py-12 text-[#3B3D53]">Loading transactions...</div>
-          ) : filteredTransactions.length === 0 ? (
-            <div className="text-center py-12 text-[#3B3D53]">No transactions found</div>
-          ) : (
-            <div className="space-y-2 sm:space-y-3 max-h-96 overflow-y-auto">
-              {filteredTransactions.map((tx: Transaction) => (
-                <div
-                  key={tx.id}
-                  className="border border-gray-200 rounded-xl p-3 sm:p-4 hover:border-[#0055FF]/50 hover:bg-blue-50/30 transition-colors cursor-pointer"
-                  data-testid={`transaction-${tx.id}`}
-                  onClick={() => setSelectedTx(tx)}
-                >
-                  <div className="flex items-start justify-between gap-2 sm:gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <h3 className="text-[#3B3D53] text-sm sm:text-base truncate">{tx.itemName}</h3>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusBg(tx.status)} ${getStatusColor(tx.status)}`}>
-                          {getStatusLabel(tx.status)}
-                        </span>
-                      </div>
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs sm:text-sm">
-                        <div className="text-[#161A41]/70">
-                          {new Date(tx.createdAt).toLocaleString()}
-                        </div>
-                        <div className="text-[#161A41]/70 capitalize">
-                          {tx.paymentMethod.replace('_', ' ')}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                      <div className="text-sm sm:text-base text-[#0055FF]">
-                        ${parseFloat(tx.price).toFixed(2)}
-                      </div>
-                      <span className="text-[#00E5CC] text-xs">View receipt →</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
+          {/* Download section (collapsible) */}
+          {showDownloads && (
+            <div style={{ background: '#ffffff', borderRadius: 16, padding: 16, marginBottom: 16, border: '1px solid rgba(0,0,0,0.06)' }}>
+              <p style={{ fontSize: 12, fontWeight: 600, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Export Data</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <button onClick={handleDownloadPDF} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 10, background: C.navy, border: 'none', color: C.white, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                  <Download size={14} /> Business Report (PDF)
+                </button>
+                <button onClick={handleDownloadCSV} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 10, background: C.sky, border: 'none', color: C.navy, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                  <Download size={14} /> Raw Data (CSV)
+                </button>
+                <button onClick={handleDownloadXeroCSV} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 10, background: '#E8F4FD', border: 'none', color: '#0070BA', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                  <FileSpreadsheet size={14} /> Export for Xero
+                </button>
+              </div>
             </div>
           )}
-        </div>
+
+          {/* Transaction list */}
+          {isLoading ? (
+            <div style={{ textAlign: 'center', padding: '48px 0', color: C.muted, fontSize: 14 }}>Loading transactions…</div>
+          ) : filteredTransactions.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '48px 0', color: C.muted, fontSize: 14 }}>No transactions in this period</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {(filteredTransactions as Transaction[]).slice().reverse().map((tx: Transaction) => {
+                const statusDot: Record<string, string> = { completed: '#22C55E', pending: '#F59E0B', failed: '#EF4444', refunded: '#8B5CF6', partially_refunded: '#F97316' };
+                return (
+                  <div
+                    key={tx.id}
+                    onClick={() => { setSelectedTx(tx); setShowRefundForm(false); setShowShare(false); setRefundAmount(""); setRefundReason(""); }}
+                    style={{ background: '#ffffff', borderRadius: 16, padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', border: '1px solid rgba(0,0,0,0.05)' }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: C.dark, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tx.itemName}</div>
+                      <div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>
+                        {new Date(tx.createdAt).toLocaleString('en-NZ', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        {' · '}
+                        <span style={{ textTransform: 'capitalize' }}>{tx.paymentMethod.replace(/_/g, ' ')}</span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0, marginLeft: 12 }}>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: C.navy }}>${parseFloat(tx.price).toFixed(2)}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <div style={{ width: 6, height: 6, borderRadius: 999, background: statusDot[tx.status] || C.muted }} />
+                        <span style={{ fontSize: 11, color: C.muted, textTransform: 'capitalize' }}>{getStatusLabel(tx.status)}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Transaction Receipt Modal */}
-      <Dialog open={!!selectedTx} onOpenChange={(open) => { if (!open) { setSelectedTx(null); setShowRefundForm(false); setRefundAmount(""); setRefundReason(""); } }}>
+      <Dialog open={!!selectedTx} onOpenChange={(open) => { if (!open) { setSelectedTx(null); setShowRefundForm(false); setShowShare(false); setRefundAmount(""); setRefundReason(""); } }}>
         <DialogContent className="max-w-md w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Receipt className="w-5 h-5 text-[#00E5CC]" />
               Transaction Receipt
             </DialogTitle>
           </DialogHeader>
@@ -606,7 +599,7 @@ export default function Transactions() {
             const effectiveAmount = parseFloat(selectedTx.price);
             const gstAmount = (effectiveAmount * 0.15) / 1.15;
             const netAmount = effectiveAmount - gstAmount;
-            const merchantName = merchant?.businessName || merchant?.name || "Merchant";
+            const mName = (merchant as any)?.businessName || (merchant as any)?.name || "Merchant";
 
             return (
               <div className="space-y-4">
@@ -634,14 +627,14 @@ export default function Transactions() {
                 {/* Receipt Card */}
                 <div className="border border-gray-200 rounded-lg p-4 text-gray-800">
                   <div className="text-center border-b border-gray-200 pb-3 mb-3">
-                    <h3 className="font-semibold text-base">{merchantName}</h3>
-                    {merchant?.businessAddress && (
-                      <p className="text-xs text-gray-500 whitespace-pre-line mt-1">{merchant.businessAddress}</p>
+                    <h3 className="font-semibold text-base">{mName}</h3>
+                    {(merchant as any)?.businessAddress && (
+                      <p className="text-xs text-gray-500 whitespace-pre-line mt-1">{(merchant as any).businessAddress}</p>
                     )}
-                    {merchant?.contactPhone && <p className="text-xs text-gray-500">{merchant.contactPhone}</p>}
-                    {merchant?.contactEmail && <p className="text-xs text-gray-500">{merchant.contactEmail}</p>}
-                    {merchant?.gstNumber && <p className="text-xs text-gray-500 mt-1 font-medium">GST No: {merchant.gstNumber}</p>}
-                    {merchant?.nzbn && <p className="text-xs text-gray-500">NZBN: {merchant.nzbn}</p>}
+                    {(merchant as any)?.contactPhone && <p className="text-xs text-gray-500">{(merchant as any).contactPhone}</p>}
+                    {(merchant as any)?.contactEmail && <p className="text-xs text-gray-500">{(merchant as any).contactEmail}</p>}
+                    {(merchant as any)?.gstNumber && <p className="text-xs text-gray-500 mt-1 font-medium">GST No: {(merchant as any).gstNumber}</p>}
+                    {(merchant as any)?.nzbn && <p className="text-xs text-gray-500">NZBN: {(merchant as any).nzbn}</p>}
                   </div>
 
                   <div className="space-y-1 mb-3">
@@ -679,7 +672,7 @@ export default function Transactions() {
                   <Button
                     onClick={() => handleDownload(selectedTx)}
                     disabled={isActioning}
-                    className="w-full bg-[#0055FF] hover:bg-[#0044dd] text-white"
+                    className="w-full bg-[#040D6D] hover:bg-[#0a1880] text-white"
                   >
                     {isActioning ? (
                       <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />Working...</>
@@ -688,14 +681,63 @@ export default function Transactions() {
                     )}
                   </Button>
                   <Button
-                    onClick={() => handleShare(selectedTx)}
-                    disabled={isActioning}
+                    onClick={() => setShowShare(v => !v)}
                     variant="outline"
-                    className="w-full border-[#0055FF] text-[#0055FF] hover:bg-blue-50"
+                    className="w-full border-[#040D6D] text-[#040D6D] hover:bg-blue-50"
                   >
                     <Share2 className="w-4 h-4 mr-2" />
-                    Share Receipt
+                    {showShare ? 'Hide Share Options' : 'Share Receipt'}
                   </Button>
+
+                  {/* Inline share panel */}
+                  {showShare && (
+                    <div style={{ borderRadius: 12, border: '1px solid rgba(4,13,109,0.12)', padding: 16, background: '#F8FAFF', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <p style={{ fontSize: 11, fontWeight: 600, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>Share via</p>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        {/* Email */}
+                        <a
+                          href={`mailto:?subject=Receipt from ${mName}&body=Your receipt for $${parseFloat(selectedTx.price).toFixed(2)} — view it here: ${window.location.origin}/receipt/${selectedTx.id}`}
+                          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 10, background: C.navy, textDecoration: 'none', color: C.white, fontSize: 13, fontWeight: 600 }}
+                        >
+                          <Mail size={14} /> Email
+                        </a>
+                        {/* SMS */}
+                        <a
+                          href={`sms:?body=Receipt from ${mName}: ${window.location.origin}/receipt/${selectedTx.id}`}
+                          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 10, background: C.navy, textDecoration: 'none', color: C.white, fontSize: 13, fontWeight: 600 }}
+                        >
+                          <MessageCircle size={14} /> Text
+                        </a>
+                        {/* WhatsApp */}
+                        <a
+                          href={`https://wa.me/?text=${encodeURIComponent(`Receipt from ${mName}: ${window.location.origin}/receipt/${selectedTx.id}`)}`}
+                          target="_blank" rel="noopener noreferrer"
+                          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 10, background: '#25D366', textDecoration: 'none', color: C.white, fontSize: 13, fontWeight: 600 }}
+                        >
+                          <MessageCircle size={14} /> WhatsApp
+                        </a>
+                        {/* Copy link */}
+                        <button
+                          onClick={async () => {
+                            await navigator.clipboard.writeText(`${window.location.origin}/receipt/${selectedTx.id}`);
+                            setCopiedLink(true);
+                            setTimeout(() => setCopiedLink(false), 2000);
+                          }}
+                          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 10, background: copiedLink ? '#22C55E' : C.sky, border: 'none', color: C.navy, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                        >
+                          {copiedLink ? <Check size={14} /> : <Link2 size={14} />}
+                          {copiedLink ? 'Copied!' : 'Copy link'}
+                        </button>
+                      </div>
+                      {/* QR code */}
+                      {qrDataUrl && (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                          <p style={{ fontSize: 11, fontWeight: 600, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>QR Code</p>
+                          <img src={qrDataUrl} alt="Receipt QR code" style={{ width: 160, height: 160, borderRadius: 8, border: '1px solid rgba(0,0,0,0.08)' }} />
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Refund button — only for completed / partially refunded transactions */}
                   {(selectedTx.status === "completed" || selectedTx.status === "partially_refunded") && (
@@ -771,6 +813,7 @@ export default function Transactions() {
           })()}
         </DialogContent>
       </Dialog>
+    </div>
     </div>
   );
 }

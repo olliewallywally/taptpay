@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useLocation } from "wouter";
 
 const NAVY = '#040D6D';
 const BLUE = '#58ABFF';
@@ -204,12 +205,12 @@ function SubHead({ onCancel, onCommit }) {
   );
 }
 
-function ActiveStack({ items, status = 'awaiting payment', onItemClick }) {
+function ActiveStack({ items, status = 'awaiting payment', onItemClick, onExpand, onRowClick }) {
   return (
     <div>
       <div className="tp-stack-hdr">
         <div className="tp-stack-title">active stack</div>
-        <button style={{ color: BLUE, display: 'flex', background: 'none', border: 'none', cursor: 'pointer' }}><Ic.ChevR /></button>
+        <button onClick={onExpand} style={{ color: BLUE, display: 'flex', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}><Ic.ChevR /></button>
       </div>
       <div className="tp-stack-card">
         {items.length === 0 ? (
@@ -237,7 +238,7 @@ function ActiveStack({ items, status = 'awaiting payment', onItemClick }) {
           const allPaid    = splitSetup && (it.completedSplits ?? 0) >= (it.totalSplits ?? 1);
 
           return (
-            <div key={it.id} className={`tp-stack-row${isHold ? ' holdable' : ''}`} onClick={() => isHold && onItemClick?.(it)}>
+            <div key={it.id} className={`tp-stack-row${isHold ? ' holdable' : ''}`} onClick={() => { if (isHold) onItemClick?.(it); }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="tp-stack-name">{it.name}</div>
                 {isSplitTx ? (
@@ -306,7 +307,7 @@ function TopBanner({ notification }) {
 
 /* ═══════════════ SCREENS ═══════════════ */
 
-function MainTerminal({ state, go, paywaveOn, togglePaywave, onItemClick, showPaywave }) {
+function MainTerminal({ state, go, paywaveOn, togglePaywave, onItemClick, showPaywave, onExpand, onRowClick }) {
   const total = state.items.reduce((s, i) => s + i.amount, 0);
   const line  = state.items.map(i => i.name).join(', ');
   return (
@@ -323,14 +324,14 @@ function MainTerminal({ state, go, paywaveOn, togglePaywave, onItemClick, showPa
       </div>
       <div className="stagger" style={{ flex: 1, background: OFFW, padding: '154px 22px 90px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div className="tp-stack-scroll" style={{ flex: 1, overflow: 'auto', paddingRight: 2 }}>
-          <ActiveStack items={state.sent || []} status="sent" onItemClick={onItemClick} />
+          <ActiveStack items={state.sent || []} status="sent" onItemClick={onItemClick} onExpand={onExpand} onRowClick={onRowClick} />
         </div>
       </div>
     </div>
   );
 }
 
-function PendingTerminal({ state, go, paywaveOn, togglePaywave, onItemClick, showPaywave }) {
+function PendingTerminal({ state, go, paywaveOn, togglePaywave, onItemClick, showPaywave, onExpand, onRowClick }) {
   const pending = state.pending;
   const total   = pending?.amount || 0;
   return (
@@ -357,7 +358,7 @@ function PendingTerminal({ state, go, paywaveOn, togglePaywave, onItemClick, sho
       </div>
       <div className="stagger" style={{ flex: 1, background: OFFW, padding: '154px 22px 90px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div className="tp-stack-scroll" style={{ flex: 1, overflow: 'auto', paddingRight: 2 }}>
-          <ActiveStack items={state.sent || []} status="sent" onItemClick={onItemClick} />
+          <ActiveStack items={state.sent || []} status="sent" onItemClick={onItemClick} onExpand={onExpand} onRowClick={onRowClick} />
         </div>
       </div>
     </div>
@@ -959,6 +960,15 @@ export default function App({
   const [pendingSplitEnabled, setPendingSplitEnabled] = useState(false);
   const conveyorTimer = useRef(null);
 
+  /* Active stack expand + transaction detail */
+  const [stackExpanded, setStackExpanded] = useState(false);
+  const [selectedStackTx, setSelectedStackTx] = useState(null);
+  const [showTxRefundForm, setShowTxRefundForm] = useState(false);
+  const [txRefundAmount, setTxRefundAmount] = useState('');
+  const [txRefundReason, setTxRefundReason] = useState('');
+  const [txRefundSubmitting, setTxRefundSubmitting] = useState(false);
+  const [, setLocation] = useLocation();
+
   const currentId = dockActive !== 'terminal' ? 'dock-' + dockActive : screen;
 
   const triggerConveyor = (prevId, dir) => {
@@ -1137,8 +1147,8 @@ export default function App({
   const renderScreen = id => {
     if (id.startsWith('dock-')) return <DockPlaceholder tab={id.slice(5)} />;
     if (id === 'home') return state.pending
-      ? <PendingTerminal state={state} go={go} paywaveOn={paywaveOn} togglePaywave={() => setPaywaveOn(v => !v)} onItemClick={handleStackItemClick} showPaywave={showPaywave} />
-      : <MainTerminal    state={state} go={go} paywaveOn={paywaveOn} togglePaywave={() => setPaywaveOn(v => !v)} onItemClick={handleStackItemClick} showPaywave={showPaywave} />;
+      ? <PendingTerminal state={state} go={go} paywaveOn={paywaveOn} togglePaywave={() => setPaywaveOn(v => !v)} onItemClick={handleStackItemClick} showPaywave={showPaywave} onExpand={() => setStackExpanded(true)} onRowClick={it => { setSelectedStackTx(it); setShowTxRefundForm(false); }} />
+      : <MainTerminal    state={state} go={go} paywaveOn={paywaveOn} togglePaywave={() => setPaywaveOn(v => !v)} onItemClick={handleStackItemClick} showPaywave={showPaywave} onExpand={() => setStackExpanded(true)} onRowClick={it => { setSelectedStackTx(it); setShowTxRefundForm(false); }} />;
     if (id === 'keypad')  return <Keypad       state={state} go={go} onCommit={handleCommit} />;
     if (id === 'split')   return <SplitPayment state={state} go={go} onCommitSplit={handleSplitCommit} />;
     if (id === 'stock')   return <ChooseStock  state={state} go={go} onCommitStock={handleStockCommit} />;
@@ -1214,9 +1224,7 @@ export default function App({
           </div>
         </div>
 
-        <div className={`tp-pdock${dockVisible ? ' show' : ' hide'}`}>
-          <Dock active={dockActive} onPick={setDockActive} />
-        </div>
+        {/* Dock removed — BottomNavigation in App handles global nav */}
       </div>
 
       {showBoards && (
@@ -1236,6 +1244,217 @@ export default function App({
       {showQRModal && <QRModal onClose={() => setShowQRModal(false)} qrElement={qrElement} payLink={livePayLink} />}
 
       <div className={`tp-toast${toastMsg ? ' show' : ''}`}>{toastMsg}</div>
+
+      {/* ── Active Stack Full-Page Overlay ── */}
+      <div style={{
+        position: 'absolute', inset: 0, zIndex: 55,
+        background: OFFW,
+        transform: stackExpanded ? 'translateY(0)' : 'translateY(100%)',
+        transition: 'transform 0.38s cubic-bezier(0.16,1,0.3,1)',
+        display: 'flex', flexDirection: 'column',
+        overflowY: stackExpanded ? 'auto' : 'hidden',
+      }}>
+        {/* Header */}
+        <div style={{ background: NAVY, padding: '52px 24px 20px', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <button
+              onClick={() => setStackExpanded(false)}
+              style={{ width: 36, height: 36, borderRadius: 999, background: 'rgba(255,255,255,0.1)', border: 'none', color: BLUE, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            ><Ic.Back sz={20} /></button>
+            <span style={{ fontSize: 16, fontWeight: 700, color: BLUE, letterSpacing: '0.1em', textTransform: 'uppercase' }}>active stack</span>
+            <div style={{ width: 36 }} />
+          </div>
+          <div style={{ marginTop: 12, fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>
+            {(state.sent || []).length} transaction{(state.sent || []).length !== 1 ? 's' : ''}
+          </div>
+        </div>
+        {/* Transaction list */}
+        <div style={{ padding: '16px 18px 120px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {(state.sent || []).length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '48px 0', color: '#aaa', fontSize: 14 }}>No active transactions</div>
+          ) : (state.sent || []).map(it => {
+            const statusColors = { paid: '#22C55E', sent: '#22C55E', processing: '#3B82F6', 'awaiting payment': '#F59E0B', declined: '#EF4444', hold: '#8B5CF6' };
+            const dotColor = statusColors[it.status] || statusColors[it.status || ''] || '#8C8C8C';
+            const isSplitTx = !!(it.splitEnabled || it.isSplit || (it.totalSplits > 1));
+            return (
+              <div
+                key={it.id}
+                onClick={() => { setSelectedStackTx(it); setShowTxRefundForm(false); setTxRefundAmount(''); setTxRefundReason(''); }}
+                style={{ background: '#fff', borderRadius: 16, padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.05)' }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: NAVY, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name || it.itemName}</div>
+                  {isSplitTx && it.totalSplits > 1 ? (
+                    <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 3 }}>split bill · {it.completedSplits ?? 0} of {it.totalSplits} paid</div>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 4 }}>
+                      <div style={{ width: 6, height: 6, borderRadius: 999, background: dotColor, flexShrink: 0 }} />
+                      <span style={{ fontSize: 12, color: '#8C8C8C', textTransform: 'capitalize' }}>{it.status || 'awaiting payment'}</span>
+                    </div>
+                  )}
+                  {it.createdAt && (
+                    <div style={{ fontSize: 11, color: '#bbb', marginTop: 2 }}>
+                      {new Date(it.createdAt).toLocaleString('en-NZ', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0, marginLeft: 12, gap: 2 }}>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: NAVY }}>{fmt(it.amount)}</span>
+                  <span style={{ fontSize: 11, color: BLUE }}>view →</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Transaction Detail Modal (in expanded stack) ── */}
+      {selectedStackTx && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 60,
+          background: 'rgba(4,13,109,0.72)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+          animation: 'tp-fadeIn 0.2s ease both',
+        }} onClick={e => { if (e.target === e.currentTarget) { setSelectedStackTx(null); } }}>
+          <div style={{
+            background: '#fff', borderRadius: '28px 28px 0 0',
+            width: '100%', maxHeight: '85vh', overflowY: 'auto',
+            padding: '24px 22px 40px',
+            animation: 'tp-inUp 0.34s cubic-bezier(0.16,1,0.3,1) both',
+          }}>
+            {/* Handle bar */}
+            <div style={{ width: 40, height: 5, borderRadius: 3, background: 'rgba(0,0,0,0.1)', margin: '0 auto 20px' }} />
+
+            {/* Details */}
+            <div style={{ background: '#F8F9FF', borderRadius: 14, padding: 16, marginBottom: 14 }}>
+              <p style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 10px' }}>Transaction Details</p>
+              {selectedStackTx.id && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
+                  <span style={{ color: '#6B7280' }}>ID</span>
+                  <span style={{ color: NAVY, fontWeight: 600 }}>#{selectedStackTx.id}</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
+                <span style={{ color: '#6B7280' }}>Item</span>
+                <span style={{ color: NAVY, fontWeight: 600 }}>{selectedStackTx.name || selectedStackTx.itemName}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
+                <span style={{ color: '#6B7280' }}>Amount</span>
+                <span style={{ color: NAVY, fontWeight: 700 }}>{fmt(selectedStackTx.amount)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
+                <span style={{ color: '#6B7280' }}>Status</span>
+                <span style={{ color: NAVY, fontWeight: 600, textTransform: 'capitalize' }}>{selectedStackTx.status || 'awaiting payment'}</span>
+              </div>
+              {selectedStackTx.paymentMethod && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
+                  <span style={{ color: '#6B7280' }}>Method</span>
+                  <span style={{ color: NAVY, fontWeight: 600, textTransform: 'capitalize' }}>{selectedStackTx.paymentMethod.replace(/_/g, ' ')}</span>
+                </div>
+              )}
+              {selectedStackTx.createdAt && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                  <span style={{ color: '#6B7280' }}>Time</span>
+                  <span style={{ color: NAVY, fontWeight: 600 }}>{new Date(selectedStackTx.createdAt).toLocaleString('en-NZ', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+              )}
+              {selectedStackTx.totalSplits > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginTop: 6 }}>
+                  <span style={{ color: '#6B7280' }}>Split</span>
+                  <span style={{ color: NAVY, fontWeight: 600 }}>{selectedStackTx.completedSplits ?? 0} of {selectedStackTx.totalSplits} paid</span>
+                </div>
+              )}
+            </div>
+
+            {/* Action buttons */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {/* Receipt Share */}
+              <button
+                onClick={() => { setSelectedStackTx(null); setLocation(`/receipt/${selectedStackTx.id}`); }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '14px', borderRadius: 14, background: NAVY, border: 'none', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+              >
+                <Ic.Share sz={16} c="#fff" /> Share Receipt
+              </button>
+
+              {/* Refund */}
+              {(selectedStackTx.status === 'paid' || selectedStackTx.status === 'completed') && selectedStackTx.id && (
+                <button
+                  onClick={() => setShowTxRefundForm(v => !v)}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '14px', borderRadius: 14, background: 'transparent', border: '1.5px solid #EF4444', color: '#EF4444', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  {showTxRefundForm ? 'Cancel Refund' : 'Issue Refund'}
+                </button>
+              )}
+
+              {/* Refund form */}
+              {showTxRefundForm && selectedStackTx.id && (
+                <div style={{ background: '#FFF5F5', borderRadius: 12, padding: 14, border: '1px solid #FECACA', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#EF4444' }}>Issue Refund</p>
+                  <div>
+                    <label style={{ fontSize: 11, color: '#6B7280', display: 'block', marginBottom: 4 }}>Amount (NZD)</label>
+                    <input
+                      type="number" min="0.01" step="0.01"
+                      value={txRefundAmount}
+                      onChange={e => setTxRefundAmount(e.target.value)}
+                      placeholder={fmt(selectedStackTx.amount).replace('$', '')}
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #FECACA', fontSize: 13, boxSizing: 'border-box', outline: 'none' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, color: '#6B7280', display: 'block', marginBottom: 4 }}>Reason</label>
+                    <textarea
+                      value={txRefundReason}
+                      onChange={e => setTxRefundReason(e.target.value)}
+                      placeholder="e.g. Customer requested refund"
+                      rows={2}
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #FECACA', fontSize: 13, resize: 'none', boxSizing: 'border-box', outline: 'none' }}
+                    />
+                  </div>
+                  <button
+                    disabled={txRefundSubmitting}
+                    onClick={async () => {
+                      const amount = parseFloat(txRefundAmount);
+                      if (!amount || amount <= 0 || !txRefundReason.trim()) {
+                        toast('Amount and reason required'); return;
+                      }
+                      setTxRefundSubmitting(true);
+                      try {
+                        const token = localStorage.getItem('authToken');
+                        const res = await fetch(`/api/transactions/${selectedStackTx.id}/refunds`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                          body: JSON.stringify({ refundAmount: amount.toFixed(2), refundReason: txRefundReason.trim(), refundMethod: 'original_payment_method' }),
+                        });
+                        if (res.ok) {
+                          toast('Refund processed');
+                          setSelectedStackTx(null);
+                          setShowTxRefundForm(false);
+                        } else {
+                          const data = await res.json();
+                          toast(data.message || 'Refund failed');
+                        }
+                      } catch { toast('Refund failed'); }
+                      finally { setTxRefundSubmitting(false); }
+                    }}
+                    style={{ padding: '12px', borderRadius: 12, background: txRefundSubmitting ? '#ccc' : '#EF4444', border: 'none', color: '#fff', fontSize: 14, fontWeight: 600, cursor: txRefundSubmitting ? 'default' : 'pointer' }}
+                  >
+                    {txRefundSubmitting ? 'Processing…' : `Confirm Refund`}
+                  </button>
+                </div>
+              )}
+
+              <button
+                onClick={() => { setSelectedStackTx(null); setShowTxRefundForm(false); }}
+                style={{ padding: '12px', borderRadius: 14, background: '#F3F4F6', border: 'none', color: NAVY, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

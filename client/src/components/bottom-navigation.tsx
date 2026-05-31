@@ -41,8 +41,7 @@ const PROPERTY_ITEMS = [
   { id: 'settings',  path: '/settings',           Icon: IcoSettings },
 ];
 
-/* /terminal is intentionally excluded — SmartTransitions has its own internal dock */
-const RETAIL_NAV_PATHS = ['/dashboard', '/stock', '/transactions', '/settings'];
+const RETAIL_NAV_PATHS = ['/dashboard', '/stock', '/transactions', '/settings', '/terminal'];
 
 function readMode(): 'retail' | 'property' {
   try { return (localStorage.getItem('taptMode') as 'retail' | 'property') || 'retail'; } catch { return 'retail'; }

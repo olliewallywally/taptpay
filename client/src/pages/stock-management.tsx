@@ -365,6 +365,18 @@ export default function StockManagement() {
     return null;
   }
 
+  const { data: merchant } = useQuery({
+    queryKey: ["/api/merchants", merchantId],
+    queryFn: async () => {
+      const token = localStorage.getItem("authToken");
+      const response = await fetch(`/api/merchants/${merchantId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error("Failed to fetch merchant");
+      return response.json();
+    },
+  });
+
   const { data: stockItems = [], isLoading } = useQuery({
     queryKey: ["/api/merchants", merchantId, "stock-items"],
     queryFn: async () => {
@@ -498,86 +510,81 @@ export default function StockManagement() {
     { key: "price-desc", icon: ArrowDown01, label: "Price ↓" },
   ];
 
+  const businessName = (merchant as any)?.businessName || (merchant as any)?.name || 'My Store';
+  const initials = businessName.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
+
   return (
-    <div className="min-h-screen bg-[#0055FF]">
-      {/* Header — sits directly on the blue background */}
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-10 sm:pt-12 pb-8 sm:pb-10">
-        <h1 className="text-[#00E5CC] text-center text-xl sm:text-2xl md:text-3xl mb-6">
-          inventory
-        </h1>
+    <div className="min-h-screen pb-32" style={{ background: '#F4F4F4', fontFamily: "'Outfit', system-ui, sans-serif" }}>
+      {/* Safe-area spacer */}
+      <div style={{ height: 54 }} />
 
-        {/* Search */}
-        <div className="relative mb-4">
-          <input
-            type="text"
-            placeholder="Search products…"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-white/10 backdrop-blur-sm border border-[#00E5CC]/30 rounded-full px-5 py-3 pl-12 text-white placeholder-[#00E5CC]/60 focus:outline-none focus:border-[#00E5CC]"
-            data-testid="input-search"
-          />
-          <Search
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-[#00E5CC]"
-            size={18}
-          />
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
-          {[
-            { label: "Total items", value: stockItems.length, color: "text-[#00E5CC]" },
-            {
-              label: "Total value",
-              value: `$${totalValue.toFixed(2)}`,
-              color: "text-yellow-300",
-            },
-            {
-              label: "Showing",
-              value: filteredAndSorted.length,
-              color: "text-[#00E5CC]",
-            },
-          ].map(({ label, value, color }) => (
-            <div
-              key={label}
-              className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-3 sm:p-4 text-center"
-            >
-              <div className={`${color} text-xl sm:text-2xl font-semibold`} data-testid={label === "Total items" ? "text-total-items" : undefined}>
-                {value}
-              </div>
-              <div className="text-[#00E5CC]/70 text-[11px] sm:text-xs mt-0.5">{label}</div>
+      {/* Tenant-profile-style navy header */}
+      <div style={{ padding: '0 18px' }}>
+        <div style={{ background: '#040D6D', borderRadius: 24, padding: '24px 26px 26px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            {/* Avatar */}
+            <div style={{ width: 56, height: 56, borderRadius: 999, background: '#58ABFF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <span style={{ fontWeight: 700, fontSize: 20, color: '#040D6D' }}>{initials}</span>
             </div>
-          ))}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: 18, color: '#FFFFFF', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {businessName}
+              </div>
+              <div style={{ fontWeight: 500, fontSize: 11, color: '#58ABFF', letterSpacing: '0.14em', textTransform: 'uppercase', marginTop: 3 }}>
+                inventory
+              </div>
+            </div>
+            {/* Item count badge */}
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 11px', borderRadius: 10, background: 'rgba(88,171,255,0.18)', color: '#58ABFF', fontWeight: 600, fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', flexShrink: 0 }}>
+              <span style={{ width: 6, height: 6, borderRadius: 999, background: '#58ABFF', flexShrink: 0 }} />
+              {(stockItems as any[]).length} items
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* White rounded-top overlay — content sits on this */}
-      <div className="bg-white rounded-t-[40px] sm:rounded-t-[48px] min-h-screen pb-32">
+      {/* White rounded-top content area */}
+      <div style={{ background: '#FFFFFF', borderRadius: '40px 40px 0 0', marginTop: 16 }}>
         <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8">
-        {/* Toolbar: sort + add */}
-        <div className="flex items-center gap-2 mb-4 flex-wrap">
-          <div className="flex items-center gap-1 flex-1 flex-wrap">
-            {sortButtons.map(({ key, icon: Icon, label }) => (
-              <button
-                key={key}
-                onClick={() => setSortKey(key)}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                  sortKey === key
-                    ? "bg-[#0055FF] text-white shadow-sm"
-                    : "bg-white text-gray-500 border border-gray-200 hover:border-[#0055FF] hover:text-[#0055FF]"
-                }`}
-              >
-                <Icon size={12} />
-                {label}
-              </button>
-            ))}
+
+        {/* Search row with + button */}
+        <div className="relative flex items-center gap-3 mb-4">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              placeholder="Search products…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-gray-50 border border-gray-200 rounded-full px-5 py-3 pl-11 text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#040D6D] text-sm"
+              data-testid="input-search"
+            />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
           </div>
           <button
             onClick={openAdd}
-            className="flex items-center gap-2 bg-[#0055FF] text-white rounded-full px-4 py-2 text-sm font-medium hover:bg-[#0044DD] transition-colors shadow-md"
             data-testid="button-add-product"
+            style={{ width: 44, height: 44, borderRadius: 999, background: '#040D6D', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 4px 14px rgba(4,13,109,0.3)' }}
           >
-            <Plus size={16} /> Add
+            <Plus size={20} color="#58ABFF" />
           </button>
+        </div>
+
+        {/* Sort toolbar */}
+        <div className="flex items-center gap-1 mb-4 flex-wrap">
+          {sortButtons.map(({ key, icon: Icon, label }) => (
+            <button
+              key={key}
+              onClick={() => setSortKey(key)}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                sortKey === key
+                  ? "bg-[#040D6D] text-white shadow-sm"
+                  : "bg-white text-gray-500 border border-gray-200 hover:border-[#040D6D] hover:text-[#040D6D]"
+              }`}
+            >
+              <Icon size={12} />
+              {label}
+            </button>
+          ))}
         </div>
 
         {/* Grid */}

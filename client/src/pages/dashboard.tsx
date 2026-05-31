@@ -106,7 +106,7 @@ export default function Dashboard() {
   // Calculate today's transactions (resets at midnight)
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-  
+
   const todayTransactions = transactions.filter((tx: any) => {
     const txDate = new Date(tx.createdAt);
     return txDate >= todayStart && tx.status === 'completed';
@@ -114,10 +114,15 @@ export default function Dashboard() {
 
   const todayRevenue = todayTransactions.reduce((sum: number, tx: any) => sum + parseFloat(tx.price), 0);
   const todayTransactionCount = todayTransactions.length;
-  
+
   // Use merchant's custom daily goal or default to $500
   const dailyGoal = merchant?.dailyGoal ? parseFloat(merchant.dailyGoal) : 500;
   const dailyPercentage = Math.min(100, (todayRevenue / dailyGoal) * 100);
+
+  // Active transactions count (pending or processing)
+  const activeCount = (transactions as any[]).filter((tx: any) => tx.status === 'pending' || tx.status === 'processing').length;
+  const allTodayCount = (transactions as any[]).filter((tx: any) => new Date(tx.createdAt) >= todayStart).length;
+  const completionPct = allTodayCount > 0 ? todayTransactions.length / allTodayCount : 0;
 
   // Calculate last 7 days revenue (for the 7 Days Revenue card)
   const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
@@ -202,39 +207,28 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-200 pb-32">
-      {/* Header Section with Active Transactions */}
-      <div className="relative">
-        <div className="absolute left-0 right-0 h-[80px] sm:h-[106px] bg-[#00E5CC] rounded-b-[60px] sm:rounded-b-[100px] z-0" style={{ bottom: '-20px' }}></div>
+    <div className="min-h-screen pb-32" style={{ background: '#F4F4F4', fontFamily: "'Outfit', system-ui, sans-serif" }}>
+      {/* Safe-area spacer */}
+      <div style={{ height: 54 }} />
 
-        <div className="bg-[#0055FF] pt-6 sm:pt-8 pb-5 sm:pb-7 rounded-b-[60px] sm:rounded-b-[100px] relative z-10">
-          <div className="max-w-md lg:max-w-lg mx-auto px-4 sm:px-6">
-            <h1 className="text-[#00E5CC] text-center text-xl sm:text-2xl mb-6 sm:mb-10">active transactions</h1>
-
-            <div className="relative flex items-center justify-center mb-4 sm:mb-6">
-              <SemiCircularProgress
-                percentage={dailyPercentage}
-                size={chartSize}
-                strokeWidth={14}
-                color="#00E5CC"
-                backgroundColor="rgba(0, 229, 204, 0.2)"
-              />
-              <div className="absolute text-center" style={{ bottom: '8px' }}>
-                <div className="text-[#00E5CC] text-3xl sm:text-4xl lg:text-4xl mb-0.5">
-                  ${todayRevenue.toFixed(2)}
-                </div>
-                <div className="text-[#00E5CC] text-sm sm:text-base">
-                  {todayTransactionCount} transaction{todayTransactionCount !== 1 ? 's' : ''} today
-                </div>
-              </div>
-            </div>
+      {/* Active transactions hero */}
+      <div style={{ padding: '0 18px' }}>
+        <div style={{ background: '#040D6D', borderRadius: 24, padding: '24px 26px 26px' }}>
+          <div style={{ fontWeight: 900, fontSize: 62, color: '#58ABFF', letterSpacing: '-0.04em', lineHeight: 0.92, fontVariantNumeric: 'tabular-nums' }}>
+            {activeCount}
+          </div>
+          <div style={{ fontWeight: 500, fontSize: 12, color: '#58ABFF', letterSpacing: '0.16em', textTransform: 'uppercase', marginTop: 6 }}>
+            active transaction{activeCount !== 1 ? 's' : ''}
+          </div>
+          <div style={{ marginTop: 18, height: 24, borderRadius: 999, border: '1.5px solid #58ABFF', padding: 3 }}>
+            <div style={{ width: `${Math.max(4, completionPct * 100)}%`, height: '100%', borderRadius: 999, background: '#58ABFF', transition: 'width 0.8s ease' }} />
           </div>
         </div>
       </div>
 
       {/* Pending account banner */}
       {merchant && merchant.status !== 'active' && (
-        <div className="max-w-md lg:max-w-5xl mx-auto px-3 sm:px-6 mt-[40px] sm:mt-[50px] relative z-10">
+        <div className="max-w-md lg:max-w-5xl mx-auto px-3 sm:px-6 mt-4 relative z-10">
           <div className="bg-amber-50 border border-amber-300 rounded-2xl px-4 py-3 flex items-start gap-3 mb-4">
             <span className="text-amber-500 text-lg mt-0.5">⏳</span>
             <div>
@@ -248,7 +242,7 @@ export default function Dashboard() {
       )}
 
       {/* Stats Cards */}
-      <div className={`max-w-md lg:max-w-5xl mx-auto px-3 sm:px-6 relative z-10 ${merchant && merchant.status !== 'active' ? '' : 'mt-[40px] sm:mt-[50px]'}`}>
+      <div className="max-w-md lg:max-w-5xl mx-auto px-3 sm:px-6 relative z-10 mt-4">
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 lg:gap-5 mb-4 sm:mb-5">
 
           {/* Monthly Stats Widget with Circle Graph */}
