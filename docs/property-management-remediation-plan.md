@@ -2,16 +2,14 @@
 
 Tracks the items from the integration review.
 
-**All review items are now complete.**
+**All review items are complete.**
 - C2 recurring-rent automation UI — `ffbf049`
 - C1 payment completion + L1 dead-code removal — `b1f44fa`
 - H1, H3, M2, M3, L2, L3, L4 + overdue reminder auto-resend backend — `a3bba61`
 - Overdue reminder settings UI on the automate page — `c5db2dc`
-- H2 / M1 duplicate-invoice rework — `<pending>` (see below; the only item that
-  still needs a product decision before coding)
+- H2 / M1 resend-existing-invoice (no duplicates) + honest batch reporting — `ba01d98`
 
-The per-item notes below are kept for reference. **H2 + M1 are the only ones
-not yet implemented** — everything else is done and marked inline.
+The per-item notes below are kept for reference; every item is marked done inline.
 
 ### New since the review: overdue reminder auto-resend
 
@@ -107,7 +105,14 @@ once, confirm the invoice is both generated **and** dispatched in the same call.
 
 ---
 
-## H2 — 🟠 Every "send" creates a new invoice (duplicates)
+## H2 — ✅ DONE (`ba01d98`) — Every "send" created a new invoice
+
+Decision: **resend the existing invoice, never duplicate.** The create endpoint
+dedupes by tenant (updates amount + resends the live invoice if one exists,
+else creates and emails immediately); a resend-by-id endpoint backs batch;
+`getLiveInvoiceByTenant` finds the target. Original notes below.
+
+## H2 (original) — Every "send" creates a new invoice (duplicates)
 
 **Problem.** Tapping an existing pending invoice row routes to the send screen,
 but `handleSend` always POSTs a brand-new ad-hoc invoice. Tapping an existing
@@ -172,7 +177,14 @@ is no longer selectable if gated off).
 
 ---
 
-## M1 — 🟡 Batch send reports false success
+## M1 — ✅ DONE (`ba01d98`) — Batch send reports false success
+
+Batch now resends each tenant's live invoice, skips those without one, checks
+every response, and reports honest counts ("Resent N · X skipped · Y failed").
+The select list shows each tenant's resendable amount or "no invoice". Original
+notes below.
+
+## M1 (original) — Batch send reports false success
 
 **Problem.** `batchMutation` fires N fetches via `Promise.all`, never checks
 `r.ok`, and reports "Sent to N tenants." Tenants with no existing invoice get
@@ -257,13 +269,11 @@ Then run a no-op `drizzle-kit generate` to confirm zero drift.
 
 ## Remaining work
 
-Only **H2 + M1** (duplicate-invoice semantics — terminal always creates a new
-invoice on send; batch reports false success) are left, and they need a product
-decision first: should re-sending an existing invoice *resend* it or always
-mint a new one? Once decided, they're one combined change (a resend endpoint +
-batch skip/dedupe + honest success reporting).
+All original review items (C1, C2, H1–H3, M1–M3, L1–L4) are complete.
 
 Minor future polish, not from the original review:
 - A per-attempt ceiling for *transient* dispatch failures (L4 covers the
   permanent no-email case; a flaky SMTP error still retries each run).
 - Real SMS delivery if/when a provider is added (H3 is email-only today).
+- Both migrations (`0003`, `0004`) must be run against the database before
+  deploy.
