@@ -407,8 +407,60 @@ function SendRentLink({ go, selectedTenant, amount, onSend, sending, frequency, 
   );
 }
 
+/* ═══ Overdue reminder settings card ═══ */
+function ReminderSettingsCard({ settings, onUpdate }: any) {
+  const s = settings || {};
+  const enabled  = s.rentReminderEnabled ?? true;
+  const delay    = s.rentReminderDelayDays ?? 3;
+  const interval = s.rentReminderIntervalDays ?? 3;
+  const max      = s.rentReminderMaxCount ?? 3;
+
+  const Row = ({ label, value, options, onPick, fmt }: any) => (
+    <div style={{ marginTop: 12 }}>
+      <div style={{ fontSize: 10.5, fontWeight: 600, color: 'rgba(88,171,255,0.5)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 7 }}>{label}</div>
+      <div style={{ display: 'flex', gap: 7 }}>
+        {options.map((o: number) => {
+          const on = value === o;
+          return (
+            <button key={o} onClick={() => onPick(o)}
+              style={{ flex: 1, padding: '9px 2px', borderRadius: 11, border: `1.5px solid ${on ? BLUE : 'rgba(88,171,255,0.18)'}`, background: on ? BLUE : 'rgba(255,255,255,0.04)', color: on ? NAVY : BLUE, fontWeight: 700, fontSize: 12.5, cursor: 'pointer', fontFamily: 'Outfit, system-ui', transition: 'all 0.16s ease' }}>
+              {fmt(o)}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ background: 'rgba(255,176,46,0.06)', border: '1px solid rgba(255,176,46,0.25)', borderRadius: 18, padding: '15px 16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <Ic.Repeat sz={16} c={AMBER} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 13.5, color: BLUE }}>overdue reminders</div>
+          <div style={{ fontSize: 11, color: 'rgba(88,171,255,0.5)', marginTop: 1 }}>auto-resend the link until paid</div>
+        </div>
+        <button onClick={() => onUpdate({ rentReminderEnabled: !enabled })} aria-label="toggle reminders"
+          style={{ width: 46, height: 27, borderRadius: 999, border: 'none', cursor: 'pointer', background: enabled ? GREEN : 'rgba(88,171,255,0.25)', position: 'relative', transition: 'background 0.2s', flexShrink: 0, padding: 0 }}>
+          <span style={{ position: 'absolute', top: 3, left: enabled ? 22 : 3, width: 21, height: 21, borderRadius: 999, background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+        </button>
+      </div>
+      {enabled && (
+        <>
+          <Row label="remind after"  value={delay}    options={[1, 3, 7]}    onPick={(v: number) => onUpdate({ rentReminderDelayDays: v })}    fmt={(o: number) => `${o}d`} />
+          <Row label="repeat every"  value={interval} options={[1, 3, 7]}    onPick={(v: number) => onUpdate({ rentReminderIntervalDays: v })} fmt={(o: number) => `${o}d`} />
+          <Row label="max reminders" value={max}      options={[1, 3, 5, 0]} onPick={(v: number) => onUpdate({ rentReminderMaxCount: v })}     fmt={(o: number) => (o === 0 ? '∞' : String(o))} />
+          <div style={{ marginTop: 11, fontSize: 11, color: 'rgba(88,171,255,0.55)', lineHeight: 1.5 }}>
+            once overdue, we email the payment link after {delay} day{delay !== 1 ? 's' : ''}, then every {interval} day{interval !== 1 ? 's' : ''}{max > 0 ? ` (up to ${max}×)` : ''}.
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ═══ SCREEN: Automate (manage schedules) ═══ */
-function AutomateScreen({ go, schedules, tenants, onPauseResume, onCancel, busyId }: any) {
+function AutomateScreen({ go, schedules, tenants, onPauseResume, onCancel, busyId, reminderSettings, onUpdateReminders }: any) {
   const tenantById = (id: string) => (tenants as any[]).find((t: any) => t.id === id);
   const live = (schedules as any[]).filter((s: any) => s.status !== 'terminated');
 
@@ -425,11 +477,13 @@ function AutomateScreen({ go, schedules, tenants, onPauseResume, onCancel, busyI
         <div style={{ height: 52 }} />
       </div>
       <div className="stagger" style={{ flex: 1, background: NAVY, padding: '52px 22px 0', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        <div style={{ color: BLUE, fontWeight: 500, fontSize: 18, textAlign: 'center', marginBottom: 16, flexShrink: 0 }}>recurring rent</div>
+        <div style={{ color: BLUE, fontWeight: 500, fontSize: 18, textAlign: 'center', marginBottom: 16, flexShrink: 0 }}>automation</div>
         <div className="tp-thin-scroll" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 110 }}>
+          <ReminderSettingsCard settings={reminderSettings} onUpdate={onUpdateReminders} />
+          <div style={{ fontSize: 10.5, fontWeight: 600, color: 'rgba(88,171,255,0.45)', letterSpacing: '0.12em', textTransform: 'uppercase', margin: '6px 2px 0' }}>recurring rent</div>
           {live.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '32px 16px', color: 'rgba(88,171,255,0.5)', fontSize: 13, lineHeight: 1.6 }}>
-              no automations yet — choose a repeat frequency when sending a rent request to set one up
+            <div style={{ textAlign: 'center', padding: '20px 16px', color: 'rgba(88,171,255,0.5)', fontSize: 13, lineHeight: 1.6 }}>
+              no schedules yet — choose a repeat frequency when sending a rent request to set one up
             </div>
           ) : live.map((s: any) => {
             const t = tenantById(s.tenantProfileId);
@@ -652,6 +706,12 @@ export default function PropertyTerminal() {
     staleTime: 30000, retry: false,
   });
 
+  const { data: reminderSettings } = useQuery<any>({
+    queryKey: ['/api/property/reminder-settings'],
+    queryFn: () => fetch('/api/property/reminder-settings', { credentials: 'include' }).then(r => r.ok ? r.json() : null),
+    staleTime: 60000, retry: false,
+  });
+
   /* Mutations */
   const sendMutation = useMutation({
     mutationFn: async ({ tenantId, amountCents, channel, freq }: any) => {
@@ -704,6 +764,29 @@ export default function PropertyTerminal() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/property/schedules'] }); },
     onError: () => { toast('Could not update automation'); },
     onSettled: () => { setBusyScheduleId(null); },
+  });
+
+  const reminderMutation = useMutation({
+    mutationFn: async (patch: any) => {
+      const r = await fetch('/api/property/reminder-settings', {
+        method: 'PUT', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      if (!r.ok) throw new Error('Failed to save');
+      return r.json();
+    },
+    onMutate: async (patch: any) => {
+      await queryClient.cancelQueries({ queryKey: ['/api/property/reminder-settings'] });
+      const prev = queryClient.getQueryData(['/api/property/reminder-settings']);
+      queryClient.setQueryData(['/api/property/reminder-settings'], (old: any) => ({ ...(old || {}), ...patch }));
+      return { prev };
+    },
+    onError: (_e, _v, ctx: any) => {
+      if (ctx?.prev !== undefined) queryClient.setQueryData(['/api/property/reminder-settings'], ctx.prev);
+      toast('Could not save reminders');
+    },
+    onSuccess: (data: any) => { queryClient.setQueryData(['/api/property/reminder-settings'], data); },
   });
 
   const markMutation = useMutation({
@@ -864,7 +947,7 @@ export default function PropertyTerminal() {
     if (id === 'send')     return <SendRentLink go={go} selectedTenant={selectedTenant} amount={amount} onSend={handleSend} sending={sendMutation.isPending} frequency={frequency} setFrequency={setFrequency} />;
     if (id === 'external') return <MarkExternal go={go} selectedTenant={selectedTenant} amount={amount} invoices={invoices} onMark={handleMark} marking={markMutation.isPending} />;
     if (id === 'batch')    return <BatchSend go={go} tenants={tenants} invoices={invoices} onBatchSend={handleBatch} sending={batchMutation.isPending} />;
-    if (id === 'automate') return <AutomateScreen go={go} schedules={schedules} tenants={tenants} onPauseResume={handlePauseResume} onCancel={handleCancelSchedule} busyId={busyScheduleId} />;
+    if (id === 'automate') return <AutomateScreen go={go} schedules={schedules} tenants={tenants} onPauseResume={handlePauseResume} onCancel={handleCancelSchedule} busyId={busyScheduleId} reminderSettings={reminderSettings} onUpdateReminders={(patch: any) => reminderMutation.mutate(patch)} />;
     if (id === 'success')  return <SentSuccess amount={amount} label={successLabel} go={go} />;
     return null;
   };
