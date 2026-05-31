@@ -139,7 +139,7 @@ function buildRentWhatsAppText(opts: {
 // Channel-aware delivery for one invoice. Tries WhatsApp when that's the chosen
 // channel and it's configured + a phone exists, otherwise falls back to email.
 // Returns { sent, channel, reason }.
-async function deliverInvoice(invoice: any, baseUrl: string, opts: { reminder?: boolean; amountCents?: number; splitNote?: string; payLabel?: string } = {}): Promise<{ sent: boolean; channel?: string; reason?: string }> {
+async function deliverInvoice(invoice: any, baseUrl: string, opts: { reminder?: boolean; amountCents?: number; splitNote?: string; payLabel?: string } = {}): Promise<{ sent: boolean; channel?: string; reason?: string; messageId?: string }> {
   const [merchant, tenant] = await Promise.all([
     storage.getMerchant(invoice.merchantId),
     storage.getTenantProfile(invoice.tenantProfileId),
@@ -157,8 +157,8 @@ async function deliverInvoice(invoice: any, baseUrl: string, opts: { reminder?: 
       tenantName: tenant.firstName, merchantName, propertyAddress: tenant.propertyAddress,
       amountCents, dueAt: new Date(invoice.dueAt), paymentUrl, reminder: opts.reminder, splitNote: opts.splitNote,
     });
-    const ok = await sendWhatsApp({ toPhone: tenant.phone, text });
-    if (ok) return { sent: true, channel: "whatsapp" };
+    const result = await sendWhatsApp({ toPhone: tenant.phone, text });
+    if (result.ok) return { sent: true, channel: "whatsapp", messageId: result.messageId };
     // else fall through to email fallback
   }
 
@@ -200,6 +200,7 @@ export async function resendInvoiceEmail(invoiceId: string, baseUrl: string): Pr
   if (!delivery.sent) return { ok: false, reason: delivery.reason || "send_failed" };
 
   const updates: any = { dispatchedAt: new Date(), sentAt: new Date() };
+  if (delivery.messageId) updates.whatsappMessageId = delivery.messageId;
   // pending/failed invoices move to "dispatched"; dispatched/overdue keep their status.
   if (invoice.status === "pending_dispatch" || invoice.status === "dispatch_failed") updates.status = "dispatched";
   const updated = await storage.updateInvoiceRentRequest(invoiceId, updates);
@@ -270,7 +271,9 @@ export async function runDispatchPass(baseUrl: string): Promise<{ dispatched: nu
       }
 
       if (delivery.sent) {
-        await storage.updateInvoiceRentRequest(invoice.id, { status: "dispatched", dispatchedAt: new Date() });
+        const dispatchUpdates: any = { status: "dispatched", dispatchedAt: new Date() };
+        if (delivery.messageId) dispatchUpdates.whatsappMessageId = delivery.messageId;
+        await storage.updateInvoiceRentRequest(invoice.id, dispatchUpdates);
         await storage.logTransactionEvent({
           merchantId: invoice.merchantId, tenantProfileId: invoice.tenantProfileId,
           invoiceId: invoice.id, eventType: "Invoice_Sent",
@@ -349,7 +352,9 @@ export async function runReminderPass(baseUrl: string, now: Date = new Date()): 
 
       if (delivery.sent) {
         const owing = splitOwing(invoice);
-        await storage.updateInvoiceRentRequest(invoice.id, { lastReminderSentAt: now, reminderCount: sentCount + 1 });
+        const reminderUpdates: any = { lastReminderSentAt: now, reminderCount: sentCount + 1 };
+        if (delivery.messageId) reminderUpdates.whatsappMessageId = delivery.messageId;
+        await storage.updateInvoiceRentRequest(invoice.id, reminderUpdates);
         await storage.logTransactionEvent({
           merchantId: invoice.merchantId, tenantProfileId: invoice.tenantProfileId,
           invoiceId: invoice.id, eventType: "Reminder_Sent",

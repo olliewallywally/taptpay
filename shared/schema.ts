@@ -824,6 +824,10 @@ export const invoicesRentRequests = pgTable("invoices_rent_requests", {
   splitPaidCount: integer("split_paid_count").notNull().default(0),
   splitPaidSessions: text("split_paid_sessions").array(),   // Windcave session ids already counted (idempotency)
   splitPayerEmails: text("split_payer_emails").array(),     // emails collected from share payers (for GST copies)
+  // WhatsApp delivery tracking: Evolution API message ID stored at send time;
+  // whatsappDeliveredAt set when the DELIVERY_ACK webhook arrives.
+  whatsappMessageId: text("whatsapp_message_id"),
+  whatsappDeliveredAt: timestamp("whatsapp_delivered_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (t) => ({
@@ -833,6 +837,7 @@ export const invoicesRentRequests = pgTable("invoices_rent_requests", {
   statusDueIdx: index("invoices_status_due_idx").on(t.status, t.dueAt),
   merchantStatusIdx: index("invoices_merchant_status_idx").on(t.merchantId, t.status),
   tokenIdx: index("invoices_token_idx").on(t.token),
+  whatsappMsgIdx: index("invoices_whatsapp_message_idx").on(t.whatsappMessageId),
 }));
 
 export const transactionEvents = pgTable("transaction_events", {

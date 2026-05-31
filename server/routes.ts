@@ -5720,23 +5720,23 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       return inv;
     }
 
-    // Split invoice — count this share, dedupe by session, settle when complete.
+    // Split invoice — atomically claim this share (serialize concurrent payers at the
+    // DB level so each gets a unique slot; dedup prevents the same session counting twice).
     if (inv.splitEnabled && inv.splitCount && inv.splitCount > 1) {
-      const counted: string[] = inv.splitPaidSessions || [];
-      if (sessionId && counted.includes(sessionId)) return inv; // already counted this share
-      const newPaidCount = (inv.splitPaidCount || 0) + 1;
-      const fullyPaid = newPaidCount >= inv.splitCount;
-      const updates: any = {
-        splitPaidCount: newPaidCount,
-        splitPaidSessions: sessionId ? [...counted, sessionId] : counted,
-        windcaveTransactionId: windcaveTransactionId ?? inv.windcaveTransactionId,
-      };
-      if (fullyPaid) { updates.status = "paid"; updates.paidAt = new Date(); }
-      const updated = await storage.updateInvoiceRentRequest(invoiceId, updates);
+      const dedupeKey = sessionId ?? crypto.randomUUID();
+      const claimed = await storage.atomicClaimSplitShare(invoiceId, dedupeKey);
+      if (!claimed) {
+        // Session already counted, or all shares claimed — return current state.
+        return await storage.getInvoiceRentRequest(invoiceId);
+      }
+      const fullyPaid = claimed.splitPaidCount >= inv.splitCount;
+      const statusUpdates: any = { windcaveTransactionId: windcaveTransactionId ?? inv.windcaveTransactionId };
+      if (fullyPaid) { statusUpdates.status = "paid"; statusUpdates.paidAt = new Date(); }
+      const updated = await storage.updateInvoiceRentRequest(invoiceId, statusUpdates);
       await storage.logTransactionEvent({
         merchantId: inv.merchantId, tenantProfileId: inv.tenantProfileId, invoiceId,
         eventType: fullyPaid ? "Payment_Received" : "Split_Share_Paid",
-        payload: { share: newPaidCount, of: inv.splitCount, channel: "card", windcaveTransactionId: windcaveTransactionId ?? null },
+        payload: { share: claimed.splitPaidCount, of: inv.splitCount, channel: "card", windcaveTransactionId: windcaveTransactionId ?? null },
       });
       if (fullyPaid) await sendRentGstInvoices(updated);
       return updated;
@@ -6167,6 +6167,43 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       await finalizeRentInvoice(invoice.id, !!queryResult.approved, queryResult.windcaveTransactionId, sessionId);
       console.log(`[RENT_NOTIF] invoice ${invoice.id} → ${queryResult.approved ? "paid" : "declined"}`);
     } catch (err) { console.error("[RENT_NOTIF] Error:", err); }
+  });
+
+  // Evolution API webhook — receives delivery status updates for WhatsApp messages.
+  // Matches each event's message ID back to the invoice that sent it, logs the
+  // status, and stamps whatsappDeliveredAt on the first DELIVERY_ACK or READ event.
+  // Guards the endpoint with the same EVOLUTION_API_KEY used to send messages.
+  app.post("/api/webhooks/whatsapp", express.json(), async (req, res) => {
+    res.status(200).send("OK"); // respond immediately so Evolution doesn't retry
+    try {
+      if (process.env.EVOLUTION_API_KEY) {
+        const incoming = req.headers["apikey"] as string | undefined;
+        if (incoming !== process.env.EVOLUTION_API_KEY) {
+          console.warn("[WA_WEBHOOK] rejected — bad apikey");
+          return;
+        }
+      }
+      const { event, data } = req.body ?? {};
+      if (event !== "messages.update") return; // only care about delivery status
+      // data may be an array or single object depending on Evolution API version
+      const updates: any[] = Array.isArray(data) ? data : (data ? [data] : []);
+      for (const upd of updates) {
+        const msgId: string | undefined = upd?.key?.id;
+        const status: string | undefined = upd?.update?.status;
+        if (!msgId || !status) continue;
+        const invoice = await storage.getInvoiceRentRequestByWhatsappMessageId(msgId);
+        if (!invoice) continue;
+        // Stamp delivered-at on first terminal delivery status
+        if ((status === "DELIVERY_ACK" || status === "READ") && !invoice.whatsappDeliveredAt) {
+          await storage.updateInvoiceRentRequest(invoice.id, { whatsappDeliveredAt: new Date() });
+        }
+        await storage.logTransactionEvent({
+          merchantId: invoice.merchantId, tenantProfileId: invoice.tenantProfileId,
+          invoiceId: invoice.id, eventType: "WhatsApp_Status",
+          payload: { messageId: msgId, status },
+        });
+      }
+    } catch (err) { console.error("[WA_WEBHOOK] Error:", err); }
   });
 
   // ── Merchant sector + timezone ────────────────────────────────────────────

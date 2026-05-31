@@ -30,18 +30,19 @@ export function normalizeNzPhone(raw?: string | null): string | null {
 }
 
 /**
- * Send a plain-text WhatsApp message. Returns true when Evolution accepts it.
- * Never throws — logs and returns false so callers can fall back to email.
+ * Send a plain-text WhatsApp message. Returns { ok, messageId } where messageId
+ * is the Evolution API key.id that can be matched against delivery webhooks.
+ * Never throws — logs and returns { ok: false } so callers can fall back to email.
  */
-export async function sendWhatsApp(opts: { toPhone: string; text: string; instance?: string }): Promise<boolean> {
+export async function sendWhatsApp(opts: { toPhone: string; text: string; instance?: string }): Promise<{ ok: boolean; messageId?: string }> {
   if (!isWhatsAppConfigured()) {
     console.log(`[WHATSAPP] not configured — skipping send to ${opts.toPhone}`);
-    return false;
+    return { ok: false };
   }
   const number = normalizeNzPhone(opts.toPhone);
   if (!number) {
     console.warn(`[WHATSAPP] unparseable number: ${opts.toPhone}`);
-    return false;
+    return { ok: false };
   }
   const base = (process.env.EVOLUTION_API_URL || "").replace(/\/+$/, "");
   const instance = opts.instance || process.env.EVOLUTION_INSTANCE || "default";
@@ -60,11 +61,13 @@ export async function sendWhatsApp(opts: { toPhone: string; text: string; instan
     if (!res.ok) {
       const body = await res.text().catch(() => "");
       console.error(`[WHATSAPP] send failed ${res.status}: ${body.slice(0, 300)}`);
-      return false;
+      return { ok: false };
     }
-    return true;
+    const json = await res.json().catch(() => ({})) as any;
+    const messageId: string | undefined = json?.key?.id;
+    return { ok: true, messageId };
   } catch (err: any) {
     console.error(`[WHATSAPP] send error: ${err?.message || err}`);
-    return false;
+    return { ok: false };
   }
 }

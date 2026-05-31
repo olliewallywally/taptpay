@@ -199,6 +199,8 @@ export interface IStorage {
   getInvoiceRentRequestByWindcaveSessionId(sessionId: string): Promise<any | undefined>;
   getInvoiceRentRequestsByMerchant(merchantId: number, opts?: { status?: string; tenantProfileId?: string }): Promise<any[]>;
   updateInvoiceRentRequest(id: string, updates: any): Promise<any | undefined>;
+  atomicClaimSplitShare(invoiceId: string, sessionId: string): Promise<any | null>;
+  getInvoiceRentRequestByWhatsappMessageId(messageId: string): Promise<any | undefined>;
   getPendingDispatchInvoices(): Promise<any[]>;
   getOverdueEligibleInvoices(now: Date): Promise<any[]>;
   getReminderEligibleInvoices(): Promise<any[]>;
@@ -1603,6 +1605,8 @@ export class MemStorage implements IStorage {
   async getInvoiceRentRequestByWindcaveSessionId(sessionId: string): Promise<any> { return undefined; }
   async getInvoiceRentRequestsByMerchant(merchantId: number, opts?: any): Promise<any[]> { return []; }
   async updateInvoiceRentRequest(id: string, updates: any): Promise<any> { return undefined; }
+  async atomicClaimSplitShare(invoiceId: string, sessionId: string): Promise<any | null> { return null; }
+  async getInvoiceRentRequestByWhatsappMessageId(messageId: string): Promise<any | undefined> { return undefined; }
   async getPendingDispatchInvoices(): Promise<any[]> { return []; }
   async getOverdueEligibleInvoices(now: Date): Promise<any[]> { return []; }
   async getReminderEligibleInvoices(): Promise<any[]> { return []; }
@@ -3084,6 +3088,33 @@ export class DatabaseStorage implements IStorage {
   async getInvoiceRentRequestByWindcaveSessionId(sessionId: string): Promise<any> {
     const db = getDb(); if (!db) return undefined;
     const [r] = await db.select().from(invoicesRentRequests).where(eq(invoicesRentRequests.windcaveSessionId, sessionId)).limit(1); return r;
+  }
+  async atomicClaimSplitShare(invoiceId: string, sessionId: string): Promise<any | null> {
+    const db = getDb(); if (!db) return null;
+    // Atomic increment + array-append with three guards: session not already counted,
+    // paid count not yet at splitCount, and invoice not already settled.
+    // Using SQL arithmetic ensures concurrent calls each get a unique slot.
+    const [updated] = await db
+      .update(invoicesRentRequests)
+      .set({
+        splitPaidCount: sql`${invoicesRentRequests.splitPaidCount} + 1`,
+        splitPaidSessions: sql`array_append(COALESCE(${invoicesRentRequests.splitPaidSessions}, ARRAY[]::text[]), ${sessionId})`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(invoicesRentRequests.id, invoiceId),
+          sql`NOT (${sessionId} = ANY(COALESCE(${invoicesRentRequests.splitPaidSessions}, ARRAY[]::text[])))`,
+          sql`${invoicesRentRequests.splitPaidCount} < ${invoicesRentRequests.splitCount}`,
+          sql`${invoicesRentRequests.status} NOT IN ('paid', 'paid_external', 'voided')`,
+        )
+      )
+      .returning();
+    return updated ?? null;
+  }
+  async getInvoiceRentRequestByWhatsappMessageId(messageId: string): Promise<any> {
+    const db = getDb(); if (!db) return undefined;
+    const [r] = await db.select().from(invoicesRentRequests).where(eq(invoicesRentRequests.whatsappMessageId, messageId)).limit(1); return r;
   }
   async getInvoiceRentRequestsByMerchant(merchantId: number, opts: { status?: string; tenantProfileId?: string } = {}): Promise<any[]> {
     const db = getDb(); if (!db) return [];
