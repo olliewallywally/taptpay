@@ -1,5 +1,5 @@
 import { useLocation } from "wouter";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useTransition } from "react";
 
 /* ── Colours ── */
 const DOCK_BG  = '#02093D'; // darker navy bar
@@ -51,6 +51,7 @@ function saveMode(m: string) { try { localStorage.setItem('taptMode', m); } catc
 
 export function BottomNavigation() {
   const [location, setLocation] = useLocation();
+  const [, startTransition] = useTransition();
 
   /* dockRef goes on the 280 px bar — identical to SmartTransitions trackRef.
      The indicator is a child of that bar so its `left` is relative to the bar. */
@@ -60,6 +61,8 @@ export function BottomNavigation() {
   const [indLeft,   setIndLeft]   = useState(0);
   const [animating, setAnimating] = useState(false);
   const [mode,      setModeState] = useState<'retail' | 'property'>(readMode);
+  const [collapsed, setCollapsed] = useState(false);
+  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /* Keep stored mode in sync with route */
   useEffect(() => {
@@ -109,6 +112,18 @@ export function BottomNavigation() {
     return () => clearTimeout(t);
   }, [location]);
 
+  /* Idle collapse — expand on nav use, collapse to pill after 2 s of inactivity */
+  const resetIdle = () => {
+    setCollapsed(false);
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+    idleTimer.current = setTimeout(() => setCollapsed(true), 2000);
+  };
+  useEffect(() => {
+    if (!showNav) return;
+    resetIdle();
+    return () => { if (idleTimer.current) clearTimeout(idleTimer.current); };
+  }, [location, showNav]);
+
   if (!showNav) return null;
 
   return (
@@ -119,12 +134,24 @@ export function BottomNavigation() {
       zIndex: 60,
       pointerEvents: 'none',
     }}>
-      {/* 320 px outer wrapper — layout/centering only, no ref needed */}
-      <div style={{
-        position: 'relative', width: 320, height: 58,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        pointerEvents: 'auto',
-      }}>
+      {/* Outer wrapper — morphs between full dock and a thin collapsed pill */}
+      <div
+        onTouchStart={resetIdle}
+        onMouseMove={resetIdle}
+        onClick={collapsed ? resetIdle : undefined}
+        style={{
+          position: 'relative',
+          /* collapsed: 64×4 pill; expanded: 320×58 full dock */
+          width:  collapsed ? 64  : 320,
+          height: collapsed ? 4   : 58,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          pointerEvents: 'auto',
+          background: DOCK_BG,
+          borderRadius: 999,
+          transition: 'width 0.5s cubic-bezier(0.34,1.56,0.64,1), height 0.5s cubic-bezier(0.34,1.56,0.64,1)',
+          overflow: 'hidden',
+        }}
+      >
         {/* 280 px dock bar — ref goes here, indicator is a child (same as SmartTransitions) */}
         <div ref={dockRef} style={{
           position: 'relative',
@@ -137,6 +164,9 @@ export function BottomNavigation() {
           justifyContent: 'space-around',
           padding: '0 16px',
           overflow: 'visible',
+          opacity: collapsed ? 0 : 1,
+          transition: 'opacity 0.3s ease',
+          pointerEvents: collapsed ? 'none' : 'auto',
         }}>
           {/* Indicator pill — child of dock bar, positioned relative to it */}
           <div style={{
@@ -161,7 +191,7 @@ export function BottomNavigation() {
               <button
                 key={id}
                 ref={el => { btnRefs.current[i] = el; }}
-                onClick={() => setLocation(path)}
+                onClick={() => startTransition(() => setLocation(path))}
                 aria-label={id}
                 style={{
                   position: 'relative', zIndex: 1,

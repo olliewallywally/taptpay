@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 /* ── Design tokens (matches AnalyticsScreen_(2)) ── */
@@ -54,7 +54,7 @@ function RevenueChart({ primary, secondary, tipIdx, animKey }: { primary: number
 
   return (
     <div style={{ position: 'relative', margin: '8px 0 4px', padding: '0 4px' }}>
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="auto" style={{ display: 'block' }}>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="auto" style={{ display: 'block', overflow: 'visible' }}>
         <defs>
           <linearGradient id="pa1" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={C.accent} stopOpacity="0.22" />
@@ -200,20 +200,64 @@ export default function PropertyAnalytics() {
   const todayInvoices = filtered.filter((i: any) => new Date(i.createdAt) >= today);
   const recentInvoices = filtered.filter((i: any) => new Date(i.createdAt) >= yesterday && new Date(i.createdAt) < today).slice(0, 5);
 
+  /* ── Swipeable sheet state ── */
+  const topRef   = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const touchStartY  = useRef(0);
+  const touchStartOff = useRef(0);
+  const [sheetOffset, setSheetOffset] = useState<number | null>(null); // null = not yet measured
+  const [snapped, setSnapped]   = useState<'default' | 'full'>('default');
+  const [dragging, setDragging] = useState(false);
+
+  // Measure the top section height once to set the default sheet offset
+  useEffect(() => {
+    const measure = () => {
+      if (topRef.current) setSheetOffset(topRef.current.offsetHeight + 12);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (topRef.current) ro.observe(topRef.current);
+    return () => ro.disconnect();
+  }, []);
+
+  const defaultOffset = sheetOffset ?? 320;
+  const snapFull = 0; // fully covers the screen
+  const currentOffset = snapped === 'full' ? snapFull : defaultOffset;
+
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartY.current   = e.touches[0].clientY;
+    touchStartOff.current = snapped === 'full' ? snapFull : defaultOffset;
+    setDragging(true);
+  }, [snapped, defaultOffset]);
+
+  const onTouchMove = useCallback((e: React.TouchEvent) => {
+    const dy  = e.touches[0].clientY - touchStartY.current;
+    const raw = touchStartOff.current + dy;
+    setSheetOffset(Math.max(snapFull - 24, Math.min(defaultOffset + 60, raw)));
+  }, [defaultOffset]);
+
+  const onTouchEnd = useCallback(() => {
+    setDragging(false);
+    const effective = sheetOffset ?? defaultOffset;
+    if (effective < defaultOffset / 2) {
+      setSnapped('full');
+      setSheetOffset(snapFull);
+    } else {
+      setSnapped('default');
+      setSheetOffset(defaultOffset);
+    }
+  }, [sheetOffset, defaultOffset]);
+
   return (
     <div style={{ background: C.base, minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
-    <div style={{ width: '100%', maxWidth: 390, height: '100svh', display: 'flex', flexDirection: 'column', fontFamily: "'Outfit', system-ui, sans-serif", background: C.base, position: 'relative', overflow: 'hidden' }}>
+    <div style={{ width: '100%', maxWidth: 430, height: '100svh', fontFamily: "'Outfit', system-ui, sans-serif", background: C.base, position: 'relative', overflow: 'hidden' }}>
 
       {/* ── Dark top ── */}
-      <div style={{ padding: '52px 24px 0', flexShrink: 0 }}>
-        {/* Status bar */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+      <div ref={topRef} style={{ padding: '52px 24px 0' }}>
+        {/* Status bar — label only, no battery icon */}
+        <div style={{ marginBottom: 20 }}>
           <span style={{ fontSize: 14, fontWeight: 600, color: C.white }}>analytics</span>
-          <svg width={22} height={11} viewBox="0 0 28 13"><rect x="0" y="1" width="24" height="11" rx="3" stroke="rgba(255,255,255,0.35)" strokeWidth="1" fill="none"/><rect x="25" y="4" width="2" height="5" rx="1" fill="rgba(255,255,255,0.2)"/><rect x="1.5" y="2.5" width="18" height="8" rx="2" fill={C.green}/></svg>
         </div>
-
-        {/* Header */}
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: C.white, margin: '0 0 24px', letterSpacing: '-0.5px' }}>Rent Revenue</h1>
 
         {/* Period pills */}
         <div style={{ display: 'flex', gap: 0, background: 'rgba(255,255,255,0.06)', borderRadius: 999, padding: 3, marginBottom: 20 }}>
@@ -232,38 +276,60 @@ export default function PropertyAnalytics() {
           </p>
         </div>
 
-        {/* Chart */}
-        <RevenueChart primary={chart.primary} secondary={chart.secondary} tipIdx={tipIdx} animKey={tf} />
+        {/* Chart — bleeds past horizontal padding to fill full width */}
+        <div style={{ margin: '8px -32px 4px', overflow: 'visible' }}>
+          <RevenueChart primary={chart.primary} secondary={chart.secondary} tipIdx={tipIdx} animKey={tf} />
+        </div>
       </div>
 
-      {/* ── White sheet ── */}
-      <div style={{ flex: 1, background: C.sheet, borderRadius: '32px 32px 0 0', marginTop: 12, padding: '0 24px 100px', overflowY: 'auto', overflowX: 'hidden', msOverflowStyle: 'none', scrollbarWidth: 'none' }}>
-        {/* Handle */}
-        <div style={{ width: 40, height: 5, borderRadius: 3, background: C.handle, margin: '14px auto 22px' }} />
+      {/* ── Swipeable white sheet ── */}
+      <div
+        ref={sheetRef}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        style={{
+          position: 'absolute', top: 0, left: 0, right: 0,
+          height: '100svh',
+          background: C.sheet,
+          borderRadius: '32px 32px 0 0',
+          transform: `translateY(${sheetOffset ?? defaultOffset}px)`,
+          transition: dragging ? 'none' : 'transform 0.38s cubic-bezier(0.34,1.56,0.64,1)',
+          overflowY: snapped === 'full' ? 'auto' : 'hidden',
+          overflowX: 'hidden',
+          willChange: 'transform',
+          msOverflowStyle: 'none' as any,
+          scrollbarWidth: 'none' as any,
+        }}
+      >
+        {/* Drag handle */}
+        <div style={{ width: 40, height: 5, borderRadius: 3, background: C.handle, margin: '14px auto 22px', cursor: 'grab', flexShrink: 0 }} />
 
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 700, color: C.textDark, margin: 0, letterSpacing: '-0.4px' }}>Payment History</h2>
+        <div style={{ padding: '0 24px 130px' }}>
+          {/* Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <h2 style={{ fontSize: 20, fontWeight: 700, color: C.textDark, margin: 0, letterSpacing: '-0.4px' }}>Payment History</h2>
+          </div>
+
+          {filtered.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '48px 0', color: C.textMuted, fontSize: 13 }}>no payments in this period</div>
+          ) : (
+            <>
+              {todayInvoices.length > 0 && (
+                <>
+                  <p style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.14em', marginBottom: 6 }}>Today</p>
+                  {todayInvoices.map((inv: any, i: number) => <TxRow key={inv.id} inv={inv} delay={i * 55} />)}
+                </>
+              )}
+              {recentInvoices.length > 0 && (
+                <>
+                  <p style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.14em', marginBottom: 6, marginTop: 20 }}>Recent</p>
+                  {recentInvoices.map((inv: any, i: number) => <TxRow key={inv.id} inv={inv} delay={(i + 3) * 55} />)}
+                </>
+              )}
+            </>
+          )}
         </div>
-
-        {filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '48px 0', color: C.textMuted, fontSize: 13 }}>no payments in this period</div>
-        ) : (
-          <>
-            {todayInvoices.length > 0 && (
-              <>
-                <p style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.14em', marginBottom: 6 }}>Today</p>
-                {todayInvoices.map((inv: any, i: number) => <TxRow key={inv.id} inv={inv} delay={i * 55} />)}
-              </>
-            )}
-            {recentInvoices.length > 0 && (
-              <>
-                <p style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.14em', marginBottom: 6, marginTop: 20 }}>Recent</p>
-                {recentInvoices.map((inv: any, i: number) => <TxRow key={inv.id} inv={inv} delay={(i + 3) * 55} />)}
-              </>
-            )}
-          </>
-        )}
       </div>
     </div>
     </div>
