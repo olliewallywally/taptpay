@@ -201,6 +201,7 @@ export interface IStorage {
   updateInvoiceRentRequest(id: string, updates: any): Promise<any | undefined>;
   getPendingDispatchInvoices(): Promise<any[]>;
   getOverdueEligibleInvoices(now: Date): Promise<any[]>;
+  getReminderEligibleInvoices(): Promise<any[]>;
 
   logTransactionEvent(data: any): Promise<any>;
   getTransactionEventsByTenant(tenantProfileId: string, limit?: number): Promise<any[]>;
@@ -1603,6 +1604,7 @@ export class MemStorage implements IStorage {
   async updateInvoiceRentRequest(id: string, updates: any): Promise<any> { return undefined; }
   async getPendingDispatchInvoices(): Promise<any[]> { return []; }
   async getOverdueEligibleInvoices(now: Date): Promise<any[]> { return []; }
+  async getReminderEligibleInvoices(): Promise<any[]> { return []; }
   async logTransactionEvent(data: any): Promise<any> { return {}; }
   async getTransactionEventsByTenant(tenantProfileId: string, limit?: number): Promise<any[]> { return []; }
   async getTransactionEventsByInvoice(invoiceId: string): Promise<any[]> { return []; }
@@ -3099,6 +3101,11 @@ export class DatabaseStorage implements IStorage {
   async getOverdueEligibleInvoices(now: Date): Promise<any[]> {
     const db = getDb(); if (!db) return [];
     return db.select().from(invoicesRentRequests).where(and(eq(invoicesRentRequests.status, "dispatched"), lte(invoicesRentRequests.dueAt, now)));
+  }
+  async getReminderEligibleInvoices(): Promise<any[]> {
+    const db = getDb(); if (!db) return [];
+    // Overdue, still unpaid — the reminder pass applies the per-merchant timing policy.
+    return db.select().from(invoicesRentRequests).where(eq(invoicesRentRequests.status, "overdue")).orderBy(invoicesRentRequests.dueAt);
   }
   async logTransactionEvent(data: any): Promise<any> {
     const db = getDb(); if (!db) return {};

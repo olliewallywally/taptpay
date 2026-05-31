@@ -1,4 +1,5 @@
 import { pgTable, text, serial, decimal, timestamp, boolean, integer, jsonb, uuid, uniqueIndex, index } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -81,7 +82,13 @@ export const merchants = pgTable("merchants", {
   // Password reset tokens (persisted in DB)
   resetToken: text("reset_token"),
   resetTokenExpiry: timestamp("reset_token_expiry"),
-  
+
+  // Property management — overdue rent reminder policy (auto-resend)
+  rentReminderEnabled: boolean("rent_reminder_enabled").notNull().default(true),
+  rentReminderDelayDays: integer("rent_reminder_delay_days").notNull().default(3),     // days after due before first reminder
+  rentReminderIntervalDays: integer("rent_reminder_interval_days").notNull().default(3), // days between subsequent reminders
+  rentReminderMaxCount: integer("rent_reminder_max_count").notNull().default(3),        // max reminders (0 = unlimited)
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -807,13 +814,15 @@ export const invoicesRentRequests = pgTable("invoices_rent_requests", {
   voidedAt: timestamp("voided_at"),
   externalPaymentReference: text("external_payment_reference"),
   lastReminderSentAt: timestamp("last_reminder_sent_at"),
+  reminderCount: integer("reminder_count").notNull().default(0),
   windcaveSessionId: text("windcave_session_id"),
   windcaveTransactionId: text("windcave_transaction_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (t) => ({
   scheduleBillingPeriodUnique: uniqueIndex("invoices_schedule_billing_period_unique")
-    .on(t.scheduleId, t.billingPeriodStart),
+    .on(t.scheduleId, t.billingPeriodStart)
+    .where(sql`${t.scheduleId} IS NOT NULL AND ${t.billingPeriodStart} IS NOT NULL`),
   statusDueIdx: index("invoices_status_due_idx").on(t.status, t.dueAt),
   merchantStatusIdx: index("invoices_merchant_status_idx").on(t.merchantId, t.status),
   tokenIdx: index("invoices_token_idx").on(t.token),
@@ -861,12 +870,20 @@ export const createActiveScheduleSchema = z.object({
   endDate: z.string().datetime().or(z.date()).optional().transform(v => v ? new Date(v as any) : undefined),
 });
 
+// Pause/resume is driven by `status` (active ↔ paused); the legacy pauseNextCycle
+// flag is no longer accepted from clients.
 export const updateActiveScheduleSchema = z.object({
   amountCents: z.number().int().positive().max(100_000_000).optional(),
   frequency: z.enum(["weekly", "fortnightly", "monthly"]).optional(),
   deliveryChannel: z.enum(["sms", "email"]).optional(),
-  pauseNextCycle: z.boolean().optional(),
   status: z.enum(["active", "paused", "terminated"]).optional(),
+});
+
+export const updateRentReminderSettingsSchema = z.object({
+  rentReminderEnabled: z.boolean().optional(),
+  rentReminderDelayDays: z.number().int().min(0).max(90).optional(),
+  rentReminderIntervalDays: z.number().int().min(1).max(90).optional(),
+  rentReminderMaxCount: z.number().int().min(0).max(20).optional(),
 });
 
 export const createAdHocInvoiceSchema = z.object({

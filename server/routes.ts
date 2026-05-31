@@ -2,7 +2,7 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema } from "@shared/schema";
+import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema } from "@shared/schema";
 import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, simulateCreateSession, simulateQuerySession, simulateRentSession, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, simulateAttendedTapToPay } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, createUser, getUserByEmail, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
@@ -5833,8 +5833,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!checkMerchantOwnership(req, existing.merchantId)) return res.status(403).json({ message: "Access denied" });
       const data = updateActiveScheduleSchema.parse(req.body);
       const schedule = await storage.updateActiveSchedule(req.params.id, data);
-      if (data.pauseNextCycle !== undefined) {
-        await storage.logTransactionEvent({ merchantId, tenantProfileId: existing.tenantProfileId, scheduleId: req.params.id, eventType: data.pauseNextCycle ? "Schedule_Paused" : "Schedule_Resumed", payload: {} });
+      if (data.status === "paused" || data.status === "active") {
+        await storage.logTransactionEvent({ merchantId, tenantProfileId: existing.tenantProfileId, scheduleId: req.params.id, eventType: data.status === "paused" ? "Schedule_Paused" : "Schedule_Resumed", payload: {} });
       }
       res.json(schedule);
     } catch (err) {
@@ -6063,18 +6063,64 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
+  // ── Overdue reminder settings (per merchant) ──────────────────────────────
+
+  function reminderSettingsOf(m: any) {
+    return {
+      rentReminderEnabled:      m?.rentReminderEnabled ?? true,
+      rentReminderDelayDays:    m?.rentReminderDelayDays ?? 3,
+      rentReminderIntervalDays: m?.rentReminderIntervalDays ?? 3,
+      rentReminderMaxCount:     m?.rentReminderMaxCount ?? 3,
+    };
+  }
+
+  app.get("/api/property/reminder-settings", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) return res.status(404).json({ message: "Merchant not found" });
+      res.json(reminderSettingsOf(merchant));
+    } catch (err) { console.error("[PROP_REMINDER_GET]", err); res.status(500).json({ message: "Failed to fetch reminder settings" }); }
+  });
+
+  app.put("/api/property/reminder-settings", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const data = updateRentReminderSettingsSchema.parse(req.body);
+      const merchant = await storage.updateMerchant(merchantId, data as any);
+      res.json(reminderSettingsOf(merchant));
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
+      console.error("[PROP_REMINDER_PUT]", err); res.status(500).json({ message: "Failed to update reminder settings" });
+    }
+  });
+
   // ── Cron endpoint ─────────────────────────────────────────────────────────
 
   app.post("/api/internal/cron", async (req, res) => {
     const cronSecret = process.env.CRON_SECRET;
     if (!cronSecret) return res.status(503).json({ message: "Cron not configured" });
-    if (req.headers["x-cron-secret"] !== cronSecret) return res.status(401).json({ message: "Unauthorized" });
+    // Constant-time comparison to avoid leaking the secret via timing.
+    const provided = req.headers["x-cron-secret"];
+    const providedBuf = Buffer.from(Array.isArray(provided) ? "" : (provided ?? ""));
+    const secretBuf = Buffer.from(cronSecret);
+    if (providedBuf.length !== secretBuf.length || !crypto.timingSafeEqual(providedBuf, secretBuf)) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
     try {
-      const { runGeneratePass, runDispatchPass, runOverduePass } = await import("./property-cron");
+      const { runGeneratePass, runDispatchPass, runOverduePass, runReminderPass } = await import("./property-cron");
       const now = new Date();
-      const [gen, disp, overdue] = await Promise.all([runGeneratePass(now), runDispatchPass(getBaseUrl(req)), runOverduePass(now)]);
-      console.log(`[CRON] generate=${JSON.stringify(gen)} dispatch=${JSON.stringify(disp)} overdue=${JSON.stringify(overdue)}`);
-      res.json({ ok: true, ranAt: now.toISOString(), generate: gen, dispatch: disp, overdue });
+      const baseUrl = getBaseUrl(req);
+      // Sequential: generate must complete before dispatch (dispatch reads the
+      // invoices generate creates), and overdue must precede the reminder pass.
+      const generate  = await runGeneratePass(now);
+      const dispatch  = await runDispatchPass(baseUrl);
+      const overdue   = await runOverduePass(now);
+      const reminders = await runReminderPass(baseUrl, now);
+      console.log(`[CRON] generate=${JSON.stringify(generate)} dispatch=${JSON.stringify(dispatch)} overdue=${JSON.stringify(overdue)} reminders=${JSON.stringify(reminders)}`);
+      res.json({ ok: true, ranAt: now.toISOString(), generate, dispatch, overdue, reminders });
     } catch (err) { console.error("[CRON]", err); res.status(500).json({ message: "Cron run failed" }); }
   });
 

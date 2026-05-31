@@ -12,11 +12,18 @@
 import { storage } from "./storage";
 import { sendEmail } from "./email-service";
 
+// UTC-based math so the run time doesn't drift an hour across DST boundaries.
 function computeNextRunDate(from: Date, frequency: string): Date {
   const d = new Date(from);
-  if (frequency === "weekly")           d.setDate(d.getDate() + 7);
-  else if (frequency === "fortnightly") d.setDate(d.getDate() + 14);
-  else                                  d.setMonth(d.getMonth() + 1);
+  if (frequency === "weekly")           d.setUTCDate(d.getUTCDate() + 7);
+  else if (frequency === "fortnightly") d.setUTCDate(d.getUTCDate() + 14);
+  else                                  d.setUTCMonth(d.getUTCMonth() + 1);
+  return d;
+}
+
+function addDaysUTC(from: Date, days: number): Date {
+  const d = new Date(from);
+  d.setUTCDate(d.getUTCDate() + days);
   return d;
 }
 
@@ -32,12 +39,15 @@ function fmtDate(d: Date): string {
 
 function buildRentEmail(opts: {
   tenantName: string; merchantName: string; propertyAddress: string;
-  amountCents: number; dueAt: Date; paymentUrl: string;
+  amountCents: number; dueAt: Date; paymentUrl: string; reminder?: boolean;
 }): { subject: string; html: string; text: string } {
-  const { tenantName, merchantName, propertyAddress, amountCents, dueAt, paymentUrl } = opts;
+  const { tenantName, merchantName, propertyAddress, amountCents, dueAt, paymentUrl, reminder } = opts;
   const amount = fmtCents(amountCents);
   const due    = fmtDate(dueAt);
-  const subject = `Rent payment due — ${amount} by ${due}`;
+  const kicker  = reminder ? "overdue reminder" : "rent payment";
+  const subject = reminder
+    ? `Reminder: rent overdue — ${amount}`
+    : `Rent payment due — ${amount} by ${due}`;
 
   const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -46,7 +56,7 @@ function buildRentEmail(opts: {
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%">
         <tr><td style="background:#040D6D;border-radius:16px 16px 0 0;padding:32px 36px 28px">
-          <p style="margin:0 0 4px;font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:#58ABFF">rent payment</p>
+          <p style="margin:0 0 4px;font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:#58ABFF">${kicker}</p>
           <p style="margin:0 0 20px;font-size:15px;font-weight:600;color:#fff">${merchantName}</p>
           <p style="margin:0 0 6px;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:rgba(88,171,255,0.6)">amount due</p>
           <p style="margin:0;font-size:58px;font-weight:700;letter-spacing:-2px;color:#58ABFF;line-height:1">${amount}</p>
@@ -98,19 +108,6 @@ export async function runGeneratePass(now: Date = new Date()): Promise<{ generat
   for (const schedule of dueSchedules) {
     try {
       const billingPeriodStart = schedule.nextRunDate;
-      if (schedule.pauseNextCycle) {
-        await storage.updateActiveSchedule(schedule.id, {
-          nextRunDate: computeNextRunDate(billingPeriodStart, schedule.frequency),
-          pauseNextCycle: false,
-        });
-        await storage.logTransactionEvent({
-          merchantId: schedule.merchantId, tenantProfileId: schedule.tenantProfileId,
-          scheduleId: schedule.id, eventType: "Invoice_Skipped",
-          payload: { reason: "pauseNextCycle", billingPeriodStart },
-        });
-        result.skipped++; continue;
-      }
-
       const invoice = await storage.createInvoiceRentRequest({
         merchantId: schedule.merchantId, tenantProfileId: schedule.tenantProfileId,
         scheduleId: schedule.id, token: generateToken(),
@@ -149,7 +146,19 @@ export async function runDispatchPass(baseUrl: string): Promise<{ dispatched: nu
         storage.getMerchant(invoice.merchantId),
         storage.getTenantProfile(invoice.tenantProfileId),
       ]);
-      if (!merchant || !tenant || !tenant.email) { result.failed++; continue; }
+      // Missing merchant/tenant is transient (data may appear) — leave pending to retry.
+      if (!merchant || !tenant) { result.failed++; continue; }
+      // No deliverable address. Email is the only live channel today, so an invoice
+      // with no email can never be sent — mark it failed instead of retrying forever.
+      if (!tenant.email) {
+        await storage.updateInvoiceRentRequest(invoice.id, { status: "dispatch_failed" });
+        await storage.logTransactionEvent({
+          merchantId: invoice.merchantId, tenantProfileId: invoice.tenantProfileId,
+          invoiceId: invoice.id, eventType: "Invoice_Dispatch_Failed",
+          payload: { reason: "no_deliverable_email" },
+        });
+        result.failed++; continue;
+      }
 
       const paymentUrl = `${baseUrl}/r/${invoice.token}`;
       const email = buildRentEmail({
@@ -200,6 +209,76 @@ export async function runOverduePass(now: Date = new Date()): Promise<{ markedOv
       result.markedOverdue++;
     } catch (err) {
       console.error(`[CRON_OVERDUE] invoice=${invoice.id}`, err);
+      result.errors++;
+    }
+  }
+  return result;
+}
+
+// ── Pass 4: auto-resend reminders for overdue invoices ────────────────────────
+// Applies each merchant's reminder policy:
+//   • first reminder once `now >= dueAt + rentReminderDelayDays`
+//   • subsequent reminders every `rentReminderIntervalDays`
+//   • stops after `rentReminderMaxCount` (0 = unlimited) or when paid/voided
+
+export async function runReminderPass(baseUrl: string, now: Date = new Date()): Promise<{ sent: number; skipped: number; errors: number }> {
+  const result = { sent: 0, skipped: 0, errors: 0 };
+  const invoices = await storage.getReminderEligibleInvoices();
+  const merchantCache = new Map<number, any>();
+
+  for (const invoice of invoices) {
+    try {
+      let merchant = merchantCache.get(invoice.merchantId);
+      if (!merchant) {
+        merchant = await storage.getMerchant(invoice.merchantId);
+        if (merchant) merchantCache.set(invoice.merchantId, merchant);
+      }
+      if (!merchant || merchant.rentReminderEnabled === false) { result.skipped++; continue; }
+
+      const delayDays    = merchant.rentReminderDelayDays ?? 3;
+      const intervalDays = merchant.rentReminderIntervalDays ?? 3;
+      const maxCount     = merchant.rentReminderMaxCount ?? 3;
+      const sentCount    = invoice.reminderCount ?? 0;
+
+      if (maxCount > 0 && sentCount >= maxCount) { result.skipped++; continue; }
+
+      // Not yet time for the first reminder
+      if (now < addDaysUTC(new Date(invoice.dueAt), delayDays)) { result.skipped++; continue; }
+      // Not yet time for the next reminder in the cadence
+      if (invoice.lastReminderSentAt && now < addDaysUTC(new Date(invoice.lastReminderSentAt), intervalDays)) {
+        result.skipped++; continue;
+      }
+
+      const tenant = await storage.getTenantProfile(invoice.tenantProfileId);
+      if (!tenant || !tenant.email) { result.skipped++; continue; }
+
+      const paymentUrl = `${baseUrl}/r/${invoice.token}`;
+      const email = buildRentEmail({
+        tenantName: `${tenant.firstName} ${tenant.lastName}`,
+        merchantName: merchant.businessName || merchant.name,
+        propertyAddress: tenant.propertyAddress,
+        amountCents: invoice.amountCents,
+        dueAt: new Date(invoice.dueAt),
+        paymentUrl,
+        reminder: true,
+      });
+
+      const sent = await sendEmail({
+        to: tenant.email, from: "noreply@taptpay.co.nz",
+        subject: email.subject, html: email.html, text: email.text,
+      });
+
+      if (sent) {
+        await storage.updateInvoiceRentRequest(invoice.id, { lastReminderSentAt: now, reminderCount: sentCount + 1 });
+        await storage.logTransactionEvent({
+          merchantId: invoice.merchantId, tenantProfileId: invoice.tenantProfileId,
+          invoiceId: invoice.id, eventType: "Reminder_Sent",
+          payload: { channel: "email", reminderNumber: sentCount + 1, to: tenant.email },
+        });
+        result.sent++;
+      } else { result.errors++; }
+    } catch (err) {
+      console.error(`[CRON_REMINDER] invoice=${invoice.id}`, err);
       result.errors++;
     }
   }
