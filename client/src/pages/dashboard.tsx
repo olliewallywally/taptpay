@@ -202,7 +202,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-200 pb-24">
+    <div className="min-h-screen bg-gray-200 pb-32">
       {/* Header Section with Active Transactions */}
       <div className="relative">
         <div className="absolute left-0 right-0 h-[80px] sm:h-[106px] bg-[#00E5CC] rounded-b-[60px] sm:rounded-b-[100px] z-0" style={{ bottom: '-20px' }}></div>

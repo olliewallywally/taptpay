@@ -336,7 +336,7 @@ export default function TenantDirectory() {
 
   return (
     <div style={{ background: C.white, minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
-    <div style={{ width: '100%', maxWidth: 390, minHeight: '100svh', background: '#F4F4F4', paddingBottom: 120, fontFamily: "'Outfit', system-ui, sans-serif" }}>
+    <div style={{ width: '100%', maxWidth: 430, minHeight: '100svh', background: '#F4F4F4', paddingBottom: 130, fontFamily: "'Outfit', system-ui, sans-serif" }}>
       <div style={{ height: 54 }} />
 
       {/* Hero */}

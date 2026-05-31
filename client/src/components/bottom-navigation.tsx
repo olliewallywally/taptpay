@@ -115,7 +115,8 @@ export function BottomNavigation() {
     <div style={{
       position: 'fixed', bottom: 0, left: 0, right: 0,
       display: 'flex', justifyContent: 'center',
-      paddingBottom: 28, zIndex: 50,
+      paddingBottom: 'max(20px, env(safe-area-inset-bottom, 20px))' as any,
+      zIndex: 60,
       pointerEvents: 'none',
     }}>
       {/* 320 px outer wrapper — layout/centering only, no ref needed */}

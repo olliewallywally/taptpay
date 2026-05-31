@@ -642,7 +642,7 @@ export default function Settings() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-200 pb-24">
+    <div className="min-h-screen bg-gray-200 pb-32">
       {/* Header */}
       <div className="bg-[#0055FF] pt-8 pb-6 rounded-b-[60px] sm:rounded-b-[100px]">
         <div className="max-w-md mx-auto px-4 sm:px-6">
@@ -1123,33 +1123,51 @@ export default function Settings() {
           </Button>
         </div>
 
-        {/* Switch to Property Management */}
-        <div className="mb-5">
+        {/* Mode switcher: Retail ↔ Property Management */}
+        <div className="mb-5 flex gap-3">
           <button
-            onClick={() => setLocation('/property')}
+            onClick={() => setLocation('/dashboard')}
             style={{
-              width: '100%',
-              background: '#040D6D',
+              flex: 1,
+              background: '#0055FF',
               borderRadius: 16,
-              padding: '20px 24px',
+              padding: '18px 16px',
               border: 'none',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 16,
+              gap: 12,
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <div style={{ width: 44, height: 44, borderRadius: 14, background: 'rgba(88,171,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="#58ABFF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1.5 1.5 0 01-1.5 1.5h-15A1.5 1.5 0 013 20V9.5z"/><path d="M9 21.5V14h6v7.5"/></svg>
-              </div>
-              <div style={{ textAlign: 'left' }}>
-                <div style={{ fontWeight: 700, fontSize: 16, color: '#FFFFFF', letterSpacing: '-0.2px' }}>Property Management</div>
-                <div style={{ fontWeight: 400, fontSize: 13, color: 'rgba(88,171,255,0.7)', marginTop: 2 }}>tenants · rent · invoices</div>
-              </div>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(0,229,204,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#00E5CC" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M4 12h10M4 17h7"/><rect x="14" y="13" width="7" height="7" rx="1.5"/></svg>
             </div>
-            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="rgba(88,171,255,0.6)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: '#00E5CC', letterSpacing: '-0.2px' }}>Retail</div>
+              <div style={{ fontWeight: 400, fontSize: 11, color: 'rgba(0,229,204,0.65)', marginTop: 1 }}>terminal · transactions</div>
+            </div>
+          </button>
+          <button
+            onClick={() => setLocation('/property')}
+            style={{
+              flex: 1,
+              background: '#040D6D',
+              borderRadius: 16,
+              padding: '18px 16px',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+            }}
+          >
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(88,171,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#58ABFF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1.5 1.5 0 01-1.5 1.5h-15A1.5 1.5 0 013 20V9.5z"/><path d="M9 21.5V14h6v7.5"/></svg>
+            </div>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: '#FFFFFF', letterSpacing: '-0.2px' }}>Property</div>
+              <div style={{ fontWeight: 400, fontSize: 11, color: 'rgba(88,171,255,0.65)', marginTop: 1 }}>tenants · rent · invoices</div>
+            </div>
           </button>
         </div>
 

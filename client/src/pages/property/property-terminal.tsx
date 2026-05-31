@@ -274,10 +274,8 @@ function ChooseTenant({ tenants, invoices, go, onSelect, splitMode, onToggleSpli
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div style={{ color: 'rgba(4,13,109,0.35)', fontWeight: 500, fontSize: 18 }}>choose tenant</div>
         </div>
-        {/* Split-bill toggle — left-aligned with the action bar */}
-        <div style={{ height: 52, display: 'flex', alignItems: 'center', padding: '0 22px' }}>
-          <SplitPill on={splitMode} onToggle={onToggleSplit} />
-        </div>
+        {/* Reserved space so the subbar sits at the same level as in home screen */}
+        <div style={{ height: 52 }} />
       </div>
       {/* Bottom — NAVY */}
       <div className="stagger" style={{ flex: 1, background: NAVY, padding: '52px 22px 0', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -291,7 +289,7 @@ function ChooseTenant({ tenants, invoices, go, onSelect, splitMode, onToggleSpli
           />
         </div>
         {/* list */}
-        <div className="tp-thin-scroll" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 110 }}>
+        <div className="tp-thin-scroll" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 130 }}>
           {filtered.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '32px 0', color: 'rgba(88,171,255,0.4)', fontSize: 13 }}>no tenants found</div>
           ) : filtered.map((t: any) => {
@@ -478,7 +476,7 @@ function ReminderSettingsCard({ settings, onUpdate }: any) {
           <div style={{ fontSize: 11, color: 'rgba(88,171,255,0.5)', marginTop: 1 }}>auto-resend the link until paid</div>
         </div>
         <button onClick={() => onUpdate({ rentReminderEnabled: !enabled })} aria-label="toggle reminders"
-          style={{ width: 46, height: 27, borderRadius: 999, border: 'none', cursor: 'pointer', background: enabled ? GREEN : 'rgba(88,171,255,0.25)', position: 'relative', transition: 'background 0.2s', flexShrink: 0, padding: 0 }}>
+          style={{ width: 46, minWidth: 46, height: 27, borderRadius: 999, border: 'none', cursor: 'pointer', background: enabled ? GREEN : 'rgba(88,171,255,0.25)', position: 'relative', transition: 'background 0.2s', flexShrink: 0, flexGrow: 0, padding: 0, boxSizing: 'border-box' }}>
           <span style={{ position: 'absolute', top: 3, left: enabled ? 22 : 3, width: 21, height: 21, borderRadius: 999, background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
         </button>
       </div>
@@ -515,7 +513,7 @@ function AutomateScreen({ go, schedules, tenants, onPauseResume, onCancel, busyI
       </div>
       <div className="stagger" style={{ flex: 1, background: NAVY, padding: '52px 22px 0', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <div style={{ color: BLUE, fontWeight: 500, fontSize: 18, textAlign: 'center', marginBottom: 16, flexShrink: 0 }}>automation</div>
-        <div className="tp-thin-scroll" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 110 }}>
+        <div className="tp-thin-scroll" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 130 }}>
           <ReminderSettingsCard settings={reminderSettings} onUpdate={onUpdateReminders} />
           <div style={{ fontSize: 10.5, fontWeight: 600, color: 'rgba(88,171,255,0.45)', letterSpacing: '0.12em', textTransform: 'uppercase', margin: '6px 2px 0' }}>recurring rent</div>
           {live.length === 0 ? (
@@ -655,7 +653,7 @@ function BatchSend({ go, tenants, invoices, onBatchSend, sending }: any) {
       </div>
       <div className="stagger" style={{ flex: 1, background: NAVY, padding: '52px 22px 0', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <div style={{ color: BLUE, fontWeight: 500, fontSize: 18, textAlign: 'center', marginBottom: 16, flexShrink: 0 }}>select tenants</div>
-        <div className="tp-thin-scroll" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 110 }}>
+        <div className="tp-thin-scroll" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 130 }}>
           {active.map((t: any) => {
             const on = selected.has(t.id);
             const inv = liveInvoiceFor(t.id);
@@ -1034,6 +1032,11 @@ export default function PropertyTerminal() {
           className={`tp-psubbar${subbarVisible ? ' show' : ' hide'}${isFeatureScreen ? ' feature' : ''}`}
           style={isFeatureScreen ? { transform: `translate(-50%, calc(${boundaryDelta}px - 100% - 20px))` } : undefined}
         >
+          {/* Split-bill pill — shown in the overlay row when on the tenants screen so it
+              never gets covered by the subbar itself */}
+          <div className={`tp-split-slot${screen === 'tenants' ? ' show' : ''}`}>
+            <SplitPill on={splitMode} onToggle={() => setSplitMode(m => !m)} />
+          </div>
           <SubBar activeIdx={subbarActiveIdx} onPick={handleSubbarPick} compact={sendVisible} />
           <div className={`tp-send-slot${sendVisible ? ' show' : ''}`}>
             <SendBtn onClick={handleSend} />
@@ -1049,7 +1052,7 @@ export default function PropertyTerminal() {
 /* ═══ CSS (same shell as SmartTransitions TP_CSS) ═══ */
 const TP_TERM_CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap');
-.tp-viewport { width: 100%; max-width: 390px; height: 100svh; margin: 0 auto; position: relative; overflow: hidden; font-family: 'Outfit', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+.tp-viewport { width: 100%; max-width: 430px; height: 100svh; margin: 0 auto; position: relative; overflow: hidden; font-family: 'Outfit', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
 .tp-screen { position: absolute; inset: 0; display: flex; flex-direction: column; overflow: hidden; }
 .tp-top-banner { position: absolute; top: 0; left: 0; right: 0; z-index: 55; background: linear-gradient(150deg,#040D6D 0%,#072b20 100%); border-bottom: 2px solid #1BBF85; box-shadow: 0 8px 40px rgba(27,191,133,0.3); padding: 52px 22px 20px; display: flex; align-items: center; gap: 16px; transform: translateY(-100%); transition: transform 0.6s cubic-bezier(0.34,1.56,0.64,1); pointer-events: none; }
 .tp-top-banner.show { transform: translateY(0); pointer-events: auto; }
@@ -1145,4 +1148,6 @@ const TP_TERM_CSS = `
 .tp-psubbar.feature { transform: translate(-50%, calc(-100% - 20px)); }
 .tp-send-slot { display: flex; align-items: center; overflow: hidden; max-width: 0; opacity: 0; transition: max-width 420ms cubic-bezier(0.34,1.56,0.64,1), opacity 280ms ease 80ms; height: 37px; }
 .tp-send-slot.show { max-width: 143px; opacity: 1; }
+.tp-split-slot { display: flex; align-items: center; overflow: hidden; max-width: 0; opacity: 0; transition: max-width 420ms cubic-bezier(0.34,1.56,0.64,1), opacity 280ms ease 80ms; height: 37px; }
+.tp-split-slot.show { max-width: 120px; opacity: 1; }
 `;

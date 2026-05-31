@@ -708,31 +708,33 @@
   }
 }
 
-/* iPhone 12 specific optimizations */
-@media (max-width: 390px) {
-  /* Extra tight spacing for small screens */
+/* Extra-small phones (SE, older models) — tighten spacing slightly */
+@media (max-width: 374px) {
   .space-y-4 > * + * {
     margin-top: 0.75rem !important;
   }
-  
   .space-y-6 > * + * {
     margin-top: 1rem !important;
   }
-  
-  /* Smaller padding for very small screens */
   .p-4 {
     padding: 0.75rem !important;
   }
-  
   .px-4 {
     padding-left: 0.75rem !important;
     padding-right: 0.75rem !important;
   }
-  
   .py-4 {
     padding-top: 0.75rem !important;
     padding-bottom: 0.75rem !important;
   }
+}
+
+/* Safe-area aware bottom padding utilities — used to clear the fixed bottom nav */
+.pb-nav {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 96px);
+}
+.pb-nav-xl {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 128px);
 }
 
 /* Slow Floating Animations - No Blur */
