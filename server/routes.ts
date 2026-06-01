@@ -81,11 +81,11 @@ function checkRateLimit(ip: string): boolean {
 // Cleanup old rate limit records periodically
 setInterval(() => {
   const now = Date.now();
-  const entries = Array.from(rateLimitMap.entries());
-  for (const [ip, record] of entries) {
-    if (now > record.resetTime) {
-      rateLimitMap.delete(ip);
-    }
+  for (const [ip, record] of Array.from(rateLimitMap.entries())) {
+    if (now > record.resetTime) rateLimitMap.delete(ip);
+  }
+  for (const [key, record] of Array.from(resendRateLimitMap.entries())) {
+    if (now > record.resetTime) resendRateLimitMap.delete(key);
   }
 }, RATE_LIMIT_WINDOW);
 
@@ -161,6 +161,17 @@ function removeUndefined<T extends Record<string, any>>(obj: T): Partial<T> {
   return Object.fromEntries(
     Object.entries(obj).filter(([_, v]) => v !== undefined)
   ) as Partial<T>;
+}
+
+// Escape user-supplied strings before embedding in HTML (e.g. admin email templates)
+function escHtml(s: string | null | undefined): string {
+  if (!s) return 'N/A';
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -249,9 +260,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const decoded = jwt.verify(token, JWT_SECRET) as any;
       // Token decoded for admin middleware - details omitted for security
       
-      // For admin users, we verify directly from the token
-      const adminEmail = process.env.ADMIN_EMAIL || 'oliverleonard.professional@gmail.com';
-      if (decoded.role === 'admin' && decoded.email === adminEmail) {
+      // For admin users, we verify directly from the token.
+      // ADMIN_EMAIL must be set in env — no hardcoded fallback.
+      const adminEmail = process.env.ADMIN_EMAIL;
+      if (decoded.role === 'admin' && adminEmail && decoded.email === adminEmail) {
         req.user = {
           id: decoded.userId,
           email: decoded.email,
@@ -467,17 +479,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  app.get("/api/auth/me", authenticateToken, (req: AuthenticatedRequest, res) => {
-    res.json({
-      user: {
-        id: req.user!.id,
-        email: req.user!.email,
-        merchantId: req.user!.merchantId,
-        role: req.user!.role,
-      },
-    });
-  });
-
   // Password reset routes
   app.post("/api/auth/forgot-password", async (req, res) => {
     try {
@@ -561,10 +562,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
       
       // Check for admin credentials
-      const adminEmail = process.env.ADMIN_EMAIL || "oliverleonard.professional@gmail.com";
+      const adminEmail = process.env.ADMIN_EMAIL;
       const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
 
-      if (email === adminEmail) {
+      if (adminEmail && email === adminEmail) {
         let passwordValid = false;
         if (adminPasswordHash) {
           passwordValid = await bcrypt.compare(password, adminPasswordHash);
@@ -688,52 +689,56 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       });
 
       // Send notification email to TaptPay admin
-      const emailHtml = `
-        <h2>New Merchant KYC Submission</h2>
-        <p>A merchant has completed their onboarding details and is ready for Windcave KYC/AML review.</p>
-        
-        <h3>Business Information</h3>
-        <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse; width:100%; font-family:sans-serif;">
-          <tr><td><strong>Business Name</strong></td><td>${merchant.businessName}</td></tr>
-          <tr><td><strong>Business Type</strong></td><td>${merchant.businessType || 'N/A'}</td></tr>
-          <tr><td><strong>Business Address</strong></td><td>${merchant.address || 'N/A'}</td></tr>
-          ${businessDescription ? `<tr><td><strong>Business Description</strong></td><td>${businessDescription}</td></tr>` : ''}
-          ${websiteUrl ? `<tr><td><strong>Website</strong></td><td>${websiteUrl}</td></tr>` : ''}
-          ${estimatedAnnualTurnover ? `<tr><td><strong>Estimated Annual Card Turnover</strong></td><td>${estimatedAnnualTurnover}</td></tr>` : ''}
-        </table>
+      // All user-supplied values are HTML-escaped via escHtml() to prevent injection.
+      const adminEmail = process.env.ADMIN_EMAIL || process.env.ADMIN_NOTIFY_EMAIL;
+      if (adminEmail) {
+        const emailHtml = `
+          <h2>New Merchant KYC Submission</h2>
+          <p>A merchant has completed their onboarding details and is ready for Windcave KYC/AML review.</p>
 
-        <h3>Director / Owner Details</h3>
-        <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse; width:100%; font-family:sans-serif;">
-          <tr><td><strong>Contact Name</strong></td><td>${merchant.name}</td></tr>
-          <tr><td><strong>Director / Legal Name</strong></td><td>${director || 'N/A'}</td></tr>
-          <tr><td><strong>Email</strong></td><td>${merchant.email}</td></tr>
-          <tr><td><strong>Phone</strong></td><td>${merchant.phone || 'N/A'}</td></tr>
-        </table>
+          <h3>Business Information</h3>
+          <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse; width:100%; font-family:sans-serif;">
+            <tr><td><strong>Business Name</strong></td><td>${escHtml(merchant.businessName)}</td></tr>
+            <tr><td><strong>Business Type</strong></td><td>${escHtml(merchant.businessType)}</td></tr>
+            <tr><td><strong>Business Address</strong></td><td>${escHtml(merchant.address)}</td></tr>
+            ${businessDescription ? `<tr><td><strong>Business Description</strong></td><td>${escHtml(businessDescription)}</td></tr>` : ''}
+            ${websiteUrl ? `<tr><td><strong>Website</strong></td><td>${escHtml(websiteUrl)}</td></tr>` : ''}
+            ${estimatedAnnualTurnover ? `<tr><td><strong>Estimated Annual Card Turnover</strong></td><td>${escHtml(estimatedAnnualTurnover)}</td></tr>` : ''}
+          </table>
 
-        <h3>Tax & Registration</h3>
-        <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse; width:100%; font-family:sans-serif;">
-          <tr><td><strong>NZBN</strong></td><td>${nzbn || 'N/A'}</td></tr>
-          <tr><td><strong>GST Number</strong></td><td>${gstNumber || 'N/A'}</td></tr>
-        </table>
+          <h3>Director / Owner Details</h3>
+          <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse; width:100%; font-family:sans-serif;">
+            <tr><td><strong>Contact Name</strong></td><td>${escHtml(merchant.name)}</td></tr>
+            <tr><td><strong>Director / Legal Name</strong></td><td>${escHtml(director)}</td></tr>
+            <tr><td><strong>Email</strong></td><td>${escHtml(merchant.email)}</td></tr>
+            <tr><td><strong>Phone</strong></td><td>${escHtml(merchant.phone)}</td></tr>
+          </table>
 
-        <h3>Bank Account Details (for settlements)</h3>
-        <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse; width:100%; font-family:sans-serif;">
-          <tr><td><strong>Bank</strong></td><td>${bankName || 'N/A'}</td></tr>
-          <tr><td><strong>Account Holder</strong></td><td>${accountHolderName || 'N/A'}</td></tr>
-          <tr><td><strong>Account Number</strong></td><td>${bankAccountNumber || 'N/A'}</td></tr>
-          <tr><td><strong>Branch</strong></td><td>${bankBranch || 'N/A'}</td></tr>
-        </table>
+          <h3>Tax &amp; Registration</h3>
+          <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse; width:100%; font-family:sans-serif;">
+            <tr><td><strong>NZBN</strong></td><td>${escHtml(nzbn)}</td></tr>
+            <tr><td><strong>GST Number</strong></td><td>${escHtml(gstNumber)}</td></tr>
+          </table>
 
-        <p style="margin-top:20px; color:#666;">Submitted via TaptPay merchant onboarding form.</p>
-      `;
+          <h3>Bank Account Details (for settlements)</h3>
+          <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse; width:100%; font-family:sans-serif;">
+            <tr><td><strong>Bank</strong></td><td>${escHtml(bankName)}</td></tr>
+            <tr><td><strong>Account Holder</strong></td><td>${escHtml(accountHolderName)}</td></tr>
+            <tr><td><strong>Account Number</strong></td><td>${escHtml(bankAccountNumber)}</td></tr>
+            <tr><td><strong>Branch</strong></td><td>${escHtml(bankBranch)}</td></tr>
+          </table>
 
-      await sendEmail({
-        to: 'oliverleonard@taptpay.co.nz',
-        from: 'noreply@taptpay.co.nz',
-        subject: `New Merchant KYC Submission — ${merchant.businessName}`,
-        html: emailHtml,
-        text: `New merchant KYC submission from ${merchant.businessName} (${merchant.email}). Director: ${director || 'N/A'}. NZBN: ${nzbn || 'N/A'}. GST: ${gstNumber || 'N/A'}. Bank: ${bankName || 'N/A'} / ${bankAccountNumber || 'N/A'}.`,
-      });
+          <p style="margin-top:20px; color:#666;">Submitted via TaptPay merchant onboarding form.</p>
+        `;
+
+        await sendEmail({
+          to: adminEmail,
+          from: 'noreply@taptpay.co.nz',
+          subject: `New Merchant KYC Submission — ${(merchant.businessName || '').replace(/[\r\n]/g, '')}`,
+          html: emailHtml,
+          text: `New merchant KYC submission from ${merchant.businessName} (${merchant.email}). Director: ${director || 'N/A'}. NZBN: ${nzbn || 'N/A'}. GST: ${gstNumber || 'N/A'}. Bank: ${bankName || 'N/A'} / ${bankAccountNumber || 'N/A'}.`,
+        });
+      }
 
       res.json({ message: "Onboarding details submitted successfully" });
     } catch (error: any) {
@@ -755,8 +760,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // Token decoded for admin auth - details omitted for security
       
       // For admin users, we verify directly from the token since they're not stored in the users Map
-      const adminEmail = process.env.ADMIN_EMAIL || 'oliverleonard.professional@gmail.com';
-      if (decoded.role === 'admin' && decoded.email === adminEmail) {
+      const adminEmail = process.env.ADMIN_EMAIL;
+      if (decoded.role === 'admin' && adminEmail && decoded.email === adminEmail) {
         res.json({
           user: {
             id: decoded.userId,
@@ -2752,6 +2757,17 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(400).json({ message: "No file uploaded" });
       }
 
+      // Verify PNG magic bytes (89 50 4E 47 0D 0A 1A 0A) regardless of client-supplied MIME type
+      const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+      const fileHeader = Buffer.alloc(8);
+      const fd = fs.openSync(req.file.path, 'r');
+      fs.readSync(fd, fileHeader, 0, 8, 0);
+      fs.closeSync(fd);
+      if (!fileHeader.equals(PNG_MAGIC)) {
+        fs.unlinkSync(req.file.path);
+        return res.status(400).json({ message: "Invalid file: only PNG images are accepted" });
+      }
+
       // Generate URL path for the logo
       const logoUrl = `/uploads/logos/${req.file.filename}`;
       
@@ -3585,8 +3601,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(401).json({ message: 'Access token required' });
       }
 
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-change-in-production') as any;
-      
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+
       if (decoded.role !== 'admin' || decoded.email !== 'admin@tapt.co.nz') {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -4120,10 +4136,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const safeEmail = email.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
       // Fire-and-forget notification — do not block the response
-      sendEmail({
-        to: 'oliverleonard@taptpay.co.nz',
+      const leadNotifyEmail = process.env.ADMIN_EMAIL;
+      if (leadNotifyEmail) sendEmail({
+        to: leadNotifyEmail,
         from: 'noreply@taptpay.co.nz',
-        subject: `New info pack request from ${name}`,
+        subject: `New info pack request from ${(name || '').replace(/[\r\n]/g, '')}`,
         html: `<p><strong>Name:</strong> ${safeName}</p><p><strong>Email:</strong> <a href="mailto:${safeEmail}">${safeEmail}</a></p><p>They have just unlocked the TaptPay info pack on taptpay.co.nz/info.</p>`,
         text: `New info pack request\n\nName: ${name}\nEmail: ${email}\n\nThey have just unlocked the TaptPay info pack on taptpay.co.nz/info.`,
       }).then((ok) => {
@@ -4254,31 +4271,34 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         address: businessAddress || '',
       });
 
-      // Notify oliverleonard@taptpay.co.nz of new merchant registration
-      const { sendEmail } = await import('./email-service');
-      const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@taptpay.co.nz';
-      await sendEmail({
-        to: 'oliverleonard@taptpay.co.nz',
-        from: fromEmail,
-        subject: `🆕 New Merchant Registration — ${businessName}`,
-        html: `
-          <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
-            <h2 style="color:#0055ff;margin-top:0">New Merchant Registered</h2>
-            <table style="width:100%;border-collapse:collapse">
-              <tr><td style="padding:8px 0;color:#666;width:40%">Business Name</td><td style="padding:8px 0;font-weight:600">${businessName}</td></tr>
-              <tr><td style="padding:8px 0;color:#666">Director</td><td style="padding:8px 0;font-weight:600">${director}</td></tr>
-              <tr><td style="padding:8px 0;color:#666">Account Name</td><td style="padding:8px 0">${merchant.name}</td></tr>
-              <tr><td style="padding:8px 0;color:#666">Email</td><td style="padding:8px 0"><a href="mailto:${contactEmail}">${contactEmail}</a></td></tr>
-              <tr><td style="padding:8px 0;color:#666">Phone</td><td style="padding:8px 0">${contactPhone}</td></tr>
-              <tr><td style="padding:8px 0;color:#666">GST Number</td><td style="padding:8px 0">${gstNumber}</td></tr>
-              <tr><td style="padding:8px 0;color:#666">Business Address</td><td style="padding:8px 0">${businessAddress || '—'}</td></tr>
-              <tr><td style="padding:8px 0;color:#666">NZBN</td><td style="padding:8px 0">${nzbn || '—'}</td></tr>
-            </table>
-            <p style="margin-top:24px;color:#999;font-size:12px">Submitted via TaptPay merchant registration</p>
-          </div>
-        `,
-        text: `New merchant registered:\nBusiness: ${businessName}\nDirector: ${director}\nEmail: ${contactEmail}\nPhone: ${contactPhone}\nGST: ${gstNumber}\nAddress: ${businessAddress || '—'}\nNZBN: ${nzbn || '—'}`,
-      });
+      // Notify admin of new merchant registration (ADMIN_EMAIL env var required)
+      const notifyEmail = process.env.ADMIN_EMAIL;
+      if (notifyEmail) {
+        const { sendEmail } = await import('./email-service');
+        const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@taptpay.co.nz';
+        await sendEmail({
+          to: notifyEmail,
+          from: fromEmail,
+          subject: `New Merchant Registration — ${(businessName || '').replace(/[\r\n]/g, '')}`,
+          html: `
+            <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
+              <h2 style="color:#0055ff;margin-top:0">New Merchant Registered</h2>
+              <table style="width:100%;border-collapse:collapse">
+                <tr><td style="padding:8px 0;color:#666;width:40%">Business Name</td><td style="padding:8px 0;font-weight:600">${escHtml(businessName)}</td></tr>
+                <tr><td style="padding:8px 0;color:#666">Director</td><td style="padding:8px 0;font-weight:600">${escHtml(director)}</td></tr>
+                <tr><td style="padding:8px 0;color:#666">Account Name</td><td style="padding:8px 0">${escHtml(merchant.name)}</td></tr>
+                <tr><td style="padding:8px 0;color:#666">Email</td><td style="padding:8px 0">${escHtml(contactEmail)}</td></tr>
+                <tr><td style="padding:8px 0;color:#666">Phone</td><td style="padding:8px 0">${escHtml(contactPhone)}</td></tr>
+                <tr><td style="padding:8px 0;color:#666">GST Number</td><td style="padding:8px 0">${escHtml(gstNumber)}</td></tr>
+                <tr><td style="padding:8px 0;color:#666">Business Address</td><td style="padding:8px 0">${escHtml(businessAddress)}</td></tr>
+                <tr><td style="padding:8px 0;color:#666">NZBN</td><td style="padding:8px 0">${escHtml(nzbn)}</td></tr>
+              </table>
+              <p style="margin-top:24px;color:#999;font-size:12px">Submitted via TaptPay merchant registration</p>
+            </div>
+          `,
+          text: `New merchant registered:\nBusiness: ${businessName}\nDirector: ${director}\nEmail: ${contactEmail}\nPhone: ${contactPhone}\nGST: ${gstNumber}\nAddress: ${businessAddress || '—'}\nNZBN: ${nzbn || '—'}`,
+        });
+      }
 
       res.json({ message: "Business details saved successfully." });
 

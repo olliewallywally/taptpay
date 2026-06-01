@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useRef, useLayoutEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { startPropertyNavigation, startPropertyBack, signalPropertyReady } from "@/lib/property-transition";
 
 /* ── Design tokens ── */
 const C = {
@@ -27,7 +28,11 @@ const GLASS = {
   boxShadow: '0 12px 32px rgba(4,13,109,0.10), inset 0 1px 0 rgba(255,255,255,0.95)',
 } as React.CSSProperties;
 
-function fmtCents(c: number) { return '$' + (c / 100).toLocaleString('en-NZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
+function fmtCents(c: number) { return '$' + (c / 100).toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function propHeaders(): HeadersInit {
+  const token = localStorage.getItem('authToken');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 function StatusBox({ status }: { status: string }) {
   const s = STATUS_MAP[status] ?? STATUS_MAP.upcoming;
@@ -285,17 +290,22 @@ export default function TenantDirectory() {
   const [showAdd,   setShowAdd]   = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const heroRef = useRef<HTMLDivElement>(null);
+
+  // Signal the hero is mounted so a reverse hero-morph (profile → directory)
+  // can capture and play (see property-transition.ts).
+  useLayoutEffect(() => { signalPropertyReady(); }, []);
 
   const { data: tenants = [], isLoading } = useQuery<any[]>({
     queryKey: ['/api/property/tenants'],
-    queryFn: () => fetch('/api/property/tenants', { credentials: 'include' }).then(r => r.ok ? r.json() : []),
+    queryFn: () => fetch('/api/property/tenants', { headers: propHeaders() }).then(r => r.ok ? r.json() : []),
     staleTime: 60000,
     retry: false,
   });
 
   const { data: invoices = [] } = useQuery<any[]>({
     queryKey: ['/api/property/invoices'],
-    queryFn: () => fetch('/api/property/invoices', { credentials: 'include' }).then(r => r.ok ? r.json() : []),
+    queryFn: () => fetch('/api/property/invoices', { headers: propHeaders() }).then(r => r.ok ? r.json() : []),
     staleTime: 30000,
     retry: false,
   });
@@ -303,8 +313,8 @@ export default function TenantDirectory() {
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
       const r = await fetch('/api/property/tenants', {
-        method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...propHeaders() },
         body: JSON.stringify(data),
       });
       if (!r.ok) {
@@ -330,18 +340,26 @@ export default function TenantDirectory() {
     !term || `${t.firstName} ${t.lastName}`.toLowerCase().includes(term) || t.propertyAddress.toLowerCase().includes(term)
   );
 
-  const invoiceByTenant = (tenantId: string) =>
-    invoices.filter((i: any) => i.tenantProfileId === tenantId && i.status !== 'voided')
-      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+  // Return the invoice that represents the worst-case status for this tenant
+  // (overdue > dispatched/pending > paid). Fallback to most recent for display.
+  const invoiceByTenant = (tenantId: string) => {
+    const live = invoices.filter((i: any) => i.tenantProfileId === tenantId && i.status !== 'voided');
+    if (live.length === 0) return undefined;
+    const overdue = live.find((i: any) => i.status === 'overdue');
+    if (overdue) return overdue;
+    const pending = live.find((i: any) => ['dispatched', 'pending_dispatch', 'dispatch_failed'].includes(i.status));
+    if (pending) return pending;
+    return [...live].sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+  };
 
   return (
     <div style={{ background: C.white, minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
     <div style={{ width: '100%', maxWidth: 430, minHeight: '100svh', background: '#F4F4F4', paddingBottom: 130, fontFamily: "'Outfit', system-ui, sans-serif" }}>
       <div style={{ height: 54 }} />
 
-      {/* Hero */}
+      {/* Hero — carries view-transition-name so it morphs into the profile hero */}
       <div style={{ padding: '0 18px' }}>
-        <div style={{ background: C.navy, borderRadius: 24, padding: '26px 26px 30px', position: 'relative' }}>
+        <div ref={heroRef} className="pt-hero" style={{ background: C.navy, borderRadius: 24, padding: '26px 26px 30px', position: 'relative' }}>
           <div style={{ fontWeight: 900, fontSize: 64, color: C.sky, letterSpacing: '-0.04em', lineHeight: 0.92, fontVariantNumeric: 'tabular-nums' }}>
             {activeTenants.length}
           </div>
@@ -373,9 +391,12 @@ export default function TenantDirectory() {
             </button>
           )}
         </div>
-        <div style={{ width: 46, height: 46, borderRadius: 14, background: C.navy, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <button
+          onClick={() => startPropertyBack(() => setLocation('/property'), { expectHero: false })}
+          aria-label="Go to property dashboard"
+          style={{ width: 46, height: 46, borderRadius: 14, background: C.navy, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer' }}>
           <svg width={20} height={20} viewBox="0 0 20 20" fill={C.sky}><rect x="1" y="1" width="7" height="7" rx="2"/><rect x="12" y="1" width="7" height="7" rx="2"/><rect x="1" y="12" width="7" height="7" rx="2"/><rect x="12" y="12" width="7" height="7" rx="2"/></svg>
-        </div>
+        </button>
       </div>
 
       {/* Tenant list */}
@@ -392,7 +413,20 @@ export default function TenantDirectory() {
               key={t.id}
               tenant={t}
               nextInvoice={invoiceByTenant(t.id)}
-              onClick={() => setLocation(`/property/tenants/${t.id}`)}
+              onClick={() => {
+                const inv = invoiceByTenant(t.id);
+                startPropertyNavigation(
+                  {
+                    id: t.id,
+                    firstName: t.firstName,
+                    lastName: t.lastName,
+                    propertyAddress: t.propertyAddress,
+                    preferredChannel: t.preferredChannel,
+                    invoiceStatus: inv?.status,
+                  },
+                  () => setLocation(`/property/tenants/${t.id}`)
+                );
+              }}
             />
           ))
         )}

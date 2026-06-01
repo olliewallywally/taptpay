@@ -978,6 +978,89 @@
   }
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   Property hero-morph transition  (View Transitions API + stagger CSS)
+   ══════════════════════════════════════════════════════════════════════
+
+   How it works:
+   1. Both the Tenant Directory hero and Tenant Profile hero carry the class
+      .pt-hero, giving them view-transition-name: property-hero.
+   2. document.startViewTransition() captures old + new DOM snapshots.
+   3. The browser automatically interpolates position, size, and border-radius
+      between the two hero cards.  We only animate the content cross-fade.
+   4. The root (everything outside the hero) fades + scales out; the new
+      page's secondary elements self-animate with .pt-bounce / .pt-slide-top.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Tag the morphing element on both pages */
+.pt-hero {
+  view-transition-name: property-hero;
+}
+
+/* ── Hero: content cross-fade inside the morphing card ──────────────── */
+::view-transition-old(property-hero) {
+  animation: 340ms cubic-bezier(0.4, 0, 0.2, 1) both pt-fade-out;
+}
+::view-transition-new(property-hero) {
+  animation: 500ms cubic-bezier(0.34, 1.56, 0.64, 1) both pt-fade-in;
+}
+@keyframes pt-fade-out { to   { opacity: 0; } }
+@keyframes pt-fade-in  { from { opacity: 0; } }
+
+/* ── Root (non-hero): old page exits, new page appears bare ─────────── */
+::view-transition-old(root) {
+  animation: 210ms cubic-bezier(0.4, 0, 1, 1) both pt-root-out;
+}
+::view-transition-new(root) {
+  /* New page appears immediately; individual elements animate themselves */
+  animation: 1ms linear both;
+}
+@keyframes pt-root-out {
+  to { opacity: 0; transform: scale(0.97) translateY(-6px); }
+}
+
+/* ── Bounce pop in — used for profile secondary elements ─────────────── */
+@keyframes bouncePopIn {
+  0%   { opacity: 0; transform: translateY(30px) scale(0.86); }
+  55%  { opacity: 1; transform: translateY(-7px) scale(1.045); }
+  74%  { transform: translateY(3px) scale(0.983); }
+  88%  { transform: translateY(-1.5px) scale(1.007); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── Slide pop from above — used for the top bar ─────────────────────── */
+@keyframes slideInFromTop {
+  from { opacity: 0; transform: translateY(-18px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0)     scale(1);    }
+}
+
+.pt-bounce {
+  opacity: 0;
+  animation: bouncePopIn 0.52s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: var(--pt-d, 0ms);
+}
+
+.pt-slide-top {
+  opacity: 0;
+  animation: slideInFromTop 0.30s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--pt-d, 0ms);
+}
+
+/* ── Respect prefers-reduced-motion ─────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(property-hero),
+  ::view-transition-new(property-hero),
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0.01ms !important;
+  }
+  .pt-bounce,
+  .pt-slide-top {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+}
+
 /* ── Native Apple Pay button ─────────────────────────────────────────── */
 .apple-pay-btn {
   -webkit-appearance: -apple-pay-button;

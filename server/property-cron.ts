@@ -51,6 +51,10 @@ function fmtCents(cents: number): string { return `$${(cents / 100).toFixed(2)}`
 function fmtDate(d: Date): string {
   return new Date(d).toLocaleDateString("en-NZ", { day: "numeric", month: "long", year: "numeric" });
 }
+function esc(s: string | null | undefined): string {
+  if (!s) return '';
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
 
 function buildRentEmail(opts: {
   tenantName: string; merchantName: string; propertyAddress: string;
@@ -78,7 +82,7 @@ function buildRentEmail(opts: {
       <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%">
         <tr><td style="background:#040D6D;border-radius:16px 16px 0 0;padding:32px 36px 28px">
           <p style="margin:0 0 4px;font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:#58ABFF">${kicker}</p>
-          <p style="margin:0 0 20px;font-size:15px;font-weight:600;color:#fff">${merchantName}</p>
+          <p style="margin:0 0 20px;font-size:15px;font-weight:600;color:#fff">${esc(merchantName)}</p>
           <p style="margin:0 0 6px;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:rgba(88,171,255,0.6)">${amountLabel}</p>
           <p style="margin:0;font-size:58px;font-weight:700;letter-spacing:-2px;color:#58ABFF;line-height:1">${amount}</p>
           ${splitHtml}
@@ -87,11 +91,11 @@ function buildRentEmail(opts: {
           <table width="100%" cellpadding="0" cellspacing="0">
             <tr><td style="padding-bottom:16px">
               <p style="margin:0 0 2px;font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:#8C8C8C">hi</p>
-              <p style="margin:0;font-size:14px;font-weight:600;color:#040D6D">${tenantName}</p>
+              <p style="margin:0;font-size:14px;font-weight:600;color:#040D6D">${esc(tenantName)}</p>
             </td></tr>
             <tr><td style="padding:16px 0;border-top:1px solid #F4F4F4">
               <p style="margin:0 0 2px;font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:#8C8C8C">property</p>
-              <p style="margin:0;font-size:14px;font-weight:600;color:#040D6D">${propertyAddress}</p>
+              <p style="margin:0;font-size:14px;font-weight:600;color:#040D6D">${esc(propertyAddress)}</p>
             </td></tr>
             <tr><td style="padding:16px 0 24px;border-top:1px solid #F4F4F4">
               <p style="margin:0 0 2px;font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:#8C8C8C">due</p>
@@ -103,13 +107,13 @@ function buildRentEmail(opts: {
               </a>
             </td></tr>
             <tr><td align="center">
-              <p style="margin:12px 0 0;font-size:11px;color:#8C8C8C">🔒 secured by windcave · apple pay &amp; google pay accepted</p>
+              <p style="margin:12px 0 0;font-size:11px;color:#8C8C8C">&#x1F512; secured by windcave &middot; apple pay &amp; google pay accepted</p>
             </td></tr>
           </table>
         </td></tr>
         <tr><td style="background:#F4F4F4;border-radius:0 0 16px 16px;padding:16px 36px">
           <p style="margin:0;font-size:11px;color:#8C8C8C;text-align:center">
-            sent by ${merchantName} via taptpay · contact your property manager with any questions.
+            sent by ${esc(merchantName)} via taptpay &middot; contact your property manager with any questions.
           </p>
         </td></tr>
       </table>

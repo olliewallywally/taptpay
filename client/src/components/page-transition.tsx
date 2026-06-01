@@ -1,8 +1,16 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useLocation } from "wouter";
+import { isVTPending } from "@/lib/property-transition";
 
 export function PageTransition({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
+
+  // When the View Transitions API is handling the animation (hero morph between
+  // property pages), bypass Framer Motion entirely so they don't fight.
+  if (isVTPending()) {
+    return <>{children}</>;
+  }
+
   return (
     <AnimatePresence mode="wait" initial={false}>
       <motion.div

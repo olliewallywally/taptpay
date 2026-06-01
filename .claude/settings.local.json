@@ -26,7 +26,22 @@
       "Bash(git commit -m ' *)",
       "Bash(echo \"=== total errors: $\\(npx tsc --noEmit -p tsconfig.json 2>&1)",
       "Bash(git stash *)",
-      "Bash(git commit -q -m ' *)"
+      "Bash(git commit -q -m ' *)",
+      "Bash(git commit *)",
+      "Bash(curl -s http://localhost:5000/api/auth/me)",
+      "Bash(npx playwright *)",
+      "Bash(PLAYWRIGHT_BROWSERS_PATH=/tmp/pw npx playwright install chromium)",
+      "Bash(npm install *)",
+      "Bash(PLAYWRIGHT_BROWSERS_PATH=/tmp/pw node --experimental-vm-modules node_modules/playwright/index.js --version)",
+      "Bash(sed -n '1270,1285p' /home/runner/workspace/server/routes.ts)",
+      "Bash(sed -n '1173,1185p' /home/runner/workspace/server/routes.ts)",
+      "Bash(sed -n '1841,1850p' /home/runner/workspace/server/routes.ts)",
+      "Bash(sed -n '3895,3910p' /home/runner/workspace/server/routes.ts)",
+      "Bash(grep -n \"emailHtml\\\\|template.*literal\\\\|\\\\`.*\\\\${\" /home/runner/workspace/server/routes.ts)",
+      "Skill(update-config)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(echo \"RC=$?\")"
     ]
-  }
+  },
+  "model": "claude-opus-4-8"
 }

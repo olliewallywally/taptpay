@@ -44,11 +44,12 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const [chartSize, setChartSize] = useState(260);
   const merchantId = getCurrentMerchantId();
-  
-  if (!merchantId) {
-    setLocation('/login');
-    return null;
-  }
+
+  useEffect(() => {
+    if (!merchantId) setLocation('/login');
+  }, [merchantId, setLocation]);
+
+  if (!merchantId) return null;
 
   const { data: merchant } = useQuery({
     queryKey: ["/api/merchants", merchantId],

@@ -36,7 +36,7 @@ function toArea(pts: number[], W: number, H: number, pad = 8) {
 }
 
 /* ── Revenue chart ── */
-function RevenueChart({ primary, secondary, tipIdx, animKey }: { primary: number[]; secondary: number[]; tipIdx: number; animKey: string }) {
+function RevenueChart({ primary, secondary, tipIdx, animKey, tipLabel }: { primary: number[]; secondary: number[]; tipIdx: number; animKey: string; tipLabel?: string }) {
   const W = 342, H = 100, pad = 8;
   const [reveal, setReveal] = useState(false);
 
@@ -83,9 +83,11 @@ function RevenueChart({ primary, secondary, tipIdx, animKey }: { primary: number
         </g>
       </svg>
       {/* Tooltip */}
-      <div style={{ position: 'absolute', left: `${(tipPt.x / W) * 100}%`, top: `${(tipPt.y / H) * 100 - 18}%`, transform: 'translate(-50%, -100%)', background: C.accent, color: C.base, padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', boxShadow: '0 4px 12px rgba(88,171,255,0.3)', opacity: reveal ? 1 : 0, transition: 'opacity 0.5s ease 1.2s' }}>
-        {/* tip label set by parent */}
-      </div>
+      {tipLabel && (
+        <div style={{ position: 'absolute', left: `${(tipPt.x / W) * 100}%`, top: `${(tipPt.y / H) * 100 - 18}%`, transform: 'translate(-50%, -100%)', background: C.accent, color: C.base, padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', boxShadow: '0 4px 12px rgba(88,171,255,0.3)', opacity: reveal ? 1 : 0, transition: 'opacity 0.5s ease 1.2s' }}>
+          {tipLabel}
+        </div>
+      )}
       <div style={{ position: 'absolute', left: `${(tipPt.x / W) * 100}%`, bottom: -6, transform: 'translateX(-50%)', width: 12, height: 12, borderRadius: '50%', background: C.white, boxShadow: '0 2px 8px rgba(0,0,0,0.3)', opacity: reveal ? 1 : 0, transition: 'opacity 0.3s ease 1s' }} />
     </div>
   );
@@ -151,13 +153,18 @@ function buildChartData(invoices: any[], tf: Timeframe) {
   return { primary: norm(paid), secondary: norm(outstanding) };
 }
 
+function propHeaders(): HeadersInit {
+  const token = localStorage.getItem('authToken');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export default function PropertyAnalytics() {
   const [tf, setTf] = useState<Timeframe>('week');
   const [totVis, setTotVis] = useState(true);
 
   const { data: invoices = [] } = useQuery<any[]>({
     queryKey: ['/api/property/invoices'],
-    queryFn: () => fetch('/api/property/invoices', { credentials: 'include' }).then(r => r.ok ? r.json() : []),
+    queryFn: () => fetch('/api/property/invoices', { headers: propHeaders() }).then(r => r.ok ? r.json() : []),
     staleTime: 30000,
     retry: false,
   });
@@ -185,6 +192,12 @@ export default function PropertyAnalytics() {
     ? buildChartData(invoices, tf)
     : { primary: FLAT, secondary: FLAT };
   const tipIdx = 7;
+
+  // Tip label: most recent bucket's paid revenue (rightmost = now)
+  const tipRevenue = filtered
+    .filter((i: any) => i.status === 'paid' || i.status === 'paid_external')
+    .reduce((s: number, i: any) => s + (i.amountCents ?? 0), 0);
+  const tipLabel = tipRevenue > 0 ? `$${(tipRevenue / 100).toFixed(0)}` : undefined;
 
   /* Switch timeframe */
   const switchTf = (p: Timeframe) => {
@@ -277,7 +290,7 @@ export default function PropertyAnalytics() {
 
         {/* Chart — bleeds past horizontal padding to fill full width */}
         <div style={{ margin: '8px -32px 4px', overflow: 'visible' }}>
-          <RevenueChart primary={chart.primary} secondary={chart.secondary} tipIdx={tipIdx} animKey={tf} />
+          <RevenueChart primary={chart.primary} secondary={chart.secondary} tipIdx={tipIdx} animKey={tf} tipLabel={tipLabel} />
         </div>
       </div>
 

@@ -90,7 +90,9 @@ export default function MerchantTerminalMobile() {
       if (!r.ok) throw new Error("Failed to fetch active transaction");
       return r.json();
     },
-    refetchInterval: 3000,
+    // SSE keeps this cache live via queryClient.setQueryData — no polling needed.
+    // A 30 s fallback refetch guards against SSE gaps (disconnect, reconnect lag).
+    refetchInterval: 30000,
     enabled: !!merchantId,
   });
 

@@ -25,20 +25,33 @@ export default function RentCheckout() {
   const [payerEmail, setPayerEmail] = useState('');
   const [busy, setBusy] = useState(false);
 
+  const fetchInvoice = async (firstLoad = false) => {
+    if (!token) { if (firstLoad) setState('not-found'); return; }
+    try {
+      const r = await fetch(`/api/checkout/resolve/${token}`);
+      if (r.status === 404) { setState('not-found'); return; }
+      if (r.status === 410) { setErrorMsg('This payment link has been voided.'); setState('error'); return; }
+      if (!r.ok) { if (firstLoad) { setErrorMsg('Failed to load payment details.'); setState('error'); } return; }
+      const data = await r.json();
+      if (data.alreadyPaid) { setState('paid'); return; }
+      setInvoice(data);
+      if (firstLoad) setState('ready');
+    } catch {
+      if (firstLoad) { setErrorMsg('Unable to load payment. Please check your connection.'); setState('error'); }
+    }
+  };
+
+  // Initial load
+  useEffect(() => { fetchInvoice(true); }, [token]);
+
+  // Poll every 8 seconds when split is active — keeps split progress live for all flatmates
   useEffect(() => {
-    if (!token) { setState('not-found'); return; }
-    fetch(`/api/checkout/resolve/${token}`)
-      .then(async r => {
-        if (r.status === 404) { setState('not-found'); return; }
-        if (r.status === 410) { setErrorMsg('This payment link has been voided.'); setState('error'); return; }
-        if (!r.ok) { setErrorMsg('Failed to load payment details.'); setState('error'); return; }
-        const data = await r.json();
-        if (data.alreadyPaid) { setState('paid'); return; }
-        setInvoice(data);
-        setState('ready');
-      })
-      .catch(() => { setErrorMsg('Unable to load payment. Please check your connection.'); setState('error'); });
-  }, [token]);
+    const splitActive = !!invoice?.splitEnabled && (invoice?.splitCount ?? 0) > 0;
+    const allPaid = splitActive && (invoice?.splitPaidCount ?? 0) >= (invoice?.splitCount ?? 0);
+    if (!splitActive || allPaid || state !== 'ready') return;
+    const id = setInterval(() => fetchInvoice(false), 8000);
+    return () => clearInterval(id);
+  }, [invoice?.splitEnabled, invoice?.splitCount, invoice?.splitPaidCount, state]);
 
   const pay = async () => {
     setState('paying');
@@ -131,8 +144,13 @@ export default function RentCheckout() {
           <div style={{ background: C.navy, borderRadius: 24, padding: '28px 28px 32px', marginBottom: 20 }}>
             <div style={{ fontWeight: 500, fontSize: 12, color: C.sky, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 8 }}>rent payment</div>
             <div style={{ fontWeight: 900, fontSize: 52, color: C.sky, letterSpacing: '-0.04em', lineHeight: 1, fontVariantNumeric: 'tabular-nums', marginBottom: 12 }}>
-              {fmtCents(invoice.amountCents)}
+              {splitActive && sharesLeft > 0 ? fmtCents(shareCents) : fmtCents(invoice.amountCents)}
             </div>
+            {splitActive && sharesLeft > 0 && (
+              <div style={{ fontSize: 12, color: 'rgba(88,171,255,0.6)', marginBottom: 4, marginTop: -8 }}>
+                your share · {fmtCents(invoice.amountCents)} total
+              </div>
+            )}
             <div style={{ height: 1, background: 'rgba(88,171,255,0.2)', marginBottom: 16 }} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>

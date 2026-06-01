@@ -14,6 +14,9 @@ function IcoHome({ c }: { c: string }) {
 function IcoPerson({ c }: { c: string }) {
   return <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="7.5" r="4"/><path d="M3.5 21c0-4 3.8-7 8.5-7s8.5 3 8.5 7"/></svg>;
 }
+function IcoBox({ c }: { c: string }) {
+  return <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8l-9-5-9 5v8l9 5 9-5V8z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/></svg>;
+}
 function IcoTerminal({ c }: { c: string }) {
   return <svg width={22} height={22} viewBox="0 0 32 22" fill="none"><path d="M4 4l6 7-6 7" stroke={c} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/><path d="M15 18h13" stroke={c} strokeWidth="2.6" strokeLinecap="round"/></svg>;
 }
@@ -27,7 +30,7 @@ function IcoSettings({ c }: { c: string }) {
 /* ── Nav items ── */
 const RETAIL_ITEMS = [
   { id: 'home',      path: '/dashboard',    Icon: IcoHome     },
-  { id: 'stock',     path: '/stock',        Icon: IcoPerson   },
+  { id: 'stock',     path: '/stock',        Icon: IcoBox      },
   { id: 'terminal',  path: '/terminal',     Icon: IcoTerminal },
   { id: 'analytics', path: '/transactions', Icon: IcoAnalytics},
   { id: 'settings',  path: '/settings',     Icon: IcoSettings },
@@ -61,7 +64,15 @@ export function BottomNavigation() {
   const [animating, setAnimating] = useState(false);
   const [mode,      setModeState] = useState<'retail' | 'property'>(readMode);
   const [collapsed, setCollapsed] = useState(false);
+  const [navWidth,  setNavWidth]  = useState(() => Math.min(320, window.innerWidth - 32));
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* Keep nav width in sync with viewport resizes */
+  useEffect(() => {
+    const onResize = () => setNavWidth(Math.min(320, window.innerWidth - 32));
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   /* Keep stored mode in sync with route */
   useEffect(() => {
@@ -115,7 +126,7 @@ export function BottomNavigation() {
   const resetIdle = () => {
     setCollapsed(false);
     if (idleTimer.current) clearTimeout(idleTimer.current);
-    idleTimer.current = setTimeout(() => setCollapsed(true), 2000);
+    idleTimer.current = setTimeout(() => setCollapsed(true), 4000);
   };
   useEffect(() => {
     if (!showNav) return;
@@ -140,9 +151,9 @@ export function BottomNavigation() {
         onClick={collapsed ? resetIdle : undefined}
         style={{
           position: 'relative',
-          /* Always 320 wide; height animates 58 → 44 (44px = accessible touch target).
-             The visual pill shrinks via the inner dock opacity + a pseudo-pill overlay. */
-          width: 320,
+          /* navWidth is capped at 320 px but shrinks on narrow viewports (e.g. iPhone SE = 320 px)
+             to leave 16 px margin on each side. Height animates 58 → 44. */
+          width: navWidth,
           height: collapsed ? 44 : 58,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           pointerEvents: 'auto',

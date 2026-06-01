@@ -1,5 +1,5 @@
 import { Switch, Route, useLocation } from "wouter";
-import { useEffect, useState, lazy, Suspense } from "react";
+import { createContext, useContext, useEffect, useState, lazy, Suspense } from "react";
 import { queryClient } from "./lib/queryClient";
 import "@/plugins/TaptPayPlugin";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -58,60 +58,87 @@ function PageLoader() {
   );
 }
 
-function ProtectedRoute({ children, skipOnboardingCheck = false }: { children: React.ReactNode; skipOnboardingCheck?: boolean }) {
-  const [, setLocation] = useLocation();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+// Auth is checked ONCE at app load and cached here. ProtectedRoute reads from
+// this context so navigating between protected routes never shows a loader or
+// makes a redundant API call — both of which would destroy page transitions.
+type AuthData = {
+  isAuthenticated: boolean;
+  merchantId?: string | null;
+  role?: string | null;
+  onboardingCompleted?: boolean | null;
+};
+
+const AuthContext = createContext<{ auth: AuthData | null; isChecking: boolean }>({
+  auth: null,
+  isChecking: true,
+});
+
+function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [auth, setAuth] = useState<AuthData | null>(null);
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
-    const checkAuthStatus = async () => {
-      const token = localStorage.getItem("authToken");
-      if (!token) {
-        setIsChecking(false);
-        const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
-        setLocation(`/login?returnTo=${returnTo}`);
-        return;
-      }
-      try {
-        const response = await fetch('/api/auth/me', {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setIsAuthenticated(true);
-          if (
-            !skipOnboardingCheck &&
-            data?.user?.merchantId &&
-            data?.user?.role !== 'admin' &&
-            data?.user?.onboardingCompleted === false
-          ) {
-            setIsChecking(false);
-            setLocation("/onboarding");
-            return;
-          }
+    const token = localStorage.getItem("authToken");
+    if (!token) {
+      setAuth({ isAuthenticated: false });
+      setIsChecking(false);
+      return;
+    }
+    fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
+      .then(async r => {
+        if (r.ok) {
+          const data = await r.json();
+          setAuth({
+            isAuthenticated: true,
+            merchantId: data?.user?.merchantId ?? null,
+            role: data?.user?.role ?? null,
+            onboardingCompleted: data?.user?.onboardingCompleted ?? null,
+          });
         } else {
           localStorage.removeItem("authToken");
-          const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
-          setLocation(`/login?returnTo=${returnTo}`);
+          localStorage.removeItem("user");
+          localStorage.removeItem("merchantId");
+          setAuth({ isAuthenticated: false });
         }
-      } catch (error) {
-        console.log('Auth check failed, keeping existing token');
-        setIsAuthenticated(true);
-      }
-      setIsChecking(false);
-    };
-    checkAuthStatus();
-  }, [setLocation, skipOnboardingCheck]);
+      })
+      .catch(() => {
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("user");
+        localStorage.removeItem("merchantId");
+        setAuth({ isAuthenticated: false });
+      })
+      .finally(() => setIsChecking(false));
+  }, []);
 
-  if (isChecking) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-green-800 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
+  return <AuthContext.Provider value={{ auth, isChecking }}>{children}</AuthContext.Provider>;
+}
 
-  return isAuthenticated ? <>{children}</> : null;
+function ProtectedRoute({ children, skipOnboardingCheck = false }: { children: React.ReactNode; skipOnboardingCheck?: boolean }) {
+  const [, setLocation] = useLocation();
+  const { auth, isChecking } = useContext(AuthContext);
+
+  useEffect(() => {
+    if (isChecking || !auth) return;
+    if (!auth.isAuthenticated) {
+      const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
+      setLocation(`/login?returnTo=${returnTo}`);
+      return;
+    }
+    if (
+      !skipOnboardingCheck &&
+      auth.merchantId &&
+      auth.role !== 'admin' &&
+      auth.onboardingCompleted === false
+    ) {
+      setLocation("/onboarding");
+    }
+  }, [isChecking, auth, skipOnboardingCheck, setLocation]);
+
+  if (isChecking) return <PageLoader />;
+  if (!auth?.isAuthenticated) return null;
+  if (!skipOnboardingCheck && auth.merchantId && auth.role !== 'admin' && auth.onboardingCompleted === false) return null;
+
+  return <>{children}</>;
 }
 
 function AdminProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -271,9 +298,11 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <NotificationProvider>
-          <Toaster />
-          <Router />
-          <BottomNavigation />
+          <AuthProvider>
+            <Toaster />
+            <Router />
+            <BottomNavigation />
+          </AuthProvider>
         </NotificationProvider>
       </TooltipProvider>
     </QueryClientProvider>

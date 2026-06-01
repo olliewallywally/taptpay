@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useMemo, useLayoutEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
+import { consumeSnap, startPropertyBack, signalPropertyReady } from "@/lib/property-transition";
 
 /* ── Design tokens ── */
 const C = {
@@ -13,10 +14,15 @@ const C = {
 };
 
 const STATUS_MAP: Record<string, { dot: string; bg: string; fg: string; label: string }> = {
-  paid:     { dot: '#13C29A', bg: 'rgba(63,155,255,0.22)', fg: C.sky, label: 'paid' },
-  overdue:  { dot: '#FF3B4E', bg: 'rgba(63,155,255,0.22)', fg: C.sky, label: 'overdue' },
-  upcoming: { dot: C.btn,    bg: 'rgba(63,155,255,0.22)', fg: C.sky, label: 'upcoming' },
+  paid:     { dot: '#13C29A', bg: 'rgba(19,194,154,0.20)', fg: '#0BD4A0', label: 'paid'     },
+  overdue:  { dot: '#FF3B4E', bg: 'rgba(255,59,78,0.20)',  fg: '#FF3B4E', label: 'overdue'  },
+  upcoming: { dot: C.btn,    bg: 'rgba(63,155,255,0.22)', fg: C.sky,    label: 'upcoming' },
 };
+
+function propHeaders(): HeadersInit {
+  const token = localStorage.getItem('authToken');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 const EVENT_KINDS: Record<string, { color: string; icon: string; fg: string }> = {
   Payment_Success:   { color: '#13C29A', icon: 'cash',     fg: '#0B7D63' },
@@ -93,16 +99,25 @@ export default function TenantProfile() {
   const [editing,  setEditing]  = useState(false);
   const [editForm, setEditForm] = useState<any>(null);
 
+  // Consume the snapshot captured on the directory tap — available before the API resolves.
+  // Using empty deps means we read it exactly once on mount, which is correct.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const snap = useMemo(() => consumeSnap(), []);
+
+  // Tell any in-flight View Transition the hero is now in the DOM so it can
+  // capture the new snapshot and play the morph (see property-transition.ts).
+  useLayoutEffect(() => { signalPropertyReady(); }, []);
+
   const { data: tenant, isLoading } = useQuery<any>({
     queryKey: ['/api/property/tenants', tenantId],
-    queryFn: () => fetch(`/api/property/tenants/${tenantId}`, { credentials: 'include' }).then(r => r.ok ? r.json() : null),
+    queryFn: () => fetch(`/api/property/tenants/${tenantId}`, { headers: propHeaders() }).then(r => r.ok ? r.json() : null),
     enabled: !!tenantId,
     retry: false,
   });
 
   const { data: events = [] } = useQuery<any[]>({
     queryKey: ['/api/property/tenants', tenantId, 'events'],
-    queryFn: () => fetch(`/api/property/tenants/${tenantId}/events`, { credentials: 'include' }).then(r => r.ok ? r.json() : []),
+    queryFn: () => fetch(`/api/property/tenants/${tenantId}/events`, { headers: propHeaders() }).then(r => r.ok ? r.json() : []),
     enabled: !!tenantId,
     staleTime: 30000,
     retry: false,
@@ -110,7 +125,7 @@ export default function TenantProfile() {
 
   const { data: invoices = [] } = useQuery<any[]>({
     queryKey: ['/api/property/invoices', { tenantProfileId: tenantId }],
-    queryFn: () => fetch(`/api/property/invoices?tenantProfileId=${tenantId}`, { credentials: 'include' }).then(r => r.ok ? r.json() : []),
+    queryFn: () => fetch(`/api/property/invoices?tenantProfileId=${tenantId}`, { headers: propHeaders() }).then(r => r.ok ? r.json() : []),
     enabled: !!tenantId,
     staleTime: 30000,
     retry: false,
@@ -118,7 +133,7 @@ export default function TenantProfile() {
 
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
-      const r = await fetch(`/api/property/tenants/${tenantId}`, { method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      const r = await fetch(`/api/property/tenants/${tenantId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', ...propHeaders() }, body: JSON.stringify(data) });
       if (!r.ok) throw new Error('Failed to update');
       return r.json();
     },
@@ -128,33 +143,62 @@ export default function TenantProfile() {
     },
   });
 
-  if (isLoading) {
-    return <div style={{ background: C.white, minHeight: '100svh', display: 'flex', justifyContent: 'center' }}><div style={{ width: '100%', maxWidth: 390, background: '#F4F4F4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.mute, fontSize: 13 }}>loading…</div></div>;
-  }
+  const archiveMutation = useMutation({
+    mutationFn: async () => {
+      const r = await fetch(`/api/property/tenants/${tenantId}/archive`, { method: 'POST', headers: propHeaders() });
+      if (!r.ok) throw new Error('Failed to archive');
+      return r.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/property/tenants'] });
+      startPropertyBack(() => setLocation('/property/tenants'));
+    },
+  });
 
-  if (!tenant) {
+  // Not found: no snap (direct URL), not loading, and no data → show error screen.
+  if (!isLoading && !tenant && !snap) {
     return (
-      <div style={{ minHeight: '100svh', background: C.white, display: 'flex', justifyContent: 'center' }}><div style={{ width: '100%', maxWidth: 390, background: '#F4F4F4', paddingTop: 100, textAlign: 'center' }}>
-        <p style={{ color: C.mute }}>tenant not found</p>
-        <button onClick={() => setLocation('/property/tenants')} style={{ marginTop: 16, color: C.btn, background: 'none', border: 'none', cursor: 'pointer', fontSize: 14 }}>← back to tenants</button>
-      </div></div>
+      <div style={{ minHeight: '100svh', background: C.white, display: 'flex', justifyContent: 'center' }}>
+        <div style={{ width: '100%', maxWidth: 390, background: '#F4F4F4', paddingTop: 100, textAlign: 'center' }}>
+          <p style={{ color: C.mute }}>tenant not found</p>
+          <button onClick={() => startPropertyBack(() => setLocation('/property/tenants'))} style={{ marginTop: 16, color: C.btn, background: 'none', border: 'none', cursor: 'pointer', fontSize: 14 }}>← back to tenants</button>
+        </div>
+      </div>
     );
   }
 
-  const initials = `${tenant.firstName?.[0] ?? ''}${tenant.lastName?.[0] ?? ''}`.toUpperCase();
-  const fullName = `${tenant.firstName} ${tenant.lastName}`;
+  // Hero data: use real tenant once loaded, snapshot during the morph animation.
+  const heroInitials = tenant
+    ? `${tenant.firstName?.[0] ?? ''}${tenant.lastName?.[0] ?? ''}`.toUpperCase()
+    : snap
+    ? `${snap.firstName?.[0] ?? ''}${snap.lastName?.[0] ?? ''}`.toUpperCase()
+    : '…';
+
+  const heroName = tenant
+    ? `${tenant.firstName} ${tenant.lastName}`
+    : snap
+    ? `${snap.firstName} ${snap.lastName}`
+    : '';
 
   const latestInvoice = [...invoices]
     .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
 
-  const tenantStatus = latestInvoice?.status === 'paid' || latestInvoice?.status === 'paid_external' ? 'paid'
-    : latestInvoice?.status === 'overdue' ? 'overdue' : 'upcoming';
+  const heroStatus = tenant
+    ? (latestInvoice?.status === 'paid' || latestInvoice?.status === 'paid_external' ? 'paid'
+      : latestInvoice?.status === 'overdue' ? 'overdue' : 'upcoming')
+    : snap?.invoiceStatus === 'overdue' ? 'overdue'
+    : (snap?.invoiceStatus === 'paid' || snap?.invoiceStatus === 'paid_external') ? 'paid'
+    : 'upcoming';
 
-  const coTenants = tenant.coTenantsText
+  const heroAddress    = tenant?.propertyAddress  || snap?.propertyAddress  || '';
+  const heroChannel    = tenant?.preferredChannel || snap?.preferredChannel || '';
+
+  const coTenants = tenant?.coTenantsText
     ? tenant.coTenantsText.split('\n').filter(Boolean)
     : [];
 
   const startEdit = () => {
+    if (!tenant) return;
     setEditForm({ firstName: tenant.firstName, lastName: tenant.lastName, propertyAddress: tenant.propertyAddress, preferredChannel: tenant.preferredChannel });
     setEditing(true);
   };
@@ -164,32 +208,34 @@ export default function TenantProfile() {
     <div style={{ width: '100%', maxWidth: 390, minHeight: '100svh', background: '#F4F4F4', paddingBottom: 130, fontFamily: "'Outfit', system-ui, sans-serif" }}>
       <div style={{ height: 56 }} />
 
-      {/* Top bar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 18px 14px' }}>
-        <button onClick={() => setLocation('/property/tenants')} style={{ width: 34, height: 34, borderRadius: 999, background: C.gray, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-          <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 6-6 6 6 6"/></svg>
-        </button>
-        <div style={{ fontWeight: 600, fontSize: 11, color: C.navy, letterSpacing: '0.16em', textTransform: 'uppercase' }}>tenant profile</div>
-        <button onClick={startEdit} style={{ width: 34, height: 34, borderRadius: 999, background: C.gray, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-          <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-        </button>
+      {/* Top bar — slides down from above as the hero morphs into place */}
+      <div className="pt-slide-top" style={{ '--pt-d': '0ms' } as any}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 18px 14px' }}>
+          <button onClick={() => startPropertyBack(() => setLocation('/property/tenants'))} style={{ width: 34, height: 34, borderRadius: 999, background: C.gray, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 6-6 6 6 6"/></svg>
+          </button>
+          <div style={{ fontWeight: 600, fontSize: 11, color: C.navy, letterSpacing: '0.16em', textTransform: 'uppercase' }}>tenant profile</div>
+          <button onClick={startEdit} disabled={!tenant} style={{ width: 34, height: 34, borderRadius: 999, background: C.gray, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: tenant ? 'pointer' : 'default', opacity: tenant ? 1 : 0.35 }}>
+            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          </button>
+        </div>
       </div>
 
-      {/* Navy editable panel */}
+      {/* Navy hero panel — same view-transition-name as the directory hero so the browser morphs between them */}
       <div style={{ padding: '0 18px' }}>
-        <div style={{ background: C.navy, borderRadius: 24, padding: '20px 20px 22px' }}>
+        <div className="pt-hero" style={{ background: C.navy, borderRadius: 24, padding: '20px 20px 22px' }}>
           {/* Head */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
             <div style={{ width: 50, height: 50, borderRadius: 999, background: C.sky, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 800, fontSize: 16, color: C.navy, letterSpacing: '0.03em' }}>
-              {initials}
+              {heroInitials}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 600, fontSize: 8.5, color: C.sky, letterSpacing: '0.12em', textTransform: 'uppercase' }}>head tenant</div>
-              <div style={{ fontWeight: 600, fontSize: 21, color: C.white, letterSpacing: '-0.02em', marginTop: 2 }}>{fullName}</div>
+              <div style={{ fontWeight: 600, fontSize: 21, color: C.white, letterSpacing: '-0.02em', marginTop: 2 }}>{heroName}</div>
             </div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 8, background: 'rgba(63,155,255,0.22)', color: C.sky, fontWeight: 700, fontSize: 9.5, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
               <span style={{ width: 6, height: 6, borderRadius: 999, background: C.btn }} />
-              {tenantStatus}
+              {heroStatus}
             </div>
           </div>
 
@@ -222,21 +268,23 @@ export default function TenantProfile() {
             </div>
           )}
 
-          {/* Fields grid */}
+          {/* Fields grid — shows snap data instantly, real data once loaded */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
-            <Field label="address"          value={tenant.propertyAddress}  wide />
-            <Field label="payment link via" value={tenant.preferredChannel} wide />
+            <Field label="address"          value={heroAddress}  wide />
+            <Field label="payment link via" value={heroChannel}  wide />
           </div>
         </div>
       </div>
 
-      {/* Activity Timeline */}
-      <div style={{ display: 'flex', alignItems: 'center', padding: '24px 20px 4px' }}>
+      {/* Activity Timeline — header bounces in after hero settles */}
+      <div className="pt-bounce" style={{ '--pt-d': '170ms', display: 'flex', alignItems: 'center', padding: '24px 20px 4px' } as any}>
         <div style={{ fontWeight: 600, fontSize: 12, color: C.navy, letterSpacing: '0.12em', textTransform: 'uppercase' }}>activity timeline</div>
       </div>
 
-      {events.length === 0 ? (
-        <div style={{ padding: '24px 18px', textAlign: 'center', color: C.mute, fontSize: 13 }}>no activity yet</div>
+      {!tenant && isLoading ? (
+        <div style={{ padding: '24px 18px', textAlign: 'center', color: C.mute, fontSize: 13 }}>loading activity…</div>
+      ) : events.length === 0 ? (
+        <div className="pt-bounce" style={{ '--pt-d': '215ms', padding: '24px 18px', textAlign: 'center', color: C.mute, fontSize: 13 } as any}>no activity yet</div>
       ) : (
         <div style={{ padding: '8px 18px 0' }}>
           {events.slice(0, 10).map((ev: any, i: number) => {
@@ -247,7 +295,11 @@ export default function TenantProfile() {
             const amtCents = ev.payload?.amountCents ?? (latestInvoice?.amountCents && isFirst ? latestInvoice.amountCents : null);
 
             return (
-              <div key={ev.id} style={{ display: 'flex', gap: 10, minHeight: isPaid && isFirst ? 0 : 64 }}>
+              <div
+                key={ev.id}
+                className="pt-bounce"
+                style={{ '--pt-d': `${215 + i * 45}ms`, display: 'flex', gap: 10, minHeight: isPaid && isFirst ? 0 : 64 } as any}
+              >
                 <Rail color={k.color} first={isFirst} last={isLast} />
                 <div style={{ flex: 1, paddingBottom: 14, paddingTop: 2 }}>
                   {isPaid && isFirst && amtCents ? (
@@ -313,11 +365,33 @@ export default function TenantProfile() {
                 />
               </div>
             ))}
+            {/* Preferred notification channel */}
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: C.sky, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>send rent link via</div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                {(['email', 'sms'] as const).map(ch => (
+                  <button key={ch} onClick={() => setEditForm((f: any) => ({ ...f, preferredChannel: ch }))}
+                    style={{ flex: 1, padding: '13px 0', borderRadius: 14, border: 'none', background: editForm.preferredChannel === ch ? C.navy : C.gray, color: editForm.preferredChannel === ch ? C.white : C.navy, fontWeight: 600, fontSize: 14, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em', transition: 'background 0.18s, color 0.18s' }}>
+                    {ch}
+                  </button>
+                ))}
+              </div>
+            </div>
             <button
               onClick={() => updateMutation.mutate(editForm)}
               disabled={updateMutation.isPending}
               style={{ width: '100%', padding: '18px 0', borderRadius: 999, background: C.navy, color: C.white, fontWeight: 700, fontSize: 16, border: 'none', cursor: 'pointer', marginTop: 8 }}>
               {updateMutation.isPending ? 'saving…' : 'save changes'}
+            </button>
+            <button
+              onClick={() => {
+                if (window.confirm('Archive this tenant? They will be removed from active lists. This cannot be undone easily.')) {
+                  archiveMutation.mutate();
+                }
+              }}
+              disabled={archiveMutation.isPending}
+              style={{ width: '100%', padding: '14px 0', borderRadius: 999, background: 'transparent', color: '#FF3B4E', fontWeight: 600, fontSize: 14, border: '1.5px solid rgba(255,59,78,0.3)', cursor: 'pointer', marginTop: 10 }}>
+              {archiveMutation.isPending ? 'archiving…' : 'archive tenant'}
             </button>
           </div>
         </div>

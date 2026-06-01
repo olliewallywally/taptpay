@@ -89,26 +89,31 @@ function IcoPause() {
 
 const STAT_ICONS = [IcoTenants, IcoWarn, IcoPage, IcoPause];
 
+function propHeaders(): HeadersInit {
+  const token = localStorage.getItem('authToken');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export default function PropertyDashboard() {
   const [, setLocation] = useLocation();
 
   const { data: tenants = [] } = useQuery<any[]>({
     queryKey: ['/api/property/tenants'],
-    queryFn: () => fetch('/api/property/tenants', { credentials: 'include' }).then(r => r.ok ? r.json() : []),
+    queryFn: () => fetch('/api/property/tenants', { headers: propHeaders() }).then(r => r.ok ? r.json() : []),
     staleTime: 60000,
     retry: false,
   });
 
   const { data: invoices = [] } = useQuery<any[]>({
     queryKey: ['/api/property/invoices'],
-    queryFn: () => fetch('/api/property/invoices', { credentials: 'include' }).then(r => r.ok ? r.json() : []),
+    queryFn: () => fetch('/api/property/invoices', { headers: propHeaders() }).then(r => r.ok ? r.json() : []),
     staleTime: 30000,
     retry: false,
   });
 
   const { data: schedules = [] } = useQuery<any[]>({
     queryKey: ['/api/property/schedules'],
-    queryFn: () => fetch('/api/property/schedules', { credentials: 'include' }).then(r => r.ok ? r.json() : []),
+    queryFn: () => fetch('/api/property/schedules', { headers: propHeaders() }).then(r => r.ok ? r.json() : []),
     staleTime: 60000,
     retry: false,
   });

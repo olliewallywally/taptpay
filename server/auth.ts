@@ -202,20 +202,7 @@ export interface AuthenticatedRequest extends Request {
 
 // In-memory user storage (replace with database in production)
 const users: Map<number, User> = new Map();
-let currentUserId = 1;
-
-// Create admin user
-const adminHashedPassword = bcrypt.hashSync('123456', 12);
-users.set(1, {
-  id: 1,
-  email: 'oliverleonard.professional@gmail.com',
-  password: adminHashedPassword,
-  merchantId: 0,
-  role: 'admin',
-  createdAt: new Date(),
-});
-
-currentUserId = 2;
+let currentUserId = 2; // Start at 2; slot 1 is reserved but admin is verified via token, not this Map.
 
 export function clearAllUsers() {
   // Clear all users except admin
@@ -277,7 +264,12 @@ export async function syncVerifiedMerchants() {
 // Initialize auth system by syncing verified merchants
 syncVerifiedMerchants();
 
-export const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+export const JWT_SECRET = process.env.JWT_SECRET ?? (() => {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET environment variable must be set in production');
+  }
+  return 'dev-only-jwt-secret-not-for-production';
+})();
 
 export async function authenticateUser(email: string, password: string): Promise<User | null> {
   const user = Array.from(users.values()).find(u => u.email === email);
@@ -336,13 +328,27 @@ export async function authenticateToken(req: AuthenticatedRequest, res: Response
     return next();
   }
 
-  // For regular users, check if user exists, if not try to recreate from merchant data
+  // For regular users, check if user exists. If not, do a targeted single-merchant lookup
+  // rather than syncing all merchants (which is O(N) and a DoS vector).
   let user = users.get(decoded.userId);
   if (!user && decoded.merchantId) {
-    // Try to recreate user from merchant data
-    console.log(`Recreating user session for merchant ${decoded.merchantId}`);
-    await syncVerifiedMerchants();
-    user = users.get(decoded.userId);
+    try {
+      const { storage } = await import('./storage');
+      const merchant = await storage.getMerchant(decoded.merchantId);
+      if (merchant && (merchant.status === 'verified' || merchant.status === 'active') && merchant.passwordHash) {
+        user = {
+          id: decoded.userId,
+          email: merchant.email,
+          password: merchant.passwordHash,
+          merchantId: merchant.id,
+          role: 'merchant',
+          createdAt: new Date(),
+        };
+        users.set(decoded.userId, user);
+      }
+    } catch {
+      // fall through to user not found below
+    }
   }
   if (!user) {
     return res.status(404).json({ message: 'User not found' });

@@ -44,16 +44,15 @@ const Ic = {
   Trash:   ({ sz = 18, c = NAVY }: any) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13"/></svg>,
 };
 
-/* ═══ SUBBAR ═══ */
+/* ═══ SUBBAR — 4 items (automate merged into batch) ═══ */
 const SUBBAR_ITEMS = [
   { id: 'tenants',  label: 'tenants',  Icon: Ic.Person   },
   { id: 'batch',    label: 'batch',    Icon: Ic.People   },
   { id: 'send',     label: 'send',     Icon: Ic.Send     },
   { id: 'external', label: 'external', Icon: Ic.External },
-  { id: 'automate', label: 'auto',     Icon: Ic.Repeat   },
 ];
-const SCREEN_TO_SUBBAR: Record<string, number> = { tenants: 0, batch: 1, send: 2, external: 3, automate: 4 };
-const SUBBAR_ROUTE: Record<number, string> = { 0: 'tenants', 1: 'batch', 2: 'send', 3: 'external', 4: 'automate' };
+const SCREEN_TO_SUBBAR: Record<string, number> = { tenants: 0, batch: 1, send: 2, external: 3 };
+const SUBBAR_ROUTE: Record<number, string> = { 0: 'tenants', 1: 'batch', 2: 'send', 3: 'external' };
 
 /* ═══ FREQUENCY ═══ */
 const FREQ_OPTIONS = [
@@ -98,10 +97,12 @@ function SubBar({ activeIdx = -1, onPick, compact = false, hideLabel = false }: 
       else { const m = measure(activeIdx); setInd({ x: m.x, w: m.w, on: true }); }
     };
     if (!mounted.current) {
-      requestAnimationFrame(() => { tick(); mounted.current = true; });
+      // Triple-RAF on first mount: wait for subbar layout + label render before measuring
+      requestAnimationFrame(() => requestAnimationFrame(() => { tick(); mounted.current = true; }));
     } else {
       setAnim(true);
-      requestAnimationFrame(() => requestAnimationFrame(tick));
+      // Triple-RAF on update: label renders in same commit, layout settles in 3 frames
+      requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(tick)));
       const t = setTimeout(() => setAnim(false), 520);
       return () => clearTimeout(t);
     }
@@ -113,7 +114,9 @@ function SubBar({ activeIdx = -1, onPick, compact = false, hideLabel = false }: 
         <div className={`tp-subbar-ind${animate ? ' animate' : ''}${ind.on ? ' on' : ''}`} style={{ left: ind.x, width: ind.w }} />
         {SUBBAR_ITEMS.map(({ id, label, Icon }, i) => {
           const active = activeIdx === i;
-          const ic = active ? BLUE : 'rgba(4,13,109,0.55)';
+          // Active icon: white — visible against the navy indicator that sits above the button.
+          // Inactive icon: dimmed navy — visible against the light-blue subbar background.
+          const ic = active ? '#FFFFFF' : 'rgba(4,13,109,0.55)';
           return (
             <button key={id} ref={(el: any) => (btnRefs.current[i] = el)}
               className={`tp-subbar-btn${active ? ' active' : ''}`}
@@ -242,12 +245,29 @@ function RequestsHome({ invoices, tenants, outstanding, go, onRowTap }: any) {
   );
 }
 
-/* ═══ Split-bill pill ═══ */
+/* ═══ Split-bill pill — narrow, no icon, same height (37px) as the action bar ═══ */
 function SplitPill({ on, onToggle }: any) {
   return (
-    <button onClick={onToggle} aria-pressed={on}
-      style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '8px 14px', borderRadius: 999, border: `1.5px solid ${on ? NAVY : 'rgba(4,13,109,0.22)'}`, background: on ? NAVY : 'transparent', color: on ? BLUE : 'rgba(4,13,109,0.55)', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', fontFamily: 'Outfit, system-ui', transition: 'all 0.18s ease', WebkitTapHighlightColor: 'transparent' }}>
-      <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={on ? BLUE : 'rgba(4,13,109,0.55)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="7" r="3.2"/><circle cx="17" cy="8" r="2.4"/><path d="M3 20c0-3.3 2.7-5.8 6-5.8s6 2.5 6 5.8"/><path d="M17.5 14.3c2.1.3 3.7 2 3.7 4.2"/></svg>
+    <button
+      onClick={onToggle}
+      aria-pressed={on}
+      style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        height: 37, padding: '0 13px',
+        borderRadius: 999,
+        border: `1.5px solid ${on ? NAVY : 'rgba(4,13,109,0.28)'}`,
+        background: on ? NAVY : 'transparent',
+        color: on ? BLUE : 'rgba(4,13,109,0.55)',
+        fontWeight: 700, fontSize: 11,
+        letterSpacing: '0.02em',
+        whiteSpace: 'nowrap',
+        cursor: 'pointer',
+        fontFamily: 'Outfit, system-ui',
+        transition: 'background 0.18s ease, border-color 0.18s ease, color 0.18s ease',
+        WebkitTapHighlightColor: 'transparent',
+        boxSizing: 'border-box',
+      }}
+    >
       split bill
     </button>
   );
@@ -358,6 +378,24 @@ function RentAmount({ go, selectedTenant, onCommit }: any) {
 
 /* ═══ SCREEN: SendRentLink ═══ */
 function SendRentLink({ go, selectedTenant, amount, onSend, sending, frequency, setFrequency, splitMode }: any) {
+  // No tenant selected yet — prompt the user to choose one first
+  if (!selectedTenant) {
+    return (
+      <div className="tp-screen" style={{ background: NAVY }}>
+        <div className="stagger" style={{ background: OFFW, color: NAVY, height: '50%', display: 'flex', flexDirection: 'column' }}>
+          <SubHead onCancel={() => go('home', 'down')} onCommit={() => go('tenants')} />
+          <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div style={{ color: 'rgba(4,13,109,0.35)', fontWeight: 500, fontSize: 18 }}>choose a tenant</div>
+          </div>
+          <div style={{ height: 52 }} />
+        </div>
+        <div className="stagger" style={{ flex: 1, background: NAVY, padding: '52px 28px 100px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <button className="tp-cta" onClick={() => go('tenants')}>choose tenant →</button>
+        </div>
+      </div>
+    );
+  }
+
   const channel = selectedTenant?.preferredChannel || 'email';
   const dest    = channel === 'email' ? selectedTenant?.email : selectedTenant?.phone;
   const recurring = frequency && frequency !== 'once';
@@ -571,6 +609,23 @@ function AutomateScreen({ go, schedules, tenants, onPauseResume, onCancel, busyI
 function MarkExternal({ go, selectedTenant, amount, invoices, onMark, marking }: any) {
   const [ref, setRef] = useState('');
 
+  if (!selectedTenant) {
+    return (
+      <div className="tp-screen" style={{ background: NAVY }}>
+        <div className="stagger" style={{ background: OFFW, color: NAVY, height: '50%', display: 'flex', flexDirection: 'column' }}>
+          <SubHead onCancel={() => go('home', 'down')} onCommit={() => go('tenants')} />
+          <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div style={{ color: 'rgba(4,13,109,0.35)', fontWeight: 500, fontSize: 18 }}>choose a tenant</div>
+          </div>
+          <div style={{ height: 52 }} />
+        </div>
+        <div className="stagger" style={{ flex: 1, background: NAVY, padding: '52px 28px 100px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <button className="tp-cta" onClick={() => go('tenants')}>choose tenant →</button>
+        </div>
+      </div>
+    );
+  }
+
   const pendingInvoice = invoices.find((i: any) =>
     i.tenantProfileId === selectedTenant?.id &&
     ['pending_dispatch', 'dispatched', 'overdue'].includes(i.status)
@@ -619,70 +674,145 @@ function MarkExternal({ go, selectedTenant, amount, invoices, onMark, marking }:
   );
 }
 
-/* ═══ SCREEN: BatchSend ═══ */
-function BatchSend({ go, tenants, invoices, onBatchSend, sending }: any) {
+/* ═══ SCREEN: BatchAndAutoScreen — batch send + schedules combined ═══ */
+function BatchAndAutoScreen({ go, tenants, invoices, onBatchSend, sending, schedules, onPauseResume, onCancel, busyId, reminderSettings, onUpdateReminders }: any) {
+  const [tab, setTab] = useState<'batch' | 'auto'>('batch');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const toggle = (id: string) => setSelected(prev => {
-    const n = new Set(prev);
-    n.has(id) ? n.delete(id) : n.add(id);
-    return n;
+    const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n;
   });
 
   const active = tenants.filter((t: any) => t.status !== 'archived');
-
   const LIVE = ['pending_dispatch', 'dispatched', 'overdue', 'dispatch_failed'];
   const liveInvoiceFor = (tid: string) => [...invoices]
     .filter((i: any) => i.tenantProfileId === tid && LIVE.includes(i.status))
     .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
-
   const totalCents = active
     .filter((t: any) => selected.has(t.id))
     .reduce((s: number, t: any) => s + (liveInvoiceFor(t.id)?.amountCents ?? 0), 0);
 
+  const liveSchedules = (schedules as any[]).filter((s: any) => s.status !== 'terminated');
+  const tenantById = (id: string) => (tenants as any[]).find((t: any) => t.id === id);
+
+  /* ── Top half headline ── */
+  const headline = tab === 'batch'
+    ? <><div className="tp-amount" style={{ fontSize: 82, color: totalCents === 0 ? 'rgba(4,13,109,0.25)' : NAVY }}>{fmt(totalCents)}</div>
+        <div style={{ marginTop: 10, fontWeight: 500, fontSize: 15, color: 'rgba(4,13,109,0.5)' }}>
+          {selected.size === 0 ? 'select tenants below' : `${selected.size} selected`}
+        </div></>
+    : <><div className="tp-amount" style={{ fontSize: 82, color: liveSchedules.length === 0 ? 'rgba(4,13,109,0.25)' : NAVY }}>{liveSchedules.length}</div>
+        <div style={{ marginTop: 10, fontWeight: 500, fontSize: 15, color: 'rgba(4,13,109,0.5)' }}>
+          active automation{liveSchedules.length !== 1 ? 's' : ''}
+        </div></>;
+
+  /* ── Tab toggle ── */
+  const TabPill = ({ id, label }: { id: 'batch' | 'auto'; label: string }) => (
+    <button onClick={() => setTab(id)}
+      style={{ flex: 1, padding: '8px 0', borderRadius: 999, border: 'none', fontFamily: 'Outfit, system-ui', fontWeight: 700, fontSize: 12, letterSpacing: '0.04em', textTransform: 'uppercase', background: tab === id ? NAVY : 'rgba(4,13,109,0.08)', color: tab === id ? BLUE : 'rgba(4,13,109,0.45)', cursor: 'pointer', transition: 'all 0.2s ease', WebkitTapHighlightColor: 'transparent' }}>
+      {label}
+    </button>
+  );
+
   return (
     <div className="tp-screen" style={{ background: NAVY }}>
       <div className="stagger" style={{ background: OFFW, color: NAVY, height: '50%', display: 'flex', flexDirection: 'column' }}>
-        <SubHead onCancel={() => go('home', 'down')} onCommit={() => selected.size > 0 && onBatchSend(Array.from(selected))} />
-        <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div className="tp-amount" style={{ fontSize: 82, color: totalCents === 0 ? 'rgba(4,13,109,0.25)' : NAVY, marginTop: 18 }}>{fmt(totalCents)}</div>
-          <div style={{ marginTop: 10, fontWeight: 500, fontSize: 15, color: 'rgba(4,13,109,0.5)' }}>
-            {selected.size === 0 ? 'select tenants below' : `${selected.size} tenant${selected.size !== 1 ? 's' : ''} selected`}
-          </div>
+        <SubHead
+          onCancel={() => go('home', 'down')}
+          onCommit={tab === 'batch' ? () => selected.size > 0 && onBatchSend(Array.from(selected)) : () => go('home', 'down')}
+        />
+        <div style={{ flex: 1, padding: '12px 28px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          {headline}
+        </div>
+        {/* Tab switcher sits at the boundary */}
+        <div style={{ display: 'flex', gap: 6, padding: '0 28px 0', flexShrink: 0 }}>
+          <TabPill id="batch" label="batch send" />
+          <TabPill id="auto"  label="schedules"  />
         </div>
         <div style={{ height: 52 }} />
       </div>
-      <div className="stagger" style={{ flex: 1, background: NAVY, padding: '52px 22px 0', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        <div style={{ color: BLUE, fontWeight: 500, fontSize: 18, textAlign: 'center', marginBottom: 16, flexShrink: 0 }}>select tenants</div>
-        <div className="tp-thin-scroll" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 130 }}>
-          {active.map((t: any) => {
-            const on = selected.has(t.id);
-            const inv = liveInvoiceFor(t.id);
-            return (
-              <button key={t.id} onClick={() => toggle(t.id)}
-                style={{ textAlign: 'left', background: on ? 'rgba(88,171,255,0.18)' : 'rgba(255,255,255,0.05)', border: `1.5px solid ${on ? BLUE : 'rgba(88,171,255,0.12)'}`, borderRadius: 16, padding: '12px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 22, height: 22, borderRadius: 6, border: `2px solid ${on ? BLUE : 'rgba(88,171,255,0.35)'}`, background: on ? BLUE : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  {on && <Ic.Check sz={12} sw={3} />}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: 14, color: BLUE, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tenantName(t)}</div>
-                  <div style={{ fontWeight: 400, fontSize: 11.5, color: 'rgba(88,171,255,0.5)', marginTop: 2 }}>{t.propertyAddress}</div>
-                </div>
-                <div style={{ flexShrink: 0, textAlign: 'right' }}>
-                  {inv
-                    ? <div style={{ fontWeight: 700, fontSize: 13.5, color: BLUE, fontVariantNumeric: 'tabular-nums' }}>{fmt(inv.amountCents)}</div>
-                    : <div style={{ fontSize: 10.5, color: 'rgba(88,171,255,0.4)' }}>no invoice</div>}
-                </div>
-              </button>
-            );
-          })}
+
+      {/* ── Bottom: batch send ── */}
+      {tab === 'batch' && (
+        <div className="stagger" style={{ flex: 1, background: NAVY, padding: '52px 22px 0', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <div style={{ color: BLUE, fontWeight: 500, fontSize: 18, textAlign: 'center', marginBottom: 16, flexShrink: 0 }}>select tenants</div>
+          <div className="tp-thin-scroll" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 130 }}>
+            {active.map((t: any) => {
+              const on = selected.has(t.id);
+              const inv = liveInvoiceFor(t.id);
+              return (
+                <button key={t.id} onClick={() => toggle(t.id)}
+                  style={{ textAlign: 'left', background: on ? 'rgba(88,171,255,0.18)' : 'rgba(255,255,255,0.05)', border: `1.5px solid ${on ? BLUE : 'rgba(88,171,255,0.12)'}`, borderRadius: 16, padding: '12px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 22, height: 22, borderRadius: 6, border: `2px solid ${on ? BLUE : 'rgba(88,171,255,0.35)'}`, background: on ? BLUE : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {on && <Ic.Check sz={12} sw={3} />}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: BLUE, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tenantName(t)}</div>
+                    <div style={{ fontWeight: 400, fontSize: 11.5, color: 'rgba(88,171,255,0.5)', marginTop: 2 }}>{t.propertyAddress}</div>
+                  </div>
+                  <div style={{ flexShrink: 0 }}>
+                    {inv ? <div style={{ fontWeight: 700, fontSize: 13.5, color: BLUE, fontVariantNumeric: 'tabular-nums' }}>{fmt(inv.amountCents)}</div>
+                         : <div style={{ fontSize: 10.5, color: 'rgba(88,171,255,0.4)' }}>no invoice</div>}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ flexShrink: 0, padding: '12px 0 20px', display: 'flex', justifyContent: 'center' }}>
+            <button className="tp-cta" onClick={() => selected.size > 0 && onBatchSend(Array.from(selected))} disabled={selected.size === 0 || sending} style={{ opacity: selected.size === 0 ? 0.4 : 1 }}>
+              {sending ? 'sending…' : `send to ${selected.size || 'selected'}`}
+            </button>
+          </div>
         </div>
-        <div style={{ flexShrink: 0, padding: '12px 0 20px', display: 'flex', justifyContent: 'center' }}>
-          <button className="tp-cta" onClick={() => selected.size > 0 && onBatchSend(Array.from(selected))} disabled={selected.size === 0 || sending}
-            style={{ opacity: selected.size === 0 ? 0.4 : 1 }}>
-            {sending ? 'sending…' : `send to ${selected.size || 'selected'}`}
-          </button>
+      )}
+
+      {/* ── Bottom: schedules / automate ── */}
+      {tab === 'auto' && (
+        <div className="stagger" style={{ flex: 1, background: NAVY, padding: '52px 22px 0', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <div className="tp-thin-scroll" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 130 }}>
+            <ReminderSettingsCard settings={reminderSettings} onUpdate={onUpdateReminders} />
+            <div style={{ fontSize: 10.5, fontWeight: 600, color: 'rgba(88,171,255,0.45)', letterSpacing: '0.12em', textTransform: 'uppercase', margin: '6px 2px 0' }}>recurring rent</div>
+            {liveSchedules.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '20px 16px', color: 'rgba(88,171,255,0.5)', fontSize: 13, lineHeight: 1.6 }}>
+                no schedules yet — set a repeat frequency when sending a request
+              </div>
+            ) : liveSchedules.map((s: any) => {
+              const t = tenantById(s.tenantProfileId);
+              const paused = s.status === 'paused';
+              const busy = busyId === s.id;
+              return (
+                <div key={s.id} style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${paused ? 'rgba(255,176,46,0.4)' : 'rgba(88,171,255,0.15)'}`, borderRadius: 18, padding: '14px 16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ width: 38, height: 38, borderRadius: 999, background: BLUE, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, fontWeight: 800, color: NAVY }}>
+                      {t ? tenantInitials(t) : '—'}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: BLUE, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textTransform: 'capitalize' }}>{t ? tenantName(t) : 'unknown'}</div>
+                      <div style={{ fontWeight: 400, fontSize: 11.5, color: 'rgba(88,171,255,0.55)', marginTop: 2 }}>{fmt(s.amountCents)} · {FREQ_LABEL[s.frequency] || s.frequency}</div>
+                    </div>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 9px', borderRadius: 8, background: paused ? 'rgba(255,176,46,0.18)' : 'rgba(19,194,154,0.16)', color: paused ? '#FFB02E' : GREEN, fontWeight: 700, fontSize: 9.5, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                      {paused ? 'paused' : 'active'}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(88,171,255,0.12)' }}>
+                    <div style={{ fontSize: 11, color: 'rgba(88,171,255,0.5)' }}>next {paused ? '—' : fmtDate(s.nextRunDate)}</div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={() => !busy && onPauseResume(s)} disabled={busy}
+                        style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 999, border: '1px solid rgba(88,171,255,0.3)', background: 'rgba(88,171,255,0.1)', color: BLUE, fontWeight: 600, fontSize: 12, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1, fontFamily: 'Outfit, system-ui' }}>
+                        {paused ? <Ic.Play sz={12} c={BLUE} /> : <Ic.Pause sz={12} c={BLUE} />}
+                        {paused ? 'resume' : 'pause'}
+                      </button>
+                      <button onClick={() => !busy && onCancel(s)} disabled={busy} aria-label="cancel automation"
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 999, border: '1px solid rgba(255,59,78,0.3)', background: 'rgba(255,59,78,0.08)', color: RED, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>
+                        <Ic.Trash sz={14} c={RED} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -711,6 +841,11 @@ function SentSuccess({ amount, label, go }: any) {
 }
 
 /* ═══ MAIN ═══ */
+function propHeaders(): HeadersInit {
+  const token = localStorage.getItem('authToken');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export default function PropertyTerminal() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
@@ -728,31 +863,33 @@ export default function PropertyTerminal() {
   const [frequency, setFrequency]         = useState('once');
   const [splitMode, setSplitMode]         = useState(false);
   const [busyScheduleId, setBusyScheduleId] = useState<string | null>(null);
+  // When send/external is tapped from subbar without a tenant, remember where to go after selection
+  const [pendingDest, setPendingDest]     = useState<'send' | 'external' | null>(null);
   const conveyorTimer = useRef<ReturnType<typeof setTimeout>>();
   const viewportRef = useRef<HTMLDivElement>(null);
 
   /* Data */
   const { data: tenants = [] } = useQuery<any[]>({
     queryKey: ['/api/property/tenants'],
-    queryFn: () => fetch('/api/property/tenants', { credentials: 'include' }).then(r => r.ok ? r.json() : []),
+    queryFn: () => fetch('/api/property/tenants', { headers: propHeaders() }).then(r => r.ok ? r.json() : []),
     staleTime: 60000, retry: false,
   });
 
   const { data: invoices = [] } = useQuery<any[]>({
     queryKey: ['/api/property/invoices'],
-    queryFn: () => fetch('/api/property/invoices', { credentials: 'include' }).then(r => r.ok ? r.json() : []),
+    queryFn: () => fetch('/api/property/invoices', { headers: propHeaders() }).then(r => r.ok ? r.json() : []),
     staleTime: 30000, retry: false,
   });
 
   const { data: schedules = [] } = useQuery<any[]>({
     queryKey: ['/api/property/schedules'],
-    queryFn: () => fetch('/api/property/schedules', { credentials: 'include' }).then(r => r.ok ? r.json() : []),
+    queryFn: () => fetch('/api/property/schedules', { headers: propHeaders() }).then(r => r.ok ? r.json() : []),
     staleTime: 30000, retry: false,
   });
 
   const { data: reminderSettings } = useQuery<any>({
     queryKey: ['/api/property/reminder-settings'],
-    queryFn: () => fetch('/api/property/reminder-settings', { credentials: 'include' }).then(r => r.ok ? r.json() : null),
+    queryFn: () => fetch('/api/property/reminder-settings', { headers: propHeaders() }).then(r => r.ok ? r.json() : null),
     staleTime: 60000, retry: false,
   });
 
@@ -763,8 +900,7 @@ export default function PropertyTerminal() {
       const due = new Date(now); due.setDate(due.getDate() + 7);
       // 1. Send the first request immediately
       const r = await fetch('/api/property/invoices', {
-        method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...propHeaders() },
         body: JSON.stringify({ tenantProfileId: tenantId, amountCents, deliveryChannel: channel, dueAt: due.toISOString(), splitEnabled: !!split }),
       });
       if (!r.ok) throw new Error('Failed to send');
@@ -773,8 +909,7 @@ export default function PropertyTerminal() {
       if (freq && freq !== 'once') {
         const startDate = addInterval(now, freq);
         const sr = await fetch(`/api/property/tenants/${tenantId}/schedules`, {
-          method: 'POST', credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json', ...propHeaders() },
           body: JSON.stringify({ amountCents, frequency: freq, deliveryChannel: channel, startDate: startDate.toISOString() }),
         });
         if (!sr.ok) throw new Error('Sent, but failed to set up automation');
@@ -797,10 +932,9 @@ export default function PropertyTerminal() {
     mutationFn: async ({ id, action, status }: any) => {
       setBusyScheduleId(id);
       const r = action === 'cancel'
-        ? await fetch(`/api/property/schedules/${id}`, { method: 'DELETE', credentials: 'include' })
+        ? await fetch(`/api/property/schedules/${id}`, { method: 'DELETE', headers: propHeaders() })
         : await fetch(`/api/property/schedules/${id}`, {
-            method: 'PUT', credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
+            method: 'PUT', headers: { 'Content-Type': 'application/json', ...propHeaders() },
             body: JSON.stringify({ status }),
           });
       if (!r.ok) throw new Error('Action failed');
@@ -814,8 +948,7 @@ export default function PropertyTerminal() {
   const reminderMutation = useMutation({
     mutationFn: async (patch: any) => {
       const r = await fetch('/api/property/reminder-settings', {
-        method: 'PUT', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'PUT', headers: { 'Content-Type': 'application/json', ...propHeaders() },
         body: JSON.stringify(patch),
       });
       if (!r.ok) throw new Error('Failed to save');
@@ -837,8 +970,7 @@ export default function PropertyTerminal() {
   const markMutation = useMutation({
     mutationFn: async ({ invoiceId, ref }: any) => {
       const r = await fetch(`/api/property/invoices/${invoiceId}/mark-paid-external`, {
-        method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...propHeaders() },
         body: JSON.stringify({ externalPaymentReference: ref || null }),
       });
       if (!r.ok) throw new Error('Failed to mark');
@@ -863,7 +995,7 @@ export default function PropertyTerminal() {
           .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
         if (!inv) return 'skipped';
         try {
-          const r = await fetch(`/api/property/invoices/${inv.id}/resend`, { method: 'POST', credentials: 'include' });
+          const r = await fetch(`/api/property/invoices/${inv.id}/resend`, { method: 'POST', headers: propHeaders() });
           return r.ok ? 'sent' : 'failed';
         } catch { return 'failed'; }
       }));
@@ -904,16 +1036,17 @@ export default function PropertyTerminal() {
       setAmount(0);
       setFrequency('once');
       setSplitMode(false);
+      setPendingDest(null);
       return;
     }
+    // Send/External with no tenant: remember destination, go to tenant picker
     if ((next === 'send' || next === 'external') && !selectedTenant) {
-      // Redirect to tenant picker — conveyor only if leaving home
+      setPendingDest(next as 'send' | 'external');
       if (screen === 'home') triggerConveyor(screen, 'up');
       setContentKey(k => k + 1);
       setScreen('tenants');
       return;
     }
-    // Feature → feature: pop-in only; conveyor only when leaving home
     if (screen === 'home') triggerConveyor(screen, dir);
     setContentKey(k => k + 1);
     setScreen(next);
@@ -923,7 +1056,10 @@ export default function PropertyTerminal() {
     setSelectedTenant(t);
     setAmount(preAmount);
     setContentKey(k => k + 1);
-    setScreen('send');
+    // Go to the screen the user originally intended (send or external), default send
+    const dest = pendingDest || 'send';
+    setPendingDest(null);
+    setScreen(dest);
   };
 
   const handleRowTap = (inv: any) => {
@@ -996,14 +1132,19 @@ export default function PropertyTerminal() {
   const sendVisible     = screen === 'home' && !!selectedTenant;
   const conveyorDir     = conveyor?.dir || 'up';
 
+  const batchAutoProps = {
+    go, tenants, invoices, onBatchSend: handleBatch, sending: batchMutation.isPending,
+    schedules, onPauseResume: handlePauseResume, onCancel: handleCancelSchedule,
+    busyId: busyScheduleId, reminderSettings, onUpdateReminders: (patch: any) => reminderMutation.mutate(patch),
+  };
+
   const renderScreen = (id: string) => {
     if (id === 'home')     return <RequestsHome invoices={invoices} tenants={tenants} outstanding={outstanding} go={go} onRowTap={handleRowTap} />;
     if (id === 'tenants')  return <ChooseTenant tenants={tenants} invoices={invoices} go={go} onSelect={handleTenantSelect} splitMode={splitMode} onToggleSplit={() => setSplitMode(m => !m)} />;
     if (id === 'amount')   return <RentAmount go={go} selectedTenant={selectedTenant} onCommit={(c: number) => { setAmount(c); go('send'); }} />;
     if (id === 'send')     return <SendRentLink go={go} selectedTenant={selectedTenant} amount={amount} onSend={handleSend} sending={sendMutation.isPending} frequency={frequency} setFrequency={setFrequency} splitMode={splitMode} />;
     if (id === 'external') return <MarkExternal go={go} selectedTenant={selectedTenant} amount={amount} invoices={invoices} onMark={handleMark} marking={markMutation.isPending} />;
-    if (id === 'batch')    return <BatchSend go={go} tenants={tenants} invoices={invoices} onBatchSend={handleBatch} sending={batchMutation.isPending} />;
-    if (id === 'automate') return <AutomateScreen go={go} schedules={schedules} tenants={tenants} onPauseResume={handlePauseResume} onCancel={handleCancelSchedule} busyId={busyScheduleId} reminderSettings={reminderSettings} onUpdateReminders={(patch: any) => reminderMutation.mutate(patch)} />;
+    if (id === 'batch')    return <BatchAndAutoScreen {...batchAutoProps} />;
     if (id === 'success')  return <SentSuccess amount={amount} label={successLabel} go={go} />;
     return null;
   };
@@ -1069,14 +1210,18 @@ const TP_TERM_CSS = `
 .tp-pill.outline { background: transparent; color: #58ABFF; box-shadow: inset 0 0 0 0.1px #58ABFF; }
 .tp-subbar-wrap { display: flex; justify-content: center; }
 .tp-subbar { position: relative; display: inline-flex; align-items: center; justify-content: center; background: #58ABFF; border-radius: 26px; padding: 5px 11px; gap: 4px; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 16px 48px rgba(4,13,109,0.2), 0 4px 12px rgba(4,13,109,0.1), inset 0 1px 0 rgba(255,255,255,0.25); }
-.tp-subbar-ind { position: absolute; top: 5px; height: 27px; background: #040D6D; border-radius: 16px; box-shadow: 0 4px 16px rgba(4,13,109,0.4); pointer-events: none; z-index: 0; opacity: 0; will-change: left, width, opacity; }
+/* Indicator sits ABOVE buttons (z-index 2) but pointer-events:none so clicks pass through */
+.tp-subbar-ind { position: absolute; top: 5px; height: 27px; background: #040D6D; border-radius: 16px; box-shadow: 0 4px 16px rgba(4,13,109,0.4); pointer-events: none; z-index: 2; opacity: 0; will-change: left, width, opacity; }
 .tp-subbar-ind.on { opacity: 1; }
 .tp-subbar-ind.animate { transition: left 0.45s cubic-bezier(0.34,1.56,0.64,1), width 0.45s cubic-bezier(0.34,1.56,0.64,1), opacity 0.25s ease; }
-.tp-subbar-btn { position: relative; z-index: 1; height: 27px; padding: 0 22px; display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 16px; border: none; cursor: pointer; background: transparent; color: rgba(4,13,109,0.55); transition: padding 0.45s cubic-bezier(0.34,1.56,0.64,1), color 0.3s ease, transform 0.18s ease; -webkit-tap-highlight-color: transparent; flex-shrink: 0; }
+/* Buttons below indicator (z-index 1). No padding transition — instant width change so measurement is always correct */
+.tp-subbar-btn { position: relative; z-index: 1; height: 27px; padding: 0 22px; display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 16px; border: none; cursor: pointer; background: transparent; color: rgba(4,13,109,0.55); transition: color 0.2s ease, transform 0.18s ease; -webkit-tap-highlight-color: transparent; flex-shrink: 0; }
 .tp-subbar-btn:active { transform: scale(0.92); }
-.tp-subbar-btn.active { background: transparent !important; box-shadow: none !important; color: #58ABFF; }
+/* Active: white icon/text — readable against the navy indicator sitting above */
+.tp-subbar-btn.active { background: transparent !important; box-shadow: none !important; color: #FFFFFF; }
 .tp-subbar.compact .tp-subbar-btn { padding: 0 11px; }
-.tp-subbar-label { font-family: 'Outfit', system-ui; font-weight: 600; font-size: 12px; letter-spacing: 0.4px; color: #58ABFF; white-space: nowrap; animation: tp-labelIn 0.3s ease-out; }
+/* Label is white too (same colour as icon when active) */
+.tp-subbar-label { font-family: 'Outfit', system-ui; font-weight: 600; font-size: 12px; letter-spacing: 0.4px; color: #FFFFFF; white-space: nowrap; animation: tp-labelIn 0.3s ease-out; }
 @keyframes tp-labelIn { from { opacity:0; transform:translateX(-4px); } to { opacity:1; transform:translateX(0); } }
 .tp-send { display: flex; align-items: center; gap: 6px; padding: 4px 14px 4px 4px; border-radius: 26px; background: #040D6D; border: none; cursor: pointer; box-shadow: 0 4px 16px rgba(4,13,109,0.25); transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); -webkit-tap-highlight-color: transparent; flex-shrink: 0; height: 37px; }
 .tp-send:active { transform: scale(0.94); }
