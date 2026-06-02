@@ -806,6 +806,12 @@ export const invoicesRentRequests = pgTable("invoices_rent_requests", {
   token: text("token").notNull().unique(),
   deliveryChannel: text("delivery_channel").notNull(),
   billingPeriodStart: timestamp("billing_period_start"),
+  // What this invoice is for. "rent" is the default (recurring or one-off rent);
+  // "charge" is a one-off non-rent bill (utilities, late fee, cleaning, damages, other).
+  // chargeType carries the category, description the human-readable label shown to the tenant.
+  kind: text("kind").notNull().default("rent"),
+  chargeType: text("charge_type"),
+  description: text("description"),
   status: text("status").notNull().default("pending_dispatch"),
   dueAt: timestamp("due_at").notNull(),
   dispatchedAt: timestamp("dispatched_at"),
@@ -904,6 +910,11 @@ export const createAdHocInvoiceSchema = z.object({
   deliveryChannel: z.enum(["email", "whatsapp", "sms"]),
   dueAt: z.string().datetime().or(z.date()).transform(v => new Date(v as any)),
   splitEnabled: z.boolean().optional(),
+  // One-off non-rent charges carry kind="charge" plus a category and label.
+  // Rent (the default) omits these.
+  kind: z.enum(["rent", "charge"]).optional(),
+  chargeType: z.enum(["utilities", "late_fee", "cleaning", "damages", "other"]).optional(),
+  description: z.string().trim().max(200).optional().or(z.literal("")).transform(v => v || undefined),
 });
 
 export const markInvoicePaidExternalSchema = z.object({

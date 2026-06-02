@@ -42,17 +42,33 @@ const Ic = {
   Pause:   ({ sz = 18, c = NAVY }: any) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill={c}><rect x="6" y="4.5" width="4" height="15" rx="1.4"/><rect x="14" y="4.5" width="4" height="15" rx="1.4"/></svg>,
   Play:    ({ sz = 18, c = NAVY }: any) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill={c}><path d="M7 4.5l12 7.5-12 7.5z"/></svg>,
   Trash:   ({ sz = 18, c = NAVY }: any) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13"/></svg>,
+  Receipt: ({ sz = 20, c = NAVY }: any) => <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>,
 };
 
-/* ═══ SUBBAR — 4 items (automate merged into batch) ═══ */
+/* ═══ SUBBAR — 4 items (send rent · bill extras · record external) ═══ */
 const SUBBAR_ITEMS = [
   { id: 'tenants',  label: 'tenants',  Icon: Ic.Person   },
-  { id: 'batch',    label: 'batch',    Icon: Ic.People   },
   { id: 'send',     label: 'send',     Icon: Ic.Send     },
+  { id: 'bill',     label: 'bill',     Icon: Ic.Receipt  },
   { id: 'external', label: 'external', Icon: Ic.External },
 ];
-const SCREEN_TO_SUBBAR: Record<string, number> = { tenants: 0, batch: 1, send: 2, external: 3 };
-const SUBBAR_ROUTE: Record<number, string> = { 0: 'tenants', 1: 'batch', 2: 'send', 3: 'external' };
+const SCREEN_TO_SUBBAR: Record<string, number> = { tenants: 0, send: 1, bill: 2, external: 3 };
+const SUBBAR_ROUTE: Record<number, string> = { 0: 'tenants', 1: 'send', 2: 'bill', 3: 'external' };
+
+/* ═══ CHARGES (Bill) ═══ */
+const CHARGE_TYPES = [
+  { id: 'utilities', label: 'water / utilities', preset: 'Water / utilities' },
+  { id: 'late_fee',  label: 'late fee',          preset: 'Late fee'          },
+  { id: 'cleaning',  label: 'cleaning',          preset: 'Cleaning'          },
+  { id: 'damages',   label: 'damages',           preset: 'Damages'           },
+  { id: 'other',     label: 'other',             preset: ''                  },
+];
+const CHARGE_PRESETS = CHARGE_TYPES.map(c => c.preset).filter(Boolean);
+const DUE_OPTIONS = [
+  { id: 0,  label: 'on receipt' },
+  { id: 7,  label: 'in 7 days'  },
+  { id: 14, label: 'in 14 days' },
+];
 
 /* ═══ FREQUENCY ═══ */
 const FREQ_OPTIONS = [
@@ -85,10 +101,14 @@ function SubBar({ activeIdx = -1, onPick, compact = false, hideLabel = false }: 
   const [animate, setAnim]  = useState(false);
 
   const measure = (i: number) => {
-    const el = btnRefs.current[i], tr = trackRef.current;
-    if (!el || !tr) return { x: 0, w: 0 };
-    const r = el.getBoundingClientRect(), t = tr.getBoundingClientRect();
-    return { x: r.left - t.left, w: r.width };
+    const el = btnRefs.current[i];
+    if (!el) return { x: 0, w: 0 };
+    // Use offsetLeft/offsetWidth, not getBoundingClientRect: the indicator lives
+    // inside .tp-subbar's `transform: scale(0.85)`, so its inline left/width are in
+    // the track's PRE-scale local space. getBoundingClientRect returns post-scale
+    // screen pixels, which would mis-position the pill (error grows toward the right).
+    // offsetLeft/offsetWidth are relative to the offsetParent (.tp-subbar) and unscaled.
+    return { x: el.offsetLeft, w: el.offsetWidth };
   };
 
   useEffect(() => {
@@ -114,9 +134,9 @@ function SubBar({ activeIdx = -1, onPick, compact = false, hideLabel = false }: 
         <div className={`tp-subbar-ind${animate ? ' animate' : ''}${ind.on ? ' on' : ''}`} style={{ left: ind.x, width: ind.w }} />
         {SUBBAR_ITEMS.map(({ id, label, Icon }, i) => {
           const active = activeIdx === i;
-          // Active icon: white — visible against the navy indicator that sits above the button.
+          // Active icon: light blue — visible against the navy indicator that sits above the button.
           // Inactive icon: dimmed navy — visible against the light-blue subbar background.
-          const ic = active ? '#FFFFFF' : 'rgba(4,13,109,0.55)';
+          const ic = active ? BLUE : 'rgba(4,13,109,0.55)';
           return (
             <button key={id} ref={(el: any) => (btnRefs.current[i] = el)}
               className={`tp-subbar-btn${active ? ' active' : ''}`}
@@ -221,6 +241,11 @@ function RequestsHome({ invoices, tenants, outstanding, go, onRowTap }: any) {
                           <div className="tp-stack-meta">
                             <span className={`tp-dot ${dotCls}`} />
                             <span className="tp-stack-status">{st}</span>
+                            {inv.kind === 'charge' && inv.description && (
+                              <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: NAVY, background: 'rgba(88,171,255,0.18)', padding: '1px 6px', borderRadius: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 120 }}>
+                                {inv.description}
+                              </span>
+                            )}
                             {isSplit && (
                               <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: '#1BBF85', background: 'rgba(27,191,133,0.12)', padding: '1px 6px', borderRadius: 6 }}>
                                 {paid}/{inv.splitCount} split
@@ -253,7 +278,9 @@ function SplitPill({ on, onToggle }: any) {
       aria-pressed={on}
       style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        height: 37, padding: '0 13px',
+        // Locked to match the action bar's rendered height (≈39px box × 0.85 scale).
+        // Keep these in sync if the .tp-subbar scale ever changes.
+        height: 33, padding: '0 13px',
         borderRadius: 999,
         border: `1.5px solid ${on ? NAVY : 'rgba(4,13,109,0.28)'}`,
         background: on ? NAVY : 'transparent',
@@ -341,7 +368,7 @@ function ChooseTenant({ tenants, invoices, go, onSelect, splitMode, onToggleSpli
 }
 
 /* ═══ SCREEN: RentAmount (keypad) ═══ */
-function RentAmount({ go, selectedTenant, onCommit }: any) {
+function RentAmount({ go, selectedTenant, onCommit, backTo = 'send' }: any) {
   const [digits, setDigits] = useState('');
   const cents = parseInt(digits || '0', 10);
   const press = (d: string) => { if (digits.length < 7) setDigits(p => p === '' && d === '0' ? '' : p + d); };
@@ -351,7 +378,7 @@ function RentAmount({ go, selectedTenant, onCommit }: any) {
   return (
     <div className="tp-screen" style={{ background: NAVY }}>
       <div className="stagger" style={{ background: OFFW, color: NAVY, height: '50%', display: 'flex', flexDirection: 'column' }}>
-        <SubHead onCancel={() => go('send', 'down')} onCommit={commit} />
+        <SubHead onCancel={() => go(backTo, 'down')} onCommit={commit} />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
           <div className="tp-amount" style={{ fontSize: 82, color: cents === 0 ? 'rgba(4,13,109,0.25)' : NAVY, marginTop: 18 }}>{fmt(cents)}</div>
           {selectedTenant && (
@@ -377,7 +404,7 @@ function RentAmount({ go, selectedTenant, onCommit }: any) {
 }
 
 /* ═══ SCREEN: SendRentLink ═══ */
-function SendRentLink({ go, selectedTenant, amount, onSend, sending, frequency, setFrequency, splitMode }: any) {
+function SendRentLink({ go, selectedTenant, amount, onSend, sending, frequency, setFrequency, splitMode, onEditAmount }: any) {
   // No tenant selected yet — prompt the user to choose one first
   if (!selectedTenant) {
     return (
@@ -426,7 +453,7 @@ function SendRentLink({ go, selectedTenant, amount, onSend, sending, frequency, 
               {dest || `tenant's ${channel}`}
             </div>
           </div>
-          <button onClick={() => go('amount')} style={{ color: 'rgba(88,171,255,0.7)', fontWeight: 600, fontSize: 12, background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, textDecoration: 'underline', textUnderlineOffset: 2 }}>
+          <button onClick={() => (onEditAmount ? onEditAmount() : go('amount'))} style={{ color: 'rgba(88,171,255,0.7)', fontWeight: 600, fontSize: 12, background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, textDecoration: 'underline', textUnderlineOffset: 2 }}>
             edit
           </button>
         </div>
@@ -475,6 +502,125 @@ function SendRentLink({ go, selectedTenant, amount, onSend, sending, frequency, 
         >
           {sending ? 'sending…' : recurring ? 'send & automate' : 'send rent request'}
         </button>
+      </div>
+    </div>
+  );
+}
+
+/* ═══ SCREEN: ChargeBill — one-off non-rent bill (utilities, fees, etc.) ═══ */
+function ChargeBill({ go, selectedTenant, amount, onEditAmount, chargeType, setChargeType, label, setLabel, dueSel, setDueSel, splitOn, onToggleSplit, onSend, sending }: any) {
+  // No tenant selected yet — same prompt the send/external screens use.
+  if (!selectedTenant) {
+    return (
+      <div className="tp-screen" style={{ background: NAVY }}>
+        <div className="stagger" style={{ background: OFFW, color: NAVY, height: '50%', display: 'flex', flexDirection: 'column' }}>
+          <SubHead onCancel={() => go('home', 'down')} onCommit={() => go('tenants')} />
+          <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div style={{ color: 'rgba(4,13,109,0.35)', fontWeight: 500, fontSize: 18 }}>choose a tenant</div>
+          </div>
+          <div style={{ height: 52 }} />
+        </div>
+        <div className="stagger" style={{ flex: 1, background: NAVY, padding: '52px 28px 100px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <button className="tp-cta" onClick={() => go('tenants')}>choose tenant →</button>
+        </div>
+      </div>
+    );
+  }
+
+  const channel = selectedTenant.preferredChannel || 'email';
+  const dest    = channel === 'email' ? selectedTenant.email : selectedTenant.phone;
+  const typeDef = CHARGE_TYPES.find((c: any) => c.id === chargeType);
+  const finalLabel = (label || typeDef?.preset || '').trim();
+  const ready = amount > 0 && !!chargeType && finalLabel.length > 0;
+
+  // Picking a type prefills the label with that type's preset. We only overwrite the
+  // label when it's empty or still holds a preset, so a user's custom text is preserved.
+  const pickType = (id: string) => {
+    setChargeType(id);
+    const def = CHARGE_TYPES.find((c: any) => c.id === id);
+    if (!label || CHARGE_PRESETS.includes(label)) setLabel(def?.preset || '');
+  };
+
+  return (
+    <div className="tp-screen" style={{ background: NAVY }}>
+      {/* Top — amount (tap to edit) + tenant */}
+      <div className="stagger" style={{ background: OFFW, color: NAVY, height: '50%', display: 'flex', flexDirection: 'column' }}>
+        <SubHead onCancel={() => go('home', 'down')} onCommit={() => ready && onSend()} />
+        <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <button onClick={onEditAmount} style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'baseline', gap: 10 }}>
+            <span className="tp-amount" style={{ fontSize: 82, color: amount === 0 ? 'rgba(4,13,109,0.25)' : NAVY }}>{fmt(amount)}</span>
+            <span style={{ fontWeight: 600, fontSize: 12, color: 'rgba(4,13,109,0.4)', textDecoration: 'underline', textUnderlineOffset: 2 }}>edit</span>
+          </button>
+          <div style={{ marginTop: 14, fontWeight: 500, fontSize: 16, color: NAVY, lineHeight: 1.4 }}>
+            {tenantName(selectedTenant)}
+            <div style={{ fontWeight: 400, fontSize: 14, color: 'rgba(4,13,109,0.5)', marginTop: 4 }}>{selectedTenant.propertyAddress}</div>
+          </div>
+        </div>
+        <div style={{ height: 52 }} />
+      </div>
+
+      {/* Bottom — charge configurator */}
+      <div className="stagger" style={{ flex: 1, background: NAVY, padding: '30px 22px 0', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <div className="tp-thin-scroll" style={{ flex: 1, overflowY: 'auto', paddingBottom: 16 }}>
+          {/* What for */}
+          <div style={{ fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>what for</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+            {CHARGE_TYPES.map((c: any) => {
+              const on = chargeType === c.id;
+              return (
+                <button key={c.id} onClick={() => pickType(c.id)}
+                  style={{ padding: '10px 16px', borderRadius: 999, border: `1.5px solid ${on ? BLUE : 'rgba(88,171,255,0.2)'}`, background: on ? BLUE : 'rgba(255,255,255,0.05)', color: on ? NAVY : BLUE, fontWeight: 700, fontSize: 13, cursor: 'pointer', transition: 'all 0.16s ease', fontFamily: 'Outfit, system-ui' }}>
+                  {c.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Description */}
+          <div style={{ fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>description</div>
+          <input className="tp-field" value={label} onChange={e => setLabel(e.target.value)}
+            placeholder={chargeType === 'other' ? 'what is this charge for?' : 'add a note (optional)'} style={{ marginBottom: 20 }} />
+
+          {/* Due */}
+          <div style={{ fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>due</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 20 }}>
+            {DUE_OPTIONS.map((d: any) => {
+              const on = dueSel === d.id;
+              return (
+                <button key={d.id} onClick={() => setDueSel(d.id)}
+                  style={{ padding: '12px 4px', borderRadius: 14, border: `1.5px solid ${on ? BLUE : 'rgba(88,171,255,0.18)'}`, background: on ? BLUE : 'rgba(255,255,255,0.05)', color: on ? NAVY : BLUE, fontWeight: 700, fontSize: 12.5, cursor: 'pointer', transition: 'all 0.18s ease', fontFamily: 'Outfit, system-ui' }}>
+                  {d.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Split toggle */}
+          <button onClick={onToggleSplit} aria-pressed={splitOn}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '13px 16px', borderRadius: 16, border: `1px solid ${splitOn ? 'rgba(88,171,255,0.4)' : 'rgba(88,171,255,0.15)'}`, background: splitOn ? 'rgba(88,171,255,0.1)' : 'rgba(255,255,255,0.04)', cursor: 'pointer', marginBottom: 12, fontFamily: 'Outfit, system-ui' }}>
+            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={BLUE} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="7" r="3.2"/><circle cx="17" cy="8" r="2.4"/><path d="M3 20c0-3.3 2.7-5.8 6-5.8s6 2.5 6 5.8"/><path d="M17.5 14.3c2.1.3 3.7 2 3.7 4.2"/></svg>
+            <span style={{ flex: 1, textAlign: 'left', fontWeight: 600, fontSize: 13.5, color: BLUE }}>split this bill</span>
+            <span style={{ width: 42, height: 25, borderRadius: 999, background: splitOn ? BLUE : 'rgba(88,171,255,0.25)', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+              <span style={{ position: 'absolute', top: 3, left: splitOn ? 20 : 3, width: 19, height: 19, borderRadius: 999, background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+            </span>
+          </button>
+
+          {/* Channel — inherited from the tenant, shown not chosen */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '13px 16px', background: 'rgba(88,171,255,0.06)', border: '1px solid rgba(88,171,255,0.18)', borderRadius: 16 }}>
+            {channel === 'email' ? <Ic.Mail sz={18} c={BLUE} /> : <Ic.Msg sz={18} c={BLUE} />}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: 10.5, color: 'rgba(88,171,255,0.5)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>sending via {channel}</div>
+              <div style={{ fontWeight: 500, fontSize: 13.5, color: BLUE, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>{dest || `tenant's ${channel}`}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* CTA */}
+        <div style={{ flexShrink: 0, padding: '12px 0 20px', display: 'flex', justifyContent: 'center' }}>
+          <button className="tp-cta" onClick={() => ready && onSend()} disabled={!ready || sending} style={{ minWidth: 220, opacity: (!ready || sending) ? 0.5 : 1 }}>
+            {sending ? 'sending…' : 'send bill'}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -818,14 +964,15 @@ function BatchAndAutoScreen({ go, tenants, invoices, onBatchSend, sending, sched
 }
 
 /* ═══ SCREEN: SentSuccess ═══ */
-function SentSuccess({ amount, label, go }: any) {
+function SentSuccess({ amount, label, go, kind = 'rent' }: any) {
+  const title = kind === 'bill' ? 'bill sent' : 'rent link sent';
   return (
     <div className="tp-screen" style={{ background: NAVY }}>
       <div className="stagger" style={{ background: OFFW, color: NAVY, height: '50%', display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={() => go('home', 'down')} onCommit={() => go('home', 'down')} />
         <div style={{ flex: 1, padding: '12px 28px 12px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
           <div className="tp-amount" style={{ fontSize: 82 }}>{fmt(amount)}</div>
-          <div style={{ marginTop: 18, fontWeight: 700, fontSize: 22 }}>rent link sent</div>
+          <div style={{ marginTop: 18, fontWeight: 700, fontSize: 22 }}>{title}</div>
         </div>
         <div style={{ height: 52 }} />
       </div>
@@ -863,8 +1010,15 @@ export default function PropertyTerminal() {
   const [frequency, setFrequency]         = useState('once');
   const [splitMode, setSplitMode]         = useState(false);
   const [busyScheduleId, setBusyScheduleId] = useState<string | null>(null);
-  // When send/external is tapped from subbar without a tenant, remember where to go after selection
-  const [pendingDest, setPendingDest]     = useState<'send' | 'external' | null>(null);
+  // When send/external/bill is tapped from subbar without a tenant, remember where to go after selection
+  const [pendingDest, setPendingDest]     = useState<'send' | 'external' | 'bill' | null>(null);
+  // Which screen the amount keypad returns to ('send' for rent, 'bill' for a charge)
+  const [amountDest, setAmountDest]       = useState<'send' | 'bill'>('send');
+  const [successKind, setSuccessKind]     = useState<'rent' | 'bill'>('rent');
+  // Charge (Bill) draft state — lives in the parent so it survives the keypad round-trip
+  const [chargeType, setChargeType]       = useState<string | null>(null);
+  const [chargeLabel, setChargeLabel]     = useState('');
+  const [dueSel, setDueSel]               = useState(7);
   const conveyorTimer = useRef<ReturnType<typeof setTimeout>>();
   const viewportRef = useRef<HTMLDivElement>(null);
 
@@ -920,12 +1074,41 @@ export default function PropertyTerminal() {
       queryClient.invalidateQueries({ queryKey: ['/api/property/invoices'] });
       if (vars?.freq && vars.freq !== 'once') queryClient.invalidateQueries({ queryKey: ['/api/property/schedules'] });
       setSuccessLabel(selectedTenant?.email || selectedTenant?.phone || '');
+      setSuccessKind('rent');
       setContentKey(k => k + 1);
       setScreen('success');
       setFrequency('once');
       setSplitMode(false);
     },
     onError: (err: any) => { toast(err?.message || 'Failed to send'); },
+  });
+
+  const billMutation = useMutation({
+    mutationFn: async ({ tenantId, amountCents, channel, chargeType, description, dueDays, split }: any) => {
+      const due = new Date(); due.setDate(due.getDate() + (dueDays || 0));
+      const r = await fetch('/api/property/invoices', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...propHeaders() },
+        body: JSON.stringify({
+          tenantProfileId: tenantId, amountCents, deliveryChannel: channel,
+          dueAt: due.toISOString(), splitEnabled: !!split,
+          kind: 'charge', chargeType, description,
+        }),
+      });
+      if (!r.ok) {
+        const msg = await r.json().then((d: any) => d.message).catch(() => 'Failed to send bill');
+        throw new Error(msg);
+      }
+      return r.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/property/invoices'] });
+      setSuccessLabel(selectedTenant?.email || selectedTenant?.phone || '');
+      setSuccessKind('bill');
+      setContentKey(k => k + 1);
+      setScreen('success');
+      setSplitMode(false);
+    },
+    onError: (err: any) => { toast(err?.message || 'Failed to send bill'); },
   });
 
   const scheduleActionMutation = useMutation({
@@ -1037,6 +1220,10 @@ export default function PropertyTerminal() {
       setFrequency('once');
       setSplitMode(false);
       setPendingDest(null);
+      setAmountDest('send');
+      setChargeType(null);
+      setChargeLabel('');
+      setDueSel(7);
       return;
     }
     // Send/External with no tenant: remember destination, go to tenant picker
@@ -1054,12 +1241,42 @@ export default function PropertyTerminal() {
 
   const handleTenantSelect = (t: any, preAmount: number) => {
     setSelectedTenant(t);
-    setAmount(preAmount);
     setContentKey(k => k + 1);
-    // Go to the screen the user originally intended (send or external), default send
+    // Go to the screen the user originally intended (send / external / bill), default send
     const dest = pendingDest || 'send';
     setPendingDest(null);
+    if (dest === 'bill') {
+      // A charge is a fresh amount — start at the keypad, then land on the bill configurator.
+      setChargeType(null); setChargeLabel(''); setDueSel(7); setAmount(0);
+      setAmountDest('bill');
+      setScreen('amount');
+      return;
+    }
+    setAmount(preAmount);
     setScreen(dest);
+  };
+
+  // Begin a charge for the already-selected tenant (from the subbar Bill tab).
+  const startBill = () => {
+    setChargeType(null); setChargeLabel(''); setDueSel(7); setAmount(0);
+    setAmountDest('bill');
+    if (screen === 'home') triggerConveyor(screen, 'up');
+    setContentKey(k => k + 1);
+    setScreen('amount');
+  };
+
+  const handleBill = () => {
+    if (!selectedTenant) { toast('choose a tenant'); return; }
+    if (amount === 0) { toast('set an amount first'); return; }
+    if (!chargeType) { toast('choose what this is for'); return; }
+    const typeDef = CHARGE_TYPES.find(c => c.id === chargeType);
+    const description = (chargeLabel || typeDef?.preset || '').trim();
+    if (!description) { toast('add a description'); return; }
+    billMutation.mutate({
+      tenantId: selectedTenant.id, amountCents: amount,
+      channel: selectedTenant.preferredChannel || 'email',
+      chargeType, description, dueDays: dueSel, split: splitMode,
+    });
   };
 
   const handleRowTap = (inv: any) => {
@@ -1097,8 +1314,27 @@ export default function PropertyTerminal() {
   /* Subbar → go shortcut (only when no tenant → redirect to tenants) */
   const handleSubbarPick = (i: number) => {
     const dest = SUBBAR_ROUTE[i];
-    if (!dest) return;
-    go(dest);
+    if (!dest || dest === screen) return;
+    // Bill: with a tenant, jump straight into a fresh charge (keypad → configurator);
+    // without one, remember the intent and pick a tenant first.
+    if (dest === 'bill') {
+      if (!selectedTenant) {
+        setPendingDest('bill');
+        if (screen === 'home') triggerConveyor(screen, 'up');
+        setContentKey(k => k + 1);
+        setScreen('tenants');
+      } else {
+        startBill();
+      }
+      return;
+    }
+    // Always open the tapped tab's own page. Send/External screens handle the
+    // no-tenant case themselves (they show a "choose a tenant" prompt); we just
+    // remember the intent so picking a tenant returns the user to the right page.
+    if ((dest === 'send' || dest === 'external') && !selectedTenant) setPendingDest(dest);
+    if (screen === 'home') triggerConveyor(screen, 'up');
+    setContentKey(k => k + 1);
+    setScreen(dest);
   };
 
   /* Boundary delta for subbar positioning on feature screens */
@@ -1141,11 +1377,12 @@ export default function PropertyTerminal() {
   const renderScreen = (id: string) => {
     if (id === 'home')     return <RequestsHome invoices={invoices} tenants={tenants} outstanding={outstanding} go={go} onRowTap={handleRowTap} />;
     if (id === 'tenants')  return <ChooseTenant tenants={tenants} invoices={invoices} go={go} onSelect={handleTenantSelect} splitMode={splitMode} onToggleSplit={() => setSplitMode(m => !m)} />;
-    if (id === 'amount')   return <RentAmount go={go} selectedTenant={selectedTenant} onCommit={(c: number) => { setAmount(c); go('send'); }} />;
-    if (id === 'send')     return <SendRentLink go={go} selectedTenant={selectedTenant} amount={amount} onSend={handleSend} sending={sendMutation.isPending} frequency={frequency} setFrequency={setFrequency} splitMode={splitMode} />;
+    if (id === 'amount')   return <RentAmount go={go} selectedTenant={selectedTenant} backTo={amountDest} onCommit={(c: number) => { setAmount(c); go(amountDest); }} />;
+    if (id === 'send')     return <SendRentLink go={go} selectedTenant={selectedTenant} amount={amount} onSend={handleSend} sending={sendMutation.isPending} frequency={frequency} setFrequency={setFrequency} splitMode={splitMode} onEditAmount={() => { setAmountDest('send'); go('amount'); }} />;
+    if (id === 'bill')     return <ChargeBill go={go} selectedTenant={selectedTenant} amount={amount} onEditAmount={() => { setAmountDest('bill'); go('amount'); }} chargeType={chargeType} setChargeType={setChargeType} label={chargeLabel} setLabel={setChargeLabel} dueSel={dueSel} setDueSel={setDueSel} splitOn={splitMode} onToggleSplit={() => setSplitMode(m => !m)} onSend={handleBill} sending={billMutation.isPending} />;
     if (id === 'external') return <MarkExternal go={go} selectedTenant={selectedTenant} amount={amount} invoices={invoices} onMark={handleMark} marking={markMutation.isPending} />;
     if (id === 'batch')    return <BatchAndAutoScreen {...batchAutoProps} />;
-    if (id === 'success')  return <SentSuccess amount={amount} label={successLabel} go={go} />;
+    if (id === 'success')  return <SentSuccess amount={amount} label={successLabel} go={go} kind={successKind} />;
     return null;
   };
 
@@ -1169,16 +1406,19 @@ export default function PropertyTerminal() {
           <FabBtn onClick={() => go('tenants')} />
         </div>
 
+        {/* Full-width row: split pill pinned far-left, action bar centred in the
+            space to its right, send pinned right. They are flex siblings, so they
+            can never overlap regardless of how wide the bar gets. */}
         <div
           className={`tp-psubbar${subbarVisible ? ' show' : ' hide'}${isFeatureScreen ? ' feature' : ''}`}
-          style={isFeatureScreen ? { transform: `translate(-50%, calc(${boundaryDelta}px - 100% - 20px))` } : undefined}
+          style={isFeatureScreen ? { transform: `translateY(calc(${boundaryDelta}px - 100% - 20px))` } : undefined}
         >
-          {/* Split-bill pill — shown in the overlay row when on the tenants screen so it
-              never gets covered by the subbar itself */}
           <div className={`tp-split-slot${screen === 'tenants' ? ' show' : ''}`}>
             <SplitPill on={splitMode} onToggle={() => setSplitMode(m => !m)} />
           </div>
-          <SubBar activeIdx={subbarActiveIdx} onPick={handleSubbarPick} compact={sendVisible || screen === 'tenants'} hideLabel={screen === 'tenants'} />
+          <div className="tp-subbar-center">
+            <SubBar activeIdx={subbarActiveIdx} onPick={handleSubbarPick} compact={sendVisible} hideLabel={false} />
+          </div>
           <div className={`tp-send-slot${sendVisible ? ' show' : ''}`}>
             <SendBtn onClick={handleSend} />
           </div>
@@ -1209,7 +1449,7 @@ const TP_TERM_CSS = `
 .tp-pill.solid { background: #58ABFF; color: #040D6D; }
 .tp-pill.outline { background: transparent; color: #58ABFF; box-shadow: inset 0 0 0 0.1px #58ABFF; }
 .tp-subbar-wrap { display: flex; justify-content: center; }
-.tp-subbar { position: relative; display: inline-flex; align-items: center; justify-content: center; background: #58ABFF; border-radius: 26px; padding: 5px 11px; gap: 4px; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 16px 48px rgba(4,13,109,0.2), 0 4px 12px rgba(4,13,109,0.1), inset 0 1px 0 rgba(255,255,255,0.25); }
+.tp-subbar { position: relative; display: inline-flex; align-items: center; justify-content: center; background: #58ABFF; border-radius: 26px; padding: 5px 11px; gap: 4px; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 16px 48px rgba(4,13,109,0.2), 0 4px 12px rgba(4,13,109,0.1), inset 0 1px 0 rgba(255,255,255,0.25); transform: scale(0.85); transform-origin: center; }
 /* Indicator sits ABOVE buttons (z-index 2) but pointer-events:none so clicks pass through */
 .tp-subbar-ind { position: absolute; top: 5px; height: 27px; background: #040D6D; border-radius: 16px; box-shadow: 0 4px 16px rgba(4,13,109,0.4); pointer-events: none; z-index: 2; opacity: 0; will-change: left, width, opacity; }
 .tp-subbar-ind.on { opacity: 1; }
@@ -1217,11 +1457,12 @@ const TP_TERM_CSS = `
 /* Buttons below indicator (z-index 1). No padding transition — instant width change so measurement is always correct */
 .tp-subbar-btn { position: relative; z-index: 1; height: 27px; padding: 0 22px; display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 16px; border: none; cursor: pointer; background: transparent; color: rgba(4,13,109,0.55); transition: color 0.2s ease, transform 0.18s ease; -webkit-tap-highlight-color: transparent; flex-shrink: 0; }
 .tp-subbar-btn:active { transform: scale(0.92); }
-/* Active: white icon/text — readable against the navy indicator sitting above */
-.tp-subbar-btn.active { background: transparent !important; box-shadow: none !important; color: #FFFFFF; }
+/* Active: light-blue icon/text. Lift above the navy indicator (z-index 2) so the
+   light-blue icon/label paint ON TOP of the navy pill instead of being hidden behind it. */
+.tp-subbar-btn.active { background: transparent !important; box-shadow: none !important; color: #58ABFF; z-index: 3; }
 .tp-subbar.compact .tp-subbar-btn { padding: 0 11px; }
 /* Label is white too (same colour as icon when active) */
-.tp-subbar-label { font-family: 'Outfit', system-ui; font-weight: 600; font-size: 12px; letter-spacing: 0.4px; color: #FFFFFF; white-space: nowrap; animation: tp-labelIn 0.3s ease-out; }
+.tp-subbar-label { font-family: 'Outfit', system-ui; font-weight: 600; font-size: 12px; letter-spacing: 0.4px; color: #58ABFF; white-space: nowrap; animation: tp-labelIn 0.3s ease-out; }
 @keyframes tp-labelIn { from { opacity:0; transform:translateX(-4px); } to { opacity:1; transform:translateX(0); } }
 .tp-send { display: flex; align-items: center; gap: 6px; padding: 4px 14px 4px 4px; border-radius: 26px; background: #040D6D; border: none; cursor: pointer; box-shadow: 0 4px 16px rgba(4,13,109,0.25); transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); -webkit-tap-highlight-color: transparent; flex-shrink: 0; height: 37px; }
 .tp-send:active { transform: scale(0.94); }
@@ -1287,12 +1528,15 @@ const TP_TERM_CSS = `
 .tp-pfab { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); transition: opacity 240ms cubic-bezier(0,0,0.2,1), transform 360ms cubic-bezier(0.34,1.56,0.64,1); will-change: opacity, transform; }
 .tp-pfab.hide { opacity: 0; transform: translate(-50%, -50%) translateY(8px) scale(0.7); pointer-events: none; }
 .tp-pfab.show { opacity: 1; }
-.tp-psubbar { position: absolute; top: 50%; left: 50%; transform: translate(-50%, 67px); display: flex; align-items: center; gap: 8px; transition: opacity 220ms cubic-bezier(0,0,0.2,1), transform 300ms cubic-bezier(0.4,0,0.2,1); will-change: opacity, transform; height: 37px; }
-.tp-psubbar.hide { opacity: 0; transform: translate(-50%, 67px) scale(0.92); pointer-events: none; }
+.tp-psubbar { position: absolute; top: 50%; left: 0; right: 0; padding: 0 22px; box-sizing: border-box; transform: translateY(67px); display: flex; align-items: center; gap: 8px; transition: opacity 220ms cubic-bezier(0,0,0.2,1), transform 300ms cubic-bezier(0.4,0,0.2,1); will-change: opacity, transform; height: 37px; }
+.tp-psubbar.hide { opacity: 0; transform: translateY(67px) scale(0.92); pointer-events: none; }
 .tp-psubbar.show { opacity: 1; }
-.tp-psubbar.feature { transform: translate(-50%, calc(-100% - 20px)); }
-.tp-send-slot { display: flex; align-items: center; overflow: hidden; max-width: 0; opacity: 0; transition: max-width 420ms cubic-bezier(0.34,1.56,0.64,1), opacity 280ms ease 80ms; height: 37px; }
+.tp-psubbar.feature { transform: translateY(calc(-100% - 20px)); }
+/* Action bar lives in a flex:1 cell and centres itself in whatever space is left
+   after the split pill / send button — so it can never overlap either of them. */
+.tp-subbar-center { flex: 1 1 auto; min-width: 0; display: flex; justify-content: center; }
+.tp-send-slot { flex-shrink: 0; display: flex; align-items: center; overflow: hidden; max-width: 0; opacity: 0; transition: max-width 420ms cubic-bezier(0.34,1.56,0.64,1), opacity 280ms ease 80ms; height: 37px; }
 .tp-send-slot.show { max-width: 143px; opacity: 1; }
-.tp-split-slot { display: flex; align-items: center; overflow: hidden; max-width: 0; opacity: 0; transition: max-width 420ms cubic-bezier(0.34,1.56,0.64,1), opacity 280ms ease 80ms; height: 37px; }
+.tp-split-slot { flex-shrink: 0; display: flex; align-items: center; overflow: hidden; max-width: 0; opacity: 0; transition: max-width 420ms cubic-bezier(0.34,1.56,0.64,1), opacity 280ms ease 80ms; height: 37px; }
 .tp-split-slot.show { max-width: 120px; opacity: 1; }
 `;

@@ -40,7 +40,19 @@
       "Bash(grep -n \"emailHtml\\\\|template.*literal\\\\|\\\\`.*\\\\${\" /home/runner/workspace/server/routes.ts)",
       "Skill(update-config)",
       "Bash(echo \"EXIT: $?\")",
-      "Bash(echo \"RC=$?\")"
+      "Bash(echo \"RC=$?\")",
+      "Bash(git push *)",
+      "Bash(git fetch *)",
+      "Bash(git merge *)",
+      "Bash(xargs git show -s --format=\"%ci  %s\")",
+      "Bash(git checkout *)",
+      "Bash(echo \"exit-grep:$?\")",
+      "Bash(awk 'NR>=800 && NR<=860' client/src/pages/property/property-terminal.tsx)",
+      "Bash(npx drizzle-kit *)",
+      "Bash(sed -n '/createAdHocInvoiceSchema = /,/}\\);/p' shared/schema.ts)",
+      "Bash(sed -n '5955,5990p' server/routes.ts)",
+      "Bash(pkill -f \"tsx server/index.ts\")",
+      "Bash(pkill -9 -f \"server/index.ts\")"
     ]
   },
   "model": "claude-opus-4-8"

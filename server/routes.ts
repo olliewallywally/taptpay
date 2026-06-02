@@ -5961,21 +5961,26 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!checkMerchantOwnership(req, tenant.merchantId)) return res.status(403).json({ message: "Access denied" });
       const data = createAdHocInvoiceSchema.parse(req.body);
       const baseUrl = getBaseUrl(req);
+      const isCharge = data.kind === "charge";
 
-      // Dedupe: if this tenant already has a live (unpaid) invoice, update its amount
-      // and resend it rather than creating a duplicate.
-      const existing = await storage.getLiveInvoiceByTenant(data.tenantProfileId);
-      if (existing) {
-        if (data.amountCents && data.amountCents !== existing.amountCents) {
-          await storage.updateInvoiceRentRequest(existing.id, { amountCents: data.amountCents });
+      // Dedupe: if this tenant already has a live (unpaid) RENT invoice, update its
+      // amount and resend it rather than creating a duplicate. One-off charges are
+      // never deduped — they must coexist with rent (and with each other) instead of
+      // overwriting the tenant's live rent invoice.
+      if (!isCharge) {
+        const existing = await storage.getLiveInvoiceByTenant(data.tenantProfileId);
+        if (existing && existing.kind !== "charge") {
+          if (data.amountCents && data.amountCents !== existing.amountCents) {
+            await storage.updateInvoiceRentRequest(existing.id, { amountCents: data.amountCents });
+          }
+          const delivery = await resendInvoiceEmail(existing.id, baseUrl);
+          const fresh = await storage.getInvoiceRentRequest(existing.id);
+          return res.status(200).json({ ...fresh, resent: true, delivered: delivery.ok, deliveryReason: delivery.reason });
         }
-        const delivery = await resendInvoiceEmail(existing.id, baseUrl);
-        const fresh = await storage.getInvoiceRentRequest(existing.id);
-        return res.status(200).json({ ...fresh, resent: true, delivered: delivery.ok, deliveryReason: delivery.reason });
       }
 
       const invoice = await storage.createInvoiceRentRequest({ ...data, merchantId, token: generateInvoiceToken(), status: "pending_dispatch" });
-      await storage.logTransactionEvent({ merchantId, tenantProfileId: data.tenantProfileId, invoiceId: invoice.id, eventType: "Invoice_Generated", payload: { amountCents: invoice.amountCents, channel: invoice.deliveryChannel } });
+      await storage.logTransactionEvent({ merchantId, tenantProfileId: data.tenantProfileId, invoiceId: invoice.id, eventType: isCharge ? "Charge_Created" : "Invoice_Generated", payload: { amountCents: invoice.amountCents, channel: invoice.deliveryChannel, ...(isCharge ? { chargeType: data.chargeType, description: data.description } : {}) } });
       // Send the link immediately; if delivery fails it stays pending and the cron retries.
       const delivery = await resendInvoiceEmail(invoice.id, baseUrl);
       const fresh = await storage.getInvoiceRentRequest(invoice.id);
