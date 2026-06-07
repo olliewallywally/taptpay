@@ -1,1 +1,2 @@
 - [Fintech landing page idea](fintech-landing-page.md) — pay.man-style dark/green design reference saved by user for future landing page build
+- [TaptPay logo - new sky blue](taptpay-logo-new.md) — new official sky blue TaptPay logo asset, saved for future use

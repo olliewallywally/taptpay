@@ -89,7 +89,20 @@
       "Bash(pkill -f 'find /nix/store')",
       "Bash(grep -v '\\\\.sample$')",
       "Bash(command -v chromium chromium-browser google-chrome-stable)",
-      "Read(//nix/store/**)"
+      "Read(//nix/store/**)",
+      "Read(//home/runner/**)",
+      "Bash(claude mcp *)",
+      "Bash(timeout 25 npx -y @upstash/context7-mcp)",
+      "Bash(curl -s http://localhost:5000/ --max-time 8)",
+      "Bash(curl -s \"http://localhost:5000/src/pages/landing-page.tsx\" --max-time 8)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5000/ --max-time 5)",
+      "Bash(PLAYWRIGHT_BROWSERS_PATH=/tmp/pw timeout 180 npx playwright install chromium)",
+      "Bash(cp /tmp/smoke.mjs ./smoke.mjs)",
+      "Bash(PLAYWRIGHT_BROWSERS_PATH=/tmp/pw node ./smoke.mjs)",
+      "Bash(gh pr *)",
+      "Bash(curl -sL -o /tmp/pr2.diff -w \"HTTP %{http_code}\\\\n\" https://github.com/olliewallywally/taptpay/pull/2.diff)",
+      "Bash(echo \"=== exit: $? ===\")",
+      "Bash(npm uninstall *)"
     ]
   },
   "model": "claude-opus-4-8"
