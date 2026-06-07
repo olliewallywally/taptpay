@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { propFetch } from "@/lib/property-api";
 
 /* ── Design tokens ── */
 const C = {
@@ -13,6 +14,7 @@ const C = {
 const STATUS_MAP: Record<string, { dot: string; bg: string; fg: string; label: string }> = {
   paid:     { dot: '#13C29A', bg: 'rgba(19,194,154,0.14)',  fg: '#0B7D63', label: 'paid' },
   overdue:  { dot: '#FF3B4E', bg: 'rgba(255,59,78,0.12)',   fg: '#C71A2A', label: 'overdue' },
+  failed:   { dot: '#FF8A00', bg: 'rgba(255,138,0,0.14)',   fg: '#B25A00', label: 'not delivered' },
   dueSoon:  { dot: '#FFB02E', bg: 'rgba(255,176,46,0.18)',  fg: '#9A6A00', label: 'due soon' },
   upcoming: { dot: '#3F9BFF', bg: 'rgba(63,155,255,0.16)',  fg: '#1A5FCC', label: 'upcoming' },
 };
@@ -31,6 +33,7 @@ function fmtCents(c: number) { return '$' + (c / 100).toLocaleString('en-NZ', { 
 function invoiceStatus(inv: any): string {
   if (inv.status === 'paid' || inv.status === 'paid_external') return 'paid';
   if (inv.status === 'overdue') return 'overdue';
+  if (inv.status === 'dispatch_failed') return 'failed';
   return 'upcoming';
 }
 
@@ -89,42 +92,39 @@ function IcoPause() {
 
 const STAT_ICONS = [IcoTenants, IcoWarn, IcoPage, IcoPause];
 
-function propHeaders(): HeadersInit {
-  const token = localStorage.getItem('authToken');
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
 export default function PropertyDashboard() {
   const [, setLocation] = useLocation();
 
   const { data: tenants = [] } = useQuery<any[]>({
     queryKey: ['/api/property/tenants'],
-    queryFn: () => fetch('/api/property/tenants', { headers: propHeaders() }).then(r => r.ok ? r.json() : []),
+    queryFn: () => propFetch('/api/property/tenants').then(r => { if (!r.ok) throw new Error('load failed'); return r.json(); }),
     staleTime: 60000,
     retry: false,
   });
 
-  const { data: invoices = [] } = useQuery<any[]>({
+  const { data: invoices = [], isLoading: invLoading, isError: invError, refetch: refetchInv } = useQuery<any[]>({
     queryKey: ['/api/property/invoices'],
-    queryFn: () => fetch('/api/property/invoices', { headers: propHeaders() }).then(r => r.ok ? r.json() : []),
+    queryFn: () => propFetch('/api/property/invoices').then(r => { if (!r.ok) throw new Error('load failed'); return r.json(); }),
     staleTime: 30000,
     retry: false,
   });
 
   const { data: schedules = [] } = useQuery<any[]>({
     queryKey: ['/api/property/schedules'],
-    queryFn: () => fetch('/api/property/schedules', { headers: propHeaders() }).then(r => r.ok ? r.json() : []),
+    queryFn: () => propFetch('/api/property/schedules').then(r => { if (!r.ok) throw new Error('load failed'); return r.json(); }),
     staleTime: 60000,
     retry: false,
   });
 
-  /* Derived stats */
+  /* Derived stats — voided invoices are excluded from collection/recent so a
+     cancelled request never drags down the rate or shows as a live payment. */
+  const liveInvoices    = invoices.filter((i: any) => i.status !== 'voided');
   const activeTenants   = tenants.filter((t: any) => t.status !== 'archived').length;
   const overdueCount    = invoices.filter((i: any) => i.status === 'overdue').length;
   const queuedCount     = invoices.filter((i: any) => i.status === 'pending_dispatch').length;
-  const activeCount     = invoices.filter((i: any) => ['pending_dispatch', 'dispatched', 'overdue'].includes(i.status)).length;
-  const paidCount       = invoices.filter((i: any) => i.status === 'paid' || i.status === 'paid_external').length;
-  const collectionPct   = invoices.length > 0 ? paidCount / invoices.length : 0;
+  const activeCount     = invoices.filter((i: any) => ['pending_dispatch', 'dispatched', 'overdue', 'dispatch_failed'].includes(i.status)).length;
+  const paidCount       = liveInvoices.filter((i: any) => i.status === 'paid' || i.status === 'paid_external').length;
+  const collectionPct   = liveInvoices.length > 0 ? paidCount / liveInvoices.length : 0;
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -132,7 +132,7 @@ export default function PropertyDashboard() {
     .filter((i: any) => (i.status === 'paid' || i.status === 'paid_external') && i.paidAt && new Date(i.paidAt) >= monthStart)
     .reduce((s: number, i: any) => s + (i.amountCents ?? 0), 0);
 
-  const recent = [...invoices]
+  const recent = [...liveInvoices]
     .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 3);
 
@@ -147,6 +147,14 @@ export default function PropertyDashboard() {
     <div style={{ background: C.white, minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
     <div style={{ width: '100%', maxWidth: 430, minHeight: '100svh', background: '#F4F4F4', paddingBottom: 130, fontFamily: "'Outfit', system-ui, sans-serif" }}>
       <div style={{ height: 54 }} />
+
+      {/* Load error — show a retry instead of silently rendering zeros */}
+      {invError && (
+        <div style={{ margin: '0 18px 12px', padding: '14px 16px', borderRadius: 16, background: 'rgba(255,59,78,0.08)', border: '1px solid rgba(255,59,78,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <span style={{ color: '#C71A2A', fontSize: 13, fontWeight: 500 }}>{invLoading ? 'loading…' : "couldn't load your data"}</span>
+          <button onClick={() => refetchInv()} style={{ background: C.navy, color: C.white, border: 'none', borderRadius: 10, padding: '8px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>retry</button>
+        </div>
+      )}
 
       {/* 1 — Active transaction hero */}
       <div style={{ padding: '0 18px' }}>

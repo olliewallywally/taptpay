@@ -184,6 +184,7 @@ export interface IStorage {
   getTenantProfilesByMerchant(merchantId: number, opts?: { search?: string; includeArchived?: boolean }): Promise<any[]>;
   updateTenantProfile(id: string, updates: any): Promise<any | undefined>;
   archiveTenantProfile(id: string): Promise<any | undefined>;
+  unarchiveTenantProfile(id: string): Promise<any | undefined>;
 
   createActiveSchedule(data: any): Promise<any>;
   getActiveSchedule(id: string): Promise<any | undefined>;
@@ -1592,6 +1593,7 @@ export class MemStorage implements IStorage {
   async getTenantProfilesByMerchant(merchantId: number, opts?: any): Promise<any[]> { return []; }
   async updateTenantProfile(id: string, updates: any): Promise<any> { return undefined; }
   async archiveTenantProfile(id: string): Promise<any> { return undefined; }
+  async unarchiveTenantProfile(id: string): Promise<any> { return undefined; }
   async createActiveSchedule(data: any): Promise<any> { throw new Error("Property management requires database"); }
   async getActiveSchedule(id: string): Promise<any> { return undefined; }
   async getActiveSchedulesByTenant(tenantProfileId: string): Promise<any[]> { return []; }
@@ -3040,6 +3042,14 @@ export class DatabaseStorage implements IStorage {
     const now = new Date();
     const [r] = await db.update(tenantProfiles).set({ status: "archived", archivedAt: now, updatedAt: now }).where(eq(tenantProfiles.id, id)).returning();
     await db.update(activeSchedules).set({ status: "terminated", terminatedAt: now, updatedAt: now }).where(and(eq(activeSchedules.tenantProfileId, id), sql`${activeSchedules.status} <> 'terminated'`));
+    return r;
+  }
+  async unarchiveTenantProfile(id: string): Promise<any> {
+    const db = getDb(); if (!db) return undefined;
+    const now = new Date();
+    // Reactivate the profile only — schedules terminated at archive time stay
+    // terminated; the merchant can set up a fresh schedule if they want one.
+    const [r] = await db.update(tenantProfiles).set({ status: "active", archivedAt: null, updatedAt: now }).where(eq(tenantProfiles.id, id)).returning();
     return r;
   }
   async createActiveSchedule(data: any): Promise<any> {

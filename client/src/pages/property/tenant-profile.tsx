@@ -2,6 +2,7 @@ import { useState, useMemo, useLayoutEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { consumeSnap, startPropertyBack, signalPropertyReady } from "@/lib/property-transition";
+import { propFetch } from "@/lib/property-api";
 
 /* ── Design tokens ── */
 const C = {
@@ -98,6 +99,7 @@ export default function TenantProfile() {
   const [subOpen,  setSubOpen]  = useState(false);
   const [editing,  setEditing]  = useState(false);
   const [editForm, setEditForm] = useState<any>(null);
+  const [editError, setEditError] = useState<string | null>(null);
 
   // Consume the snapshot captured on the directory tap — available before the API resolves.
   // Using empty deps means we read it exactly once on mount, which is correct.
@@ -110,14 +112,14 @@ export default function TenantProfile() {
 
   const { data: tenant, isLoading } = useQuery<any>({
     queryKey: ['/api/property/tenants', tenantId],
-    queryFn: () => fetch(`/api/property/tenants/${tenantId}`, { headers: propHeaders() }).then(r => r.ok ? r.json() : null),
+    queryFn: () => propFetch(`/api/property/tenants/${tenantId}`).then(r => r.ok ? r.json() : null),
     enabled: !!tenantId,
     retry: false,
   });
 
   const { data: events = [] } = useQuery<any[]>({
     queryKey: ['/api/property/tenants', tenantId, 'events'],
-    queryFn: () => fetch(`/api/property/tenants/${tenantId}/events`, { headers: propHeaders() }).then(r => r.ok ? r.json() : []),
+    queryFn: () => propFetch(`/api/property/tenants/${tenantId}/events`).then(r => r.ok ? r.json() : []),
     enabled: !!tenantId,
     staleTime: 30000,
     retry: false,
@@ -125,7 +127,7 @@ export default function TenantProfile() {
 
   const { data: invoices = [] } = useQuery<any[]>({
     queryKey: ['/api/property/invoices', { tenantProfileId: tenantId }],
-    queryFn: () => fetch(`/api/property/invoices?tenantProfileId=${tenantId}`, { headers: propHeaders() }).then(r => r.ok ? r.json() : []),
+    queryFn: () => propFetch(`/api/property/invoices?tenantProfileId=${tenantId}`).then(r => r.ok ? r.json() : []),
     enabled: !!tenantId,
     staleTime: 30000,
     retry: false,
@@ -134,13 +136,18 @@ export default function TenantProfile() {
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
       const r = await fetch(`/api/property/tenants/${tenantId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', ...propHeaders() }, body: JSON.stringify(data) });
-      if (!r.ok) throw new Error('Failed to update');
+      if (!r.ok) {
+        const msg = await r.json().then((d: any) => d.message).catch(() => `Error ${r.status}`);
+        throw new Error(msg);
+      }
       return r.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/property/tenants', tenantId] });
+      setEditError(null);
       setEditing(false);
     },
+    onError: (err: any) => { setEditError(err?.message || 'Failed to update tenant'); },
   });
 
   const archiveMutation = useMutation({
@@ -199,9 +206,15 @@ export default function TenantProfile() {
 
   const startEdit = () => {
     if (!tenant) return;
-    setEditForm({ firstName: tenant.firstName, lastName: tenant.lastName, propertyAddress: tenant.propertyAddress, preferredChannel: tenant.preferredChannel });
+    setEditError(null);
+    setEditForm({ firstName: tenant.firstName, lastName: tenant.lastName, propertyAddress: tenant.propertyAddress, email: tenant.email ?? '', phone: tenant.phone ?? '', preferredChannel: tenant.preferredChannel });
     setEditing(true);
   };
+
+  // The chosen channel must have a matching contact, else the link can't be sent.
+  const editContactOk = editForm
+    ? (editForm.preferredChannel === 'email' ? !!String(editForm.email ?? '').trim() : !!String(editForm.phone ?? '').trim())
+    : true;
 
   return (
     <div style={{ background: C.white, minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
@@ -352,13 +365,16 @@ export default function TenantProfile() {
               </button>
             </div>
             {[
-              { k: 'firstName', label: 'first name' },
-              { k: 'lastName',  label: 'last name' },
-              { k: 'propertyAddress', label: 'property address' },
-            ].map(({ k, label }) => (
+              { k: 'firstName', label: 'first name', type: 'text' },
+              { k: 'lastName',  label: 'last name', type: 'text' },
+              { k: 'propertyAddress', label: 'property address', type: 'text' },
+              { k: 'email', label: 'email', type: 'email' },
+              { k: 'phone', label: 'phone', type: 'tel' },
+            ].map(({ k, label, type }) => (
               <div key={k} style={{ marginBottom: 14 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: C.sky, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>{label}</div>
                 <input
+                  type={type}
                   value={editForm[k] ?? ''}
                   onChange={e => setEditForm((f: any) => ({ ...f, [k]: e.target.value }))}
                   style={{ width: '100%', padding: '14px 16px', borderRadius: 14, background: C.gray, border: 'none', outline: 'none', color: C.navy, fontSize: 15, fontWeight: 500, boxSizing: 'border-box' }}
@@ -368,19 +384,29 @@ export default function TenantProfile() {
             {/* Preferred notification channel */}
             <div style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: C.sky, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>send rent link via</div>
-              <div style={{ display: 'flex', gap: 10 }}>
-                {(['email', 'sms'] as const).map(ch => (
+              <div style={{ display: 'flex', gap: 8 }}>
+                {(['email', 'whatsapp', 'sms'] as const).map(ch => (
                   <button key={ch} onClick={() => setEditForm((f: any) => ({ ...f, preferredChannel: ch }))}
-                    style={{ flex: 1, padding: '13px 0', borderRadius: 14, border: 'none', background: editForm.preferredChannel === ch ? C.navy : C.gray, color: editForm.preferredChannel === ch ? C.white : C.navy, fontWeight: 600, fontSize: 14, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em', transition: 'background 0.18s, color 0.18s' }}>
+                    style={{ flex: 1, padding: '13px 0', borderRadius: 14, border: 'none', background: editForm.preferredChannel === ch ? C.navy : C.gray, color: editForm.preferredChannel === ch ? C.white : C.navy, fontWeight: 600, fontSize: 12.5, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.04em', transition: 'background 0.18s, color 0.18s' }}>
                     {ch}
                   </button>
                 ))}
               </div>
+              {!editContactOk && (
+                <div style={{ marginTop: 8, fontSize: 12, color: '#FF3B4E', fontWeight: 500 }}>
+                  add {editForm.preferredChannel === 'email' ? 'an email address' : 'a phone number'} above to send via {editForm.preferredChannel}
+                </div>
+              )}
             </div>
+            {editError && (
+              <div style={{ marginBottom: 12, padding: '12px 16px', borderRadius: 14, background: 'rgba(255,59,78,0.07)', border: '1px solid rgba(255,59,78,0.18)' }}>
+                <p style={{ color: '#FF3B4E', fontSize: 13, fontWeight: 500, margin: 0 }}>{editError}</p>
+              </div>
+            )}
             <button
               onClick={() => updateMutation.mutate(editForm)}
-              disabled={updateMutation.isPending}
-              style={{ width: '100%', padding: '18px 0', borderRadius: 999, background: C.navy, color: C.white, fontWeight: 700, fontSize: 16, border: 'none', cursor: 'pointer', marginTop: 8 }}>
+              disabled={updateMutation.isPending || !editContactOk}
+              style={{ width: '100%', padding: '18px 0', borderRadius: 999, background: editContactOk ? C.navy : C.gray, color: editContactOk ? C.white : C.mute, fontWeight: 700, fontSize: 16, border: 'none', cursor: editContactOk && !updateMutation.isPending ? 'pointer' : 'default', marginTop: 8 }}>
               {updateMutation.isPending ? 'saving…' : 'save changes'}
             </button>
             <button

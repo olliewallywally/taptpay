@@ -812,6 +812,11 @@ export const invoicesRentRequests = pgTable("invoices_rent_requests", {
   kind: text("kind").notNull().default("rent"),
   chargeType: text("charge_type"),
   description: text("description"),
+  // Optional supporting document (PDF/image) attached to a one-off charge. Shown
+  // to the tenant on the checkout page as a "View invoice" link they can open,
+  // download or share. Null for rent and for charges sent without an attachment.
+  documentUrl: text("document_url"),
+  documentName: text("document_name"),
   status: text("status").notNull().default("pending_dispatch"),
   dueAt: timestamp("due_at").notNull(),
   dispatchedAt: timestamp("dispatched_at"),
@@ -915,6 +920,9 @@ export const createAdHocInvoiceSchema = z.object({
   kind: z.enum(["rent", "charge"]).optional(),
   chargeType: z.enum(["utilities", "late_fee", "cleaning", "damages", "other"]).optional(),
   description: z.string().trim().max(200).optional().or(z.literal("")).transform(v => v || undefined),
+  // Optional attached invoice document (a URL returned by the upload endpoint).
+  documentUrl: z.string().trim().max(500).optional().or(z.literal("")).transform(v => v || undefined),
+  documentName: z.string().trim().max(255).optional().or(z.literal("")).transform(v => v || undefined),
 });
 
 export const markInvoicePaidExternalSchema = z.object({

@@ -72,12 +72,30 @@ function loadScript(src: string): Promise<void> {
 const WINDCAVE_HPP_RE = /^https?:\/\/(?:[a-z0-9-]+\.)*(?:windcave|paymentexpress)\.com/i;
 
 function CheckoutInner() {
-  const { transactionId } = useParams<{ transactionId: string }>();
+  // This page serves two payment sources behind one branded UI:
+  //   • Retail transactions at /checkout/:transactionId
+  //   • Property rent/charge invoices at /r/:token
+  // Only the data source and the three network calls differ; the wallet, 3DS,
+  // navigation-guard and Hosted Fields machinery below is identical for both.
+  const { transactionId, token } = useParams<{ transactionId?: string; token?: string }>();
+  const isInvoice = !!token;
   const [, setLocation] = useLocation();
   const search = useSearch();
   const txId = transactionId ? parseInt(transactionId) : null;
   const urlParams = new URLSearchParams(search);
   const overrideAmount = urlParams.get("amount");
+
+  // Source-specific endpoints — keyed by token for invoices, numeric id for txns.
+  const sessionEndpoint = isInvoice ? `/api/checkout/${token}/session` : `/api/transactions/${txId}/pay`;
+  const hfCompleteEndpoint = isInvoice ? `/api/checkout/${token}/hosted-fields-complete` : `/api/transactions/${txId}/hosted-fields-complete`;
+  const gpayCompleteEndpoint = isInvoice ? `/api/checkout/${token}/googlepay-complete` : `/api/transactions/${txId}/googlepay-complete`;
+  // Stable identifier for effect deps / guards across both sources.
+  const payId: string | number | null = isInvoice ? (token ?? null) : txId;
+
+  // Invoice split state (no-op for retail transactions).
+  const [splitChoosing, setSplitChoosing] = useState(false);
+  const [payerEmail, setPayerEmail] = useState("");
+  const [splitBusy, setSplitBusy] = useState(false);
 
   const [cardOpen, setCardOpen] = useState(false);
   const [applePayAvailable, setApplePayAvailable] = useState(false);
@@ -106,15 +124,72 @@ function CheckoutInner() {
   const googlePreSessionRef = useRef<any>(null);
   const [googlePreSessionTrigger, setGooglePreSessionTrigger] = useState(0);
 
-  const { data: transaction, isLoading: txLoading } = useQuery({
+  const { data: rawTransaction, isLoading: rawTxLoading } = useQuery({
     queryKey: ["/api/transactions", txId],
     queryFn: async () => {
       const res = await fetch(`/api/transactions/${txId}`);
       if (!res.ok) throw new Error("Not found");
       return res.json();
     },
-    enabled: !!txId,
+    enabled: !isInvoice && !!txId,
   });
+
+  // Invoice resolve — amount, merchant, label, and split state for /r/:token.
+  const { data: invoiceData, isLoading: invoiceLoading, error: invoiceError, refetch: refetchInvoice } = useQuery({
+    queryKey: ["/api/checkout/resolve", token],
+    queryFn: async () => {
+      const res = await fetch(`/api/checkout/resolve/${token}`);
+      if (res.status === 404) throw new Error("not-found");
+      if (res.status === 410) throw new Error("voided");
+      if (!res.ok) throw new Error("error");
+      return res.json();
+    },
+    enabled: isInvoice && !!token,
+    retry: false,
+  });
+
+  // Split-share maths (invoice only) — mirrors the server's share computation.
+  const totalCents: number = invoiceData?.amountCents ?? 0;
+  const splitCount: number = invoiceData?.splitCount ?? 0;
+  const splitPaid: number = invoiceData?.splitPaidCount ?? 0;
+  const splitActive = !!invoiceData?.splitEnabled && splitCount > 0;
+  const shareBase = splitCount ? Math.floor(totalCents / splitCount) : 0;
+  const isLastShare = splitCount ? splitPaid === splitCount - 1 : false;
+  const shareCents = splitCount ? (isLastShare ? totalCents - shareBase * (splitCount - 1) : shareBase) : totalCents;
+  const invoiceChargeCents = splitActive ? shareCents : totalCents;
+
+  // Normalize both sources into the transaction shape the rest of the page uses.
+  const transaction: any = isInvoice
+    ? (invoiceData && !invoiceData.alreadyPaid
+        ? {
+            id: invoiceData.invoiceId,
+            merchantId: invoiceData.merchantId,
+            price: (invoiceChargeCents / 100).toFixed(2),
+            itemName: invoiceData.kind === "charge" ? (invoiceData.description || "Payment") : "Rent",
+            taptStoneId: null,
+            splitEnabled: false, // invoice splits are handled in-page, not via /split/:id
+            isSplit: false,
+          }
+        : null)
+    : rawTransaction;
+
+  const txLoading = isInvoice ? invoiceLoading : rawTxLoading;
+
+  // Body for the create-session call, per source.
+  const buildSessionBody = (): Record<string, any> => {
+    if (isInvoice) return payerEmail ? { payerEmail } : {};
+    const body: Record<string, any> = { merchantId: transaction.merchantId };
+    if (transaction.taptStoneId) body.stoneId = transaction.taptStoneId;
+    if (overrideAmount) body.amount = overrideAmount;
+    return body;
+  };
+
+  // Post-success navigation. Retail → receipt page; invoice → stay on the branded
+  // success screen and refresh split progress (each flatmate pays on their own link).
+  const navigateAfterSuccess = (result: any) => {
+    if (isInvoice) { refetchInvoice(); return; }
+    setTimeout(() => setLocation(result.redirectPath || `/receipt/${txId}`), 1200);
+  };
 
   const { data: envData } = useQuery({
     queryKey: ["/api/windcave/env"],
@@ -184,7 +259,7 @@ function CheckoutInner() {
   // preSessionRef, and create a race where the user taps between the clear and
   // the new async completing. Using stable primitives stops that churn.
   useEffect(() => {
-    if (!applePayAvailable || !transaction?.id || !envData?.env || !txId) return;
+    if (!applePayAvailable || !transaction?.id || !envData?.env || !payId) return;
     let cancelled = false;
 
     // Clear the stale pre-session only when a payment was attempted — that is,
@@ -196,11 +271,8 @@ function CheckoutInner() {
     }
 
     (async () => {
-      const body: Record<string, any> = { merchantId: transaction.merchantId };
-      if (transaction.taptStoneId) body.stoneId = transaction.taptStoneId;
-      if (overrideAmount) body.amount = overrideAmount;
       try {
-        const res = await apiRequest("POST", `/api/transactions/${txId}/pay`, body);
+        const res = await apiRequest("POST", sessionEndpoint, buildSessionBody());
         if (!cancelled && res.ok) {
           const data = await res.json();
           if (data.ajaxSubmitApplePayUrl) {
@@ -215,14 +287,14 @@ function CheckoutInner() {
   // React Query refetches, so the effect only re-runs when something meaningful
   // changes (new transaction, different env, overrideAmount param, or a payment
   // was attempted and preSessionTrigger incremented).
-  }, [applePayAvailable, transaction?.id, envData?.env, txId, overrideAmount, preSessionTrigger]);
+  }, [applePayAvailable, transaction?.id, envData?.env, payId, overrideAmount, preSessionTrigger]);
 
   // Pre-create a Windcave session for Google Pay so it is ready the instant
   // the user approves — eliminates the createSession() network call that
   // previously happened after loadPaymentData() resolved, which added latency
   // at the most sensitive moment.  Same pattern as the Apple Pay pre-session.
   useEffect(() => {
-    if (!googlePayAvailable || !transaction?.id || !envData?.env || !txId) return;
+    if (!googlePayAvailable || !transaction?.id || !envData?.env || !payId) return;
     let cancelled = false;
 
     if (googlePreSessionTrigger > 0) {
@@ -230,11 +302,8 @@ function CheckoutInner() {
     }
 
     (async () => {
-      const body: Record<string, unknown> = { merchantId: transaction.merchantId };
-      if (transaction.taptStoneId) body.stoneId = transaction.taptStoneId;
-      if (overrideAmount) body.amount = overrideAmount;
       try {
-        const res = await apiRequest("POST", `/api/transactions/${txId}/pay`, body);
+        const res = await apiRequest("POST", sessionEndpoint, buildSessionBody());
         if (!cancelled && res.ok) {
           const data = await res.json();
           if (data?.sessionId) {
@@ -245,7 +314,7 @@ function CheckoutInner() {
     })();
 
     return () => { cancelled = true; };
-  }, [googlePayAvailable, transaction?.id, envData?.env, txId, overrideAmount, googlePreSessionTrigger]);
+  }, [googlePayAvailable, transaction?.id, envData?.env, payId, overrideAmount, googlePreSessionTrigger]);
 
   // Lazy-load Windcave Hosted Fields scripts only when the card tab is first
   // opened — loading them at page load causes the HF SDK to auto-initialise
@@ -657,12 +726,9 @@ function CheckoutInner() {
   }
 
   async function createSession() {
-    if (!txId || !transaction) return null;
-    const body: Record<string, any> = { merchantId: transaction.merchantId };
-    if (transaction.taptStoneId) body.stoneId = transaction.taptStoneId;
-    if (overrideAmount) body.amount = overrideAmount;
+    if (!payId || !transaction) return null;
     try {
-      const res = await apiRequest("POST", `/api/transactions/${txId}/pay`, body);
+      const res = await apiRequest("POST", sessionEndpoint, buildSessionBody());
       if (!res.ok) return null;
       const data = await res.json();
       sessionRef.current = data;
@@ -672,11 +738,11 @@ function CheckoutInner() {
 
   async function finaliseCard(sessionId: string) {
     try {
-      const res = await apiRequest("POST", `/api/transactions/${txId}/hosted-fields-complete`, { sessionId, paymentMethod: "card" });
+      const res = await apiRequest("POST", hfCompleteEndpoint, { sessionId, paymentMethod: "card" });
       const result = await res.json();
       if (result.approved) {
         setPayState("success");
-        setTimeout(() => setLocation(result.redirectPath || `/receipt/${txId}`), 1200);
+        navigateAfterSuccess(result);
       } else {
         setPayState("error");
         setErrorMsg("Payment was declined. Please try another card.");
@@ -707,9 +773,20 @@ function CheckoutInner() {
         if (!allValid) { setPayState("idle"); return; }
         hfController.current!.submit(
           session.ajaxSubmitCardUrl,
-          60,
+          // Generous timeout (20 min) so a slow bank 3DS challenge is never cut
+          // short — we must never time the customer out mid-payment.
+          1200,
           async (status: string) => {
-            if (status === "done") await finaliseCard(session.sessionId);
+            if (status === "done") {
+              await finaliseCard(session.sessionId);
+            } else {
+              // Any non-"done" terminal status (abandoned / timed-out 3DS, etc.).
+              // Surface a retryable error instead of leaving the spinner hanging
+              // forever — the customer can tap "Try again" as many times as needed.
+              console.warn("HF submit non-done status:", status);
+              setPayState("error");
+              setErrorMsg("Card payment didn't complete. Please try again.");
+            }
           },
           (err: any) => {
             console.error("HF submit:", err);
@@ -768,7 +845,7 @@ function CheckoutInner() {
       async (state: string, _url: string, notify: (ok: boolean) => void) => {
         if (state === "done") {
           try {
-            const res = await apiRequest("POST", `/api/transactions/${txId}/hosted-fields-complete`, {
+            const res = await apiRequest("POST", hfCompleteEndpoint, {
               sessionId: preSession.sessionId,
               paymentMethod: "apple_pay",
             });
@@ -777,7 +854,7 @@ function CheckoutInner() {
             if (result.approved) {
               setPayState("success");
               setPreSessionTrigger(t => t + 1); // queue a fresh session for any retry
-              setTimeout(() => setLocation(result.redirectPath || `/receipt/${txId}`), 1200);
+              navigateAfterSuccess(result);
             } else {
               setPayState("error");
               setErrorMsg("Apple Pay payment was declined.");
@@ -859,14 +936,14 @@ function CheckoutInner() {
       setGooglePreSessionTrigger(t => t + 1);
       // NOTE: ajaxSubmitGooglePayUrl is intentionally NOT sent — the backend looks it
       // up from its server-side cache to prevent SSRF attacks.
-      const res = await apiRequest("POST", `/api/transactions/${txId}/googlepay-complete`, {
+      const res = await apiRequest("POST", gpayCompleteEndpoint, {
         sessionId: session.sessionId,
         googlePayToken,
       });
       const result = await res.json();
       if (result.approved) {
         setPayState("success");
-        setTimeout(() => setLocation(result.redirectPath || `/receipt/${txId}`), 1200);
+        navigateAfterSuccess(result);
       } else {
         setPayState("error");
         setErrorMsg("Google Pay payment was declined.");
@@ -883,9 +960,38 @@ function CheckoutInner() {
     setErrorMsg("");
     sessionRef.current = null;
     setPayState("idle");
+    // Mint fresh wallet pre-sessions so a retry after sitting on the error
+    // screen never reuses a stale/expired Windcave session. The card flow
+    // already creates a brand-new session on every handleCardPay, so retries
+    // are effectively unlimited — there is no attempt cap anywhere.
+    setPreSessionTrigger(t => t + 1);
+    setGooglePreSessionTrigger(t => t + 1);
+  }
+
+  // Invoice split: tenant picks how many flatmates share the bill. Calls the
+  // existing invoice split endpoint, then refreshes so the share amount updates.
+  async function setupSplit(count: number) {
+    if (!isInvoice || splitBusy) return;
+    setSplitBusy(true);
+    try {
+      const res = await fetch(`/api/checkout/${token}/split`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ count }),
+      });
+      if (res.ok) {
+        setSplitChoosing(false);
+        await refetchInvoice();
+      }
+    } catch {} finally {
+      setSplitBusy(false);
+    }
   }
 
   function handleCancel() {
+    // Invoices are opened directly from a payment link — there is no prior TaptPay
+    // page to return to, so the Cancel affordance is hidden for them (see render).
+    if (isInvoice) return;
     // If we came from a split flow (amount override or transaction is split-enabled),
     // go back to the split page so the customer can adjust — not to /pay which would loop
     if (transaction?.splitEnabled && txId) {
@@ -906,7 +1012,46 @@ function CheckoutInner() {
   const amountDisplay = `$${parseFloat(displayPrice).toFixed(2)}`;
   const itemName = transaction?.itemName || "";
 
-  if (!txId || (!txLoading && !transaction)) {
+  // Invoice link is invalid / voided / errored.
+  if (isInvoice && invoiceError) {
+    const voided = (invoiceError as Error).message === "voided";
+    return (
+      <div style={pageStyle}>
+        <div style={cardWrapStyle}>
+          <div style={blueCardStyle}>
+            <div style={logoWrap}><img src={logoSrc} alt="logo" style={{ ...logoImgStyle, ...logoStyle }} /></div>
+            <div style={{ textAlign: "center" }}>
+              <XCircle size={48} color="#f87171" style={{ margin: "0 auto 16px" }} />
+              <p style={{ color: "#fff", fontSize: 18, fontWeight: 700, marginBottom: 8 }}>{voided ? "Link cancelled" : "Link not found"}</p>
+              <p style={{ color: "rgba(255,255,255,0.7)", fontSize: 13 }}>{voided ? "This payment link has been cancelled." : "This payment link doesn't exist or has expired."}</p>
+            </div>
+          </div>
+          <div style={tealTabStyle} />
+        </div>
+      </div>
+    );
+  }
+
+  // Invoice already settled — show a branded confirmation instead of a pay form.
+  if (isInvoice && invoiceData?.alreadyPaid) {
+    return (
+      <div style={pageStyle}>
+        <div style={cardWrapStyle}>
+          <div style={blueCardStyle}>
+            <div style={logoWrap}><img src={logoSrc} alt="logo" style={{ ...logoImgStyle, ...logoStyle }} /></div>
+            <div style={{ textAlign: "center" }}>
+              <CheckCircle size={64} color="#00E5CC" style={{ margin: "0 auto 16px" }} />
+              <p style={{ color: "#fff", fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Already paid</p>
+              <p style={{ color: "rgba(255,255,255,0.7)", fontSize: 14 }}>This has already been paid. Thank you!</p>
+            </div>
+          </div>
+          <div style={tealTabStyle} />
+        </div>
+      </div>
+    );
+  }
+
+  if (!payId || (!txLoading && !transaction)) {
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f0f4ff" }}>
         <div style={{ background: "#fff", borderRadius: 24, padding: 32, textAlign: "center" }}>
@@ -934,7 +1079,7 @@ function CheckoutInner() {
             <div style={{ textAlign: "center" }}>
               <CheckCircle size={64} color="#00E5CC" style={{ margin: "0 auto 16px" }} />
               <p style={{ color: "#fff", fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Payment Successful!</p>
-              <p style={{ color: "rgba(255,255,255,0.7)", fontSize: 14 }}>Thank you — redirecting…</p>
+              <p style={{ color: "rgba(255,255,255,0.7)", fontSize: 14 }}>{isInvoice ? "Thank you — your payment is confirmed." : "Thank you — redirecting…"}</p>
             </div>
           </div>
           <div style={tealTabStyle} />
@@ -968,8 +1113,74 @@ function CheckoutInner() {
           ) : (
             <>
               {/* Item name + Amount */}
-              <p style={itemNameStyle}>{itemName}</p>
+              <p style={itemNameStyle}>{splitActive ? `${itemName} · your share` : itemName}</p>
               <p style={amountStyle}>{amountDisplay}</p>
+
+              {/* View-invoice link — shown for one-off charges (not rent) that carry an
+                  attached document. Opens in a new tab so the payer can read, download
+                  or share it via their browser/OS. */}
+              {isInvoice && invoiceData?.kind === "charge" && invoiceData?.documentUrl && (
+                <a
+                  href={invoiceData.documentUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={viewInvoiceLinkStyle}
+                >
+                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 13h6M9 16.5h6"/></svg>
+                  View invoice
+                </a>
+              )}
+
+              {/* ── Invoice split-bill (rent/charges only) ── */}
+              {isInvoice && invoiceData?.splitEnabled && (
+                <div style={{ marginBottom: 20 }}>
+                  {/* Progress once a split is under way */}
+                  {splitActive && (
+                    <div style={{ background: "rgba(255,255,255,0.1)", borderRadius: 16, padding: "12px 14px", marginBottom: 12 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                        <span style={{ color: "#fff", fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>Split {splitCount} ways</span>
+                        <span style={{ color: "rgba(255,255,255,0.7)", fontSize: 12 }}>{splitPaid} of {splitCount} paid</span>
+                      </div>
+                      <div style={{ display: "flex", gap: 4 }}>
+                        {Array.from({ length: splitCount }).map((_, i) => (
+                          <div key={i} style={{ flex: 1, height: 6, borderRadius: 999, background: i < splitPaid ? "#00E5CC" : "rgba(255,255,255,0.25)" }} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Chooser: pick how many flatmates */}
+                  {!splitActive && splitChoosing && (
+                    <div style={{ background: "rgba(255,255,255,0.1)", borderRadius: 16, padding: "14px" }}>
+                      <p style={{ color: "#fff", fontSize: 13, fontWeight: 600, marginBottom: 10, textAlign: "center" }}>How many of you are splitting?</p>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 6 }}>
+                        {[2, 3, 4, 5, 6].map(n => (
+                          <button key={n} onClick={() => setupSplit(n)} disabled={splitBusy}
+                            style={{ padding: "12px 0", borderRadius: 12, border: "1.5px solid #00E5CC", background: "transparent", color: "#fff", fontWeight: 800, fontSize: 16, cursor: splitBusy ? "wait" : "pointer" }}>
+                            {n}
+                          </button>
+                        ))}
+                      </div>
+                      <button onClick={() => setSplitChoosing(false)} style={{ marginTop: 10, width: "100%", background: "none", border: "none", color: "rgba(255,255,255,0.6)", fontSize: 12, cursor: "pointer" }}>cancel</button>
+                    </div>
+                  )}
+
+                  {/* Offer to split (before a split has started) */}
+                  {!splitActive && !splitChoosing && (
+                    <button onClick={() => setSplitChoosing(true)} disabled={isProcessing}
+                      style={{ width: "100%", padding: "12px 0", borderRadius: 14, border: "1.5px solid rgba(0,229,204,0.6)", background: "transparent", color: "#00E5CC", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+                      Split with flatmates
+                    </button>
+                  )}
+
+                  {/* Payer email — so each split payer gets their own GST receipt */}
+                  {splitActive && (
+                    <input type="email" value={payerEmail} onChange={e => setPayerEmail(e.target.value)}
+                      placeholder="your email (for your receipt)"
+                      style={{ width: "100%", boxSizing: "border-box", marginTop: 12, padding: "12px 14px", borderRadius: 12, border: "1.5px solid rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.1)", color: "#fff", fontSize: 14, outline: "none" }} />
+                  )}
+                </div>
+              )}
 
               {/* In-app browser warning — shown instead of wallet buttons */}
               {inAppEnv.isInApp ? (
@@ -1185,27 +1396,30 @@ function CheckoutInner() {
           </>
         )}
 
-        {/* Cancel link — sits cleanly below the card stack */}
-        <div style={{ textAlign: "center", marginTop: 20 }}>
-          <button
-            onClick={handleCancel}
-            disabled={isProcessing}
-            style={{
-              background: "none",
-              border: "none",
-              color: "#8899bb",
-              fontSize: 13,
-              fontWeight: 500,
-              cursor: isProcessing ? "default" : "pointer",
-              opacity: isProcessing ? 0.4 : 1,
-              padding: "4px 0",
-              textDecoration: "underline",
-              textUnderlineOffset: 3,
-            }}
-          >
-            Cancel payment
-          </button>
-        </div>
+        {/* Cancel link — sits cleanly below the card stack. Hidden for invoices,
+            which are opened directly from a link with no prior page to return to. */}
+        {!isInvoice && (
+          <div style={{ textAlign: "center", marginTop: 20 }}>
+            <button
+              onClick={handleCancel}
+              disabled={isProcessing}
+              style={{
+                background: "none",
+                border: "none",
+                color: "#8899bb",
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: isProcessing ? "default" : "pointer",
+                opacity: isProcessing ? 0.4 : 1,
+                padding: "4px 0",
+                textDecoration: "underline",
+                textUnderlineOffset: 3,
+              }}
+            >
+              Cancel payment
+            </button>
+          </div>
+        )}
 
         {/* Secured by line */}
         <p style={{ marginTop: 12, textAlign: "center", fontSize: 11, color: "#aab0c0", letterSpacing: "0.03em" }}>
@@ -1265,6 +1479,21 @@ const itemNameStyle: CSSProperties = {
   fontSize: 14,
   marginBottom: 4,
   fontWeight: 400,
+};
+
+const viewInvoiceLinkStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  gap: 6,
+  margin: "0 auto 18px",
+  width: "fit-content",
+  color: "#00E5CC",
+  fontSize: 13.5,
+  fontWeight: 600,
+  textDecoration: "underline",
+  textUnderlineOffset: 3,
+  cursor: "pointer",
 };
 
 const amountStyle: CSSProperties = {

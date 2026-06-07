@@ -23,20 +23,32 @@ function SettingsSection({ title, isOpen, onToggle, children }: {
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white rounded-2xl sm:rounded-3xl mb-5 overflow-hidden">
+    <div
+      className="bg-white rounded-3xl mb-4 overflow-hidden transition-shadow"
+      style={{ boxShadow: isOpen ? '0 10px 30px rgba(4,13,109,0.10)' : '0 4px 16px rgba(4,13,109,0.06)' }}
+    >
       <button
         onClick={onToggle}
         className="w-full flex items-center justify-between px-5 sm:px-6 py-5 text-left"
       >
-        <h2 className="text-[#0055FF] text-xl font-medium">{title}</h2>
-        <ChevronDown
-          size={20}
-          className="text-[#0055FF] shrink-0 ml-2"
+        <h2 style={{ fontWeight: 600, fontSize: 17, color: '#040D6D', letterSpacing: '-0.01em' }}>{title}</h2>
+        <div
           style={{
-            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-            transition: 'transform 0.3s ease',
+            width: 30, height: 30, borderRadius: 999, flexShrink: 0, marginLeft: 8,
+            background: isOpen ? '#040D6D' : 'rgba(4,13,109,0.07)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'background 0.25s ease',
           }}
-        />
+        >
+          <ChevronDown
+            size={17}
+            style={{
+              color: isOpen ? '#58ABFF' : '#040D6D',
+              transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.3s ease, color 0.25s ease',
+            }}
+          />
+        </div>
       </button>
       <div
         style={{
@@ -635,125 +647,149 @@ export default function Settings() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-200 flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#0055FF] border-t-transparent rounded-full animate-spin"></div>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#F4F4F4' }}>
+        <div className="w-8 h-8 border-2 border-[#040D6D] border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
+  const businessName = merchant?.businessName || businessDetails.businessName || 'Your Business';
+  const initials = businessName.trim().split(/\s+/).map((w: string) => w[0]).join('').slice(0, 2).toUpperCase() || 'B';
+  const statusActive = merchant?.status === 'active';
+
   return (
-    <div className="min-h-screen bg-gray-200 pb-32">
-      {/* Header */}
-      <div className="bg-[#0055FF] pt-8 pb-6 rounded-b-[60px] sm:rounded-b-[100px]">
-        <div className="max-w-md mx-auto px-4 sm:px-6">
-          <h1 className="text-[#00E5CC] text-center text-2xl sm:text-3xl">Settings</h1>
+    <div className="min-h-screen pb-32" style={{ background: '#F4F4F4', fontFamily: "'Outfit', system-ui, sans-serif" }}>
+      {/* Safe-area spacer */}
+      <div style={{ height: 54 }} />
+
+      {/* Navy header card */}
+      <div style={{ padding: '0 18px' }}>
+        <div style={{ background: '#040D6D', borderRadius: 24, padding: '24px 26px 26px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{ width: 56, height: 56, borderRadius: 999, background: '#58ABFF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <span style={{ fontWeight: 700, fontSize: 20, color: '#040D6D' }}>{initials}</span>
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: 18, color: '#FFFFFF', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {businessName}
+              </div>
+              <div style={{ fontWeight: 500, fontSize: 11, color: '#58ABFF', letterSpacing: '0.16em', textTransform: 'uppercase', marginTop: 3 }}>
+                settings
+              </div>
+            </div>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 11px', borderRadius: 10, background: statusActive ? 'rgba(19,194,154,0.18)' : 'rgba(255,176,46,0.20)', color: statusActive ? '#13C29A' : '#FFB02E', fontWeight: 600, fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', flexShrink: 0 }}>
+              <span style={{ width: 6, height: 6, borderRadius: 999, background: statusActive ? '#13C29A' : '#FFB02E', flexShrink: 0 }} />
+              {statusActive ? 'active' : 'pending'}
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Content */}
-      <div className="max-w-md mx-auto px-4 sm:px-6 mt-8">
+      <div className="max-w-md mx-auto px-4 sm:px-6" style={{ paddingTop: 20 }}>
         {/* Payment Board Builder Shortcut */}
         <button
           onClick={() => setLocation('/board-builder')}
-          className="w-full bg-white rounded-2xl sm:rounded-3xl p-5 flex items-center justify-between mb-5 transition-all hover:shadow-md text-left"
+          className="w-full bg-white rounded-3xl p-5 flex items-center justify-between mb-4 transition-all hover:shadow-lg text-left"
+          style={{ boxShadow: '0 4px 16px rgba(4,13,109,0.06)' }}
         >
           <div className="flex items-center gap-4">
-            <div className="w-11 h-11 rounded-2xl bg-[#0055FF]/10 flex items-center justify-center flex-shrink-0">
-              <Printer className="w-5 h-5 text-[#0055FF]" />
+            <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(4,13,109,0.08)' }}>
+              <Printer className="w-5 h-5" style={{ color: '#040D6D' }} />
             </div>
             <div>
-              <div className="text-[#0055FF] font-medium text-lg leading-tight">Payment Board Builder</div>
+              <div style={{ fontWeight: 600, fontSize: 16, color: '#040D6D', lineHeight: 1.2 }}>Payment Board Builder</div>
               <div className="text-gray-400 text-sm mt-0.5">Design & print your custom payment sign</div>
             </div>
           </div>
-          <ArrowRight className="w-5 h-5 text-[#0055FF]/60 flex-shrink-0 ml-3" />
+          <ArrowRight className="w-5 h-5 flex-shrink-0 ml-3" style={{ color: 'rgba(4,13,109,0.5)' }} />
         </button>
 
         {/* Business Details Section */}
         <SettingsSection title="Business Details" isOpen={openSections.has('business')} onToggle={() => toggle('business')}>
           <div className="space-y-4 mt-1">
             <div>
-              <Label htmlFor="businessName" className="!text-[#0055FF] font-semibold text-base mb-2 block">Company Name</Label>
+              <Label htmlFor="businessName" className="!text-[#040D6D] font-semibold text-base mb-2 block">Company Name</Label>
               <Input
                 id="businessName"
                 value={businessDetails.businessName}
                 onChange={(e) => handleBusinessChange('businessName', e.target.value)}
-                className="!border-2 !border-[#0055FF] focus:!border-[#00E5CC] focus:!ring-[#00E5CC]"
+                className="!border !border-gray-200 focus:!border-[#040D6D] focus:!ring-[#040D6D]"
                 data-testid="input-business-name"
               />
             </div>
 
             <div>
-              <Label htmlFor="director" className="!text-[#0055FF] font-semibold text-base mb-2 block">Director</Label>
+              <Label htmlFor="director" className="!text-[#040D6D] font-semibold text-base mb-2 block">Director</Label>
               <Input
                 id="director"
                 value={businessDetails.director}
                 onChange={(e) => handleBusinessChange('director', e.target.value)}
-                className="!border-2 !border-[#0055FF] focus:!border-[#00E5CC] focus:!ring-[#00E5CC]"
+                className="!border !border-gray-200 focus:!border-[#040D6D] focus:!ring-[#040D6D]"
                 data-testid="input-director"
               />
             </div>
 
             <div>
-              <Label htmlFor="address" className="!text-[#0055FF] font-semibold text-base mb-2 block">Address</Label>
+              <Label htmlFor="address" className="!text-[#040D6D] font-semibold text-base mb-2 block">Address</Label>
               <Input
                 id="address"
                 value={businessDetails.address}
                 onChange={(e) => handleBusinessChange('address', e.target.value)}
-                className="!border-2 !border-[#0055FF] focus:!border-[#00E5CC] focus:!ring-[#00E5CC]"
+                className="!border !border-gray-200 focus:!border-[#040D6D] focus:!ring-[#040D6D]"
                 data-testid="input-address"
               />
             </div>
 
             <div>
-              <Label htmlFor="nzbn" className="!text-[#0055FF] font-semibold text-base mb-2 block">NZBN</Label>
+              <Label htmlFor="nzbn" className="!text-[#040D6D] font-semibold text-base mb-2 block">NZBN</Label>
               <Input
                 id="nzbn"
                 value={businessDetails.nzbn}
                 onChange={(e) => handleBusinessChange('nzbn', e.target.value)}
-                className="!border-2 !border-[#0055FF] focus:!border-[#00E5CC] focus:!ring-[#00E5CC]"
+                className="!border !border-gray-200 focus:!border-[#040D6D] focus:!ring-[#040D6D]"
                 data-testid="input-nzbn"
               />
             </div>
 
             <div>
-              <Label htmlFor="phone" className="!text-[#0055FF] font-semibold text-base mb-2 block">Phone Number</Label>
+              <Label htmlFor="phone" className="!text-[#040D6D] font-semibold text-base mb-2 block">Phone Number</Label>
               <Input
                 id="phone"
                 type="tel"
                 value={businessDetails.phone}
                 onChange={(e) => handleBusinessChange('phone', e.target.value)}
-                className="!border-2 !border-[#0055FF] focus:!border-[#00E5CC] focus:!ring-[#00E5CC]"
+                className="!border !border-gray-200 focus:!border-[#040D6D] focus:!ring-[#040D6D]"
                 data-testid="input-phone"
               />
             </div>
 
             <div>
-              <Label htmlFor="email" className="!text-[#0055FF] font-semibold text-base mb-2 block">Email</Label>
+              <Label htmlFor="email" className="!text-[#040D6D] font-semibold text-base mb-2 block">Email</Label>
               <Input
                 id="email"
                 type="email"
                 value={businessDetails.email}
                 onChange={(e) => handleBusinessChange('email', e.target.value)}
-                className="!border-2 !border-[#0055FF] focus:!border-[#00E5CC] focus:!ring-[#00E5CC]"
+                className="!border !border-gray-200 focus:!border-[#040D6D] focus:!ring-[#040D6D]"
                 data-testid="input-email"
               />
             </div>
 
             <div>
-              <Label htmlFor="gstNumber" className="!text-[#0055FF] font-semibold text-base mb-2 block">GST Number</Label>
+              <Label htmlFor="gstNumber" className="!text-[#040D6D] font-semibold text-base mb-2 block">GST Number</Label>
               <Input
                 id="gstNumber"
                 value={businessDetails.gstNumber}
                 onChange={(e) => handleBusinessChange('gstNumber', e.target.value)}
-                className="!border-2 !border-[#0055FF] focus:!border-[#00E5CC] focus:!ring-[#00E5CC]"
+                className="!border !border-gray-200 focus:!border-[#040D6D] focus:!ring-[#040D6D]"
                 data-testid="input-gst-number"
               />
             </div>
           </div>
 
-          <Button 
-            className="w-full bg-[#00E5CC] hover:bg-[#00c9b3] text-[#0055FF] mt-5"
+          <Button
+            className="w-full bg-[#040D6D] hover:bg-[#0a1580] text-[#58ABFF] mt-5"
             onClick={handleSaveDetails}
             disabled={updateMerchantMutation.isPending}
             data-testid="button-save"
@@ -787,7 +823,7 @@ export default function Settings() {
                 <Button
                   onClick={() => updateDailyGoalMutation.mutate(dailyGoal)}
                   disabled={updateDailyGoalMutation.isPending}
-                  className="bg-[#0055FF] hover:bg-[#0055FF]/90"
+                  className="bg-[#040D6D] hover:bg-[#0a1580]"
                   data-testid="button-save-daily-goal"
                 >
                   {updateDailyGoalMutation.isPending ? "Saving..." : "Save"}
@@ -799,16 +835,17 @@ export default function Settings() {
 
         {/* Subscription & Billing Section */}
         {isNativeApp() ? (
-          <div className="bg-white rounded-2xl sm:rounded-3xl mb-5 overflow-hidden">
+          <div className="bg-white rounded-3xl mb-4 overflow-hidden" style={{ boxShadow: '0 4px 16px rgba(4,13,109,0.06)' }}>
             <div className="px-5 sm:px-6 py-5">
-              <h2 className="text-[#0055FF] text-xl font-medium mb-4">Subscription & Billing</h2>
-              <div className="p-5 bg-[#0055FF]/5 rounded-xl text-center space-y-3">
+              <h2 style={{ fontWeight: 600, fontSize: 17, color: '#040D6D', letterSpacing: '-0.01em' }} className="mb-4">Subscription &amp; Billing</h2>
+              <div className="p-5 rounded-xl text-center space-y-3" style={{ background: 'rgba(4,13,109,0.05)' }}>
                 <p className="text-gray-700 text-sm leading-relaxed">
                   To add or update your payment method, visit
                 </p>
                 <a
                   href="https://taptpay.co.nz/settings"
-                  className="text-[#0055FF] font-semibold text-base underline block"
+                  className="font-semibold text-base underline block"
+                  style={{ color: '#040D6D' }}
                 >
                   taptpay.co.nz
                 </a>
@@ -819,10 +856,10 @@ export default function Settings() {
         <SettingsSection title="Subscription & Billing" isOpen={openSections.has('billing')} onToggle={() => toggle('billing')}>
           <div className="space-y-5 mt-1">
             {/* Current Tier */}
-            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-[#0055FF]/10 to-[#00E5CC]/10 rounded-xl">
+            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-[#040D6D]/10 to-[#58ABFF]/12 rounded-xl">
               <div>
                 <p className="text-gray-700 font-medium">Current Plan</p>
-                <p className="text-2xl font-bold text-[#0055FF] mt-1">
+                <p className="text-2xl font-bold text-[#040D6D] mt-1">
                   {isFreeTier ? 'Free Tier' : 'Paid ($19.99/month)'}
                 </p>
               </div>
@@ -863,7 +900,7 @@ export default function Settings() {
                 Choose how often you want to be charged for transaction fees (10 cents per transaction)
               </p>
               <Select value={billingFrequency} onValueChange={handleBillingFrequencyChange}>
-                <SelectTrigger className="border-[#0055FF] focus:border-[#00E5CC]" data-testid="select-billing-frequency">
+                <SelectTrigger className="border-gray-200 focus:border-[#040D6D]" data-testid="select-billing-frequency">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -937,7 +974,7 @@ export default function Settings() {
                       placeholder="1234 5678 9012 3456"
                       value={cardNumber}
                       onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
-                      className="border-[#0055FF] focus:border-[#00E5CC] font-mono"
+                      className="border-gray-200 focus:border-[#040D6D] font-mono"
                       maxLength={23}
                       data-testid="input-card-number"
                     />
@@ -951,7 +988,7 @@ export default function Settings() {
                         placeholder="MM/YY"
                         value={cardExpiry}
                         onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
-                        className="border-[#0055FF] focus:border-[#00E5CC] font-mono"
+                        className="border-gray-200 focus:border-[#040D6D] font-mono"
                         maxLength={5}
                         data-testid="input-card-expiry"
                       />
@@ -964,7 +1001,7 @@ export default function Settings() {
                         placeholder="123"
                         value={cardCvc}
                         onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                        className="border-[#0055FF] focus:border-[#00E5CC] font-mono"
+                        className="border-gray-200 focus:border-[#040D6D] font-mono"
                         maxLength={4}
                         data-testid="input-card-cvc"
                       />
@@ -983,7 +1020,7 @@ export default function Settings() {
                     <Button
                       onClick={handleSaveCard}
                       disabled={cardSaving}
-                      className="flex-1 bg-[#0055FF] hover:bg-[#0044CC] text-white"
+                      className="flex-1 bg-[#040D6D] hover:bg-[#0a1580] text-[#58ABFF]"
                       data-testid="button-save-card"
                     >
                       {cardSaving ? "Saving..." : "Save Card"}
@@ -1116,7 +1153,7 @@ export default function Settings() {
         <div className="mb-5">
           <Button
             onClick={() => setLocation(`/pay/${merchantId}`)}
-            className="w-full bg-[#0055FF] hover:bg-[#0044dd] text-[#00E5CC] py-6 rounded-2xl text-lg"
+            className="w-full bg-[#040D6D] hover:bg-[#0a1580] text-[#58ABFF] py-6 rounded-2xl text-lg"
             data-testid="button-customer-page"
           >
             Customer Payment Page

@@ -1,0 +1,1 @@
+- [Fintech landing page idea](fintech-landing-page.md) — pay.man-style dark/green design reference saved by user for future landing page build

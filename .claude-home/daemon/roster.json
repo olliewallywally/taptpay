@@ -1,0 +1,62 @@
+{
+  "proto": 1,
+  "supervisorPid": 2717,
+  "updatedAt": 1780544628981,
+  "workers": {
+    "94da0d14": {
+      "pid": 2014,
+      "procStart": "437905",
+      "sessionId": "94da0d14-4dc0-49f5-bb03-4f3a429bc77a",
+      "rendezvousSock": "/tmp/cc-daemon-1000/05a8b063/rv/94da0d14.sock",
+      "ptySock": "/tmp/cc-daemon-1000/05a8b063/spare/009263c6.pty.sock",
+      "cliVersion": "2.1.162",
+      "startedAt": 1780544573737,
+      "attempt": 1,
+      "cwd": "/home/runner/workspace",
+      "dispatch": {
+        "proto": 1,
+        "short": "94da0d14",
+        "nonce": "40174437",
+        "sessionId": "94da0d14-4dc0-49f5-bb03-4f3a429bc77a",
+        "createdAt": 1780544568403,
+        "source": "slash",
+        "cwd": "/home/runner/workspace",
+        "launch": {
+          "mode": "resume",
+          "sessionId": "/home/runner/.claude/projects/-home-runner-workspace/826740c4-ccb4-4693-97a9-09e0d0ea267a.jsonl",
+          "fork": true,
+          "flagArgs": [
+            "--reply-on-resume",
+            "--permission-mode",
+            "acceptEdits"
+          ]
+        },
+        "env": {
+          "CLAUDE_BG_ISOLATION": "none",
+          "CLAUDE_BG_SESSION_PERMISSION_RULES": "{\"allow\":[\"Read(//home/runner/.claude/plugins/**)\",\"Read(//nix/store/lsgsb0ar7rdwa09d1z2dnfjh4188pddk-replit-bashrc/**)\",\"Read(//nix/store/lsgsb0ar7rdwa09d1z2dnfjh4188pddk-replit-bashrc/**)\"],\"deny\":[]}"
+        },
+        "isolation": "none",
+        "respawnFlags": [
+          "--reply-on-resume",
+          "--permission-mode",
+          "acceptEdits"
+        ],
+        "seed": {
+          "intent": "the bill feature page on the property management terminal isnt working, i cant click on it. can you investigate and fix it please",
+          "name": "Replit plugin reinstallation question"
+        },
+        "cols": 156,
+        "rows": 52
+      },
+      "decModes": [
+        1000,
+        1002,
+        1003,
+        1006,
+        2004,
+        1004,
+        2031
+      ]
+    }
+  }
+}

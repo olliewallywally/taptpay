@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { propFetch } from "@/lib/property-api";
 
 /* ═══ TOKENS ═══ */
 const NAVY = '#040D6D';
@@ -20,6 +21,7 @@ function tenantName(t: any) { return `${t.firstName} ${t.lastName}`; }
 function invoiceStatusFor(inv: any) {
   if (inv.status === 'paid' || inv.status === 'paid_external') return 'paid';
   if (inv.status === 'overdue') return 'overdue';
+  if (inv.status === 'dispatch_failed') return 'failed';
   if (inv.status === 'dispatched') return 'sent';
   return 'awaiting';
 }
@@ -224,7 +226,7 @@ function RequestsHome({ invoices, tenants, outstanding, go, onRowTap }: any) {
               <div className="tp-stack-empty">tap + to send a rent request</div>
             ) : recent.map((inv: any) => {
               const st = invoiceStatusFor(inv);
-              const dotCls = st === 'paid' ? 'paid' : st === 'overdue' ? 'declined' : st === 'sent' ? 'payment-sent' : 'awaiting';
+              const dotCls = st === 'paid' ? 'paid' : (st === 'overdue' || st === 'failed') ? 'declined' : st === 'sent' ? 'payment-sent' : 'awaiting';
               return (
                 <div key={inv.id} className="tp-stack-row" style={{ cursor: 'pointer' }} onClick={() => onRowTap?.(inv)}>
                   <div style={{ width: 34, height: 34, borderRadius: 999, background: NAVY, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 11, fontWeight: 800, color: BLUE, letterSpacing: '0.02em', marginRight: 12 }}>
@@ -343,7 +345,7 @@ function ChooseTenant({ tenants, invoices, go, onSelect, splitMode, onToggleSpli
             const inv = latestInvoice(t.id);
             const amount = inv?.amountCents ?? 0;
             const st = inv ? invoiceStatusFor(inv) : null;
-            const dotCls = st === 'paid' ? 'paid' : st === 'overdue' ? 'declined' : 'awaiting';
+            const dotCls = st === 'paid' ? 'paid' : (st === 'overdue' || st === 'failed') ? 'declined' : 'awaiting';
             return (
               <button key={t.id} onClick={() => onSelect(t, amount)}
                 style={{ textAlign: 'left', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(88,171,255,0.15)', borderRadius: 18, padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 13 }}>
@@ -394,7 +396,9 @@ function RentAmount({ go, selectedTenant, onCommit, backTo = 'send' }: any) {
           {['1','2','3','4','5','6','7','8','9'].map(d => (
             <button key={d} className="tp-kp" onClick={() => press(d)}>{d}</button>
           ))}
-          <button className="tp-kp outline">·</button>
+          {/* Amounts are entered in cents (e.g. 5000 → $50.00), so there is no
+              decimal key — this cell is an inert spacer to keep the 3×4 grid. */}
+          <div className="tp-kp" style={{ visibility: 'hidden' }} aria-hidden />
           <button className="tp-kp" onClick={() => press('0')}>0</button>
           <button className="tp-kp outline" onClick={back}><Ic.Back /></button>
         </div>
@@ -508,7 +512,7 @@ function SendRentLink({ go, selectedTenant, amount, onSend, sending, frequency, 
 }
 
 /* ═══ SCREEN: ChargeBill — one-off non-rent bill (utilities, fees, etc.) ═══ */
-function ChargeBill({ go, selectedTenant, amount, onEditAmount, chargeType, setChargeType, label, setLabel, dueSel, setDueSel, splitOn, onToggleSplit, onSend, sending }: any) {
+function ChargeBill({ go, selectedTenant, amount, onEditAmount, chargeType, setChargeType, label, setLabel, dueSel, setDueSel, splitOn, onToggleSplit, onSend, sending, docUrl, docName, uploadingDoc, onUploadDoc, onClearDoc }: any) {
   // No tenant selected yet — same prompt the send/external screens use.
   if (!selectedTenant) {
     return (
@@ -580,6 +584,24 @@ function ChargeBill({ go, selectedTenant, amount, onEditAmount, chargeType, setC
           <div style={{ fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>description</div>
           <input className="tp-field" value={label} onChange={e => setLabel(e.target.value)}
             placeholder={chargeType === 'other' ? 'what is this charge for?' : 'add a note (optional)'} style={{ marginBottom: 20 }} />
+
+          {/* Invoice document — optional PDF/image the tenant can view from the checkout page */}
+          <div style={{ fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>invoice <span style={{ opacity: 0.6 }}>· optional</span></div>
+          {docUrl ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '13px 16px', background: 'rgba(88,171,255,0.1)', border: '1px solid rgba(88,171,255,0.4)', borderRadius: 16, marginBottom: 20 }}>
+              <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={BLUE} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 13h6M9 16.5h6"/></svg>
+              <span style={{ flex: 1, minWidth: 0, fontWeight: 500, fontSize: 13.5, color: BLUE, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{docName || 'attached'}</span>
+              <button onClick={onClearDoc} style={{ background: 'none', border: 'none', color: 'rgba(88,171,255,0.7)', fontWeight: 600, fontSize: 12.5, cursor: 'pointer', flexShrink: 0, fontFamily: 'Outfit, system-ui' }}>remove</button>
+            </div>
+          ) : (
+            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, padding: '13px 16px', background: 'rgba(255,255,255,0.05)', border: '1.5px dashed rgba(88,171,255,0.4)', borderRadius: 16, marginBottom: 20, cursor: uploadingDoc ? 'wait' : 'pointer', opacity: uploadingDoc ? 0.6 : 1 }}>
+              <svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke={BLUE} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg>
+              <span style={{ fontWeight: 600, fontSize: 13.5, color: BLUE, fontFamily: 'Outfit, system-ui' }}>{uploadingDoc ? 'uploading…' : 'attach invoice (PDF/image)'}</span>
+              <input type="file" accept="application/pdf,image/*" disabled={uploadingDoc}
+                onChange={e => { const f = e.target.files?.[0]; if (f) onUploadDoc(f); e.currentTarget.value = ''; }}
+                style={{ display: 'none' }} />
+            </label>
+          )}
 
           {/* Due */}
           <div style={{ fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>due</div>
@@ -754,6 +776,7 @@ function AutomateScreen({ go, schedules, tenants, onPauseResume, onCancel, busyI
 /* ═══ SCREEN: MarkExternal ═══ */
 function MarkExternal({ go, selectedTenant, amount, invoices, onMark, marking }: any) {
   const [ref, setRef] = useState('');
+  const [pickedId, setPickedId] = useState<string | null>(null);
 
   if (!selectedTenant) {
     return (
@@ -772,17 +795,21 @@ function MarkExternal({ go, selectedTenant, amount, invoices, onMark, marking }:
     );
   }
 
-  const pendingInvoice = invoices.find((i: any) =>
-    i.tenantProfileId === selectedTenant?.id &&
-    ['pending_dispatch', 'dispatched', 'overdue'].includes(i.status)
-  );
+  // All of this tenant's outstanding invoices — the merchant picks which one was
+  // paid externally (a tenant can owe rent AND one-off charges at once).
+  const LIVE = ['pending_dispatch', 'dispatched', 'overdue', 'dispatch_failed'];
+  const outstanding = (invoices as any[])
+    .filter((i: any) => i.tenantProfileId === selectedTenant?.id && LIVE.includes(i.status))
+    .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const picked = outstanding.find((i: any) => i.id === pickedId) || outstanding[0] || null;
+  const labelFor = (inv: any) => (inv.kind === 'charge' ? (inv.description || 'charge') : 'rent');
 
   return (
     <div className="tp-screen" style={{ background: NAVY }}>
       <div className="stagger" style={{ background: OFFW, color: NAVY, height: '50%', display: 'flex', flexDirection: 'column' }}>
-        <SubHead onCancel={() => go('home', 'down')} onCommit={() => pendingInvoice && onMark(pendingInvoice.id, ref)} />
+        <SubHead onCancel={() => go('home', 'down')} onCommit={() => picked && onMark(picked.id, ref)} />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div className="tp-amount" style={{ fontSize: 82 }}>{pendingInvoice ? fmt(pendingInvoice.amountCents) : fmt(amount)}</div>
+          <div className="tp-amount" style={{ fontSize: 82 }}>{picked ? fmt(picked.amountCents) : fmt(amount)}</div>
           {selectedTenant && (
             <div style={{ marginTop: 14, fontWeight: 500, fontSize: 15, color: NAVY }}>{tenantName(selectedTenant)}</div>
           )}
@@ -791,12 +818,34 @@ function MarkExternal({ go, selectedTenant, amount, invoices, onMark, marking }:
       </div>
       <div className="stagger" style={{ flex: 1, background: NAVY, padding: '40px 28px 100px', display: 'flex', flexDirection: 'column' }}>
         <div style={{ color: BLUE, fontWeight: 500, fontSize: 18, textAlign: 'center' }}>mark as received externally</div>
-        {!pendingInvoice && (
+        {!picked && (
           <div style={{ marginTop: 16, textAlign: 'center', color: 'rgba(88,171,255,0.5)', fontSize: 13 }}>no outstanding invoice found for this tenant</div>
         )}
-        {pendingInvoice && (
+        {picked && (
           <>
-            <div style={{ marginTop: 22 }}>
+            {/* Chooser — only when the tenant has more than one outstanding invoice */}
+            {outstanding.length > 1 && (
+              <div style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ fontSize: 10.5, fontWeight: 600, color: 'rgba(88,171,255,0.5)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>which invoice?</div>
+                {outstanding.map((inv: any) => {
+                  const on = inv.id === picked.id;
+                  return (
+                    <button key={inv.id} onClick={() => setPickedId(inv.id)}
+                      style={{ textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, background: on ? 'rgba(88,171,255,0.18)' : 'rgba(255,255,255,0.05)', border: `1.5px solid ${on ? BLUE : 'rgba(88,171,255,0.12)'}`, borderRadius: 14, padding: '12px 14px', cursor: 'pointer', fontFamily: 'Outfit, system-ui' }}>
+                      <span style={{ width: 18, height: 18, borderRadius: 999, border: `2px solid ${on ? BLUE : 'rgba(88,171,255,0.35)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        {on && <span style={{ width: 8, height: 8, borderRadius: 999, background: BLUE }} />}
+                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: 13.5, color: BLUE, textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{labelFor(inv)}</div>
+                        <div style={{ fontSize: 10.5, color: 'rgba(88,171,255,0.5)', marginTop: 1 }}>{invoiceStatusFor(inv)}</div>
+                      </div>
+                      <div style={{ fontWeight: 700, fontSize: 13.5, color: BLUE, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{fmt(inv.amountCents)}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <div style={{ marginTop: 16 }}>
               <input
                 className="tp-field"
                 placeholder="reference (optional)"
@@ -806,13 +855,13 @@ function MarkExternal({ go, selectedTenant, amount, invoices, onMark, marking }:
             </div>
             <div style={{ flex: 1 }} />
             <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <button className="tp-cta" onClick={() => onMark(pendingInvoice.id, ref)} disabled={marking} style={{ opacity: marking ? 0.65 : 1 }}>
+              <button className="tp-cta" onClick={() => onMark(picked.id, ref)} disabled={marking} style={{ opacity: marking ? 0.65 : 1 }}>
                 {marking ? 'marking…' : 'confirm received'}
               </button>
             </div>
           </>
         )}
-        {!pendingInvoice && (
+        {!picked && (
           <div style={{ flex: 1 }} />
         )}
       </div>
@@ -987,6 +1036,62 @@ function SentSuccess({ amount, label, go, kind = 'rent' }: any) {
   );
 }
 
+/* ═══ Invoice action sheet — tap a request row to resend / mark received / cancel ═══ */
+function InvoiceActionSheet({ invoice, onClose, onEditResend, onResend, onMarkReceived, onVoid, busy }: any) {
+  const st = invoiceStatusFor(invoice);
+  const settled = st === 'paid';
+  const isCharge = invoice.kind === 'charge';
+  const owing = (invoice.splitEnabled && invoice.splitCount > 1) ? (invoice.owingCents ?? invoice.amountCents) : invoice.amountCents;
+
+  const Action = ({ label, onClick, danger, primary }: any) => (
+    <button onClick={onClick} disabled={busy}
+      style={{ width: '100%', padding: '15px 0', borderRadius: 16, border: danger ? '1.5px solid rgba(255,91,91,0.4)' : 'none',
+        background: danger ? 'transparent' : primary ? NAVY : 'rgba(4,13,109,0.06)',
+        color: danger ? RED : primary ? BLUE : NAVY,
+        fontWeight: 700, fontSize: 15, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1,
+        fontFamily: 'Outfit, system-ui', marginBottom: 10, transition: 'opacity 0.15s' }}>
+      {label}
+    </button>
+  );
+
+  return (
+    <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 80, background: 'rgba(4,13,109,0.45)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', animation: 'tp-fade 0.2s ease both' }}>
+      <style>{`@keyframes tp-fade{from{opacity:0}to{opacity:1}}@keyframes tp-sheetup{from{transform:translateY(100%)}to{transform:translateY(0)}}`}</style>
+      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 430, background: OFFW, borderRadius: '26px 26px 0 0', padding: '12px 22px 28px', animation: 'tp-sheetup 0.32s cubic-bezier(0.16,1,0.3,1) both' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '0 0 14px' }}>
+          <div style={{ width: 38, height: 4, borderRadius: 2, background: 'rgba(4,13,109,0.12)' }} />
+        </div>
+
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 17, color: NAVY, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{invoice.tenantName || 'tenant'}</div>
+            <div style={{ fontWeight: 500, fontSize: 12.5, color: 'rgba(4,13,109,0.5)', marginTop: 2 }}>
+              {isCharge ? (invoice.description || 'charge') : 'rent'} · {fmt(owing)}
+            </div>
+          </div>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 999, background: st === 'paid' ? 'rgba(27,191,133,0.14)' : (st === 'overdue' || st === 'failed') ? 'rgba(255,91,91,0.12)' : 'rgba(88,171,255,0.16)', color: st === 'paid' ? GREEN : (st === 'overdue' || st === 'failed') ? RED : '#1A5FCC', fontWeight: 700, fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{st === 'failed' ? 'not delivered' : st}</div>
+        </div>
+
+        {settled ? (
+          <div style={{ textAlign: 'center', padding: '8px 0 18px', color: 'rgba(4,13,109,0.5)', fontSize: 14, fontWeight: 500 }}>
+            this {isCharge ? 'charge' : 'invoice'} is already settled
+          </div>
+        ) : (
+          <>
+            {isCharge
+              ? <Action label="resend link" onClick={onResend} primary />
+              : <Action label="edit amount & resend" onClick={onEditResend} primary />}
+            <Action label="mark received externally" onClick={onMarkReceived} />
+            <Action label="cancel invoice" onClick={onVoid} danger />
+          </>
+        )}
+        <Action label="close" onClick={onClose} />
+      </div>
+    </div>
+  );
+}
+
 /* ═══ MAIN ═══ */
 function propHeaders(): HeadersInit {
   const token = localStorage.getItem('authToken');
@@ -1019,31 +1124,37 @@ export default function PropertyTerminal() {
   const [chargeType, setChargeType]       = useState<string | null>(null);
   const [chargeLabel, setChargeLabel]     = useState('');
   const [dueSel, setDueSel]               = useState(7);
+  // Optional invoice document attached to a one-off charge (uploaded ahead of send).
+  const [chargeDocUrl, setChargeDocUrl]   = useState<string | null>(null);
+  const [chargeDocName, setChargeDocName] = useState<string>('');
+  const [uploadingDoc, setUploadingDoc]   = useState(false);
+  // Tapped invoice row → action sheet (resend / mark received / cancel).
+  const [rowAction, setRowAction]         = useState<any>(null);
   const conveyorTimer = useRef<ReturnType<typeof setTimeout>>();
   const viewportRef = useRef<HTMLDivElement>(null);
 
   /* Data */
   const { data: tenants = [] } = useQuery<any[]>({
     queryKey: ['/api/property/tenants'],
-    queryFn: () => fetch('/api/property/tenants', { headers: propHeaders() }).then(r => r.ok ? r.json() : []),
+    queryFn: () => propFetch('/api/property/tenants').then(r => r.ok ? r.json() : []),
     staleTime: 60000, retry: false,
   });
 
   const { data: invoices = [] } = useQuery<any[]>({
     queryKey: ['/api/property/invoices'],
-    queryFn: () => fetch('/api/property/invoices', { headers: propHeaders() }).then(r => r.ok ? r.json() : []),
+    queryFn: () => propFetch('/api/property/invoices').then(r => r.ok ? r.json() : []),
     staleTime: 30000, retry: false,
   });
 
   const { data: schedules = [] } = useQuery<any[]>({
     queryKey: ['/api/property/schedules'],
-    queryFn: () => fetch('/api/property/schedules', { headers: propHeaders() }).then(r => r.ok ? r.json() : []),
+    queryFn: () => propFetch('/api/property/schedules').then(r => r.ok ? r.json() : []),
     staleTime: 30000, retry: false,
   });
 
   const { data: reminderSettings } = useQuery<any>({
     queryKey: ['/api/property/reminder-settings'],
-    queryFn: () => fetch('/api/property/reminder-settings', { headers: propHeaders() }).then(r => r.ok ? r.json() : null),
+    queryFn: () => propFetch('/api/property/reminder-settings').then(r => r.ok ? r.json() : null),
     staleTime: 60000, retry: false,
   });
 
@@ -1084,14 +1195,14 @@ export default function PropertyTerminal() {
   });
 
   const billMutation = useMutation({
-    mutationFn: async ({ tenantId, amountCents, channel, chargeType, description, dueDays, split }: any) => {
+    mutationFn: async ({ tenantId, amountCents, channel, chargeType, description, dueDays, split, documentUrl, documentName }: any) => {
       const due = new Date(); due.setDate(due.getDate() + (dueDays || 0));
       const r = await fetch('/api/property/invoices', {
         method: 'POST', headers: { 'Content-Type': 'application/json', ...propHeaders() },
         body: JSON.stringify({
           tenantProfileId: tenantId, amountCents, deliveryChannel: channel,
           dueAt: due.toISOString(), splitEnabled: !!split,
-          kind: 'charge', chargeType, description,
+          kind: 'charge', chargeType, description, documentUrl, documentName,
         }),
       });
       if (!r.ok) {
@@ -1107,6 +1218,7 @@ export default function PropertyTerminal() {
       setContentKey(k => k + 1);
       setScreen('success');
       setSplitMode(false);
+      setChargeDocUrl(null); setChargeDocName('');
     },
     onError: (err: any) => { toast(err?.message || 'Failed to send bill'); },
   });
@@ -1199,10 +1311,35 @@ export default function PropertyTerminal() {
     onError: () => { toast('Batch resend failed'); },
   });
 
+  // Cancel (void) a single invoice/charge — from the row action sheet.
+  const voidMutation = useMutation({
+    mutationFn: async (invoiceId: string) => {
+      const r = await fetch(`/api/property/invoices/${invoiceId}/void`, { method: 'POST', headers: propHeaders() });
+      if (!r.ok) {
+        const msg = await r.json().then((d: any) => d.message).catch(() => 'Failed to cancel');
+        throw new Error(msg);
+      }
+      return r.json();
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/property/invoices'] }); setBanner('Invoice cancelled'); },
+    onError: (e: any) => { toast(e?.message || 'Could not cancel invoice'); },
+  });
+
+  // Resend a single invoice's link — from the row action sheet.
+  const resendOneMutation = useMutation({
+    mutationFn: async (invoiceId: string) => {
+      const r = await fetch(`/api/property/invoices/${invoiceId}/resend`, { method: 'POST', headers: propHeaders() });
+      if (!r.ok) throw new Error('Failed to resend');
+      return r.json();
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/property/invoices'] }); setBanner('Link resent'); },
+    onError: () => { toast('Could not resend link'); },
+  });
+
   /* Helpers */
   const toast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 1600); };
   const outstanding = (invoices as any[])
-    .filter((i: any) => ['pending_dispatch', 'dispatched', 'overdue'].includes(i.status))
+    .filter((i: any) => ['pending_dispatch', 'dispatched', 'overdue', 'dispatch_failed'].includes(i.status))
     .reduce((s: number, i: any) => s + (i.owingCents ?? i.amountCents ?? 0), 0);
 
   const triggerConveyor = (prevId: string, dir: string) => {
@@ -1224,6 +1361,8 @@ export default function PropertyTerminal() {
       setChargeType(null);
       setChargeLabel('');
       setDueSel(7);
+      setChargeDocUrl(null);
+      setChargeDocName('');
       return;
     }
     // Send/External with no tenant: remember destination, go to tenant picker
@@ -1248,6 +1387,7 @@ export default function PropertyTerminal() {
     if (dest === 'bill') {
       // A charge is a fresh amount — start at the keypad, then land on the bill configurator.
       setChargeType(null); setChargeLabel(''); setDueSel(7); setAmount(0);
+      setChargeDocUrl(null); setChargeDocName('');
       setAmountDest('bill');
       setScreen('amount');
       return;
@@ -1259,11 +1399,37 @@ export default function PropertyTerminal() {
   // Begin a charge for the already-selected tenant (from the subbar Bill tab).
   const startBill = () => {
     setChargeType(null); setChargeLabel(''); setDueSel(7); setAmount(0);
+    setChargeDocUrl(null); setChargeDocName('');
     setAmountDest('bill');
     if (screen === 'home') triggerConveyor(screen, 'up');
     setContentKey(k => k + 1);
     setScreen('amount');
   };
+
+  // Upload the chosen invoice document, stashing the returned URL + name so the
+  // next send attaches them. Runs immediately on file pick for instant feedback.
+  const uploadChargeDoc = async (file: File) => {
+    if (file.size > 20 * 1024 * 1024) { toast('file must be under 20MB'); return; }
+    setUploadingDoc(true);
+    try {
+      const fd = new FormData();
+      fd.append('document', file);
+      const r = await fetch('/api/property/invoices/document', { method: 'POST', headers: propHeaders(), body: fd });
+      if (!r.ok) {
+        const msg = await r.json().then((d: any) => d.message).catch(() => 'Upload failed');
+        throw new Error(msg);
+      }
+      const { documentUrl, documentName } = await r.json();
+      setChargeDocUrl(documentUrl);
+      setChargeDocName(documentName || file.name);
+    } catch (err: any) {
+      toast(err?.message || 'Failed to upload document');
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  const clearChargeDoc = () => { setChargeDocUrl(null); setChargeDocName(''); };
 
   const handleBill = () => {
     if (!selectedTenant) { toast('choose a tenant'); return; }
@@ -1276,10 +1442,19 @@ export default function PropertyTerminal() {
       tenantId: selectedTenant.id, amountCents: amount,
       channel: selectedTenant.preferredChannel || 'email',
       chargeType, description, dueDays: dueSel, split: splitMode,
+      documentUrl: chargeDocUrl || undefined, documentName: chargeDocName || undefined,
     });
   };
 
-  const handleRowTap = (inv: any) => {
+  // Tapping a request row opens the action sheet (resend / mark received / cancel)
+  // — never routes a charge into the rent send flow.
+  const handleRowTap = (inv: any) => { setRowAction(inv); };
+
+  // "edit amount & resend" from the sheet — opens the rent send screen pre-filled.
+  const openEditResend = () => {
+    const inv = rowAction;
+    setRowAction(null);
+    if (!inv) return;
     const t = (tenants as any[]).find(x => x.id === inv.tenantProfileId);
     if (t) {
       setSelectedTenant(t);
@@ -1287,6 +1462,15 @@ export default function PropertyTerminal() {
       triggerConveyor('home', 'up');
       setContentKey(k => k + 1);
       setScreen('send');
+    }
+  };
+
+  const handleVoid = () => {
+    const inv = rowAction;
+    if (!inv) return;
+    if (window.confirm('Cancel this invoice? The tenant will no longer be able to pay it. This cannot be undone.')) {
+      voidMutation.mutate(inv.id);
+      setRowAction(null);
     }
   };
 
@@ -1379,7 +1563,7 @@ export default function PropertyTerminal() {
     if (id === 'tenants')  return <ChooseTenant tenants={tenants} invoices={invoices} go={go} onSelect={handleTenantSelect} splitMode={splitMode} onToggleSplit={() => setSplitMode(m => !m)} />;
     if (id === 'amount')   return <RentAmount go={go} selectedTenant={selectedTenant} backTo={amountDest} onCommit={(c: number) => { setAmount(c); go(amountDest); }} />;
     if (id === 'send')     return <SendRentLink go={go} selectedTenant={selectedTenant} amount={amount} onSend={handleSend} sending={sendMutation.isPending} frequency={frequency} setFrequency={setFrequency} splitMode={splitMode} onEditAmount={() => { setAmountDest('send'); go('amount'); }} />;
-    if (id === 'bill')     return <ChargeBill go={go} selectedTenant={selectedTenant} amount={amount} onEditAmount={() => { setAmountDest('bill'); go('amount'); }} chargeType={chargeType} setChargeType={setChargeType} label={chargeLabel} setLabel={setChargeLabel} dueSel={dueSel} setDueSel={setDueSel} splitOn={splitMode} onToggleSplit={() => setSplitMode(m => !m)} onSend={handleBill} sending={billMutation.isPending} />;
+    if (id === 'bill')     return <ChargeBill go={go} selectedTenant={selectedTenant} amount={amount} onEditAmount={() => { setAmountDest('bill'); go('amount'); }} chargeType={chargeType} setChargeType={setChargeType} label={chargeLabel} setLabel={setChargeLabel} dueSel={dueSel} setDueSel={setDueSel} splitOn={splitMode} onToggleSplit={() => setSplitMode(m => !m)} onSend={handleBill} sending={billMutation.isPending} docUrl={chargeDocUrl} docName={chargeDocName} uploadingDoc={uploadingDoc} onUploadDoc={uploadChargeDoc} onClearDoc={clearChargeDoc} />;
     if (id === 'external') return <MarkExternal go={go} selectedTenant={selectedTenant} amount={amount} invoices={invoices} onMark={handleMark} marking={markMutation.isPending} />;
     if (id === 'batch')    return <BatchAndAutoScreen {...batchAutoProps} />;
     if (id === 'success')  return <SentSuccess amount={amount} label={successLabel} go={go} kind={successKind} />;
@@ -1426,6 +1610,18 @@ export default function PropertyTerminal() {
       </div>
 
       <div className={`tp-toast${toastMsg ? ' show' : ''}`}>{toastMsg}</div>
+
+      {rowAction && (
+        <InvoiceActionSheet
+          invoice={rowAction}
+          busy={voidMutation.isPending || resendOneMutation.isPending || markMutation.isPending}
+          onClose={() => setRowAction(null)}
+          onEditResend={openEditResend}
+          onResend={() => { resendOneMutation.mutate(rowAction.id); setRowAction(null); }}
+          onMarkReceived={() => { markMutation.mutate({ invoiceId: rowAction.id, ref: '' }); setRowAction(null); }}
+          onVoid={handleVoid}
+        />
+      )}
     </div>
   );
 }

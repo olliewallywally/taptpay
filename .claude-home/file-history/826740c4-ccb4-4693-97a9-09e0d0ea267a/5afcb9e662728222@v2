@@ -1,0 +1,10 @@
+# Persist ~/.claude across Replit container resets.
+# ~/.claude lives in the (non-persistent) home dir; the real data lives in the
+# workspace at .claude-home (persistent). Re-create the symlink if it's missing
+# or broken so Claude Code keeps its plugins, login, and history after a reset.
+__claude_home_src="/home/runner/workspace/.claude-home"
+__claude_home_link="/home/runner/.claude"
+if [ -d "$__claude_home_src" ] && [ "$(readlink -f "$__claude_home_link" 2>/dev/null)" != "$__claude_home_src" ]; then
+  ln -sfn "$__claude_home_src" "$__claude_home_link"
+fi
+unset __claude_home_src __claude_home_link

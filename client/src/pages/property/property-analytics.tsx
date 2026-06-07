@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { propFetch } from "@/lib/property-api";
 
 /* ── Design tokens (matches AnalyticsScreen_(2)) ── */
 const C = {
@@ -54,7 +55,7 @@ function RevenueChart({ primary, secondary, tipIdx, animKey, tipLabel }: { prima
 
   return (
     <div style={{ position: 'relative', margin: '8px 0 4px', padding: '0 4px' }}>
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="auto" style={{ display: 'block', overflow: 'visible' }}>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block', height: 'auto', overflow: 'visible' }}>
         <defs>
           <linearGradient id="pa1" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={C.accent} stopOpacity="0.22" />
@@ -102,8 +103,9 @@ function TxRow({ inv, delay = 0 }: { inv: any; delay?: number }) {
   const initials = name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
   const isPaid  = inv.status === 'paid' || inv.status === 'paid_external';
   const isOverdue = inv.status === 'overdue';
+  const isFailed = inv.status === 'dispatch_failed';
   const amount  = inv.amountCents ? `${isPaid ? '+' : ''}$${(inv.amountCents / 100).toFixed(2)}` : '—';
-  const label   = isPaid ? 'Paid' : isOverdue ? 'Overdue' : inv.status === 'pending_dispatch' ? 'Queued' : 'Sent';
+  const label   = isPaid ? 'Paid' : isOverdue ? 'Overdue' : isFailed ? 'Not delivered' : inv.status === 'pending_dispatch' ? 'Queued' : 'Sent';
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 0', borderBottom: '1px solid rgba(0,0,0,0.04)', opacity: vis ? 1 : 0, transform: vis ? 'translateY(0) scale(1)' : 'translateY(8px) scale(0.98)', transition: 'all 0.5s cubic-bezier(0.34,1.56,0.64,1)' }}>
@@ -113,7 +115,7 @@ function TxRow({ inv, delay = 0 }: { inv: any; delay?: number }) {
         <p style={{ fontSize: 11, color: C.textMuted, margin: 0, marginTop: 2 }}>{inv.propertyAddress || (inv.dueAt ? new Date(inv.dueAt).toLocaleDateString('en-NZ') : '')}</p>
       </div>
       <div style={{ textAlign: 'right', flexShrink: 0 }}>
-        <p style={{ fontSize: 15, fontWeight: 700, color: isPaid ? C.green : isOverdue ? C.red : C.textDark, margin: 0, fontVariantNumeric: 'tabular-nums' }}>{amount}</p>
+        <p style={{ fontSize: 15, fontWeight: 700, color: isPaid ? C.green : (isOverdue || isFailed) ? C.red : C.textDark, margin: 0, fontVariantNumeric: 'tabular-nums' }}>{amount}</p>
         <p style={{ fontSize: 10, color: C.textMuted, margin: 0, marginTop: 1 }}>{label}</p>
       </div>
     </div>
@@ -140,6 +142,7 @@ function buildChartData(invoices: any[], tf: Timeframe) {
   const outstanding: number[] = Array(buckets).fill(0);
 
   invoices.forEach((inv: any) => {
+    if (inv.status === 'voided') return; // cancelled requests aren't revenue or outstanding
     const date = new Date(inv.paidAt ?? inv.createdAt);
     const bucket = Math.max(0, Math.min(buckets - 1, getKey(date)));
     const val = Math.round((inv.amountCents ?? 0) / 100);
@@ -150,12 +153,9 @@ function buildChartData(invoices: any[], tf: Timeframe) {
   const maxVal = Math.max(...paid, ...outstanding, 1);
   const norm = (arr: number[]) => arr.map(v => Math.round((v / maxVal) * 90) + 5);
 
-  return { primary: norm(paid), secondary: norm(outstanding) };
-}
-
-function propHeaders(): HeadersInit {
-  const token = localStorage.getItem('authToken');
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  // paidRaw is the per-bucket paid $ total so the tooltip can show the value at
+  // the point it actually sits on, instead of a whole-period total.
+  return { primary: norm(paid), secondary: norm(outstanding), paidRaw: paid };
 }
 
 export default function PropertyAnalytics() {
@@ -164,7 +164,7 @@ export default function PropertyAnalytics() {
 
   const { data: invoices = [] } = useQuery<any[]>({
     queryKey: ['/api/property/invoices'],
-    queryFn: () => fetch('/api/property/invoices', { headers: propHeaders() }).then(r => r.ok ? r.json() : []),
+    queryFn: () => propFetch('/api/property/invoices').then(r => r.ok ? r.json() : []),
     staleTime: 30000,
     retry: false,
   });
@@ -178,7 +178,9 @@ export default function PropertyAnalytics() {
     year:  new Date(now.getTime() - 365 * 86400000),
   }[tf];
 
-  const filtered = invoices.filter((i: any) => new Date(i.createdAt) >= cutoff);
+  // Voided (cancelled) invoices are never revenue or history — drop them up front.
+  const liveInvoices = invoices.filter((i: any) => i.status !== 'voided');
+  const filtered = liveInvoices.filter((i: any) => new Date(i.createdAt) >= cutoff);
 
   /* Revenue total */
   const totalRevenue = filtered
@@ -188,16 +190,14 @@ export default function PropertyAnalytics() {
 
   /* Chart — only built from real property invoice data, never retail transactions */
   const FLAT = [5, 5, 5, 5, 5, 5, 5, 5, 5, 5];
-  const chart = invoices.length > 0
-    ? buildChartData(invoices, tf)
+  const chart = liveInvoices.length > 0
+    ? buildChartData(liveInvoices, tf)
     : { primary: FLAT, secondary: FLAT };
   const tipIdx = 7;
 
-  // Tip label: most recent bucket's paid revenue (rightmost = now)
-  const tipRevenue = filtered
-    .filter((i: any) => i.status === 'paid' || i.status === 'paid_external')
-    .reduce((s: number, i: any) => s + (i.amountCents ?? 0), 0);
-  const tipLabel = tipRevenue > 0 ? `$${(tipRevenue / 100).toFixed(0)}` : undefined;
+  // Tip label reflects the paid revenue in the exact bucket the marker sits on.
+  const tipBucket = (chart as any).paidRaw?.[tipIdx] ?? 0;
+  const tipLabel = tipBucket > 0 ? `$${tipBucket}` : undefined;
 
   /* Switch timeframe */
   const switchTf = (p: Timeframe) => {
@@ -210,8 +210,12 @@ export default function PropertyAnalytics() {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
 
-  const todayInvoices = filtered.filter((i: any) => new Date(i.createdAt) >= today);
-  const recentInvoices = filtered.filter((i: any) => new Date(i.createdAt) >= yesterday && new Date(i.createdAt) < today).slice(0, 5);
+  const byNewest = (a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  const todayInvoices = filtered.filter((i: any) => new Date(i.createdAt) >= today).sort(byNewest);
+  const yesterdayInvoices = filtered.filter((i: any) => new Date(i.createdAt) >= yesterday && new Date(i.createdAt) < today).sort(byNewest);
+  // Everything else within the selected timeframe — previously dropped entirely,
+  // which made "week/month/year" show an empty history. Capped for performance.
+  const earlierInvoices = filtered.filter((i: any) => new Date(i.createdAt) < yesterday).sort(byNewest).slice(0, 50);
 
   /* ── Swipeable sheet state ── */
   const topRef   = useRef<HTMLDivElement>(null);
@@ -339,10 +343,16 @@ export default function PropertyAnalytics() {
                   {todayInvoices.map((inv: any, i: number) => <TxRow key={inv.id} inv={inv} delay={i * 55} />)}
                 </>
               )}
-              {recentInvoices.length > 0 && (
+              {yesterdayInvoices.length > 0 && (
                 <>
-                  <p style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.14em', marginBottom: 6, marginTop: 20 }}>Recent</p>
-                  {recentInvoices.map((inv: any, i: number) => <TxRow key={inv.id} inv={inv} delay={(i + 3) * 55} />)}
+                  <p style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.14em', marginBottom: 6, marginTop: 20 }}>Yesterday</p>
+                  {yesterdayInvoices.map((inv: any, i: number) => <TxRow key={inv.id} inv={inv} delay={(i + 3) * 55} />)}
+                </>
+              )}
+              {earlierInvoices.length > 0 && (
+                <>
+                  <p style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.14em', marginBottom: 6, marginTop: 20 }}>Earlier</p>
+                  {earlierInvoices.map((inv: any, i: number) => <TxRow key={inv.id} inv={inv} delay={Math.min(i + 6, 12) * 55} />)}
                 </>
               )}
             </>
