@@ -102,7 +102,8 @@
       "Bash(gh pr *)",
       "Bash(curl -sL -o /tmp/pr2.diff -w \"HTTP %{http_code}\\\\n\" https://github.com/olliewallywally/taptpay/pull/2.diff)",
       "Bash(echo \"=== exit: $? ===\")",
-      "Bash(npm uninstall *)"
+      "Bash(npm uninstall *)",
+      "Bash(curl -s \"http://localhost:5000/src/pages/property/property-terminal.tsx\" --max-time 8)"
     ]
   },
   "model": "claude-opus-4-8"

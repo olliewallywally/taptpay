@@ -12,7 +12,10 @@
     "todo-list": 2,
     "ide-upsell-external-terminal": 2,
     "install-github-app": 2,
-    "install-slack-app": 2
+    "install-slack-app": 2,
+    "drag-and-drop-images": 2,
+    "double-esc-code-restore": 2,
+    "continue": 2
   },
   "cachedGrowthBookFeatures": {
     "tengu_slate_kestrel": true,
@@ -620,8 +623,8 @@
       "lastUsedNumStartups": 1
     },
     "superpowers@claude-plugins-official": {
-      "usageCount": 1,
-      "lastUsedAt": 1780807399689,
+      "usageCount": 2,
+      "lastUsedAt": 1780808755441,
       "lastUsedNumStartups": 2
     },
     "context7@claude-plugins-official": {
@@ -673,7 +676,10 @@
     "todo-list": 1,
     "ide-upsell-external-terminal": 1,
     "install-github-app": 1,
-    "install-slack-app": 1
+    "install-slack-app": 1,
+    "drag-and-drop-images": 1,
+    "double-esc-code-restore": 1,
+    "continue": 1
   },
   "hasSeenAutoModeEntryWarning": true,
   "skillUsage": {
@@ -681,5 +687,6 @@
       "usageCount": 1,
       "lastUsedAt": 1780808755435
     }
-  }
+  },
+  "remoteControlUpsellSeenCount": 1
 }

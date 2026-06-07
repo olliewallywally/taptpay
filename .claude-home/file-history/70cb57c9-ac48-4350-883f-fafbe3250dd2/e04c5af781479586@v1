@@ -448,21 +448,8 @@ function SendRentLink({ go, selectedTenant, amount, onSend, sending, frequency, 
         <div style={{ height: 52 }} />
       </div>
       <div className="stagger" style={{ flex: 1, background: NAVY, padding: '40px 28px 100px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        {/* Rent amount — tap to set/edit via the keypad */}
-        <div style={{ width: '100%' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <Ic.Receipt sz={15} c="rgba(88,171,255,0.7)" />
-            <span style={{ fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>rent amount</span>
-          </div>
-          <button onClick={() => (onEditAmount ? onEditAmount() : go('amount'))}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '15px 18px', borderRadius: 16, border: `1.5px solid rgba(88,171,255,0.2)`, background: 'rgba(255,255,255,0.05)', cursor: 'pointer', fontFamily: 'Outfit, system-ui' }}>
-            <span style={{ fontWeight: 700, fontSize: 24, color: amount > 0 ? BLUE : 'rgba(88,171,255,0.4)', fontVariantNumeric: 'tabular-nums' }}>{fmt(amount)}</span>
-            <span style={{ fontWeight: 600, fontSize: 12.5, color: BLUE }}>{amount > 0 ? 'edit' : 'set amount'} ›</span>
-          </button>
-        </div>
-
         {/* Channel badge */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 22px', background: 'rgba(88,171,255,0.08)', border: `1px solid rgba(88,171,255,0.2)`, borderRadius: 20, width: '100%', boxSizing: 'border-box', marginTop: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 22px', background: 'rgba(88,171,255,0.08)', border: `1px solid rgba(88,171,255,0.2)`, borderRadius: 20, width: '100%', boxSizing: 'border-box' }}>
           {channel === 'email' ? <Ic.Mail sz={22} c={BLUE} /> : <Ic.Msg sz={22} c={BLUE} />}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 4 }}>sending via {channel}</div>
@@ -470,6 +457,9 @@ function SendRentLink({ go, selectedTenant, amount, onSend, sending, frequency, 
               {dest || `tenant's ${channel}`}
             </div>
           </div>
+          <button onClick={() => (onEditAmount ? onEditAmount() : go('amount'))} style={{ color: 'rgba(88,171,255,0.7)', fontWeight: 600, fontSize: 12, background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, textDecoration: 'underline', textUnderlineOffset: 2 }}>
+            edit
+          </button>
         </div>
 
         {/* Frequency selector */}
@@ -649,7 +639,7 @@ function ChargeBill({ go, selectedTenant, amount, onEditAmount, chargeType, setC
 
         {/* CTA */}
         <div style={{ flexShrink: 0, padding: '12px 0 20px', display: 'flex', justifyContent: 'center' }}>
-          <button className="tp-cta-wire" onClick={() => ready && onSend()} disabled={!ready || sending} style={{ minWidth: 220, opacity: !ready ? 0.5 : 1, ...(sending ? { background: BLUE, color: NAVY } : {}) }}>
+          <button className="tp-cta" onClick={() => ready && onSend()} disabled={!ready || sending} style={{ minWidth: 220, opacity: (!ready || sending) ? 0.5 : 1 }}>
             {sending ? 'sending…' : 'send bill'}
           </button>
         </div>
@@ -1697,8 +1687,6 @@ const TP_TERM_CSS = `
 .tp-field::placeholder { color: rgba(4,13,109,0.35); }
 .tp-cta { display: inline-flex; align-items: center; justify-content: center; padding: 14px 36px; border-radius: 999px; background: #58ABFF; color: #040D6D; font-family: 'Outfit', system-ui; font-weight: 600; font-size: 15px; transition: transform 120ms, opacity 120ms; white-space: nowrap; border: none; cursor: pointer; box-sizing: border-box; }
 .tp-cta:active { transform: scale(0.96); opacity: 0.92; }
-.tp-cta-wire { display: inline-flex; align-items: center; justify-content: center; padding: 14px 36px; border-radius: 999px; background: transparent; color: #58ABFF; font-family: 'Outfit', system-ui; font-weight: 600; font-size: 15px; border: 1.5px solid #58ABFF; transition: background 160ms ease, color 160ms ease, transform 120ms; white-space: nowrap; cursor: pointer; box-sizing: border-box; }
-.tp-cta-wire:active { background: #58ABFF; color: #040D6D; transform: scale(0.96); }
 .tp-kp { width: 76px; height: 76px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-family: 'Outfit', system-ui; font-weight: 700; font-size: 30px; transition: transform 100ms, background 100ms; background: #58ABFF; color: #fff; border: none; cursor: pointer; }
 .tp-kp:active { transform: scale(0.92); }
 .tp-kp.outline { background: transparent; color: #58ABFF; box-shadow: inset 0 0 0 2px #58ABFF; }
@@ -1736,10 +1724,7 @@ const TP_TERM_CSS = `
 .tp-pfab { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); transition: opacity 240ms cubic-bezier(0,0,0.2,1), transform 360ms cubic-bezier(0.34,1.56,0.64,1); will-change: opacity, transform; }
 .tp-pfab.hide { opacity: 0; transform: translate(-50%, -50%) translateY(8px) scale(0.7); pointer-events: none; }
 .tp-pfab.show { opacity: 1; }
-.tp-psubbar { position: absolute; top: 50%; left: 0; right: 0; padding: 0 22px; box-sizing: border-box; transform: translateY(67px); display: flex; align-items: center; gap: 8px; transition: opacity 220ms cubic-bezier(0,0,0.2,1), transform 300ms cubic-bezier(0.4,0,0.2,1); will-change: opacity, transform; height: 37px; pointer-events: none; }
-/* Only the visible pills capture taps — the bar's empty full-width area passes
-   taps through to the screen beneath (e.g. the "send bill" CTA). */
-.tp-psubbar.show .tp-subbar, .tp-psubbar.show .tp-split-slot, .tp-psubbar.show .tp-send-slot { pointer-events: auto; }
+.tp-psubbar { position: absolute; top: 50%; left: 0; right: 0; padding: 0 22px; box-sizing: border-box; transform: translateY(67px); display: flex; align-items: center; gap: 8px; transition: opacity 220ms cubic-bezier(0,0,0.2,1), transform 300ms cubic-bezier(0.4,0,0.2,1); will-change: opacity, transform; height: 37px; }
 .tp-psubbar.hide { opacity: 0; transform: translateY(67px) scale(0.92); pointer-events: none; }
 .tp-psubbar.show { opacity: 1; }
 .tp-psubbar.feature { transform: translateY(calc(-100% - 20px)); }
