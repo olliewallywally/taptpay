@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
-import { Search, Plus, Upload, ShieldOff, X } from 'lucide-react';
+import { Search, Plus, Upload, ShieldOff, X, Radar } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 
 const SEGMENTS = ['hospitality', 'retail', 'property', 'trades', 'other'] as const;
@@ -22,6 +22,7 @@ export function LeadsList() {
   const [segmentFilter, setSegmentFilter] = useState<string>('');
   const [showImport, setShowImport] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
+  const [showSource, setShowSource] = useState(false);
 
   const { data: leads, isLoading } = useQuery<any[]>({ queryKey: ['/api/admin/leads'] });
   const { data: stats } = useQuery<{ total: number; counts: Record<string, number> }>({
@@ -61,6 +62,13 @@ export function LeadsList() {
             data-testid="button-suppression-list"
           >
             <ShieldOff className="size-4" /> Suppression
+          </button>
+          <button
+            onClick={() => setShowSource(true)}
+            className="flex items-center gap-2 bg-[#24263a] text-[#dbdfea] rounded-lg px-3 py-2 text-sm hover:bg-[#1d1e2c] transition-colors"
+            data-testid="button-find-leads"
+          >
+            <Radar className="size-4" /> Find leads
           </button>
           <button
             onClick={() => setShowImport(true)}
@@ -184,6 +192,7 @@ export function LeadsList() {
 
       {showImport && <ImportModal onClose={() => setShowImport(false)} />}
       {showAdd && <AddLeadModal onClose={() => setShowAdd(false)} />}
+      {showSource && <SourceModal onClose={() => setShowSource(false)} />}
     </div>
   );
 }
@@ -330,6 +339,95 @@ function AddLeadModal({ onClose }: { onClose: () => void }) {
           {busy ? 'Adding…' : 'Add lead'}
         </button>
       </div>
+    </ModalShell>
+  );
+}
+
+function SourceModal({ onClose }: { onClose: () => void }) {
+  const [provider, setProvider] = useState('overpass');
+  const [segment, setSegment] = useState<string>('hospitality');
+  const [region, setRegion] = useState('');
+  const [limit, setLimit] = useState('50');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [result, setResult] = useState<{ found: number; imported: number; duplicates: number; message?: string } | null>(null);
+
+  const { data: sources } = useQuery<any[]>({ queryKey: ['/api/admin/lead-sources'] });
+
+  const submit = async () => {
+    setBusy(true); setError(''); setResult(null);
+    try {
+      const res = await apiRequest('POST', '/api/admin/leads/source', {
+        provider,
+        segment: segment || undefined,
+        region: provider === 'overpass' ? region || undefined : undefined,
+        searchTerm: provider === 'nzbn' ? region || undefined : undefined,
+        limit: Number(limit) || 50,
+      });
+      setResult(await res.json());
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/leads'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/leads/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/lead-sources'] });
+    } catch (err: any) {
+      setError(err?.message?.replace(/^\d+:\s*/, '') || 'Search failed');
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <ModalShell title="Find leads" onClose={onClose}>
+      <p className="text-[#dbdfea] text-xs opacity-60 mb-3">
+        Pull businesses straight into the pipeline. Overpass (OpenStreetMap) is free, needs no key, and is strong for NZ cafés, retail and tradies. NZBN needs an API key.
+      </p>
+      <div className="space-y-3 mb-4">
+        <div className="grid grid-cols-2 gap-3">
+          <select value={provider} onChange={(e) => setProvider(e.target.value)} className="bg-[#1d1e2c] text-[#dbdfea] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0055FF]" data-testid="select-source-provider">
+            <option value="overpass">Overpass (OpenStreetMap)</option>
+            <option value="nzbn">NZBN register</option>
+          </select>
+          <select value={segment} onChange={(e) => setSegment(e.target.value)} className="bg-[#1d1e2c] text-[#dbdfea] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0055FF]" data-testid="select-source-segment">
+            {SEGMENTS.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+        <input
+          value={region}
+          onChange={(e) => setRegion(e.target.value)}
+          placeholder={provider === 'overpass' ? 'Region, e.g. Wellington' : 'Search term, e.g. café'}
+          className="w-full bg-[#1d1e2c] text-[#dbdfea] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0055FF]"
+          data-testid="input-source-region"
+        />
+        <div>
+          <label className="text-[#dbdfea] text-[10px] opacity-50 block mb-1">Max results</label>
+          <input type="number" min={1} max={200} value={limit} onChange={(e) => setLimit(e.target.value)} className="w-32 bg-[#1d1e2c] text-[#dbdfea] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0055FF]" data-testid="input-source-limit" />
+        </div>
+      </div>
+
+      {error && <p className="text-[#f87171] text-sm mb-3" data-testid="text-source-error">{error}</p>}
+      {result && (
+        <p className="text-[#4ade80] text-sm mb-3" data-testid="text-source-result">
+          {result.message ? result.message + ' ' : ''}Imported {result.imported} · {result.duplicates} duplicate(s) · {result.found} found.
+        </p>
+      )}
+
+      <div className="flex justify-end gap-2 mb-4">
+        <button onClick={onClose} className="text-[#dbdfea] text-sm px-4 py-2 hover:opacity-70">{result ? 'Done' : 'Cancel'}</button>
+        <button onClick={submit} disabled={busy || !region.trim()} className="bg-[#0055FF] text-white rounded-lg px-4 py-2 text-sm hover:bg-[#0044cc] disabled:opacity-40" data-testid="button-run-source">
+          {busy ? 'Searching…' : 'Search'}
+        </button>
+      </div>
+
+      {(sources || []).length > 0 && (
+        <div className="border-t border-[#1d1e2c] pt-3">
+          <p className="text-[#dbdfea] text-[10px] opacity-50 mb-2">Recent sources</p>
+          <div className="space-y-1">
+            {(sources || []).slice(0, 5).map((s: any) => (
+              <div key={s.id} className="flex justify-between text-xs text-[#dbdfea] opacity-70" data-testid={`source-row-${s.id}`}>
+                <span className="truncate mr-2">{s.label || s.provider}</span>
+                <span className="whitespace-nowrap">{s.totalImported}/{s.totalFound}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </ModalShell>
   );
 }

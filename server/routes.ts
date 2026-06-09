@@ -2,7 +2,7 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createLeadSchema, updateLeadSchema, importLeadsSchema, createSuppressionSchema, unsubscribeSchema } from "@shared/schema";
+import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createLeadSchema, updateLeadSchema, importLeadsSchema, createSuppressionSchema, unsubscribeSchema, sourceLeadsSchema } from "@shared/schema";
 import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, simulateCreateSession, simulateQuerySession, simulateRentSession, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, simulateAttendedTapToPay } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, createUser, getUserByEmail, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
@@ -22,6 +22,8 @@ import { resendInvoiceEmail } from "./property-cron";
 import { sendGstInvoices, extractEmails } from "./gst-invoice";
 import { parseCsv, mapCsvRows } from "./lead-engine/csv";
 import { normalizeDomain, normalizeEmail, normalizePhone, deriveDedupeKey, inferSegment } from "./lead-engine/normalize";
+import { ingestLeads } from "./lead-engine/ingest";
+import { runSource } from "./lead-engine/sources";
 
 // Store SSE connections for real-time updates (merchantId -> stoneId -> Set of connections)
 // stoneId can be null for merchant-level connections
@@ -6311,54 +6313,63 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!parsed.success) return res.status(400).json({ message: "Invalid import", errors: parsed.error.flatten() });
       const { csv, segment, label, consentBasis } = parsed.data;
 
-      const rows = mapCsvRows(parseCsv(csv));
-      if (rows.length === 0) {
+      const candidates = mapCsvRows(parseCsv(csv));
+      if (candidates.length === 0) {
         return res.status(400).json({ message: "No rows with a business name found. Include a header row with a 'business name' column." });
       }
 
-      const source = await storage.createLeadSource({
+      const result = await ingestLeads(candidates, {
         provider: "csv",
-        label: label ?? `CSV import ${new Date().toISOString().slice(0, 10)}`,
-        params: { segment: segment ?? null, rows: rows.length },
-        totalFound: rows.length,
-        totalImported: 0,
+        label,
+        params: { segment: segment ?? null, rows: candidates.length },
+        segment,
+        consentBasis: consentBasis ?? "manual",
         createdBy: req.user?.email ?? null,
       });
-
-      let imported = 0;
-      let duplicates = 0;
-      const seen = new Set<string>();
-      for (const row of rows) {
-        const dedupeKey = deriveDedupeKey(row);
-        if (seen.has(dedupeKey)) { duplicates++; continue; }
-        seen.add(dedupeKey);
-        if (await storage.getLeadByDedupeKey(dedupeKey)) { duplicates++; continue; }
-        await storage.createLead({
-          businessName: row.businessName,
-          segment: segment ?? row.segment ?? inferSegment(row.category),
-          category: row.category,
-          website: row.website,
-          domain: normalizeDomain(row.website || row.email),
-          email: normalizeEmail(row.email),
-          phone: row.phone,
-          contactName: row.contactName,
-          address: row.address,
-          suburb: row.suburb,
-          city: row.city,
-          region: row.region,
-          nzbn: row.nzbn,
-          dedupeKey,
-          sourceId: source.id,
-          consentBasis: consentBasis ?? "manual",
-          status: "new",
-        });
-        imported++;
-      }
-      await storage.updateLeadSource(source.id, { totalImported: imported });
-      res.json({ found: rows.length, imported, duplicates, sourceId: source.id });
+      res.json(result);
     } catch (error) {
       console.error("Error importing leads:", error);
       res.status(500).json({ message: "Failed to import leads" });
+    }
+  });
+
+  // NOTE: registered before /:id so "source" isn't captured as an id.
+  app.post("/api/admin/leads/source", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const parsed = sourceLeadsSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid search", errors: parsed.error.flatten() });
+      const { provider, segment, region, category, searchTerm, limit, label } = parsed.data;
+      if (provider === "overpass" && !region) return res.status(400).json({ message: 'A region is required (e.g. "Wellington").' });
+      if (provider === "nzbn" && !searchTerm && !region) return res.status(400).json({ message: "A search term is required for NZBN." });
+
+      const run = await runSource({ provider, segment, region, category, searchTerm, limit });
+      if (!run.configured) return res.status(400).json({ message: run.message || "This source isn't configured." });
+      if (run.candidates.length === 0) {
+        return res.json({ found: 0, imported: 0, duplicates: 0, sourceId: null, message: run.message || "No businesses found for that search." });
+      }
+
+      const result = await ingestLeads(run.candidates, {
+        provider,
+        label: label ?? `${provider}: ${segment ?? "all"} in ${region || searchTerm}`,
+        params: { provider, segment: segment ?? null, region: region ?? null, category: category ?? null, limit: limit ?? null },
+        segment,
+        // Lawful basis is established at enrichment, once a published email is confirmed.
+        consentBasis: undefined,
+        createdBy: req.user?.email ?? null,
+      });
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error sourcing leads:", error);
+      res.status(502).json({ message: error?.message || "Failed to source leads" });
+    }
+  });
+
+  app.get("/api/admin/lead-sources", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      res.json(await storage.getLeadSources());
+    } catch (error) {
+      console.error("Error listing lead sources:", error);
+      res.status(500).json({ message: "Failed to list lead sources" });
     }
   });
 

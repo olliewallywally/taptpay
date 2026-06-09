@@ -7,6 +7,7 @@
  */
 
 import { inferSegment } from "./normalize";
+import type { LeadCandidate } from "./types";
 
 export function parseCsv(text: string): string[][] {
   const rows: string[][] = [];
@@ -39,20 +40,8 @@ export function parseCsv(text: string): string[][] {
   return rows.filter(r => r.some(c => c.trim() !== ""));
 }
 
-export interface ParsedLeadRow {
-  businessName: string;
-  category?: string;
-  segment?: string;
-  website?: string;
-  email?: string;
-  phone?: string;
-  contactName?: string;
-  address?: string;
-  suburb?: string;
-  city?: string;
-  region?: string;
-  nzbn?: string;
-}
+// CSV rows map onto the shared LeadCandidate shape used across all sources.
+export type ParsedLeadRow = LeadCandidate;
 
 // Header (lowercased) → canonical field. Accepts common aliases.
 const HEADER_ALIASES: Record<string, keyof ParsedLeadRow> = {

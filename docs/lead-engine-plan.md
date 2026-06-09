@@ -194,10 +194,13 @@ CAC/conversion dashboard rather than just "emails sent."
   counts, detail/edit, CSV import with header-aliasing + dedupe); suppression list;
   public `/unsubscribe` + `POST /api/public/unsubscribe`; `isSuppressed()` seam for
   later sends. *Outcome: store, view, import, and suppress leads.*
-- [ ] **Phase 1 — Sourcing.** Overpass + NZBN connectors (+ optional Places); a
-  "New search" UI (segment + region + category) → dedupe → leads with
-  source/consent metadata. *Outcome: one click pulls, e.g., Wellington cafés into
-  the pipeline.*
+- [x] **Phase 1 — Sourcing.** ✅ Done. **Overpass** connector (free, keyless;
+  segment→OSM-tag presets, area search, injection-safe query builder) — live-tested
+  against the real API. **NZBN** connector gated behind `NZBN_API_KEY` (no-ops
+  cleanly when unset). Shared `ingestLeads()` path (provenance + in-batch & DB
+  dedupe + normalization) now backs both CSV and sourcing. "Find leads" search UI +
+  `POST /api/admin/leads/source` + `GET /api/admin/lead-sources` (recent runs).
+  *Outcome: one click pulls, e.g., Wellington cafés into the pipeline.*
 - [ ] **Phase 2 — Enrichment.** Website-scrape + NZBN waterfall, enrichment cache,
   signal extraction, email-confidence flag. *Outcome: leads gain emails/phones/
   socials + personalization signals.*

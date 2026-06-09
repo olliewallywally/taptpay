@@ -1033,6 +1033,17 @@ export const importLeadsSchema = z.object({
   consentBasis: optText(60),
 });
 
+// Sourcing search — pulls leads from an external connector (Overpass, NZBN…).
+export const sourceLeadsSchema = z.object({
+  provider: z.enum(["overpass", "nzbn"]),
+  segment: leadSegmentSchema.optional(),
+  region: optText(120),       // Overpass: area name, e.g. "Wellington"
+  category: optText(80),      // optional "key=value" OSM tag override
+  searchTerm: optText(120),   // NZBN: free-text search
+  limit: z.number().int().min(1).max(200).optional(),
+  label: optText(160),
+});
+
 // Manual suppression add.
 export const createSuppressionSchema = z.object({
   type: z.enum(["email", "phone", "domain"]).default("email"),
