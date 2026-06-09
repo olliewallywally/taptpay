@@ -103,7 +103,11 @@
       "Bash(curl -sL -o /tmp/pr2.diff -w \"HTTP %{http_code}\\\\n\" https://github.com/olliewallywally/taptpay/pull/2.diff)",
       "Bash(echo \"=== exit: $? ===\")",
       "Bash(npm uninstall *)",
-      "Bash(curl -s \"http://localhost:5000/src/pages/property/property-terminal.tsx\" --max-time 8)"
+      "Bash(curl -s \"http://localhost:5000/src/pages/property/property-terminal.tsx\" --max-time 8)",
+      "Bash(echo \"---EXIT $?---\")",
+      "Bash(grep -nA8 \"export async function createWindcaveRefund\" server/windcave.ts)",
+      "Bash(ls -la docs/superpowers/specs/ docs/superpowers/plans/)",
+      "Bash(grep -rl \"refund\\\\|analytics\\\\|gst-invoice\" docs/superpowers/)"
     ]
   },
   "model": "claude-opus-4-8"

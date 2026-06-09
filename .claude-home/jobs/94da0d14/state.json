@@ -1,7 +1,7 @@
 {
-  "state": "working",
+  "state": "failed",
   "detail": "Yes — memory survives now, for the same reason the plugins do. My memory lives at `~/.claude/projects/-home-runner-works",
-  "tempo": "active",
+  "tempo": "idle",
   "output": null,
   "children": null,
   "linkScanOffset": 0,
@@ -31,7 +31,7 @@
   "daemonShort": "94da0d14",
   "cwd": "/home/runner/workspace",
   "createdAt": "2026-06-04T03:42:48.402Z",
-  "updatedAt": "2026-06-04T03:42:53.989Z",
-  "firstTerminalAt": null,
+  "updatedAt": "2026-06-08T02:01:46.250Z",
+  "firstTerminalAt": "2026-06-08T02:01:46.250Z",
   "backend": "daemon"
 }
