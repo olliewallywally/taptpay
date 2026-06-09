@@ -1,4 +1,4 @@
-import { merchants, transactions, merchantSettlements, platformFees, refunds, splitPayments, taptStones, stockItems, cryptoTransactions, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, tenantProfiles, activeSchedules, invoicesRentRequests, transactionEvents, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type CryptoTransaction, type InsertCryptoTransaction, type MerchantSubscription, type SubscriptionBillingHistory } from "@shared/schema";
+import { merchants, transactions, merchantSettlements, platformFees, refunds, splitPayments, taptStones, stockItems, cryptoTransactions, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, tenantProfiles, activeSchedules, invoicesRentRequests, transactionEvents, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type CryptoTransaction, type InsertCryptoTransaction, type MerchantSubscription, type SubscriptionBillingHistory, leads, leadSources, suppressions, type Lead, type InsertLead, type LeadSource, type InsertLeadSource, type Suppression, type InsertSuppression } from "@shared/schema";
 import { getDb, isDatabaseConnected } from "./database";
 import { eq, desc, and, inArray, gte, lte, or, ilike, sql } from "drizzle-orm";
 
@@ -209,6 +209,22 @@ export interface IStorage {
   logTransactionEvent(data: any): Promise<any>;
   getTransactionEventsByTenant(tenantProfileId: string, limit?: number): Promise<any[]>;
   getTransactionEventsByInvoice(invoiceId: string): Promise<any[]>;
+
+  // ── Lead engine ────────────────────────────────────────────────────────────
+  createLeadSource(data: InsertLeadSource): Promise<LeadSource>;
+  updateLeadSource(id: number, updates: Partial<InsertLeadSource>): Promise<LeadSource | undefined>;
+  getLeadSources(): Promise<LeadSource[]>;
+  createLead(data: InsertLead): Promise<Lead>;
+  getLead(id: number): Promise<Lead | undefined>;
+  getLeadByDedupeKey(dedupeKey: string): Promise<Lead | undefined>;
+  listLeads(filter?: { status?: string; segment?: string; q?: string }): Promise<Lead[]>;
+  getLeadCountsByStatus(): Promise<Record<string, number>>;
+  updateLead(id: number, updates: Partial<InsertLead>): Promise<Lead | undefined>;
+  deleteLead(id: number): Promise<boolean>;
+  addSuppression(data: InsertSuppression): Promise<Suppression>;
+  listSuppressions(): Promise<Suppression[]>;
+  deleteSuppression(id: number): Promise<boolean>;
+  isSuppressed(values: { email?: string; phone?: string; domain?: string }): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -230,6 +246,12 @@ export class MemStorage implements IStorage {
   private currentStockItemId: number;
   private activeTransactionCache: Map<string, Transaction | null>;
   private pushSubs: any[];
+  private leads: Map<number, Lead>;
+  private leadSources: Map<number, LeadSource>;
+  private suppressions: Map<number, Suppression>;
+  private currentLeadId: number;
+  private currentLeadSourceId: number;
+  private currentSuppressionId: number;
 
   constructor() {
     this.merchants = new Map();
@@ -250,6 +272,12 @@ export class MemStorage implements IStorage {
     this.currentStockItemId = 1;
     this.currentCryptoTransactionId = 1;
     this.activeTransactionCache = new Map();
+    this.leads = new Map();
+    this.leadSources = new Map();
+    this.suppressions = new Map();
+    this.currentLeadId = 1;
+    this.currentLeadSourceId = 1;
+    this.currentSuppressionId = 1;
   }
 
   async getMerchant(id: number): Promise<Merchant | undefined> {
@@ -1614,6 +1642,145 @@ export class MemStorage implements IStorage {
   async logTransactionEvent(data: any): Promise<any> { return {}; }
   async getTransactionEventsByTenant(tenantProfileId: string, limit?: number): Promise<any[]> { return []; }
   async getTransactionEventsByInvoice(invoiceId: string): Promise<any[]> { return []; }
+
+  // ── Lead engine ────────────────────────────────────────────────────────────
+  async createLeadSource(data: InsertLeadSource): Promise<LeadSource> {
+    const id = this.currentLeadSourceId++;
+    const row: LeadSource = {
+      id,
+      provider: data.provider,
+      label: data.label ?? null,
+      params: data.params ?? null,
+      totalFound: data.totalFound ?? 0,
+      totalImported: data.totalImported ?? 0,
+      createdBy: data.createdBy ?? null,
+      createdAt: new Date(),
+    };
+    this.leadSources.set(id, row);
+    return row;
+  }
+
+  async updateLeadSource(id: number, updates: Partial<InsertLeadSource>): Promise<LeadSource | undefined> {
+    const row = this.leadSources.get(id);
+    if (!row) return undefined;
+    const updated = { ...row, ...updates } as LeadSource;
+    this.leadSources.set(id, updated);
+    return updated;
+  }
+
+  async getLeadSources(): Promise<LeadSource[]> {
+    return Array.from(this.leadSources.values()).sort((a, b) => b.id - a.id);
+  }
+
+  async createLead(data: InsertLead): Promise<Lead> {
+    const id = this.currentLeadId++;
+    const now = new Date();
+    const row: Lead = {
+      id,
+      businessName: data.businessName,
+      segment: data.segment ?? null,
+      category: data.category ?? null,
+      website: data.website ?? null,
+      domain: data.domain ?? null,
+      email: data.email ?? null,
+      phone: data.phone ?? null,
+      contactName: data.contactName ?? null,
+      address: data.address ?? null,
+      suburb: data.suburb ?? null,
+      city: data.city ?? null,
+      region: data.region ?? null,
+      country: data.country ?? "NZ",
+      nzbn: data.nzbn ?? null,
+      status: data.status ?? "new",
+      score: data.score ?? 0,
+      notes: data.notes ?? null,
+      sourceId: data.sourceId ?? null,
+      dedupeKey: data.dedupeKey,
+      consentBasis: data.consentBasis ?? null,
+      consentSourceUrl: data.consentSourceUrl ?? null,
+      lastContactedAt: data.lastContactedAt ?? null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.leads.set(id, row);
+    return row;
+  }
+
+  async getLead(id: number): Promise<Lead | undefined> {
+    return this.leads.get(id);
+  }
+
+  async getLeadByDedupeKey(dedupeKey: string): Promise<Lead | undefined> {
+    return Array.from(this.leads.values()).find(l => l.dedupeKey === dedupeKey);
+  }
+
+  async listLeads(filter?: { status?: string; segment?: string; q?: string }): Promise<Lead[]> {
+    let rows = Array.from(this.leads.values());
+    if (filter?.status) rows = rows.filter(l => l.status === filter.status);
+    if (filter?.segment) rows = rows.filter(l => l.segment === filter.segment);
+    if (filter?.q) {
+      const q = filter.q.toLowerCase();
+      rows = rows.filter(l =>
+        l.businessName.toLowerCase().includes(q) ||
+        (l.email ?? "").toLowerCase().includes(q) ||
+        (l.domain ?? "").toLowerCase().includes(q) ||
+        (l.suburb ?? "").toLowerCase().includes(q) ||
+        (l.city ?? "").toLowerCase().includes(q)
+      );
+    }
+    return rows.sort((a, b) => b.id - a.id);
+  }
+
+  async getLeadCountsByStatus(): Promise<Record<string, number>> {
+    const counts: Record<string, number> = {};
+    for (const l of Array.from(this.leads.values())) counts[l.status] = (counts[l.status] ?? 0) + 1;
+    return counts;
+  }
+
+  async updateLead(id: number, updates: Partial<InsertLead>): Promise<Lead | undefined> {
+    const row = this.leads.get(id);
+    if (!row) return undefined;
+    const updated = { ...row, ...updates, id: row.id, updatedAt: new Date() } as Lead;
+    this.leads.set(id, updated);
+    return updated;
+  }
+
+  async deleteLead(id: number): Promise<boolean> {
+    return this.leads.delete(id);
+  }
+
+  async addSuppression(data: InsertSuppression): Promise<Suppression> {
+    const existing = Array.from(this.suppressions.values()).find(s => s.type === data.type && s.value === data.value);
+    if (existing) return existing;
+    const id = this.currentSuppressionId++;
+    const row: Suppression = {
+      id,
+      type: data.type,
+      value: data.value,
+      reason: data.reason,
+      notes: data.notes ?? null,
+      createdAt: new Date(),
+    };
+    this.suppressions.set(id, row);
+    return row;
+  }
+
+  async listSuppressions(): Promise<Suppression[]> {
+    return Array.from(this.suppressions.values()).sort((a, b) => b.id - a.id);
+  }
+
+  async deleteSuppression(id: number): Promise<boolean> {
+    return this.suppressions.delete(id);
+  }
+
+  async isSuppressed(values: { email?: string; phone?: string; domain?: string }): Promise<boolean> {
+    for (const s of Array.from(this.suppressions.values())) {
+      if (s.type === "email" && values.email && s.value === values.email) return true;
+      if (s.type === "phone" && values.phone && s.value === values.phone) return true;
+      if (s.type === "domain" && values.domain && s.value === values.domain) return true;
+    }
+    return false;
+  }
 
 }
 
@@ -3163,6 +3330,107 @@ export class DatabaseStorage implements IStorage {
   async getTransactionEventsByInvoice(invoiceId: string): Promise<any[]> {
     const db = getDb(); if (!db) return [];
     return db.select().from(transactionEvents).where(eq(transactionEvents.invoiceId, invoiceId)).orderBy(desc(transactionEvents.createdAt));
+  }
+
+  // ── Lead engine ────────────────────────────────────────────────────────────
+  async createLeadSource(data: InsertLeadSource): Promise<LeadSource> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db.insert(leadSources).values(data).returning();
+    return result[0];
+  }
+
+  async updateLeadSource(id: number, updates: Partial<InsertLeadSource>): Promise<LeadSource | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db.update(leadSources).set(updates).where(eq(leadSources.id, id)).returning();
+    return result[0];
+  }
+
+  async getLeadSources(): Promise<LeadSource[]> {
+    if (!this.db) throw new Error('Database not available');
+    return await this.db.select().from(leadSources).orderBy(desc(leadSources.id));
+  }
+
+  async createLead(data: InsertLead): Promise<Lead> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db.insert(leads).values(data).returning();
+    return result[0];
+  }
+
+  async getLead(id: number): Promise<Lead | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db.select().from(leads).where(eq(leads.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getLeadByDedupeKey(dedupeKey: string): Promise<Lead | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db.select().from(leads).where(eq(leads.dedupeKey, dedupeKey)).limit(1);
+    return result[0];
+  }
+
+  async listLeads(filter?: { status?: string; segment?: string; q?: string }): Promise<Lead[]> {
+    if (!this.db) throw new Error('Database not available');
+    const conds: any[] = [];
+    if (filter?.status) conds.push(eq(leads.status, filter.status));
+    if (filter?.segment) conds.push(eq(leads.segment, filter.segment));
+    if (filter?.q) {
+      const like = `%${filter.q}%`;
+      conds.push(or(ilike(leads.businessName, like), ilike(leads.email, like), ilike(leads.domain, like), ilike(leads.suburb, like), ilike(leads.city, like)));
+    }
+    const base = this.db.select().from(leads);
+    return conds.length
+      ? await base.where(and(...conds)).orderBy(desc(leads.id))
+      : await base.orderBy(desc(leads.id));
+  }
+
+  async getLeadCountsByStatus(): Promise<Record<string, number>> {
+    if (!this.db) throw new Error('Database not available');
+    const rows = await this.db.select({ status: leads.status, count: sql<number>`count(*)::int` }).from(leads).groupBy(leads.status);
+    const counts: Record<string, number> = {};
+    for (const r of rows as Array<{ status: string; count: number }>) counts[r.status] = Number(r.count);
+    return counts;
+  }
+
+  async updateLead(id: number, updates: Partial<InsertLead>): Promise<Lead | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db.update(leads).set({ ...updates, updatedAt: new Date() }).where(eq(leads.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteLead(id: number): Promise<boolean> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db.delete(leads).where(eq(leads.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async addSuppression(data: InsertSuppression): Promise<Suppression> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db.insert(suppressions).values(data).onConflictDoNothing().returning();
+    if (result[0]) return result[0];
+    const existing = await this.db.select().from(suppressions).where(and(eq(suppressions.type, data.type), eq(suppressions.value, data.value))).limit(1);
+    return existing[0];
+  }
+
+  async listSuppressions(): Promise<Suppression[]> {
+    if (!this.db) throw new Error('Database not available');
+    return await this.db.select().from(suppressions).orderBy(desc(suppressions.id));
+  }
+
+  async deleteSuppression(id: number): Promise<boolean> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db.delete(suppressions).where(eq(suppressions.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async isSuppressed(values: { email?: string; phone?: string; domain?: string }): Promise<boolean> {
+    if (!this.db) throw new Error('Database not available');
+    const ors: any[] = [];
+    if (values.email) ors.push(and(eq(suppressions.type, "email"), eq(suppressions.value, values.email)));
+    if (values.phone) ors.push(and(eq(suppressions.type, "phone"), eq(suppressions.value, values.phone)));
+    if (values.domain) ors.push(and(eq(suppressions.type, "domain"), eq(suppressions.value, values.domain)));
+    if (!ors.length) return false;
+    const result = await this.db.select({ id: suppressions.id }).from(suppressions).where(or(...ors)).limit(1);
+    return result.length > 0;
   }
 
 }

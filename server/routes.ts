@@ -2,7 +2,7 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema } from "@shared/schema";
+import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createLeadSchema, updateLeadSchema, importLeadsSchema, createSuppressionSchema, unsubscribeSchema } from "@shared/schema";
 import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, simulateCreateSession, simulateQuerySession, simulateRentSession, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, simulateAttendedTapToPay } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, createUser, getUserByEmail, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
@@ -20,6 +20,8 @@ import fs from "fs";
 import { sendPushToMerchant } from "./push";
 import { resendInvoiceEmail } from "./property-cron";
 import { sendGstInvoices, extractEmails } from "./gst-invoice";
+import { parseCsv, mapCsvRows } from "./lead-engine/csv";
+import { normalizeDomain, normalizeEmail, normalizePhone, deriveDedupeKey, inferSegment } from "./lead-engine/normalize";
 
 // Store SSE connections for real-time updates (merchantId -> stoneId -> Set of connections)
 // stoneId can be null for merchant-level connections
@@ -6272,6 +6274,212 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
       console.error("[PROP_REMINDER_PUT]", err); res.status(500).json({ message: "Failed to update reminder settings" });
+    }
+  });
+
+  // ── Lead engine (admin cockpit) ─────────────────────────────────────────────
+  // Clay-style sourcing / enrichment / outreach. Phase 0: store, view, import and
+  // suppress leads. See docs/lead-engine-plan.md.
+
+  app.get("/api/admin/leads", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const status = typeof req.query.status === "string" ? req.query.status : undefined;
+      const segment = typeof req.query.segment === "string" ? req.query.segment : undefined;
+      const q = typeof req.query.q === "string" ? req.query.q : undefined;
+      res.json(await storage.listLeads({ status, segment, q }));
+    } catch (error) {
+      console.error("Error listing leads:", error);
+      res.status(500).json({ message: "Failed to list leads" });
+    }
+  });
+
+  // NOTE: registered before /:id so "stats" isn't captured as an id.
+  app.get("/api/admin/leads/stats", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const counts = await storage.getLeadCountsByStatus();
+      const total = Object.values(counts).reduce((a, b) => a + b, 0);
+      res.json({ total, counts });
+    } catch (error) {
+      console.error("Error fetching lead stats:", error);
+      res.status(500).json({ message: "Failed to fetch lead stats" });
+    }
+  });
+
+  app.post("/api/admin/leads/import", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const parsed = importLeadsSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid import", errors: parsed.error.flatten() });
+      const { csv, segment, label, consentBasis } = parsed.data;
+
+      const rows = mapCsvRows(parseCsv(csv));
+      if (rows.length === 0) {
+        return res.status(400).json({ message: "No rows with a business name found. Include a header row with a 'business name' column." });
+      }
+
+      const source = await storage.createLeadSource({
+        provider: "csv",
+        label: label ?? `CSV import ${new Date().toISOString().slice(0, 10)}`,
+        params: { segment: segment ?? null, rows: rows.length },
+        totalFound: rows.length,
+        totalImported: 0,
+        createdBy: req.user?.email ?? null,
+      });
+
+      let imported = 0;
+      let duplicates = 0;
+      const seen = new Set<string>();
+      for (const row of rows) {
+        const dedupeKey = deriveDedupeKey(row);
+        if (seen.has(dedupeKey)) { duplicates++; continue; }
+        seen.add(dedupeKey);
+        if (await storage.getLeadByDedupeKey(dedupeKey)) { duplicates++; continue; }
+        await storage.createLead({
+          businessName: row.businessName,
+          segment: segment ?? row.segment ?? inferSegment(row.category),
+          category: row.category,
+          website: row.website,
+          domain: normalizeDomain(row.website || row.email),
+          email: normalizeEmail(row.email),
+          phone: row.phone,
+          contactName: row.contactName,
+          address: row.address,
+          suburb: row.suburb,
+          city: row.city,
+          region: row.region,
+          nzbn: row.nzbn,
+          dedupeKey,
+          sourceId: source.id,
+          consentBasis: consentBasis ?? "manual",
+          status: "new",
+        });
+        imported++;
+      }
+      await storage.updateLeadSource(source.id, { totalImported: imported });
+      res.json({ found: rows.length, imported, duplicates, sourceId: source.id });
+    } catch (error) {
+      console.error("Error importing leads:", error);
+      res.status(500).json({ message: "Failed to import leads" });
+    }
+  });
+
+  app.get("/api/admin/leads/:id", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const lead = await storage.getLead(parseInt(req.params.id));
+      if (!lead) return res.status(404).json({ message: "Lead not found" });
+      res.json(lead);
+    } catch (error) {
+      console.error("Error fetching lead:", error);
+      res.status(500).json({ message: "Failed to fetch lead" });
+    }
+  });
+
+  app.post("/api/admin/leads", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const parsed = createLeadSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid lead", errors: parsed.error.flatten() });
+      const d = parsed.data;
+      const dedupeKey = deriveDedupeKey(d);
+      const existing = await storage.getLeadByDedupeKey(dedupeKey);
+      if (existing) return res.status(409).json({ message: "A lead for this business already exists", leadId: existing.id });
+      const lead = await storage.createLead({
+        ...d,
+        segment: d.segment ?? inferSegment(d.category),
+        email: normalizeEmail(d.email),
+        domain: normalizeDomain(d.website || d.email),
+        dedupeKey,
+        consentBasis: "manual",
+      });
+      res.status(201).json(lead);
+    } catch (error) {
+      console.error("Error creating lead:", error);
+      res.status(500).json({ message: "Failed to create lead" });
+    }
+  });
+
+  app.patch("/api/admin/leads/:id", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const parsed = updateLeadSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid update", errors: parsed.error.flatten() });
+      const id = parseInt(req.params.id);
+      if (!(await storage.getLead(id))) return res.status(404).json({ message: "Lead not found" });
+      // Strip undefined so we never null-out a field the form didn't touch.
+      const updates: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(parsed.data)) if (v !== undefined) updates[k] = v;
+      if ("email" in updates) updates.email = normalizeEmail(updates.email as string);
+      if ("website" in updates) updates.domain = normalizeDomain((updates.website as string) || (updates.email as string));
+      res.json(await storage.updateLead(id, updates));
+    } catch (error) {
+      console.error("Error updating lead:", error);
+      res.status(500).json({ message: "Failed to update lead" });
+    }
+  });
+
+  app.delete("/api/admin/leads/:id", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const ok = await storage.deleteLead(parseInt(req.params.id));
+      if (!ok) return res.status(404).json({ message: "Lead not found" });
+      res.json({ message: "Lead deleted" });
+    } catch (error) {
+      console.error("Error deleting lead:", error);
+      res.status(500).json({ message: "Failed to delete lead" });
+    }
+  });
+
+  app.get("/api/admin/suppressions", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      res.json(await storage.listSuppressions());
+    } catch (error) {
+      console.error("Error listing suppressions:", error);
+      res.status(500).json({ message: "Failed to list suppressions" });
+    }
+  });
+
+  app.post("/api/admin/suppressions", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const parsed = createSuppressionSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid suppression", errors: parsed.error.flatten() });
+      const { type, reason, notes } = parsed.data;
+      const value = type === "email" ? normalizeEmail(parsed.data.value)
+        : type === "domain" ? normalizeDomain(parsed.data.value)
+        : normalizePhone(parsed.data.value);
+      if (!value) return res.status(400).json({ message: `Invalid ${type} value` });
+      res.status(201).json(await storage.addSuppression({ type, value, reason, notes }));
+    } catch (error) {
+      console.error("Error adding suppression:", error);
+      res.status(500).json({ message: "Failed to add suppression" });
+    }
+  });
+
+  app.delete("/api/admin/suppressions/:id", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const ok = await storage.deleteSuppression(parseInt(req.params.id));
+      if (!ok) return res.status(404).json({ message: "Suppression not found" });
+      res.json({ message: "Suppression removed" });
+    } catch (error) {
+      console.error("Error deleting suppression:", error);
+      res.status(500).json({ message: "Failed to delete suppression" });
+    }
+  });
+
+  // Public unsubscribe — honours an email opt-out (UEMA 2007). Token-based
+  // unsubscribe is wired with the outreach engine (Phase 4) once tokens exist.
+  app.post("/api/public/unsubscribe", async (req, res) => {
+    try {
+      const parsed = unsubscribeSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "A valid email or token is required" });
+      const email = normalizeEmail(parsed.data.email);
+      if (!email) return res.status(400).json({ message: "A valid email is required" });
+      await storage.addSuppression({ type: "email", value: email, reason: "unsubscribed", notes: "public unsubscribe" });
+      // Best-effort: flip any matching lead to suppressed.
+      for (const l of await storage.listLeads({ q: email })) {
+        if ((l.email ?? "").toLowerCase() === email && l.status !== "suppressed") {
+          await storage.updateLead(l.id, { status: "suppressed" });
+        }
+      }
+      res.json({ message: "You have been unsubscribed." });
+    } catch (error) {
+      console.error("Error processing unsubscribe:", error);
+      res.status(500).json({ message: "Failed to unsubscribe" });
     }
   });
 

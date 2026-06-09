@@ -919,3 +919,137 @@ export type InvoiceRentRequest = typeof invoicesRentRequests.$inferSelect;
 export type InsertInvoiceRentRequest = typeof invoicesRentRequests.$inferInsert;
 export type TransactionEvent = typeof transactionEvents.$inferSelect;
 export type InsertTransactionEvent = typeof transactionEvents.$inferInsert;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LEAD ENGINE — Clay-style sourcing / enrichment / outreach pipeline
+//
+// Phase 0 (foundations): store, view, import and suppress leads. Sourcing,
+// enrichment, AI personalization and the outreach sequence engine build on
+// these tables in later phases. See docs/lead-engine-plan.md.
+//
+// Lead lifecycle (status):
+//   new → enriching → enriched → ready → enrolled → contacted → replied
+//   → converted   (became a TaptPay merchant — the win)
+//   → suppressed  (unsubscribed / bounced / do-not-contact)
+//   → rejected    (manually discarded)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Provenance of a batch of leads (a CSV import, a Google Places search, etc).
+export const leadSources = pgTable("lead_sources", {
+  id: serial("id").primaryKey(),
+  provider: text("provider").notNull(),          // csv | overpass | nzbn | places | info_pack | manual
+  label: text("label"),                           // human label, e.g. "Wellington cafés — CSV 2026-06"
+  params: jsonb("params"),                        // query params used (segment, region, category…)
+  totalFound: integer("total_found").notNull().default(0),
+  totalImported: integer("total_imported").notNull().default(0),
+  createdBy: text("created_by"),                  // admin email that ran it
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const leads = pgTable("leads", {
+  id: serial("id").primaryKey(),
+  businessName: text("business_name").notNull(),
+  segment: text("segment"),                       // hospitality | retail | property | trades | other
+  category: text("category"),                     // e.g. cafe, restaurant, plumber, property_manager
+  website: text("website"),
+  domain: text("domain"),                         // normalized registrable domain (dedupe + suppression)
+  email: text("email"),                           // primary contact email
+  phone: text("phone"),
+  contactName: text("contact_name"),
+  address: text("address"),
+  suburb: text("suburb"),
+  city: text("city"),
+  region: text("region"),
+  country: text("country").notNull().default("NZ"),
+  nzbn: text("nzbn"),                             // New Zealand Business Number
+  status: text("status").notNull().default("new"),
+  score: integer("score").notNull().default(0),   // lead quality 0-100 (set during enrichment)
+  notes: text("notes"),
+  sourceId: integer("source_id").references(() => leadSources.id),
+  dedupeKey: text("dedupe_key").notNull(),        // normalized domain, else name+suburb — avoids duplicates
+  consentBasis: text("consent_basis"),            // published_on_website | inbound | manual
+  consentSourceUrl: text("consent_source_url"),
+  lastContactedAt: timestamp("last_contacted_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+  dedupeKeyUnique: uniqueIndex("leads_dedupe_key_unique").on(t.dedupeKey),
+  statusIdx: index("leads_status_idx").on(t.status),
+  segmentIdx: index("leads_segment_idx").on(t.segment),
+  domainIdx: index("leads_domain_idx").on(t.domain),
+}));
+
+// Do-not-contact list — checked before every outreach send. A converted
+// merchant, a bounce, a complaint or an unsubscribe all land here.
+export const suppressions = pgTable("suppressions", {
+  id: serial("id").primaryKey(),
+  type: text("type").notNull(),                   // email | phone | domain
+  value: text("value").notNull(),                 // normalized email / phone / domain
+  reason: text("reason").notNull(),               // unsubscribed | bounced | complained | manual | converted
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  typeValueUnique: uniqueIndex("suppressions_type_value_unique").on(t.type, t.value),
+}));
+
+export const insertLeadSourceSchema = createInsertSchema(leadSources).omit({ id: true, createdAt: true });
+export const insertLeadSchema = createInsertSchema(leads).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertSuppressionSchema = createInsertSchema(suppressions).omit({ id: true, createdAt: true });
+
+const leadSegmentSchema = z.enum(["hospitality", "retail", "property", "trades", "other"]);
+const leadStatusSchema = z.enum([
+  "new", "enriching", "enriched", "ready", "enrolled", "contacted", "replied", "converted", "suppressed", "rejected",
+]);
+const optText = (max: number) => z.string().trim().max(max).optional().or(z.literal("")).transform(v => v || undefined);
+
+// Admin "add lead" form.
+export const createLeadSchema = z.object({
+  businessName: z.string().trim().min(1, "Business name is required").max(200),
+  segment: leadSegmentSchema.optional(),
+  category: optText(80),
+  website: optText(300),
+  email: z.string().trim().email().max(200).optional().or(z.literal("")).transform(v => v || undefined),
+  phone: optText(40),
+  contactName: optText(120),
+  address: optText(300),
+  suburb: optText(120),
+  city: optText(120),
+  region: optText(120),
+  nzbn: optText(20),
+  notes: optText(2000),
+});
+
+// Admin update — editable fields plus status / score.
+export const updateLeadSchema = createLeadSchema.partial().extend({
+  status: leadStatusSchema.optional(),
+  score: z.number().int().min(0).max(100).optional(),
+});
+
+// CSV import payload (raw CSV text + optional batch defaults).
+export const importLeadsSchema = z.object({
+  csv: z.string().min(1, "CSV content is required").max(5_000_000),
+  segment: leadSegmentSchema.optional(),
+  label: optText(160),
+  consentBasis: optText(60),
+});
+
+// Manual suppression add.
+export const createSuppressionSchema = z.object({
+  type: z.enum(["email", "phone", "domain"]).default("email"),
+  value: z.string().trim().min(1).max(200),
+  reason: z.enum(["unsubscribed", "bounced", "complained", "manual", "converted"]).default("manual"),
+  notes: optText(500),
+});
+
+// Public unsubscribe (email now; token support arrives with the outreach engine).
+export const unsubscribeSchema = z.object({
+  email: z.string().trim().email().max(200).optional(),
+  token: z.string().trim().max(120).optional(),
+}).refine(d => d.email || d.token, { message: "email or token is required" });
+
+export type LeadSource = typeof leadSources.$inferSelect;
+export type InsertLeadSource = typeof leadSources.$inferInsert;
+export type Lead = typeof leads.$inferSelect;
+export type InsertLead = typeof leads.$inferInsert;
+export type Suppression = typeof suppressions.$inferSelect;
+export type InsertSuppression = typeof suppressions.$inferInsert;

@@ -49,6 +49,7 @@ const TenantProfile         = lazy(() => import("@/pages/property/tenant-profile
 const PropertyAnalytics     = lazy(() => import("@/pages/property/property-analytics"));
 const RentCheckout          = lazy(() => import("@/pages/property/rent-checkout"));
 const PropertyTerminal      = lazy(() => import("@/pages/property/property-terminal"));
+const Unsubscribe           = lazy(() => import("@/pages/Unsubscribe"));
 
 function PageLoader() {
   return (
@@ -220,6 +221,7 @@ function Router() {
         <Switch>
           <Route path="/" component={LandingPage} />
           <Route path="/info" component={InfoPage} />
+          <Route path="/unsubscribe" component={Unsubscribe} />
           <Route path="/business-details" component={BusinessDetails} />
           <Route path="/check-email" component={CheckEmail} />
           <Route path="/confirm-email" component={ConfirmEmail} />

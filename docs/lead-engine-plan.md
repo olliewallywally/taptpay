@@ -189,9 +189,11 @@ CAC/conversion dashboard rather than just "emails sent."
 
 ## 7. Phasing
 
-- [ ] **Phase 0 — Foundations.** New tables + migration; admin "Leads" nav; lead
-  list/detail; CSV import; suppression list + unsubscribe route. *Outcome: store,
-  view, import, and suppress leads.*
+- [x] **Phase 0 — Foundations.** ✅ Done. `leads` / `lead_sources` / `suppressions`
+  tables + migration `0007`; admin **Leads** cockpit (list + filters + pipeline
+  counts, detail/edit, CSV import with header-aliasing + dedupe); suppression list;
+  public `/unsubscribe` + `POST /api/public/unsubscribe`; `isSuppressed()` seam for
+  later sends. *Outcome: store, view, import, and suppress leads.*
 - [ ] **Phase 1 — Sourcing.** Overpass + NZBN connectors (+ optional Places); a
   "New search" UI (segment + region + category) → dedupe → leads with
   source/consent metadata. *Outcome: one click pulls, e.g., Wellington cafés into
