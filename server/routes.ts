@@ -2,7 +2,7 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createLeadSchema, updateLeadSchema, importLeadsSchema, createSuppressionSchema, unsubscribeSchema, sourceLeadsSchema } from "@shared/schema";
+import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createLeadSchema, updateLeadSchema, importLeadsSchema, createSuppressionSchema, unsubscribeSchema, sourceLeadsSchema, enrichLeadsSchema } from "@shared/schema";
 import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, simulateCreateSession, simulateQuerySession, simulateRentSession, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, simulateAttendedTapToPay } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, createUser, getUserByEmail, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
@@ -24,6 +24,7 @@ import { parseCsv, mapCsvRows } from "./lead-engine/csv";
 import { normalizeDomain, normalizeEmail, normalizePhone, deriveDedupeKey, inferSegment } from "./lead-engine/normalize";
 import { ingestLeads } from "./lead-engine/ingest";
 import { runSource } from "./lead-engine/sources";
+import { enrichLead, enrichLeads } from "./lead-engine/enrichment";
 
 // Store SSE connections for real-time updates (merchantId -> stoneId -> Set of connections)
 // stoneId can be null for merchant-level connections
@@ -6370,6 +6371,29 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     } catch (error) {
       console.error("Error listing lead sources:", error);
       res.status(500).json({ message: "Failed to list lead sources" });
+    }
+  });
+
+  // Bulk-enrich the oldest leads in a status (default "new"). Sequential + polite.
+  app.post("/api/admin/leads/enrich", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const parsed = enrichLeadsSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid request", errors: parsed.error.flatten() });
+      const result = await enrichLeads({ status: parsed.data.status ?? "new", limit: parsed.data.limit ?? 10 });
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error bulk-enriching leads:", error);
+      res.status(500).json({ message: error?.message || "Failed to enrich leads" });
+    }
+  });
+
+  app.post("/api/admin/leads/:id/enrich", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const lead = await enrichLead(parseInt(req.params.id));
+      res.json(lead);
+    } catch (error: any) {
+      console.error("Error enriching lead:", error);
+      res.status(error?.message === "Lead not found" ? 404 : 500).json({ message: error?.message || "Failed to enrich lead" });
     }
   });
 

@@ -1,4 +1,4 @@
-import { merchants, transactions, merchantSettlements, platformFees, refunds, splitPayments, taptStones, stockItems, cryptoTransactions, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, tenantProfiles, activeSchedules, invoicesRentRequests, transactionEvents, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type CryptoTransaction, type InsertCryptoTransaction, type MerchantSubscription, type SubscriptionBillingHistory, leads, leadSources, suppressions, type Lead, type InsertLead, type LeadSource, type InsertLeadSource, type Suppression, type InsertSuppression } from "@shared/schema";
+import { merchants, transactions, merchantSettlements, platformFees, refunds, splitPayments, taptStones, stockItems, cryptoTransactions, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, tenantProfiles, activeSchedules, invoicesRentRequests, transactionEvents, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type CryptoTransaction, type InsertCryptoTransaction, type MerchantSubscription, type SubscriptionBillingHistory, leads, leadSources, suppressions, type Lead, type InsertLead, type LeadSource, type InsertLeadSource, type Suppression, type InsertSuppression, enrichmentCache, type EnrichmentCache, type InsertEnrichmentCache } from "@shared/schema";
 import { getDb, isDatabaseConnected } from "./database";
 import { eq, desc, and, inArray, gte, lte, or, ilike, sql } from "drizzle-orm";
 
@@ -225,6 +225,8 @@ export interface IStorage {
   listSuppressions(): Promise<Suppression[]>;
   deleteSuppression(id: number): Promise<boolean>;
   isSuppressed(values: { email?: string; phone?: string; domain?: string }): Promise<boolean>;
+  getEnrichmentByDomain(domain: string): Promise<EnrichmentCache | undefined>;
+  upsertEnrichment(data: InsertEnrichmentCache): Promise<EnrichmentCache>;
 }
 
 export class MemStorage implements IStorage {
@@ -252,6 +254,8 @@ export class MemStorage implements IStorage {
   private currentLeadId: number;
   private currentLeadSourceId: number;
   private currentSuppressionId: number;
+  private enrichments: Map<number, EnrichmentCache>;
+  private currentEnrichmentId: number;
 
   constructor() {
     this.merchants = new Map();
@@ -278,6 +282,8 @@ export class MemStorage implements IStorage {
     this.currentLeadId = 1;
     this.currentLeadSourceId = 1;
     this.currentSuppressionId = 1;
+    this.enrichments = new Map();
+    this.currentEnrichmentId = 1;
   }
 
   async getMerchant(id: number): Promise<Merchant | undefined> {
@@ -1699,6 +1705,12 @@ export class MemStorage implements IStorage {
       consentBasis: data.consentBasis ?? null,
       consentSourceUrl: data.consentSourceUrl ?? null,
       lastContactedAt: data.lastContactedAt ?? null,
+      linkedinUrl: data.linkedinUrl ?? null,
+      facebookUrl: data.facebookUrl ?? null,
+      instagramUrl: data.instagramUrl ?? null,
+      signals: data.signals ?? null,
+      emailConfidence: data.emailConfidence ?? null,
+      enrichedAt: data.enrichedAt ?? null,
       createdAt: now,
       updatedAt: now,
     };
@@ -1780,6 +1792,30 @@ export class MemStorage implements IStorage {
       if (s.type === "domain" && values.domain && s.value === values.domain) return true;
     }
     return false;
+  }
+
+  async getEnrichmentByDomain(domain: string): Promise<EnrichmentCache | undefined> {
+    return Array.from(this.enrichments.values()).find((e) => e.domain === domain);
+  }
+
+  async upsertEnrichment(data: InsertEnrichmentCache): Promise<EnrichmentCache> {
+    const existing = Array.from(this.enrichments.values()).find((e) => e.domain === data.domain);
+    if (existing) {
+      const updated = { ...existing, ...data, fetchedAt: new Date() } as EnrichmentCache;
+      this.enrichments.set(existing.id, updated);
+      return updated;
+    }
+    const id = this.currentEnrichmentId++;
+    const row: EnrichmentCache = {
+      id,
+      domain: data.domain,
+      url: data.url ?? null,
+      status: data.status,
+      payload: data.payload ?? null,
+      fetchedAt: new Date(),
+    };
+    this.enrichments.set(id, row);
+    return row;
   }
 
 }
@@ -3431,6 +3467,25 @@ export class DatabaseStorage implements IStorage {
     if (!ors.length) return false;
     const result = await this.db.select({ id: suppressions.id }).from(suppressions).where(or(...ors)).limit(1);
     return result.length > 0;
+  }
+
+  async getEnrichmentByDomain(domain: string): Promise<EnrichmentCache | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const r = await this.db.select().from(enrichmentCache).where(eq(enrichmentCache.domain, domain)).limit(1);
+    return r[0];
+  }
+
+  async upsertEnrichment(data: InsertEnrichmentCache): Promise<EnrichmentCache> {
+    if (!this.db) throw new Error('Database not available');
+    const r = await this.db
+      .insert(enrichmentCache)
+      .values(data)
+      .onConflictDoUpdate({
+        target: enrichmentCache.domain,
+        set: { url: data.url, status: data.status, payload: data.payload as any, fetchedAt: new Date() },
+      })
+      .returning();
+    return r[0];
   }
 
 }

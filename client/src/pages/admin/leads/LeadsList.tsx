@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
-import { Search, Plus, Upload, ShieldOff, X, Radar } from 'lucide-react';
+import { Search, Plus, Upload, ShieldOff, X, Radar, Sparkles } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 
 const SEGMENTS = ['hospitality', 'retail', 'property', 'trades', 'other'] as const;
@@ -23,6 +23,8 @@ export function LeadsList() {
   const [showImport, setShowImport] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [showSource, setShowSource] = useState(false);
+  const [enriching, setEnriching] = useState(false);
+  const [enrichMsg, setEnrichMsg] = useState('');
 
   const { data: leads, isLoading } = useQuery<any[]>({ queryKey: ['/api/admin/leads'] });
   const { data: stats } = useQuery<{ total: number; counts: Record<string, number> }>({
@@ -45,6 +47,19 @@ export function LeadsList() {
 
   const counts = stats?.counts || {};
 
+  const runEnrich = async () => {
+    setEnriching(true); setEnrichMsg('');
+    try {
+      const res = await apiRequest('POST', '/api/admin/leads/enrich', { status: 'new', limit: 10 });
+      const r = await res.json();
+      setEnrichMsg(`Enriched ${r.processed} · ${r.withEmail} with email · ${r.failed} failed`);
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/leads'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/leads/stats'] });
+    } catch (err: any) {
+      setEnrichMsg(err?.message?.replace(/^\d+:\s*/, '') || 'Enrich failed');
+    } finally { setEnriching(false); }
+  };
+
   return (
     <div className="min-h-screen bg-[#1a1b2e] p-4 md:p-6">
       {/* Header */}
@@ -54,6 +69,7 @@ export function LeadsList() {
           <p className="text-[#dbdfea] text-xs opacity-60 mt-1">
             {stats?.total ?? leads?.length ?? 0} in pipeline
           </p>
+          {enrichMsg && <p className="text-[#00E5CC] text-xs mt-1" data-testid="text-enrich-msg">{enrichMsg}</p>}
         </div>
         <div className="flex gap-2 flex-wrap">
           <button
@@ -62,6 +78,14 @@ export function LeadsList() {
             data-testid="button-suppression-list"
           >
             <ShieldOff className="size-4" /> Suppression
+          </button>
+          <button
+            onClick={runEnrich}
+            disabled={enriching}
+            className="flex items-center gap-2 bg-[#24263a] text-[#00E5CC] rounded-lg px-3 py-2 text-sm hover:bg-[#1d1e2c] transition-colors disabled:opacity-40"
+            data-testid="button-enrich-new"
+          >
+            <Sparkles className="size-4" /> {enriching ? 'Enriching…' : 'Enrich new'}
           </button>
           <button
             onClick={() => setShowSource(true)}

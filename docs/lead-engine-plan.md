@@ -201,9 +201,15 @@ CAC/conversion dashboard rather than just "emails sent."
   dedupe + normalization) now backs both CSV and sourcing. "Find leads" search UI +
   `POST /api/admin/leads/source` + `GET /api/admin/lead-sources` (recent runs).
   *Outcome: one click pulls, e.g., Wellington cafés into the pipeline.*
-- [ ] **Phase 2 — Enrichment.** Website-scrape + NZBN waterfall, enrichment cache,
-  signal extraction, email-confidence flag. *Outcome: leads gain emails/phones/
-  socials + personalization signals.*
+- [x] **Phase 2 — Enrichment.** ✅ Done. Polite, dependency-free **website scraper**
+  (robots-aware, capped pages/size/time, `User-Agent`) extracts emails/phones/
+  socials + a signals blurb; results cached by domain (`enrichment_cache`, 30-day
+  TTL). Waterfall picks the best email with **brand-root matching** (handles
+  `.com`/`.co.nz`), sets `email_confidence` and — only when found on the business's
+  own site — `consentBasis: "published_on_website"`; then **scores** the lead and
+  promotes `new → ready/enriched`. `POST /api/admin/leads/:id/enrich` + bulk
+  `/enrich`; cockpit "Enrich" actions + enrichment panel. Live-tested end-to-end.
+  *Outcome: leads gain emails/phones/socials + personalization signals.*
 - [ ] **Phase 3 — AI personalization.** Anthropic SDK + prompts + per-lead opener
   with fallback + a review/approve step in the cockpit. *Outcome: each lead has an
   on-brand drafted message.*

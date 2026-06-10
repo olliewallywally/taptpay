@@ -970,6 +970,13 @@ export const leads = pgTable("leads", {
   consentBasis: text("consent_basis"),            // published_on_website | inbound | manual
   consentSourceUrl: text("consent_source_url"),
   lastContactedAt: timestamp("last_contacted_at"),
+  // Enrichment outputs (Phase 2)
+  linkedinUrl: text("linkedin_url"),
+  facebookUrl: text("facebook_url"),
+  instagramUrl: text("instagram_url"),
+  signals: text("signals"),                       // short personalization blurb (title/desc/keywords)
+  emailConfidence: text("email_confidence"),      // high | medium | low | none
+  enrichedAt: timestamp("enriched_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (t) => ({
@@ -1064,3 +1071,26 @@ export type Lead = typeof leads.$inferSelect;
 export type InsertLead = typeof leads.$inferInsert;
 export type Suppression = typeof suppressions.$inferSelect;
 export type InsertSuppression = typeof suppressions.$inferInsert;
+
+// Cache of website-scrape results, keyed by domain, so the same site isn't
+// re-fetched for every lead and re-enrichment stays rate-limit friendly.
+export const enrichmentCache = pgTable("enrichment_cache", {
+  id: serial("id").primaryKey(),
+  domain: text("domain").notNull(),
+  url: text("url"),
+  status: text("status").notNull(),              // ok | failed | blocked | no_site
+  payload: jsonb("payload"),                      // parsed ScrapeResult
+  fetchedAt: timestamp("fetched_at").defaultNow(),
+}, (t) => ({
+  domainUnique: uniqueIndex("enrichment_cache_domain_unique").on(t.domain),
+}));
+
+export const insertEnrichmentSchema = createInsertSchema(enrichmentCache).omit({ id: true, fetchedAt: true });
+export type EnrichmentCache = typeof enrichmentCache.$inferSelect;
+export type InsertEnrichmentCache = typeof enrichmentCache.$inferInsert;
+
+// Enrichment request (single lead via /:id/enrich, or a bulk batch).
+export const enrichLeadsSchema = z.object({
+  status: leadStatusSchema.optional(),
+  limit: z.number().int().min(1).max(25).optional(),
+});

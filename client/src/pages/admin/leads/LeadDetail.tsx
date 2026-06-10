@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
-import { ArrowLeft, Trash2, ShieldOff, Save } from 'lucide-react';
+import { ArrowLeft, Trash2, ShieldOff, Save, Sparkles } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
+
+const CONF_COLOR: Record<string, string> = {
+  high: 'text-[#4ade80]', medium: 'text-[#fbbf24]', low: 'text-[#f59e0b]', none: 'text-[#94a3b8]',
+};
 
 const STATUSES = [
   'new', 'enriching', 'enriched', 'ready', 'enrolled', 'contacted', 'replied', 'converted', 'suppressed', 'rejected',
@@ -80,6 +84,17 @@ export function LeadDetail({ leadId }: { leadId: string }) {
     } finally { setBusy(false); }
   };
 
+  const enrich = async () => {
+    setBusy(true);
+    try {
+      await apiRequest('POST', `/api/admin/leads/${leadId}/enrich`);
+      invalidate();
+      flash('Enriched');
+    } catch (err: any) {
+      flash(err?.message?.replace(/^\d+:\s*/, '') || 'Enrich failed');
+    } finally { setBusy(false); }
+  };
+
   const remove = async () => {
     if (!confirm('Delete this lead permanently?')) return;
     setBusy(true);
@@ -117,6 +132,9 @@ export function LeadDetail({ leadId }: { leadId: string }) {
         </button>
         <div className="flex items-center gap-2">
           {msg && <span className="text-[#4ade80] text-sm" data-testid="text-detail-msg">{msg}</span>}
+          <button onClick={enrich} disabled={busy} className="flex items-center gap-2 bg-[#24263a] text-[#00E5CC] rounded-lg px-3 py-2 text-sm hover:bg-[#1d1e2c] disabled:opacity-40" data-testid="button-enrich-lead">
+            <Sparkles className="size-4" /> Enrich
+          </button>
           <button onClick={suppress} disabled={busy} className="flex items-center gap-2 bg-[#24263a] text-[#f87171] rounded-lg px-3 py-2 text-sm hover:bg-[#1d1e2c] disabled:opacity-40" data-testid="button-suppress-lead">
             <ShieldOff className="size-4" /> Suppress
           </button>
@@ -164,6 +182,46 @@ export function LeadDetail({ leadId }: { leadId: string }) {
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="w-full bg-[#1d1e2c] text-[#dbdfea] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0055FF]" data-testid="textarea-detail-notes" />
           </div>
         </div>
+      </div>
+
+      {/* Enrichment */}
+      <div className="bg-[#24263a] rounded-lg p-4 mt-4" data-testid="card-enrichment">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[#dbdfea] text-xs opacity-60">Enrichment</p>
+          <span className="text-[#dbdfea] text-[10px] opacity-40">
+            {lead.enrichedAt ? `last run ${new Date(lead.enrichedAt).toLocaleString('en-NZ')}` : 'not enriched yet'}
+          </span>
+        </div>
+        <div className="grid sm:grid-cols-4 gap-4">
+          <div>
+            <p className="text-[#dbdfea] text-[10px] opacity-50 mb-1">Score</p>
+            <p className="text-2xl text-[#0055FF]" data-testid="text-lead-score">{lead.score ?? 0}</p>
+          </div>
+          <div>
+            <p className="text-[#dbdfea] text-[10px] opacity-50 mb-1">Email confidence</p>
+            <p className={`text-sm capitalize ${CONF_COLOR[lead.emailConfidence] || 'text-[#dbdfea]'}`} data-testid="text-email-confidence">{lead.emailConfidence || '—'}</p>
+          </div>
+          <div className="sm:col-span-2">
+            <p className="text-[#dbdfea] text-[10px] opacity-50 mb-1">Socials</p>
+            <div className="flex gap-3 flex-wrap">
+              {lead.facebookUrl && <a href={lead.facebookUrl} target="_blank" rel="noreferrer" className="text-[#0055FF] text-sm hover:underline">Facebook</a>}
+              {lead.instagramUrl && <a href={lead.instagramUrl} target="_blank" rel="noreferrer" className="text-[#0055FF] text-sm hover:underline">Instagram</a>}
+              {lead.linkedinUrl && <a href={lead.linkedinUrl} target="_blank" rel="noreferrer" className="text-[#0055FF] text-sm hover:underline">LinkedIn</a>}
+              {!lead.facebookUrl && !lead.instagramUrl && !lead.linkedinUrl && <span className="text-[#dbdfea] text-sm opacity-40">—</span>}
+            </div>
+          </div>
+        </div>
+        {lead.signals && (
+          <div className="mt-3">
+            <p className="text-[#dbdfea] text-[10px] opacity-50 mb-1">Signals</p>
+            <p className="text-[#dbdfea] text-sm opacity-80" data-testid="text-signals">{lead.signals}</p>
+          </div>
+        )}
+        {lead.consentBasis && (
+          <p className="text-[#dbdfea] text-[10px] opacity-40 mt-3">
+            Consent basis: {lead.consentBasis}{lead.consentSourceUrl ? ` · ${lead.consentSourceUrl}` : ''}
+          </p>
+        )}
       </div>
     </div>
   );
