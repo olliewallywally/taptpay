@@ -219,10 +219,18 @@ CAC/conversion dashboard rather than just "emails sent."
   `draft_*` columns at status "draft"; cockpit has per-lead generate/edit/**approve**
   and a bulk "Draft ready". `POST /api/admin/leads/:id/personalize` + bulk `/personalize`.
   *Outcome: each lead has an on-brand drafted message, gated by human approval.*
-- [ ] **Phase 4 — Outreach engine.** Campaigns + multi-step sequences, scheduler,
-  compliant email send from the separate domain (unsubscribe, throttles,
-  bounce/reply handling), WhatsApp step. *Outcome: enrolled leads get a compliant
-  multi-touch sequence; replies auto-pause it.*
+- [x] **Phase 4 — Outreach engine.** ✅ Done. `campaigns` / `campaign_steps` /
+  `campaign_enrollments` / `outreach_messages` (migration 0010). Multi-step
+  sequences (per-step `dayOffset`, channel, and `lead_draft` vs merge-field
+  `template`); eligibility-gated enroll; a cron pass (`runOutreachPass`, wired into
+  `/api/internal/cron`) that sends due steps within a per-campaign daily cap,
+  advances/​completes enrollments, and marks leads `contacted`. **Compliance enforced
+  at send**: suppression + consent-basis re-checked, one-click unsubscribe (token →
+  suppress + stop), separate sending identity (`OUTREACH_FROM_EMAIL`), dry-run when
+  unconfigured (`LEAD_OUTREACH_DRY_RUN`). WhatsApp step via Evolution; provider
+  webhook + manual "mark replied" auto-pause. Campaigns cockpit (list, builder,
+  enroll, enrollments). Live-tested end-to-end in dry-run. *Outcome: enrolled leads
+  get a compliant multi-touch sequence; replies/bounces/unsubscribes stop it.*
 - [ ] **Phase 5 — Analytics & scale.** Funnel metrics (sourced → enriched → sent →
   opened → replied → converted), per-segment/campaign reporting; then optional
   upgrades (job queue, paid enrichment, SMS/LinkedIn) once there's budget.

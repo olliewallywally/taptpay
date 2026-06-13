@@ -1109,3 +1109,121 @@ export const personalizeLeadsSchema = z.object({
   status: leadStatusSchema.optional(),
   limit: z.number().int().min(1).max(15).optional(),
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OUTREACH ENGINE (Phase 4)
+// Campaigns hold an ordered set of steps; leads are enrolled and a cron pass
+// sends due steps (compliant: suppression + consent checked at send time),
+// advancing each enrollment until a reply/bounce/unsubscribe pauses it, or it
+// completes. See docs/lead-engine-plan.md.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const campaigns = pgTable("campaigns", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  segment: text("segment"),                              // optional target segment (informational)
+  status: text("status").notNull().default("draft"),    // draft | active | paused | archived
+  channel: text("channel").notNull().default("email"),  // primary channel (informational; steps carry their own)
+  dailyCap: integer("daily_cap").notNull().default(50),  // max sends per day for this campaign
+  fromIdentity: text("from_identity"),                   // optional override of OUTREACH_FROM_EMAIL
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const campaignSteps = pgTable("campaign_steps", {
+  id: serial("id").primaryKey(),
+  campaignId: integer("campaign_id").references(() => campaigns.id).notNull(),
+  stepOrder: integer("step_order").notNull(),
+  dayOffset: integer("day_offset").notNull().default(0), // days after enrollment this step is due
+  channel: text("channel").notNull().default("email"),   // email | whatsapp
+  source: text("source").notNull().default("template"), // lead_draft | template
+  subject: text("subject"),                              // template email subject (merge fields)
+  body: text("body"),                                    // template body (merge fields)
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  campaignOrderIdx: index("campaign_steps_campaign_order_idx").on(t.campaignId, t.stepOrder),
+}));
+
+export const campaignEnrollments = pgTable("campaign_enrollments", {
+  id: serial("id").primaryKey(),
+  campaignId: integer("campaign_id").references(() => campaigns.id).notNull(),
+  leadId: integer("lead_id").references(() => leads.id).notNull(),
+  status: text("status").notNull().default("active"),    // active|paused|replied|bounced|completed|unsubscribed|failed
+  currentStep: integer("current_step").notNull().default(0),
+  nextSendAt: timestamp("next_send_at"),
+  enrolledAt: timestamp("enrolled_at").defaultNow(),
+  lastSentAt: timestamp("last_sent_at"),
+  completedAt: timestamp("completed_at"),
+  note: text("note"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+  campaignLeadUnique: uniqueIndex("enrollments_campaign_lead_unique").on(t.campaignId, t.leadId),
+  statusNextIdx: index("enrollments_status_next_idx").on(t.status, t.nextSendAt),
+}));
+
+export const outreachMessages = pgTable("outreach_messages", {
+  id: serial("id").primaryKey(),
+  enrollmentId: integer("enrollment_id").references(() => campaignEnrollments.id).notNull(),
+  campaignId: integer("campaign_id").notNull(),
+  leadId: integer("lead_id").notNull(),
+  stepOrder: integer("step_order").notNull(),
+  channel: text("channel").notNull(),
+  toAddress: text("to_address").notNull(),
+  subject: text("subject"),
+  body: text("body"),
+  status: text("status").notNull().default("queued"),   // queued|sent|failed|bounced|complained
+  providerId: text("provider_id"),
+  unsubscribeToken: text("unsubscribe_token"),
+  error: text("error"),
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  tokenUnique: uniqueIndex("outreach_messages_token_unique").on(t.unsubscribeToken),
+  campaignSentIdx: index("outreach_messages_campaign_sent_idx").on(t.campaignId, t.sentAt),
+}));
+
+export const insertCampaignSchema = createInsertSchema(campaigns).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertCampaignStepSchema = createInsertSchema(campaignSteps).omit({ id: true, createdAt: true });
+export const insertEnrollmentSchema = createInsertSchema(campaignEnrollments).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertOutreachMessageSchema = createInsertSchema(outreachMessages).omit({ id: true, createdAt: true });
+
+export const createCampaignSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(160),
+  segment: leadSegmentSchema.optional(),
+  channel: z.enum(["email", "whatsapp"]).default("email"),
+  dailyCap: z.number().int().min(1).max(1000).default(50),
+  fromIdentity: optText(200),
+});
+
+export const updateCampaignSchema = z.object({
+  name: z.string().trim().min(1).max(160).optional(),
+  segment: leadSegmentSchema.optional(),
+  status: z.enum(["draft", "active", "paused", "archived"]).optional(),
+  dailyCap: z.number().int().min(1).max(1000).optional(),
+  fromIdentity: optText(200),
+});
+
+export const createCampaignStepSchema = z.object({
+  dayOffset: z.number().int().min(0).max(365).default(0),
+  channel: z.enum(["email", "whatsapp"]).default("email"),
+  source: z.enum(["lead_draft", "template"]).default("template"),
+  subject: optText(300),
+  body: optText(5000),
+});
+
+export const enrollLeadsSchema = z.object({
+  status: leadStatusSchema.optional(),                  // lead pipeline status to pull from (default "ready")
+  leadIds: z.array(z.number().int()).max(1000).optional(),
+  limit: z.number().int().min(1).max(1000).optional(),
+});
+
+export type Campaign = typeof campaigns.$inferSelect;
+export type InsertCampaign = typeof campaigns.$inferInsert;
+export type CampaignStep = typeof campaignSteps.$inferSelect;
+export type InsertCampaignStep = typeof campaignSteps.$inferInsert;
+export type CampaignEnrollment = typeof campaignEnrollments.$inferSelect;
+export type InsertCampaignEnrollment = typeof campaignEnrollments.$inferInsert;
+export type OutreachMessage = typeof outreachMessages.$inferSelect;
+export type InsertOutreachMessage = typeof outreachMessages.$inferInsert;

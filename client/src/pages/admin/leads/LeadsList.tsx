@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
-import { Search, Plus, Upload, ShieldOff, X, Radar, Sparkles, PenLine } from 'lucide-react';
+import { Search, Plus, Upload, ShieldOff, X, Radar, Sparkles, PenLine, Send } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 
 const SEGMENTS = ['hospitality', 'retail', 'property', 'trades', 'other'] as const;
@@ -93,6 +93,13 @@ export function LeadsList() {
             data-testid="button-suppression-list"
           >
             <ShieldOff className="size-4" /> Suppression
+          </button>
+          <button
+            onClick={() => setLocation('/campaigns')}
+            className="flex items-center gap-2 bg-[#24263a] text-[#dbdfea] rounded-lg px-3 py-2 text-sm hover:bg-[#1d1e2c] transition-colors"
+            data-testid="button-campaigns"
+          >
+            <Send className="size-4" /> Campaigns
           </button>
           <button
             onClick={runEnrich}

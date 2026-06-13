@@ -1,5 +1,5 @@
 import { useLocation, Route, Switch } from 'wouter';
-import { Home, Users, Settings, Code, BarChart3, LogOut, Target } from 'lucide-react';
+import { Home, Users, Settings, Code, BarChart3, LogOut, Target, Send } from 'lucide-react';
 import logoImage from "@assets/logo_1762915255857.png";
 
 // Import admin sub-pages (we'll create these next)
@@ -11,6 +11,8 @@ import { Analytics } from './Analytics';
 import { LeadsList } from './leads/LeadsList';
 import { LeadDetail } from './leads/LeadDetail';
 import { Suppression } from './leads/Suppression';
+import { Campaigns } from './leads/Campaigns';
+import { CampaignDetail } from './leads/CampaignDetail';
 
 export default function AdminDashboard() {
   const [location, setLocation] = useLocation();
@@ -134,6 +136,16 @@ export default function AdminDashboard() {
               Leads
             </button>
             <button
+              onClick={() => setLocation('/campaigns')}
+              className={`w-full flex items-center gap-3 px-6 py-3 text-[#dbdfea] text-[10px] transition-colors ${
+                isActive('/campaigns') ? 'bg-[#1d1e2c]' : 'hover:bg-[#1d1e2c]'
+              }`}
+              data-testid="sidebar-admin-campaigns"
+            >
+              <Send className="size-3.5" />
+              Campaigns
+            </button>
+            <button
               onClick={() => setLocation('/api')}
               className={`w-full flex items-center gap-3 px-6 py-3 text-[#dbdfea] text-[10px] transition-colors ${
                 isActive('/api') ? 'bg-[#1d1e2c]' : 'hover:bg-[#1d1e2c]'
@@ -191,6 +203,10 @@ export default function AdminDashboard() {
             {(params) => <LeadDetail leadId={params.id} />}
           </Route>
           <Route path="/suppression" component={Suppression} />
+          <Route path="/campaigns" component={Campaigns} />
+          <Route path="/campaigns/:id">
+            {(params) => <CampaignDetail campaignId={params.id} />}
+          </Route>
           <Route path="/api" component={APIManagement} />
           <Route path="/analytics" component={Analytics} />
           <Route path="/web-analytics" component={Analytics} />

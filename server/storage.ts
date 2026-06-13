@@ -1,4 +1,4 @@
-import { merchants, transactions, merchantSettlements, platformFees, refunds, splitPayments, taptStones, stockItems, cryptoTransactions, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, tenantProfiles, activeSchedules, invoicesRentRequests, transactionEvents, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type CryptoTransaction, type InsertCryptoTransaction, type MerchantSubscription, type SubscriptionBillingHistory, leads, leadSources, suppressions, type Lead, type InsertLead, type LeadSource, type InsertLeadSource, type Suppression, type InsertSuppression, enrichmentCache, type EnrichmentCache, type InsertEnrichmentCache } from "@shared/schema";
+import { merchants, transactions, merchantSettlements, platformFees, refunds, splitPayments, taptStones, stockItems, cryptoTransactions, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, tenantProfiles, activeSchedules, invoicesRentRequests, transactionEvents, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type CryptoTransaction, type InsertCryptoTransaction, type MerchantSubscription, type SubscriptionBillingHistory, leads, leadSources, suppressions, type Lead, type InsertLead, type LeadSource, type InsertLeadSource, type Suppression, type InsertSuppression, enrichmentCache, type EnrichmentCache, type InsertEnrichmentCache, campaigns, campaignSteps, campaignEnrollments, outreachMessages, type Campaign, type InsertCampaign, type CampaignStep, type InsertCampaignStep, type CampaignEnrollment, type InsertCampaignEnrollment, type OutreachMessage, type InsertOutreachMessage } from "@shared/schema";
 import { getDb, isDatabaseConnected } from "./database";
 import { eq, desc, and, inArray, gte, lte, or, ilike, sql } from "drizzle-orm";
 
@@ -227,6 +227,24 @@ export interface IStorage {
   isSuppressed(values: { email?: string; phone?: string; domain?: string }): Promise<boolean>;
   getEnrichmentByDomain(domain: string): Promise<EnrichmentCache | undefined>;
   upsertEnrichment(data: InsertEnrichmentCache): Promise<EnrichmentCache>;
+
+  // ── Outreach engine ────────────────────────────────────────────────────────
+  createCampaign(data: InsertCampaign): Promise<Campaign>;
+  getCampaign(id: number): Promise<Campaign | undefined>;
+  listCampaigns(): Promise<Campaign[]>;
+  updateCampaign(id: number, updates: Partial<InsertCampaign>): Promise<Campaign | undefined>;
+  createCampaignStep(data: InsertCampaignStep): Promise<CampaignStep>;
+  getCampaignSteps(campaignId: number): Promise<CampaignStep[]>;
+  deleteCampaignStep(id: number): Promise<boolean>;
+  createEnrollment(data: InsertCampaignEnrollment): Promise<CampaignEnrollment>;
+  getEnrollment(id: number): Promise<CampaignEnrollment | undefined>;
+  getEnrollmentByLeadCampaign(campaignId: number, leadId: number): Promise<CampaignEnrollment | undefined>;
+  listEnrollmentsByCampaign(campaignId: number): Promise<CampaignEnrollment[]>;
+  getDueEnrollments(now: Date, limit: number): Promise<CampaignEnrollment[]>;
+  updateEnrollment(id: number, updates: Partial<InsertCampaignEnrollment>): Promise<CampaignEnrollment | undefined>;
+  createOutreachMessage(data: InsertOutreachMessage): Promise<OutreachMessage>;
+  getOutreachMessageByToken(token: string): Promise<OutreachMessage | undefined>;
+  countCampaignMessagesSince(campaignId: number, since: Date): Promise<number>;
 }
 
 export class MemStorage implements IStorage {
@@ -256,6 +274,14 @@ export class MemStorage implements IStorage {
   private currentSuppressionId: number;
   private enrichments: Map<number, EnrichmentCache>;
   private currentEnrichmentId: number;
+  private campaigns: Map<number, Campaign>;
+  private campaignSteps: Map<number, CampaignStep>;
+  private enrollments: Map<number, CampaignEnrollment>;
+  private outreachMessages: Map<number, OutreachMessage>;
+  private currentCampaignId: number;
+  private currentCampaignStepId: number;
+  private currentEnrollmentId: number;
+  private currentOutreachMessageId: number;
 
   constructor() {
     this.merchants = new Map();
@@ -284,6 +310,14 @@ export class MemStorage implements IStorage {
     this.currentSuppressionId = 1;
     this.enrichments = new Map();
     this.currentEnrichmentId = 1;
+    this.campaigns = new Map();
+    this.campaignSteps = new Map();
+    this.enrollments = new Map();
+    this.outreachMessages = new Map();
+    this.currentCampaignId = 1;
+    this.currentCampaignStepId = 1;
+    this.currentEnrollmentId = 1;
+    this.currentOutreachMessageId = 1;
   }
 
   async getMerchant(id: number): Promise<Merchant | undefined> {
@@ -1821,6 +1855,142 @@ export class MemStorage implements IStorage {
     };
     this.enrichments.set(id, row);
     return row;
+  }
+
+  // ── Outreach engine ────────────────────────────────────────────────────────
+  async createCampaign(data: InsertCampaign): Promise<Campaign> {
+    const id = this.currentCampaignId++;
+    const now = new Date();
+    const row: Campaign = {
+      id,
+      name: data.name,
+      segment: data.segment ?? null,
+      status: data.status ?? "draft",
+      channel: data.channel ?? "email",
+      dailyCap: data.dailyCap ?? 50,
+      fromIdentity: data.fromIdentity ?? null,
+      createdBy: data.createdBy ?? null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.campaigns.set(id, row);
+    return row;
+  }
+
+  async getCampaign(id: number): Promise<Campaign | undefined> { return this.campaigns.get(id); }
+
+  async listCampaigns(): Promise<Campaign[]> {
+    return Array.from(this.campaigns.values()).sort((a, b) => b.id - a.id);
+  }
+
+  async updateCampaign(id: number, updates: Partial<InsertCampaign>): Promise<Campaign | undefined> {
+    const row = this.campaigns.get(id);
+    if (!row) return undefined;
+    const updated = { ...row, ...updates, id: row.id, updatedAt: new Date() } as Campaign;
+    this.campaigns.set(id, updated);
+    return updated;
+  }
+
+  async createCampaignStep(data: InsertCampaignStep): Promise<CampaignStep> {
+    const id = this.currentCampaignStepId++;
+    const row: CampaignStep = {
+      id,
+      campaignId: data.campaignId,
+      stepOrder: data.stepOrder,
+      dayOffset: data.dayOffset ?? 0,
+      channel: data.channel ?? "email",
+      source: data.source ?? "template",
+      subject: data.subject ?? null,
+      body: data.body ?? null,
+      createdAt: new Date(),
+    };
+    this.campaignSteps.set(id, row);
+    return row;
+  }
+
+  async getCampaignSteps(campaignId: number): Promise<CampaignStep[]> {
+    return Array.from(this.campaignSteps.values()).filter((s) => s.campaignId === campaignId).sort((a, b) => a.stepOrder - b.stepOrder);
+  }
+
+  async deleteCampaignStep(id: number): Promise<boolean> { return this.campaignSteps.delete(id); }
+
+  async createEnrollment(data: InsertCampaignEnrollment): Promise<CampaignEnrollment> {
+    const id = this.currentEnrollmentId++;
+    const now = new Date();
+    const row: CampaignEnrollment = {
+      id,
+      campaignId: data.campaignId,
+      leadId: data.leadId,
+      status: data.status ?? "active",
+      currentStep: data.currentStep ?? 0,
+      nextSendAt: data.nextSendAt ?? null,
+      enrolledAt: data.enrolledAt ?? now,
+      lastSentAt: data.lastSentAt ?? null,
+      completedAt: data.completedAt ?? null,
+      note: data.note ?? null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.enrollments.set(id, row);
+    return row;
+  }
+
+  async getEnrollment(id: number): Promise<CampaignEnrollment | undefined> { return this.enrollments.get(id); }
+
+  async getEnrollmentByLeadCampaign(campaignId: number, leadId: number): Promise<CampaignEnrollment | undefined> {
+    return Array.from(this.enrollments.values()).find((e) => e.campaignId === campaignId && e.leadId === leadId);
+  }
+
+  async listEnrollmentsByCampaign(campaignId: number): Promise<CampaignEnrollment[]> {
+    return Array.from(this.enrollments.values()).filter((e) => e.campaignId === campaignId).sort((a, b) => b.id - a.id);
+  }
+
+  async getDueEnrollments(now: Date, limit: number): Promise<CampaignEnrollment[]> {
+    return Array.from(this.enrollments.values())
+      .filter((e) => e.status === "active" && e.nextSendAt != null && new Date(e.nextSendAt).getTime() <= now.getTime())
+      .sort((a, b) => new Date(a.nextSendAt as Date).getTime() - new Date(b.nextSendAt as Date).getTime())
+      .slice(0, limit);
+  }
+
+  async updateEnrollment(id: number, updates: Partial<InsertCampaignEnrollment>): Promise<CampaignEnrollment | undefined> {
+    const row = this.enrollments.get(id);
+    if (!row) return undefined;
+    const updated = { ...row, ...updates, id: row.id, updatedAt: new Date() } as CampaignEnrollment;
+    this.enrollments.set(id, updated);
+    return updated;
+  }
+
+  async createOutreachMessage(data: InsertOutreachMessage): Promise<OutreachMessage> {
+    const id = this.currentOutreachMessageId++;
+    const row: OutreachMessage = {
+      id,
+      enrollmentId: data.enrollmentId,
+      campaignId: data.campaignId,
+      leadId: data.leadId,
+      stepOrder: data.stepOrder,
+      channel: data.channel,
+      toAddress: data.toAddress,
+      subject: data.subject ?? null,
+      body: data.body ?? null,
+      status: data.status ?? "queued",
+      providerId: data.providerId ?? null,
+      unsubscribeToken: data.unsubscribeToken ?? null,
+      error: data.error ?? null,
+      sentAt: data.sentAt ?? null,
+      createdAt: new Date(),
+    };
+    this.outreachMessages.set(id, row);
+    return row;
+  }
+
+  async getOutreachMessageByToken(token: string): Promise<OutreachMessage | undefined> {
+    return Array.from(this.outreachMessages.values()).find((m) => m.unsubscribeToken === token);
+  }
+
+  async countCampaignMessagesSince(campaignId: number, since: Date): Promise<number> {
+    return Array.from(this.outreachMessages.values()).filter(
+      (m) => m.campaignId === campaignId && m.status === "sent" && m.sentAt != null && new Date(m.sentAt).getTime() >= since.getTime(),
+    ).length;
   }
 
 }
@@ -3491,6 +3661,103 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return r[0];
+  }
+
+  // ── Outreach engine ────────────────────────────────────────────────────────
+  async createCampaign(data: InsertCampaign): Promise<Campaign> {
+    if (!this.db) throw new Error('Database not available');
+    const r = await this.db.insert(campaigns).values(data).returning();
+    return r[0];
+  }
+
+  async getCampaign(id: number): Promise<Campaign | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const r = await this.db.select().from(campaigns).where(eq(campaigns.id, id)).limit(1);
+    return r[0];
+  }
+
+  async listCampaigns(): Promise<Campaign[]> {
+    if (!this.db) throw new Error('Database not available');
+    return await this.db.select().from(campaigns).orderBy(desc(campaigns.id));
+  }
+
+  async updateCampaign(id: number, updates: Partial<InsertCampaign>): Promise<Campaign | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const r = await this.db.update(campaigns).set({ ...updates, updatedAt: new Date() }).where(eq(campaigns.id, id)).returning();
+    return r[0];
+  }
+
+  async createCampaignStep(data: InsertCampaignStep): Promise<CampaignStep> {
+    if (!this.db) throw new Error('Database not available');
+    const r = await this.db.insert(campaignSteps).values(data).returning();
+    return r[0];
+  }
+
+  async getCampaignSteps(campaignId: number): Promise<CampaignStep[]> {
+    if (!this.db) throw new Error('Database not available');
+    return await this.db.select().from(campaignSteps).where(eq(campaignSteps.campaignId, campaignId)).orderBy(campaignSteps.stepOrder);
+  }
+
+  async deleteCampaignStep(id: number): Promise<boolean> {
+    if (!this.db) throw new Error('Database not available');
+    const r = await this.db.delete(campaignSteps).where(eq(campaignSteps.id, id)).returning();
+    return r.length > 0;
+  }
+
+  async createEnrollment(data: InsertCampaignEnrollment): Promise<CampaignEnrollment> {
+    if (!this.db) throw new Error('Database not available');
+    const r = await this.db.insert(campaignEnrollments).values(data).returning();
+    return r[0];
+  }
+
+  async getEnrollment(id: number): Promise<CampaignEnrollment | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const r = await this.db.select().from(campaignEnrollments).where(eq(campaignEnrollments.id, id)).limit(1);
+    return r[0];
+  }
+
+  async getEnrollmentByLeadCampaign(campaignId: number, leadId: number): Promise<CampaignEnrollment | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const r = await this.db.select().from(campaignEnrollments)
+      .where(and(eq(campaignEnrollments.campaignId, campaignId), eq(campaignEnrollments.leadId, leadId))).limit(1);
+    return r[0];
+  }
+
+  async listEnrollmentsByCampaign(campaignId: number): Promise<CampaignEnrollment[]> {
+    if (!this.db) throw new Error('Database not available');
+    return await this.db.select().from(campaignEnrollments).where(eq(campaignEnrollments.campaignId, campaignId)).orderBy(desc(campaignEnrollments.id));
+  }
+
+  async getDueEnrollments(now: Date, limit: number): Promise<CampaignEnrollment[]> {
+    if (!this.db) throw new Error('Database not available');
+    return await this.db.select().from(campaignEnrollments)
+      .where(and(eq(campaignEnrollments.status, "active"), lte(campaignEnrollments.nextSendAt, now)))
+      .orderBy(campaignEnrollments.nextSendAt).limit(limit);
+  }
+
+  async updateEnrollment(id: number, updates: Partial<InsertCampaignEnrollment>): Promise<CampaignEnrollment | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const r = await this.db.update(campaignEnrollments).set({ ...updates, updatedAt: new Date() }).where(eq(campaignEnrollments.id, id)).returning();
+    return r[0];
+  }
+
+  async createOutreachMessage(data: InsertOutreachMessage): Promise<OutreachMessage> {
+    if (!this.db) throw new Error('Database not available');
+    const r = await this.db.insert(outreachMessages).values(data).returning();
+    return r[0];
+  }
+
+  async getOutreachMessageByToken(token: string): Promise<OutreachMessage | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const r = await this.db.select().from(outreachMessages).where(eq(outreachMessages.unsubscribeToken, token)).limit(1);
+    return r[0];
+  }
+
+  async countCampaignMessagesSince(campaignId: number, since: Date): Promise<number> {
+    if (!this.db) throw new Error('Database not available');
+    const r = await this.db.select({ n: sql<number>`count(*)::int` }).from(outreachMessages)
+      .where(and(eq(outreachMessages.campaignId, campaignId), eq(outreachMessages.status, "sent"), gte(outreachMessages.sentAt, since)));
+    return Number((r[0] as { n: number } | undefined)?.n || 0);
   }
 
 }
