@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
-import { Search, Plus, Upload, ShieldOff, X, Radar, Sparkles } from 'lucide-react';
+import { Search, Plus, Upload, ShieldOff, X, Radar, Sparkles, PenLine } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 
 const SEGMENTS = ['hospitality', 'retail', 'property', 'trades', 'other'] as const;
@@ -25,6 +25,8 @@ export function LeadsList() {
   const [showSource, setShowSource] = useState(false);
   const [enriching, setEnriching] = useState(false);
   const [enrichMsg, setEnrichMsg] = useState('');
+  const [drafting, setDrafting] = useState(false);
+  const [draftMsg, setDraftMsg] = useState('');
 
   const { data: leads, isLoading } = useQuery<any[]>({ queryKey: ['/api/admin/leads'] });
   const { data: stats } = useQuery<{ total: number; counts: Record<string, number> }>({
@@ -60,6 +62,18 @@ export function LeadsList() {
     } finally { setEnriching(false); }
   };
 
+  const runDraft = async () => {
+    setDrafting(true); setDraftMsg('');
+    try {
+      const res = await apiRequest('POST', '/api/admin/leads/personalize', { status: 'ready', limit: 8 });
+      const r = await res.json();
+      setDraftMsg(`Drafted ${r.drafted}/${r.processed}${r.usedAi ? '' : ' (template — set ANTHROPIC_API_KEY for AI)'}`);
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/leads'] });
+    } catch (err: any) {
+      setDraftMsg(err?.message?.replace(/^\d+:\s*/, '') || 'Draft failed');
+    } finally { setDrafting(false); }
+  };
+
   return (
     <div className="min-h-screen bg-[#1a1b2e] p-4 md:p-6">
       {/* Header */}
@@ -70,6 +84,7 @@ export function LeadsList() {
             {stats?.total ?? leads?.length ?? 0} in pipeline
           </p>
           {enrichMsg && <p className="text-[#00E5CC] text-xs mt-1" data-testid="text-enrich-msg">{enrichMsg}</p>}
+          {draftMsg && <p className="text-[#00E5CC] text-xs mt-1" data-testid="text-draft-msg">{draftMsg}</p>}
         </div>
         <div className="flex gap-2 flex-wrap">
           <button
@@ -86,6 +101,14 @@ export function LeadsList() {
             data-testid="button-enrich-new"
           >
             <Sparkles className="size-4" /> {enriching ? 'Enriching…' : 'Enrich new'}
+          </button>
+          <button
+            onClick={runDraft}
+            disabled={drafting}
+            className="flex items-center gap-2 bg-[#24263a] text-[#00E5CC] rounded-lg px-3 py-2 text-sm hover:bg-[#1d1e2c] transition-colors disabled:opacity-40"
+            data-testid="button-draft-ready"
+          >
+            <PenLine className="size-4" /> {drafting ? 'Drafting…' : 'Draft ready'}
           </button>
           <button
             onClick={() => setShowSource(true)}

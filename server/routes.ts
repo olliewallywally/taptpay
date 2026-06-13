@@ -2,7 +2,7 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createLeadSchema, updateLeadSchema, importLeadsSchema, createSuppressionSchema, unsubscribeSchema, sourceLeadsSchema, enrichLeadsSchema } from "@shared/schema";
+import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createLeadSchema, updateLeadSchema, importLeadsSchema, createSuppressionSchema, unsubscribeSchema, sourceLeadsSchema, enrichLeadsSchema, personalizeLeadsSchema } from "@shared/schema";
 import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, simulateCreateSession, simulateQuerySession, simulateRentSession, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, simulateAttendedTapToPay } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, createUser, getUserByEmail, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
@@ -25,6 +25,7 @@ import { normalizeDomain, normalizeEmail, normalizePhone, deriveDedupeKey, infer
 import { ingestLeads } from "./lead-engine/ingest";
 import { runSource } from "./lead-engine/sources";
 import { enrichLead, enrichLeads } from "./lead-engine/enrichment";
+import { personalizeLead, personalizeLeads } from "./lead-engine/personalize";
 
 // Store SSE connections for real-time updates (merchantId -> stoneId -> Set of connections)
 // stoneId can be null for merchant-level connections
@@ -6394,6 +6395,30 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     } catch (error: any) {
       console.error("Error enriching lead:", error);
       res.status(error?.message === "Lead not found" ? 404 : 500).json({ message: error?.message || "Failed to enrich lead" });
+    }
+  });
+
+  // AI personalization: draft an outreach message. Falls back to a template when
+  // ANTHROPIC_API_KEY isn't set. Drafts start at "draft" for human review.
+  app.post("/api/admin/leads/personalize", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const parsed = personalizeLeadsSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid request", errors: parsed.error.flatten() });
+      const result = await personalizeLeads({ status: parsed.data.status ?? "ready", limit: parsed.data.limit ?? 8 });
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error personalizing leads:", error);
+      res.status(500).json({ message: error?.message || "Failed to personalize leads" });
+    }
+  });
+
+  app.post("/api/admin/leads/:id/personalize", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const lead = await personalizeLead(parseInt(req.params.id));
+      res.json(lead);
+    } catch (error: any) {
+      console.error("Error personalizing lead:", error);
+      res.status(error?.message === "Lead not found" ? 404 : 500).json({ message: error?.message || "Failed to personalize lead" });
     }
   });
 

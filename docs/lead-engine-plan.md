@@ -210,9 +210,15 @@ CAC/conversion dashboard rather than just "emails sent."
   promotes `new → ready/enriched`. `POST /api/admin/leads/:id/enrich` + bulk
   `/enrich`; cockpit "Enrich" actions + enrichment panel. Live-tested end-to-end.
   *Outcome: leads gain emails/phones/socials + personalization signals.*
-- [ ] **Phase 3 — AI personalization.** Anthropic SDK + prompts + per-lead opener
-  with fallback + a review/approve step in the cockpit. *Outcome: each lead has an
-  on-brand drafted message.*
+- [x] **Phase 3 — AI personalization.** ✅ Done. `@anthropic-ai/sdk` with **Haiku**
+  (`claude-haiku-4-5`, cap-able via `LEAD_AI_MODEL`/`LEAD_AI_ENABLED`, tight
+  `max_tokens`) drafts a subject+body per lead from enriched signals, with
+  guardrails (use-only-provided-facts, finished copy, NZ tone, soft CTA) and
+  defensive JSON parsing. **Degrades to a segment template** when no
+  `ANTHROPIC_API_KEY` is set, so the pipeline never breaks. Drafts persist to
+  `draft_*` columns at status "draft"; cockpit has per-lead generate/edit/**approve**
+  and a bulk "Draft ready". `POST /api/admin/leads/:id/personalize` + bulk `/personalize`.
+  *Outcome: each lead has an on-brand drafted message, gated by human approval.*
 - [ ] **Phase 4 — Outreach engine.** Campaigns + multi-step sequences, scheduler,
   compliant email send from the separate domain (unsubscribe, throttles,
   bounce/reply handling), WhatsApp step. *Outcome: enrolled leads get a compliant

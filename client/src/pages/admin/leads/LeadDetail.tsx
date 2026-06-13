@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
-import { ArrowLeft, Trash2, ShieldOff, Save, Sparkles } from 'lucide-react';
+import { ArrowLeft, Trash2, ShieldOff, Save, Sparkles, PenLine, Check } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 
 const CONF_COLOR: Record<string, string> = {
@@ -34,6 +34,8 @@ export function LeadDetail({ leadId }: { leadId: string }) {
   const [status, setStatus] = useState('new');
   const [segment, setSegment] = useState('');
   const [notes, setNotes] = useState('');
+  const [draftSubject, setDraftSubject] = useState('');
+  const [draftBody, setDraftBody] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
 
@@ -45,6 +47,8 @@ export function LeadDetail({ leadId }: { leadId: string }) {
     setStatus(lead.status || 'new');
     setSegment(lead.segment || '');
     setNotes(lead.notes ?? '');
+    setDraftSubject(lead.draftSubject ?? '');
+    setDraftBody(lead.draftBody ?? '');
   }, [lead]);
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -61,7 +65,7 @@ export function LeadDetail({ leadId }: { leadId: string }) {
   const save = async () => {
     setBusy(true);
     try {
-      await apiRequest('PATCH', `/api/admin/leads/${leadId}`, { ...form, status, segment: segment || undefined, notes });
+      await apiRequest('PATCH', `/api/admin/leads/${leadId}`, { ...form, status, segment: segment || undefined, notes, draftSubject, draftBody });
       invalidate();
       flash('Saved');
     } catch (err: any) {
@@ -92,6 +96,29 @@ export function LeadDetail({ leadId }: { leadId: string }) {
       flash('Enriched');
     } catch (err: any) {
       flash(err?.message?.replace(/^\d+:\s*/, '') || 'Enrich failed');
+    } finally { setBusy(false); }
+  };
+
+  const generateDraft = async () => {
+    setBusy(true);
+    try {
+      const res = await apiRequest('POST', `/api/admin/leads/${leadId}/personalize`);
+      const updated = await res.json();
+      invalidate();
+      flash(updated?.draftModel === 'template' ? 'Drafted (template — set ANTHROPIC_API_KEY for AI)' : 'Drafted');
+    } catch (err: any) {
+      flash(err?.message?.replace(/^\d+:\s*/, '') || 'Draft failed');
+    } finally { setBusy(false); }
+  };
+
+  const setDraftApproval = async (approved: boolean) => {
+    setBusy(true);
+    try {
+      await apiRequest('PATCH', `/api/admin/leads/${leadId}`, { draftSubject, draftBody, draftStatus: approved ? 'approved' : 'draft' });
+      invalidate();
+      flash(approved ? 'Draft approved' : 'Approval cleared');
+    } catch (err: any) {
+      flash(err?.message?.replace(/^\d+:\s*/, '') || 'Update failed');
     } finally { setBusy(false); }
   };
 
@@ -222,6 +249,32 @@ export function LeadDetail({ leadId }: { leadId: string }) {
             Consent basis: {lead.consentBasis}{lead.consentSourceUrl ? ` · ${lead.consentSourceUrl}` : ''}
           </p>
         )}
+      </div>
+
+      {/* Outreach draft */}
+      <div className="bg-[#24263a] rounded-lg p-4 mt-4" data-testid="card-draft">
+        <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <p className="text-[#dbdfea] text-xs opacity-60">Outreach draft</p>
+            {lead.draftStatus === 'approved'
+              ? <span className="text-[#4ade80] text-[10px]">approved</span>
+              : lead.draftStatus === 'draft'
+                ? <span className="text-[#fbbf24] text-[10px]">draft</span>
+                : <span className="text-[#dbdfea] text-[10px] opacity-40">none</span>}
+            {lead.draftModel && <span className="text-[#dbdfea] text-[10px] opacity-40">· {lead.draftModel}</span>}
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={generateDraft} disabled={busy} className="flex items-center gap-2 bg-[#1d1e2c] text-[#00E5CC] rounded-lg px-3 py-1.5 text-sm hover:bg-[#15161f] disabled:opacity-40" data-testid="button-generate-draft">
+              <PenLine className="size-4" /> {lead.draftSubject ? 'Regenerate' : 'Generate'}
+            </button>
+            {lead.draftStatus === 'approved'
+              ? <button onClick={() => setDraftApproval(false)} disabled={busy} className="bg-[#1d1e2c] text-[#dbdfea] rounded-lg px-3 py-1.5 text-sm hover:bg-[#15161f] disabled:opacity-40" data-testid="button-unapprove-draft">Unapprove</button>
+              : <button onClick={() => setDraftApproval(true)} disabled={busy || !draftBody.trim()} className="flex items-center gap-2 bg-[#0055FF] text-white rounded-lg px-3 py-1.5 text-sm hover:bg-[#0044cc] disabled:opacity-40" data-testid="button-approve-draft"><Check className="size-4" /> Approve</button>}
+          </div>
+        </div>
+        <input value={draftSubject} onChange={(e) => setDraftSubject(e.target.value)} placeholder="Subject" className="w-full bg-[#1d1e2c] text-[#dbdfea] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0055FF] mb-2" data-testid="input-draft-subject" />
+        <textarea value={draftBody} onChange={(e) => setDraftBody(e.target.value)} placeholder="Generate a draft, then edit and approve before it can be sent." rows={8} className="w-full bg-[#1d1e2c] text-[#dbdfea] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0055FF]" data-testid="textarea-draft-body" />
+        <p className="text-[#dbdfea] text-[10px] opacity-40 mt-2">Edits save with the lead's Save button; Approve also saves the current text.</p>
       </div>
     </div>
   );

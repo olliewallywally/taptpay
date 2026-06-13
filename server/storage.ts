@@ -1711,6 +1711,11 @@ export class MemStorage implements IStorage {
       signals: data.signals ?? null,
       emailConfidence: data.emailConfidence ?? null,
       enrichedAt: data.enrichedAt ?? null,
+      draftSubject: data.draftSubject ?? null,
+      draftBody: data.draftBody ?? null,
+      draftStatus: data.draftStatus ?? null,
+      draftModel: data.draftModel ?? null,
+      draftGeneratedAt: data.draftGeneratedAt ?? null,
       createdAt: now,
       updatedAt: now,
     };

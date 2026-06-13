@@ -977,6 +977,12 @@ export const leads = pgTable("leads", {
   signals: text("signals"),                       // short personalization blurb (title/desc/keywords)
   emailConfidence: text("email_confidence"),      // high | medium | low | none
   enrichedAt: timestamp("enriched_at"),
+  // AI personalization (Phase 3) — the drafted outreach message
+  draftSubject: text("draft_subject"),
+  draftBody: text("draft_body"),
+  draftStatus: text("draft_status"),               // none | draft | approved
+  draftModel: text("draft_model"),                 // model id, or "template" when AI fell back
+  draftGeneratedAt: timestamp("draft_generated_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (t) => ({
@@ -1026,10 +1032,13 @@ export const createLeadSchema = z.object({
   notes: optText(2000),
 });
 
-// Admin update — editable fields plus status / score.
+// Admin update — editable fields plus status / score / draft.
 export const updateLeadSchema = createLeadSchema.partial().extend({
   status: leadStatusSchema.optional(),
   score: z.number().int().min(0).max(100).optional(),
+  draftSubject: z.string().max(300).optional(),
+  draftBody: z.string().max(5000).optional(),
+  draftStatus: z.enum(["none", "draft", "approved"]).optional(),
 });
 
 // CSV import payload (raw CSV text + optional batch defaults).
@@ -1093,4 +1102,10 @@ export type InsertEnrichmentCache = typeof enrichmentCache.$inferInsert;
 export const enrichLeadsSchema = z.object({
   status: leadStatusSchema.optional(),
   limit: z.number().int().min(1).max(25).optional(),
+});
+
+// AI personalization request (bulk batch; single lead uses /:id/personalize).
+export const personalizeLeadsSchema = z.object({
+  status: leadStatusSchema.optional(),
+  limit: z.number().int().min(1).max(15).optional(),
 });
