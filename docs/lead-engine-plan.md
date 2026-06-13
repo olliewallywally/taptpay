@@ -5,9 +5,11 @@ prospective TaptPay merchants — built **inside this repo on free / self-hosted
 tooling**, run from an admin cockpit, with NZ compliance and email deliverability
 designed in from day one.
 
-> **Status:** proposal / not yet built. This doc is the source of truth for scope
-> and phasing. Tick items off as they land (same convention as
-> `docs/whatsapp-evolution-api-plan.md` and the remediation plan).
+> **Status:** ✅ Phases 0–5 shipped on branch `claude/pensive-babbage-pt12n6`. The
+> engine runs in the existing cron path, but **email sending is dry-run (simulated)
+> until `OUTREACH_FROM_EMAIL` is set** and AI drafts fall back to templates until
+> `ANTHROPIC_API_KEY` is set — so nothing sends for real or costs anything until you
+> opt in. This doc remains the source of truth for scope and phasing.
 
 ---
 
@@ -231,9 +233,17 @@ CAC/conversion dashboard rather than just "emails sent."
   webhook + manual "mark replied" auto-pause. Campaigns cockpit (list, builder,
   enroll, enrollments). Live-tested end-to-end in dry-run. *Outcome: enrolled leads
   get a compliant multi-touch sequence; replies/bounces/unsubscribes stop it.*
-- [ ] **Phase 5 — Analytics & scale.** Funnel metrics (sourced → enriched → sent →
-  opened → replied → converted), per-segment/campaign reporting; then optional
-  upgrades (job queue, paid enrichment, SMS/LinkedIn) once there's budget.
+- [x] **Phase 5 — Analytics & conversion loop.** ✅ Done. `GET /api/admin/leads/analytics`
+  assembles the pipeline funnel, per-segment and per-campaign performance, send stats
+  and AI-draft counts → an **Insights** dashboard. Conversion loop: a cron
+  `runConversionPass` (email-match against merchants) auto-marks leads `converted`
+  (+ suppresses, stopping outreach), plus a manual "Converted" button; attribution
+  flows through each lead's source + campaign links. Live-tested end-to-end.
+  *Outcome: a real CAC/funnel view, and leads that become merchants close the loop
+  automatically.*
+  - Remaining optional upgrades (when there's budget/volume): a job queue/worker for
+    sourcing+enrichment+sends, paid enrichment (Apollo/Hunter), and SMS/LinkedIn
+    channels — the channel + source interfaces are already stubbed for these.
 
 ---
 

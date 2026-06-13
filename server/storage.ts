@@ -245,6 +245,7 @@ export interface IStorage {
   createOutreachMessage(data: InsertOutreachMessage): Promise<OutreachMessage>;
   getOutreachMessageByToken(token: string): Promise<OutreachMessage | undefined>;
   countCampaignMessagesSince(campaignId: number, since: Date): Promise<number>;
+  getOutreachMessageStats(): Promise<{ total: number; sent: number; failed: number; emailSent: number; whatsappSent: number; last7dSent: number }>;
 }
 
 export class MemStorage implements IStorage {
@@ -1991,6 +1992,21 @@ export class MemStorage implements IStorage {
     return Array.from(this.outreachMessages.values()).filter(
       (m) => m.campaignId === campaignId && m.status === "sent" && m.sentAt != null && new Date(m.sentAt).getTime() >= since.getTime(),
     ).length;
+  }
+
+  async getOutreachMessageStats(): Promise<{ total: number; sent: number; failed: number; emailSent: number; whatsappSent: number; last7dSent: number }> {
+    const all = Array.from(this.outreachMessages.values());
+    const weekAgo = Date.now() - 7 * 86_400_000;
+    let sent = 0, failed = 0, emailSent = 0, whatsappSent = 0, last7dSent = 0;
+    for (const m of all) {
+      if (m.status === "sent") {
+        sent++;
+        if (m.channel === "email") emailSent++;
+        else if (m.channel === "whatsapp") whatsappSent++;
+        if (m.sentAt && new Date(m.sentAt).getTime() >= weekAgo) last7dSent++;
+      } else if (m.status === "failed") failed++;
+    }
+    return { total: all.length, sent, failed, emailSent, whatsappSent, last7dSent };
   }
 
 }
@@ -3758,6 +3774,22 @@ export class DatabaseStorage implements IStorage {
     const r = await this.db.select({ n: sql<number>`count(*)::int` }).from(outreachMessages)
       .where(and(eq(outreachMessages.campaignId, campaignId), eq(outreachMessages.status, "sent"), gte(outreachMessages.sentAt, since)));
     return Number((r[0] as { n: number } | undefined)?.n || 0);
+  }
+
+  async getOutreachMessageStats(): Promise<{ total: number; sent: number; failed: number; emailSent: number; whatsappSent: number; last7dSent: number }> {
+    if (!this.db) throw new Error('Database not available');
+    const rows = await this.db.select({ status: outreachMessages.status, channel: outreachMessages.channel, sentAt: outreachMessages.sentAt }).from(outreachMessages);
+    const weekAgo = Date.now() - 7 * 86_400_000;
+    let sent = 0, failed = 0, emailSent = 0, whatsappSent = 0, last7dSent = 0;
+    for (const m of rows as Array<{ status: string; channel: string; sentAt: Date | null }>) {
+      if (m.status === "sent") {
+        sent++;
+        if (m.channel === "email") emailSent++;
+        else if (m.channel === "whatsapp") whatsappSent++;
+        if (m.sentAt && new Date(m.sentAt).getTime() >= weekAgo) last7dSent++;
+      } else if (m.status === "failed") failed++;
+    }
+    return { total: rows.length, sent, failed, emailSent, whatsappSent, last7dSent };
   }
 
 }

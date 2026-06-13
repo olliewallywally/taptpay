@@ -13,6 +13,7 @@ import { LeadDetail } from './leads/LeadDetail';
 import { Suppression } from './leads/Suppression';
 import { Campaigns } from './leads/Campaigns';
 import { CampaignDetail } from './leads/CampaignDetail';
+import { LeadAnalytics } from './leads/LeadAnalytics';
 
 export default function AdminDashboard() {
   const [location, setLocation] = useLocation();
@@ -207,6 +208,7 @@ export default function AdminDashboard() {
           <Route path="/campaigns/:id">
             {(params) => <CampaignDetail campaignId={params.id} />}
           </Route>
+          <Route path="/insights" component={LeadAnalytics} />
           <Route path="/api" component={APIManagement} />
           <Route path="/analytics" component={Analytics} />
           <Route path="/web-analytics" component={Analytics} />

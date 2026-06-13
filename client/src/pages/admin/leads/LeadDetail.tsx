@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
-import { ArrowLeft, Trash2, ShieldOff, Save, Sparkles, PenLine, Check } from 'lucide-react';
+import { ArrowLeft, Trash2, ShieldOff, Save, Sparkles, PenLine, Check, BadgeCheck } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 
 const CONF_COLOR: Record<string, string> = {
@@ -111,6 +111,18 @@ export function LeadDetail({ leadId }: { leadId: string }) {
     } finally { setBusy(false); }
   };
 
+  const convertLead = async () => {
+    if (!confirm('Mark this lead as converted (became a merchant)? This suppresses further outreach.')) return;
+    setBusy(true);
+    try {
+      await apiRequest('POST', `/api/admin/leads/${leadId}/convert`);
+      invalidate();
+      flash('Marked converted');
+    } catch (err: any) {
+      flash(err?.message?.replace(/^\d+:\s*/, '') || 'Convert failed');
+    } finally { setBusy(false); }
+  };
+
   const setDraftApproval = async (approved: boolean) => {
     setBusy(true);
     try {
@@ -162,6 +174,11 @@ export function LeadDetail({ leadId }: { leadId: string }) {
           <button onClick={enrich} disabled={busy} className="flex items-center gap-2 bg-[#24263a] text-[#00E5CC] rounded-lg px-3 py-2 text-sm hover:bg-[#1d1e2c] disabled:opacity-40" data-testid="button-enrich-lead">
             <Sparkles className="size-4" /> Enrich
           </button>
+          {lead.status !== 'converted' && (
+            <button onClick={convertLead} disabled={busy} className="flex items-center gap-2 bg-[#24263a] text-[#4ade80] rounded-lg px-3 py-2 text-sm hover:bg-[#1d1e2c] disabled:opacity-40" data-testid="button-convert-lead">
+              <BadgeCheck className="size-4" /> Converted
+            </button>
+          )}
           <button onClick={suppress} disabled={busy} className="flex items-center gap-2 bg-[#24263a] text-[#f87171] rounded-lg px-3 py-2 text-sm hover:bg-[#1d1e2c] disabled:opacity-40" data-testid="button-suppress-lead">
             <ShieldOff className="size-4" /> Suppress
           </button>

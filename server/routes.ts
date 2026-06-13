@@ -27,6 +27,8 @@ import { runSource } from "./lead-engine/sources";
 import { enrichLead, enrichLeads } from "./lead-engine/enrichment";
 import { personalizeLead, personalizeLeads } from "./lead-engine/personalize";
 import { enrollLeads } from "./lead-engine/outreach/enroll";
+import { getLeadAnalytics } from "./lead-engine/analytics";
+import { markLeadConverted } from "./lead-engine/conversion";
 
 // Store SSE connections for real-time updates (merchantId -> stoneId -> Set of connections)
 // stoneId can be null for merchant-level connections
@@ -6310,6 +6312,27 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
+  // NOTE: registered before /:id so "analytics" isn't captured as an id.
+  app.get("/api/admin/leads/analytics", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      res.json(await getLeadAnalytics());
+    } catch (error) {
+      console.error("Error building lead analytics:", error);
+      res.status(500).json({ message: "Failed to build analytics" });
+    }
+  });
+
+  app.post("/api/admin/leads/:id/convert", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const ok = await markLeadConverted(parseInt(req.params.id));
+      if (!ok) return res.status(404).json({ message: "Lead not found or already converted" });
+      res.json({ message: "Lead marked converted" });
+    } catch (error) {
+      console.error("Error converting lead:", error);
+      res.status(500).json({ message: "Failed to convert lead" });
+    }
+  });
+
   app.post("/api/admin/leads/import", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       const parsed = importLeadsSchema.safeParse(req.body);
@@ -6677,8 +6700,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const reminders = await runReminderPass(baseUrl, now);
       const { runOutreachPass } = await import("./lead-engine/outreach/scheduler");
       const outreach = await runOutreachPass(baseUrl, now);
-      console.log(`[CRON] generate=${JSON.stringify(generate)} dispatch=${JSON.stringify(dispatch)} overdue=${JSON.stringify(overdue)} reminders=${JSON.stringify(reminders)} outreach=${JSON.stringify(outreach)}`);
-      res.json({ ok: true, ranAt: now.toISOString(), generate, dispatch, overdue, reminders, outreach });
+      const { runConversionPass } = await import("./lead-engine/conversion");
+      const conversions = await runConversionPass();
+      console.log(`[CRON] generate=${JSON.stringify(generate)} dispatch=${JSON.stringify(dispatch)} overdue=${JSON.stringify(overdue)} reminders=${JSON.stringify(reminders)} outreach=${JSON.stringify(outreach)} conversions=${JSON.stringify(conversions)}`);
+      res.json({ ok: true, ranAt: now.toISOString(), generate, dispatch, overdue, reminders, outreach, conversions });
     } catch (err) { console.error("[CRON]", err); res.status(500).json({ message: "Cron run failed" }); }
   });
 
