@@ -54,25 +54,31 @@ export async function fetchNzbnLeads(params: NzbnParams): Promise<NzbnResult> {
   if (!res.ok) throw new Error(`NZBN returned HTTP ${res.status}.`);
 
   const data: any = await res.json();
-  const items: any[] = Array.isArray(data?.items) ? data.items : [];
+  const items: any[] = Array.isArray(data?.items) ? data.items
+    : Array.isArray(data?.entities) ? data.entities
+    : Array.isArray(data?.results) ? data.results
+    : [];
   const candidates = items
     .map((it) => toNzbnCandidate(it, params))
     .filter((c): c is LeadCandidate => c !== null);
   return { configured: true, candidates };
 }
 
-function toNzbnCandidate(it: any, params: NzbnParams): LeadCandidate | null {
-  const businessName = String(it?.entityName || it?.tradingNames?.[0]?.name || "").trim();
+function toNzbnCandidate(raw: any, params: NzbnParams): LeadCandidate | null {
+  // Tolerate either a bare entity or a { entity: {...} } wrapper.
+  const it = raw?.entity || raw || {};
+  const businessName = String(it.entityName || it.name || it.tradingNames?.[0]?.name || raw?.entityName || "").trim();
   if (!businessName) return null;
-  const addresses: any[] = it?.addresses?.addressList || [];
-  const physical = addresses.find((a) => a?.purpose === "PHYSICAL") || addresses[0] || {};
+  const nzbn = it.nzbn || raw?.nzbn || undefined;
+  const addresses: any[] = it.addresses?.addressList || it.addressList || [];
+  const physical = addresses.find((a) => /physical/i.test(a?.purpose || a?.type || "")) || addresses[0] || {};
   return {
     businessName,
     segment: params.segment,
-    nzbn: it?.nzbn || undefined,
-    address: physical?.address1 || undefined,
-    suburb: physical?.address2 || undefined,
-    city: physical?.address3 || undefined,
-    consentSourceUrl: it?.nzbn ? `https://www.nzbn.govt.nz/mynzbn/nzbndetails/${it.nzbn}/` : undefined,
+    nzbn,
+    address: physical.address1 || physical.line1 || undefined,
+    suburb: physical.address2 || physical.line2 || undefined,
+    city: physical.address3 || physical.line3 || physical.city || undefined,
+    consentSourceUrl: nzbn ? `https://www.nzbn.govt.nz/mynzbn/nzbndetails/${nzbn}/` : undefined,
   };
 }

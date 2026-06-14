@@ -251,7 +251,8 @@ CAC/conversion dashboard rather than just "emails sent."
 - ✅ **Converted leads stop their in-flight enrollments** (not just suppressed on next tick).
 - ✅ **Committed jest tests** for the pure logic (normalize / csv / render / webhook-verify), `npm test` added — 15 tests.
 - ✅ **`docs/lead-engine-go-live.md`** — verification steps for the live paths that need real credentials (AI, real email, NZBN, reply detection).
-- ⏳ Not built (needs credentials/config): automatic inbound **reply detection** (manual "mark replied" + bounce webhook exist); live verification of the Anthropic call, real Resend send, and the NZBN response mapping.
+- ✅ **Inbound reply detection** — `POST /api/outreach/inbound` (secret-gated) matches a replier to a lead, pauses its sequences, sets the lead `replied`; NZBN parser hardened to tolerate more response shapes. (Activate by pointing an ESP inbound-parse route at it.)
+- ⏳ Code complete, needs real credentials to *verify* at deploy: the live Anthropic call, the real Resend send, and the NZBN response mapping — see `docs/lead-engine-go-live.md`.
 
 ---
 

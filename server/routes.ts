@@ -30,6 +30,7 @@ import { enrollLeads } from "./lead-engine/outreach/enroll";
 import { getLeadAnalytics } from "./lead-engine/analytics";
 import { markLeadConverted } from "./lead-engine/conversion";
 import { verifyWebhookSignature } from "./lead-engine/outreach/webhook-verify";
+import { markRepliedByEmail, extractSender } from "./lead-engine/outreach/replies";
 
 // Store SSE connections for real-time updates (merchantId -> stoneId -> Set of connections)
 // stoneId can be null for merchant-level connections
@@ -6556,6 +6557,28 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
       res.json({ ok: true });
     } catch (error) { console.error("Error handling outreach webhook:", error); res.status(200).json({ ok: false }); }
+  });
+
+  // Inbound reply handler — an ESP inbound-parse / forwarding route posts here
+  // (URL carries ?token=<OUTREACH_WEBHOOK_SECRET>). Pauses the sender's active
+  // sequences so a prospect who replied is never emailed again. Ignored unless
+  // the secret is configured and the token matches.
+  app.post("/api/outreach/inbound", async (req, res) => {
+    try {
+      const secret = process.env.OUTREACH_WEBHOOK_SECRET;
+      if (!secret) {
+        console.warn("[outreach inbound] OUTREACH_WEBHOOK_SECRET not set — ignoring");
+        return res.status(200).json({ ok: false, reason: "not configured" });
+      }
+      const token = typeof req.query.token === "string" ? req.query.token : "";
+      const a = Buffer.from(token);
+      const b = Buffer.from(secret);
+      if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const paused = await markRepliedByEmail(extractSender(req.body));
+      res.json({ ok: true, paused });
+    } catch (error) { console.error("Error handling inbound reply:", error); res.status(200).json({ ok: false }); }
   });
 
   app.get("/api/admin/leads/:id", authenticateAdmin, async (req: AuthenticatedRequest, res) => {

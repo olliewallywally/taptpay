@@ -49,13 +49,18 @@ The new tables auto-create on the next dev restart via `drizzle-kit push` (or ru
   adjust `server/lead-engine/sources/nzbn.ts` if the live shape differs. Overpass
   needs no key and is the primary source.
 
-## 7. Reply detection (not automated yet)
-Inbound replies do **not** auto-pause sequences today — only bounces/complaints (via
-the webhook) and a manual **"mark replied"** in the cockpit do. To automate, either:
-- point your ESP's **inbound/reply parse** webhook at a new handler that calls
-  `updateEnrollment(..., { status: "replied" })`, or
-- poll the sending mailbox over **IMAP** and match replies to recent recipients.
-Both need mailbox credentials, so they're left as a follow-up.
+## 7. Reply detection
+Replies auto-pause sequences once an inbound source is wired up:
+- Point your ESP **inbound-parse** (SendGrid/Mailgun) or an email-forwarding route at
+  `POST /api/outreach/inbound?token=<OUTREACH_WEBHOOK_SECRET>`. It reads the sender
+  (`from` / `sender` / `envelope.from`, JSON or urlencoded), matches it to a lead,
+  sets the lead to `replied`, and pauses its active enrollments. Ignored unless the
+  token matches the secret.
+- For multipart inbound payloads (e.g. SendGrid), add a `multer` adapter in front of
+  the route to populate `req.body.from`.
+- A manual **"mark replied"** in the cockpit remains for ad-hoc cases.
+
+Bounces/complaints are handled separately by `POST /api/outreach/webhook` (§4).
 
 ## 8. Scheduler
 The outreach + conversion passes already run inside `POST /api/internal/cron`
