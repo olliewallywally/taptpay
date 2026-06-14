@@ -89,8 +89,9 @@ export async function runOutreachPass(baseUrl: string, now: Date = new Date()): 
 
     const token = randomBytes(24).toString("base64url");
     const unsubscribeUrl = `${base}/unsubscribe?token=${token}`;
+    const oneClickUrl = `${base}/api/public/unsubscribe?token=${token}`;
     const result = step.channel === "email"
-      ? await sendEmailStep({ to: toAddress, subject: content.subject, body: content.body, unsubscribeUrl, fromOverride: campaign.fromIdentity })
+      ? await sendEmailStep({ to: toAddress, subject: content.subject, body: content.body, unsubscribeUrl, oneClickUrl, fromOverride: campaign.fromIdentity })
       : await sendWhatsAppStep({ phone: toAddress, body: content.body });
 
     await storage.createOutreachMessage({

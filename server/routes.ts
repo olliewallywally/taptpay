@@ -29,6 +29,7 @@ import { personalizeLead, personalizeLeads } from "./lead-engine/personalize";
 import { enrollLeads } from "./lead-engine/outreach/enroll";
 import { getLeadAnalytics } from "./lead-engine/analytics";
 import { markLeadConverted } from "./lead-engine/conversion";
+import { verifyWebhookSignature } from "./lead-engine/outreach/webhook-verify";
 
 // Store SSE connections for real-time updates (merchantId -> stoneId -> Set of connections)
 // stoneId can be null for merchant-level connections
@@ -6530,9 +6531,18 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
   // Provider webhook (bounces/complaints) — suppress the address; the scheduler's
   // compliance gate then auto-stops any active enrollment on its next tick.
-  app.post("/api/outreach/webhook", async (req, res) => {
+  app.post("/api/outreach/webhook", express.raw({ type: () => true }), async (req, res) => {
     try {
-      const body: any = req.body || {};
+      const rawBody = Buffer.isBuffer(req.body) ? req.body.toString("utf8") : (typeof req.body === "string" ? req.body : JSON.stringify(req.body || {}));
+      const secret = process.env.OUTREACH_WEBHOOK_SECRET;
+      if (!secret) {
+        console.warn("[outreach webhook] OUTREACH_WEBHOOK_SECRET not set — ignoring unverified event");
+        return res.status(200).json({ ok: false, reason: "webhook not configured" });
+      }
+      if (!verifyWebhookSignature(rawBody, req.headers as Record<string, string | string[] | undefined>, secret)) {
+        return res.status(401).json({ message: "Invalid webhook signature" });
+      }
+      const body: any = JSON.parse(rawBody || "{}");
       const type = String(body.type || body.event || "").toLowerCase();
       const data = body.data || body;
       const rawTo = Array.isArray(data?.to) ? data.to[0] : (data?.to || data?.email || data?.recipient);
@@ -6651,7 +6661,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // unsubscribe is wired with the outreach engine (Phase 4) once tokens exist.
   app.post("/api/public/unsubscribe", async (req, res) => {
     try {
-      const parsed = unsubscribeSchema.safeParse(req.body);
+      // Accept the token from the query string too, so a one-click POST
+      // (List-Unsubscribe-Post) works even though its body isn't our JSON.
+      const queryToken = typeof req.query.token === "string" ? req.query.token : undefined;
+      const parsed = unsubscribeSchema.safeParse({ email: req.body?.email, token: req.body?.token || queryToken });
       if (!parsed.success) return res.status(400).json({ message: "A valid email or token is required" });
       let email = normalizeEmail(parsed.data.email);
       if (!email && parsed.data.token) {

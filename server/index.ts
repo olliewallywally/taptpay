@@ -59,7 +59,7 @@ app.use(compression({ threshold: 1024 }));
 
 // Skip JSON parsing for webhook routes to preserve raw body for signature verification
 app.use((req, res, next) => {
-  if (req.path === '/api/crypto-transactions/webhook/coinbase' || req.path === '/api/windcave/notification') {
+  if (req.path === '/api/crypto-transactions/webhook/coinbase' || req.path === '/api/windcave/notification' || req.path === '/api/outreach/webhook') {
     next();
   } else {
     express.json()(req, res, next);

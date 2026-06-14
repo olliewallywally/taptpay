@@ -43,6 +43,7 @@ export async function sendEmailStep(opts: {
   subject: string;
   body: string;
   unsubscribeUrl: string;
+  oneClickUrl?: string; // RFC 8058 one-click unsubscribe endpoint (List-Unsubscribe header)
   fromOverride?: string | null;
 }): Promise<SendResult> {
   const fromEmail = outreachFromEmail(opts.fromOverride);
@@ -51,11 +52,19 @@ export async function sendEmailStep(opts: {
   const footer = `\n\n—\nYou received this because your business contact is publicly listed. Unsubscribe: ${opts.unsubscribeUrl}\n${fromName}, New Zealand${address}`;
   const text = `${opts.body}${footer}`;
 
+  // List-Unsubscribe (+ one-click) improves deliverability and meets Gmail/Yahoo
+  // bulk-sender expectations.
+  const headers: Record<string, string> = {};
+  if (opts.oneClickUrl) {
+    headers["List-Unsubscribe"] = `<${opts.oneClickUrl}>`;
+    headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click";
+  }
+
   if (emailDryRun(opts.fromOverride)) {
     console.log(`[outreach dry-run] EMAIL → ${opts.to} | ${opts.subject}`);
     return { ok: true, providerId: "dry-run", simulated: true };
   }
-  const ok = await sendEmail({ to: opts.to, from: `${fromName} <${fromEmail}>`, subject: opts.subject, text, html: textToHtml(text) });
+  const ok = await sendEmail({ to: opts.to, from: `${fromName} <${fromEmail}>`, subject: opts.subject, text, html: textToHtml(text), headers });
   return ok ? { ok: true, providerId: "resend" } : { ok: false, error: "email provider rejected the send" };
 }
 

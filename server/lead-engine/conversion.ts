@@ -17,6 +17,13 @@ export async function markLeadConverted(leadId: number): Promise<boolean> {
   if (lead.email) {
     await storage.addSuppression({ type: "email", value: lead.email, reason: "converted", notes: "became a merchant" });
   }
+  // Stop any in-flight sequences for this lead (so they don't show as merely
+  // "unsubscribed" once the suppression takes effect on the next tick).
+  for (const e of await storage.getEnrollmentsByLead(leadId)) {
+    if (e.status === "active" || e.status === "paused") {
+      await storage.updateEnrollment(e.id, { status: "completed", note: "converted", nextSendAt: null });
+    }
+  }
   return true;
 }
 

@@ -245,6 +245,14 @@ CAC/conversion dashboard rather than just "emails sent."
     sourcing+enrichment+sends, paid enrichment (Apollo/Hunter), and SMS/LinkedIn
     channels — the channel + source interfaces are already stubbed for these.
 
+### Hardening (post-build review)
+- ✅ **Webhook signature verification** — `OUTREACH_WEBHOOK_SECRET` (Resend/Svix HMAC + replay window); the bounce/complaint webhook now **ignores unsigned events** instead of trusting any caller.
+- ✅ **`List-Unsubscribe` + one-click** (RFC 8058) headers on outreach email; the public unsubscribe accepts the token via query for one-click POSTs.
+- ✅ **Converted leads stop their in-flight enrollments** (not just suppressed on next tick).
+- ✅ **Committed jest tests** for the pure logic (normalize / csv / render / webhook-verify), `npm test` added — 15 tests.
+- ✅ **`docs/lead-engine-go-live.md`** — verification steps for the live paths that need real credentials (AI, real email, NZBN, reply detection).
+- ⏳ Not built (needs credentials/config): automatic inbound **reply detection** (manual "mark replied" + bounce webhook exist); live verification of the Anthropic call, real Resend send, and the NZBN response mapping.
+
 ---
 
 ## 8. Environment / config to add

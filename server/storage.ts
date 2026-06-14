@@ -240,6 +240,7 @@ export interface IStorage {
   getEnrollment(id: number): Promise<CampaignEnrollment | undefined>;
   getEnrollmentByLeadCampaign(campaignId: number, leadId: number): Promise<CampaignEnrollment | undefined>;
   listEnrollmentsByCampaign(campaignId: number): Promise<CampaignEnrollment[]>;
+  getEnrollmentsByLead(leadId: number): Promise<CampaignEnrollment[]>;
   getDueEnrollments(now: Date, limit: number): Promise<CampaignEnrollment[]>;
   updateEnrollment(id: number, updates: Partial<InsertCampaignEnrollment>): Promise<CampaignEnrollment | undefined>;
   createOutreachMessage(data: InsertOutreachMessage): Promise<OutreachMessage>;
@@ -1944,6 +1945,10 @@ export class MemStorage implements IStorage {
 
   async listEnrollmentsByCampaign(campaignId: number): Promise<CampaignEnrollment[]> {
     return Array.from(this.enrollments.values()).filter((e) => e.campaignId === campaignId).sort((a, b) => b.id - a.id);
+  }
+
+  async getEnrollmentsByLead(leadId: number): Promise<CampaignEnrollment[]> {
+    return Array.from(this.enrollments.values()).filter((e) => e.leadId === leadId);
   }
 
   async getDueEnrollments(now: Date, limit: number): Promise<CampaignEnrollment[]> {
@@ -3742,6 +3747,11 @@ export class DatabaseStorage implements IStorage {
   async listEnrollmentsByCampaign(campaignId: number): Promise<CampaignEnrollment[]> {
     if (!this.db) throw new Error('Database not available');
     return await this.db.select().from(campaignEnrollments).where(eq(campaignEnrollments.campaignId, campaignId)).orderBy(desc(campaignEnrollments.id));
+  }
+
+  async getEnrollmentsByLead(leadId: number): Promise<CampaignEnrollment[]> {
+    if (!this.db) throw new Error('Database not available');
+    return await this.db.select().from(campaignEnrollments).where(eq(campaignEnrollments.leadId, leadId));
   }
 
   async getDueEnrollments(now: Date, limit: number): Promise<CampaignEnrollment[]> {
