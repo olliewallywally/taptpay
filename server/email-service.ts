@@ -12,6 +12,7 @@ interface EmailParams {
   subject: string;
   text?: string;
   html?: string;
+  headers?: Record<string, string>;
 }
 
 export async function sendEmail(params: EmailParams): Promise<boolean> {
@@ -32,6 +33,7 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
       subject: params.subject,
       text: params.text || '',
       html: params.html || '',
+      ...(params.headers ? { headers: params.headers } : {}),
     });
     if (error) {
       console.error('Resend email error:', error);

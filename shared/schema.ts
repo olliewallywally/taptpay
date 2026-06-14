@@ -919,3 +919,311 @@ export type InvoiceRentRequest = typeof invoicesRentRequests.$inferSelect;
 export type InsertInvoiceRentRequest = typeof invoicesRentRequests.$inferInsert;
 export type TransactionEvent = typeof transactionEvents.$inferSelect;
 export type InsertTransactionEvent = typeof transactionEvents.$inferInsert;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LEAD ENGINE — Clay-style sourcing / enrichment / outreach pipeline
+//
+// Phase 0 (foundations): store, view, import and suppress leads. Sourcing,
+// enrichment, AI personalization and the outreach sequence engine build on
+// these tables in later phases. See docs/lead-engine-plan.md.
+//
+// Lead lifecycle (status):
+//   new → enriching → enriched → ready → enrolled → contacted → replied
+//   → converted   (became a TaptPay merchant — the win)
+//   → suppressed  (unsubscribed / bounced / do-not-contact)
+//   → rejected    (manually discarded)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Provenance of a batch of leads (a CSV import, a Google Places search, etc).
+export const leadSources = pgTable("lead_sources", {
+  id: serial("id").primaryKey(),
+  provider: text("provider").notNull(),          // csv | overpass | nzbn | places | info_pack | manual
+  label: text("label"),                           // human label, e.g. "Wellington cafés — CSV 2026-06"
+  params: jsonb("params"),                        // query params used (segment, region, category…)
+  totalFound: integer("total_found").notNull().default(0),
+  totalImported: integer("total_imported").notNull().default(0),
+  createdBy: text("created_by"),                  // admin email that ran it
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const leads = pgTable("leads", {
+  id: serial("id").primaryKey(),
+  businessName: text("business_name").notNull(),
+  segment: text("segment"),                       // hospitality | retail | property | trades | other
+  category: text("category"),                     // e.g. cafe, restaurant, plumber, property_manager
+  website: text("website"),
+  domain: text("domain"),                         // normalized registrable domain (dedupe + suppression)
+  email: text("email"),                           // primary contact email
+  phone: text("phone"),
+  contactName: text("contact_name"),
+  address: text("address"),
+  suburb: text("suburb"),
+  city: text("city"),
+  region: text("region"),
+  country: text("country").notNull().default("NZ"),
+  nzbn: text("nzbn"),                             // New Zealand Business Number
+  status: text("status").notNull().default("new"),
+  score: integer("score").notNull().default(0),   // lead quality 0-100 (set during enrichment)
+  notes: text("notes"),
+  sourceId: integer("source_id").references(() => leadSources.id),
+  dedupeKey: text("dedupe_key").notNull(),        // normalized domain, else name+suburb — avoids duplicates
+  consentBasis: text("consent_basis"),            // published_on_website | inbound | manual
+  consentSourceUrl: text("consent_source_url"),
+  lastContactedAt: timestamp("last_contacted_at"),
+  // Enrichment outputs (Phase 2)
+  linkedinUrl: text("linkedin_url"),
+  facebookUrl: text("facebook_url"),
+  instagramUrl: text("instagram_url"),
+  signals: text("signals"),                       // short personalization blurb (title/desc/keywords)
+  emailConfidence: text("email_confidence"),      // high | medium | low | none
+  enrichedAt: timestamp("enriched_at"),
+  // AI personalization (Phase 3) — the drafted outreach message
+  draftSubject: text("draft_subject"),
+  draftBody: text("draft_body"),
+  draftStatus: text("draft_status"),               // none | draft | approved
+  draftModel: text("draft_model"),                 // model id, or "template" when AI fell back
+  draftGeneratedAt: timestamp("draft_generated_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+  dedupeKeyUnique: uniqueIndex("leads_dedupe_key_unique").on(t.dedupeKey),
+  statusIdx: index("leads_status_idx").on(t.status),
+  segmentIdx: index("leads_segment_idx").on(t.segment),
+  domainIdx: index("leads_domain_idx").on(t.domain),
+}));
+
+// Do-not-contact list — checked before every outreach send. A converted
+// merchant, a bounce, a complaint or an unsubscribe all land here.
+export const suppressions = pgTable("suppressions", {
+  id: serial("id").primaryKey(),
+  type: text("type").notNull(),                   // email | phone | domain
+  value: text("value").notNull(),                 // normalized email / phone / domain
+  reason: text("reason").notNull(),               // unsubscribed | bounced | complained | manual | converted
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  typeValueUnique: uniqueIndex("suppressions_type_value_unique").on(t.type, t.value),
+}));
+
+export const insertLeadSourceSchema = createInsertSchema(leadSources).omit({ id: true, createdAt: true });
+export const insertLeadSchema = createInsertSchema(leads).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertSuppressionSchema = createInsertSchema(suppressions).omit({ id: true, createdAt: true });
+
+const leadSegmentSchema = z.enum(["hospitality", "retail", "property", "trades", "other"]);
+const leadStatusSchema = z.enum([
+  "new", "enriching", "enriched", "ready", "enrolled", "contacted", "replied", "converted", "suppressed", "rejected",
+]);
+const optText = (max: number) => z.string().trim().max(max).optional().or(z.literal("")).transform(v => v || undefined);
+
+// Admin "add lead" form.
+export const createLeadSchema = z.object({
+  businessName: z.string().trim().min(1, "Business name is required").max(200),
+  segment: leadSegmentSchema.optional(),
+  category: optText(80),
+  website: optText(300),
+  email: z.string().trim().email().max(200).optional().or(z.literal("")).transform(v => v || undefined),
+  phone: optText(40),
+  contactName: optText(120),
+  address: optText(300),
+  suburb: optText(120),
+  city: optText(120),
+  region: optText(120),
+  nzbn: optText(20),
+  notes: optText(2000),
+});
+
+// Admin update — editable fields plus status / score / draft.
+export const updateLeadSchema = createLeadSchema.partial().extend({
+  status: leadStatusSchema.optional(),
+  score: z.number().int().min(0).max(100).optional(),
+  draftSubject: z.string().max(300).optional(),
+  draftBody: z.string().max(5000).optional(),
+  draftStatus: z.enum(["none", "draft", "approved"]).optional(),
+});
+
+// CSV import payload (raw CSV text + optional batch defaults).
+export const importLeadsSchema = z.object({
+  csv: z.string().min(1, "CSV content is required").max(5_000_000),
+  segment: leadSegmentSchema.optional(),
+  label: optText(160),
+  consentBasis: optText(60),
+});
+
+// Sourcing search — pulls leads from an external connector (Overpass, NZBN…).
+export const sourceLeadsSchema = z.object({
+  provider: z.enum(["overpass", "nzbn"]),
+  segment: leadSegmentSchema.optional(),
+  region: optText(120),       // Overpass: area name, e.g. "Wellington"
+  category: optText(80),      // optional "key=value" OSM tag override
+  searchTerm: optText(120),   // NZBN: free-text search
+  limit: z.number().int().min(1).max(200).optional(),
+  label: optText(160),
+});
+
+// Manual suppression add.
+export const createSuppressionSchema = z.object({
+  type: z.enum(["email", "phone", "domain"]).default("email"),
+  value: z.string().trim().min(1).max(200),
+  reason: z.enum(["unsubscribed", "bounced", "complained", "manual", "converted"]).default("manual"),
+  notes: optText(500),
+});
+
+// Public unsubscribe (email now; token support arrives with the outreach engine).
+export const unsubscribeSchema = z.object({
+  email: z.string().trim().email().max(200).optional(),
+  token: z.string().trim().max(120).optional(),
+}).refine(d => d.email || d.token, { message: "email or token is required" });
+
+export type LeadSource = typeof leadSources.$inferSelect;
+export type InsertLeadSource = typeof leadSources.$inferInsert;
+export type Lead = typeof leads.$inferSelect;
+export type InsertLead = typeof leads.$inferInsert;
+export type Suppression = typeof suppressions.$inferSelect;
+export type InsertSuppression = typeof suppressions.$inferInsert;
+
+// Cache of website-scrape results, keyed by domain, so the same site isn't
+// re-fetched for every lead and re-enrichment stays rate-limit friendly.
+export const enrichmentCache = pgTable("enrichment_cache", {
+  id: serial("id").primaryKey(),
+  domain: text("domain").notNull(),
+  url: text("url"),
+  status: text("status").notNull(),              // ok | failed | blocked | no_site
+  payload: jsonb("payload"),                      // parsed ScrapeResult
+  fetchedAt: timestamp("fetched_at").defaultNow(),
+}, (t) => ({
+  domainUnique: uniqueIndex("enrichment_cache_domain_unique").on(t.domain),
+}));
+
+export const insertEnrichmentSchema = createInsertSchema(enrichmentCache).omit({ id: true, fetchedAt: true });
+export type EnrichmentCache = typeof enrichmentCache.$inferSelect;
+export type InsertEnrichmentCache = typeof enrichmentCache.$inferInsert;
+
+// Enrichment request (single lead via /:id/enrich, or a bulk batch).
+export const enrichLeadsSchema = z.object({
+  status: leadStatusSchema.optional(),
+  limit: z.number().int().min(1).max(25).optional(),
+});
+
+// AI personalization request (bulk batch; single lead uses /:id/personalize).
+export const personalizeLeadsSchema = z.object({
+  status: leadStatusSchema.optional(),
+  limit: z.number().int().min(1).max(15).optional(),
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OUTREACH ENGINE (Phase 4)
+// Campaigns hold an ordered set of steps; leads are enrolled and a cron pass
+// sends due steps (compliant: suppression + consent checked at send time),
+// advancing each enrollment until a reply/bounce/unsubscribe pauses it, or it
+// completes. See docs/lead-engine-plan.md.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const campaigns = pgTable("campaigns", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  segment: text("segment"),                              // optional target segment (informational)
+  status: text("status").notNull().default("draft"),    // draft | active | paused | archived
+  channel: text("channel").notNull().default("email"),  // primary channel (informational; steps carry their own)
+  dailyCap: integer("daily_cap").notNull().default(50),  // max sends per day for this campaign
+  fromIdentity: text("from_identity"),                   // optional override of OUTREACH_FROM_EMAIL
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const campaignSteps = pgTable("campaign_steps", {
+  id: serial("id").primaryKey(),
+  campaignId: integer("campaign_id").references(() => campaigns.id).notNull(),
+  stepOrder: integer("step_order").notNull(),
+  dayOffset: integer("day_offset").notNull().default(0), // days after enrollment this step is due
+  channel: text("channel").notNull().default("email"),   // email | whatsapp
+  source: text("source").notNull().default("template"), // lead_draft | template
+  subject: text("subject"),                              // template email subject (merge fields)
+  body: text("body"),                                    // template body (merge fields)
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  campaignOrderIdx: index("campaign_steps_campaign_order_idx").on(t.campaignId, t.stepOrder),
+}));
+
+export const campaignEnrollments = pgTable("campaign_enrollments", {
+  id: serial("id").primaryKey(),
+  campaignId: integer("campaign_id").references(() => campaigns.id).notNull(),
+  leadId: integer("lead_id").references(() => leads.id).notNull(),
+  status: text("status").notNull().default("active"),    // active|paused|replied|bounced|completed|unsubscribed|failed
+  currentStep: integer("current_step").notNull().default(0),
+  nextSendAt: timestamp("next_send_at"),
+  enrolledAt: timestamp("enrolled_at").defaultNow(),
+  lastSentAt: timestamp("last_sent_at"),
+  completedAt: timestamp("completed_at"),
+  note: text("note"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+  campaignLeadUnique: uniqueIndex("enrollments_campaign_lead_unique").on(t.campaignId, t.leadId),
+  statusNextIdx: index("enrollments_status_next_idx").on(t.status, t.nextSendAt),
+}));
+
+export const outreachMessages = pgTable("outreach_messages", {
+  id: serial("id").primaryKey(),
+  enrollmentId: integer("enrollment_id").references(() => campaignEnrollments.id).notNull(),
+  campaignId: integer("campaign_id").notNull(),
+  leadId: integer("lead_id").notNull(),
+  stepOrder: integer("step_order").notNull(),
+  channel: text("channel").notNull(),
+  toAddress: text("to_address").notNull(),
+  subject: text("subject"),
+  body: text("body"),
+  status: text("status").notNull().default("queued"),   // queued|sent|failed|bounced|complained
+  providerId: text("provider_id"),
+  unsubscribeToken: text("unsubscribe_token"),
+  error: text("error"),
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  tokenUnique: uniqueIndex("outreach_messages_token_unique").on(t.unsubscribeToken),
+  campaignSentIdx: index("outreach_messages_campaign_sent_idx").on(t.campaignId, t.sentAt),
+}));
+
+export const insertCampaignSchema = createInsertSchema(campaigns).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertCampaignStepSchema = createInsertSchema(campaignSteps).omit({ id: true, createdAt: true });
+export const insertEnrollmentSchema = createInsertSchema(campaignEnrollments).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertOutreachMessageSchema = createInsertSchema(outreachMessages).omit({ id: true, createdAt: true });
+
+export const createCampaignSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(160),
+  segment: leadSegmentSchema.optional(),
+  channel: z.enum(["email", "whatsapp"]).default("email"),
+  dailyCap: z.number().int().min(1).max(1000).default(50),
+  fromIdentity: optText(200),
+});
+
+export const updateCampaignSchema = z.object({
+  name: z.string().trim().min(1).max(160).optional(),
+  segment: leadSegmentSchema.optional(),
+  status: z.enum(["draft", "active", "paused", "archived"]).optional(),
+  dailyCap: z.number().int().min(1).max(1000).optional(),
+  fromIdentity: optText(200),
+});
+
+export const createCampaignStepSchema = z.object({
+  dayOffset: z.number().int().min(0).max(365).default(0),
+  channel: z.enum(["email", "whatsapp"]).default("email"),
+  source: z.enum(["lead_draft", "template"]).default("template"),
+  subject: optText(300),
+  body: optText(5000),
+});
+
+export const enrollLeadsSchema = z.object({
+  status: leadStatusSchema.optional(),                  // lead pipeline status to pull from (default "ready")
+  leadIds: z.array(z.number().int()).max(1000).optional(),
+  limit: z.number().int().min(1).max(1000).optional(),
+});
+
+export type Campaign = typeof campaigns.$inferSelect;
+export type InsertCampaign = typeof campaigns.$inferInsert;
+export type CampaignStep = typeof campaignSteps.$inferSelect;
+export type InsertCampaignStep = typeof campaignSteps.$inferInsert;
+export type CampaignEnrollment = typeof campaignEnrollments.$inferSelect;
+export type InsertCampaignEnrollment = typeof campaignEnrollments.$inferInsert;
+export type OutreachMessage = typeof outreachMessages.$inferSelect;
+export type InsertOutreachMessage = typeof outreachMessages.$inferInsert;

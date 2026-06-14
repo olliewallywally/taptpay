@@ -1,5 +1,5 @@
 import { useLocation, Route, Switch } from 'wouter';
-import { Home, Users, Settings, Code, BarChart3, LogOut } from 'lucide-react';
+import { Home, Users, Settings, Code, BarChart3, LogOut, Target, Send } from 'lucide-react';
 import logoImage from "@assets/logo_1762915255857.png";
 
 // Import admin sub-pages (we'll create these next)
@@ -8,6 +8,12 @@ import { MerchantsPage } from './MerchantsPage';
 import { MerchantDetail } from './MerchantDetail';
 import { APIManagement } from './APIManagement';
 import { Analytics } from './Analytics';
+import { LeadsList } from './leads/LeadsList';
+import { LeadDetail } from './leads/LeadDetail';
+import { Suppression } from './leads/Suppression';
+import { Campaigns } from './leads/Campaigns';
+import { CampaignDetail } from './leads/CampaignDetail';
+import { LeadAnalytics } from './leads/LeadAnalytics';
 
 export default function AdminDashboard() {
   const [location, setLocation] = useLocation();
@@ -28,7 +34,7 @@ export default function AdminDashboard() {
     <div className="relative min-h-screen bg-[#1a1b2e] overflow-x-hidden">
       {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#24263a] border-t border-[#1d1e2c] z-50 pb-safe">
-        <div className="grid grid-cols-5 h-16">
+        <div className="grid grid-cols-6 h-16">
           <button
             onClick={() => setLocation('/')}
             className={`flex flex-col items-center justify-center gap-1 ${
@@ -48,6 +54,16 @@ export default function AdminDashboard() {
           >
             <Users className="size-5" />
             <span className="text-[10px]">Merchants</span>
+          </button>
+          <button
+            onClick={() => setLocation('/leads')}
+            className={`flex flex-col items-center justify-center gap-1 ${
+              isActive('/leads') ? 'text-[#0055FF]' : 'text-[#dbdfea]'
+            }`}
+            data-testid="nav-admin-leads"
+          >
+            <Target className="size-5" />
+            <span className="text-[10px]">Leads</span>
           </button>
           <button
             onClick={() => setLocation('/analytics')}
@@ -111,6 +127,26 @@ export default function AdminDashboard() {
               Merchants
             </button>
             <button
+              onClick={() => setLocation('/leads')}
+              className={`w-full flex items-center gap-3 px-6 py-3 text-[#dbdfea] text-[10px] transition-colors ${
+                isActive('/leads') ? 'bg-[#1d1e2c]' : 'hover:bg-[#1d1e2c]'
+              }`}
+              data-testid="sidebar-admin-leads"
+            >
+              <Target className="size-3.5" />
+              Leads
+            </button>
+            <button
+              onClick={() => setLocation('/campaigns')}
+              className={`w-full flex items-center gap-3 px-6 py-3 text-[#dbdfea] text-[10px] transition-colors ${
+                isActive('/campaigns') ? 'bg-[#1d1e2c]' : 'hover:bg-[#1d1e2c]'
+              }`}
+              data-testid="sidebar-admin-campaigns"
+            >
+              <Send className="size-3.5" />
+              Campaigns
+            </button>
+            <button
               onClick={() => setLocation('/api')}
               className={`w-full flex items-center gap-3 px-6 py-3 text-[#dbdfea] text-[10px] transition-colors ${
                 isActive('/api') ? 'bg-[#1d1e2c]' : 'hover:bg-[#1d1e2c]'
@@ -163,6 +199,16 @@ export default function AdminDashboard() {
           <Route path="/merchants/:id">
             {(params) => <MerchantDetail merchantId={params.id} />}
           </Route>
+          <Route path="/leads" component={LeadsList} />
+          <Route path="/leads/:id">
+            {(params) => <LeadDetail leadId={params.id} />}
+          </Route>
+          <Route path="/suppression" component={Suppression} />
+          <Route path="/campaigns" component={Campaigns} />
+          <Route path="/campaigns/:id">
+            {(params) => <CampaignDetail campaignId={params.id} />}
+          </Route>
+          <Route path="/insights" component={LeadAnalytics} />
           <Route path="/api" component={APIManagement} />
           <Route path="/analytics" component={Analytics} />
           <Route path="/web-analytics" component={Analytics} />

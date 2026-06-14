@@ -1,9 +1,11 @@
 module.exports = {
   testEnvironment: 'jsdom',
-  roots: ['<rootDir>/client/src'],
+  roots: ['<rootDir>/client/src', '<rootDir>/server'],
   testMatch: [
     '<rootDir>/client/src/**/__tests__/**/*.{js,jsx,ts,tsx}',
-    '<rootDir>/client/src/**/*.(test|spec).{js,jsx,ts,tsx}'
+    '<rootDir>/client/src/**/*.(test|spec).{js,jsx,ts,tsx}',
+    '<rootDir>/server/**/__tests__/**/*.{ts,tsx}',
+    '<rootDir>/server/**/*.(test|spec).{ts,tsx}'
   ],
   moduleFileExtensions: ['js', 'jsx', 'ts', 'tsx', 'json'],
   transform: {
