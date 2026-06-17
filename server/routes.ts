@@ -6674,6 +6674,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
     const client = await storage.getClientProfile(parsed.data.clientProfileId);
     if (!client || client.merchantId !== merchantId) return res.status(404).json({ message: "Client not found" });
+    if (parsed.data.quoteId) {
+      const linkedQuote = await storage.getQuote(parsed.data.quoteId);
+      if (!linkedQuote || linkedQuote.merchantId !== merchantId) return res.status(404).json({ message: "Quote not found" });
+    }
     const row = await storage.createJobInvoice({
       merchantId, clientProfileId: parsed.data.clientProfileId,
       quoteId: parsed.data.quoteId ?? null, kind: parsed.data.kind,
@@ -6693,6 +6697,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     // Issue the remaining balance for a deposit-paid job.
     const dep = await storage.getJobInvoice(req.params.id);
     if (!dep || dep.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+    if (dep.kind !== "deposit") return res.status(400).json({ message: "Balance can only be sent for a deposit invoice" });
     const quote = dep.quoteId ? await storage.getQuote(dep.quoteId) : null;
     const balanceCents = quote ? Math.max(quote.totalCents - (dep.amountCents || 0), 0) : 0;
     if (balanceCents <= 0) return res.status(400).json({ message: "No balance remaining" });
@@ -6711,7 +6716,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     const inv = await storage.getJobInvoice(req.params.id);
     if (!inv || inv.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
     const parsed = markJobPaidExternalSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Invalid" });
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
     const row = await storage.updateJobInvoice(req.params.id, {
       status: "paid_external", paidAt: new Date(),
       externalPaymentReference: parsed.data.externalPaymentReference ?? null,
@@ -6757,7 +6762,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     const existing = await storage.getJobSchedule(req.params.id);
     if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
     const parsed = updateJobScheduleSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Invalid" });
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
     res.json(await storage.updateJobSchedule(req.params.id, parsed.data));
   });
   app.delete("/api/trades/schedules/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
