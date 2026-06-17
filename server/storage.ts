@@ -210,6 +210,35 @@ export interface IStorage {
   logTransactionEvent(data: any): Promise<any>;
   getTransactionEventsByTenant(tenantProfileId: string, limit?: number): Promise<any[]>;
   getTransactionEventsByInvoice(invoiceId: string): Promise<any[]>;
+
+  // ── Trades vertical ───────────────────────────────────────────────────────
+  createClientProfile(data: any): Promise<any>;
+  getClientProfile(id: string): Promise<any | undefined>;
+  getClientProfilesByMerchant(merchantId: number): Promise<any[]>;
+  updateClientProfile(id: string, updates: any): Promise<any | undefined>;
+  archiveClientProfile(id: string): Promise<any | undefined>;
+  unarchiveClientProfile(id: string): Promise<any | undefined>;
+
+  createQuote(data: any): Promise<any>;
+  getQuote(id: string): Promise<any | undefined>;
+  getQuoteByToken(token: string): Promise<any | undefined>;
+  getQuotesByMerchant(merchantId: number, opts?: { status?: string }): Promise<any[]>;
+  updateQuote(id: string, updates: any): Promise<any | undefined>;
+
+  createJobInvoice(data: any): Promise<any>;
+  getJobInvoice(id: string): Promise<any | undefined>;
+  getJobInvoiceByToken(token: string): Promise<any | undefined>;
+  getJobInvoicesByMerchant(merchantId: number, opts?: { status?: string; clientProfileId?: string }): Promise<any[]>;
+  updateJobInvoice(id: string, updates: any): Promise<any | undefined>;
+
+  createJobSchedule(data: any): Promise<any>;
+  getJobSchedule(id: string): Promise<any | undefined>;
+  getJobSchedulesByMerchant(merchantId: number): Promise<any[]>;
+  updateJobSchedule(id: string, updates: any): Promise<any | undefined>;
+  terminateJobSchedule(id: string): Promise<any | undefined>;
+
+  createJobEvent(data: any): Promise<any>;
+  getJobEventsByClient(clientProfileId: string, limit?: number): Promise<any[]>;
 }
 
 export class MemStorage implements IStorage {
