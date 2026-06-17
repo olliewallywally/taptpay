@@ -71,6 +71,9 @@ export const merchants = pgTable("merchants", {
   // Onboarding status
   onboardingCompleted: boolean("onboarding_completed").default(false),
 
+  // GST registration (Trades vertical)
+  gstRegistered: boolean("gst_registered").notNull().default(false),
+
   // Dashboard preferences
   dailyGoal: decimal("daily_goal", { precision: 10, scale: 2 }).default("500.00"), // Daily revenue goal in dollars
   
@@ -938,3 +941,213 @@ export type InvoiceRentRequest = typeof invoicesRentRequests.$inferSelect;
 export type InsertInvoiceRentRequest = typeof invoicesRentRequests.$inferInsert;
 export type TransactionEvent = typeof transactionEvents.$inferSelect;
 export type InsertTransactionEvent = typeof transactionEvents.$inferInsert;
+
+/* ═══════════════ TRADES VERTICAL ═══════════════ */
+
+export const GST_RATE = 0.15; // NZ GST; amounts are GST-inclusive
+
+export const clientProfiles = pgTable("client_profiles", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  merchantId: integer("merchant_id").references(() => merchants.id).notNull(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  siteAddress: text("site_address").notNull(),
+  notes: text("notes"),
+  preferredChannel: text("preferred_channel").notNull().default("email"),
+  status: text("status").notNull().default("active"),
+  archivedAt: timestamp("archived_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const quotes = pgTable("quotes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  merchantId: integer("merchant_id").references(() => merchants.id).notNull(),
+  clientProfileId: uuid("client_profile_id").references(() => clientProfiles.id).notNull(),
+  token: text("token").notNull().unique(),
+  // draft · sent · viewed · accepted · declined · expired
+  status: text("status").notNull().default("draft"),
+  // [{ description, qty, unitPriceCents, lineTotalCents }]
+  lineItems: jsonb("line_items").notNull(),
+  subtotalCents: integer("subtotal_cents").notNull(),
+  gstCents: integer("gst_cents").notNull().default(0),
+  totalCents: integer("total_cents").notNull(),
+  depositEnabled: boolean("deposit_enabled").notNull().default(false),
+  depositType: text("deposit_type"),        // 'percent' | 'fixed'
+  depositValue: integer("deposit_value"),    // percent (0-100) or cents
+  depositCents: integer("deposit_cents"),    // computed deposit amount in cents
+  deliveryChannel: text("delivery_channel").notNull().default("email"),
+  validUntil: timestamp("valid_until"),
+  notes: text("notes"),
+  documentUrl: text("document_url"),
+  documentName: text("document_name"),
+  sentAt: timestamp("sent_at"),
+  viewedAt: timestamp("viewed_at"),
+  acceptedAt: timestamp("accepted_at"),
+  declinedAt: timestamp("declined_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+  merchantStatusIdx: index("quotes_merchant_status_idx").on(t.merchantId, t.status),
+  tokenIdx: index("quotes_token_idx").on(t.token),
+}));
+
+export const jobSchedules = pgTable("job_schedules", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  merchantId: integer("merchant_id").references(() => merchants.id).notNull(),
+  clientProfileId: uuid("client_profile_id").references(() => clientProfiles.id).notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  frequency: text("frequency").notNull(),
+  deliveryChannel: text("delivery_channel").notNull().default("email"),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date"),
+  nextRunDate: timestamp("next_run_date").notNull(),
+  lastRunDate: timestamp("last_run_date"),
+  status: text("status").notNull().default("active"),
+  terminatedAt: timestamp("terminated_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+  nextRunDateIdx: index("job_schedules_next_run_date_idx").on(t.nextRunDate),
+  merchantStatusIdx: index("job_schedules_merchant_status_idx").on(t.merchantId, t.status),
+}));
+
+export const jobInvoices = pgTable("job_invoices", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  merchantId: integer("merchant_id").references(() => merchants.id).notNull(),
+  clientProfileId: uuid("client_profile_id").references(() => clientProfiles.id).notNull(),
+  quoteId: uuid("quote_id").references(() => quotes.id),       // null for quick invoices
+  scheduleId: uuid("schedule_id").references(() => jobSchedules.id),
+  // 'deposit' | 'balance' | 'full' | 'recurring'
+  kind: text("kind").notNull().default("full"),
+  amountCents: integer("amount_cents").notNull(),
+  token: text("token").notNull().unique(),
+  deliveryChannel: text("delivery_channel").notNull(),
+  jobDetails: text("job_details"),
+  status: text("status").notNull().default("pending_dispatch"),
+  dueAt: timestamp("due_at").notNull(),
+  dispatchedAt: timestamp("dispatched_at"),
+  sentAt: timestamp("sent_at"),
+  viewedAt: timestamp("viewed_at"),
+  paidAt: timestamp("paid_at"),
+  voidedAt: timestamp("voided_at"),
+  completedAt: timestamp("completed_at"),
+  externalPaymentReference: text("external_payment_reference"),
+  lastReminderSentAt: timestamp("last_reminder_sent_at"),
+  scheduledSendAt: timestamp("scheduled_send_at"),
+  reminderCount: integer("reminder_count").notNull().default(0),
+  documentUrl: text("document_url"),
+  documentName: text("document_name"),
+  windcaveSessionId: text("windcave_session_id"),
+  windcaveTransactionId: text("windcave_transaction_id"),
+  splitEnabled: boolean("split_enabled").notNull().default(false),
+  splitCount: integer("split_count"),
+  splitPaidCount: integer("split_paid_count").notNull().default(0),
+  splitPaidSessions: text("split_paid_sessions").array(),
+  splitPayerEmails: text("split_payer_emails").array(),
+  whatsappMessageId: text("whatsapp_message_id"),
+  whatsappDeliveredAt: timestamp("whatsapp_delivered_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+  statusDueIdx: index("job_invoices_status_due_idx").on(t.status, t.dueAt),
+  merchantStatusIdx: index("job_invoices_merchant_status_idx").on(t.merchantId, t.status),
+  tokenIdx: index("job_invoices_token_idx").on(t.token),
+}));
+
+export const jobEvents = pgTable("job_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  merchantId: integer("merchant_id").references(() => merchants.id).notNull(),
+  clientProfileId: uuid("client_profile_id").references(() => clientProfiles.id),
+  quoteId: uuid("quote_id").references(() => quotes.id),
+  jobInvoiceId: uuid("job_invoice_id").references(() => jobInvoices.id),
+  scheduleId: uuid("schedule_id").references(() => jobSchedules.id),
+  eventType: text("event_type").notNull(),
+  payload: jsonb("payload"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  clientCreatedIdx: index("job_events_client_created_idx").on(t.clientProfileId, t.createdAt),
+  merchantCreatedIdx: index("job_events_merchant_created_idx").on(t.merchantId, t.createdAt),
+}));
+
+// Trades Zod schemas (reuse the property field validators above)
+const siteAddressSchema = z.string().trim().min(1, "Site address is required").max(200);
+
+const clientProfileFields = z.object({
+  firstName: personNameSchema,
+  lastName: personNameSchema,
+  email: optionalEmailSchema,
+  phone: optionalPhoneSchema,
+  siteAddress: siteAddressSchema,
+  notes: z.string().max(1000).optional().or(z.literal("")).transform(v => v || undefined),
+  preferredChannel: z.enum(["email", "whatsapp", "sms"]).default("email"),
+});
+export const createClientProfileSchema = clientProfileFields;
+export const updateClientProfileSchema = clientProfileFields.partial();
+
+const quoteLineItemSchema = z.object({
+  description: z.string().trim().min(1).max(200),
+  qty: z.number().int().positive().max(100000),
+  unitPriceCents: z.number().int().min(0).max(100_000_000),
+  lineTotalCents: z.number().int().min(0).max(100_000_000),
+});
+
+export const createQuoteSchema = z.object({
+  clientProfileId: z.string().uuid(),
+  lineItems: z.array(quoteLineItemSchema).min(1),
+  deliveryChannel: z.enum(["email", "whatsapp", "sms"]).default("email"),
+  depositEnabled: z.boolean().default(false),
+  depositType: z.enum(["percent", "fixed"]).optional(),
+  depositValue: z.number().int().min(0).max(100_000_000).optional(),
+  validUntil: z.string().datetime().or(z.date()).optional().transform(v => v ? new Date(v as any) : undefined),
+  notes: z.string().trim().max(1000).optional().or(z.literal("")).transform(v => v || undefined),
+  documentUrl: z.string().trim().max(500).optional().or(z.literal("")).transform(v => v || undefined),
+  documentName: z.string().trim().max(255).optional().or(z.literal("")).transform(v => v || undefined),
+});
+
+export const acceptQuoteSchema = z.object({
+  accept: z.boolean(), // true = accept, false = decline
+});
+
+export const createJobInvoiceSchema = z.object({
+  clientProfileId: z.string().uuid(),
+  amountCents: z.number().int().positive().max(100_000_000),
+  deliveryChannel: z.enum(["email", "whatsapp", "sms"]),
+  dueAt: z.string().datetime().or(z.date()).transform(v => new Date(v as any)),
+  scheduledSendAt: z.string().datetime().or(z.date()).optional().transform(v => v ? new Date(v as any) : undefined),
+  kind: z.enum(["deposit", "balance", "full", "recurring"]).default("full"),
+  quoteId: z.string().uuid().optional(),
+  jobDetails: z.string().trim().max(500).optional().or(z.literal("")).transform(v => v || undefined),
+  splitEnabled: z.boolean().optional(),
+  documentUrl: z.string().trim().max(500).optional().or(z.literal("")).transform(v => v || undefined),
+  documentName: z.string().trim().max(255).optional().or(z.literal("")).transform(v => v || undefined),
+});
+
+export const markJobPaidExternalSchema = z.object({
+  externalPaymentReference: z.string().trim().max(200).optional().or(z.literal("")).transform(v => v || undefined),
+});
+
+export const createJobScheduleSchema = z.object({
+  clientProfileId: z.string().uuid(),
+  amountCents: z.number().int().positive().max(100_000_000),
+  frequency: z.enum(["weekly", "fortnightly", "monthly"]),
+  deliveryChannel: z.enum(["email", "whatsapp", "sms"]),
+  startDate: z.string().datetime().or(z.date()).transform(v => new Date(v as any)),
+  endDate: z.string().datetime().or(z.date()).optional().transform(v => v ? new Date(v as any) : undefined),
+});
+
+export const updateJobScheduleSchema = z.object({
+  amountCents: z.number().int().positive().max(100_000_000).optional(),
+  frequency: z.enum(["weekly", "fortnightly", "monthly"]).optional(),
+  deliveryChannel: z.enum(["email", "whatsapp", "sms"]).optional(),
+  status: z.enum(["active", "paused", "terminated"]).optional(),
+});
+
+// Trades types
+export type ClientProfile = typeof clientProfiles.$inferSelect;
+export type InsertClientProfile = typeof clientProfiles.$inferInsert;
+export type Quote = typeof quotes.$inferSelect;
+export type JobInvoice = typeof jobInvoices.$inferSelect;
+export type JobSchedule = typeof jobSchedules.$inferSelect;
