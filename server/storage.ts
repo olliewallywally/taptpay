@@ -1,4 +1,4 @@
-import { merchants, transactions, merchantSettlements, platformFees, refunds, splitPayments, taptStones, stockItems, cryptoTransactions, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, tenantProfiles, activeSchedules, invoicesRentRequests, transactionEvents, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type CryptoTransaction, type InsertCryptoTransaction, type MerchantSubscription, type SubscriptionBillingHistory } from "@shared/schema";
+import { merchants, transactions, merchantSettlements, platformFees, refunds, splitPayments, taptStones, stockItems, cryptoTransactions, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, tenantProfiles, activeSchedules, invoicesRentRequests, transactionEvents, clientProfiles, quotes, jobInvoices, jobSchedules, jobEvents, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type CryptoTransaction, type InsertCryptoTransaction, type MerchantSubscription, type SubscriptionBillingHistory } from "@shared/schema";
 import { getDb, isDatabaseConnected } from "./database";
 import { eq, desc, and, inArray, gte, lte, or, ilike, sql } from "drizzle-orm";
 
@@ -1617,6 +1617,31 @@ export class MemStorage implements IStorage {
   async getTransactionEventsByTenant(tenantProfileId: string, limit?: number): Promise<any[]> { return []; }
   async getTransactionEventsByInvoice(invoiceId: string): Promise<any[]> { return []; }
 
+  // ── Trades — MemStorage stubs (DB-only feature) ───────────────────────────
+  async createClientProfile(data: any): Promise<any> { throw new Error("Trades requires database"); }
+  async getClientProfile(id: string): Promise<any> { return undefined; }
+  async getClientProfilesByMerchant(merchantId: number): Promise<any[]> { return []; }
+  async updateClientProfile(id: string, updates: any): Promise<any> { return undefined; }
+  async archiveClientProfile(id: string): Promise<any> { return undefined; }
+  async unarchiveClientProfile(id: string): Promise<any> { return undefined; }
+  async createQuote(data: any): Promise<any> { throw new Error("Trades requires database"); }
+  async getQuote(id: string): Promise<any> { return undefined; }
+  async getQuoteByToken(token: string): Promise<any> { return undefined; }
+  async getQuotesByMerchant(merchantId: number, opts?: any): Promise<any[]> { return []; }
+  async updateQuote(id: string, updates: any): Promise<any> { return undefined; }
+  async createJobInvoice(data: any): Promise<any> { throw new Error("Trades requires database"); }
+  async getJobInvoice(id: string): Promise<any> { return undefined; }
+  async getJobInvoiceByToken(token: string): Promise<any> { return undefined; }
+  async getJobInvoicesByMerchant(merchantId: number, opts?: any): Promise<any[]> { return []; }
+  async updateJobInvoice(id: string, updates: any): Promise<any> { return undefined; }
+  async createJobSchedule(data: any): Promise<any> { throw new Error("Trades requires database"); }
+  async getJobSchedule(id: string): Promise<any> { return undefined; }
+  async getJobSchedulesByMerchant(merchantId: number): Promise<any[]> { return []; }
+  async updateJobSchedule(id: string, updates: any): Promise<any> { return undefined; }
+  async terminateJobSchedule(id: string): Promise<any> { return undefined; }
+  async createJobEvent(data: any): Promise<any> { return undefined; }
+  async getJobEventsByClient(clientProfileId: string, limit?: number): Promise<any[]> { return []; }
+
 }
 
 // Database Storage Implementation
@@ -3173,6 +3198,151 @@ export class DatabaseStorage implements IStorage {
   async getTransactionEventsByInvoice(invoiceId: string): Promise<any[]> {
     const db = getDb(); if (!db) return [];
     return db.select().from(transactionEvents).where(eq(transactionEvents.invoiceId, invoiceId)).orderBy(desc(transactionEvents.createdAt));
+  }
+
+  // ───────── Trades: clients ─────────
+  async createClientProfile(data: any): Promise<any> {
+    const db = getDb(); if (!db) throw new Error('No database');
+    const [row] = await db.insert(clientProfiles).values(data).returning();
+    return row;
+  }
+  async getClientProfile(id: string): Promise<any> {
+    const db = getDb(); if (!db) return undefined;
+    const [row] = await db.select().from(clientProfiles).where(eq(clientProfiles.id, id));
+    return row;
+  }
+  async getClientProfilesByMerchant(merchantId: number): Promise<any[]> {
+    const db = getDb(); if (!db) return [];
+    return db.select().from(clientProfiles)
+      .where(eq(clientProfiles.merchantId, merchantId))
+      .orderBy(desc(clientProfiles.createdAt));
+  }
+  async updateClientProfile(id: string, updates: any): Promise<any> {
+    const db = getDb(); if (!db) return undefined;
+    const [row] = await db.update(clientProfiles)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(clientProfiles.id, id)).returning();
+    return row;
+  }
+  async archiveClientProfile(id: string): Promise<any> {
+    const db = getDb(); if (!db) return undefined;
+    const [row] = await db.update(clientProfiles)
+      .set({ status: "archived", archivedAt: new Date(), updatedAt: new Date() })
+      .where(eq(clientProfiles.id, id)).returning();
+    return row;
+  }
+  async unarchiveClientProfile(id: string): Promise<any> {
+    const db = getDb(); if (!db) return undefined;
+    const [row] = await db.update(clientProfiles)
+      .set({ status: "active", archivedAt: null, updatedAt: new Date() })
+      .where(eq(clientProfiles.id, id)).returning();
+    return row;
+  }
+
+  // ───────── Trades: quotes ─────────
+  async createQuote(data: any): Promise<any> {
+    const db = getDb(); if (!db) throw new Error('No database');
+    const [row] = await db.insert(quotes).values(data).returning();
+    return row;
+  }
+  async getQuote(id: string): Promise<any> {
+    const db = getDb(); if (!db) return undefined;
+    const [row] = await db.select().from(quotes).where(eq(quotes.id, id));
+    return row;
+  }
+  async getQuoteByToken(token: string): Promise<any> {
+    const db = getDb(); if (!db) return undefined;
+    const [row] = await db.select().from(quotes).where(eq(quotes.token, token));
+    return row;
+  }
+  async getQuotesByMerchant(merchantId: number, opts: { status?: string } = {}): Promise<any[]> {
+    const db = getDb(); if (!db) return [];
+    const conds = [eq(quotes.merchantId, merchantId)];
+    if (opts.status) conds.push(eq(quotes.status, opts.status));
+    return db.select().from(quotes).where(and(...conds)).orderBy(desc(quotes.createdAt));
+  }
+  async updateQuote(id: string, updates: any): Promise<any> {
+    const db = getDb(); if (!db) return undefined;
+    const [row] = await db.update(quotes)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(quotes.id, id)).returning();
+    return row;
+  }
+
+  // ───────── Trades: job invoices ─────────
+  async createJobInvoice(data: any): Promise<any> {
+    const db = getDb(); if (!db) throw new Error('No database');
+    const [row] = await db.insert(jobInvoices).values(data).returning();
+    return row;
+  }
+  async getJobInvoice(id: string): Promise<any> {
+    const db = getDb(); if (!db) return undefined;
+    const [row] = await db.select().from(jobInvoices).where(eq(jobInvoices.id, id));
+    return row;
+  }
+  async getJobInvoiceByToken(token: string): Promise<any> {
+    const db = getDb(); if (!db) return undefined;
+    const [row] = await db.select().from(jobInvoices).where(eq(jobInvoices.token, token));
+    return row;
+  }
+  async getJobInvoicesByMerchant(merchantId: number, opts: { status?: string; clientProfileId?: string } = {}): Promise<any[]> {
+    const db = getDb(); if (!db) return [];
+    const conds: any[] = [eq(jobInvoices.merchantId, merchantId)];
+    if (opts.status) conds.push(eq(jobInvoices.status, opts.status));
+    if (opts.clientProfileId) conds.push(eq(jobInvoices.clientProfileId, opts.clientProfileId));
+    return db.select().from(jobInvoices).where(and(...conds)).orderBy(desc(jobInvoices.createdAt));
+  }
+  async updateJobInvoice(id: string, updates: any): Promise<any> {
+    const db = getDb(); if (!db) return undefined;
+    const [row] = await db.update(jobInvoices)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(jobInvoices.id, id)).returning();
+    return row;
+  }
+
+  // ───────── Trades: job schedules ─────────
+  async createJobSchedule(data: any): Promise<any> {
+    const db = getDb(); if (!db) throw new Error('No database');
+    const [row] = await db.insert(jobSchedules).values(data).returning();
+    return row;
+  }
+  async getJobSchedule(id: string): Promise<any> {
+    const db = getDb(); if (!db) return undefined;
+    const [row] = await db.select().from(jobSchedules).where(eq(jobSchedules.id, id));
+    return row;
+  }
+  async getJobSchedulesByMerchant(merchantId: number): Promise<any[]> {
+    const db = getDb(); if (!db) return [];
+    return db.select().from(jobSchedules)
+      .where(eq(jobSchedules.merchantId, merchantId))
+      .orderBy(desc(jobSchedules.createdAt));
+  }
+  async updateJobSchedule(id: string, updates: any): Promise<any> {
+    const db = getDb(); if (!db) return undefined;
+    const [row] = await db.update(jobSchedules)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(jobSchedules.id, id)).returning();
+    return row;
+  }
+  async terminateJobSchedule(id: string): Promise<any> {
+    const db = getDb(); if (!db) return undefined;
+    const [row] = await db.update(jobSchedules)
+      .set({ status: "terminated", terminatedAt: new Date(), updatedAt: new Date() })
+      .where(eq(jobSchedules.id, id)).returning();
+    return row;
+  }
+
+  // ───────── Trades: events ─────────
+  async createJobEvent(data: any): Promise<any> {
+    const db = getDb(); if (!db) return undefined;
+    const [row] = await db.insert(jobEvents).values(data).returning();
+    return row;
+  }
+  async getJobEventsByClient(clientProfileId: string, limit = 50): Promise<any[]> {
+    const db = getDb(); if (!db) return [];
+    return db.select().from(jobEvents)
+      .where(eq(jobEvents.clientProfileId, clientProfileId))
+      .orderBy(desc(jobEvents.createdAt)).limit(limit);
   }
 
 }
