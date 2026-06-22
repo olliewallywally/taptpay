@@ -82,7 +82,7 @@ export default function QuoteBuilder() {
       <section style={{ maxWidth: 560, margin: "0 auto", background: "#fff", borderRadius: 22, padding: 24 }}>
         <div style={{ color: T.GREEN, fontWeight: 800, fontSize: 12, textTransform: "uppercase", letterSpacing: ".12em" }}>Quote created</div>
         <h1 style={{ margin: "10px 0 6px" }}>{money(created.totalCents)}</h1>
-        <p style={{ color: "#687078" }}>Dispatch is added in the next phase. Share this customer link for now.</p>
+        <p style={{ color: "#687078" }}>{created.delivered ? "Quote sent to the client." : "Delivery was unavailable. Share this customer link instead."}</p>
         <input readOnly value={publicUrl} style={inputStyle} onFocus={e => e.currentTarget.select()} />
         <button onClick={() => navigator.clipboard?.writeText(publicUrl)} style={{ ...buttonStyle, marginTop: 12 }}>Copy link</button>
         <button onClick={() => setLocation("/trades/terminal")} style={linkStyle}>Back to terminal</button>

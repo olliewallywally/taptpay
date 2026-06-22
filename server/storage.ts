@@ -232,8 +232,14 @@ export interface IStorage {
   createJobInvoice(data: any): Promise<any>;
   getJobInvoice(id: string): Promise<any | undefined>;
   getJobInvoiceByToken(token: string): Promise<any | undefined>;
+  getJobInvoiceByWindcaveSessionId(sessionId: string): Promise<any | undefined>;
+  getJobInvoiceByWhatsappMessageId(messageId: string): Promise<any | undefined>;
   getJobInvoicesByMerchant(merchantId: number, opts?: { status?: string; clientProfileId?: string }): Promise<any[]>;
   updateJobInvoice(id: string, updates: any): Promise<any | undefined>;
+  atomicClaimJobSplitShare(invoiceId: string, sessionId: string): Promise<any | null>;
+  getPendingDispatchJobInvoices(): Promise<any[]>;
+  getOverdueEligibleJobInvoices(now: Date): Promise<any[]>;
+  getReminderEligibleJobInvoices(): Promise<any[]>;
 
   createJobSchedule(data: any): Promise<any>;
   getJobSchedule(id: string): Promise<any | undefined>;
@@ -1666,8 +1672,14 @@ export class MemStorage implements IStorage {
   async createJobInvoice(data: any): Promise<any> { throw new Error("Trades requires database"); }
   async getJobInvoice(id: string): Promise<any> { return undefined; }
   async getJobInvoiceByToken(token: string): Promise<any> { return undefined; }
+  async getJobInvoiceByWindcaveSessionId(sessionId: string): Promise<any> { return undefined; }
+  async getJobInvoiceByWhatsappMessageId(messageId: string): Promise<any> { return undefined; }
   async getJobInvoicesByMerchant(merchantId: number, opts?: any): Promise<any[]> { return []; }
   async updateJobInvoice(id: string, updates: any): Promise<any> { return undefined; }
+  async atomicClaimJobSplitShare(invoiceId: string, sessionId: string): Promise<any | null> { return null; }
+  async getPendingDispatchJobInvoices(): Promise<any[]> { return []; }
+  async getOverdueEligibleJobInvoices(now: Date): Promise<any[]> { return []; }
+  async getReminderEligibleJobInvoices(): Promise<any[]> { return []; }
   async createJobSchedule(data: any): Promise<any> { throw new Error("Trades requires database"); }
   async getJobSchedule(id: string): Promise<any> { return undefined; }
   async getJobSchedulesByMerchant(merchantId: number): Promise<any[]> { return []; }
@@ -3153,11 +3165,23 @@ export class DatabaseStorage implements IStorage {
   }
   async getInvoiceRentRequestByToken(token: string): Promise<any> {
     const db = getDb(); if (!db) return undefined;
-    const [r] = await db.select().from(invoicesRentRequests).where(eq(invoicesRentRequests.token, token)).limit(1); return r;
+    try {
+      const [row] = await db.select().from(invoicesRentRequests).where(eq(invoicesRentRequests.token, token)).limit(1);
+      return row;
+    } catch (error) {
+      if (isNeonEmptyResultError(error)) return undefined;
+      throw error;
+    }
   }
   async getInvoiceRentRequestByWindcaveSessionId(sessionId: string): Promise<any> {
     const db = getDb(); if (!db) return undefined;
-    const [r] = await db.select().from(invoicesRentRequests).where(eq(invoicesRentRequests.windcaveSessionId, sessionId)).limit(1); return r;
+    try {
+      const [row] = await db.select().from(invoicesRentRequests).where(eq(invoicesRentRequests.windcaveSessionId, sessionId)).limit(1);
+      return row;
+    } catch (error) {
+      if (isNeonEmptyResultError(error)) return undefined;
+      throw error;
+    }
   }
   async atomicClaimSplitShare(invoiceId: string, sessionId: string): Promise<any | null> {
     const db = getDb(); if (!db) return null;
@@ -3330,6 +3354,26 @@ export class DatabaseStorage implements IStorage {
       throw error;
     }
   }
+  async getJobInvoiceByWindcaveSessionId(sessionId: string): Promise<any> {
+    const db = getDb(); if (!db) return undefined;
+    try {
+      const [row] = await db.select().from(jobInvoices).where(eq(jobInvoices.windcaveSessionId, sessionId)).limit(1);
+      return row;
+    } catch (error) {
+      if (isNeonEmptyResultError(error)) return undefined;
+      throw error;
+    }
+  }
+  async getJobInvoiceByWhatsappMessageId(messageId: string): Promise<any> {
+    const db = getDb(); if (!db) return undefined;
+    try {
+      const [row] = await db.select().from(jobInvoices).where(eq(jobInvoices.whatsappMessageId, messageId)).limit(1);
+      return row;
+    } catch (error) {
+      if (isNeonEmptyResultError(error)) return undefined;
+      throw error;
+    }
+  }
   async getJobInvoicesByMerchant(merchantId: number, opts: { status?: string; clientProfileId?: string } = {}): Promise<any[]> {
     const db = getDb(); if (!db) return [];
     const conds: any[] = [eq(jobInvoices.merchantId, merchantId)];
@@ -3343,6 +3387,40 @@ export class DatabaseStorage implements IStorage {
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(jobInvoices.id, id)).returning();
     return row;
+  }
+  async atomicClaimJobSplitShare(invoiceId: string, sessionId: string): Promise<any | null> {
+    const db = getDb(); if (!db) return null;
+    const [updated] = await db.update(jobInvoices)
+      .set({
+        splitPaidCount: sql`${jobInvoices.splitPaidCount} + 1`,
+        splitPaidSessions: sql`array_append(COALESCE(${jobInvoices.splitPaidSessions}, ARRAY[]::text[]), ${sessionId})`,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(jobInvoices.id, invoiceId),
+        sql`NOT (${sessionId} = ANY(COALESCE(${jobInvoices.splitPaidSessions}, ARRAY[]::text[])))`,
+        sql`${jobInvoices.splitPaidCount} < ${jobInvoices.splitCount}`,
+        sql`${jobInvoices.status} NOT IN ('paid', 'paid_external', 'voided')`,
+      ))
+      .returning();
+    return updated ?? null;
+  }
+  async getPendingDispatchJobInvoices(): Promise<any[]> {
+    const db = getDb(); if (!db) return [];
+    return db.select().from(jobInvoices)
+      .where(inArray(jobInvoices.status, ["pending_dispatch", "dispatch_failed"]))
+      .orderBy(jobInvoices.createdAt);
+  }
+  async getOverdueEligibleJobInvoices(now: Date): Promise<any[]> {
+    const db = getDb(); if (!db) return [];
+    return db.select().from(jobInvoices)
+      .where(and(inArray(jobInvoices.status, ["dispatched", "viewed"]), lte(jobInvoices.dueAt, now)));
+  }
+  async getReminderEligibleJobInvoices(): Promise<any[]> {
+    const db = getDb(); if (!db) return [];
+    return db.select().from(jobInvoices)
+      .where(eq(jobInvoices.status, "balance_due"))
+      .orderBy(jobInvoices.dueAt);
   }
 
   // ───────── Trades: job schedules ─────────

@@ -165,7 +165,7 @@ function CheckoutInner() {
             id: invoiceData.invoiceId,
             merchantId: invoiceData.merchantId,
             price: (invoiceChargeCents / 100).toFixed(2),
-            itemName: invoiceData.kind === "charge" ? (invoiceData.description || "Payment") : "Rent",
+            itemName: invoiceData.vertical === "trades" ? (invoiceData.description || "Job invoice") : (invoiceData.kind === "charge" ? (invoiceData.description || "Payment") : "Rent"),
             taptStoneId: null,
             splitEnabled: false, // invoice splits are handled in-page, not via /split/:id
             isSplit: false,
