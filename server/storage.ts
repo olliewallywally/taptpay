@@ -2,6 +2,10 @@ import { merchants, transactions, merchantSettlements, platformFees, refunds, sp
 import { getDb, isDatabaseConnected } from "./database";
 import { eq, desc, and, inArray, gte, lte, or, ilike, sql } from "drizzle-orm";
 
+function isNeonEmptyResultError(error: unknown): boolean {
+  return error instanceof TypeError && error.message === "Cannot read properties of null (reading 'map')";
+}
+
 export interface IStorage {
   // Merchant operations
   getMerchant(id: number): Promise<Merchant | undefined>;
@@ -3283,8 +3287,13 @@ export class DatabaseStorage implements IStorage {
   }
   async getQuoteByToken(token: string): Promise<any> {
     const db = getDb(); if (!db) return undefined;
-    const [row] = await db.select().from(quotes).where(eq(quotes.token, token));
-    return row;
+    try {
+      const [row] = await db.select().from(quotes).where(eq(quotes.token, token)).limit(1);
+      return row;
+    } catch (error) {
+      if (isNeonEmptyResultError(error)) return undefined;
+      throw error;
+    }
   }
   async getQuotesByMerchant(merchantId: number, opts: { status?: string } = {}): Promise<any[]> {
     const db = getDb(); if (!db) return [];
@@ -3313,8 +3322,13 @@ export class DatabaseStorage implements IStorage {
   }
   async getJobInvoiceByToken(token: string): Promise<any> {
     const db = getDb(); if (!db) return undefined;
-    const [row] = await db.select().from(jobInvoices).where(eq(jobInvoices.token, token));
-    return row;
+    try {
+      const [row] = await db.select().from(jobInvoices).where(eq(jobInvoices.token, token)).limit(1);
+      return row;
+    } catch (error) {
+      if (isNeonEmptyResultError(error)) return undefined;
+      throw error;
+    }
   }
   async getJobInvoicesByMerchant(merchantId: number, opts: { status?: string; clientProfileId?: string } = {}): Promise<any[]> {
     const db = getDb(); if (!db) return [];
