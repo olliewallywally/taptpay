@@ -48,6 +48,11 @@ const TenantDirectory       = lazy(() => import("@/pages/property/tenant-directo
 const TenantProfile         = lazy(() => import("@/pages/property/tenant-profile"));
 const PropertyAnalytics     = lazy(() => import("@/pages/property/property-analytics"));
 const PropertyTerminal      = lazy(() => import("@/pages/property/property-terminal"));
+const TradesDashboard       = lazy(() => import("@/pages/trades/trades-dashboard"));
+const TradesClientDirectory = lazy(() => import("@/pages/trades/client-directory"));
+const TradesClientProfile   = lazy(() => import("@/pages/trades/client-profile"));
+const TradesAnalytics       = lazy(() => import("@/pages/trades/trades-analytics"));
+const TradesTerminal        = lazy(() => import("@/pages/trades/trades-terminal"));
 
 function PageLoader() {
   return (
@@ -266,6 +271,22 @@ function Router() {
           </Route>
           <Route path="/property/terminal">
             <ProtectedRoute><PropertyTerminal /></ProtectedRoute>
+          </Route>
+          {/* ── Trades section ── */}
+          <Route path="/trades">
+            <ProtectedRoute><TradesDashboard /></ProtectedRoute>
+          </Route>
+          <Route path="/trades/clients">
+            <ProtectedRoute><TradesClientDirectory /></ProtectedRoute>
+          </Route>
+          <Route path="/trades/clients/:id">
+            <ProtectedRoute><TradesClientProfile /></ProtectedRoute>
+          </Route>
+          <Route path="/trades/analytics">
+            <ProtectedRoute><TradesAnalytics /></ProtectedRoute>
+          </Route>
+          <Route path="/trades/terminal">
+            <ProtectedRoute><TradesTerminal /></ProtectedRoute>
           </Route>
           {/* Public rent/charge checkout — no auth required. Uses the shared
               branded Checkout page (same UI as retail) via the invoice token. */}
