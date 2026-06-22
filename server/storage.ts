@@ -234,6 +234,7 @@ export interface IStorage {
   createJobSchedule(data: any): Promise<any>;
   getJobSchedule(id: string): Promise<any | undefined>;
   getJobSchedulesByMerchant(merchantId: number): Promise<any[]>;
+  getDueJobSchedules(now: Date): Promise<any[]>;
   updateJobSchedule(id: string, updates: any): Promise<any | undefined>;
   terminateJobSchedule(id: string): Promise<any | undefined>;
 
@@ -1666,6 +1667,7 @@ export class MemStorage implements IStorage {
   async createJobSchedule(data: any): Promise<any> { throw new Error("Trades requires database"); }
   async getJobSchedule(id: string): Promise<any> { return undefined; }
   async getJobSchedulesByMerchant(merchantId: number): Promise<any[]> { return []; }
+  async getDueJobSchedules(now: Date): Promise<any[]> { return []; }
   async updateJobSchedule(id: string, updates: any): Promise<any> { return undefined; }
   async terminateJobSchedule(id: string): Promise<any> { return undefined; }
   async createJobEvent(data: any): Promise<any> { return undefined; }
@@ -3345,6 +3347,11 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(jobSchedules)
       .where(eq(jobSchedules.merchantId, merchantId))
       .orderBy(desc(jobSchedules.createdAt));
+  }
+  async getDueJobSchedules(now: Date): Promise<any[]> {
+    const db = getDb(); if (!db) return [];
+    return db.select().from(jobSchedules)
+      .where(and(eq(jobSchedules.status, "active"), lte(jobSchedules.nextRunDate, now)));
   }
   async updateJobSchedule(id: string, updates: any): Promise<any> {
     const db = getDb(); if (!db) return undefined;

@@ -6832,11 +6832,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
       const parsed = createJobScheduleSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
+      if (parsed.data.endDate && parsed.data.endDate < parsed.data.startDate)
+        return res.status(400).json({ message: "End date cannot be before start date" });
       const client = await storage.getClientProfile(parsed.data.clientProfileId);
       if (!client || client.merchantId !== merchantId) return res.status(404).json({ message: "Client not found" });
       const row = await storage.createJobSchedule({
         ...parsed.data, merchantId, nextRunDate: parsed.data.startDate,
       });
+      await storage.createJobEvent({ merchantId, clientProfileId: row.clientProfileId, scheduleId: row.id, eventType: "schedule_created", payload: { amountCents: row.amountCents, frequency: row.frequency } });
       res.status(201).json(row);
     } catch (err) { console.error("[TRADES_SCHEDULES_POST]", err); res.status(500).json({ message: "Failed to create schedule" }); }
   });
@@ -6848,7 +6851,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
       const parsed = updateJobScheduleSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
-      res.json(await storage.updateJobSchedule(req.params.id, parsed.data));
+      const row = await storage.updateJobSchedule(req.params.id, parsed.data);
+      await storage.createJobEvent({ merchantId, clientProfileId: existing.clientProfileId, scheduleId: existing.id, eventType: parsed.data.status === "paused" ? "schedule_paused" : parsed.data.status === "active" ? "schedule_resumed" : "schedule_updated", payload: parsed.data });
+      res.json(row);
     } catch (err) { console.error("[TRADES_SCHEDULES_PUT]", err); res.status(500).json({ message: "Failed to update schedule" }); }
   });
   app.delete("/api/trades/schedules/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
@@ -6857,7 +6862,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
       const existing = await storage.getJobSchedule(req.params.id);
       if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
-      res.json(await storage.terminateJobSchedule(req.params.id));
+      const row = await storage.terminateJobSchedule(req.params.id);
+      await storage.createJobEvent({ merchantId, clientProfileId: existing.clientProfileId, scheduleId: existing.id, eventType: "schedule_terminated" });
+      res.json(row);
     } catch (err) { console.error("[TRADES_SCHEDULES_DELETE]", err); res.status(500).json({ message: "Failed to delete schedule" }); }
   });
 
@@ -6875,16 +6882,18 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
     try {
       const { runGeneratePass, runDispatchPass, runOverduePass, runReminderPass } = await import("./property-cron");
+      const { runTradesGeneratePass } = await import("./trades-cron");
       const now = new Date();
       const baseUrl = getBaseUrl(req);
       // Sequential: generate must complete before dispatch (dispatch reads the
       // invoices generate creates), and overdue must precede the reminder pass.
       const generate  = await runGeneratePass(now);
+      const tradesGenerate = await runTradesGeneratePass(now);
       const dispatch  = await runDispatchPass(baseUrl);
       const overdue   = await runOverduePass(now);
       const reminders = await runReminderPass(baseUrl, now);
-      console.log(`[CRON] generate=${JSON.stringify(generate)} dispatch=${JSON.stringify(dispatch)} overdue=${JSON.stringify(overdue)} reminders=${JSON.stringify(reminders)}`);
-      res.json({ ok: true, ranAt: now.toISOString(), generate, dispatch, overdue, reminders });
+      console.log(`[CRON] generate=${JSON.stringify(generate)} tradesGenerate=${JSON.stringify(tradesGenerate)} dispatch=${JSON.stringify(dispatch)} overdue=${JSON.stringify(overdue)} reminders=${JSON.stringify(reminders)}`);
+      res.json({ ok: true, ranAt: now.toISOString(), generate, tradesGenerate, dispatch, overdue, reminders });
     } catch (err) { console.error("[CRON]", err); res.status(500).json({ message: "Cron run failed" }); }
   });
 

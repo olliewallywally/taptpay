@@ -55,6 +55,7 @@ const TradesAnalytics       = lazy(() => import("@/pages/trades/trades-analytics
 const TradesTerminal        = lazy(() => import("@/pages/trades/trades-terminal"));
 const TradesQuoteBuilder    = lazy(() => import("@/pages/trades/quote-builder"));
 const TradesQuoteResponse   = lazy(() => import("@/pages/trades/quote-response"));
+const TradesRecurring       = lazy(() => import("@/pages/trades/recurring-schedules"));
 
 function PageLoader() {
   return (
@@ -296,6 +297,9 @@ function Router() {
             <ProtectedRoute><TradesQuoteBuilder /></ProtectedRoute>
           </Route>
           <Route path="/trades/quote/:token" component={TradesQuoteResponse} />
+          <Route path="/trades/recurring">
+            <ProtectedRoute><TradesRecurring /></ProtectedRoute>
+          </Route>
           {/* Public rent/charge checkout — no auth required. Uses the shared
               branded Checkout page (same UI as retail) via the invoice token. */}
           <Route path="/r/:token" component={Checkout} />
