@@ -53,6 +53,8 @@ const TradesClientDirectory = lazy(() => import("@/pages/trades/client-directory
 const TradesClientProfile   = lazy(() => import("@/pages/trades/client-profile"));
 const TradesAnalytics       = lazy(() => import("@/pages/trades/trades-analytics"));
 const TradesTerminal        = lazy(() => import("@/pages/trades/trades-terminal"));
+const TradesQuoteBuilder    = lazy(() => import("@/pages/trades/quote-builder"));
+const TradesQuoteResponse   = lazy(() => import("@/pages/trades/quote-response"));
 
 function PageLoader() {
   return (
@@ -70,6 +72,7 @@ type AuthData = {
   merchantId?: string | null;
   role?: string | null;
   onboardingCompleted?: boolean | null;
+  gstRegistered?: boolean;
 };
 
 const AuthContext = createContext<{ auth: AuthData | null; isChecking: boolean }>({
@@ -97,6 +100,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
             merchantId: data?.user?.merchantId ?? null,
             role: data?.user?.role ?? null,
             onboardingCompleted: data?.user?.onboardingCompleted ?? null,
+            gstRegistered: data?.user?.gstRegistered ?? false,
           });
         } else {
           localStorage.removeItem("authToken");
@@ -288,6 +292,10 @@ function Router() {
           <Route path="/trades/terminal">
             <ProtectedRoute><TradesTerminal /></ProtectedRoute>
           </Route>
+          <Route path="/trades/quote">
+            <ProtectedRoute><TradesQuoteBuilder /></ProtectedRoute>
+          </Route>
+          <Route path="/trades/quote/:token" component={TradesQuoteResponse} />
           {/* Public rent/charge checkout — no auth required. Uses the shared
               branded Checkout page (same UI as retail) via the invoice token. */}
           <Route path="/r/:token" component={Checkout} />

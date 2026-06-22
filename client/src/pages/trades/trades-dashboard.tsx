@@ -28,12 +28,18 @@ export default function TradesDashboard() {
   const [, setLocation] = useLocation();
   return (
     <Shell title="Jobs" subtitle="Your quotes, jobs and invoices">
-      <EmptyState label="Open the terminal to send an invoice. Quotes & the full job flow land in Phase 3b." />
+      <EmptyState label="Open the terminal to create quotes, send invoices and manage jobs." />
       <button
         onClick={() => setLocation('/trades/terminal')}
         style={{ marginTop: 18, width: '100%', background: T.INK, border: 'none', borderRadius: 14, color: '#fff', fontWeight: 700, fontSize: 15, padding: '15px', cursor: 'pointer' }}
       >
         Open terminal →
+      </button>
+      <button
+        onClick={() => setLocation('/trades/clients')}
+        style={{ marginTop: 10, width: '100%', background: T.ACCENT, border: 'none', borderRadius: 14, color: '#fff', fontWeight: 700, fontSize: 15, padding: '15px', cursor: 'pointer' }}
+      >
+        Manage clients
       </button>
       <button
         onClick={() => setLocation('/settings')}

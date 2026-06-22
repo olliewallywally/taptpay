@@ -669,10 +669,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     const merchantId = req.user!.merchantId;
     let onboardingCompleted = true; // default for non-merchant users
     let merchantStatus: string | null = null;
+    let gstRegistered = false;
     if (merchantId) {
       const merchant = await storage.getMerchant(merchantId);
       onboardingCompleted = merchant?.onboardingCompleted ?? false;
       merchantStatus = merchant?.status ?? null;
+      gstRegistered = merchant?.gstRegistered ?? false;
     }
     res.json({
       user: {
@@ -682,6 +684,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         role: req.user!.role,
         onboardingCompleted,
         merchantStatus,
+        gstRegistered,
       },
     });
   });
@@ -6517,19 +6520,19 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Compute subtotal/GST/total/deposit for a quote from its line items.
   // Amounts are GST-INCLUSIVE: gst is the portion already inside the total.
   function computeQuoteTotals(
-    lineItems: Array<{ lineTotalCents: number }>,
+    lineItems: Array<{ qty: number; unitPriceCents: number }>,
     gstRegistered: boolean,
     depositEnabled: boolean,
     depositType?: string,
     depositValue?: number,
   ) {
-    const totalCents = lineItems.reduce((s, li) => s + li.lineTotalCents, 0);
+    const totalCents = lineItems.reduce((s, li) => s + Math.round(li.qty * li.unitPriceCents), 0);
     const gstCents = gstRegistered ? Math.round(totalCents - totalCents / (1 + GST_RATE)) : 0;
     const subtotalCents = totalCents - gstCents;
     let depositCents: number | null = null;
     if (depositEnabled && depositType && depositValue != null) {
       depositCents = depositType === "percent"
-        ? Math.round(totalCents * (depositValue / 100))
+        ? Math.round(totalCents * (Math.min(100, Math.max(0, depositValue)) / 100))
         : Math.min(depositValue, totalCents);
     }
     return { subtotalCents, gstCents, totalCents, depositCents };
@@ -6605,17 +6608,25 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
       const parsed = createQuoteSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
+      if (parsed.data.depositEnabled && (!parsed.data.depositType || !parsed.data.depositValue || parsed.data.depositValue <= 0))
+        return res.status(400).json({ message: "Deposit type and value are required" });
+      if (parsed.data.depositEnabled && parsed.data.depositType === "percent" && (parsed.data.depositValue ?? 0) > 100)
+        return res.status(400).json({ message: "Deposit percentage cannot exceed 100" });
       const client = await storage.getClientProfile(parsed.data.clientProfileId);
       if (!client || client.merchantId !== merchantId) return res.status(404).json({ message: "Client not found" });
       const merchant = await storage.getMerchant(merchantId);
-      const totals = computeQuoteTotals(parsed.data.lineItems, !!merchant?.gstRegistered,
+      const lineItems = parsed.data.lineItems.map(item => ({
+        ...item,
+        lineTotalCents: Math.round(item.qty * item.unitPriceCents),
+      }));
+      const totals = computeQuoteTotals(lineItems, !!merchant?.gstRegistered,
         parsed.data.depositEnabled, parsed.data.depositType, parsed.data.depositValue);
       const token = generateInvoiceToken();
       const row = await storage.createQuote({
         merchantId,
         clientProfileId: parsed.data.clientProfileId,
         token, status: "sent",
-        lineItems: parsed.data.lineItems,
+        lineItems,
         subtotalCents: totals.subtotalCents, gstCents: totals.gstCents, totalCents: totals.totalCents,
         depositEnabled: parsed.data.depositEnabled,
         depositType: parsed.data.depositType ?? null,
@@ -6642,6 +6653,30 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       res.json(row);
     } catch (err) { console.error("[TRADES_QUOTES_GET_ID]", err); res.status(500).json({ message: "Failed to fetch quote" }); }
   });
+  // Public quote view. Keep the response deliberately narrow: customers need the
+  // quote, client display details, and merchant trading name, not merchant secrets.
+  app.get("/api/trades/quotes/token/:token", async (req, res) => {
+    try {
+      let quote = await storage.getQuoteByToken(req.params.token);
+      if (!quote) return res.status(404).json({ message: "Quote not found" });
+      if (!["accepted", "declined", "expired"].includes(quote.status) && quote.validUntil && new Date(quote.validUntil) < new Date()) {
+        quote = await storage.updateQuote(quote.id, { status: "expired" }) ?? quote;
+      } else if (quote.status === "sent") {
+        quote = await storage.updateQuote(quote.id, { status: "viewed", viewedAt: new Date() }) ?? quote;
+        await storage.createJobEvent({ merchantId: quote.merchantId, clientProfileId: quote.clientProfileId, quoteId: quote.id, eventType: "quote_viewed" });
+      }
+      const [client, merchant] = await Promise.all([
+        storage.getClientProfile(quote.clientProfileId),
+        storage.getMerchant(quote.merchantId),
+      ]);
+      if (!client || !merchant) return res.status(404).json({ message: "Quote details unavailable" });
+      res.json({
+        quote,
+        client: { firstName: client.firstName, lastName: client.lastName, siteAddress: client.siteAddress },
+        merchant: { name: merchant.name, businessName: merchant.businessName, gstRegistered: merchant.gstRegistered },
+      });
+    } catch (err) { console.error("[TRADES_QUOTES_TOKEN_GET]", err); res.status(500).json({ message: "Failed to fetch quote" }); }
+  });
   // Customer-facing accept/decline (called from the public quote page, no auth — looked up by token)
   app.post("/api/trades/quotes/token/:token/respond", async (req, res) => {
     try {
@@ -6651,6 +6686,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!quote) return res.status(404).json({ message: "Quote not found" });
       if (quote.status === "accepted" || quote.status === "declined")
         return res.status(409).json({ message: "Already responded" });
+      if (quote.status === "expired" || (quote.validUntil && new Date(quote.validUntil) < new Date())) {
+        if (quote.status !== "expired") await storage.updateQuote(quote.id, { status: "expired" });
+        return res.status(410).json({ message: "Quote has expired" });
+      }
       if (!parsed.data.accept) {
         const declined = await storage.updateQuote(quote.id, { status: "declined", declinedAt: new Date() });
         await storage.createJobEvent({ merchantId: quote.merchantId, clientProfileId: quote.clientProfileId, quoteId: quote.id, eventType: "quote_declined" });
@@ -6723,7 +6762,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const dep = await storage.getJobInvoice(req.params.id);
       if (!dep || dep.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
       if (dep.kind !== "deposit") return res.status(400).json({ message: "Balance can only be sent for a deposit invoice" });
+      if (!["paid", "paid_external", "deposit_paid"].includes(dep.status))
+        return res.status(409).json({ message: "Deposit must be paid before sending the balance" });
       const quote = dep.quoteId ? await storage.getQuote(dep.quoteId) : null;
+      const existingInvoices = await storage.getJobInvoicesByMerchant(merchantId, { clientProfileId: dep.clientProfileId });
+      if (existingInvoices.some((invoice: any) => invoice.quoteId === dep.quoteId && invoice.kind === "balance" && invoice.status !== "voided"))
+        return res.status(409).json({ message: "Balance invoice already exists" });
       const balanceCents = quote ? Math.max(quote.totalCents - (dep.amountCents || 0), 0) : 0;
       if (balanceCents <= 0) return res.status(400).json({ message: "No balance remaining" });
       const due = new Date(); due.setDate(due.getDate() + 7);
@@ -6758,7 +6802,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
       const inv = await storage.getJobInvoice(req.params.id);
       if (!inv || inv.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
-      res.json(await storage.updateJobInvoice(req.params.id, { status: "paid", completedAt: new Date() }));
+      if (!["paid", "paid_external"].includes(inv.status))
+        return res.status(409).json({ message: "Invoice must be paid before completing the job" });
+      const row = await storage.updateJobInvoice(req.params.id, { completedAt: new Date() });
+      await storage.createJobEvent({ merchantId: inv.merchantId, clientProfileId: inv.clientProfileId, jobInvoiceId: inv.id, eventType: "job_completed" });
+      res.json(row);
     } catch (err) { console.error("[TRADES_INVOICES_COMPLETE]", err); res.status(500).json({ message: "Failed to complete invoice" }); }
   });
   app.post("/api/trades/invoices/:id/void", authenticateToken, async (req: AuthenticatedRequest, res) => {
