@@ -501,7 +501,7 @@ function SentSuccess({ amount, label, go }: any) {
 }
 
 /* ═══ Job action sheet — tap a job row to mark received externally / cancel ═══ */
-function JobActionSheet({ invoice, onClose, onMarkReceived, onVoid, busy }: any) {
+function JobActionSheet({ invoice, onClose, onMarkReceived, onSendBalance, onComplete, onVoid, busy }: any) {
   const st = invoiceStatusFor(invoice);
   const settled = st === 'paid';
 
@@ -535,15 +535,16 @@ function JobActionSheet({ invoice, onClose, onMarkReceived, onVoid, busy }: any)
         </div>
 
         {settled ? (
-          <div style={{ textAlign: 'center', padding: '8px 0 18px', color: 'rgba(26,29,33,0.5)', fontSize: 14, fontWeight: 500 }}>
-            this invoice is already settled
-          </div>
+          invoice.completedAt
+            ? <div style={{ textAlign: 'center', padding: '8px 0 18px', color: 'rgba(26,29,33,0.5)', fontSize: 14, fontWeight: 500 }}>this job is complete</div>
+            : <Action label="mark job complete" onClick={onComplete} primary />
         ) : (
           <>
             <Action label="mark received externally" onClick={onMarkReceived} />
             <Action label="cancel invoice" onClick={onVoid} danger />
           </>
         )}
+        {invoice.kind === 'deposit' && settled && !invoice.balanceSent && <Action label="send remaining balance" onClick={onSendBalance} primary />}
         <Action label="close" onClick={onClose} />
       </div>
     </div>
@@ -586,13 +587,27 @@ export default function TradesTerminal() {
     staleTime: 30000, retry: false,
   });
 
+  const { data: rawQuotes = [] } = useQuery<any[]>({
+    queryKey: ['/api/trades/quotes'],
+    queryFn: () => tradesFetch('/api/trades/quotes').then(r => r.ok ? r.json() : []),
+    staleTime: 30000, retry: false,
+  });
+
   // The invoices endpoint returns plain rows; decorate each with its client's name
   // (looked up from the clients query) so the stack + action sheet can show it.
   const clientById = (id: string) => (clients as any[]).find((c: any) => c.id === id);
   const invoices = (rawInvoices as any[]).map((i: any) => {
     const c = clientById(i.clientProfileId);
-    return { ...i, clientName: c ? clientName(c) : '' };
+    const balanceSent = i.kind === 'deposit' && (rawInvoices as any[]).some((other: any) => other.quoteId === i.quoteId && other.kind === 'balance' && other.status !== 'voided');
+    return { ...i, clientName: c ? clientName(c) : '', balanceSent };
   });
+  const quoteRows = (rawQuotes as any[])
+    .filter((q: any) => !['accepted', 'expired'].includes(q.status))
+    .map((q: any) => {
+      const c = clientById(q.clientProfileId);
+      return { ...q, id: `quote-${q.id}`, quoteId: q.id, isQuote: true, kind: 'quote', amountCents: q.totalCents, clientName: c ? clientName(c) : '' };
+    });
+  const stackRows = [...quoteRows, ...invoices].sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   /* Mutations */
   const invoiceMutation = useMutation({
@@ -651,6 +666,20 @@ export default function TradesTerminal() {
     onError: (e: any) => { toast(e?.message || 'Could not cancel'); },
   });
 
+  const jobActionMutation = useMutation({
+    mutationFn: async ({ invoiceId, action }: { invoiceId: string; action: 'send-balance' | 'complete' }) => {
+      const r = await fetch(`/api/trades/invoices/${invoiceId}/${action}`, { method: 'POST', headers: tradesHeaders() });
+      if (!r.ok) throw new Error(await r.json().then((d: any) => d.message).catch(() => 'Action failed'));
+      return r.json();
+    },
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/trades/invoices'] });
+      setBanner(vars.action === 'send-balance' ? 'Balance invoice created' : 'Job completed');
+      setRowAction(null);
+    },
+    onError: (e: any) => toast(e?.message || 'Action failed'),
+  });
+
   /* Helpers */
   const toast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 1600); };
   const outstanding = (invoices as any[])
@@ -697,7 +726,10 @@ export default function TradesTerminal() {
     setScreen('amount');
   };
 
-  const handleRowTap = (inv: any) => { setRowAction(inv); };
+  const handleRowTap = (inv: any) => {
+    if (inv.isQuote) { setLocation(`/trades/clients/${inv.clientProfileId}`); return; }
+    setRowAction(inv);
+  };
 
   const handleVoid = () => {
     const inv = rowAction;
@@ -721,7 +753,7 @@ export default function TradesTerminal() {
   const handleSubbarPick = (i: number) => {
     const dest = SUBBAR_ROUTE[i];
     if (!dest || dest === screen) return;
-    if (dest === 'quote') { toast('quotes land in Phase 3b'); return; }
+    if (dest === 'quote') { setLocation('/trades/quote'); return; }
     if ((dest === 'invoice' || dest === 'external') && !selectedClient) {
       setPendingDest(dest as 'invoice' | 'external');
       if (screen === 'home') triggerConveyor(screen, 'up');
@@ -766,7 +798,7 @@ export default function TradesTerminal() {
   const conveyorDir     = conveyor?.dir || 'up';
 
   const renderScreen = (id: string) => {
-    if (id === 'home')     return <JobsHome invoices={invoices} outstanding={outstanding} go={go} onRowTap={handleRowTap} />;
+    if (id === 'home')     return <JobsHome invoices={stackRows} outstanding={outstanding} go={go} onRowTap={handleRowTap} />;
     if (id === 'clients')  return <ChooseClient clients={clients} invoices={invoices} go={go} onSelect={handleClientSelect} />;
     if (id === 'amount')   return <AmountKeypad go={go} selectedClient={selectedClient} backTo={'invoice'} onCommit={(c: number) => { setAmount(c); go('invoice'); }} />;
     if (id === 'invoice')  return <QuickInvoice go={go} selectedClient={selectedClient} amount={amount} onEditAmount={() => go('amount')} jobNote={jobNote} setJobNote={setJobNote} onSend={() => { if (!selectedClient || amount <= 0) { toast('set an amount first'); return; } invoiceMutation.mutate({ clientId: selectedClient.id, amountCents: amount, channel: selectedClient.preferredChannel || 'email', jobDetails: jobNote }); }} sending={invoiceMutation.isPending} />;
@@ -813,8 +845,10 @@ export default function TradesTerminal() {
       {rowAction && (
         <JobActionSheet
           invoice={rowAction}
-          busy={voidMutation.isPending || markMutation.isPending}
+          busy={voidMutation.isPending || markMutation.isPending || jobActionMutation.isPending}
           onClose={() => setRowAction(null)}
+          onSendBalance={() => jobActionMutation.mutate({ invoiceId: rowAction.id, action: 'send-balance' })}
+          onComplete={() => jobActionMutation.mutate({ invoiceId: rowAction.id, action: 'complete' })}
           onMarkReceived={() => { markMutation.mutate({ invoiceId: rowAction.id, ref: '' }); }}
           onVoid={handleVoid}
         />
