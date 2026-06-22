@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { tradesFetch, tradesHeaders } from "@/lib/trades-api";
+import { tradesFeeCents } from "@/lib/trades-money";
 import { TRADES_THEME as T } from "@/lib/trades-theme";
 
 type DraftLine = { id: number; description: string; qty: string; unitPrice: string };
@@ -31,16 +32,16 @@ export default function QuoteBuilder() {
   });
 
   const totals = useMemo(() => {
-    const subtotal = lines.reduce((sum, line) => {
+    const total = lines.reduce((sum, line) => {
       const qty = Math.max(0, Number(line.qty) || 0);
       const unit = Math.max(0, Math.round((Number(line.unitPrice) || 0) * 100));
       return sum + Math.round(qty * unit);
     }, 0);
-    const gst = auth?.user?.gstRegistered ? Math.round(subtotal - subtotal / 1.15) : 0;
+    const gst = auth?.user?.gstRegistered ? Math.round(total - total / 1.15) : 0;
     const deposit = !depositEnabled ? 0 : depositType === "percent"
-      ? Math.round(subtotal * Math.min(100, Math.max(0, Number(depositValue) || 0)) / 100)
-      : Math.min(subtotal, Math.round((Number(depositValue) || 0) * 100));
-    return { subtotal, gst, deposit };
+      ? Math.round(total * Math.min(100, Math.max(0, Number(depositValue) || 0)) / 100)
+      : Math.min(total, Math.round((Number(depositValue) || 0) * 100));
+    return { total, gst, net: total - gst, deposit };
   }, [lines, auth?.user?.gstRegistered, depositEnabled, depositType, depositValue]);
 
   const createQuote = useMutation({
@@ -130,13 +131,14 @@ export default function QuoteBuilder() {
         </div>
 
         <div style={{ ...cardStyle, background: T.INK, color: "#fff" }}>
-          <div style={totalRow}><span>Subtotal</span><strong>{money(totals.subtotal)}</strong></div>
+          {!!auth?.user?.gstRegistered && <div style={totalRow}><span>Subtotal excl. GST</span><strong>{money(totals.net)}</strong></div>}
           {!!auth?.user?.gstRegistered && <div style={totalRow}><span>GST (15%) included</span><span>{money(totals.gst)}</span></div>}
           {depositEnabled && <div style={totalRow}><span>Deposit due on acceptance</span><strong style={{ color: T.ACCENT }}>{money(totals.deposit)}</strong></div>}
-          <div style={{ ...totalRow, borderTop: "1px solid rgba(255,255,255,.14)", paddingTop: 14, marginTop: 8, fontSize: 19 }}><span>Total</span><strong>{money(totals.subtotal)}</strong></div>
+          <div style={{ ...totalRow, borderTop: "1px solid rgba(255,255,255,.14)", paddingTop: 14, marginTop: 8, fontSize: 19 }}><span>Total</span><strong>{money(totals.total)}</strong></div>
+          <div style={{ ...totalRow, color: "rgba(255,255,255,.55)", fontSize: 12 }}><span>TaptPay fee (0.3%)</span><span>{money(tradesFeeCents(totals.total))}</span></div>
         </div>
         {error && <p role="alert" style={{ color: T.RED, fontWeight: 600 }}>{error}</p>}
-        <button disabled={createQuote.isPending || totals.subtotal <= 0} onClick={() => createQuote.mutate()} style={{ ...buttonStyle, opacity: createQuote.isPending || totals.subtotal <= 0 ? .55 : 1 }}>{createQuote.isPending ? "Creating..." : "Create quote"}</button>
+        <button disabled={createQuote.isPending || totals.total <= 0} onClick={() => createQuote.mutate()} style={{ ...buttonStyle, opacity: createQuote.isPending || totals.total <= 0 ? .55 : 1 }}>{createQuote.isPending ? "Creating..." : "Create quote"}</button>
       </section>
     </main>
   );

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { tradesFetch, tradesHeaders } from "@/lib/trades-api";
+import { formatNzd, tradesFeeCents } from "@/lib/trades-money";
 import { TRADES_THEME } from "@/lib/trades-theme";
 
 /* ═══ TOKENS (trades palette via TRADES_THEME — see trades-theme.ts) ═══ */
@@ -347,6 +348,7 @@ function QuickInvoice({ go, selectedClient, amount, onEditAmount, jobNote, setJo
             {clientName(selectedClient)}
             <div style={{ fontWeight: 400, fontSize: 14, color: 'rgba(26,29,33,0.5)', marginTop: 4 }}>{selectedClient.siteAddress}</div>
           </div>
+          {amount > 0 && <div style={{ marginTop: 10, fontSize: 12, color: 'rgba(26,29,33,0.48)' }}>TaptPay fee (0.3%): {formatNzd(tradesFeeCents(amount))}</div>}
         </div>
         <div style={{ height: 52 }} />
       </div>
