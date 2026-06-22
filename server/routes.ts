@@ -19,6 +19,7 @@ import path from "path";
 import fs from "fs";
 import { sendPushToMerchant } from "./push";
 import { resendInvoiceEmail } from "./property-cron";
+import { resendTradeInvoice, sendTradePaymentInvoice, sendTradeQuote } from "./trades-delivery";
 import { sendGstInvoices, extractEmails } from "./gst-invoice";
 
 // Store SSE connections for real-time updates (merchantId -> stoneId -> Set of connections)
@@ -5817,6 +5818,72 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
   // ── Tenant Profiles ──────────────────────────────────────────────────────
 
+  type CheckoutInvoice = any & { checkoutVertical?: "property" | "trades" };
+
+  async function getCheckoutInvoiceByToken(token: string): Promise<CheckoutInvoice | undefined> {
+    const propertyInvoice = await storage.getInvoiceRentRequestByToken(token);
+    if (propertyInvoice) return { ...propertyInvoice, checkoutVertical: "property" };
+    const tradeInvoice = await storage.getJobInvoiceByToken(token);
+    return tradeInvoice ? { ...tradeInvoice, checkoutVertical: "trades" } : undefined;
+  }
+
+  async function getCheckoutParty(invoice: CheckoutInvoice): Promise<any> {
+    if (invoice.checkoutVertical === "trades") {
+      const client = await storage.getClientProfile(invoice.clientProfileId);
+      return client ? {
+        email: client.email,
+        name: `${client.firstName} ${client.lastName}`,
+        address: client.siteAddress,
+        coTenantsText: null,
+      } : null;
+    }
+    const tenant = await storage.getTenantProfile(invoice.tenantProfileId);
+    return tenant ? {
+      email: tenant.email,
+      name: `${tenant.firstName} ${tenant.lastName}`,
+      address: tenant.propertyAddress,
+      coTenantsText: tenant.coTenantsText ?? null,
+    } : null;
+  }
+
+  async function updateCheckoutInvoice(invoice: CheckoutInvoice, updates: any): Promise<any> {
+    return invoice.checkoutVertical === "trades"
+      ? storage.updateJobInvoice(invoice.id, updates)
+      : storage.updateInvoiceRentRequest(invoice.id, updates);
+  }
+
+  async function finalizeTradeInvoice(invoiceId: string, approved: boolean, windcaveTransactionId?: string, sessionId?: string): Promise<any> {
+    const invoice = await storage.getJobInvoice(invoiceId);
+    if (!invoice) return null;
+    if (["paid", "paid_external", "voided"].includes(invoice.status)) return invoice;
+    if (!approved) {
+      await storage.createJobEvent({ merchantId: invoice.merchantId, clientProfileId: invoice.clientProfileId, jobInvoiceId: invoice.id, eventType: "payment_declined", payload: { channel: "card" } });
+      return invoice;
+    }
+    if (invoice.splitEnabled && invoice.splitCount && invoice.splitCount > 1) {
+      const claimed = await storage.atomicClaimJobSplitShare(invoiceId, sessionId ?? crypto.randomUUID());
+      if (!claimed) return storage.getJobInvoice(invoiceId);
+      const fullyPaid = claimed.splitPaidCount >= invoice.splitCount;
+      const updated = await storage.updateJobInvoice(invoiceId, {
+        ...(fullyPaid ? { status: "paid", paidAt: new Date() } : {}),
+        windcaveTransactionId: windcaveTransactionId ?? invoice.windcaveTransactionId,
+      });
+      await storage.createJobEvent({ merchantId: invoice.merchantId, clientProfileId: invoice.clientProfileId, jobInvoiceId: invoice.id, eventType: fullyPaid ? "payment_received" : "split_share_paid", payload: { share: claimed.splitPaidCount, of: invoice.splitCount, channel: "card" } });
+      if (fullyPaid) await sendTradePaymentInvoice(updated);
+      return updated;
+    }
+    const updated = await storage.updateJobInvoice(invoiceId, { status: "paid", paidAt: new Date(), windcaveTransactionId: windcaveTransactionId ?? null });
+    await storage.createJobEvent({ merchantId: invoice.merchantId, clientProfileId: invoice.clientProfileId, jobInvoiceId: invoice.id, eventType: "payment_received", payload: { channel: "card", amountCents: invoice.amountCents } });
+    await sendTradePaymentInvoice(updated);
+    return updated;
+  }
+
+  async function finalizeCheckoutInvoice(invoice: CheckoutInvoice, approved: boolean, windcaveTransactionId?: string, sessionId?: string): Promise<any> {
+    return invoice.checkoutVertical === "trades"
+      ? finalizeTradeInvoice(invoice.id, approved, windcaveTransactionId, sessionId)
+      : finalizeRentInvoice(invoice.id, approved, windcaveTransactionId, sessionId);
+  }
+
   app.get("/api/property/tenants", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
@@ -6128,25 +6195,26 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const { token } = req.params;
       if (!tokenRateLimit(token)) return res.status(429).json({ message: "Too many requests" });
-      const invoice = await storage.getInvoiceRentRequestByToken(token);
+      const invoice = await getCheckoutInvoiceByToken(token);
       if (!invoice) return res.status(404).json({ message: "Payment link not found" });
       if (invoice.status === "voided") return res.status(410).json({ message: "This payment link has been voided" });
       if (invoice.status === "paid" || invoice.status === "paid_external") return res.status(200).json({ alreadyPaid: true, amountCents: invoice.amountCents });
-      const [merchant, tenant] = await Promise.all([storage.getMerchant(invoice.merchantId), storage.getTenantProfile(invoice.tenantProfileId)]);
-      if (!merchant || !tenant) return res.status(404).json({ message: "Payment details unavailable" });
+      const [merchant, party] = await Promise.all([storage.getMerchant(invoice.merchantId), getCheckoutParty(invoice)]);
+      if (!merchant || !party) return res.status(404).json({ message: "Payment details unavailable" });
       res.json({
+        vertical: invoice.checkoutVertical ?? "property",
         invoiceId: invoice.id, amountCents: invoice.amountCents, dueAt: invoice.dueAt, status: invoice.status,
         merchantId: invoice.merchantId,
         merchantName: merchant.businessName || merchant.name,
         customLogoUrl: merchant.customLogoUrl ?? null,
-        propertyAddress: tenant.propertyAddress,
-        tenantName: `${tenant.firstName} ${tenant.lastName}`,
-        coTenantsText: tenant.coTenantsText ?? null,
+        propertyAddress: party.address,
+        tenantName: party.name,
+        coTenantsText: party.coTenantsText ?? null,
         // What the payment is for — lets the branded checkout label the amount
         // ("Rent" vs the one-off charge's description).
         kind: invoice.kind ?? "rent",
         chargeType: invoice.chargeType ?? null,
-        description: invoice.description ?? null,
+        description: invoice.checkoutVertical === "trades" ? (invoice.jobDetails ?? "Job invoice") : (invoice.description ?? null),
         // Attached invoice document for one-off charges — surfaced as a
         // "View invoice" link on the branded checkout page.
         documentUrl: invoice.documentUrl ?? null,
@@ -6165,12 +6233,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!tokenRateLimit(token)) return res.status(429).json({ message: "Too many requests" });
       const count = parseInt(String(req.body?.count), 10);
       if (!Number.isInteger(count) || count < 2 || count > 12) return res.status(400).json({ message: "Choose between 2 and 12 people" });
-      const invoice = await storage.getInvoiceRentRequestByToken(token);
+      const invoice = await getCheckoutInvoiceByToken(token);
       if (!invoice) return res.status(404).json({ message: "Payment link not found" });
       if (!invoice.splitEnabled) return res.status(400).json({ message: "Splitting is not enabled for this payment" });
       if (["voided", "paid", "paid_external"].includes(invoice.status)) return res.status(409).json({ message: "Invoice is not payable" });
       if ((invoice.splitPaidCount ?? 0) > 0) return res.status(409).json({ message: "A split is already in progress" });
-      await storage.updateInvoiceRentRequest(invoice.id, { splitCount: count });
+      await updateCheckoutInvoice(invoice, { splitCount: count });
       res.json({ splitCount: count, splitPaidCount: 0, shareCents: Math.floor(invoice.amountCents / count) });
     } catch (err) { console.error("[CHECKOUT_SPLIT]", err); res.status(500).json({ message: "Failed to set up split" }); }
   });
@@ -6180,11 +6248,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const { token, payerEmail } = req.body as { token?: string; payerEmail?: string };
       if (!token) return res.status(400).json({ message: "token required" });
       if (!tokenRateLimit(token)) return res.status(429).json({ message: "Too many requests" });
-      const invoice = await storage.getInvoiceRentRequestByToken(token);
+      const invoice = await getCheckoutInvoiceByToken(token);
       if (!invoice) return res.status(404).json({ message: "Payment link not found" });
       if (["voided", "paid", "paid_external"].includes(invoice.status)) return res.status(409).json({ message: "Invoice is not payable" });
-      const [merchant, tenant] = await Promise.all([storage.getMerchant(invoice.merchantId), storage.getTenantProfile(invoice.tenantProfileId)]);
-      if (!merchant || !tenant) return res.status(500).json({ message: "Invoice data unavailable" });
+      const [merchant, party] = await Promise.all([storage.getMerchant(invoice.merchantId), getCheckoutParty(invoice)]);
+      if (!merchant || !party) return res.status(500).json({ message: "Invoice data unavailable" });
       const baseUrl = getBaseUrl(req);
 
       // Determine what to charge: the full amount, or one share of a split.
@@ -6200,28 +6268,28 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         if (typeof payerEmail === "string" && /.+@.+\..+/.test(payerEmail)) {
           const emails: string[] = invoice.splitPayerEmails || [];
           const lower = payerEmail.toLowerCase();
-          if (!emails.includes(lower)) await storage.updateInvoiceRentRequest(invoice.id, { splitPayerEmails: [...emails, lower] });
+          if (!emails.includes(lower)) await updateCheckoutInvoice(invoice, { splitPayerEmails: [...emails, lower] });
         }
       }
 
       const amountStr = (chargeCents / 100).toFixed(2);
-      const merchantRef = `RENT-${invoice.id.slice(0, 8).toUpperCase()}`;
+      const merchantRef = (invoice.checkoutVertical === "trades" ? "JOB-" : "RENT-") + invoice.id.slice(0, 8).toUpperCase();
       const xId = crypto.randomBytes(16).toString("hex");
       let sessionResult: any;
       if (isWindcaveConfigured()) {
         sessionResult = await createWindcaveSession(
-          xId, amountStr, merchantRef, tenant.email ?? "tenant@taptpay.co.nz", baseUrl, 0, 0,
-          { callbackBase: `${baseUrl}/api/checkout/callback?token=${token}`, notificationUrl: `${baseUrl}/api/windcave/rent-notification` },
+          xId, amountStr, merchantRef, party.email ?? "tenant@taptpay.co.nz", baseUrl, 0, 0,
+          { callbackBase: `${baseUrl}/api/checkout/callback?token=${token}`, notificationUrl: `${baseUrl}/api/windcave/${invoice.checkoutVertical === "trades" ? "trades" : "rent"}-notification` },
         );
       } else {
         sessionResult = simulateRentSession(token, baseUrl);
       }
       if (!sessionResult.success) return res.status(502).json({ message: "Payment gateway error. Please try again." });
-      if (sessionResult.sessionId) await storage.updateInvoiceRentRequest(invoice.id, { windcaveSessionId: sessionResult.sessionId });
+      if (sessionResult.sessionId) await updateCheckoutInvoice(invoice, { windcaveSessionId: sessionResult.sessionId });
       // Duplicate X-ID — Windcave reports the session already completed; finalize now
       // and bounce the payer back to the checkout page to see the result.
       if (sessionResult.alreadyComplete) {
-        await finalizeRentInvoice(invoice.id, !!sessionResult.approved, sessionResult.windcaveTransactionId, sessionResult.sessionId);
+        await finalizeCheckoutInvoice(invoice, !!sessionResult.approved, sessionResult.windcaveTransactionId, sessionResult.sessionId);
         return res.json({ hppUrl: `${baseUrl}/r/${token}` });
       }
       if (!sessionResult.hppUrl) return res.status(502).json({ message: "Payment gateway error. Please try again." });
@@ -6239,11 +6307,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const { token } = req.params;
       const { payerEmail } = req.body as { payerEmail?: string };
       if (!tokenRateLimit(token)) return res.status(429).json({ message: "Too many requests" });
-      const invoice = await storage.getInvoiceRentRequestByToken(token);
+      const invoice = await getCheckoutInvoiceByToken(token);
       if (!invoice) return res.status(404).json({ message: "Payment link not found" });
       if (["voided", "paid", "paid_external"].includes(invoice.status)) return res.status(409).json({ message: "Invoice is not payable" });
-      const [merchant, tenant] = await Promise.all([storage.getMerchant(invoice.merchantId), storage.getTenantProfile(invoice.tenantProfileId)]);
-      if (!merchant || !tenant) return res.status(500).json({ message: "Invoice data unavailable" });
+      const [merchant, party] = await Promise.all([storage.getMerchant(invoice.merchantId), getCheckoutParty(invoice)]);
+      if (!merchant || !party) return res.status(500).json({ message: "Invoice data unavailable" });
       const baseUrl = getBaseUrl(req);
 
       // Determine what to charge: the full amount, or one share of a split.
@@ -6259,18 +6327,18 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         if (typeof payerEmail === "string" && /.+@.+\..+/.test(payerEmail)) {
           const emails: string[] = invoice.splitPayerEmails || [];
           const lower = payerEmail.toLowerCase();
-          if (!emails.includes(lower)) await storage.updateInvoiceRentRequest(invoice.id, { splitPayerEmails: [...emails, lower] });
+          if (!emails.includes(lower)) await updateCheckoutInvoice(invoice, { splitPayerEmails: [...emails, lower] });
         }
       }
 
       const amountStr = (chargeCents / 100).toFixed(2);
-      const merchantRef = `RENT-${invoice.id.slice(0, 8).toUpperCase()}`;
+      const merchantRef = (invoice.checkoutVertical === "trades" ? "JOB-" : "RENT-") + invoice.id.slice(0, 8).toUpperCase();
       const xId = crypto.randomBytes(16).toString("hex");
       let sessionResult: any;
       if (isWindcaveConfigured()) {
         sessionResult = await createWindcaveSession(
-          xId, amountStr, merchantRef, tenant.email ?? "tenant@taptpay.co.nz", baseUrl, 0, 0,
-          { callbackBase: `${baseUrl}/api/checkout/callback?token=${token}`, notificationUrl: `${baseUrl}/api/windcave/rent-notification` },
+          xId, amountStr, merchantRef, party.email ?? "tenant@taptpay.co.nz", baseUrl, 0, 0,
+          { callbackBase: `${baseUrl}/api/checkout/callback?token=${token}`, notificationUrl: `${baseUrl}/api/windcave/${invoice.checkoutVertical === "trades" ? "trades" : "rent"}-notification` },
         );
       } else {
         // Simulation: reuse the retail sim session so we get fake AJAX submit URLs
@@ -6278,12 +6346,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         sessionResult = simulateCreateSession(merchantRef, baseUrl);
       }
       if (!sessionResult.success) return res.status(502).json({ message: "Payment gateway error. Please try again." });
-      if (sessionResult.sessionId) await storage.updateInvoiceRentRequest(invoice.id, { windcaveSessionId: sessionResult.sessionId });
+      if (sessionResult.sessionId) await updateCheckoutInvoice(invoice, { windcaveSessionId: sessionResult.sessionId });
 
       // Duplicate X-ID — Windcave reports the session already completed; finalize now
       // and tell the page to show its success/declined state without a second submit.
       if (sessionResult.alreadyComplete) {
-        await finalizeRentInvoice(invoice.id, !!sessionResult.approved, sessionResult.windcaveTransactionId, sessionResult.sessionId);
+        await finalizeCheckoutInvoice(invoice, !!sessionResult.approved, sessionResult.windcaveTransactionId, sessionResult.sessionId);
         return res.json({ alreadyComplete: true, approved: !!sessionResult.approved });
       }
 
@@ -6311,7 +6379,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const { token } = req.params;
       const { sessionId } = req.body as { sessionId?: string };
       if (!sessionId) return res.status(400).json({ message: "sessionId required" });
-      const invoice = await storage.getInvoiceRentRequestByToken(token);
+      const invoice = await getCheckoutInvoiceByToken(token);
       if (!invoice) return res.status(404).json({ message: "Payment link not found" });
       if (invoice.windcaveSessionId && invoice.windcaveSessionId !== sessionId) {
         console.error(`[checkout-complete] sessionId mismatch for invoice ${invoice.id}`);
@@ -6319,7 +6387,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
       const queryResult = isWindcaveConfigured() ? await queryWindcaveSession(sessionId) : simulateQuerySession(sessionId);
       invoiceAjaxUrlCache.delete(token);
-      const updated = await finalizeRentInvoice(invoice.id, queryResult.approved === true, queryResult.windcaveTransactionId, sessionId);
+      const updated = await finalizeCheckoutInvoice(invoice, queryResult.approved === true, queryResult.windcaveTransactionId, sessionId);
       return res.json({
         approved: queryResult.approved === true,
         status: updated?.status,
@@ -6336,7 +6404,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const { token } = req.params;
       const { sessionId, googlePayToken } = req.body as { sessionId?: string; googlePayToken?: object };
       if (!sessionId) return res.status(400).json({ message: "sessionId required" });
-      const invoice = await storage.getInvoiceRentRequestByToken(token);
+      const invoice = await getCheckoutInvoiceByToken(token);
       if (!invoice) return res.status(404).json({ message: "Payment link not found" });
       if (invoice.windcaveSessionId && invoice.windcaveSessionId !== sessionId) {
         console.error(`[checkout-gpay] sessionId mismatch for invoice ${invoice.id}`);
@@ -6369,7 +6437,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         invoiceAjaxUrlCache.delete(token);
       }
 
-      const updated = await finalizeRentInvoice(invoice.id, approved, windcaveTransactionId, sessionId);
+      const updated = await finalizeCheckoutInvoice(invoice, approved, windcaveTransactionId, sessionId);
       return res.json({
         approved,
         status: updated?.status,
@@ -6388,7 +6456,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const result = req.query.result as string;
       const isSim = req.query.sim === "1";
       if (!token) return res.redirect("/");
-      const invoice = await storage.getInvoiceRentRequestByToken(token);
+      const invoice = await getCheckoutInvoiceByToken(token);
       if (!invoice) return res.redirect("/");
       const back = `/r/${token}`;
 
@@ -6405,7 +6473,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         queryResult = { success: true, approved: result === "approved", windcaveTransactionId: result === "approved" ? `SIMTXN_${Date.now()}` : undefined };
       }
       if (queryResult.success) {
-        await finalizeRentInvoice(invoice.id, !!queryResult.approved, queryResult.windcaveTransactionId, sessionId);
+        await finalizeCheckoutInvoice(invoice, !!queryResult.approved, queryResult.windcaveTransactionId, sessionId);
       }
       return res.redirect(back);
     } catch (err) { console.error("[CHECKOUT_CALLBACK]", err); return res.redirect("/"); }
@@ -6429,6 +6497,22 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     } catch (err) { console.error("[RENT_NOTIF] Error:", err); }
   });
 
+
+  app.all("/api/windcave/trades-notification", express.urlencoded({ extended: true }), express.json(), async (req, res) => {
+    res.status(200).send("OK");
+    try {
+      const sessionId = (req.query?.sessionid as string) || (req.query?.sessionId as string) || req.body?.sessionId || req.body?.sessionid;
+      if (!sessionId) { console.warn("[TRADES_NOTIF] No sessionId", req.query); return; }
+      const stored = await storage.getJobInvoiceByWindcaveSessionId(sessionId);
+      if (!stored) { console.warn(`[TRADES_NOTIF] No invoice for session ${sessionId}`); return; }
+      if (["paid", "paid_external", "voided"].includes(stored.status)) return;
+      const queryResult = isWindcaveConfigured() ? await queryWindcaveSession(sessionId) : simulateQuerySession(sessionId);
+      if (!queryResult.success) { console.error(`[TRADES_NOTIF] query failed for ${sessionId}:`, queryResult.error); return; }
+      const invoice = { ...stored, checkoutVertical: "trades" as const };
+      await finalizeCheckoutInvoice(invoice, !!queryResult.approved, queryResult.windcaveTransactionId, sessionId);
+      console.log(`[TRADES_NOTIF] invoice ${invoice.id} -> ${queryResult.approved ? "paid" : "declined"}`);
+    } catch (err) { console.error("[TRADES_NOTIF] Error:", err); }
+  });
   // Evolution API webhook — receives delivery status updates for WhatsApp messages.
   // Matches each event's message ID back to the invoice that sent it, logs the
   // status, and stamps whatsappDeliveredAt on the first DELIVERY_ACK or READ event.
@@ -6451,17 +6535,19 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         const msgId: string | undefined = upd?.key?.id;
         const status: string | undefined = upd?.update?.status;
         if (!msgId || !status) continue;
-        const invoice = await storage.getInvoiceRentRequestByWhatsappMessageId(msgId);
+        const propertyInvoice = await storage.getInvoiceRentRequestByWhatsappMessageId(msgId);
+        const tradeInvoice = propertyInvoice ? null : await storage.getJobInvoiceByWhatsappMessageId(msgId);
+        const invoice = propertyInvoice ?? tradeInvoice;
         if (!invoice) continue;
-        // Stamp delivered-at on first terminal delivery status
         if ((status === "DELIVERY_ACK" || status === "READ") && !invoice.whatsappDeliveredAt) {
-          await storage.updateInvoiceRentRequest(invoice.id, { whatsappDeliveredAt: new Date() });
+          if (tradeInvoice) await storage.updateJobInvoice(invoice.id, { whatsappDeliveredAt: new Date() });
+          else await storage.updateInvoiceRentRequest(invoice.id, { whatsappDeliveredAt: new Date() });
         }
-        await storage.logTransactionEvent({
-          merchantId: invoice.merchantId, tenantProfileId: invoice.tenantProfileId,
-          invoiceId: invoice.id, eventType: "WhatsApp_Status",
-          payload: { messageId: msgId, status },
-        });
+        if (tradeInvoice) {
+          await storage.createJobEvent({ merchantId: invoice.merchantId, clientProfileId: invoice.clientProfileId, jobInvoiceId: invoice.id, eventType: "whatsapp_status", payload: { messageId: msgId, status } });
+        } else {
+          await storage.logTransactionEvent({ merchantId: invoice.merchantId, tenantProfileId: invoice.tenantProfileId, invoiceId: invoice.id, eventType: "WhatsApp_Status", payload: { messageId: msgId, status } });
+        }
       }
     } catch (err) { console.error("[WA_WEBHOOK] Error:", err); }
   });
@@ -6640,8 +6726,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         sentAt: new Date(),
       });
       await storage.createJobEvent({ merchantId, clientProfileId: client.id, quoteId: row.id, eventType: "quote_sent" });
-      // NOTE: actual email/WhatsApp dispatch reuses the property dispatcher — wired in Phase 5.
-      res.status(201).json(row);
+      const delivery = await sendTradeQuote(row.id, getBaseUrl(req));
+      res.status(201).json({ ...row, delivered: delivery.sent, deliveryReason: delivery.reason });
     } catch (err) { console.error("[TRADES_QUOTES_POST]", err); res.status(500).json({ message: "Failed to create quote" }); }
   });
   app.get("/api/trades/quotes/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
@@ -6653,6 +6739,19 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       res.json(row);
     } catch (err) { console.error("[TRADES_QUOTES_GET_ID]", err); res.status(500).json({ message: "Failed to fetch quote" }); }
   });
+  app.post("/api/trades/quotes/:id/resend", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const quote = await storage.getQuote(req.params.id);
+      if (!quote || quote.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      if (["accepted", "declined", "expired"].includes(quote.status)) return res.status(409).json({ message: "Quote can no longer be resent" });
+      const delivery = await sendTradeQuote(quote.id, getBaseUrl(req));
+      if (!delivery.sent) return res.status(502).json({ message: "Could not resend quote", reason: delivery.reason });
+      res.json({ ...quote, delivered: true });
+    } catch (err) { console.error("[TRADES_QUOTE_RESEND]", err); res.status(500).json({ message: "Failed to resend quote" }); }
+  });
+
   // Public quote view. Keep the response deliberately narrow: customers need the
   // quote, client display details, and merchant trading name, not merchant secrets.
   app.get("/api/trades/quotes/token/:token", async (req, res) => {
@@ -6714,7 +6813,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           deliveryChannel: quote.deliveryChannel, status: "pending_dispatch", dueAt: due,
         });
       }
-      res.json({ quote: accepted, depositInvoice });
+      const delivery = depositInvoice ? await resendTradeInvoice(depositInvoice.id, getBaseUrl(req)) : null;
+      const paymentUrl = depositInvoice ? getBaseUrl(req) + "/r/" + depositInvoice.token : null;
+      res.json({ quote: accepted, depositInvoice: delivery?.invoice ?? depositInvoice, paymentUrl, delivered: delivery?.sent ?? false });
     } catch (err) { console.error("[TRADES_QUOTES_TOKEN_RESPOND]", err); res.status(500).json({ message: "Failed to process quote response" }); }
   });
 
@@ -6751,9 +6852,23 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         documentUrl: parsed.data.documentUrl ?? null, documentName: parsed.data.documentName ?? null,
       });
       await storage.createJobEvent({ merchantId, clientProfileId: client.id, jobInvoiceId: row.id, eventType: "invoice_sent" });
-      res.status(201).json(row);
+      const shouldSendNow = !row.scheduledSendAt || new Date(row.scheduledSendAt) <= new Date();
+      const delivery = shouldSendNow ? await resendTradeInvoice(row.id, getBaseUrl(req)) : { sent: false, reason: "scheduled" };
+      res.status(201).json({ ...(("invoice" in delivery && delivery.invoice) || row), delivered: delivery.sent, deliveryReason: delivery.reason });
     } catch (err) { console.error("[TRADES_INVOICES_POST]", err); res.status(500).json({ message: "Failed to create invoice" }); }
   });
+  app.post("/api/trades/invoices/:id/resend", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const invoice = await storage.getJobInvoice(req.params.id);
+      if (!invoice || invoice.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      const delivery = await resendTradeInvoice(invoice.id, getBaseUrl(req));
+      if (!delivery.sent) return res.status(502).json({ message: "Could not resend invoice", reason: delivery.reason });
+      res.json(delivery.invoice);
+    } catch (err) { console.error("[TRADES_INVOICE_RESEND]", err); res.status(500).json({ message: "Failed to resend invoice" }); }
+  });
+
   app.post("/api/trades/invoices/:id/send-balance", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
@@ -6777,7 +6892,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         deliveryChannel: dep.deliveryChannel, status: "pending_dispatch", dueAt: due,
       });
       await storage.createJobEvent({ merchantId: dep.merchantId, clientProfileId: dep.clientProfileId, jobInvoiceId: bal.id, eventType: "balance_sent" });
-      res.status(201).json(bal);
+      const delivery = await resendTradeInvoice(bal.id, getBaseUrl(req));
+      res.status(201).json({ ...(delivery.invoice ?? bal), delivered: delivery.sent, deliveryReason: delivery.reason });
     } catch (err) { console.error("[TRADES_INVOICES_SEND_BALANCE]", err); res.status(500).json({ message: "Failed to send balance invoice" }); }
   });
   app.post("/api/trades/invoices/:id/mark-paid-external", authenticateToken, async (req: AuthenticatedRequest, res) => {
@@ -6793,6 +6909,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         externalPaymentReference: parsed.data.externalPaymentReference ?? null,
       });
       await storage.createJobEvent({ merchantId: inv.merchantId, clientProfileId: inv.clientProfileId, jobInvoiceId: inv.id, eventType: "paid_external" });
+      await sendTradePaymentInvoice(row);
       res.json(row);
     } catch (err) { console.error("[TRADES_INVOICES_MARK_PAID]", err); res.status(500).json({ message: "Failed to mark invoice paid" }); }
   });
@@ -6883,6 +7000,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const { runGeneratePass, runDispatchPass, runOverduePass, runReminderPass } = await import("./property-cron");
       const { runTradesGeneratePass } = await import("./trades-cron");
+      const { runTradesDispatchPass, runTradesOverduePass, runTradesReminderPass } = await import("./trades-delivery");
       const now = new Date();
       const baseUrl = getBaseUrl(req);
       // Sequential: generate must complete before dispatch (dispatch reads the
@@ -6890,10 +7008,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const generate  = await runGeneratePass(now);
       const tradesGenerate = await runTradesGeneratePass(now);
       const dispatch  = await runDispatchPass(baseUrl);
+      const tradesDispatch = await runTradesDispatchPass(baseUrl);
       const overdue   = await runOverduePass(now);
+      const tradesOverdue = await runTradesOverduePass(now);
       const reminders = await runReminderPass(baseUrl, now);
+      const tradesReminders = await runTradesReminderPass(baseUrl, now);
       console.log(`[CRON] generate=${JSON.stringify(generate)} tradesGenerate=${JSON.stringify(tradesGenerate)} dispatch=${JSON.stringify(dispatch)} overdue=${JSON.stringify(overdue)} reminders=${JSON.stringify(reminders)}`);
-      res.json({ ok: true, ranAt: now.toISOString(), generate, tradesGenerate, dispatch, overdue, reminders });
+      res.json({ ok: true, ranAt: now.toISOString(), generate, tradesGenerate, dispatch, tradesDispatch, overdue, tradesOverdue, reminders, tradesReminders });
     } catch (err) { console.error("[CRON]", err); res.status(500).json({ message: "Cron run failed" }); }
   });
 
