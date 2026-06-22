@@ -1,0 +1,61 @@
+{
+  "proto": 1,
+  "supervisorPid": 3425,
+  "updatedAt": 1780884111723,
+  "workers": {
+    "ff5a794a": {
+      "pid": 3438,
+      "procStart": "987440",
+      "sessionId": "ff5a794a-ce8f-4e64-bb7f-0cb79a3473a6",
+      "rendezvousSock": "/tmp/cc-daemon-1000/05a8b063/rv/ff5a794a.sock",
+      "ptySock": "/tmp/cc-daemon-1000/05a8b063/spare/cc91c57d.pty.sock",
+      "cliVersion": "2.1.168",
+      "startedAt": 1780884111347,
+      "attempt": 1,
+      "cwd": "/home/runner/workspace",
+      "dispatch": {
+        "proto": 1,
+        "short": "ff5a794a",
+        "nonce": "605ead00",
+        "sessionId": "ff5a794a-ce8f-4e64-bb7f-0cb79a3473a6",
+        "createdAt": 1780884105911,
+        "source": "slash",
+        "cwd": "/home/runner/workspace",
+        "launch": {
+          "mode": "resume",
+          "sessionId": "/home/runner/.claude/projects/-home-runner-workspace/eeb21831-f01a-473a-97fe-19163be1ec44.jsonl",
+          "fork": true,
+          "flagArgs": [
+            "--reply-on-resume",
+            "--permission-mode",
+            "acceptEdits"
+          ]
+        },
+        "env": {
+          "CLAUDE_BG_ISOLATION": "none"
+        },
+        "isolation": "none",
+        "respawnFlags": [
+          "--reply-on-resume",
+          "--permission-mode",
+          "acceptEdits"
+        ],
+        "seed": {
+          "intent": "the noptification settings dont work, when i go to settings to turn them on, it says failed. you need to investigate this and fix it, do not elave one line of code unturned until yo have found the iss",
+          "name": "Fix MCP issue"
+        },
+        "cols": 175,
+        "rows": 50
+      },
+      "decModes": [
+        1000,
+        1002,
+        1003,
+        1006,
+        2004,
+        1004,
+        2031
+      ]
+    }
+  }
+}

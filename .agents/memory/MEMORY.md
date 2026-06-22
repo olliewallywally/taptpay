@@ -1,0 +1,4 @@
+- [Fintech landing page idea](fintech-landing-page.md) — pay.man-style dark/green design reference saved by user for future landing page build
+- [TaptPay logo - new sky blue](taptpay-logo-new.md) — new official sky blue TaptPay logo asset, saved for future use
+- [Hero section landing page design](hero-section-landing-page.md) — navy bg, sky blue logo centred, "multi-stack digital payment solution" tagline
+- [New landing page UI](new-landing-page-ui.md) — full set of 13 landing page section designs: hero, feature panels, app screenshots, pricing, ecommerce plugin, mobile view

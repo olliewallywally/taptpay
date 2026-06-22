@@ -2,7 +2,7 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema } from "@shared/schema";
+import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, GST_RATE } from "@shared/schema";
 import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, simulateCreateSession, simulateQuerySession, simulateRentSession, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, simulateAttendedTapToPay } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, createUser, getUserByEmail, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
@@ -29,6 +29,14 @@ const sseConnections = new Map<number, Map<number | null, Set<any>>>();
 // Populated at session creation; consumed once at payment completion.
 // Prevents SSRF by never accepting these URLs from client bodies.
 const sessionAjaxUrlCache = new Map<number, {
+  ajaxSubmitCardUrl?: string;
+  ajaxSubmitApplePayUrl?: string;
+  ajaxSubmitGooglePayUrl?: string;
+}>();
+
+// Same as sessionAjaxUrlCache but for the property rent/charge checkout, which is
+// keyed by the invoice's public token rather than a numeric transaction id.
+const invoiceAjaxUrlCache = new Map<string, {
   ajaxSubmitCardUrl?: string;
   ajaxSubmitApplePayUrl?: string;
   ajaxSubmitGooglePayUrl?: string;
@@ -154,6 +162,36 @@ const logoUpload = multer({
       cb(new Error('Only PNG files are allowed'));
     }
   }
+});
+
+// Multer configuration for one-off charge invoice documents (PDF / image).
+// Stored under uploads/invoices and served back via the static /uploads mount;
+// the saved URL is attached to the invoice and surfaced on the checkout page.
+const invoiceDocsDir = path.join(process.cwd(), 'uploads', 'invoices');
+if (!fs.existsSync(invoiceDocsDir)) {
+  fs.mkdirSync(invoiceDocsDir, { recursive: true });
+}
+
+const INVOICE_DOC_MIME = new Set([
+  'application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'image/heic',
+]);
+
+const invoiceDocStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, invoiceDocsDir),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const unique = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}`;
+    cb(null, `invoice-${unique}${ext}`);
+  },
+});
+
+const invoiceDocUpload = multer({
+  storage: invoiceDocStorage,
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB max
+  fileFilter: (_req, file, cb) => {
+    if (INVOICE_DOC_MIME.has(file.mimetype)) cb(null, true);
+    else cb(new Error('Only PDF or image files are allowed'));
+  },
 });
 
 // Utility to remove undefined keys
@@ -5841,6 +5879,19 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     } catch (err) { console.error("[PROP_TENANT_ARCHIVE]", err); res.status(500).json({ message: "Failed to archive tenant" }); }
   });
 
+  app.post("/api/property/tenants/:id/unarchive", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const existing = await storage.getTenantProfile(req.params.id);
+      if (!existing) return res.status(404).json({ message: "Tenant not found" });
+      if (!checkMerchantOwnership(req, existing.merchantId)) return res.status(403).json({ message: "Access denied" });
+      const tenant = await storage.unarchiveTenantProfile(req.params.id);
+      await storage.logTransactionEvent({ merchantId, tenantProfileId: req.params.id, eventType: "Tenant_Restored", payload: {} });
+      res.json(tenant);
+    } catch (err) { console.error("[PROP_TENANT_UNARCHIVE]", err); res.status(500).json({ message: "Failed to restore tenant" }); }
+  });
+
   app.get("/api/property/tenants/:id/events", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
@@ -5952,6 +6003,26 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     } catch (err) { console.error("[PROP_INVOICES_LIST]", err); res.status(500).json({ message: "Failed to fetch invoices" }); }
   });
 
+  // Upload a supporting document (PDF/image) for a one-off charge. Returns the
+  // stored URL + original filename; the bill-create call then attaches them to
+  // the invoice. Kept separate from invoice creation so the create route stays
+  // JSON (multipart is only needed when there's actually a file to send).
+  app.post("/api/property/invoices/document", authenticateToken, invoiceDocUpload.single('document'), async (req: AuthenticatedRequest, res) => {
+    try {
+      if (!req.user?.merchantId) {
+        if (req.file) fs.unlinkSync(req.file.path);
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+      const documentUrl = `/uploads/invoices/${req.file.filename}`;
+      res.json({ documentUrl, documentName: req.file.originalname });
+    } catch (err) {
+      if (req.file) { try { fs.unlinkSync(req.file.path); } catch {} }
+      console.error("[PROP_INVOICE_DOC_UPLOAD]", err);
+      res.status(500).json({ message: "Failed to upload document" });
+    }
+  });
+
   app.post("/api/property/invoices", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
@@ -5961,21 +6032,26 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!checkMerchantOwnership(req, tenant.merchantId)) return res.status(403).json({ message: "Access denied" });
       const data = createAdHocInvoiceSchema.parse(req.body);
       const baseUrl = getBaseUrl(req);
+      const isCharge = data.kind === "charge";
 
-      // Dedupe: if this tenant already has a live (unpaid) invoice, update its amount
-      // and resend it rather than creating a duplicate.
-      const existing = await storage.getLiveInvoiceByTenant(data.tenantProfileId);
-      if (existing) {
-        if (data.amountCents && data.amountCents !== existing.amountCents) {
-          await storage.updateInvoiceRentRequest(existing.id, { amountCents: data.amountCents });
+      // Dedupe: if this tenant already has a live (unpaid) RENT invoice, update its
+      // amount and resend it rather than creating a duplicate. One-off charges are
+      // never deduped — they must coexist with rent (and with each other) instead of
+      // overwriting the tenant's live rent invoice.
+      if (!isCharge) {
+        const existing = await storage.getLiveInvoiceByTenant(data.tenantProfileId);
+        if (existing && existing.kind !== "charge") {
+          if (data.amountCents && data.amountCents !== existing.amountCents) {
+            await storage.updateInvoiceRentRequest(existing.id, { amountCents: data.amountCents });
+          }
+          const delivery = await resendInvoiceEmail(existing.id, baseUrl);
+          const fresh = await storage.getInvoiceRentRequest(existing.id);
+          return res.status(200).json({ ...fresh, resent: true, delivered: delivery.ok, deliveryReason: delivery.reason });
         }
-        const delivery = await resendInvoiceEmail(existing.id, baseUrl);
-        const fresh = await storage.getInvoiceRentRequest(existing.id);
-        return res.status(200).json({ ...fresh, resent: true, delivered: delivery.ok, deliveryReason: delivery.reason });
       }
 
       const invoice = await storage.createInvoiceRentRequest({ ...data, merchantId, token: generateInvoiceToken(), status: "pending_dispatch" });
-      await storage.logTransactionEvent({ merchantId, tenantProfileId: data.tenantProfileId, invoiceId: invoice.id, eventType: "Invoice_Generated", payload: { amountCents: invoice.amountCents, channel: invoice.deliveryChannel } });
+      await storage.logTransactionEvent({ merchantId, tenantProfileId: data.tenantProfileId, invoiceId: invoice.id, eventType: isCharge ? "Charge_Created" : "Invoice_Generated", payload: { amountCents: invoice.amountCents, channel: invoice.deliveryChannel, ...(isCharge ? { chargeType: data.chargeType, description: data.description } : {}) } });
       // Send the link immediately; if delivery fails it stays pending and the cron retries.
       const delivery = await resendInvoiceEmail(invoice.id, baseUrl);
       const fresh = await storage.getInvoiceRentRequest(invoice.id);
@@ -6057,10 +6133,21 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchant || !tenant) return res.status(404).json({ message: "Payment details unavailable" });
       res.json({
         invoiceId: invoice.id, amountCents: invoice.amountCents, dueAt: invoice.dueAt, status: invoice.status,
+        merchantId: invoice.merchantId,
         merchantName: merchant.businessName || merchant.name,
+        customLogoUrl: merchant.customLogoUrl ?? null,
         propertyAddress: tenant.propertyAddress,
         tenantName: `${tenant.firstName} ${tenant.lastName}`,
         coTenantsText: tenant.coTenantsText ?? null,
+        // What the payment is for — lets the branded checkout label the amount
+        // ("Rent" vs the one-off charge's description).
+        kind: invoice.kind ?? "rent",
+        chargeType: invoice.chargeType ?? null,
+        description: invoice.description ?? null,
+        // Attached invoice document for one-off charges — surfaced as a
+        // "View invoice" link on the branded checkout page.
+        documentUrl: invoice.documentUrl ?? null,
+        documentName: invoice.documentName ?? null,
         splitEnabled: !!invoice.splitEnabled,
         splitCount: invoice.splitCount ?? null,
         splitPaidCount: invoice.splitPaidCount ?? 0,
@@ -6137,6 +6224,156 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!sessionResult.hppUrl) return res.status(502).json({ message: "Payment gateway error. Please try again." });
       res.json({ hppUrl: sessionResult.hppUrl });
     } catch (err) { console.error("[CHECKOUT_PAY]", err); res.status(500).json({ message: "Failed to initiate payment" }); }
+  });
+
+  // In-page (Hosted Fields) equivalent of /api/checkout/pay. Creates a Windcave
+  // session for the invoice and returns the AJAX submit URLs so the branded
+  // checkout page can take card / Apple Pay / Google Pay details in-page instead
+  // of redirecting the payer out to the external Windcave HPP. The URLs are
+  // cached server-side (never trusted from the client) and consumed at completion.
+  app.post("/api/checkout/:token/session", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const { payerEmail } = req.body as { payerEmail?: string };
+      if (!tokenRateLimit(token)) return res.status(429).json({ message: "Too many requests" });
+      const invoice = await storage.getInvoiceRentRequestByToken(token);
+      if (!invoice) return res.status(404).json({ message: "Payment link not found" });
+      if (["voided", "paid", "paid_external"].includes(invoice.status)) return res.status(409).json({ message: "Invoice is not payable" });
+      const [merchant, tenant] = await Promise.all([storage.getMerchant(invoice.merchantId), storage.getTenantProfile(invoice.tenantProfileId)]);
+      if (!merchant || !tenant) return res.status(500).json({ message: "Invoice data unavailable" });
+      const baseUrl = getBaseUrl(req);
+
+      // Determine what to charge: the full amount, or one share of a split.
+      let chargeCents = invoice.amountCents;
+      const isSplit = invoice.splitEnabled && invoice.splitCount && invoice.splitCount > 1;
+      if (isSplit) {
+        const paid = invoice.splitPaidCount ?? 0;
+        if (paid >= invoice.splitCount!) return res.status(409).json({ message: "This split is already fully paid" });
+        const base = Math.floor(invoice.amountCents / invoice.splitCount!);
+        const isLastShare = paid === invoice.splitCount! - 1;
+        chargeCents = isLastShare ? invoice.amountCents - base * (invoice.splitCount! - 1) : base;
+        // Record the payer's email (for their GST copy) before charging.
+        if (typeof payerEmail === "string" && /.+@.+\..+/.test(payerEmail)) {
+          const emails: string[] = invoice.splitPayerEmails || [];
+          const lower = payerEmail.toLowerCase();
+          if (!emails.includes(lower)) await storage.updateInvoiceRentRequest(invoice.id, { splitPayerEmails: [...emails, lower] });
+        }
+      }
+
+      const amountStr = (chargeCents / 100).toFixed(2);
+      const merchantRef = `RENT-${invoice.id.slice(0, 8).toUpperCase()}`;
+      const xId = crypto.randomBytes(16).toString("hex");
+      let sessionResult: any;
+      if (isWindcaveConfigured()) {
+        sessionResult = await createWindcaveSession(
+          xId, amountStr, merchantRef, tenant.email ?? "tenant@taptpay.co.nz", baseUrl, 0, 0,
+          { callbackBase: `${baseUrl}/api/checkout/callback?token=${token}`, notificationUrl: `${baseUrl}/api/windcave/rent-notification` },
+        );
+      } else {
+        // Simulation: reuse the retail sim session so we get fake AJAX submit URLs
+        // for the in-page Hosted Fields flow (simulateRentSession only has an HPP url).
+        sessionResult = simulateCreateSession(merchantRef, baseUrl);
+      }
+      if (!sessionResult.success) return res.status(502).json({ message: "Payment gateway error. Please try again." });
+      if (sessionResult.sessionId) await storage.updateInvoiceRentRequest(invoice.id, { windcaveSessionId: sessionResult.sessionId });
+
+      // Duplicate X-ID — Windcave reports the session already completed; finalize now
+      // and tell the page to show its success/declined state without a second submit.
+      if (sessionResult.alreadyComplete) {
+        await finalizeRentInvoice(invoice.id, !!sessionResult.approved, sessionResult.windcaveTransactionId, sessionResult.sessionId);
+        return res.json({ alreadyComplete: true, approved: !!sessionResult.approved });
+      }
+
+      invoiceAjaxUrlCache.set(token, {
+        ajaxSubmitCardUrl: sessionResult.ajaxSubmitCardUrl,
+        ajaxSubmitApplePayUrl: sessionResult.ajaxSubmitApplePayUrl,
+        ajaxSubmitGooglePayUrl: sessionResult.ajaxSubmitGooglePayUrl,
+      });
+
+      return res.json({
+        sessionId: sessionResult.sessionId,
+        amountStr,
+        ajaxSubmitCardUrl: sessionResult.ajaxSubmitCardUrl,
+        ajaxSubmitApplePayUrl: sessionResult.ajaxSubmitApplePayUrl,
+        ajaxSubmitGooglePayUrl: sessionResult.ajaxSubmitGooglePayUrl,
+      });
+    } catch (err) { console.error("[CHECKOUT_SESSION]", err); res.status(500).json({ message: "Failed to initiate payment" }); }
+  });
+
+  // Card / Apple Pay completion for the invoice in-page flow. Mirrors
+  // /api/transactions/:id/hosted-fields-complete but finalizes via the
+  // invoice-aware, idempotent finalizeRentInvoice (handles splits + GST).
+  app.post("/api/checkout/:token/hosted-fields-complete", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const { sessionId } = req.body as { sessionId?: string };
+      if (!sessionId) return res.status(400).json({ message: "sessionId required" });
+      const invoice = await storage.getInvoiceRentRequestByToken(token);
+      if (!invoice) return res.status(404).json({ message: "Payment link not found" });
+      if (invoice.windcaveSessionId && invoice.windcaveSessionId !== sessionId) {
+        console.error(`[checkout-complete] sessionId mismatch for invoice ${invoice.id}`);
+        return res.status(403).json({ message: "Session ID mismatch" });
+      }
+      const queryResult = isWindcaveConfigured() ? await queryWindcaveSession(sessionId) : simulateQuerySession(sessionId);
+      invoiceAjaxUrlCache.delete(token);
+      const updated = await finalizeRentInvoice(invoice.id, queryResult.approved === true, queryResult.windcaveTransactionId, sessionId);
+      return res.json({
+        approved: queryResult.approved === true,
+        status: updated?.status,
+        splitCount: updated?.splitCount ?? null,
+        splitPaidCount: updated?.splitPaidCount ?? 0,
+      });
+    } catch (err) { console.error("[CHECKOUT_HF_COMPLETE]", err); res.status(500).json({ message: "Failed to finalise payment" }); }
+  });
+
+  // Google Pay completion for the invoice in-page flow. Mirrors
+  // /api/transactions/:id/googlepay-complete using the token-keyed AJAX cache.
+  app.post("/api/checkout/:token/googlepay-complete", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const { sessionId, googlePayToken } = req.body as { sessionId?: string; googlePayToken?: object };
+      if (!sessionId) return res.status(400).json({ message: "sessionId required" });
+      const invoice = await storage.getInvoiceRentRequestByToken(token);
+      if (!invoice) return res.status(404).json({ message: "Payment link not found" });
+      if (invoice.windcaveSessionId && invoice.windcaveSessionId !== sessionId) {
+        console.error(`[checkout-gpay] sessionId mismatch for invoice ${invoice.id}`);
+        return res.status(403).json({ message: "Session ID mismatch" });
+      }
+
+      let approved = false;
+      let windcaveTransactionId: string | undefined;
+      if (!isWindcaveConfigured()) {
+        approved = true;
+        windcaveTransactionId = `SIMTXN_GPAY_${Date.now()}`;
+      } else {
+        const ajaxUrl = invoiceAjaxUrlCache.get(token)?.ajaxSubmitGooglePayUrl;
+        if (ajaxUrl && googlePayToken) {
+          assertWindcaveUrl(ajaxUrl);
+          const gpayResult = await submitGooglePayToken(ajaxUrl, googlePayToken);
+          if (gpayResult.error === "3DS_REQUIRED") {
+            const queryResult = await queryWindcaveSession(sessionId);
+            approved = queryResult.approved === true;
+            windcaveTransactionId = queryResult.windcaveTransactionId;
+          } else {
+            approved = gpayResult.approved === true;
+            windcaveTransactionId = gpayResult.windcaveTransactionId;
+          }
+        } else {
+          const queryResult = await queryWindcaveSession(sessionId);
+          approved = queryResult.approved === true;
+          windcaveTransactionId = queryResult.windcaveTransactionId;
+        }
+        invoiceAjaxUrlCache.delete(token);
+      }
+
+      const updated = await finalizeRentInvoice(invoice.id, approved, windcaveTransactionId, sessionId);
+      return res.json({
+        approved,
+        status: updated?.status,
+        splitCount: updated?.splitCount ?? null,
+        splitPaidCount: updated?.splitPaidCount ?? 0,
+      });
+    } catch (err) { console.error("[CHECKOUT_GPAY_COMPLETE]", err); res.status(500).json({ message: "Failed to finalise Google Pay payment" }); }
   });
 
   // Browser return after the tenant pays on the Windcave HPP. Confirms the real
@@ -6273,6 +6510,307 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
       console.error("[PROP_REMINDER_PUT]", err); res.status(500).json({ message: "Failed to update reminder settings" });
     }
+  });
+
+  // ═══════════════ TRADES ═══════════════
+
+  // Compute subtotal/GST/total/deposit for a quote from its line items.
+  // Amounts are GST-INCLUSIVE: gst is the portion already inside the total.
+  function computeQuoteTotals(
+    lineItems: Array<{ lineTotalCents: number }>,
+    gstRegistered: boolean,
+    depositEnabled: boolean,
+    depositType?: string,
+    depositValue?: number,
+  ) {
+    const totalCents = lineItems.reduce((s, li) => s + li.lineTotalCents, 0);
+    const gstCents = gstRegistered ? Math.round(totalCents - totalCents / (1 + GST_RATE)) : 0;
+    const subtotalCents = totalCents - gstCents;
+    let depositCents: number | null = null;
+    if (depositEnabled && depositType && depositValue != null) {
+      depositCents = depositType === "percent"
+        ? Math.round(totalCents * (depositValue / 100))
+        : Math.min(depositValue, totalCents);
+    }
+    return { subtotalCents, gstCents, totalCents, depositCents };
+  }
+
+  app.get("/api/trades/clients", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const rows = await storage.getClientProfilesByMerchant(merchantId);
+      res.json(rows);
+    } catch (err) { console.error("[TRADES_CLIENTS_GET]", err); res.status(500).json({ message: "Failed to fetch clients" }); }
+  });
+  app.post("/api/trades/clients", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const parsed = createClientProfileSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
+      const row = await storage.createClientProfile({ ...parsed.data, merchantId });
+      res.status(201).json(row);
+    } catch (err) { console.error("[TRADES_CLIENTS_POST]", err); res.status(500).json({ message: "Failed to create client" }); }
+  });
+  app.get("/api/trades/clients/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const row = await storage.getClientProfile(req.params.id);
+      if (!row || row.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      res.json(row);
+    } catch (err) { console.error("[TRADES_CLIENTS_GET_ID]", err); res.status(500).json({ message: "Failed to fetch client" }); }
+  });
+  app.put("/api/trades/clients/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const existing = await storage.getClientProfile(req.params.id);
+      if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      const parsed = updateClientProfileSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
+      res.json(await storage.updateClientProfile(req.params.id, parsed.data));
+    } catch (err) { console.error("[TRADES_CLIENTS_PUT]", err); res.status(500).json({ message: "Failed to update client" }); }
+  });
+  app.post("/api/trades/clients/:id/archive", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const existing = await storage.getClientProfile(req.params.id);
+      if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      res.json(await storage.archiveClientProfile(req.params.id));
+    } catch (err) { console.error("[TRADES_CLIENTS_ARCHIVE]", err); res.status(500).json({ message: "Failed to archive client" }); }
+  });
+  app.get("/api/trades/clients/:id/events", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const existing = await storage.getClientProfile(req.params.id);
+      if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      res.json(await storage.getJobEventsByClient(req.params.id));
+    } catch (err) { console.error("[TRADES_CLIENTS_EVENTS]", err); res.status(500).json({ message: "Failed to fetch client events" }); }
+  });
+
+  app.get("/api/trades/quotes", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      res.json(await storage.getQuotesByMerchant(merchantId, { status: req.query.status as string | undefined }));
+    } catch (err) { console.error("[TRADES_QUOTES_GET]", err); res.status(500).json({ message: "Failed to fetch quotes" }); }
+  });
+  app.post("/api/trades/quotes", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const parsed = createQuoteSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
+      const client = await storage.getClientProfile(parsed.data.clientProfileId);
+      if (!client || client.merchantId !== merchantId) return res.status(404).json({ message: "Client not found" });
+      const merchant = await storage.getMerchant(merchantId);
+      const totals = computeQuoteTotals(parsed.data.lineItems, !!merchant?.gstRegistered,
+        parsed.data.depositEnabled, parsed.data.depositType, parsed.data.depositValue);
+      const token = generateInvoiceToken();
+      const row = await storage.createQuote({
+        merchantId,
+        clientProfileId: parsed.data.clientProfileId,
+        token, status: "sent",
+        lineItems: parsed.data.lineItems,
+        subtotalCents: totals.subtotalCents, gstCents: totals.gstCents, totalCents: totals.totalCents,
+        depositEnabled: parsed.data.depositEnabled,
+        depositType: parsed.data.depositType ?? null,
+        depositValue: parsed.data.depositValue ?? null,
+        depositCents: totals.depositCents,
+        deliveryChannel: parsed.data.deliveryChannel,
+        validUntil: parsed.data.validUntil ?? null,
+        notes: parsed.data.notes ?? null,
+        documentUrl: parsed.data.documentUrl ?? null,
+        documentName: parsed.data.documentName ?? null,
+        sentAt: new Date(),
+      });
+      await storage.createJobEvent({ merchantId, clientProfileId: client.id, quoteId: row.id, eventType: "quote_sent" });
+      // NOTE: actual email/WhatsApp dispatch reuses the property dispatcher — wired in Phase 5.
+      res.status(201).json(row);
+    } catch (err) { console.error("[TRADES_QUOTES_POST]", err); res.status(500).json({ message: "Failed to create quote" }); }
+  });
+  app.get("/api/trades/quotes/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const row = await storage.getQuote(req.params.id);
+      if (!row || row.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      res.json(row);
+    } catch (err) { console.error("[TRADES_QUOTES_GET_ID]", err); res.status(500).json({ message: "Failed to fetch quote" }); }
+  });
+  // Customer-facing accept/decline (called from the public quote page, no auth — looked up by token)
+  app.post("/api/trades/quotes/token/:token/respond", async (req, res) => {
+    try {
+      const parsed = acceptQuoteSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
+      const quote = await storage.getQuoteByToken(req.params.token);
+      if (!quote) return res.status(404).json({ message: "Quote not found" });
+      if (quote.status === "accepted" || quote.status === "declined")
+        return res.status(409).json({ message: "Already responded" });
+      if (!parsed.data.accept) {
+        const declined = await storage.updateQuote(quote.id, { status: "declined", declinedAt: new Date() });
+        await storage.createJobEvent({ merchantId: quote.merchantId, clientProfileId: quote.clientProfileId, quoteId: quote.id, eventType: "quote_declined" });
+        return res.json({ quote: declined, depositInvoice: null });
+      }
+      const accepted = await storage.updateQuote(quote.id, { status: "accepted", acceptedAt: new Date() });
+      await storage.createJobEvent({ merchantId: quote.merchantId, clientProfileId: quote.clientProfileId, quoteId: quote.id, eventType: "quote_accepted" });
+      // Deposit enabled → auto-issue the deposit invoice so the checkout shows it immediately.
+      let depositInvoice = null;
+      const due = new Date(); due.setDate(due.getDate() + 7);
+      if (quote.depositEnabled && quote.depositCents && quote.depositCents > 0) {
+        depositInvoice = await storage.createJobInvoice({
+          merchantId: quote.merchantId, clientProfileId: quote.clientProfileId, quoteId: quote.id,
+          kind: "deposit", amountCents: quote.depositCents, token: generateInvoiceToken(),
+          deliveryChannel: quote.deliveryChannel, status: "pending_dispatch", dueAt: due,
+        });
+      } else {
+        // No deposit → issue the full balance straight away.
+        depositInvoice = await storage.createJobInvoice({
+          merchantId: quote.merchantId, clientProfileId: quote.clientProfileId, quoteId: quote.id,
+          kind: "full", amountCents: quote.totalCents, token: generateInvoiceToken(),
+          deliveryChannel: quote.deliveryChannel, status: "pending_dispatch", dueAt: due,
+        });
+      }
+      res.json({ quote: accepted, depositInvoice });
+    } catch (err) { console.error("[TRADES_QUOTES_TOKEN_RESPOND]", err); res.status(500).json({ message: "Failed to process quote response" }); }
+  });
+
+  app.get("/api/trades/invoices", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      res.json(await storage.getJobInvoicesByMerchant(merchantId, {
+        status: req.query.status as string | undefined,
+        clientProfileId: req.query.clientProfileId as string | undefined,
+      }));
+    } catch (err) { console.error("[TRADES_INVOICES_GET]", err); res.status(500).json({ message: "Failed to fetch invoices" }); }
+  });
+  app.post("/api/trades/invoices", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const parsed = createJobInvoiceSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
+      const client = await storage.getClientProfile(parsed.data.clientProfileId);
+      if (!client || client.merchantId !== merchantId) return res.status(404).json({ message: "Client not found" });
+      if (parsed.data.quoteId) {
+        const linkedQuote = await storage.getQuote(parsed.data.quoteId);
+        if (!linkedQuote || linkedQuote.merchantId !== merchantId) return res.status(404).json({ message: "Quote not found" });
+      }
+      const row = await storage.createJobInvoice({
+        merchantId, clientProfileId: parsed.data.clientProfileId,
+        quoteId: parsed.data.quoteId ?? null, kind: parsed.data.kind,
+        amountCents: parsed.data.amountCents, token: generateInvoiceToken(),
+        deliveryChannel: parsed.data.deliveryChannel, jobDetails: parsed.data.jobDetails ?? null,
+        status: "pending_dispatch", dueAt: parsed.data.dueAt,
+        scheduledSendAt: parsed.data.scheduledSendAt ?? null,
+        splitEnabled: !!parsed.data.splitEnabled,
+        documentUrl: parsed.data.documentUrl ?? null, documentName: parsed.data.documentName ?? null,
+      });
+      await storage.createJobEvent({ merchantId, clientProfileId: client.id, jobInvoiceId: row.id, eventType: "invoice_sent" });
+      res.status(201).json(row);
+    } catch (err) { console.error("[TRADES_INVOICES_POST]", err); res.status(500).json({ message: "Failed to create invoice" }); }
+  });
+  app.post("/api/trades/invoices/:id/send-balance", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      // Issue the remaining balance for a deposit-paid job.
+      const dep = await storage.getJobInvoice(req.params.id);
+      if (!dep || dep.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      if (dep.kind !== "deposit") return res.status(400).json({ message: "Balance can only be sent for a deposit invoice" });
+      const quote = dep.quoteId ? await storage.getQuote(dep.quoteId) : null;
+      const balanceCents = quote ? Math.max(quote.totalCents - (dep.amountCents || 0), 0) : 0;
+      if (balanceCents <= 0) return res.status(400).json({ message: "No balance remaining" });
+      const due = new Date(); due.setDate(due.getDate() + 7);
+      const bal = await storage.createJobInvoice({
+        merchantId: dep.merchantId, clientProfileId: dep.clientProfileId, quoteId: dep.quoteId,
+        kind: "balance", amountCents: balanceCents, token: generateInvoiceToken(),
+        deliveryChannel: dep.deliveryChannel, status: "pending_dispatch", dueAt: due,
+      });
+      await storage.createJobEvent({ merchantId: dep.merchantId, clientProfileId: dep.clientProfileId, jobInvoiceId: bal.id, eventType: "balance_sent" });
+      res.status(201).json(bal);
+    } catch (err) { console.error("[TRADES_INVOICES_SEND_BALANCE]", err); res.status(500).json({ message: "Failed to send balance invoice" }); }
+  });
+  app.post("/api/trades/invoices/:id/mark-paid-external", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const inv = await storage.getJobInvoice(req.params.id);
+      if (!inv || inv.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      const parsed = markJobPaidExternalSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
+      const row = await storage.updateJobInvoice(req.params.id, {
+        status: "paid_external", paidAt: new Date(),
+        externalPaymentReference: parsed.data.externalPaymentReference ?? null,
+      });
+      await storage.createJobEvent({ merchantId: inv.merchantId, clientProfileId: inv.clientProfileId, jobInvoiceId: inv.id, eventType: "paid_external" });
+      res.json(row);
+    } catch (err) { console.error("[TRADES_INVOICES_MARK_PAID]", err); res.status(500).json({ message: "Failed to mark invoice paid" }); }
+  });
+  app.post("/api/trades/invoices/:id/complete", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const inv = await storage.getJobInvoice(req.params.id);
+      if (!inv || inv.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      res.json(await storage.updateJobInvoice(req.params.id, { status: "paid", completedAt: new Date() }));
+    } catch (err) { console.error("[TRADES_INVOICES_COMPLETE]", err); res.status(500).json({ message: "Failed to complete invoice" }); }
+  });
+  app.post("/api/trades/invoices/:id/void", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const inv = await storage.getJobInvoice(req.params.id);
+      if (!inv || inv.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      res.json(await storage.updateJobInvoice(req.params.id, { status: "voided", voidedAt: new Date() }));
+    } catch (err) { console.error("[TRADES_INVOICES_VOID]", err); res.status(500).json({ message: "Failed to void invoice" }); }
+  });
+
+  app.get("/api/trades/schedules", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      res.json(await storage.getJobSchedulesByMerchant(merchantId));
+    } catch (err) { console.error("[TRADES_SCHEDULES_GET]", err); res.status(500).json({ message: "Failed to fetch schedules" }); }
+  });
+  app.post("/api/trades/schedules", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const parsed = createJobScheduleSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
+      const client = await storage.getClientProfile(parsed.data.clientProfileId);
+      if (!client || client.merchantId !== merchantId) return res.status(404).json({ message: "Client not found" });
+      const row = await storage.createJobSchedule({
+        ...parsed.data, merchantId, nextRunDate: parsed.data.startDate,
+      });
+      res.status(201).json(row);
+    } catch (err) { console.error("[TRADES_SCHEDULES_POST]", err); res.status(500).json({ message: "Failed to create schedule" }); }
+  });
+  app.put("/api/trades/schedules/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const existing = await storage.getJobSchedule(req.params.id);
+      if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      const parsed = updateJobScheduleSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
+      res.json(await storage.updateJobSchedule(req.params.id, parsed.data));
+    } catch (err) { console.error("[TRADES_SCHEDULES_PUT]", err); res.status(500).json({ message: "Failed to update schedule" }); }
+  });
+  app.delete("/api/trades/schedules/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const existing = await storage.getJobSchedule(req.params.id);
+      if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      res.json(await storage.terminateJobSchedule(req.params.id));
+    } catch (err) { console.error("[TRADES_SCHEDULES_DELETE]", err); res.status(500).json({ message: "Failed to delete schedule" }); }
   });
 
   // ── Cron endpoint ─────────────────────────────────────────────────────────

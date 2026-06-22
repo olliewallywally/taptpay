@@ -7,7 +7,7 @@
  *   3. overduePass   — mark dispatched invoices overdue once dueAt has passed
  *   4. reminderPass  — auto-resend reminders for overdue invoices
  *
- * Delivery is channel-aware (email or WhatsApp) via deliverInvoice(). For split
+ * Delivery is channel-aware (email, WhatsApp or SMS) via deliverInvoice(). For split
  * invoices, reminders chase only the remaining (owing) amount.
  *
  * Triggered via POST /api/internal/cron (x-cron-secret header).
@@ -16,6 +16,7 @@
 import { storage } from "./storage";
 import { sendEmail } from "./email-service";
 import { isWhatsAppConfigured, sendWhatsApp } from "./whatsapp-service";
+import { isSmsConfigured, sendSms } from "./sms-service";
 
 // Remaining owing on a split invoice (null for non-split). Shares 1..n-1 are
 // each floor(total/n); the remainder lands on the final share, so after k
@@ -56,20 +57,36 @@ function esc(s: string | null | undefined): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// The noun phrase a payment request is "for" — "rent" for rent invoices, or the
+// one-off charge's label (description / charge type) for non-rent charges. Keeps
+// the rent wording byte-identical while letting charges read correctly.
+function billNoun(invoice: { kind?: string | null; description?: string | null; chargeType?: string | null }): string {
+  if (invoice.kind !== "charge") return "rent";
+  const byType: Record<string, string> = {
+    utilities: "utilities", late_fee: "late fee", cleaning: "cleaning fee", damages: "damages", other: "charge",
+  };
+  const d = (invoice.description || "").trim();
+  return d || byType[invoice.chargeType || "other"] || "charge";
+}
+
+const capitalize = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+
 function buildRentEmail(opts: {
   tenantName: string; merchantName: string; propertyAddress: string;
   amountCents: number; dueAt: Date; paymentUrl: string; reminder?: boolean;
-  splitNote?: string; payLabel?: string;
+  splitNote?: string; payLabel?: string; label?: string;
 }): { subject: string; html: string; text: string } {
   const { tenantName, merchantName, propertyAddress, amountCents, dueAt, paymentUrl, reminder, splitNote, payLabel } = opts;
   const amount = fmtCents(amountCents);
   const due    = fmtDate(dueAt);
-  const kicker  = reminder ? "overdue reminder" : "rent payment";
+  const noun = opts.label || "rent";
+  const Noun = capitalize(noun);
+  const kicker  = reminder ? "overdue reminder" : `${noun} payment`;
   const amountLabel = reminder ? "amount still owing" : "amount due";
   const payText = payLabel || `pay ${amount}`;
   const subject = reminder
-    ? `Reminder: rent overdue — ${amount}${splitNote ? ` (${splitNote})` : ""}`
-    : `Rent payment due — ${amount} by ${due}`;
+    ? `Reminder: ${noun} overdue — ${amount}${splitNote ? ` (${splitNote})` : ""}`
+    : `${Noun} payment due — ${amount} by ${due}`;
   const splitHtml = splitNote
     ? `<p style="margin:8px 0 0;font-size:12px;color:rgba(88,171,255,0.8)">${splitNote}</p>`
     : "";
@@ -121,22 +138,23 @@ function buildRentEmail(opts: {
   </table>
 </body></html>`;
 
-  const text = `${reminder ? "Rent reminder" : "Rent payment due"} — ${amount}${reminder ? "" : ` by ${due}`}\n\nHi ${tenantName},\n\n${merchantName} ${reminder ? "is following up on your outstanding rent" : "has sent you a rent payment request"}.\n${splitNote ? `\n${splitNote}\n` : ""}\nProperty: ${propertyAddress}\n${amountLabel}: ${amount}\nDue:      ${due}\n\nPay now: ${paymentUrl}\n`;
+  const text = `${reminder ? `${Noun} reminder` : `${Noun} payment due`} — ${amount}${reminder ? "" : ` by ${due}`}\n\nHi ${tenantName},\n\n${merchantName} ${reminder ? `is following up on your outstanding ${noun}` : `has sent you a ${noun} payment request`}.\n${splitNote ? `\n${splitNote}\n` : ""}\nProperty: ${propertyAddress}\n${amountLabel}: ${amount}\nDue:      ${due}\n\nPay now: ${paymentUrl}\n`;
   return { subject, html, text };
 }
 
 // WhatsApp message body — short and link-first.
 function buildRentWhatsAppText(opts: {
   tenantName: string; merchantName: string; propertyAddress: string;
-  amountCents: number; dueAt: Date; paymentUrl: string; reminder?: boolean; splitNote?: string;
+  amountCents: number; dueAt: Date; paymentUrl: string; reminder?: boolean; splitNote?: string; label?: string;
 }): string {
   const amount = fmtCents(opts.amountCents);
   const due = fmtDate(opts.dueAt);
+  const noun = opts.label || "rent";
   if (opts.reminder) {
-    return `Hi ${opts.tenantName}, a reminder that ${amount} rent is still outstanding for ${opts.propertyAddress}.` +
+    return `Hi ${opts.tenantName}, a reminder that ${amount} ${noun} is still outstanding for ${opts.propertyAddress}.` +
       `${opts.splitNote ? ` (${opts.splitNote})` : ""}\nPay here: ${opts.paymentUrl}\n— ${opts.merchantName} via taptpay`;
   }
-  return `Hi ${opts.tenantName}, your rent of ${amount} for ${opts.propertyAddress} is due ${due}.` +
+  return `Hi ${opts.tenantName}, your ${noun} of ${amount} for ${opts.propertyAddress} is due ${due}.` +
     `\nPay securely here: ${opts.paymentUrl}\n— ${opts.merchantName} via taptpay`;
 }
 
@@ -154,15 +172,28 @@ async function deliverInvoice(invoice: any, baseUrl: string, opts: { reminder?: 
   const paymentUrl = `${baseUrl}/r/${invoice.token}`;
   const merchantName = merchant.businessName || merchant.name;
   const amountCents = opts.amountCents ?? invoice.amountCents;
+  // "rent" for rent invoices, or the charge's label for one-off charges.
+  const label = billNoun(invoice);
 
   // WhatsApp (preferred when selected + available)
   if (channel === "whatsapp" && isWhatsAppConfigured() && tenant.phone) {
     const text = buildRentWhatsAppText({
       tenantName: tenant.firstName, merchantName, propertyAddress: tenant.propertyAddress,
-      amountCents, dueAt: new Date(invoice.dueAt), paymentUrl, reminder: opts.reminder, splitNote: opts.splitNote,
+      amountCents, dueAt: new Date(invoice.dueAt), paymentUrl, reminder: opts.reminder, splitNote: opts.splitNote, label,
     });
     const result = await sendWhatsApp({ toPhone: tenant.phone, text });
     if (result.ok) return { sent: true, channel: "whatsapp", messageId: result.messageId };
+    // else fall through to email fallback
+  }
+
+  // SMS (when selected + available). Reuses the short, link-first WhatsApp copy.
+  if (channel === "sms" && isSmsConfigured() && tenant.phone) {
+    const text = buildRentWhatsAppText({
+      tenantName: tenant.firstName, merchantName, propertyAddress: tenant.propertyAddress,
+      amountCents, dueAt: new Date(invoice.dueAt), paymentUrl, reminder: opts.reminder, splitNote: opts.splitNote, label,
+    });
+    const result = await sendSms({ toPhone: tenant.phone, text });
+    if (result.ok) return { sent: true, channel: "sms", messageId: result.messageId };
     // else fall through to email fallback
   }
 
@@ -170,7 +201,7 @@ async function deliverInvoice(invoice: any, baseUrl: string, opts: { reminder?: 
   if (tenant.email) {
     const email = buildRentEmail({
       tenantName: `${tenant.firstName} ${tenant.lastName}`, merchantName, propertyAddress: tenant.propertyAddress,
-      amountCents, dueAt: new Date(invoice.dueAt), paymentUrl, reminder: opts.reminder, splitNote: opts.splitNote, payLabel: opts.payLabel,
+      amountCents, dueAt: new Date(invoice.dueAt), paymentUrl, reminder: opts.reminder, splitNote: opts.splitNote, payLabel: opts.payLabel, label,
     });
     const ok = await sendEmail({ to: tenant.email, from: "noreply@taptpay.co.nz", subject: email.subject, html: email.html, text: email.text });
     return { sent: ok, channel: "email", reason: ok ? undefined : "send_failed" };
@@ -204,7 +235,7 @@ export async function resendInvoiceEmail(invoiceId: string, baseUrl: string): Pr
   if (!delivery.sent) return { ok: false, reason: delivery.reason || "send_failed" };
 
   const updates: any = { dispatchedAt: new Date(), sentAt: new Date() };
-  if (delivery.messageId) updates.whatsappMessageId = delivery.messageId;
+  if (delivery.messageId && delivery.channel === "whatsapp") updates.whatsappMessageId = delivery.messageId;
   // pending/failed invoices move to "dispatched"; dispatched/overdue keep their status.
   if (invoice.status === "pending_dispatch" || invoice.status === "dispatch_failed") updates.status = "dispatched";
   const updated = await storage.updateInvoiceRentRequest(invoiceId, updates);
@@ -276,7 +307,7 @@ export async function runDispatchPass(baseUrl: string): Promise<{ dispatched: nu
 
       if (delivery.sent) {
         const dispatchUpdates: any = { status: "dispatched", dispatchedAt: new Date() };
-        if (delivery.messageId) dispatchUpdates.whatsappMessageId = delivery.messageId;
+        if (delivery.messageId && delivery.channel === "whatsapp") dispatchUpdates.whatsappMessageId = delivery.messageId;
         await storage.updateInvoiceRentRequest(invoice.id, dispatchUpdates);
         await storage.logTransactionEvent({
           merchantId: invoice.merchantId, tenantProfileId: invoice.tenantProfileId,
@@ -357,7 +388,7 @@ export async function runReminderPass(baseUrl: string, now: Date = new Date()): 
       if (delivery.sent) {
         const owing = splitOwing(invoice);
         const reminderUpdates: any = { lastReminderSentAt: now, reminderCount: sentCount + 1 };
-        if (delivery.messageId) reminderUpdates.whatsappMessageId = delivery.messageId;
+        if (delivery.messageId && delivery.channel === "whatsapp") reminderUpdates.whatsappMessageId = delivery.messageId;
         await storage.updateInvoiceRentRequest(invoice.id, reminderUpdates);
         await storage.logTransactionEvent({
           merchantId: invoice.merchantId, tenantProfileId: invoice.tenantProfileId,

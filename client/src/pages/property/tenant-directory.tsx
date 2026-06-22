@@ -2,6 +2,7 @@ import { useState, useRef, useLayoutEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { startPropertyNavigation, startPropertyBack, signalPropertyReady } from "@/lib/property-transition";
+import { propFetch } from "@/lib/property-api";
 
 /* ── Design tokens ── */
 const C = {
@@ -71,7 +72,7 @@ function AddTenantSheet({ onClose, onSave, saving, saveError }: {
 }) {
   const [form, setForm] = useState({
     firstName: '', lastName: '', email: '', phone: '',
-    propertyAddress: '', preferredChannel: 'email' as 'email' | 'sms',
+    propertyAddress: '', preferredChannel: 'email' as 'email' | 'whatsapp' | 'sms',
   });
   const [subtenants, setSubtenants] = useState<{ name: string; email: string; phone: string }[]>([]);
   const [subForm, setSubForm]       = useState({ name: '', email: '', phone: '' });
@@ -81,7 +82,10 @@ function AddTenantSheet({ onClose, onSave, saving, saveError }: {
   const set    = (k: string) => (v: string) => setForm(f => ({ ...f, [k]: v }));
   const setSub = (k: string) => (v: string) => setSubForm(f => ({ ...f, [k]: v }));
 
-  const valid = form.firstName.trim() && form.lastName.trim() && form.propertyAddress.trim();
+  // The chosen delivery channel must have a matching contact, or the rent link
+  // can't be delivered: email → email address; whatsapp/sms → phone number.
+  const channelContactOk = form.preferredChannel === 'email' ? !!form.email.trim() : !!form.phone.trim();
+  const valid = form.firstName.trim() && form.lastName.trim() && form.propertyAddress.trim() && channelContactOk;
 
   const handleClose = () => {
     setClosing(true);
@@ -169,14 +173,19 @@ function AddTenantSheet({ onClose, onSave, saving, saveError }: {
           {/* Preferred channel */}
           <div style={{ marginBottom: 24 }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: C.sky, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>send rent link via</div>
-            <div style={{ display: 'flex', gap: 10 }}>
-              {(['email', 'sms'] as const).map(ch => (
+            <div style={{ display: 'flex', gap: 8 }}>
+              {(['email', 'whatsapp', 'sms'] as const).map(ch => (
                 <button key={ch} onClick={() => setForm(f => ({ ...f, preferredChannel: ch }))}
-                  style={{ flex: 1, padding: '13px 0', borderRadius: 14, border: 'none', background: form.preferredChannel === ch ? C.navy : C.gray, color: form.preferredChannel === ch ? C.white : C.navy, fontWeight: 600, fontSize: 14, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em', transition: 'background 0.18s, color 0.18s' }}>
+                  style={{ flex: 1, padding: '13px 0', borderRadius: 14, border: 'none', background: form.preferredChannel === ch ? C.navy : C.gray, color: form.preferredChannel === ch ? C.white : C.navy, fontWeight: 600, fontSize: 12.5, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.04em', transition: 'background 0.18s, color 0.18s' }}>
                   {ch}
                 </button>
               ))}
             </div>
+            {!channelContactOk && (
+              <div style={{ marginTop: 8, fontSize: 12, color: '#C71A2A', fontWeight: 500 }}>
+                add {form.preferredChannel === 'email' ? 'an email address' : 'a phone number'} above to send via {form.preferredChannel}
+              </div>
+            )}
           </div>
 
           {/* ── Subtenants ── */}
@@ -288,6 +297,7 @@ export default function TenantDirectory() {
   const [, setLocation] = useLocation();
   const [search,    setSearch]    = useState('');
   const [showAdd,   setShowAdd]   = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const heroRef = useRef<HTMLDivElement>(null);
@@ -298,16 +308,35 @@ export default function TenantDirectory() {
 
   const { data: tenants = [], isLoading } = useQuery<any[]>({
     queryKey: ['/api/property/tenants'],
-    queryFn: () => fetch('/api/property/tenants', { headers: propHeaders() }).then(r => r.ok ? r.json() : []),
+    queryFn: () => propFetch('/api/property/tenants').then(r => r.ok ? r.json() : []),
     staleTime: 60000,
     retry: false,
   });
 
   const { data: invoices = [] } = useQuery<any[]>({
     queryKey: ['/api/property/invoices'],
-    queryFn: () => fetch('/api/property/invoices', { headers: propHeaders() }).then(r => r.ok ? r.json() : []),
+    queryFn: () => propFetch('/api/property/invoices').then(r => r.ok ? r.json() : []),
     staleTime: 30000,
     retry: false,
+  });
+
+  // Archived tenants — fetched lazily only when the merchant expands the section.
+  const { data: archivedTenants = [] } = useQuery<any[]>({
+    queryKey: ['/api/property/tenants', 'archived'],
+    queryFn: () => propFetch('/api/property/tenants?includeArchived=true').then(r => r.ok ? r.json() : []),
+    select: (list: any[]) => list.filter((t: any) => t.status === 'archived'),
+    enabled: showArchived,
+    staleTime: 30000,
+    retry: false,
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const r = await fetch(`/api/property/tenants/${id}/unarchive`, { method: 'POST', headers: propHeaders() });
+      if (!r.ok) throw new Error('Failed to restore');
+      return r.json();
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/property/tenants'] }); },
   });
 
   const createMutation = useMutation({
@@ -429,6 +458,34 @@ export default function TenantDirectory() {
               }}
             />
           ))
+        )}
+      </div>
+
+      {/* Archived tenants — collapsed by default; restore brings them back active */}
+      <div style={{ padding: '22px 18px 0' }}>
+        <button onClick={() => setShowArchived(s => !s)}
+          style={{ background: 'none', border: 'none', color: C.mute, fontSize: 12, fontWeight: 600, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.08em', padding: 0 }}>
+          {showArchived ? 'hide archived' : 'show archived'}
+        </button>
+        {showArchived && (
+          archivedTenants.length === 0 ? (
+            <div style={{ padding: '14px 0', color: C.mute, fontSize: 13 }}>no archived tenants</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+              {archivedTenants.map((t: any) => (
+                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 16, background: '#EDEDED' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13.5, color: C.navy, textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.firstName} {t.lastName}</div>
+                    <div style={{ fontSize: 11.5, color: C.mute, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.propertyAddress}</div>
+                  </div>
+                  <button onClick={() => restoreMutation.mutate(t.id)} disabled={restoreMutation.isPending}
+                    style={{ flexShrink: 0, background: C.navy, color: C.white, border: 'none', borderRadius: 10, padding: '8px 14px', fontSize: 12, fontWeight: 700, cursor: restoreMutation.isPending ? 'default' : 'pointer', opacity: restoreMutation.isPending ? 0.6 : 1 }}>
+                    restore
+                  </button>
+                </div>
+              ))}
+            </div>
+          )
         )}
       </div>
 

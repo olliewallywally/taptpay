@@ -47,7 +47,6 @@ const PropertyDashboard     = lazy(() => import("@/pages/property/property-dashb
 const TenantDirectory       = lazy(() => import("@/pages/property/tenant-directory"));
 const TenantProfile         = lazy(() => import("@/pages/property/tenant-profile"));
 const PropertyAnalytics     = lazy(() => import("@/pages/property/property-analytics"));
-const RentCheckout          = lazy(() => import("@/pages/property/rent-checkout"));
 const PropertyTerminal      = lazy(() => import("@/pages/property/property-terminal"));
 
 function PageLoader() {
@@ -268,8 +267,9 @@ function Router() {
           <Route path="/property/terminal">
             <ProtectedRoute><PropertyTerminal /></ProtectedRoute>
           </Route>
-          {/* Public rent checkout — no auth required */}
-          <Route path="/r/:token" component={RentCheckout} />
+          {/* Public rent/charge checkout — no auth required. Uses the shared
+              branded Checkout page (same UI as retail) via the invoice token. */}
+          <Route path="/r/:token" component={Checkout} />
           <Route path="/onboarding">
             <ProtectedRoute skipOnboardingCheck={true}><MerchantOnboarding /></ProtectedRoute>
           </Route>
