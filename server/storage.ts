@@ -1,6 +1,6 @@
 import { merchants, transactions, merchantSettlements, platformFees, refunds, splitPayments, taptStones, stockItems, cryptoTransactions, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, tenantProfiles, activeSchedules, invoicesRentRequests, transactionEvents, clientProfiles, quotes, jobInvoices, jobSchedules, jobEvents, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type CryptoTransaction, type InsertCryptoTransaction, type MerchantSubscription, type SubscriptionBillingHistory } from "@shared/schema";
 import { getDb, isDatabaseConnected } from "./database";
-import { eq, desc, and, inArray, gte, lte, or, ilike, sql } from "drizzle-orm";
+import { eq, ne, desc, and, inArray, gte, lte, or, ilike, sql } from "drizzle-orm";
 
 function isNeonEmptyResultError(error: unknown): boolean {
   return error instanceof TypeError && error.message === "Cannot read properties of null (reading 'map')";
@@ -253,6 +253,25 @@ export interface IStorage {
   getJobEventsByClient(clientProfileId: string, limit?: number): Promise<any[]>;
 }
 
+// Defaults for merchant columns the in-memory mocks don't set explicitly.
+// Centralised so newly added non-null columns don't silently drift every
+// `const merchant: Merchant = {…}` literal out of sync with the schema.
+const MEM_MERCHANT_DEFAULTS = {
+  googleId: null,
+  windcaveMerchantId: null,
+  emailVerified: false,
+  onboardingCompleted: false,
+  gstRegistered: false,
+  billingCardLast4: null,
+  billingCardBrand: null,
+  billingCardExpiry: null,
+  rentReminderEnabled: true,
+  rentReminderDelayDays: 3,
+  rentReminderIntervalDays: 3,
+  rentReminderMaxCount: 3,
+  tradeRemindersEnabled: true,
+};
+
 export class MemStorage implements IStorage {
   private merchants: Map<number, Merchant>;
   private transactions: Map<number, Transaction>;
@@ -328,7 +347,8 @@ export class MemStorage implements IStorage {
 
   async createMerchant(insertMerchant: InsertMerchant): Promise<Merchant> {
     const id = this.currentMerchantId++;
-    const merchant: Merchant = { 
+    const merchant: Merchant = {
+      ...MEM_MERCHANT_DEFAULTS,
       id,
       name: insertMerchant.name,
       businessName: insertMerchant.businessName,
@@ -374,7 +394,8 @@ export class MemStorage implements IStorage {
 
   async createMerchantWithPassword(merchantData: any, passwordHash: string): Promise<Merchant> {
     const id = this.currentMerchantId++;
-    const merchant: Merchant = { 
+    const merchant: Merchant = {
+      ...MEM_MERCHANT_DEFAULTS,
       id,
       name: merchantData.name,
       businessName: merchantData.businessName,
@@ -420,7 +441,8 @@ export class MemStorage implements IStorage {
 
   async createMerchantWithSignup(data: CreateMerchant & { verificationToken: string }): Promise<Merchant> {
     const id = this.currentMerchantId++;
-    const merchant: Merchant = { 
+    const merchant: Merchant = {
+      ...MEM_MERCHANT_DEFAULTS,
       id,
       name: data.name,
       businessName: data.businessName,
@@ -1484,6 +1506,8 @@ export class MemStorage implements IStorage {
       ...data,
       merchantId: data.merchantId ?? null,
       description: data.description ?? null,
+      emoji: (data as any).emoji ?? null,
+      variations: (data as any).variations ?? null,
       id,
       isActive: true,
       createdAt: new Date(),
@@ -3385,8 +3409,10 @@ export class DatabaseStorage implements IStorage {
   }
   async getJobInvoiceByScheduleAndDue(scheduleId: string, dueAt: Date): Promise<any> {
     const db = getDb(); if (!db) return undefined;
+    // Ignore voided rows so a cancelled duplicate never blocks regeneration —
+    // matches the partial unique index (which also excludes voided).
     const [row] = await db.select().from(jobInvoices)
-      .where(and(eq(jobInvoices.scheduleId, scheduleId), eq(jobInvoices.dueAt, dueAt))).limit(1);
+      .where(and(eq(jobInvoices.scheduleId, scheduleId), eq(jobInvoices.dueAt, dueAt), ne(jobInvoices.status, "voided"))).limit(1);
     return row;
   }
   async updateJobInvoice(id: string, updates: any): Promise<any> {

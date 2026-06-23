@@ -1062,10 +1062,11 @@ export const jobInvoices = pgTable("job_invoices", {
   statusDueIdx: index("job_invoices_status_due_idx").on(t.status, t.dueAt),
   merchantStatusIdx: index("job_invoices_merchant_status_idx").on(t.merchantId, t.status),
   tokenIdx: index("job_invoices_token_idx").on(t.token),
-  // One recurring invoice per (schedule, due date) — makes cron generation
+  // One LIVE recurring invoice per (schedule, due date) — makes cron generation
   // idempotent under concurrent/retried runs. Partial so non-recurring invoices
-  // (null scheduleId) never collide.
-  scheduleDueUq: uniqueIndex("job_invoices_schedule_due_uq").on(t.scheduleId, t.dueAt).where(sql`${t.scheduleId} IS NOT NULL`),
+  // (null scheduleId) never collide, and voided rows are excluded so a cancelled
+  // duplicate can't wedge the index.
+  scheduleDueUq: uniqueIndex("job_invoices_schedule_due_uq").on(t.scheduleId, t.dueAt).where(sql`${t.scheduleId} IS NOT NULL AND ${t.status} <> 'voided'`),
 }));
 
 export const jobEvents = pgTable("job_events", {
