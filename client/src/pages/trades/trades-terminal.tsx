@@ -13,7 +13,7 @@ const GREEN = TRADES_THEME.GREEN;
 const RED   = TRADES_THEME.RED;
 const AMBER = TRADES_THEME.AMBER;
 
-const fmt = (c: number) => `$${(c / 100).toFixed(2)}`;
+const fmt = formatNzd; // canonical NZD formatter (Intl en-NZ) — see trades-money.ts
 
 function clientInitials(t: any) {
   return `${t.firstName?.[0] ?? ''}${t.lastName?.[0] ?? ''}`.toUpperCase();

@@ -2,7 +2,7 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, GST_RATE } from "@shared/schema";
+import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, GST_RATE } from "@shared/schema";
 import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, simulateCreateSession, simulateQuerySession, simulateRentSession, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, simulateAttendedTapToPay } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, createUser, getUserByEmail, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
@@ -5868,12 +5868,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         ...(fullyPaid ? { status: "paid", paidAt: new Date() } : {}),
         windcaveTransactionId: windcaveTransactionId ?? invoice.windcaveTransactionId,
       });
-      await storage.createJobEvent({ merchantId: invoice.merchantId, clientProfileId: invoice.clientProfileId, jobInvoiceId: invoice.id, eventType: fullyPaid ? "payment_received" : "split_share_paid", payload: { share: claimed.splitPaidCount, of: invoice.splitCount, channel: "card" } });
+      await storage.createJobEvent({ merchantId: invoice.merchantId, clientProfileId: invoice.clientProfileId, jobInvoiceId: invoice.id, eventType: fullyPaid ? "payment_received" : "split_share_paid", payload: { share: claimed.splitPaidCount, of: invoice.splitCount, channel: "card", windcaveTransactionId: windcaveTransactionId ?? null } });
       if (fullyPaid) await sendTradePaymentInvoice(updated);
       return updated;
     }
     const updated = await storage.updateJobInvoice(invoiceId, { status: "paid", paidAt: new Date(), windcaveTransactionId: windcaveTransactionId ?? null });
-    await storage.createJobEvent({ merchantId: invoice.merchantId, clientProfileId: invoice.clientProfileId, jobInvoiceId: invoice.id, eventType: "payment_received", payload: { channel: "card", amountCents: invoice.amountCents } });
+    await storage.createJobEvent({ merchantId: invoice.merchantId, clientProfileId: invoice.clientProfileId, jobInvoiceId: invoice.id, eventType: "payment_received", payload: { channel: "card", amountCents: invoice.amountCents, windcaveTransactionId: windcaveTransactionId ?? null } });
     await sendTradePaymentInvoice(updated);
     return updated;
   }
@@ -6285,7 +6285,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         sessionResult = simulateRentSession(token, baseUrl);
       }
       if (!sessionResult.success) return res.status(502).json({ message: "Payment gateway error. Please try again." });
-      if (sessionResult.sessionId) await updateCheckoutInvoice(invoice, { windcaveSessionId: sessionResult.sessionId });
+      // Pin single-payment invoices to their one Windcave session so a stale or
+      // foreign session can't finalize them. Split invoices legitimately create
+      // one session per payer; pinning a single shared value would 403 every
+      // payer but the most recent, so we skip it and rely on per-session dedup
+      // (splitPaidSessions) instead.
+      if (sessionResult.sessionId && !isSplit) await updateCheckoutInvoice(invoice, { windcaveSessionId: sessionResult.sessionId });
       // Duplicate X-ID — Windcave reports the session already completed; finalize now
       // and bounce the payer back to the checkout page to see the result.
       if (sessionResult.alreadyComplete) {
@@ -6346,7 +6351,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         sessionResult = simulateCreateSession(merchantRef, baseUrl);
       }
       if (!sessionResult.success) return res.status(502).json({ message: "Payment gateway error. Please try again." });
-      if (sessionResult.sessionId) await updateCheckoutInvoice(invoice, { windcaveSessionId: sessionResult.sessionId });
+      // Pin single-payment invoices to their one Windcave session so a stale or
+      // foreign session can't finalize them. Split invoices legitimately create
+      // one session per payer; pinning a single shared value would 403 every
+      // payer but the most recent, so we skip it and rely on per-session dedup
+      // (splitPaidSessions) instead.
+      if (sessionResult.sessionId && !isSplit) await updateCheckoutInvoice(invoice, { windcaveSessionId: sessionResult.sessionId });
 
       // Duplicate X-ID — Windcave reports the session already completed; finalize now
       // and tell the page to show its success/declined state without a second submit.
@@ -6381,7 +6391,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!sessionId) return res.status(400).json({ message: "sessionId required" });
       const invoice = await getCheckoutInvoiceByToken(token);
       if (!invoice) return res.status(404).json({ message: "Payment link not found" });
-      if (invoice.windcaveSessionId && invoice.windcaveSessionId !== sessionId) {
+      // Split invoices have one session per payer (not pinned on the invoice), so
+      // the single-session equality check only applies to single payments.
+      const isSplit = invoice.splitEnabled && invoice.splitCount && invoice.splitCount > 1;
+      if (!isSplit && invoice.windcaveSessionId && invoice.windcaveSessionId !== sessionId) {
         console.error(`[checkout-complete] sessionId mismatch for invoice ${invoice.id}`);
         return res.status(403).json({ message: "Session ID mismatch" });
       }
@@ -6406,7 +6419,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!sessionId) return res.status(400).json({ message: "sessionId required" });
       const invoice = await getCheckoutInvoiceByToken(token);
       if (!invoice) return res.status(404).json({ message: "Payment link not found" });
-      if (invoice.windcaveSessionId && invoice.windcaveSessionId !== sessionId) {
+      // Split invoices have one session per payer (not pinned on the invoice), so
+      // the single-session equality check only applies to single payments.
+      const isSplit = invoice.splitEnabled && invoice.splitCount && invoice.splitCount > 1;
+      if (!isSplit && invoice.windcaveSessionId && invoice.windcaveSessionId !== sessionId) {
         console.error(`[checkout-gpay] sessionId mismatch for invoice ${invoice.id}`);
         return res.status(403).json({ message: "Session ID mismatch" });
       }
@@ -6603,6 +6619,31 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
   // ═══════════════ TRADES ═══════════════
 
+  // Trades job-invoice reminders have their own on/off switch (cadence reuses the
+  // rent* day settings) so disabling rent reminders doesn't silently stop them.
+  app.get("/api/trades/reminder-settings", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) return res.status(404).json({ message: "Merchant not found" });
+      res.json({ tradeRemindersEnabled: merchant.tradeRemindersEnabled ?? true });
+    } catch (err) { console.error("[TRADES_REMINDER_GET]", err); res.status(500).json({ message: "Failed to fetch reminder settings" }); }
+  });
+
+  app.put("/api/trades/reminder-settings", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const data = updateTradeReminderSettingsSchema.parse(req.body);
+      const merchant = await storage.updateMerchant(merchantId, data as any);
+      res.json({ tradeRemindersEnabled: merchant?.tradeRemindersEnabled ?? true });
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
+      console.error("[TRADES_REMINDER_PUT]", err); res.status(500).json({ message: "Failed to update reminder settings" });
+    }
+  });
+
   // Compute subtotal/GST/total/deposit for a quote from its line items.
   // Amounts are GST-INCLUSIVE: gst is the portion already inside the total.
   function computeQuoteTotals(
@@ -6727,6 +6768,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       });
       await storage.createJobEvent({ merchantId, clientProfileId: client.id, quoteId: row.id, eventType: "quote_sent" });
       const delivery = await sendTradeQuote(row.id, getBaseUrl(req));
+      // Record undelivered quotes so the list/timeline can distinguish them from
+      // ones the client actually received (status stays "sent" so the manually
+      // shared link still works).
+      if (!delivery.sent) await storage.createJobEvent({ merchantId, clientProfileId: client.id, quoteId: row.id, eventType: "quote_dispatch_failed", payload: { reason: delivery.reason } });
       res.status(201).json({ ...row, delivered: delivery.sent, deliveryReason: delivery.reason });
     } catch (err) { console.error("[TRADES_QUOTES_POST]", err); res.status(500).json({ message: "Failed to create quote" }); }
   });
@@ -6879,11 +6924,18 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (dep.kind !== "deposit") return res.status(400).json({ message: "Balance can only be sent for a deposit invoice" });
       if (!["paid", "paid_external", "deposit_paid"].includes(dep.status))
         return res.status(409).json({ message: "Deposit must be paid before sending the balance" });
-      const quote = dep.quoteId ? await storage.getQuote(dep.quoteId) : null;
+      if (!dep.quoteId) return res.status(400).json({ message: "This deposit is not linked to a quote, so a balance can't be calculated" });
+      const quote = await storage.getQuote(dep.quoteId);
+      if (!quote) return res.status(404).json({ message: "Linked quote not found" });
       const existingInvoices = await storage.getJobInvoicesByMerchant(merchantId, { clientProfileId: dep.clientProfileId });
-      if (existingInvoices.some((invoice: any) => invoice.quoteId === dep.quoteId && invoice.kind === "balance" && invoice.status !== "voided"))
+      const onQuote = existingInvoices.filter((invoice: any) => invoice.quoteId === dep.quoteId && invoice.status !== "voided");
+      if (onQuote.some((invoice: any) => invoice.kind === "balance"))
         return res.status(409).json({ message: "Balance invoice already exists" });
-      const balanceCents = quote ? Math.max(quote.totalCents - (dep.amountCents || 0), 0) : 0;
+      // Subtract everything already billed against this quote (the deposit plus any
+      // other non-voided invoices), not just this one deposit, so a balance can
+      // never double-bill amounts already covered.
+      const alreadyBilled = onQuote.reduce((sum: number, invoice: any) => sum + (invoice.amountCents || 0), 0);
+      const balanceCents = Math.max(quote.totalCents - alreadyBilled, 0);
       if (balanceCents <= 0) return res.status(400).json({ message: "No balance remaining" });
       const due = new Date(); due.setDate(due.getDate() + 7);
       const bal = await storage.createJobInvoice({
@@ -6919,6 +6971,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
       const inv = await storage.getJobInvoice(req.params.id);
       if (!inv || inv.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      // A paid deposit is only part-payment — the balance must still be collected,
+      // so don't let a deposit invoice close out the job.
+      if (inv.kind === "deposit")
+        return res.status(409).json({ message: "Send and collect the balance before completing the job" });
       if (!["paid", "paid_external"].includes(inv.status))
         return res.status(409).json({ message: "Invoice must be paid before completing the job" });
       const row = await storage.updateJobInvoice(req.params.id, { completedAt: new Date() });

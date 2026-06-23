@@ -91,6 +91,9 @@ export const merchants = pgTable("merchants", {
   rentReminderDelayDays: integer("rent_reminder_delay_days").notNull().default(3),     // days after due before first reminder
   rentReminderIntervalDays: integer("rent_reminder_interval_days").notNull().default(3), // days between subsequent reminders
   rentReminderMaxCount: integer("rent_reminder_max_count").notNull().default(3),        // max reminders (0 = unlimited)
+  // Trades — own reminder on/off switch so disabling rent reminders does not
+  // silently stop trades job-invoice reminders (cadence reuses the rent* days).
+  tradeRemindersEnabled: boolean("trade_reminders_enabled").notNull().default(true),
 
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -912,6 +915,10 @@ export const updateRentReminderSettingsSchema = z.object({
   rentReminderMaxCount: z.number().int().min(0).max(20).optional(),
 });
 
+export const updateTradeReminderSettingsSchema = z.object({
+  tradeRemindersEnabled: z.boolean(),
+});
+
 export const createAdHocInvoiceSchema = z.object({
   tenantProfileId: z.string().uuid(),
   amountCents: z.number().int().positive().max(100_000_000),
@@ -1055,6 +1062,10 @@ export const jobInvoices = pgTable("job_invoices", {
   statusDueIdx: index("job_invoices_status_due_idx").on(t.status, t.dueAt),
   merchantStatusIdx: index("job_invoices_merchant_status_idx").on(t.merchantId, t.status),
   tokenIdx: index("job_invoices_token_idx").on(t.token),
+  // One recurring invoice per (schedule, due date) — makes cron generation
+  // idempotent under concurrent/retried runs. Partial so non-recurring invoices
+  // (null scheduleId) never collide.
+  scheduleDueUq: uniqueIndex("job_invoices_schedule_due_uq").on(t.scheduleId, t.dueAt).where(sql`${t.scheduleId} IS NOT NULL`),
 }));
 
 export const jobEvents = pgTable("job_events", {
@@ -1123,6 +1134,11 @@ export const createJobInvoiceSchema = z.object({
   splitEnabled: z.boolean().optional(),
   documentUrl: z.string().trim().max(500).optional().or(z.literal("")).transform(v => v || undefined),
   documentName: z.string().trim().max(255).optional().or(z.literal("")).transform(v => v || undefined),
+}).refine(d => d.kind !== "deposit" || !!d.quoteId, {
+  // A deposit's balance is derived from its quote total, so a deposit must be
+  // quote-linked or send-balance can never compute a remaining amount.
+  message: "A deposit invoice must be linked to a quote",
+  path: ["quoteId"],
 });
 
 export const markJobPaidExternalSchema = z.object({

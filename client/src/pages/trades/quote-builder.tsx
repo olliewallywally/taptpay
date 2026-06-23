@@ -2,12 +2,12 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { tradesFetch, tradesHeaders } from "@/lib/trades-api";
-import { tradesFeeCents } from "@/lib/trades-money";
+import { formatNzd, includedGstCents, tradesFeeCents } from "@/lib/trades-money";
 import { TRADES_THEME as T } from "@/lib/trades-theme";
 
 type DraftLine = { id: number; description: string; qty: string; unitPrice: string };
 
-const money = (cents: number) => new Intl.NumberFormat("en-NZ", { style: "currency", currency: "NZD" }).format(cents / 100);
+const money = formatNzd; // canonical NZD formatter (Intl en-NZ) — see trades-money.ts
 const inputStyle = { width: "100%", boxSizing: "border-box" as const, border: "1px solid rgba(26,29,33,.16)", borderRadius: 12, padding: "12px 13px", font: "inherit", background: "#fff", color: T.INK };
 
 export default function QuoteBuilder() {
@@ -37,7 +37,7 @@ export default function QuoteBuilder() {
       const unit = Math.max(0, Math.round((Number(line.unitPrice) || 0) * 100));
       return sum + Math.round(qty * unit);
     }, 0);
-    const gst = auth?.user?.gstRegistered ? Math.round(total - total / 1.15) : 0;
+    const gst = auth?.user?.gstRegistered ? includedGstCents(total) : 0;
     const deposit = !depositEnabled ? 0 : depositType === "percent"
       ? Math.round(total * Math.min(100, Math.max(0, Number(depositValue) || 0)) / 100)
       : Math.min(total, Math.round((Number(depositValue) || 0) * 100));

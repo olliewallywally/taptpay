@@ -15,8 +15,12 @@ export default function TradesAnalytics() {
   const { data: quotes = [] } = useQuery<any[]>({ queryKey: ["/api/trades/quotes"], queryFn: () => tradesFetch("/api/trades/quotes").then(r => r.ok ? r.json() : []) });
   const { data: auth } = useQuery<any>({ queryKey: ["/api/auth/me", "trades-analytics"], queryFn: () => tradesFetch("/api/auth/me").then(r => r.ok ? r.json() : null) });
   const cutoff = new Date(Date.now() - periodDays[period] * 86400000);
-  const filtered = invoices.filter((invoice: any) => invoice.status !== "voided" && new Date(invoice.createdAt) >= cutoff);
-  const paid = filtered.filter((invoice: any) => ["paid", "paid_external"].includes(invoice.status));
+  const active = invoices.filter((invoice: any) => invoice.status !== "voided");
+  const filtered = active.filter((invoice: any) => new Date(invoice.createdAt) >= cutoff);
+  // Revenue counts what was PAID within the window (by paidAt), not what was
+  // created in it — so an older invoice paid this period is included, and the
+  // headline matches the paidAt-based trend bars below.
+  const paid = active.filter((invoice: any) => ["paid", "paid_external"].includes(invoice.status) && new Date(invoice.paidAt || invoice.createdAt) >= cutoff);
   const revenue = paid.reduce((sum: number, invoice: any) => sum + invoice.amountCents, 0);
   const outstanding = filtered.filter((invoice: any) => !["paid", "paid_external"].includes(invoice.status)).reduce((sum: number, invoice: any) => sum + invoice.amountCents, 0);
   const accepted = quotes.filter((quote: any) => quote.status === "accepted" && new Date(quote.createdAt) >= cutoff).length;

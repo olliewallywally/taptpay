@@ -236,6 +236,7 @@ export interface IStorage {
   getJobInvoiceByWhatsappMessageId(messageId: string): Promise<any | undefined>;
   getJobInvoicesByMerchant(merchantId: number, opts?: { status?: string; clientProfileId?: string }): Promise<any[]>;
   updateJobInvoice(id: string, updates: any): Promise<any | undefined>;
+  getJobInvoiceByScheduleAndDue(scheduleId: string, dueAt: Date): Promise<any | undefined>;
   atomicClaimJobSplitShare(invoiceId: string, sessionId: string): Promise<any | null>;
   getPendingDispatchJobInvoices(): Promise<any[]>;
   getOverdueEligibleJobInvoices(now: Date): Promise<any[]>;
@@ -1675,6 +1676,7 @@ export class MemStorage implements IStorage {
   async getJobInvoiceByWindcaveSessionId(sessionId: string): Promise<any> { return undefined; }
   async getJobInvoiceByWhatsappMessageId(messageId: string): Promise<any> { return undefined; }
   async getJobInvoicesByMerchant(merchantId: number, opts?: any): Promise<any[]> { return []; }
+  async getJobInvoiceByScheduleAndDue(scheduleId: string, dueAt: Date): Promise<any> { return undefined; }
   async updateJobInvoice(id: string, updates: any): Promise<any> { return undefined; }
   async atomicClaimJobSplitShare(invoiceId: string, sessionId: string): Promise<any | null> { return null; }
   async getPendingDispatchJobInvoices(): Promise<any[]> { return []; }
@@ -3381,6 +3383,12 @@ export class DatabaseStorage implements IStorage {
     if (opts.clientProfileId) conds.push(eq(jobInvoices.clientProfileId, opts.clientProfileId));
     return db.select().from(jobInvoices).where(and(...conds)).orderBy(desc(jobInvoices.createdAt));
   }
+  async getJobInvoiceByScheduleAndDue(scheduleId: string, dueAt: Date): Promise<any> {
+    const db = getDb(); if (!db) return undefined;
+    const [row] = await db.select().from(jobInvoices)
+      .where(and(eq(jobInvoices.scheduleId, scheduleId), eq(jobInvoices.dueAt, dueAt))).limit(1);
+    return row;
+  }
   async updateJobInvoice(id: string, updates: any): Promise<any> {
     const db = getDb(); if (!db) return undefined;
     const [row] = await db.update(jobInvoices)
@@ -3414,7 +3422,7 @@ export class DatabaseStorage implements IStorage {
   async getOverdueEligibleJobInvoices(now: Date): Promise<any[]> {
     const db = getDb(); if (!db) return [];
     return db.select().from(jobInvoices)
-      .where(and(inArray(jobInvoices.status, ["dispatched", "viewed"]), lte(jobInvoices.dueAt, now)));
+      .where(and(inArray(jobInvoices.status, ["dispatched", "viewed", "dispatch_failed"]), lte(jobInvoices.dueAt, now)));
   }
   async getReminderEligibleJobInvoices(): Promise<any[]> {
     const db = getDb(); if (!db) return [];

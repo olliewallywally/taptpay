@@ -2,6 +2,7 @@ import { storage } from './storage';
 import { sendEmail } from './email-service';
 import { isWhatsAppConfigured, sendWhatsApp } from './whatsapp-service';
 import { isSmsConfigured, sendSms } from './sms-service';
+import { GST_RATE } from '@shared/schema';
 
 type DeliveryResult = {
   sent: boolean;
@@ -223,7 +224,7 @@ export async function runTradesReminderPass(
   for (const invoice of await storage.getReminderEligibleJobInvoices()) {
     try {
       const merchant = await storage.getMerchant(invoice.merchantId);
-      if (!merchant || merchant.rentReminderEnabled === false) {
+      if (!merchant || merchant.tradeRemindersEnabled === false) {
         result.skipped++;
         continue;
       }
@@ -269,7 +270,7 @@ export async function sendTradePaymentInvoice(invoice: any): Promise<number> {
   ]);
   if (!client?.email || !merchant) return 0;
   const total = invoice.amountCents;
-  const gst = merchant.gstRegistered ? Math.round((total * 3) / 23) : 0;
+  const gst = merchant.gstRegistered ? Math.round(total - total / (1 + GST_RATE)) : 0;
   const net = total - gst;
   const merchantName = merchant.businessName || merchant.name;
   const label = paymentLabel(invoice);
