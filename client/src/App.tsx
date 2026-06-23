@@ -30,7 +30,6 @@ const ForgotPassword        = lazy(() => import("@/pages/forgot-password"));
 const ResetPassword         = lazy(() => import("@/pages/reset-password"));
 const NewAdminDashboard     = lazy(() => import("@/pages/admin/AdminDashboard"));
 const CreateMerchant        = lazy(() => import("@/pages/create-merchant"));
-const VerifyMerchant        = lazy(() => import("@/pages/verify-merchant"));
 const StockManagement       = lazy(() => import("@/pages/stock-management"));
 const LegalPage             = lazy(() => import("@/pages/legal"));
 const InfoPage              = lazy(() => import("@/pages/info"));
@@ -312,7 +311,6 @@ function Router() {
           <Route path="/app-login" component={AppLogin} />
           <Route path="/terms" component={LegalPage} />
           <Route path="/privacy" component={LegalPage} />
-          <Route path="/verify-merchant" component={VerifyMerchant} />
           <Route path="/pay/:merchantId" component={CustomerPayment} />
           <Route path="/pay/:merchantId/stone/:stoneId" component={CustomerPayment} />
           <Route path="/checkout/:transactionId" component={Checkout} />

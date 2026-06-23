@@ -2,7 +2,7 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, GST_RATE } from "@shared/schema";
+import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, GST_RATE } from "@shared/schema";
 import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, simulateCreateSession, simulateQuerySession, simulateRentSession, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, simulateAttendedTapToPay } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, createUser, getUserByEmail, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
@@ -4275,6 +4275,29 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         console.warn('Failed to send verification email, but merchant account was created');
       }
 
+      // Notify the TaptPay admin of the new signup immediately (lead capture) so a
+      // merchant who abandons before completing KYC is still surfaced. Non-fatal.
+      const signupNotifyEmail = process.env.ADMIN_EMAIL || process.env.ADMIN_NOTIFY_EMAIL;
+      if (signupNotifyEmail) {
+        try {
+          await sendEmail({
+            to: signupNotifyEmail,
+            from: process.env.RESEND_FROM_EMAIL || 'noreply@taptpay.co.nz',
+            subject: `New TaptPay signup — ${(name || '').replace(/[\r\n]/g, '')}`,
+            html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
+              <h2 style="color:#0055ff;margin-top:0">New signup started</h2>
+              <p>A new merchant created an account and was sent a verification email.</p>
+              <table style="width:100%;border-collapse:collapse">
+                <tr><td style="padding:8px 0;color:#666;width:40%">Name</td><td style="padding:8px 0;font-weight:600">${escHtml(name)}</td></tr>
+                <tr><td style="padding:8px 0;color:#666">Email</td><td style="padding:8px 0">${escHtml(email)}</td></tr>
+              </table>
+              <p style="margin-top:24px;color:#999;font-size:12px">They'll appear again with full details once they complete KYC onboarding.</p>
+            </div>`,
+            text: `New TaptPay signup: ${name} <${email}>. Verification email sent; awaiting email confirmation and KYC.`,
+          });
+        } catch (e) { console.error('[SIGNUP_NOTIFY]', e); }
+      }
+
       res.json({
         message: "Account created. Please check your email to continue.",
         merchant: {
@@ -4334,34 +4357,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         address: businessAddress || '',
       });
 
-      // Notify admin of new merchant registration (ADMIN_EMAIL env var required)
-      const notifyEmail = process.env.ADMIN_EMAIL;
-      if (notifyEmail) {
-        const { sendEmail } = await import('./email-service');
-        const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@taptpay.co.nz';
-        await sendEmail({
-          to: notifyEmail,
-          from: fromEmail,
-          subject: `New Merchant Registration — ${(businessName || '').replace(/[\r\n]/g, '')}`,
-          html: `
-            <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
-              <h2 style="color:#0055ff;margin-top:0">New Merchant Registered</h2>
-              <table style="width:100%;border-collapse:collapse">
-                <tr><td style="padding:8px 0;color:#666;width:40%">Business Name</td><td style="padding:8px 0;font-weight:600">${escHtml(businessName)}</td></tr>
-                <tr><td style="padding:8px 0;color:#666">Director</td><td style="padding:8px 0;font-weight:600">${escHtml(director)}</td></tr>
-                <tr><td style="padding:8px 0;color:#666">Account Name</td><td style="padding:8px 0">${escHtml(merchant.name)}</td></tr>
-                <tr><td style="padding:8px 0;color:#666">Email</td><td style="padding:8px 0">${escHtml(contactEmail)}</td></tr>
-                <tr><td style="padding:8px 0;color:#666">Phone</td><td style="padding:8px 0">${escHtml(contactPhone)}</td></tr>
-                <tr><td style="padding:8px 0;color:#666">GST Number</td><td style="padding:8px 0">${escHtml(gstNumber)}</td></tr>
-                <tr><td style="padding:8px 0;color:#666">Business Address</td><td style="padding:8px 0">${escHtml(businessAddress)}</td></tr>
-                <tr><td style="padding:8px 0;color:#666">NZBN</td><td style="padding:8px 0">${escHtml(nzbn)}</td></tr>
-              </table>
-              <p style="margin-top:24px;color:#999;font-size:12px">Submitted via TaptPay merchant registration</p>
-            </div>
-          `,
-          text: `New merchant registered:\nBusiness: ${businessName}\nDirector: ${director}\nEmail: ${contactEmail}\nPhone: ${contactPhone}\nGST: ${gstNumber}\nAddress: ${businessAddress || '—'}\nNZBN: ${nzbn || '—'}`,
-        });
-      }
+      // Admin is notified at signup (lead) and again with the full record at KYC
+      // onboarding, so this mid-funnel step no longer sends a third, redundant
+      // email — its fields are all included in the KYC submission notification.
 
       res.json({ message: "Business details saved successfully." });
 
@@ -4433,57 +4431,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Verify merchant and create password
-  app.post("/api/verify-merchant", async (req, res) => {
-    try {
-      const validation = verifyMerchantSchema.safeParse(req.body);
-      if (!validation.success) {
-        return res.status(400).json({ 
-          message: "Invalid input", 
-          errors: validation.error.issues 
-        });
-      }
-
-      const { token, password } = validation.data;
-
-      // Find merchant by token
-      const merchant = await storage.getMerchantByToken(token);
-      if (!merchant) {
-        return res.status(400).json({ message: "Invalid or expired verification token" });
-      }
-
-      // Hash password and verify merchant
-      const passwordHash = await bcrypt.hash(password, 12);
-      
-      const verifiedMerchant = await storage.verifyMerchant(token, passwordHash);
-      if (!verifiedMerchant) {
-        return res.status(500).json({ message: "Failed to verify merchant" });
-      }
-
-      // Create user account for the verified merchant
-      try {
-        await createUser(verifiedMerchant.email, password, verifiedMerchant.id, 'merchant');
-        console.log("User account created successfully for merchant:", verifiedMerchant.email);
-      } catch (error) {
-        console.error("Error creating user account:", error);
-        // Don't fail verification if user creation fails, but log it
-      }
-
-      res.json({ 
-        message: "Merchant verified successfully. You can now log in.",
-        merchant: {
-          id: verifiedMerchant.id,
-          name: verifiedMerchant.name,
-          businessName: verifiedMerchant.businessName,
-          email: verifiedMerchant.email,
-          status: verifiedMerchant.status
-        }
-      });
-    } catch (error) {
-      console.error("Error verifying merchant:", error);
-      res.status(500).json({ message: "Failed to verify merchant" });
-    }
-  });
+  // (Removed legacy POST /api/verify-merchant — superseded by the signup +
+  // /api/auth/confirm-email flow. Nothing navigated to its /verify-merchant page.)
 
   // Server-Sent Events for real-time updates
   app.get("/api/merchants/:id/events", (req, res) => {

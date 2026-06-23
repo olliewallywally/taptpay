@@ -145,12 +145,6 @@ describe('JSX Syntax Validation', () => {
       require('../transactions');
     }).not.toThrow();
   });
-
-  test('VerifyMerchant component has valid JSX syntax', () => {
-    expect(() => {
-      require('../verify-merchant');
-    }).not.toThrow();
-  });
 });
 
 describe('Component Import Test', () => {
@@ -178,8 +172,7 @@ describe('Component Import Test', () => {
       '../settings-simple',
       '../settings',
       '../stock-management',
-      '../transactions',
-      '../verify-merchant'
+      '../transactions'
     ];
 
     const importResults = componentPaths.map(path => {
