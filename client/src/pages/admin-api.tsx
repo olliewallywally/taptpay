@@ -113,10 +113,7 @@ export default function AdminApi() {
 
   // Create API key mutation
   const createKeyMutation = useMutation({
-    mutationFn: (data: any) => apiRequest(`/api/admin/api-keys`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
+    mutationFn: (data: any) => apiRequest('POST', '/api/admin/api-keys', data).then(r => r.json()),
     onSuccess: (response: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/api-keys'] });
       setIsCreateDialogOpen(false);
@@ -143,10 +140,7 @@ export default function AdminApi() {
 
   // Revoke API key mutation
   const revokeKeyMutation = useMutation({
-    mutationFn: (keyId: number) => apiRequest(`/api/admin/api-keys/${keyId}/revoke`, {
-      method: 'POST',
-      body: JSON.stringify({}),
-    }),
+    mutationFn: (keyId: number) => apiRequest('POST', `/api/admin/api-keys/${keyId}/revoke`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/api-keys'] });
       toast({

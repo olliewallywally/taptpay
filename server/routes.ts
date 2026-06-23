@@ -4555,7 +4555,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(400).json({ message: "Invalid push subscription" });
       }
 
-      const merchantId = req.merchantId;
+      const merchantId = req.user?.merchantId;
       if (!merchantId) {
         return res.status(401).json({ message: "Authentication required" });
       }
@@ -4583,7 +4583,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(400).json({ message: "Endpoint required" });
       }
 
-      const merchantId = req.merchantId;
+      const merchantId = req.user?.merchantId;
       if (!merchantId) {
         return res.status(401).json({ message: "Authentication required" });
       }
@@ -4610,7 +4610,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(400).json({ message: "Invalid device token" });
       }
 
-      const merchantId = req.merchantId;
+      const merchantId = req.user?.merchantId;
       if (!merchantId) {
         return res.status(401).json({ message: "Authentication required" });
       }
@@ -4634,7 +4634,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Remove native iOS device token (unsubscribe)
   app.post("/api/push/native-unsubscribe", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
-      const merchantId = req.merchantId;
+      const merchantId = req.user?.merchantId;
       if (!merchantId) {
         return res.status(401).json({ message: "Authentication required" });
       }
@@ -4655,7 +4655,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Get push notification status for current merchant
   app.get("/api/push/status", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
-      const merchantId = req.merchantId;
+      const merchantId = req.user?.merchantId;
       if (!merchantId) {
         return res.status(401).json({ message: "Authentication required" });
       }

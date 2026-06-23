@@ -256,7 +256,7 @@ export const createSplitPaymentSchema = z.object({
     const num = parseFloat(val);
     return !isNaN(num) && num > 0;
   }, "Amount must be a positive number"),
-  paymentMethod: z.enum(["qr_code", "nfc_tap", "card_reader", "manual", "cash", "tap_to_pay"]).default("qr_code"),
+  paymentMethod: z.enum(["qr_code", "nfc_tap", "card_reader", "manual", "cash", "tap_to_pay", "crypto", "api"]).default("qr_code"),
 });
 
 // Bill split creation schema
@@ -396,7 +396,7 @@ export const insertTransactionSchema = createInsertSchema(transactions).omit({
   merchantId: z.number(),
   price: z.string().regex(/^\d+(\.\d{2})?$/, "Price must be a valid decimal"),
   status: z.enum(["pending", "processing", "completed", "failed"]).default("pending"),
-  paymentMethod: z.enum(["qr_code", "nfc_tap", "card_reader", "manual", "cash", "tap_to_pay"]).default("qr_code"),
+  paymentMethod: z.enum(["qr_code", "nfc_tap", "card_reader", "manual", "cash", "tap_to_pay", "crypto", "api"]).default("qr_code"),
   selectedStoneId: z.number().optional(),
   splitEnabled: z.boolean().optional().default(false),
 });

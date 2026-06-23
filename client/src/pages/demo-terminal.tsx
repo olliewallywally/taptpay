@@ -582,7 +582,7 @@ export default function DemoTerminal() {
   const downloadQrCode = async () => {
     if (!currentTransaction?.merchantId) return;
     try {
-      const stoneId = currentTransaction.taptStoneId;
+      const stoneId = (currentTransaction as any).taptStoneId;
       const url = stoneId
         ? `/api/merchants/${currentTransaction.merchantId}/stone/${stoneId}/qr?size=800&download=true`
         : `/api/merchants/${currentTransaction.merchantId}/qr?size=800&download=true`;

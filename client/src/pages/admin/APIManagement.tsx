@@ -5,7 +5,7 @@ import { Key, Copy, Check, Plus, AlertTriangle } from 'lucide-react';
 export function APIManagement() {
   const [copiedKey, setCopiedKey] = useState<number | null>(null);
 
-  const { data: apiKeys, isLoading } = useQuery({
+  const { data: apiKeys, isLoading } = useQuery<any[]>({
     queryKey: ['/api/admin/api-keys'],
   });
 

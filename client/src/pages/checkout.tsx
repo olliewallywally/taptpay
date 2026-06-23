@@ -5,14 +5,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Loader2, CheckCircle, XCircle } from "lucide-react";
 import taptLogo from "@assets/IMG_6592_1755070818452.png";
 import googlePayLogo from "@assets/Google_Pay_Logo.svg_1773556576322.png";
-
-declare global {
-  interface Window {
-    WindcavePayments?: any;
-    ApplePaySession?: any;
-    google?: any;
-  }
-}
+// Window augmentations are declared centrally in client/src/global.d.ts.
 
 // ── Error boundary — catches any render crash and shows a safe fallback ──
 class CheckoutErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {

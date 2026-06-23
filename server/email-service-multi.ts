@@ -63,7 +63,7 @@ async function sendWithResend(params: EmailParams): Promise<boolean> {
       subject: params.subject,
       text: params.text,
       html: params.html,
-    });
+    } as Parameters<typeof resendClient.emails.send>[0]);
     if (error) {
       console.error('Resend email error:', error);
       return false;
