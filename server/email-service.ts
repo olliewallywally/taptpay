@@ -16,7 +16,14 @@ interface EmailParams {
 
 export async function sendEmail(params: EmailParams): Promise<boolean> {
   if (!resend) {
-    console.log('\n=== SIMULATED EMAIL ===');
+    // In production, never pretend a simulated email was delivered — that masks
+    // a missing RESEND_API_KEY and makes "email sent" lies propagate to callers,
+    // logs, and the admin test endpoint. Report the real failure instead.
+    if (process.env.NODE_ENV === 'production') {
+      console.error(`❌ RESEND_API_KEY not set — cannot send email "${params.subject}" to ${params.to}`);
+      return false;
+    }
+    console.log('\n=== SIMULATED EMAIL (dev) ===');
     console.log(`To: ${params.to}`);
     console.log(`From: ${params.from}`);
     console.log(`Subject: ${params.subject}`);

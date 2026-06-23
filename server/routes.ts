@@ -3936,10 +3936,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const testEmail = await sendEmail({
         to: req.user?.email || 'test@example.com',
-        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@tapt.co.nz',
-        subject: 'Tapt SendGrid Test Email',
-        text: 'This is a test email to verify SendGrid configuration.',
-        html: '<h2>SendGrid Test</h2><p>This is a test email to verify SendGrid configuration.</p>'
+        from: process.env.RESEND_FROM_EMAIL || 'noreply@taptpay.co.nz',
+        subject: 'TaptPay Email Test',
+        text: 'This is a test email to verify the Resend email configuration.',
+        html: '<h2>TaptPay Email Test</h2><p>This is a test email to verify the Resend email configuration.</p>'
       });
 
       if (testEmail) {
@@ -3950,6 +3950,27 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     } catch (error) {
       console.error('Test email error:', error);
       res.status(500).json({ success: false, message: 'Failed to send test email', error: error });
+    }
+  });
+
+  // Email configuration diagnostics — confirms at a glance whether auto-emails
+  // (verification, admin notifications) can actually be delivered in this env.
+  app.get("/api/admin/email-status", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { getEmailServiceStatus } = await import('./email-service-multi');
+      const status = getEmailServiceStatus();
+      res.json({
+        ...status,
+        nodeEnv: process.env.NODE_ENV || 'development',
+        fromAddress: process.env.RESEND_FROM_EMAIL || 'noreply@taptpay.co.nz',
+        adminNotifyConfigured: !!(process.env.ADMIN_EMAIL || process.env.ADMIN_NOTIFY_EMAIL),
+        // In production with no real provider, emails are NOT delivered (and no
+        // longer silently "simulated" as success).
+        willDeliver: status.availableProviders.length > 0,
+      });
+    } catch (error) {
+      console.error('Email status error:', error);
+      res.status(500).json({ message: 'Failed to read email status' });
     }
   });
 
@@ -4317,7 +4338,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const notifyEmail = process.env.ADMIN_EMAIL;
       if (notifyEmail) {
         const { sendEmail } = await import('./email-service');
-        const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@taptpay.co.nz';
+        const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@taptpay.co.nz';
         await sendEmail({
           to: notifyEmail,
           from: fromEmail,

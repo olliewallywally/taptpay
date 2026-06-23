@@ -122,6 +122,13 @@ export async function sendEmailMulti(params: EmailParams): Promise<boolean> {
   }
 
   if (!success) {
+    // Only simulate (and report success) outside production, or when the operator
+    // explicitly opted into simulation. In production a genuine delivery failure
+    // must surface as a failure, not be masked by a fake "sent" result.
+    if (process.env.NODE_ENV === 'production' && EMAIL_CONFIG.provider !== 'simulation') {
+      console.error(`❌ Email delivery failed (provider="${EMAIL_CONFIG.provider}", resendConfigured=${!!resendClient}) — "${params.subject}" to ${params.to}`);
+      return false;
+    }
     console.log('All providers failed, using simulation mode');
     success = simulateEmail(params);
   }
