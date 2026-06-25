@@ -1,11 +1,17 @@
 import { useLocation } from "wouter";
 import { useRef, useState, useEffect, useTransition } from "react";
+import { TRADES_THEME } from "@/lib/trades-theme";
 
 /* ── Colours ── */
-const DOCK_BG  = '#02093D'; // darker navy bar
-const PILL_BG  = '#02093D'; // indicator pill — same colour, elevation shown by shadow only
+const DOCK_BG  = '#02093D'; // darker navy bar (retail/property)
 const BLUE     = '#58ABFF';
 const BLUE_DIM = 'rgba(88,171,255,0.45)';
+/* Trades reuses the same dock structure with the trades palette: deep-forest
+   bar, off-white active/dim icons (the trades accent is near-black, so it can't
+   be a foreground on the dark bar — off-white is the legible choice). */
+const TRADES_DOCK   = TRADES_THEME.INK;
+const TRADES_ACTIVE = TRADES_THEME.OFFW;
+const TRADES_DIM    = 'rgba(244,244,244,0.5)';
 
 /* ── Icons ── */
 function IcoHome({ c }: { c: string }) {
@@ -44,10 +50,18 @@ const PROPERTY_ITEMS = [
   { id: 'settings',  path: '/settings',           Icon: IcoSettings },
 ];
 
+const TRADES_ITEMS = [
+  { id: 'home',      path: '/trades',           Icon: IcoHome     },
+  { id: 'clients',   path: '/trades/clients',   Icon: IcoPerson   },
+  { id: 'terminal',  path: '/trades/terminal',  Icon: IcoTerminal },
+  { id: 'analytics', path: '/trades/analytics', Icon: IcoAnalytics},
+  { id: 'settings',  path: '/settings',         Icon: IcoSettings },
+];
+
 const RETAIL_NAV_PATHS = ['/dashboard', '/stock', '/transactions', '/settings', '/terminal'];
 
-function readMode(): 'retail' | 'property' {
-  try { return (localStorage.getItem('taptMode') as 'retail' | 'property') || 'retail'; } catch { return 'retail'; }
+function readMode(): 'retail' | 'property' | 'trades' {
+  try { return (localStorage.getItem('taptMode') as 'retail' | 'property' | 'trades') || 'retail'; } catch { return 'retail'; }
 }
 function saveMode(m: string) { try { localStorage.setItem('taptMode', m); } catch {} }
 
@@ -62,7 +76,7 @@ export function BottomNavigation() {
   const mounted  = useRef(false);
   const [indLeft,   setIndLeft]   = useState(0);
   const [animating, setAnimating] = useState(false);
-  const [mode,      setModeState] = useState<'retail' | 'property'>(readMode);
+  const [mode,      setModeState] = useState<'retail' | 'property' | 'trades'>(readMode);
   const [collapsed, setCollapsed] = useState(false);
   const [navWidth,  setNavWidth]  = useState(() => Math.min(320, window.innerWidth - 32));
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -76,23 +90,31 @@ export function BottomNavigation() {
 
   /* Keep stored mode in sync with route */
   useEffect(() => {
-    if (location.startsWith('/property')) {
+    if (location.startsWith('/trades')) {
+      saveMode('trades'); setModeState('trades');
+    } else if (location.startsWith('/property')) {
       saveMode('property'); setModeState('property');
     } else if (RETAIL_NAV_PATHS.includes(location) && location !== '/settings') {
       saveMode('retail'); setModeState('retail');
     }
   }, [location]);
 
-  const isPropertyMode = location.startsWith('/property') || mode === 'property';
-  const items = isPropertyMode ? PROPERTY_ITEMS : RETAIL_ITEMS;
+  const isTradesMode   = location.startsWith('/trades') || mode === 'trades';
+  const isPropertyMode = !isTradesMode && (location.startsWith('/property') || mode === 'property');
+  const items = isTradesMode ? TRADES_ITEMS : isPropertyMode ? PROPERTY_ITEMS : RETAIL_ITEMS;
+  const navPalette = isTradesMode
+    ? { dock: TRADES_DOCK, active: TRADES_ACTIVE, dim: TRADES_DIM }
+    : { dock: DOCK_BG, active: BLUE, dim: BLUE_DIM };
 
   const onRetailPage   = RETAIL_NAV_PATHS.includes(location);
   const onPropertyPage = location.startsWith('/property');
-  const showNav = onRetailPage || onPropertyPage;
+  // Show on merchant trades pages, but not the public client quote page (/trades/quote/:token).
+  const onTradesPage   = location.startsWith('/trades') && !location.startsWith('/trades/quote/');
+  const showNav = onRetailPage || onPropertyPage || onTradesPage;
 
   const activeIdx = items.findIndex(({ path }) => {
-    if (path === '/dashboard' || path === '/property') return location === path;
-    if (path === '/settings'  || path === '/terminal') return location === path;
+    if (path === '/dashboard' || path === '/property' || path === '/trades') return location === path;
+    if (path === '/settings'  || path === '/terminal' || path === '/trades/terminal') return location === path;
     return location === path || location.startsWith(path + '/');
   });
 
@@ -169,7 +191,7 @@ export function BottomNavigation() {
           transform: 'translateX(-50%)',
           width: collapsed ? 56 : 0,
           height: collapsed ? 4 : 0,
-          background: DOCK_BG,
+          background: navPalette.dock,
           borderRadius: 999,
           opacity: collapsed ? 1 : 0,
           transition: 'width 0.45s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s ease',
@@ -181,7 +203,7 @@ export function BottomNavigation() {
           position: 'relative',
           width: 280,
           height: 48,
-          background: DOCK_BG,
+          background: navPalette.dock,
           borderRadius: 24,
           display: 'flex',
           alignItems: 'center',
@@ -200,7 +222,7 @@ export function BottomNavigation() {
             top: -5,      // same as SmartTransitions .tp-dock-ind
             width: 65,
             height: 58,
-            background: PILL_BG,
+            background: navPalette.dock,
             borderRadius: 29,
             boxShadow: '0 4px 20px rgba(0,0,0,0.45)',
             pointerEvents: 'none',
@@ -228,7 +250,7 @@ export function BottomNavigation() {
                   WebkitTapHighlightColor: 'transparent',
                 }}
               >
-                <Icon c={isActive ? BLUE : BLUE_DIM} />
+                <Icon c={isActive ? navPalette.active : navPalette.dim} />
               </button>
             );
           })}

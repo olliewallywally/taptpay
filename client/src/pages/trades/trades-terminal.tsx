@@ -231,7 +231,7 @@ function ChooseClient({ clients, invoices, go, onSelect }: any) {
       <div className="stagger" style={{ background: OFFW, color: NAVY, height: '50%', display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={() => go('home', 'down')} onCommit={() => go('home', 'down')} />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div style={{ color: 'rgba(20,64,43,0.35)', fontWeight: 500, fontSize: 18 }}>choose client</div>
+          <div style={{ color: 'rgba(6,21,14,0.35)', fontWeight: 500, fontSize: 18 }}>choose client</div>
         </div>
         <div style={{ height: 52 }} />
       </div>
@@ -255,8 +255,8 @@ function ChooseClient({ clients, invoices, go, onSelect }: any) {
             const dotCls = st === 'paid' ? 'paid' : st === 'failed' ? 'declined' : 'awaiting';
             return (
               <button key={t.id} onClick={() => onSelect(t)}
-                style={{ textAlign: 'left', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(91,99,107,0.15)', borderRadius: 18, padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 13 }}>
-                <div style={{ width: 38, height: 38, borderRadius: 999, background: BLUE, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, fontWeight: 800, color: NAVY }}>
+                style={{ textAlign: 'left', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(34,34,34,0.15)', borderRadius: 18, padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 13 }}>
+                <div style={{ width: 38, height: 38, borderRadius: 999, background: BLUE, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, fontWeight: 800, color: OFFW }}>
                   {clientInitials(t)}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -289,9 +289,9 @@ function AmountKeypad({ go, selectedClient, onCommit, backTo = 'invoice' }: any)
       <div className="stagger" style={{ background: OFFW, color: NAVY, height: '50%', display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={() => go(backTo, 'down')} onCommit={commit} />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <div className="tp-amount" style={{ fontSize: 82, color: cents === 0 ? 'rgba(20,64,43,0.25)' : NAVY, marginTop: 18 }}>{fmt(cents)}</div>
+          <div className="tp-amount" style={{ fontSize: 82, color: cents === 0 ? 'rgba(6,21,14,0.25)' : NAVY, marginTop: 18 }}>{fmt(cents)}</div>
           {selectedClient && (
-            <div style={{ fontWeight: 500, fontSize: 15, color: 'rgba(20,64,43,0.5)', paddingBottom: 8 }}>
+            <div style={{ fontWeight: 500, fontSize: 15, color: 'rgba(6,21,14,0.5)', paddingBottom: 8 }}>
               {clientName(selectedClient)} · {selectedClient.siteAddress}
             </div>
           )}
@@ -321,7 +321,7 @@ function QuickInvoice({ go, selectedClient, amount, onEditAmount, jobNote, setJo
         <div className="stagger" style={{ background: OFFW, color: NAVY, height: '50%', display: 'flex', flexDirection: 'column' }}>
           <SubHead onCancel={() => go('home', 'down')} onCommit={() => go('clients')} />
           <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <div style={{ color: 'rgba(20,64,43,0.35)', fontWeight: 500, fontSize: 18 }}>choose a client</div>
+            <div style={{ color: 'rgba(6,21,14,0.35)', fontWeight: 500, fontSize: 18 }}>choose a client</div>
           </div>
           <div style={{ height: 52 }} />
         </div>
@@ -341,14 +341,14 @@ function QuickInvoice({ go, selectedClient, amount, onEditAmount, jobNote, setJo
         <SubHead onCancel={() => go('home', 'down')} onCommit={onSend} />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <button onClick={onEditAmount} style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'baseline', gap: 10 }}>
-            <span className="tp-amount" style={{ fontSize: 82, color: amount === 0 ? 'rgba(20,64,43,0.25)' : NAVY }}>{fmt(amount)}</span>
-            <span style={{ fontWeight: 600, fontSize: 12, color: 'rgba(20,64,43,0.4)', textDecoration: 'underline', textUnderlineOffset: 2 }}>edit</span>
+            <span className="tp-amount" style={{ fontSize: 82, color: amount === 0 ? 'rgba(6,21,14,0.25)' : NAVY }}>{fmt(amount)}</span>
+            <span style={{ fontWeight: 600, fontSize: 12, color: 'rgba(6,21,14,0.4)', textDecoration: 'underline', textUnderlineOffset: 2 }}>edit</span>
           </button>
           <div style={{ marginTop: 14, fontWeight: 500, fontSize: 16, color: NAVY, lineHeight: 1.4 }}>
             {clientName(selectedClient)}
-            <div style={{ fontWeight: 400, fontSize: 14, color: 'rgba(20,64,43,0.5)', marginTop: 4 }}>{selectedClient.siteAddress}</div>
+            <div style={{ fontWeight: 400, fontSize: 14, color: 'rgba(6,21,14,0.5)', marginTop: 4 }}>{selectedClient.siteAddress}</div>
           </div>
-          {amount > 0 && <div style={{ marginTop: 10, fontSize: 12, color: 'rgba(20,64,43,0.48)' }}>TaptPay fee (0.3%): {formatNzd(tradesFeeCents(amount))}</div>}
+          {amount > 0 && <div style={{ marginTop: 10, fontSize: 12, color: 'rgba(6,21,14,0.48)' }}>TaptPay fee (0.3%): {formatNzd(tradesFeeCents(amount))}</div>}
         </div>
         <div style={{ height: 52 }} />
       </div>
@@ -361,7 +361,7 @@ function QuickInvoice({ go, selectedClient, amount, onEditAmount, jobNote, setJo
         </div>
 
         {/* Channel badge */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 22px', background: 'rgba(91,99,107,0.08)', border: `1px solid rgba(91,99,107,0.2)`, borderRadius: 20, width: '100%', boxSizing: 'border-box', marginTop: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 22px', background: 'rgba(34,34,34,0.08)', border: `1px solid rgba(34,34,34,0.2)`, borderRadius: 20, width: '100%', boxSizing: 'border-box', marginTop: 18 }}>
           {channel === 'email' ? <Ic.Mail sz={22} c={OFFW} /> : <Ic.Msg sz={22} c={OFFW} />}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 600, fontSize: 11, color: 'rgba(244,244,244,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 4 }}>sending via {channel}</div>
@@ -397,7 +397,7 @@ function MarkExternal({ go, selectedClient, amount, invoices, onMark, marking }:
         <div className="stagger" style={{ background: OFFW, color: NAVY, height: '50%', display: 'flex', flexDirection: 'column' }}>
           <SubHead onCancel={() => go('home', 'down')} onCommit={() => go('clients')} />
           <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <div style={{ color: 'rgba(20,64,43,0.35)', fontWeight: 500, fontSize: 18 }}>choose a client</div>
+            <div style={{ color: 'rgba(6,21,14,0.35)', fontWeight: 500, fontSize: 18 }}>choose a client</div>
           </div>
           <div style={{ height: 52 }} />
         </div>
@@ -441,8 +441,8 @@ function MarkExternal({ go, selectedClient, amount, invoices, onMark, marking }:
                   const on = inv.id === picked.id;
                   return (
                     <button key={inv.id} onClick={() => setPickedId(inv.id)}
-                      style={{ textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, background: on ? 'rgba(91,99,107,0.18)' : 'rgba(255,255,255,0.05)', border: `1.5px solid ${on ? BLUE : 'rgba(91,99,107,0.12)'}`, borderRadius: 14, padding: '12px 14px', cursor: 'pointer', fontFamily: 'Outfit, system-ui' }}>
-                      <span style={{ width: 18, height: 18, borderRadius: 999, border: `2px solid ${on ? BLUE : 'rgba(91,99,107,0.35)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      style={{ textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, background: on ? 'rgba(34,34,34,0.18)' : 'rgba(255,255,255,0.05)', border: `1.5px solid ${on ? BLUE : 'rgba(34,34,34,0.12)'}`, borderRadius: 14, padding: '12px 14px', cursor: 'pointer', fontFamily: 'Outfit, system-ui' }}>
+                      <span style={{ width: 18, height: 18, borderRadius: 999, border: `2px solid ${on ? BLUE : 'rgba(34,34,34,0.35)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         {on && <span style={{ width: 8, height: 8, borderRadius: 999, background: BLUE }} />}
                       </span>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -510,7 +510,7 @@ function JobActionSheet({ invoice, onClose, onMarkReceived, onSendBalance, onCom
   const Action = ({ label, onClick, danger, primary }: any) => (
     <button onClick={onClick} disabled={busy}
       style={{ width: '100%', padding: '15px 0', borderRadius: 16, border: danger ? '1.5px solid rgba(255,59,78,0.4)' : 'none',
-        background: danger ? 'transparent' : primary ? NAVY : 'rgba(20,64,43,0.06)',
+        background: danger ? 'transparent' : primary ? NAVY : 'rgba(6,21,14,0.06)',
         color: danger ? RED : primary ? OFFW : NAVY,
         fontWeight: 700, fontSize: 15, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1,
         fontFamily: 'Outfit, system-ui', marginBottom: 10, transition: 'opacity 0.15s' }}>
@@ -519,26 +519,26 @@ function JobActionSheet({ invoice, onClose, onMarkReceived, onSendBalance, onCom
   );
 
   return (
-    <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 80, background: 'rgba(20,64,43,0.45)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', animation: 'tp-fade 0.2s ease both' }}>
+    <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 80, background: 'rgba(6,21,14,0.45)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', animation: 'tp-fade 0.2s ease both' }}>
       <style>{`@keyframes tp-fade{from{opacity:0}to{opacity:1}}@keyframes tp-sheetup{from{transform:translateY(100%)}to{transform:translateY(0)}}`}</style>
       <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 430, background: OFFW, borderRadius: '26px 26px 0 0', padding: '12px 22px 28px', animation: 'tp-sheetup 0.32s cubic-bezier(0.16,1,0.3,1) both' }}>
         <div style={{ display: 'flex', justifyContent: 'center', padding: '0 0 14px' }}>
-          <div style={{ width: 38, height: 4, borderRadius: 2, background: 'rgba(20,64,43,0.12)' }} />
+          <div style={{ width: 38, height: 4, borderRadius: 2, background: 'rgba(6,21,14,0.12)' }} />
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 700, fontSize: 17, color: NAVY, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{invoice.clientName || 'client'}</div>
-            <div style={{ fontWeight: 500, fontSize: 12.5, color: 'rgba(20,64,43,0.5)', marginTop: 2 }}>
+            <div style={{ fontWeight: 500, fontSize: 12.5, color: 'rgba(6,21,14,0.5)', marginTop: 2 }}>
               {kindLabel(invoice)} · {fmt(invoice.amountCents)}
             </div>
           </div>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 999, background: st === 'paid' ? 'rgba(27,191,133,0.14)' : st === 'failed' ? 'rgba(255,59,78,0.12)' : 'rgba(91,99,107,0.16)', color: st === 'paid' ? GREEN : st === 'failed' ? RED : '#3C4248', fontWeight: 700, fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{st === 'failed' ? 'not delivered' : st}</div>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 999, background: st === 'paid' ? 'rgba(27,191,133,0.14)' : st === 'failed' ? 'rgba(255,59,78,0.12)' : 'rgba(34,34,34,0.16)', color: st === 'paid' ? GREEN : st === 'failed' ? RED : '#3C4248', fontWeight: 700, fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{st === 'failed' ? 'not delivered' : st}</div>
         </div>
 
         {settled ? (
           invoice.completedAt
-            ? <div style={{ textAlign: 'center', padding: '8px 0 18px', color: 'rgba(20,64,43,0.5)', fontSize: 14, fontWeight: 500 }}>this job is complete</div>
+            ? <div style={{ textAlign: 'center', padding: '8px 0 18px', color: 'rgba(6,21,14,0.5)', fontSize: 14, fontWeight: 500 }}>this job is complete</div>
             : <Action label="mark job complete" onClick={onComplete} primary />
         ) : (
           <>
@@ -872,11 +872,11 @@ const TP_TERM_CSS = `
 .tp-banner-title { font-weight: 700; font-size: 16px; color: #fff; }
 .tp-subhead { display: flex; justify-content: space-between; align-items: center; padding: 20px 22px 0; }
 .tp-subhead-btn { width: 44px; height: 44px; border-radius: 999px; border: 2px solid ${NAVY}; display: flex; align-items: center; justify-content: center; color: ${NAVY}; background: none; cursor: pointer; transition: transform 120ms, background 120ms; }
-.tp-subhead-btn:active { transform: scale(0.92); background: rgba(20,64,43,0.06); }
+.tp-subhead-btn:active { transform: scale(0.92); background: rgba(6,21,14,0.06); }
 .tp-amount { font-family: 'Outfit', system-ui; font-weight: 900; letter-spacing: -0.04em; line-height: 0.95; }
 .tp-subbar-wrap { display: flex; justify-content: center; }
-.tp-subbar { position: relative; display: inline-flex; align-items: center; justify-content: center; background: ${BLUE}; border-radius: 26px; padding: 5px 11px; gap: 4px; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 16px 48px rgba(20,64,43,0.2), 0 4px 12px rgba(20,64,43,0.1), inset 0 1px 0 rgba(255,255,255,0.25); transform: scale(0.85); transform-origin: center; }
-.tp-subbar-ind { position: absolute; top: 5px; height: 27px; background: ${NAVY}; border-radius: 16px; box-shadow: 0 4px 16px rgba(20,64,43,0.4); pointer-events: none; z-index: 2; opacity: 0; will-change: left, width, opacity; }
+.tp-subbar { position: relative; display: inline-flex; align-items: center; justify-content: center; background: ${BLUE}; border-radius: 26px; padding: 5px 11px; gap: 4px; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 16px 48px rgba(6,21,14,0.2), 0 4px 12px rgba(6,21,14,0.1), inset 0 1px 0 rgba(255,255,255,0.25); transform: scale(0.85); transform-origin: center; }
+.tp-subbar-ind { position: absolute; top: 5px; height: 27px; background: ${NAVY}; border-radius: 16px; box-shadow: 0 4px 16px rgba(6,21,14,0.4); pointer-events: none; z-index: 2; opacity: 0; will-change: left, width, opacity; }
 .tp-subbar-ind.on { opacity: 1; }
 .tp-subbar-ind.animate { transition: left 0.45s cubic-bezier(0.34,1.56,0.64,1), width 0.45s cubic-bezier(0.34,1.56,0.64,1), opacity 0.25s ease; }
 .tp-subbar-btn { position: relative; z-index: 1; height: 27px; padding: 0 22px; display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 16px; border: none; cursor: pointer; background: transparent; color: rgba(244,244,244,0.55); transition: color 0.2s ease, transform 0.18s ease; -webkit-tap-highlight-color: transparent; flex-shrink: 0; }
@@ -885,23 +885,23 @@ const TP_TERM_CSS = `
 .tp-subbar.compact .tp-subbar-btn { padding: 0 11px; }
 .tp-subbar-label { font-family: 'Outfit', system-ui; font-weight: 600; font-size: 12px; letter-spacing: 0.4px; color: ${OFFW}; white-space: nowrap; animation: tp-labelIn 0.3s ease-out; }
 @keyframes tp-labelIn { from { opacity:0; transform:translateX(-4px); } to { opacity:1; transform:translateX(0); } }
-.tp-send { display: flex; align-items: center; gap: 6px; padding: 4px 14px 4px 4px; border-radius: 26px; background: ${NAVY}; border: none; cursor: pointer; box-shadow: 0 4px 16px rgba(20,64,43,0.25); transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); -webkit-tap-highlight-color: transparent; flex-shrink: 0; height: 37px; }
+.tp-send { display: flex; align-items: center; gap: 6px; padding: 4px 14px 4px 4px; border-radius: 26px; background: ${NAVY}; border: none; cursor: pointer; box-shadow: 0 4px 16px rgba(6,21,14,0.25); transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); -webkit-tap-highlight-color: transparent; flex-shrink: 0; height: 37px; }
 .tp-send:active { transform: scale(0.94); }
 .tp-send-circle { width: 20px; height: 20px; border-radius: 50%; background: ${BLUE}; display: flex; align-items: center; justify-content: center; }
 .tp-send-label { font-size: 11px; font-weight: 700; color: ${OFFW}; letter-spacing: 0.3px; }
-.tp-fab { width: 70px; height: 70px; border-radius: 999px; background: ${BLUE}; color: ${NAVY}; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 18px rgba(20,64,43,0.25); border: none; cursor: pointer; transition: transform 140ms; -webkit-tap-highlight-color: transparent; }
+.tp-fab { width: 70px; height: 70px; border-radius: 999px; background: ${BLUE}; color: ${OFFW}; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 18px rgba(6,21,14,0.25); border: none; cursor: pointer; transition: transform 140ms; -webkit-tap-highlight-color: transparent; }
 .tp-fab:active { transform: scale(0.92); }
 .tp-stack-hdr { display: flex; justify-content: space-between; align-items: center; padding: 0 4px; margin-bottom: 12px; }
 .tp-stack-title { font-weight: 700; font-size: 14px; color: ${NAVY}; letter-spacing: -0.2px; }
-.tp-stack-card { border-radius: 14px; background: #fff; overflow: hidden; box-shadow: 0 2px 12px rgba(20,64,43,0.06); border: 1px solid rgba(20,64,43,0.04); }
+.tp-stack-card { border-radius: 14px; background: #fff; overflow: hidden; box-shadow: 0 2px 12px rgba(6,21,14,0.06); border: 1px solid rgba(6,21,14,0.04); }
 .tp-stack-row { display: flex; align-items: center; padding: 14px 16px; animation: tp-stackIn 0.38s cubic-bezier(0.34,1.56,0.64,1) both; }
-.tp-stack-row + .tp-stack-row { border-top: 1px solid rgba(20,64,43,0.05); }
+.tp-stack-row + .tp-stack-row { border-top: 1px solid rgba(6,21,14,0.05); }
 @keyframes tp-stackIn { from { opacity:0; transform:translateY(-12px) scale(0.97); } to { opacity:1; transform:translateY(0) scale(1); } }
 .tp-stack-name { font-weight: 600; font-size: 14px; color: ${NAVY}; margin-bottom: 1px; }
 .tp-stack-meta { display: flex; align-items: center; gap: 5px; }
-.tp-stack-status { font-weight: 500; font-size: 11px; color: rgba(20,64,43,0.35); }
+.tp-stack-status { font-weight: 500; font-size: 11px; color: rgba(6,21,14,0.35); }
 .tp-stack-price { font-weight: 700; font-size: 15px; color: ${NAVY}; letter-spacing: -0.3px; }
-.tp-stack-empty { padding: 14px 16px; font-size: 13px; color: rgba(20,64,43,0.4); text-align: center; }
+.tp-stack-empty { padding: 14px 16px; font-size: 13px; color: rgba(6,21,14,0.4); text-align: center; }
 .tp-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; animation: tp-pulse 2s ease-in-out infinite; }
 .tp-dot.awaiting { background: ${BLUE}; }
 .tp-dot.payment-sent { background: ${BLUE}; }
@@ -909,19 +909,19 @@ const TP_TERM_CSS = `
 .tp-dot.declined { background: ${RED}; animation: none; opacity: 1; }
 @keyframes tp-pulse { 0%,100% { opacity:0.4; } 50% { opacity:1; } }
 .tp-field { width: 100%; padding: 18px 24px; border-radius: 999px; background: ${OFFW}; border: none; color: ${NAVY}; font-family: 'Outfit', system-ui; font-weight: 500; font-size: 17px; letter-spacing: -0.01em; outline: none; box-sizing: border-box; }
-.tp-field::placeholder { color: rgba(20,64,43,0.35); }
-.tp-cta { display: inline-flex; align-items: center; justify-content: center; padding: 14px 36px; border-radius: 999px; background: ${BLUE}; color: ${NAVY}; font-family: 'Outfit', system-ui; font-weight: 600; font-size: 15px; transition: transform 120ms, opacity 120ms; white-space: nowrap; border: none; cursor: pointer; box-sizing: border-box; }
+.tp-field::placeholder { color: rgba(6,21,14,0.35); }
+.tp-cta { display: inline-flex; align-items: center; justify-content: center; padding: 14px 36px; border-radius: 999px; background: ${BLUE}; color: ${OFFW}; font-family: 'Outfit', system-ui; font-weight: 600; font-size: 15px; transition: transform 120ms, opacity 120ms; white-space: nowrap; border: none; cursor: pointer; box-sizing: border-box; }
 .tp-cta:active { transform: scale(0.96); opacity: 0.92; }
 .tp-kp { width: 76px; height: 76px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-family: 'Outfit', system-ui; font-weight: 700; font-size: 30px; transition: transform 100ms, background 100ms; background: ${BLUE}; color: #fff; border: none; cursor: pointer; }
 .tp-kp:active { transform: scale(0.92); }
 .tp-kp.outline { background: transparent; color: ${OFFW}; box-shadow: inset 0 0 0 2px ${OFFW}; }
-.tp-kp.outline:active { background: rgba(91,99,107,0.12); }
-.tp-success-check { width: 92px; height: 92px; border-radius: 999px; background: ${BLUE}; display: flex; align-items: center; justify-content: center; color: ${NAVY}; }
+.tp-kp.outline:active { background: rgba(34,34,34,0.12); }
+.tp-success-check { width: 92px; height: 92px; border-radius: 999px; background: ${BLUE}; display: flex; align-items: center; justify-content: center; color: ${OFFW}; }
 .tp-pulse { animation: tp-pulseDot 1800ms ease-in-out infinite; }
 @keyframes tp-pulseDot { 0%,100% { transform:scale(1); opacity:1; } 50% { transform:scale(1.08); opacity:0.85; } }
-.tp-thin-scroll { scrollbar-width: thin; scrollbar-color: rgba(91,99,107,0) transparent; transition: scrollbar-color 350ms; }
+.tp-thin-scroll { scrollbar-width: thin; scrollbar-color: rgba(34,34,34,0) transparent; transition: scrollbar-color 350ms; }
 .tp-thin-scroll::-webkit-scrollbar { width: 3px; }
-.tp-thin-scroll::-webkit-scrollbar-thumb { background-color: rgba(91,99,107,0); border-radius: 999px; }
+.tp-thin-scroll::-webkit-scrollbar-thumb { background-color: rgba(34,34,34,0); border-radius: 999px; }
 .tp-stack-scroll { scrollbar-width: thin; scrollbar-color: ${NAVY} transparent; }
 .tp-stack-scroll::-webkit-scrollbar { width: 4px; background: transparent; }
 .tp-stack-scroll::-webkit-scrollbar-track { background: transparent; }

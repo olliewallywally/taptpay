@@ -9,7 +9,7 @@ import { TRADES_THEME as T } from "@/lib/trades-theme";
 type DraftLine = { id: number; description: string; qty: string; unitPrice: string };
 
 const money = formatNzd; // canonical NZD formatter (Intl en-NZ) — see trades-money.ts
-const inputStyle = { width: "100%", boxSizing: "border-box" as const, border: "1px solid rgba(20,64,43,.16)", borderRadius: 12, padding: "12px 13px", font: "inherit", background: "#fff", color: T.INK };
+const inputStyle = { width: "100%", boxSizing: "border-box" as const, border: "1px solid rgba(6,21,14,.16)", borderRadius: 12, padding: "12px 13px", font: "inherit", background: "#fff", color: T.INK };
 
 export default function QuoteBuilder() {
   const [, setLocation] = useLocation();
@@ -175,7 +175,7 @@ export default function QuoteBuilder() {
   );
 }
 
-const cardStyle = { background: "#fff", borderRadius: 18, padding: 18, marginTop: 16, boxShadow: "0 8px 30px rgba(20,64,43,.05)" };
+const cardStyle = { background: "#fff", borderRadius: 18, padding: 18, marginTop: 16, boxShadow: "0 8px 30px rgba(6,21,14,.05)" };
 const labelStyle = { display: "block", fontWeight: 800, fontSize: 11, textTransform: "uppercase" as const, letterSpacing: ".11em", marginBottom: 10 };
 const buttonStyle = { width: "100%", border: 0, borderRadius: 14, padding: "15px 18px", background: T.ACCENT, color: "#fff", fontWeight: 800, fontSize: 15, cursor: "pointer" };
 const linkStyle = { display: "inline-block", border: 0, background: "none", color: T.ACCENT, fontWeight: 700, padding: "12px 0", cursor: "pointer" };
