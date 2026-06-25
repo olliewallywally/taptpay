@@ -139,7 +139,12 @@
       "Bash(tee /tmp/tsc.txt)",
       "Bash(echo \"started pid $!\")",
       "Bash(gh auth *)",
-      "Bash(git branch *)"
+      "Bash(git branch *)",
+      "Bash(git rev-list *)",
+      "Bash(git status *)",
+      "Bash(command -v chromium chromium-browser google-chrome)",
+      "Bash(curl -s -o /dev/null -w \"GET / -> %{http_code}\\\\n\" http://localhost:5000/)",
+      "Bash(curl -s -X POST http://localhost:5000/api/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"testcafe@taptpay.co.nz\",\"password\":\"SmokeTest123!\"}')"
     ]
   },
   "model": "claude-opus-4-8"
