@@ -5,7 +5,7 @@ import { tradesFetch, tradesHeaders } from "@/lib/trades-api";
 import { TRADES_THEME as T } from "@/lib/trades-theme";
 
 const emptyForm = { firstName: "", lastName: "", email: "", phone: "", siteAddress: "", preferredChannel: "email", notes: "" };
-const fieldStyle = { width: "100%", boxSizing: "border-box" as const, padding: "12px 13px", borderRadius: 11, border: "1px solid rgba(26,29,33,.16)", background: "#fff", color: T.INK, font: "inherit" };
+const fieldStyle = { width: "100%", boxSizing: "border-box" as const, padding: "12px 13px", borderRadius: 11, border: "1px solid rgba(20,64,43,.16)", background: "#fff", color: T.INK, font: "inherit" };
 
 export default function ClientDirectory() {
   const [, setLocation] = useLocation();
@@ -55,7 +55,7 @@ export default function ClientDirectory() {
   </main>;
 }
 
-const cardStyle = { background: "#fff", borderRadius: 17, padding: 17, marginTop: 16, boxShadow: "0 8px 30px rgba(26,29,33,.05)" };
+const cardStyle = { background: "#fff", borderRadius: 17, padding: 17, marginTop: 16, boxShadow: "0 8px 30px rgba(20,64,43,.05)" };
 const primaryButton = { width: "100%", padding: 14, borderRadius: 12, border: 0, background: T.ACCENT, color: "#fff", fontWeight: 800, cursor: "pointer" };
 const smallButton = { padding: "10px 15px", borderRadius: 999, border: 0, background: T.INK, color: "#fff", fontWeight: 800, cursor: "pointer" };
 const linkStyle = { border: 0, background: "none", color: T.ACCENT, fontWeight: 700, padding: "10px 0", cursor: "pointer" };

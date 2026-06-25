@@ -33,11 +33,11 @@ export default function QuoteResponse() {
     <h1 style={{ marginBottom: 4 }}>{money(quote.totalCents)}</h1>
     <p style={{ marginTop: 0, color: "#687078" }}>For {client.firstName} {client.lastName} at {client.siteAddress}</p>
     <div style={{ marginTop: 24 }}>
-      {(quote.lineItems || []).map((line: any, index: number) => <div key={index} style={{ ...summaryStyle, borderBottom: "1px solid rgba(26,29,33,.08)" }}><span>{line.description}<small style={{ display: "block", color: "#7b8288" }}>{line.qty} x {money(line.unitPriceCents)}</small></span><strong>{money(line.lineTotalCents)}</strong></div>)}
+      {(quote.lineItems || []).map((line: any, index: number) => <div key={index} style={{ ...summaryStyle, borderBottom: "1px solid rgba(20,64,43,.08)" }}><span>{line.description}<small style={{ display: "block", color: "#7b8288" }}>{line.qty} x {money(line.unitPriceCents)}</small></span><strong>{money(line.lineTotalCents)}</strong></div>)}
     </div>
     {!!quote.gstCents && <div style={summaryStyle}><span>{gstMode === "exclusive" ? "Subtotal" : "Subtotal (excl. GST)"}</span><strong>{money(quote.subtotalCents)}</strong></div>}
     {!!quote.gstCents && <div style={summaryStyle}><span>{gstMode === "exclusive" ? "GST (15%)" : "GST (15%) included"}</span><span>{money(quote.gstCents)}</span></div>}
-    {quote.depositEnabled && <div style={{ ...summaryStyle, background: "rgba(255,122,26,.09)", borderRadius: 12, padding: 14 }}><span>Deposit on acceptance</span><strong>{money(quote.depositCents)}</strong></div>}
+    {quote.depositEnabled && <div style={{ ...summaryStyle, background: "rgba(91,99,107,.09)", borderRadius: 12, padding: 14 }}><span>Deposit on acceptance</span><strong>{money(quote.depositCents)}</strong></div>}
     {quote.notes && <p style={{ background: T.OFFW, borderRadius: 12, padding: 14 }}>{quote.notes}</p>}
     <a href={`/api/trades/quotes/token/${token}/pdf`} style={{ ...actionStyle, display: "block", textAlign: "center", textDecoration: "none", background: "transparent", color: T.ACCENT, border: `1px solid ${T.ACCENT}`, marginTop: 18 }}>Download PDF</a>
     {closed ? <p style={{ fontWeight: 700 }}>This quote is {quote.status}.</p> : <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 24 }}><button disabled={respond.isPending} onClick={() => respond.mutate(false)} style={{ ...actionStyle, background: "transparent", color: T.RED, border: `1px solid ${T.RED}` }}>Decline</button><button disabled={respond.isPending} onClick={() => respond.mutate(true)} style={{ ...actionStyle, background: T.ACCENT, color: "#fff", border: 0 }}>Accept quote</button></div>}
@@ -45,6 +45,6 @@ export default function QuoteResponse() {
   </Frame>;
 }
 
-function Frame({ children }: { children: React.ReactNode }) { return <main style={{ minHeight: "100vh", background: T.OFFW, padding: "36px 16px", color: T.INK, fontFamily: "Outfit, system-ui, sans-serif" }}><section style={{ maxWidth: 560, margin: "0 auto", background: "#fff", borderRadius: 22, padding: 24, boxShadow: "0 16px 50px rgba(26,29,33,.08)" }}>{children}</section></main>; }
+function Frame({ children }: { children: React.ReactNode }) { return <main style={{ minHeight: "100vh", background: T.OFFW, padding: "36px 16px", color: T.INK, fontFamily: "Outfit, system-ui, sans-serif" }}><section style={{ maxWidth: 560, margin: "0 auto", background: "#fff", borderRadius: 22, padding: 24, boxShadow: "0 16px 50px rgba(20,64,43,.08)" }}>{children}</section></main>; }
 const summaryStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 20, padding: "12px 0" };
 const actionStyle = { borderRadius: 14, padding: 15, fontWeight: 800, cursor: "pointer" };

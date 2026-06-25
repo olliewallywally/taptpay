@@ -34,7 +34,7 @@ export default function TradesDashboard() {
 }
 
 function Stat({ label, value }: { label: string; value: string }) { return <div style={card}><small style={{ color: "#687078", textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 700 }}>{label}</small><div style={{ fontSize: 24, fontWeight: 900, marginTop: 7 }}>{value}</div></div>; }
-const card = { background: "#fff", borderRadius: 17, padding: 16, boxShadow: "0 8px 30px rgba(26,29,33,.05)" };
+const card = { background: "#fff", borderRadius: 17, padding: 16, boxShadow: "0 8px 30px rgba(20,64,43,.05)" };
 const primary = { border: 0, borderRadius: 13, padding: 14, background: T.ACCENT, color: "#fff", fontWeight: 800, cursor: "pointer" };
 const secondary = { border: 0, borderRadius: 13, padding: 14, background: T.INK, color: "#fff", fontWeight: 800, cursor: "pointer" };
 const roundButton = { border: 0, borderRadius: 999, padding: "10px 14px", background: T.INK, color: "#fff", fontWeight: 700, cursor: "pointer" };

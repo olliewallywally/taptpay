@@ -5,7 +5,7 @@ import { tradesFetch, tradesHeaders } from "@/lib/trades-api";
 import { TRADES_THEME as T } from "@/lib/trades-theme";
 
 const money = (c: number) => new Intl.NumberFormat("en-NZ", { style: "currency", currency: "NZD" }).format((c || 0) / 100);
-const fieldStyle = { width: "100%", boxSizing: "border-box" as const, padding: "11px 12px", borderRadius: 10, border: "1px solid rgba(26,29,33,.16)", font: "inherit" };
+const fieldStyle = { width: "100%", boxSizing: "border-box" as const, padding: "11px 12px", borderRadius: 10, border: "1px solid rgba(20,64,43,.16)", font: "inherit" };
 
 export default function ClientProfile() {
   const [, params] = useRoute("/trades/clients/:id");
@@ -44,9 +44,9 @@ export default function ClientProfile() {
 
 function Frame({ children }: { children: React.ReactNode }) { return <main style={{ minHeight: "100vh", background: T.OFFW, padding: "22px 16px 80px", color: T.INK, fontFamily: "Outfit, system-ui, sans-serif" }}><section style={{ maxWidth: 620, margin: "0 auto" }}>{children}</section></main>; }
 function Section({ title, empty, children }: { title: string; empty: string; children: React.ReactNode }) { const items = Array.isArray(children) ? children : [children]; return <section style={{ marginTop: 24 }}><h2 style={{ fontSize: 14, textTransform: "uppercase", letterSpacing: ".1em" }}>{title}</h2>{items.length && items.some(Boolean) ? <div style={cardStyle}>{children}</div> : <div style={{ ...cardStyle, color: "#7b8288" }}>{empty}</div>}</section>; }
-function Row({ title, detail, action }: { title: string; detail: string; action?: React.ReactNode }) { return <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: "1px solid rgba(26,29,33,.08)" }}><div><strong style={{ display: "block", textTransform: "capitalize" }}>{title}</strong><small style={{ color: "#687078", textTransform: "capitalize" }}>{detail}</small></div>{action}</div>; }
-const cardStyle = { background: "#fff", borderRadius: 17, padding: 17, boxShadow: "0 8px 30px rgba(26,29,33,.05)" };
+function Row({ title, detail, action }: { title: string; detail: string; action?: React.ReactNode }) { return <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: "1px solid rgba(20,64,43,.08)" }}><div><strong style={{ display: "block", textTransform: "capitalize" }}>{title}</strong><small style={{ color: "#687078", textTransform: "capitalize" }}>{detail}</small></div>{action}</div>; }
+const cardStyle = { background: "#fff", borderRadius: 17, padding: 17, boxShadow: "0 8px 30px rgba(20,64,43,.05)" };
 const linkStyle = { border: 0, background: "none", color: T.ACCENT, fontWeight: 700, padding: "10px 0", cursor: "pointer" };
 const primaryButton = { flex: 1, border: 0, borderRadius: 11, padding: 12, background: T.ACCENT, color: "#fff", fontWeight: 800, cursor: "pointer" };
-const secondaryButton = { flex: 1, border: "1px solid rgba(26,29,33,.14)", borderRadius: 11, padding: 12, background: "transparent", color: T.INK, fontWeight: 800, cursor: "pointer" };
+const secondaryButton = { flex: 1, border: "1px solid rgba(20,64,43,.14)", borderRadius: 11, padding: 12, background: "transparent", color: T.INK, fontWeight: 800, cursor: "pointer" };
 const miniButton = { border: 0, borderRadius: 9, padding: "8px 10px", background: T.INK, color: "#fff", fontWeight: 700, fontSize: 11, cursor: "pointer" };
