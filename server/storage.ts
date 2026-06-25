@@ -262,6 +262,7 @@ const MEM_MERCHANT_DEFAULTS = {
   emailVerified: false,
   onboardingCompleted: false,
   gstRegistered: false,
+  tradeGstMode: "inclusive",
   billingCardLast4: null,
   billingCardBrand: null,
   billingCardExpiry: null,
