@@ -30,6 +30,7 @@ const scrollTo = (id: string) =>
 
 // ─── Top navigation ────────────────────────────────────────────────────────────
 function Nav() {
+  const [, setLocation] = useLocation();
   const links: [string, () => void][] = [
     ["home", () => window.scrollTo({ top: 0, behavior: "smooth" })],
     ["products", () => scrollTo("verticals")],
@@ -51,6 +52,12 @@ function Nav() {
           </button>
         ))}
       </div>
+      <button
+        onClick={() => setLocation("/login")}
+        className="pointer-events-auto absolute right-4 md:right-6 top-5 md:top-7 rounded-full bg-[#58ABFF] text-[#070D51] hover:bg-white transition-colors font-semibold lowercase text-[11px] md:text-sm px-4 md:px-5 py-1.5 md:py-2"
+      >
+        log in
+      </button>
     </nav>
   );
 }
@@ -73,16 +80,6 @@ function Hero() {
           alt="taptpay"
           className="h-16 sm:h-24 md:h-32 lg:h-36 w-auto select-none"
           draggable={false}
-        />
-        {/* period dot to match the wordmark in the artwork */}
-        <span
-          className="ml-1 mb-2 md:mb-3 lg:mb-4 inline-block rounded-[28%]"
-          style={{
-            backgroundColor: SKY,
-            width: "0.5em",
-            height: "0.5em",
-            fontSize: "clamp(40px, 9vw, 130px)",
-          }}
         />
       </motion.div>
 
