@@ -42,7 +42,9 @@ export default function Login() {
       } else {
         toast({ title: 'Welcome back!', description: 'Signed in with Google.' });
       }
-      setLocation('/dashboard');
+      // Full-page navigation so AuthProvider re-checks auth with the new token
+      // (it only runs its check once on mount — see the merchant-login path).
+      window.location.href = '/dashboard';
     } else if (error) {
       window.history.replaceState({}, '', '/login');
       toast({ title: 'Sign in failed', description: decodeURIComponent(error), variant: 'destructive' });
@@ -79,7 +81,15 @@ export default function Login() {
 
         const params = new URLSearchParams(window.location.search);
         const returnTo = params.get("returnTo");
-        setLocation(returnTo || "/dashboard");
+        // Only honour same-origin absolute paths ("/...", not "//host" or
+        // "scheme://"): returnTo is reflected from the URL, and a hard
+        // navigation to it would otherwise be an open redirect.
+        const dest = returnTo && /^\/(?!\/)/.test(returnTo) ? returnTo : "/dashboard";
+        // Full-page navigation (not SPA setLocation): AuthProvider only checks
+        // auth once on mount, so a client-side route change would leave its
+        // cached state stale and ProtectedRoute would bounce back to /login.
+        // A hard navigation re-initialises auth with the just-stored token.
+        window.location.href = dest;
       } else {
         localStorage.setItem("adminAuthToken", result.token);
         localStorage.setItem("adminUser", JSON.stringify(result.user));
