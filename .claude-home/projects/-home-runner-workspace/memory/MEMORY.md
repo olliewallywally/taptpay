@@ -1,1 +1,4 @@
 - [TaptPay design language](taptpay-design-language.md) — landing page is the user's own PR #2 design; they prefer implementing their concrete designs over Claude designing from a brief
+- [Trades vertical project](trades-vertical-project.md) — building 3rd vertical (Trades) mirroring Property; approved spec + key decisions
+- [Trades branch git state](trades-branch-git-state.md) — split-bill work safe in a single stash; restore steps
+- [DB schema drift & FK sequences](db-schema-drift-fk-sequences.md) — latent bug: FK cols have rogue auto-increment; never db:push from main-based branch

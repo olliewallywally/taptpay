@@ -1,0 +1,50 @@
+const { chromium } = require('playwright');
+
+(async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+
+  const log = (...a) => console.log('[repro]', ...a);
+
+  page.on('console', (m) => log('PAGE.console:', m.type(), m.text()));
+  page.on('pageerror', (e) => log('PAGE.error:', e.message));
+  page.on('framenavigated', (f) => { if (f === page.mainFrame()) log('NAV ->', f.url()); });
+
+  // Intercept the two auth calls so we don't need real credentials.
+  await page.route('**/api/auth/login', async (route) => {
+    log('intercept POST /api/auth/login -> 200');
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        token: 'fake.jwt.token',
+        user: { id: 1, email: 'test@taptpay.co.nz', merchantId: 31, role: 'merchant' },
+      }),
+    });
+  });
+  await page.route('**/api/auth/me', async (route) => {
+    log('intercept GET /api/auth/me -> 200 (authenticated, onboarding complete)');
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        user: { id: 1, email: 'test@taptpay.co.nz', merchantId: 31, role: 'merchant', onboardingCompleted: true, merchantStatus: 'verified' },
+      }),
+    });
+  });
+
+  await page.goto('http://localhost:5000/login', { waitUntil: 'networkidle' });
+  log('initial url:', page.url());
+
+  await page.fill('[data-testid="input-email"]', 'test@taptpay.co.nz');
+  await page.fill('[data-testid="input-password"]', 'password123');
+  log('clicking login...');
+  await page.click('[data-testid="button-login"]');
+
+  // Give it time to navigate / settle
+  await page.waitForTimeout(3000);
+  log('FINAL url:', page.url());
+  log('authToken in localStorage:', await page.evaluate(() => localStorage.getItem('authToken')));
+
+  await browser.close();
+})().catch((e) => { console.error('FATAL', e); process.exit(1); });

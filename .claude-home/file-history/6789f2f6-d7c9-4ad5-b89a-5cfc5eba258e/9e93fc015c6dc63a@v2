@@ -1,0 +1,75 @@
+import { createContext, useContext, useCallback, useEffect, useState } from "react";
+
+// Auth lives in its own leaf module — NOT in App.tsx — on purpose. App.tsx
+// imports the page components (login, dashboard, …) and those pages import the
+// auth context back. When the context lived in App.tsx that App↔page cycle made
+// the bundler evaluate App.tsx twice, creating two distinct AuthContext objects:
+// the <AuthContext.Provider> used one, a consumer like login.tsx's useAuth() got
+// the other (its default no-op refreshAuth), so post-login auth never synced and
+// ProtectedRoute bounced straight back to /login. Keeping this module dependency-
+// free (React only) guarantees a single shared context instance.
+
+// Auth is checked ONCE at app load and cached here. ProtectedRoute reads from
+// this context so navigating between protected routes never shows a loader or
+// makes a redundant API call — both of which would destroy page transitions.
+export type AuthData = {
+  isAuthenticated: boolean;
+  merchantId?: string | null;
+  role?: string | null;
+  onboardingCompleted?: boolean | null;
+};
+
+const AuthContext = createContext<{ auth: AuthData | null; isChecking: boolean; refreshAuth: () => Promise<void> }>({
+  auth: null,
+  isChecking: true,
+  refreshAuth: async () => {},
+});
+
+export function useAuth() {
+  return useContext(AuthContext);
+}
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [auth, setAuth] = useState<AuthData | null>(null);
+  const [isChecking, setIsChecking] = useState(true);
+
+  // Re-reads the token from localStorage and resolves the cached auth state.
+  // Called once at app load, and again after login/logout so the cached state
+  // reflects the new token without requiring a full page reload.
+  const refreshAuth = useCallback(async () => {
+    const token = localStorage.getItem("authToken");
+    if (!token) {
+      setAuth({ isAuthenticated: false });
+      setIsChecking(false);
+      return;
+    }
+    try {
+      const r = await fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } });
+      if (r.ok) {
+        const data = await r.json();
+        setAuth({
+          isAuthenticated: true,
+          merchantId: data?.user?.merchantId ?? null,
+          role: data?.user?.role ?? null,
+          onboardingCompleted: data?.user?.onboardingCompleted ?? null,
+        });
+      } else {
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("user");
+        localStorage.removeItem("merchantId");
+        setAuth({ isAuthenticated: false });
+      }
+    } catch {
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("user");
+      localStorage.removeItem("merchantId");
+      setAuth({ isAuthenticated: false });
+    } finally {
+      setIsChecking(false);
+    }
+  }, []);
+
+  useEffect(() => { refreshAuth(); }, [refreshAuth]);
+
+  return <AuthContext.Provider value={{ auth, isChecking, refreshAuth }}>{children}</AuthContext.Provider>;
+}

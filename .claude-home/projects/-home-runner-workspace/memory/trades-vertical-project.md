@@ -1,0 +1,41 @@
+---
+name: trades-vertical-project
+description: "Trades vertical build — approved design spec, key decisions, action-bar mapping"
+metadata: 
+  node_type: memory
+  type: project
+  originSessionId: db0c107b-d45d-4610-b215-84091dd80729
+---
+
+Building a third TaptPay vertical: **Trades** (plumbers/electricians/builders), mirroring the **Property Management** vertical's architecture (NOT retail). Branch: `feat/trades-vertical` (off `main`). Approved design spec: `docs/superpowers/specs/2026-06-17-trades-vertical-design.md`. Next step after committing spec: invoke writing-plans for a PHASED implementation plan.
+
+**Core lifecycle:** quote → accept → deposit → balance → complete. An accepted quote becomes a *job* that parks in the home "stack". Deposit + balance are two payment links off the job, reusing property's rent-link/checkout/SSE machinery.
+
+**Approved decisions (from user):**
+- BOTH a full Quote builder AND a quick Invoice path (keypad→send, no quote step).
+- Deposit link auto-presented to customer the moment they accept a deposit-enabled quote.
+- Recurring is an in-flow TOGGLE (maintenance/retainer), not its own action-bar slot — mirrors how property nests frequency.
+- 3-way settings switcher: Retail `/dashboard` · Property `/property` · Trades `/trades` (extend `settings.tsx` ~line 1170, currently 2 buttons).
+- Colours NOT final — must be trivially swappable via a single TRADES_THEME token block (placeholder: charcoal `#1A1D21` + safety-amber `#FF7A1A`). User unsure on colours.
+- GST: NZ default = GST-inclusive, "GST (15%) incl." line, gated by merchant `gstRegistered` flag (documented as easily reversible).
+
+**Action bar (4 slots):** clients · quote · invoice · external. Deposit toggle lives inside quote; recurring toggle inside quote+invoice. "send balance / mark complete" live in the tap-row action sheet (reuse property's InvoiceActionSheet), not the action bar.
+
+**Data model:** fork trades-named tables mirroring property: `client_profiles`, `quotes`, `job_invoices`, `job_schedules`, `job_events`. Fee = 0.3%. Doc labelled "Invoice" not "Receipt". Drop stock page, cash-sale, bills/expenses.
+
+**GST default (reversible):** GST-inclusive amounts, "GST (15%) incl." line, gated by `merchants.gstRegistered`. `GST_RATE=0.15`. `computeQuoteTotals`: gstCents = round(total - total/(1+rate)).
+
+**Theme:** swappable `TRADES_THEME` token block (placeholder charcoal `#1A1D21` + amber `#FF7A1A`) — user unsure on colours, must stay one-edit swappable.
+
+## PHASE 1 (backend foundation) = COMPLETE as of 2026-06-17
+Built via subagent-driven-development on branch `feat/trades-vertical` (off main). Spec: `docs/superpowers/specs/2026-06-17-trades-vertical-design.md`. Plan: `docs/superpowers/plans/2026-06-17-trades-vertical-phase1-foundation.md`. Ledger: `.git/sdd/progress.md` (authoritative recovery map).
+- Task1 schema (d9143f2), Task2 storage (a235297), Task3 routes + fixes (aa88522, 653e99f), final-review try/catch fix (450df46), migration artifact (e9a05ca). All task-reviewed + whole-branch reviewed (opus: "ready with fixes" — fixes applied).
+- DB: 5 trades tables + merchants.gst_registered applied via ADDITIVE SQL (migrations/0007_trades_vertical.sql), NOT db:push. Property data intact.
+- **LANDMINE: never `npm run db:push` on this branch** — live DB is ahead of main; push wants to DROP invoices_rent_requests.scheduled_send_at + truncate tables. Use additive SQL only.
+
+## RESUME NEXT SESSION (see ledger for detail)
+1. Run superpowers:finishing-a-development-branch for Phase 1 (merge/PR decision). 
+2. Phase 2 = nav & shells: 3-way settings switch (settings.tsx ~line 1170, currently Retail/Property → add Trades `/trades`), `/trades/*` routes in App.tsx mirroring property, TRADES_THEME tokens, empty page shells. Then Phases 3-6 per plan roadmap.
+3. Separate follow-up user requested: migration to defuse rogue FK auto-increment sequences (`ALTER TABLE transactions ALTER COLUMN merchant_id DROP DEFAULT`; same for platform_fees.transaction_id, refunds.transaction_id — zero data loss, dormant landmine). And get `main` current with split-bill (scheduled_send_at) before any db:push.
+
+See [[taptpay-design-language]] and [[trades-branch-git-state]].

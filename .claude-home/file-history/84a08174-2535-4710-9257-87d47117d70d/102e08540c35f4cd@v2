@@ -1,0 +1,989 @@
+# PM + UX Polish Implementation Plan (Workstream A–D)
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Ship the PM-terminal/dashboard polish, an app-wide bounce/pop-in motion system, and a brand-aligned notification redesign, per `docs/superpowers/specs/2026-06-15-pm-ux-polish-design.md`.
+
+**Architecture:** Reuse existing brand tokens (navy `#040D6D`, sky `#58ABFF`) and the terminal's signature overshoot easing `cubic-bezier(0.34,1.56,0.64,1)`. Add shared motion primitives (`lib/motion.ts` + `<PopIn>`), then apply them across pages. Server work reuses existing property-cron delivery plumbing (`resendInvoiceEmail`/`deliverInvoice` already support a `reminder` flag) and existing columns (`dueAt`, `lastReminderSentAt`, `reminderCount`); only the scheduled-send feature needs a new column.
+
+**Tech Stack:** React + TypeScript, Framer Motion, wouter, TanStack Query, Express, Drizzle ORM (Postgres), Jest + Testing Library.
+
+**Build/verify commands:**
+- Unit tests: `npx jest <path> -v`
+- Typecheck (advisory, pre-existing errors exist): `npx tsc --noEmit`
+- Client build: `npx vite build`
+
+> **Note:** A pre-existing jest `@assets` png mapping bug (see `docs/launch-readiness.md`) makes some page-import suites red. It is unrelated to this work. Run the *specific* test files named in each task rather than the whole suite to confirm your changes.
+
+---
+
+## File Structure
+
+**New files**
+- `client/src/lib/motion.ts` — easing/duration/stagger constants + `popInTransition()` + `prefersReducedMotion()`.
+- `client/src/lib/__tests__/motion.test.ts` — unit tests for the helpers.
+- `client/src/components/pop-in.tsx` — `<PopIn>` Framer Motion wrapper.
+- `client/public/sounds/payment-success.mp3` — success chime asset.
+- `client/src/lib/sound.ts` — interaction-gated, mute-aware chime player.
+- `client/src/lib/__tests__/sound.test.ts` — unit tests for the mute/interaction gate.
+- `client/src/hooks/use-payment-received-toast.ts` — SSE → compact toast + chime.
+- `migrations/<generated>_add_scheduled_send_at.sql` — new column (A3).
+
+**Modified files**
+- `client/src/components/page-transition.tsx` — overshoot entrance + reduced-motion fallback.
+- `client/src/pages/property/stat-carousel.tsx` — white boxes.
+- `client/src/pages/property/property-dashboard.tsx` — hover/press on all boxes + PopIn stagger.
+- `client/src/pages/property/property-terminal.tsx` — taller request panel, remind button, dates step.
+- `client/src/components/notification-system.tsx` — brand redesign + compact variant.
+- `shared/schema.ts` — `scheduledSendAt` column + schema field.
+- `server/property-cron.ts` — `sendInvoiceReminder()` + dispatch-pass scheduled-send guard.
+- `server/routes.ts` — `POST /api/property/invoices/:id/remind`; create-invoice scheduled-send branch.
+
+---
+
+## Task 1: Motion primitives (`lib/motion.ts`)
+
+**Files:**
+- Create: `client/src/lib/motion.ts`
+- Test: `client/src/lib/__tests__/motion.test.ts`
+
+- [ ] **Step 1: Write the failing test**
+
+```ts
+// client/src/lib/__tests__/motion.test.ts
+import { OVERSHOOT, POP_DURATION, STAGGER_STEP, popInTransition, prefersReducedMotion } from "../motion";
+
+describe("motion primitives", () => {
+  it("exposes the terminal overshoot easing", () => {
+    expect(OVERSHOOT).toEqual([0.34, 1.56, 0.64, 1]);
+  });
+
+  it("popInTransition staggers by index", () => {
+    expect(popInTransition(0)).toEqual({ duration: POP_DURATION, ease: OVERSHOOT, delay: 0 });
+    expect(popInTransition(3).delay).toBeCloseTo(3 * STAGGER_STEP);
+  });
+
+  it("prefersReducedMotion is false when matchMedia says no-preference", () => {
+    (window as any).matchMedia = jest.fn().mockReturnValue({ matches: false });
+    expect(prefersReducedMotion()).toBe(false);
+  });
+
+  it("prefersReducedMotion is true when matchMedia matches reduce", () => {
+    (window as any).matchMedia = jest.fn().mockReturnValue({ matches: true });
+    expect(prefersReducedMotion()).toBe(true);
+  });
+});
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `npx jest client/src/lib/__tests__/motion.test.ts -v`
+Expected: FAIL — "Cannot find module '../motion'".
+
+- [ ] **Step 3: Write minimal implementation**
+
+```ts
+// client/src/lib/motion.ts
+// Shared motion language. The overshoot easing is the terminal's signature
+// "bounce/pop-in" feel (cubic-bezier(0.34,1.56,0.64,1)).
+export const OVERSHOOT = [0.34, 1.56, 0.64, 1] as const;
+export const POP_DURATION = 0.42;
+export const STAGGER_STEP = 0.06;
+
+/** Framer Motion transition for a pop-in, staggered by sibling index. */
+export function popInTransition(index = 0) {
+  return { duration: POP_DURATION, ease: OVERSHOOT, delay: index * STAGGER_STEP };
+}
+
+/** True when the user has asked for reduced motion. SSR/test-safe. */
+export function prefersReducedMotion(): boolean {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches === true;
+}
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `npx jest client/src/lib/__tests__/motion.test.ts -v`
+Expected: PASS (4 tests).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add client/src/lib/motion.ts client/src/lib/__tests__/motion.test.ts
+git commit -m "feat(motion): shared overshoot easing + pop-in helpers"
+```
+
+---
+
+## Task 2: `<PopIn>` wrapper component
+
+**Files:**
+- Create: `client/src/components/pop-in.tsx`
+
+> Visual component (no unit test — verified via build + later page usage).
+
+- [ ] **Step 1: Implement the component**
+
+```tsx
+// client/src/components/pop-in.tsx
+import { motion } from "framer-motion";
+import { CSSProperties, ReactNode } from "react";
+import { OVERSHOOT, POP_DURATION, STAGGER_STEP, prefersReducedMotion } from "@/lib/motion";
+
+/**
+ * Wraps content in the signature bounce/pop-in entrance. Pass `index` to stagger
+ * siblings. Honours prefers-reduced-motion with a plain fade (no transform).
+ */
+export function PopIn({
+  children, index = 0, className, style,
+}: { children: ReactNode; index?: number; className?: string; style?: CSSProperties }) {
+  const reduced = prefersReducedMotion();
+  return (
+    <motion.div
+      className={className}
+      style={style}
+      initial={reduced ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.97 }}
+      animate={reduced ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
+      transition={reduced
+        ? { duration: 0.2, ease: "easeOut", delay: index * 0.03 }
+        : { duration: POP_DURATION, ease: OVERSHOOT, delay: index * STAGGER_STEP }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+```
+
+- [ ] **Step 2: Verify it compiles**
+
+Run: `npx vite build`
+Expected: build succeeds (no type/import errors from this file).
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add client/src/components/pop-in.tsx
+git commit -m "feat(motion): PopIn wrapper with reduced-motion fallback"
+```
+
+---
+
+## Task 3: Page-entrance overshoot (`page-transition.tsx`)
+
+**Files:**
+- Modify: `client/src/components/page-transition.tsx`
+
+- [ ] **Step 1: Replace the motion config**
+
+Replace the `<motion.div>` block (currently `initial={{ opacity: 0, y: 14, scale: 0.982 }}` … `transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}`) with the overshoot version plus a reduced-motion branch. Keep the `isVTPending()` early-return bypass exactly as-is.
+
+```tsx
+import { AnimatePresence, motion } from "framer-motion";
+import { useLocation } from "wouter";
+import { isVTPending } from "@/lib/view-transition";
+import { OVERSHOOT, prefersReducedMotion } from "@/lib/motion";
+
+export function PageTransition({ children }: { children: React.ReactNode }) {
+  const [location] = useLocation();
+
+  // When the View Transitions API is handling the animation (hero morph between
+  // property pages), bypass Framer Motion entirely so they don't fight.
+  if (isVTPending()) {
+    return <>{children}</>;
+  }
+
+  const reduced = prefersReducedMotion();
+
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={location}
+        initial={reduced ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.972 }}
+        animate={reduced ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
+        exit={reduced
+          ? { opacity: 0, transition: { duration: 0.14 } }
+          : { opacity: 0, scale: 0.984, y: -10, transition: { duration: 0.18, ease: "easeIn" } }}
+        transition={reduced
+          ? { duration: 0.2, ease: "easeOut" }
+          : { duration: 0.44, ease: OVERSHOOT }}
+        style={{ willChange: "opacity, transform" }}
+      >
+        {children}
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+```
+
+- [ ] **Step 2: Verify build + manual check**
+
+Run: `npx vite build`
+Expected: succeeds. Manually navigate between non-property routes (e.g. `/login` → `/dashboard`) and confirm the page bounces in; confirm property hero-morph navigation is unchanged (VT bypass still wins).
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add client/src/components/page-transition.tsx
+git commit -m "feat(motion): overshoot page entrance + reduced-motion fallback"
+```
+
+---
+
+## Task 4: Carousel boxes → pure white (`stat-carousel.tsx`)
+
+**Files:**
+- Modify: `client/src/pages/property/stat-carousel.tsx:11` and the pill `style` block (~line 45)
+- Test: `client/src/pages/property/__tests__/stat-carousel.test.tsx` (existing — must stay green)
+
+- [ ] **Step 1: Change the pill background + add definition**
+
+Replace the constant:
+
+```tsx
+const PILL_BG = "#FFFFFF"; // pure white; page bg is #F4F4F4 so add a hairline + soft shadow for definition
+```
+
+In the pill `style` object, add a border and shadow alongside the existing `background: PILL_BG` / `borderRadius: 22`:
+
+```tsx
+              background: PILL_BG,
+              borderRadius: 22,
+              border: "1px solid rgba(4,13,109,0.06)",
+              boxShadow: "0 4px 14px rgba(4,13,109,0.06)",
+```
+
+- [ ] **Step 2: Verify existing carousel test still passes**
+
+Run: `npx jest client/src/pages/property/__tests__/stat-carousel.test.tsx -v`
+Expected: PASS (the `pageFromScroll` tests are unaffected by styling).
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add client/src/pages/property/stat-carousel.tsx
+git commit -m "feat(dashboard): white carousel boxes with hairline + shadow"
+```
+
+---
+
+## Task 5: Hover/press on all dashboard boxes + PopIn stagger (`property-dashboard.tsx`)
+
+**Files:**
+- Modify: `client/src/pages/property/property-dashboard.tsx`
+
+> The dashboard uses plain `<div>` boxes with inline styles. Convert the box wrappers to `motion.div` for `whileHover`/`whileTap`, and wrap the major sections in `<PopIn>` for staggered entrance.
+
+- [ ] **Step 1: Add imports**
+
+At the top of the file add:
+
+```tsx
+import { motion } from "framer-motion";
+import { PopIn } from "@/components/pop-in";
+```
+
+- [ ] **Step 2: Define a shared hover treatment**
+
+Below the `GLASS` constant, add:
+
+```tsx
+/** Shared lift-on-hover / press-on-tap for dashboard boxes. */
+const HOVER = {
+  whileHover: { y: -2, transition: { duration: 0.18, ease: [0.34, 1.56, 0.64, 1] as const } },
+  whileTap: { scale: 0.98 },
+} as const;
+```
+
+- [ ] **Step 3: Apply to each box and stagger sections**
+
+Convert the four box wrappers — the **hero** (`background: C.navy`, ~line 162), the **revenue** box (`background: C.sky`, ~line 177), the **gauge** box (`background: '#F2F0F0'`, ~line 185), and each **transaction card** (`...GLASS`, ~line 209) — from `<div>` to `<motion.div {...HOVER}>`, keeping their existing `style`. Wrap the hero, the revenue+gauge row, the `<StatCarousel/>`, and the transactions block each in `<PopIn index={n}>` with increasing `n` (0,1,2,3) so they cascade. Example for the hero:
+
+```tsx
+      {/* 1 — Active transaction hero */}
+      <PopIn index={0}>
+      <div style={{ padding: '0 18px' }}>
+        <motion.div {...HOVER} style={{ background: C.navy, borderRadius: 24, padding: '24px 26px 26px', cursor: 'default' }}>
+          {/* …unchanged inner content… */}
+        </motion.div>
+      </div>
+      </PopIn>
+```
+
+Apply the same `motion.div {...HOVER}` swap to the revenue box, gauge box, and the `recent.map(...)` transaction cards (those are tappable — give them `cursor: 'pointer'`). Wrap the revenue+gauge grid row in `<PopIn index={1}>`, the carousel in `<PopIn index={2}>`, and the transactions header+list in `<PopIn index={3}>`.
+
+> Note: the StatCarousel pills get hover via Task 5b below (they live in `stat-carousel.tsx`).
+
+- [ ] **Step 4: Verify build**
+
+Run: `npx vite build`
+Expected: succeeds. Manually: hover lifts each box on desktop; tap presses on touch; sections cascade in on load; with OS "reduce motion" on, sections fade without transform.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add client/src/pages/property/property-dashboard.tsx
+git commit -m "feat(dashboard): hover/press on all boxes + staggered pop-in"
+```
+
+---
+
+## Task 5b: Hover/press on carousel pills
+
+**Files:**
+- Modify: `client/src/pages/property/stat-carousel.tsx`
+
+- [ ] **Step 1: Convert pills to motion + add hover**
+
+Add `import { motion } from "framer-motion";` at the top. Change the mapped pill `<div>` to:
+
+```tsx
+          <motion.div
+            key={label}
+            whileHover={{ y: -2, transition: { duration: 0.18, ease: [0.34, 1.56, 0.64, 1] } }}
+            whileTap={{ scale: 0.98 }}
+            style={{ /* …existing pill style unchanged… */ }}
+          >
+```
+
+(Close with `</motion.div>`.)
+
+- [ ] **Step 2: Verify carousel test + build**
+
+Run: `npx jest client/src/pages/property/__tests__/stat-carousel.test.tsx -v && npx vite build`
+Expected: tests PASS, build succeeds.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add client/src/pages/property/stat-carousel.tsx
+git commit -m "feat(dashboard): hover/press on carousel pills"
+```
+
+---
+
+## Task 6: Taller rent-request panel (`property-terminal.tsx`)
+
+**Files:**
+- Modify: `client/src/pages/property/property-terminal.tsx` — `RequestsHome` (navy block ~line 214, off-white block ~line 219)
+
+- [ ] **Step 1: Lower the navy/off-white split**
+
+In the navy block style, change `height: '50%'` → `height: '42%'`.
+In the off-white block style, change the collapsed `top` from `'50%'` to `'42%'` (i.e. `top: expanded ? 0 : '42%'`) and reduce the collapsed top padding so content starts sensibly: change `padding: expanded ? '58px 22px 110px' : '154px 22px 110px'` → `padding: expanded ? '58px 22px 110px' : '132px 22px 92px'`.
+
+> Net: navy hero shrinks, list panel grows and reaches ~18px closer to the bottom nav, showing ~2 more rows. The `92px` bottom padding preserves clearance for the fixed bottom nav.
+
+- [ ] **Step 2: Verify build + small-viewport check**
+
+Run: `npx vite build`
+Expected: succeeds. Manually, on a 360×640 viewport, confirm: more rows visible before scroll, the last row is never hidden behind the bottom nav, and the expand toggle still animates to full-screen.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add client/src/pages/property/property-terminal.tsx
+git commit -m "feat(terminal): taller rent-request panel"
+```
+
+---
+
+## Task 7: Server — manual reminder (`sendInvoiceReminder` + `/remind`)
+
+**Files:**
+- Modify: `server/property-cron.ts` (add `sendInvoiceReminder`, exported)
+- Modify: `server/routes.ts` (add `POST /api/property/invoices/:id/remind` near the existing `:id/resend` at line 6071)
+
+> Reuses existing `deliverInvoice` + `deliverOptsFor(invoice, true)` (forces reminder copy) and existing columns `lastReminderSentAt` / `reminderCount`. Cooldown = 5 minutes, enforced server-side via `lastReminderSentAt`.
+
+- [ ] **Step 1: Add `sendInvoiceReminder` to property-cron.ts**
+
+Immediately after `resendInvoiceEmail` (ends ~line 248), add:
+
+```ts
+const REMINDER_COOLDOWN_MS = 5 * 60 * 1000;
+
+/**
+ * Manually send a reminder for a single invoice (the terminal "remind" button).
+ * Forces reminder-flavoured copy regardless of overdue status, enforces a 5-minute
+ * cooldown via lastReminderSentAt, and bumps reminderCount. Distinct from the
+ * automated overdue pass (runReminderPass) and from resend (original copy).
+ */
+export async function sendInvoiceReminder(
+  invoiceId: string,
+  baseUrl: string,
+  now: Date = new Date(),
+): Promise<{ ok: boolean; reason?: string; retryAfterMs?: number; invoice?: any }> {
+  const invoice = await storage.getInvoiceRentRequest(invoiceId);
+  if (!invoice) return { ok: false, reason: "not_found" };
+  if (["paid", "paid_external", "voided"].includes(invoice.status)) return { ok: false, reason: "not_payable" };
+
+  if (invoice.lastReminderSentAt) {
+    const elapsed = now.getTime() - new Date(invoice.lastReminderSentAt).getTime();
+    if (elapsed < REMINDER_COOLDOWN_MS) {
+      return { ok: false, reason: "cooldown", retryAfterMs: REMINDER_COOLDOWN_MS - elapsed };
+    }
+  }
+
+  const delivery = await deliverInvoice(invoice, baseUrl, deliverOptsFor(invoice, true));
+  if (!delivery.sent) return { ok: false, reason: delivery.reason || "send_failed" };
+
+  const updated = await storage.updateInvoiceRentRequest(invoiceId, {
+    lastReminderSentAt: now,
+    reminderCount: (invoice.reminderCount ?? 0) + 1,
+  });
+  await storage.logTransactionEvent({
+    merchantId: invoice.merchantId, tenantProfileId: invoice.tenantProfileId,
+    invoiceId, eventType: "Reminder_Sent", payload: { channel: delivery.channel, manual: true },
+  });
+  return { ok: true, invoice: updated };
+}
+```
+
+- [ ] **Step 2: Add the route in routes.ts**
+
+Immediately after the `:id/resend` handler (ends ~line 6083), add — and add `sendInvoiceReminder` to the existing `property-cron` import at the top of routes.ts (where `resendInvoiceEmail` is imported):
+
+```ts
+  app.post("/api/property/invoices/:id/remind", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const invoice = await storage.getInvoiceRentRequest(req.params.id);
+      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+      if (!checkMerchantOwnership(req, invoice.merchantId)) return res.status(403).json({ message: "Access denied" });
+      const result = await sendInvoiceReminder(req.params.id, getBaseUrl(req));
+      if (!result.ok) {
+        if (result.reason === "cooldown") {
+          return res.status(429).json({ message: "Reminder already sent recently", retryAfterMs: result.retryAfterMs });
+        }
+        if (result.reason === "not_payable") return res.status(400).json({ message: "Invoice is not payable" });
+        return res.status(502).json({ message: "Could not send reminder", reason: result.reason });
+      }
+      res.json(result.invoice);
+    } catch (err) { console.error("[PROP_INVOICE_REMIND]", err); res.status(500).json({ message: "Failed to send reminder" }); }
+  });
+```
+
+- [ ] **Step 3: Write a unit test for the cooldown logic**
+
+Create `server/__tests__/send-invoice-reminder.test.ts` (mock `storage` + `deliverInvoice` as the existing server tests do — match the mocking style already used in `server/` tests; if none exist, mock `../storage` with `jest.mock`):
+
+```ts
+import { jest } from "@jest/globals";
+
+jest.mock("../storage", () => ({
+  storage: {
+    getInvoiceRentRequest: jest.fn(),
+    updateInvoiceRentRequest: jest.fn(async (_id: string, p: any) => ({ id: _id, ...p })),
+    logTransactionEvent: jest.fn(),
+  },
+}));
+
+import { storage } from "../storage";
+import { sendInvoiceReminder } from "../property-cron";
+
+const now = new Date("2026-06-15T10:00:00Z");
+
+it("rejects a paid invoice", async () => {
+  (storage.getInvoiceRentRequest as jest.Mock).mockResolvedValue({ id: "i1", status: "paid" });
+  const r = await sendInvoiceReminder("i1", "http://x", now);
+  expect(r).toMatchObject({ ok: false, reason: "not_payable" });
+});
+
+it("rejects within the 5-minute cooldown", async () => {
+  (storage.getInvoiceRentRequest as jest.Mock).mockResolvedValue({
+    id: "i1", status: "overdue", lastReminderSentAt: new Date("2026-06-15T09:58:00Z"),
+  });
+  const r = await sendInvoiceReminder("i1", "http://x", now);
+  expect(r.ok).toBe(false);
+  expect(r.reason).toBe("cooldown");
+  expect(r.retryAfterMs).toBeGreaterThan(0);
+});
+```
+
+> The "happy path" needs `deliverInvoice` to report `sent: true`. `deliverInvoice` is a module-internal function; if it isn't exported/mockable, keep the test to the two guard cases above (cooldown + not-payable), which are the logic this task owns. Do **not** add an export solely for the test unless trivial.
+
+- [ ] **Step 4: Run the test**
+
+Run: `npx jest server/__tests__/send-invoice-reminder.test.ts -v`
+Expected: PASS (2 tests). If the mock wiring fails, fix the mock to match the repo's existing server-test pattern before proceeding.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add server/property-cron.ts server/routes.ts server/__tests__/send-invoice-reminder.test.ts
+git commit -m "feat(terminal): manual per-invoice reminder endpoint + cooldown"
+```
+
+---
+
+## Task 8: Client — "remind" button on rent-request rows
+
+**Files:**
+- Modify: `client/src/pages/property/property-terminal.tsx` — `RequestsHome` row (`onRowTap` area ~line 237) and the row-tap detail sheet
+
+> Add a small "remind" button on unpaid rows with an optimistic cooldown. Uses the existing query client + the page's `toast` helper (already imported in this file — reuse the same toast call used elsewhere).
+
+- [ ] **Step 1: Add a reminder mutation near the existing mutations**
+
+Find where the page defines its TanStack mutations (e.g. `reminderMutation` for settings, `sendMutation`, around line 1261). Add:
+
+```tsx
+  const [remindedIds, setRemindedIds] = useState<Set<string>>(new Set());
+  const remindInvoiceMutation = useMutation({
+    mutationFn: async (invoiceId: string) => {
+      const r = await fetch(`/api/property/invoices/${invoiceId}/remind`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader() },
+      });
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}));
+        throw new Error(r.status === 429 ? 'Already reminded recently' : (body.message || 'Could not send reminder'));
+      }
+      return r.json();
+    },
+    onSuccess: (_data, invoiceId) => {
+      setRemindedIds(prev => new Set(prev).add(invoiceId));
+      toast('Reminder sent');
+      setTimeout(() => setRemindedIds(prev => { const n = new Set(prev); n.delete(invoiceId); return n; }), 4000);
+      queryClient.invalidateQueries({ queryKey: ['/api/property/invoices'] });
+    },
+    onError: (e: any) => toast(e.message || 'Could not send reminder'),
+  });
+```
+
+> `authHeader()` is the helper this file already uses for `propFetch`/mutations — reuse the exact same auth mechanism the neighbouring mutations use (match `reminderMutation` at line 1261). If they use `propFetch`, use `propFetch` here instead of raw `fetch`.
+
+- [ ] **Step 2: Pass the handler into `RequestsHome` and render the button**
+
+Where `RequestsHome` is rendered (it receives `onRowTap`), also pass:
+
+```tsx
+  onRemind={(inv: any) => remindInvoiceMutation.mutate(inv.id)}
+  remindedIds={remindedIds}
+  remindingId={remindInvoiceMutation.isPending ? remindInvoiceMutation.variables : null}
+```
+
+In `RequestsHome`'s row (after the status/amount column, inside the row, for unpaid statuses), render a compact button. Unpaid = status ∈ {`sent`,`dispatched`,`overdue`,`failed`} (use the existing `st` value computed at line 234):
+
+```tsx
+{['sent','dispatched','overdue','failed'].includes(st) && (
+  <button
+    onClick={(e) => { e.stopPropagation(); onRemind?.(inv); }}
+    disabled={remindedIds?.has(inv.id) || remindingId === inv.id}
+    style={{
+      marginLeft: 8, flexShrink: 0, fontSize: 10.5, fontWeight: 700, letterSpacing: '0.04em',
+      color: remindedIds?.has(inv.id) ? '#1BBF85' : NAVY,
+      background: remindedIds?.has(inv.id) ? 'rgba(27,191,133,0.12)' : 'rgba(88,171,255,0.16)',
+      border: 'none', borderRadius: 8, padding: '5px 9px', cursor: 'pointer',
+      opacity: remindingId === inv.id ? 0.6 : 1,
+    }}
+  >
+    {remindedIds?.has(inv.id) ? 'reminded ✓' : remindingId === inv.id ? '…' : 'remind'}
+  </button>
+)}
+```
+
+Add `onRemind`, `remindedIds`, `remindingId` to `RequestsHome`'s destructured props (`function RequestsHome({ ..., onRemind, remindedIds, remindingId }: any)`).
+
+- [ ] **Step 3: Verify build**
+
+Run: `npx vite build`
+Expected: succeeds. Manually: button appears only on unpaid rows; tapping it (without opening the row) sends a reminder, shows "reminded ✓" for ~4s, and disables during the request; a second immediate tap from another client surfaces the "Already reminded recently" toast.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add client/src/pages/property/property-terminal.tsx
+git commit -m "feat(terminal): per-row send-reminder button with cooldown"
+```
+
+---
+
+## Task 9: Server — scheduled send date (migration + schema + create branch + cron guard)
+
+**Files:**
+- Modify: `shared/schema.ts` — `invoicesRentRequests` table (~line 843) + `createAdHocInvoiceSchema` (~line 913)
+- Create: a Drizzle migration adding `scheduled_send_at`
+- Modify: `server/routes.ts` — `POST /api/property/invoices` (~line 6059) scheduled branch
+- Modify: `server/property-cron.ts` — `runDispatchPass` guard
+
+> `dueAt` already exists and is already in `createAdHocInvoiceSchema`, so the **due date** needs no server change — only the new **send date** does.
+
+- [ ] **Step 1: Add the column to the Drizzle table**
+
+In `invoicesRentRequests`, after `lastReminderSentAt` (line 828) add:
+
+```ts
+  scheduledSendAt: timestamp("scheduled_send_at"),
+```
+
+- [ ] **Step 2: Add the field to the create schema**
+
+In `createAdHocInvoiceSchema`, after the `dueAt` field add:
+
+```ts
+  scheduledSendAt: z.string().datetime().or(z.date()).optional().transform(v => (v ? new Date(v as any) : undefined)),
+```
+
+- [ ] **Step 3: Generate + inspect the migration**
+
+Run: `npx drizzle-kit generate` (matches the repo's existing migration workflow under `migrations/`).
+Expected: a new SQL file adding `scheduled_send_at timestamp` to `invoices_rent_requests`. Open it and confirm it only adds that nullable column.
+
+- [ ] **Step 4: Branch the create endpoint on a future send date**
+
+In `POST /api/property/invoices`, replace the immediate-send tail (lines ~6059–6064, the `createInvoiceRentRequest` + `resendInvoiceEmail` + response) with:
+
+```ts
+      const scheduledSendAt = (data as any).scheduledSendAt as Date | undefined;
+      const isFuture = scheduledSendAt && scheduledSendAt.getTime() > Date.now();
+
+      const invoice = await storage.createInvoiceRentRequest({
+        ...data, merchantId, token: generateInvoiceToken(), status: "pending_dispatch",
+      });
+      await storage.logTransactionEvent({ merchantId, tenantProfileId: data.tenantProfileId, invoiceId: invoice.id, eventType: isCharge ? "Charge_Created" : "Invoice_Generated", payload: { amountCents: invoice.amountCents, channel: invoice.deliveryChannel, ...(isFuture ? { scheduledSendAt } : {}), ...(isCharge ? { chargeType: data.chargeType, description: data.description } : {}) } });
+
+      if (isFuture) {
+        // Future-dated: leave pending; the dispatch cron sends it on/after scheduledSendAt.
+        const fresh = await storage.getInvoiceRentRequest(invoice.id);
+        return res.status(201).json({ ...fresh, resent: false, scheduled: true, delivered: false });
+      }
+
+      // Send the link immediately; if delivery fails it stays pending and the cron retries.
+      const delivery = await resendInvoiceEmail(invoice.id, baseUrl);
+      const fresh = await storage.getInvoiceRentRequest(invoice.id);
+      res.status(201).json({ ...fresh, resent: false, delivered: delivery.ok, deliveryReason: delivery.reason });
+```
+
+> `createInvoiceRentRequest` spreads `data`, which now includes `scheduledSendAt`; confirm the storage insert persists it (it inserts the invoice row from the provided fields). If the storage layer whitelists columns, add `scheduledSendAt` to that insert mapping.
+
+- [ ] **Step 5: Guard the dispatch pass**
+
+In `runDispatchPass` (property-cron.ts ~line 290), at the top of the `for (const invoice of invoices)` loop body, add:
+
+```ts
+    if (invoice.scheduledSendAt && new Date(invoice.scheduledSendAt).getTime() > Date.now()) continue; // not yet due to send
+```
+
+- [ ] **Step 6: Verify typecheck of touched files + build**
+
+Run: `npx tsc --noEmit 2>&1 | grep -E "property-cron|routes.ts|schema.ts" || echo "no new errors in touched files"`
+Expected: no *new* errors attributable to these edits (pre-existing errors elsewhere are fine). Then `npx vite build` succeeds.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add shared/schema.ts server/routes.ts server/property-cron.ts migrations/
+git commit -m "feat(terminal): scheduled send date for rent requests"
+```
+
+---
+
+## Task 10: Client — send-date + due-date step (`property-terminal.tsx`)
+
+**Files:**
+- Modify: `client/src/pages/property/property-terminal.tsx` — `SendRentLink` (~line 438) + `handleSend` (~line 1180)
+
+> Add two controls before the recurring/automate section: **send date** (default "now") and **due date** (default = current behaviour). Reuse the existing `dueSel` quick-select pattern from `ChargeBill`.
+
+- [ ] **Step 1: Add date state to the terminal component**
+
+Near the other terminal state (`const [amount, setAmount]`, etc., ~line 1122), add:
+
+```tsx
+  const [sendDate, setSendDate] = useState<string>('');   // '' = now; else yyyy-mm-dd
+  const [dueDate, setDueDate]   = useState<string>('');    // '' = default (+7d); else yyyy-mm-dd
+```
+
+- [ ] **Step 2: Render the dates step in `SendRentLink`**
+
+In `SendRentLink`, before the frequency/`recurring` block (the section around line 502), insert a dates row. Pass `sendDate,setSendDate,dueDate,setDueDate` into `SendRentLink`'s props and render:
+
+```tsx
+      <div style={{ display: 'flex', gap: 10, margin: '14px 0 4px' }}>
+        <label style={{ flex: 1, fontSize: 11, fontWeight: 700, color: BLUE, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+          send
+          <input type="date" value={sendDate} min={new Date().toISOString().slice(0,10)}
+            onChange={e => setSendDate(e.target.value)}
+            style={{ display: 'block', width: '100%', marginTop: 6, padding: '9px 10px', borderRadius: 12, border: '1px solid rgba(88,171,255,0.4)', background: '#fff', color: NAVY, font: 'inherit' }} />
+        </label>
+        <label style={{ flex: 1, fontSize: 11, fontWeight: 700, color: BLUE, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+          due
+          <input type="date" value={dueDate} min={sendDate || new Date().toISOString().slice(0,10)}
+            onChange={e => setDueDate(e.target.value)}
+            style={{ display: 'block', width: '100%', marginTop: 6, padding: '9px 10px', borderRadius: 12, border: '1px solid rgba(88,171,255,0.4)', background: '#fff', color: NAVY, font: 'inherit' }} />
+        </label>
+      </div>
+```
+
+(Add `sendDate, setSendDate, dueDate, setDueDate` to `SendRentLink`'s destructured props.)
+
+- [ ] **Step 3: Wire the dates into `handleSend`**
+
+In `handleSend` (the function that POSTs to `/api/property/invoices`, ~line 1180), include the dates in the request body:
+
+```tsx
+      dueAt: dueDate
+        ? new Date(`${dueDate}T09:00:00`).toISOString()
+        : /* keep existing default dueAt computation */ defaultDueAtIso,
+      ...(sendDate ? { scheduledSendAt: new Date(`${sendDate}T09:00:00`).toISOString() } : {}),
+```
+
+> Replace `defaultDueAtIso` with however the file currently computes the default `dueAt` for a send (find the existing `dueAt:` line in `handleSend` and keep that expression as the fallback). The point: when `dueDate`/`sendDate` are set, use them; otherwise behave exactly as today.
+
+- [ ] **Step 4: Verify build + flow**
+
+Run: `npx vite build`
+Expected: succeeds. Manually: the dates step appears before the recurring/automate section; leaving both blank sends immediately with the old default due date (unchanged behaviour); a future send date creates a scheduled (not immediately delivered) request; the due date can't precede the send date.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add client/src/pages/property/property-terminal.tsx
+git commit -m "feat(terminal): send-date + due-date step in send flow"
+```
+
+---
+
+## Task 11: Notification brand redesign (`notification-system.tsx`)
+
+**Files:**
+- Modify: `client/src/components/notification-system.tsx` — `NotificationCard` surface (~line 147) + `TYPE_CONFIG` (~line 84)
+
+- [ ] **Step 1: Rebrand the card surface**
+
+In `NotificationCard`, replace the dark-glass `style` on the outer card div (lines ~150–156) with the navy brand surface:
+
+```tsx
+      style={{
+        background: "linear-gradient(150deg, rgba(4,13,109,0.97) 0%, rgba(7,20,90,0.96) 100%)",
+        backdropFilter: "blur(28px) saturate(1.6)",
+        WebkitBackdropFilter: "blur(28px) saturate(1.6)",
+        border: `1px solid rgba(88,171,255,0.22)`,
+        boxShadow: `0 16px 48px rgba(4,13,109,0.45), 0 2px 8px rgba(4,13,109,0.3), inset 0 1px 0 rgba(255,255,255,0.08)`,
+      }}
+```
+
+- [ ] **Step 2: Harmonise the success accent to brand teal**
+
+In `TYPE_CONFIG`, keep the structure but ensure `success.color` reads `#13C29A` (the brand dashboard teal) for consistency with the dashboard status colours:
+
+```tsx
+  success: { icon: CheckCircle, color: "#13C29A", label: "TaptPay" },
+```
+
+(Leave error/warning/info/device as-is; they already read acceptably on navy.)
+
+- [ ] **Step 3: Verify build + visual**
+
+Run: `npx vite build`
+Expected: succeeds. Manually trigger a success/error/info toast and confirm the navy brand surface with sky border and readable text/accents.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add client/src/components/notification-system.tsx
+git commit -m "feat(notifications): brand-navy surface redesign"
+```
+
+---
+
+## Task 12: Compact "payment received" notification variant
+
+**Files:**
+- Modify: `client/src/components/notification-system.tsx` — `Notification` interface (~line 6), `NotificationCard` render (~line 147)
+- Create: `client/src/hooks/use-payment-received-toast.ts`
+
+- [ ] **Step 1: Extend the Notification interface**
+
+Add optional fields to `interface Notification`:
+
+```tsx
+  compact?: boolean;   // render the small payment-received layout
+  amount?: string;     // preformatted amount shown in the compact variant
+```
+
+- [ ] **Step 2: Render a compact layout**
+
+In `NotificationCard`, after computing `cfg`/`Icon`, add an early compact render branch (keeps the same outer brand card + accent bar, but a tighter single-line body, no message text, no progress bar):
+
+```tsx
+  if (notification.compact) {
+    return (
+      <div className="relative rounded-[16px] overflow-hidden"
+        style={{
+          background: "linear-gradient(150deg, rgba(4,13,109,0.97) 0%, rgba(7,20,90,0.96) 100%)",
+          backdropFilter: "blur(24px) saturate(1.6)", WebkitBackdropFilter: "blur(24px) saturate(1.6)",
+          border: "1px solid rgba(88,171,255,0.22)", boxShadow: "0 12px 36px rgba(4,13,109,0.45)",
+        }}>
+        <div className="flex items-center gap-2.5 px-3.5 py-2.5">
+          <div className="flex-shrink-0 w-6 h-6 rounded-lg flex items-center justify-center"
+            style={{ backgroundColor: `${cfg.color}1a`, border: `1px solid ${cfg.color}30` }}>
+            <Icon className="w-3.5 h-3.5" style={{ color: cfg.color }} />
+          </div>
+          <span className="text-white text-sm font-semibold leading-none">{notification.title}</span>
+          {notification.amount && (
+            <span className="ml-auto text-sm font-bold leading-none" style={{ color: cfg.color }}>{notification.amount}</span>
+          )}
+        </div>
+      </div>
+    );
+  }
+```
+
+- [ ] **Step 3: Create the payment-received hook**
+
+```ts
+// client/src/hooks/use-payment-received-toast.ts
+import { useEffect, useRef } from "react";
+import { sseClient } from "@/lib/sse-client";
+import { useNotifications } from "@/components/notification-system";
+import { playPaymentChime } from "@/lib/sound";
+
+/** Fires a compact "payment received" toast + chime when a transaction completes. */
+export function usePaymentReceivedToast() {
+  const { addNotification } = useNotifications();
+  const seen = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const handler = (message: any) => {
+      const tx = message?.transaction;
+      if (!tx || tx.status !== "completed") return;
+      const key = `${tx.id}:${tx.completedSplits ?? 0}`;
+      if (seen.current.has(key)) return;
+      seen.current.add(key);
+
+      const cents = tx.amountReceivedCents ?? tx.amountCents ?? tx.totalCents ?? 0;
+      const amount = "$" + (cents / 100).toLocaleString("en-NZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      addNotification({ type: "success", title: "Payment received", message: "", amount, compact: true, duration: 3500 } as any);
+      playPaymentChime();
+    };
+    sseClient.subscribe("transaction_updated", handler);
+    return () => sseClient.unsubscribe("transaction_updated", handler);
+  }, [addNotification]);
+}
+```
+
+> `tx.amountReceivedCents`/`amountCents`/`totalCents`: use whichever the transaction payload actually carries — inspect a real `transaction_updated` payload (the terminal logs `SSE message received:`); keep the `??` chain so it degrades gracefully.
+
+- [ ] **Step 4: Mount the hook**
+
+In the merchant terminal (`client/src/pages/merchant-terminal-mobile-v2.tsx`, near the other SSE hooks `useDeviceStatusMonitoring()` / `useSSEConnectionMonitoring(...)` at ~line 156), call `usePaymentReceivedToast();` and add the import. (Add to the property terminal too if PMs should hear it — confirm at execution; the spec says "when a payment is received", so mount wherever the merchant watches for payments.)
+
+- [ ] **Step 5: Verify build**
+
+Run: `npx vite build`
+Expected: succeeds. Manually (or via a simulated `transaction_updated` completed event) confirm a small navy toast with the amount appears, distinct from full-size toasts, and does not double-fire for the same transaction/split.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add client/src/components/notification-system.tsx client/src/hooks/use-payment-received-toast.ts client/src/pages/merchant-terminal-mobile-v2.tsx
+git commit -m "feat(notifications): compact payment-received toast on SSE"
+```
+
+---
+
+## Task 13: Success chime (interaction-gated, mute-aware)
+
+**Files:**
+- Create: `client/public/sounds/payment-success.mp3` (short success chime; place a real asset — if none available, copy/convert one from `attached_assets` or add a royalty-free chime)
+- Create: `client/src/lib/sound.ts`
+- Test: `client/src/lib/__tests__/sound.test.ts`
+
+- [ ] **Step 1: Write the failing test**
+
+```ts
+// client/src/lib/__tests__/sound.test.ts
+import { isChimeMuted, setChimeMuted } from "../sound";
+
+describe("chime mute flag", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("defaults to unmuted", () => {
+    expect(isChimeMuted()).toBe(false);
+  });
+
+  it("persists a mute preference", () => {
+    setChimeMuted(true);
+    expect(isChimeMuted()).toBe(true);
+    setChimeMuted(false);
+    expect(isChimeMuted()).toBe(false);
+  });
+});
+```
+
+- [ ] **Step 2: Run it (fails)**
+
+Run: `npx jest client/src/lib/__tests__/sound.test.ts -v`
+Expected: FAIL — module not found.
+
+- [ ] **Step 3: Implement `sound.ts`**
+
+```ts
+// client/src/lib/sound.ts
+const MUTE_KEY = "taptpay.chime.muted";
+let hasInteracted = false;
+
+if (typeof window !== "undefined") {
+  const mark = () => { hasInteracted = true; };
+  window.addEventListener("pointerdown", mark, { once: true });
+  window.addEventListener("keydown", mark, { once: true });
+}
+
+export function isChimeMuted(): boolean {
+  try { return localStorage.getItem(MUTE_KEY) === "1"; } catch { return false; }
+}
+
+export function setChimeMuted(muted: boolean): void {
+  try { localStorage.setItem(MUTE_KEY, muted ? "1" : "0"); } catch { /* ignore */ }
+}
+
+let audio: HTMLAudioElement | null = null;
+
+/** Play the success chime. No-op when muted or before first user interaction. */
+export function playPaymentChime(): void {
+  if (typeof window === "undefined") return;
+  if (isChimeMuted() || !hasInteracted) return;
+  try {
+    if (!audio) { audio = new Audio("/sounds/payment-success.mp3"); audio.volume = 0.5; }
+    audio.currentTime = 0;
+    void audio.play().catch(() => { /* autoplay blocked — ignore */ });
+  } catch { /* ignore */ }
+}
+```
+
+- [ ] **Step 4: Run the test (passes)**
+
+Run: `npx jest client/src/lib/__tests__/sound.test.ts -v`
+Expected: PASS (2 tests).
+
+- [ ] **Step 5: Verify the asset + build**
+
+Confirm `client/public/sounds/payment-success.mp3` exists and is a real audio file (`file client/public/sounds/payment-success.mp3` → audio). Run `npx vite build`; expected success.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add client/src/lib/sound.ts client/src/lib/__tests__/sound.test.ts client/public/sounds/payment-success.mp3
+git commit -m "feat(notifications): interaction-gated, mute-aware success chime"
+```
+
+---
+
+## Final verification
+
+- [ ] Run the unit tests this plan added/touched:
+  `npx jest client/src/lib/__tests__/motion.test.ts client/src/lib/__tests__/sound.test.ts client/src/pages/property/__tests__/stat-carousel.test.tsx server/__tests__/send-invoice-reminder.test.ts -v`
+  Expected: all PASS.
+- [ ] `npx vite build` — succeeds.
+- [ ] Manual smoke on a mobile viewport: dashboard boxes white + hover + cascade; terminal request panel taller; remind button on unpaid rows; dates step before automate; brand-navy toasts; compact payment toast + chime after interaction; `prefers-reduced-motion` disables transforms.
+- [ ] Confirm the property hero-morph navigation (View Transitions) is visually unchanged.
+
+## Self-review notes (coverage check)
+
+- Spec A1 → Tasks 7, 8 · A2 → Task 6 · A3 → Tasks 9, 10 (due date already supported; only send date added).
+- Spec B1 → Task 4 · B2 → Tasks 5, 5b.
+- Spec C1 → Task 1 · C2 → Task 2 · C3 (page entrance) → Task 3 · C3 (stagger) → Task 5 (dashboard); roll out to further pages in follow-up using the same `<PopIn>` · C4 (reduced motion) → Tasks 1–3.
+- Spec D1 → Task 11 · D2 → Task 12 · D3 → Task 13.

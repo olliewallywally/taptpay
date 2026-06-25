@@ -1,0 +1,8 @@
+something is broken on the main tmerinal for PM, the plus button and action bar has move down and is now overlapping with the rent request section, please move it back to where it was.
+
+
+on the mian terminal page for property management, we need to add outstanding expenses under outstanding rent but needs to be smaller and with a slight opacity fade as i dont want to take away from the rent component, also we need to make sure the expenses/bills aren't being added to the outstanding rent amount and they are actually showing outstanding bills 
+
+the carolsel section on the dashboard isn't letting me swipe to the next boxes, please fix
+
+i want all confirm buttons to be wireframe - once pressed they go solid and the text smoothly animtates into a tick and say if the wireframe is light blue on a nvay background, the text needs to start as the same colour and the wire frame button and then say it goesnt solid light blue, the text needs to change to navy blue as it animates into a tick which also needs to be navy blue
