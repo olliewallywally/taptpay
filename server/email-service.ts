@@ -6,12 +6,18 @@ if (!resend) {
   console.warn("RESEND_API_KEY not set. Email functionality will be simulated.");
 }
 
+interface EmailAttachment {
+  filename: string;
+  content: Buffer | string;
+}
+
 interface EmailParams {
   to: string;
   from: string;
   subject: string;
   text?: string;
   html?: string;
+  attachments?: EmailAttachment[];
 }
 
 export async function sendEmail(params: EmailParams): Promise<boolean> {
@@ -28,6 +34,9 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
     console.log(`From: ${params.from}`);
     console.log(`Subject: ${params.subject}`);
     console.log(`Text: ${params.text || 'No text content'}`);
+    if (params.attachments?.length) {
+      console.log(`Attachments: ${params.attachments.map(a => a.filename).join(', ')}`);
+    }
     console.log('=====================\n');
     return true;
   }
@@ -39,6 +48,7 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
       subject: params.subject,
       text: params.text || '',
       html: params.html || '',
+      attachments: params.attachments,
     });
     if (error) {
       console.error('Resend email error:', error);

@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { tradesFetch, tradesHeaders } from "@/lib/trades-api";
-import { formatNzd, includedGstCents, tradesFeeCents } from "@/lib/trades-money";
+import { formatNzd, tradesFeeCents } from "@/lib/trades-money";
+import { computeQuoteTotals } from "@shared/trades-gst";
 import { TRADES_THEME as T } from "@/lib/trades-theme";
 
 type DraftLine = { id: number; description: string; qty: string; unitPrice: string };
@@ -31,18 +32,31 @@ export default function QuoteBuilder() {
     queryFn: () => tradesFetch("/api/auth/me").then(r => r.ok ? r.json() : null),
   });
 
+  const gstMode = auth?.user?.tradeGstMode === "exclusive" ? "exclusive" : "inclusive";
   const totals = useMemo(() => {
-    const total = lines.reduce((sum, line) => {
-      const qty = Math.max(0, Number(line.qty) || 0);
-      const unit = Math.max(0, Math.round((Number(line.unitPrice) || 0) * 100));
-      return sum + Math.round(qty * unit);
-    }, 0);
-    const gst = auth?.user?.gstRegistered ? includedGstCents(total) : 0;
-    const deposit = !depositEnabled ? 0 : depositType === "percent"
-      ? Math.round(total * Math.min(100, Math.max(0, Number(depositValue) || 0)) / 100)
-      : Math.min(total, Math.round((Number(depositValue) || 0) * 100));
-    return { total, gst, net: total - gst, deposit };
-  }, [lines, auth?.user?.gstRegistered, depositEnabled, depositType, depositValue]);
+    const lineInputs = lines.map(line => ({
+      qty: Math.max(0, Number(line.qty) || 0),
+      unitPriceCents: Math.max(0, Math.round((Number(line.unitPrice) || 0) * 100)),
+    }));
+    const depositInput = depositEnabled
+      ? depositType === "percent"
+        ? Number(depositValue) || 0
+        : Math.round((Number(depositValue) || 0) * 100)
+      : undefined;
+    const computed = computeQuoteTotals(lineInputs, {
+      gstRegistered: !!auth?.user?.gstRegistered,
+      gstMode,
+      depositEnabled,
+      depositType: depositEnabled ? depositType : undefined,
+      depositValue: depositInput,
+    });
+    return {
+      total: computed.totalCents,
+      gst: computed.gstCents,
+      net: computed.subtotalCents,
+      deposit: computed.depositCents ?? 0,
+    };
+  }, [lines, auth?.user?.gstRegistered, gstMode, depositEnabled, depositType, depositValue]);
 
   const createQuote = useMutation({
     mutationFn: async () => {
@@ -76,6 +90,21 @@ export default function QuoteBuilder() {
 
   const updateLine = (id: number, field: keyof DraftLine, value: string) => setLines(current => current.map(line => line.id === id ? { ...line, [field]: value } : line));
   const publicUrl = created ? `${window.location.origin}/trades/quote/${created.token}` : "";
+  const downloadCreatedPdf = async () => {
+    if (!created?.id) return;
+    const response = await fetch(`/api/trades/quotes/${created.id}/pdf`, { headers: tradesHeaders() });
+    if (!response.ok) {
+      setError(await response.json().then(d => d.message).catch(() => "Could not download PDF"));
+      return;
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `quote-${String(created.token || created.id).slice(0, 8)}.pdf`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   if (created) return (
     <main style={{ minHeight: "100vh", background: T.OFFW, padding: "40px 18px", color: T.INK, fontFamily: "Outfit, system-ui, sans-serif" }}>
@@ -85,6 +114,8 @@ export default function QuoteBuilder() {
         <p style={{ color: "#687078" }}>{created.delivered ? "Quote sent to the client." : "Delivery was unavailable. Share this customer link instead."}</p>
         <input readOnly value={publicUrl} style={inputStyle} onFocus={e => e.currentTarget.select()} />
         <button onClick={() => navigator.clipboard?.writeText(publicUrl)} style={{ ...buttonStyle, marginTop: 12 }}>Copy link</button>
+        <button onClick={downloadCreatedPdf} style={{ ...buttonStyle, marginTop: 10, background: T.INK }}>Download PDF</button>
+        {error && <p role="alert" style={{ color: T.RED, fontWeight: 600 }}>{error}</p>}
         <button onClick={() => setLocation("/trades/terminal")} style={linkStyle}>Back to terminal</button>
       </section>
     </main>
@@ -131,10 +162,10 @@ export default function QuoteBuilder() {
         </div>
 
         <div style={{ ...cardStyle, background: T.INK, color: "#fff" }}>
-          {!!auth?.user?.gstRegistered && <div style={totalRow}><span>Subtotal excl. GST</span><strong>{money(totals.net)}</strong></div>}
-          {!!auth?.user?.gstRegistered && <div style={totalRow}><span>GST (15%) included</span><span>{money(totals.gst)}</span></div>}
+          {!!auth?.user?.gstRegistered && <div style={totalRow}><span>{gstMode === "exclusive" ? "Subtotal" : "Subtotal (excl. GST)"}</span><strong>{money(totals.net)}</strong></div>}
+          {!!auth?.user?.gstRegistered && <div style={totalRow}><span>{gstMode === "exclusive" ? "GST (15%)" : "GST (15%) included"}</span><span>{money(totals.gst)}</span></div>}
           {depositEnabled && <div style={totalRow}><span>Deposit due on acceptance</span><strong style={{ color: T.ACCENT }}>{money(totals.deposit)}</strong></div>}
-          <div style={{ ...totalRow, borderTop: "1px solid rgba(255,255,255,.14)", paddingTop: 14, marginTop: 8, fontSize: 19 }}><span>Total</span><strong>{money(totals.total)}</strong></div>
+          <div style={{ ...totalRow, borderTop: "1px solid rgba(255,255,255,.14)", paddingTop: 14, marginTop: 8, fontSize: 19 }}><span>{gstMode === "exclusive" && auth?.user?.gstRegistered ? "Total (incl GST)" : "Total"}</span><strong>{money(totals.total)}</strong></div>
           <div style={{ ...totalRow, color: "rgba(255,255,255,.55)", fontSize: 12 }}><span>TaptPay fee (0.3%)</span><span>{money(tradesFeeCents(totals.total))}</span></div>
         </div>
         {error && <p role="alert" style={{ color: T.RED, fontWeight: 600 }}>{error}</p>}

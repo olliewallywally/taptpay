@@ -73,6 +73,7 @@ type AuthData = {
   role?: string | null;
   onboardingCompleted?: boolean | null;
   gstRegistered?: boolean;
+  tradeGstMode?: "inclusive" | "exclusive";
 };
 
 const AuthContext = createContext<{ auth: AuthData | null; isChecking: boolean }>({
@@ -101,6 +102,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
             role: data?.user?.role ?? null,
             onboardingCompleted: data?.user?.onboardingCompleted ?? null,
             gstRegistered: data?.user?.gstRegistered ?? false,
+            tradeGstMode: data?.user?.tradeGstMode === "exclusive" ? "exclusive" : "inclusive",
           });
         } else {
           localStorage.removeItem("authToken");

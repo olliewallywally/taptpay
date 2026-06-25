@@ -73,6 +73,9 @@ export const merchants = pgTable("merchants", {
 
   // GST registration (Trades vertical)
   gstRegistered: boolean("gst_registered").notNull().default(false),
+  // Trades quote price presentation: inclusive prices already contain GST;
+  // exclusive prices are net prices with GST added on top.
+  tradeGstMode: text("trade_gst_mode").notNull().default("inclusive"),
 
   // Dashboard preferences
   dailyGoal: decimal("daily_goal", { precision: 10, scale: 2 }).default("500.00"), // Daily revenue goal in dollars
@@ -919,6 +922,11 @@ export const updateTradeReminderSettingsSchema = z.object({
   tradeRemindersEnabled: z.boolean(),
 });
 
+export const updateTradeGstSettingsSchema = z.object({
+  gstRegistered: z.boolean().optional(),
+  tradeGstMode: z.enum(["inclusive", "exclusive"]).optional(),
+});
+
 export const createAdHocInvoiceSchema = z.object({
   tenantProfileId: z.string().uuid(),
   amountCents: z.number().int().positive().max(100_000_000),
@@ -951,7 +959,7 @@ export type InsertTransactionEvent = typeof transactionEvents.$inferInsert;
 
 /* ═══════════════ TRADES VERTICAL ═══════════════ */
 
-export const GST_RATE = 0.15; // NZ GST; amounts are GST-inclusive
+export { GST_RATE } from "./trades-gst";
 
 export const clientProfiles = pgTable("client_profiles", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -980,6 +988,7 @@ export const quotes = pgTable("quotes", {
   lineItems: jsonb("line_items").notNull(),
   subtotalCents: integer("subtotal_cents").notNull(),
   gstCents: integer("gst_cents").notNull().default(0),
+  gstMode: text("gst_mode"),
   totalCents: integer("total_cents").notNull(),
   depositEnabled: boolean("deposit_enabled").notNull().default(false),
   depositType: text("deposit_type"),        // 'percent' | 'fixed'

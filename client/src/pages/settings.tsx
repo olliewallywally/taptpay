@@ -126,6 +126,27 @@ export default function Settings() {
   const [pushSupported, setPushSupported] = useState(false);
   const [vapidAvailable, setVapidAvailable] = useState(false);
 
+  const [gstRegistered, setGstRegistered] = useState(false);
+  const [tradeGstMode, setTradeGstMode] = useState<"inclusive" | "exclusive">("inclusive");
+
+  useEffect(() => {
+    apiRequest("GET", "/api/trades/gst-settings")
+      .then(r => r.json())
+      .then(data => {
+        setGstRegistered(!!data.gstRegistered);
+        setTradeGstMode(data.tradeGstMode === "exclusive" ? "exclusive" : "inclusive");
+      })
+      .catch(() => {});
+  }, []);
+
+  const saveGst = (patch: { gstRegistered?: boolean; tradeGstMode?: "inclusive" | "exclusive" }) => {
+    if (patch.gstRegistered !== undefined) setGstRegistered(patch.gstRegistered);
+    if (patch.tradeGstMode) setTradeGstMode(patch.tradeGstMode);
+    apiRequest("PUT", "/api/trades/gst-settings", patch).catch(() => {
+      toast({ title: "Could not save GST setting", variant: "destructive" });
+    });
+  };
+
   useEffect(() => {
     if (isNativeIOS()) {
       setPushSupported(true);
@@ -786,6 +807,38 @@ export default function Settings() {
                 className="!border !border-gray-200 focus:!border-[#040D6D] focus:!ring-[#040D6D]"
                 data-testid="input-gst-number"
               />
+            </div>
+
+            <div className="border-t border-gray-100 pt-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <Label className="!text-[#040D6D] font-semibold text-base block">GST registered (Trades)</Label>
+                  <p className="text-sm text-gray-500 mt-1">Show GST on trades quotes and invoices.</p>
+                </div>
+                <Switch
+                  checked={gstRegistered}
+                  onCheckedChange={(value) => saveGst({ gstRegistered: value })}
+                  data-testid="switch-gst-registered"
+                />
+              </div>
+              {gstRegistered && (
+                <div className="mt-4">
+                  <Label className="!text-[#040D6D] font-semibold text-sm block mb-2">Quote prices shown as</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["inclusive", "exclusive"] as const).map(mode => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => saveGst({ tradeGstMode: mode })}
+                        className={`rounded-xl py-2 text-sm font-semibold transition-colors ${tradeGstMode === mode ? "bg-[#040D6D] text-white" : "bg-gray-100 text-gray-600"}`}
+                        data-testid={`button-gst-mode-${mode}`}
+                      >
+                        {mode === "inclusive" ? "Incl GST" : "+ GST"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

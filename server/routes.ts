@@ -2,11 +2,13 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, GST_RATE } from "@shared/schema";
+import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
 import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, simulateCreateSession, simulateQuerySession, simulateRentSession, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, simulateAttendedTapToPay } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, createUser, getUserByEmail, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
+import { generateQuotePdf } from "./trades-quote-pdf";
 import { generateBusinessReportPdf } from "./report-generator";
+import { computeQuoteTotals } from "@shared/trades-gst";
 import { getBaseUrl, generatePaymentUrl, generateQrCodeUrl, generateStonePaymentUrl, generateNfcTagUrl } from "./url-utils";
 import { sendEmail } from "./email-service";
 import QRCode from "qrcode";
@@ -671,11 +673,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     let onboardingCompleted = true; // default for non-merchant users
     let merchantStatus: string | null = null;
     let gstRegistered = false;
+    let tradeGstMode = "inclusive";
     if (merchantId) {
       const merchant = await storage.getMerchant(merchantId);
       onboardingCompleted = merchant?.onboardingCompleted ?? false;
       merchantStatus = merchant?.status ?? null;
       gstRegistered = merchant?.gstRegistered ?? false;
+      tradeGstMode = merchant?.tradeGstMode === "exclusive" ? "exclusive" : "inclusive";
     }
     res.json({
       user: {
@@ -686,6 +690,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         onboardingCompleted,
         merchantStatus,
         gstRegistered,
+        tradeGstMode,
       },
     });
   });
@@ -6614,26 +6619,38 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Compute subtotal/GST/total/deposit for a quote from its line items.
-  // Amounts are GST-INCLUSIVE: gst is the portion already inside the total.
-  function computeQuoteTotals(
-    lineItems: Array<{ qty: number; unitPriceCents: number }>,
-    gstRegistered: boolean,
-    depositEnabled: boolean,
-    depositType?: string,
-    depositValue?: number,
-  ) {
-    const totalCents = lineItems.reduce((s, li) => s + Math.round(li.qty * li.unitPriceCents), 0);
-    const gstCents = gstRegistered ? Math.round(totalCents - totalCents / (1 + GST_RATE)) : 0;
-    const subtotalCents = totalCents - gstCents;
-    let depositCents: number | null = null;
-    if (depositEnabled && depositType && depositValue != null) {
-      depositCents = depositType === "percent"
-        ? Math.round(totalCents * (Math.min(100, Math.max(0, depositValue)) / 100))
-        : Math.min(depositValue, totalCents);
+  app.get("/api/trades/gst-settings", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) return res.status(404).json({ message: "Merchant not found" });
+      res.json({
+        gstRegistered: merchant.gstRegistered ?? false,
+        tradeGstMode: merchant.tradeGstMode === "exclusive" ? "exclusive" : "inclusive",
+      });
+    } catch (err) {
+      console.error("[TRADES_GST_GET]", err);
+      res.status(500).json({ message: "Failed to fetch GST settings" });
     }
-    return { subtotalCents, gstCents, totalCents, depositCents };
-  }
+  });
+
+  app.put("/api/trades/gst-settings", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const data = updateTradeGstSettingsSchema.parse(req.body);
+      const merchant = await storage.updateMerchant(merchantId, data as any);
+      res.json({
+        gstRegistered: merchant?.gstRegistered ?? false,
+        tradeGstMode: merchant?.tradeGstMode === "exclusive" ? "exclusive" : "inclusive",
+      });
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
+      console.error("[TRADES_GST_PUT]", err);
+      res.status(500).json({ message: "Failed to update GST settings" });
+    }
+  });
 
   app.get("/api/trades/clients", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
@@ -6716,15 +6733,24 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         ...item,
         lineTotalCents: Math.round(item.qty * item.unitPriceCents),
       }));
-      const totals = computeQuoteTotals(lineItems, !!merchant?.gstRegistered,
-        parsed.data.depositEnabled, parsed.data.depositType, parsed.data.depositValue);
+      const gstMode = merchant?.tradeGstMode === "exclusive" ? "exclusive" : "inclusive";
+      const totals = computeQuoteTotals(lineItems, {
+        gstRegistered: !!merchant?.gstRegistered,
+        gstMode,
+        depositEnabled: parsed.data.depositEnabled,
+        depositType: parsed.data.depositType,
+        depositValue: parsed.data.depositValue,
+      });
       const token = generateInvoiceToken();
       const row = await storage.createQuote({
         merchantId,
         clientProfileId: parsed.data.clientProfileId,
         token, status: "sent",
         lineItems,
-        subtotalCents: totals.subtotalCents, gstCents: totals.gstCents, totalCents: totals.totalCents,
+        subtotalCents: totals.subtotalCents,
+        gstCents: totals.gstCents,
+        gstMode: merchant?.gstRegistered ? gstMode : null,
+        totalCents: totals.totalCents,
         depositEnabled: parsed.data.depositEnabled,
         depositType: parsed.data.depositType ?? null,
         depositValue: parsed.data.depositValue ?? null,
@@ -6754,6 +6780,48 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       res.json(row);
     } catch (err) { console.error("[TRADES_QUOTES_GET_ID]", err); res.status(500).json({ message: "Failed to fetch quote" }); }
   });
+
+  async function streamQuotePdf(quote: any, req: any, res: any) {
+    const [client, merchant] = await Promise.all([
+      storage.getClientProfile(quote.clientProfileId),
+      storage.getMerchant(quote.merchantId),
+    ]);
+    if (!client || !merchant) return res.status(404).json({ message: "Quote details unavailable" });
+    const pdf = generateQuotePdf(quote, client, merchant, getBaseUrl(req));
+    const safeName = String(merchant.businessName || merchant.name || "quote")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "") || "quote";
+    const ref = String(quote.token || quote.id || "quote").slice(0, 8).toUpperCase();
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="quote-${safeName}-${ref}.pdf"`);
+    res.send(pdf);
+  }
+
+  app.get("/api/trades/quotes/:id/pdf", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const quote = await storage.getQuote(req.params.id);
+      if (!quote || quote.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      await streamQuotePdf(quote, req, res);
+    } catch (err) {
+      console.error("[TRADES_QUOTE_PDF]", err);
+      res.status(500).json({ message: "Failed to generate quote PDF" });
+    }
+  });
+
+  app.get("/api/trades/quotes/token/:token/pdf", async (req, res) => {
+    try {
+      const quote = await storage.getQuoteByToken(req.params.token);
+      if (!quote) return res.status(404).json({ message: "Quote not found" });
+      await streamQuotePdf(quote, req, res);
+    } catch (err) {
+      console.error("[TRADES_QUOTE_TOKEN_PDF]", err);
+      res.status(500).json({ message: "Failed to generate quote PDF" });
+    }
+  });
+
   app.post("/api/trades/quotes/:id/resend", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
@@ -6787,7 +6855,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       res.json({
         quote,
         client: { firstName: client.firstName, lastName: client.lastName, siteAddress: client.siteAddress },
-        merchant: { name: merchant.name, businessName: merchant.businessName, gstRegistered: merchant.gstRegistered },
+        merchant: {
+          name: merchant.name,
+          businessName: merchant.businessName,
+          gstRegistered: merchant.gstRegistered,
+          tradeGstMode: merchant.tradeGstMode === "exclusive" ? "exclusive" : "inclusive",
+        },
       });
     } catch (err) { console.error("[TRADES_QUOTES_TOKEN_GET]", err); res.status(500).json({ message: "Failed to fetch quote" }); }
   });
