@@ -22,7 +22,7 @@ const STATUS_MAP: Record<string, { dot: string; bg: string; fg: string; label: s
   overdue: { dot: C.red, bg: "rgba(255,59,78,0.12)", fg: "#C71A2A", label: "overdue" },
   failed: { dot: C.amber, bg: "rgba(255,176,46,0.18)", fg: "#9A6A00", label: "not delivered" },
   dueSoon: { dot: C.amber, bg: "rgba(255,176,46,0.18)", fg: "#9A6A00", label: "due soon" },
-  upcoming: { dot: C.panel, bg: "rgba(34,34,34,0.12)", fg: C.panel, label: "upcoming" },
+  upcoming: { dot: C.panel, bg: "rgba(88,171,255,0.12)", fg: C.panel, label: "upcoming" },
 };
 
 const LIVE_STATUSES = ["pending_dispatch", "dispatched", "viewed", "deposit_paid", "balance_due", "dispatch_failed"];
@@ -32,7 +32,7 @@ const GLASS: CSSProperties = {
   backdropFilter: "blur(16px) saturate(130%)",
   WebkitBackdropFilter: "blur(16px) saturate(130%)",
   border: "1px solid rgba(255,255,255,0.7)",
-  boxShadow: "0 12px 32px rgba(6,21,14,0.10), inset 0 1px 0 rgba(255,255,255,0.95)",
+  boxShadow: "0 12px 32px rgba(4,13,109,0.10), inset 0 1px 0 rgba(255,255,255,0.95)",
 };
 
 type Channel = "email" | "whatsapp" | "sms";
@@ -161,7 +161,7 @@ function AddClientSheet({ onClose, onSave, saving, saveError }: {
         style={{
           position: "absolute",
           inset: 0,
-          background: "rgba(6,21,14,0.55)",
+          background: "rgba(4,13,109,0.55)",
           backdropFilter: "blur(8px)",
           WebkitBackdropFilter: "blur(8px)",
           animation: closing ? fadeOut : fadeIn,
@@ -256,7 +256,7 @@ function ClientRow({ client, nextInvoice, onClick }: { client: any; nextInvoice:
         <button
           onClick={(event) => { event.stopPropagation(); onClick(); }}
           aria-label={`Open ${fullName}`}
-          style={{ position: "absolute", top: 12, right: 12, width: 28, height: 28, borderRadius: 999, background: C.white, border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 1px 3px rgba(6,21,14,0.12)" }}
+          style={{ position: "absolute", top: 12, right: 12, width: 28, height: 28, borderRadius: 999, background: C.white, border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 1px 3px rgba(4,13,109,0.12)" }}
         >
           <Pencil size={14} color={C.ink} strokeWidth={1.9} />
         </button>
@@ -379,7 +379,7 @@ export default function ClientDirectory() {
             <button
               onClick={() => setShowAdd(true)}
               aria-label="Add client"
-              style={{ position: "absolute", right: 24, bottom: -20, width: 46, height: 46, borderRadius: 999, background: C.cream, color: C.ink, border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 6px 16px rgba(6,21,14,0.32)" }}
+              style={{ position: "absolute", right: 24, bottom: -20, width: 46, height: 46, borderRadius: 999, background: C.cream, color: C.ink, border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 6px 16px rgba(4,13,109,0.32)" }}
             >
               <Plus size={22} strokeWidth={2.6} />
             </button>

@@ -50,7 +50,7 @@ const EVENT_TONES = {
   green: { color: C.green, bg: "rgba(27,191,133,0.14)", fg: "#0B7D63" },
   red: { color: C.red, bg: "rgba(255,59,78,0.12)", fg: "#C71A2A" },
   amber: { color: C.amber, bg: "rgba(255,176,46,0.18)", fg: "#9A6A00" },
-  dark: { color: C.panel, bg: "rgba(34,34,34,0.12)", fg: C.panel },
+  dark: { color: C.panel, bg: "rgba(88,171,255,0.12)", fg: C.panel },
   muted: { color: C.mute, bg: "rgba(0,0,0,0.06)", fg: C.mute },
 };
 
@@ -218,7 +218,7 @@ function SheetTextArea({ label, value, onChange }: { label: string; value: strin
 function Rail({ color, first, last }: { color: string; first: boolean; last: boolean }) {
   return (
     <div style={{ position: "relative", width: 30, flexShrink: 0, display: "flex", justifyContent: "center" }}>
-      <div style={{ position: "absolute", top: first ? 14 : 0, bottom: last ? "calc(100% - 14px)" : 0, width: 2, background: "rgba(6,21,14,0.14)" }} />
+      <div style={{ position: "absolute", top: first ? 14 : 0, bottom: last ? "calc(100% - 14px)" : 0, width: 2, background: "rgba(4,13,109,0.14)" }} />
       <div style={{ position: "absolute", top: 8, width: 13, height: 13, borderRadius: 999, background: C.white, border: `3px solid ${color}`, boxShadow: "0 0 0 3px rgba(255,255,255,0.9)" }} />
     </div>
   );
@@ -266,7 +266,7 @@ function EditClientSheet({ initial, onClose, onSave, onArchive, saving, archivin
 
       <div
         onClick={handleClose}
-        style={{ position: "absolute", inset: 0, background: "rgba(6,21,14,0.55)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", animation: closing ? fadeOut : fadeIn }}
+        style={{ position: "absolute", inset: 0, background: "rgba(4,13,109,0.55)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", animation: closing ? fadeOut : fadeIn }}
       />
 
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, display: "flex", justifyContent: "center" }}>
@@ -344,11 +344,17 @@ function EditClientSheet({ initial, onClose, onSave, onArchive, saving, archivin
 const screenStyle: CSSProperties = { background: C.white, minHeight: "100svh", display: "flex", justifyContent: "center" };
 const appStyle: CSSProperties = { width: "100%", maxWidth: 390, minHeight: "100svh", background: C.cream, paddingBottom: 130, fontFamily: "'Outfit', system-ui, sans-serif" };
 
-export default function ClientProfile() {
+export default function ClientProfile({ clientId: clientIdProp, embedded = false, onClose }: { clientId?: string; embedded?: boolean; onClose?: () => void } = {}) {
   const [, params] = useRoute("/trades/clients/:id");
   const [, setLocation] = useLocation();
-  const clientId = params?.id ?? "";
+  // When embedded in the trades terminal the id comes from a prop (no route), and "back"
+  // returns to the terminal in-place rather than routing away from the terminal page.
+  const clientId = clientIdProp ?? params?.id ?? "";
+  const goBack = () => { if (embedded && onClose) { onClose(); return; } setLocation("/trades/clients"); };
   const queryClient = useQueryClient();
+  // Embedded fills (and scrolls within) the terminal screen; standalone is a full page.
+  const screenWrap: CSSProperties = embedded ? { ...screenStyle, minHeight: undefined, height: "100%", overflowY: "auto" } : screenStyle;
+  const appWrap: CSSProperties = embedded ? { ...appStyle, minHeight: "auto" } : appStyle;
 
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState<ClientForm | null>(null);
@@ -428,7 +434,7 @@ export default function ClientProfile() {
       queryClient.invalidateQueries({ queryKey: ["/api/trades/clients"] });
       setEditing(false);
       setEditForm(null);
-      setLocation("/trades/clients");
+      goBack();
     },
     onError: (error) => {
       setEditError(error instanceof Error ? error.message : "Failed to archive client");
@@ -437,10 +443,10 @@ export default function ClientProfile() {
 
   if (!isLoading && !client) {
     return (
-      <div style={screenStyle}>
-        <div style={{ ...appStyle, paddingTop: 100, textAlign: "center" }}>
+      <div style={screenWrap}>
+        <div style={{ ...appWrap, paddingTop: 100, textAlign: "center" }}>
           <p style={{ color: C.mute }}>client not found</p>
-          <button onClick={() => setLocation("/trades/clients")} style={{ marginTop: 16, color: C.ink, background: "none", border: "none", cursor: "pointer", fontSize: 14, fontWeight: 700 }}>back to clients</button>
+          <button onClick={goBack} style={{ marginTop: 16, color: C.ink, background: "none", border: "none", cursor: "pointer", fontSize: 14, fontWeight: 700 }}>back to clients</button>
         </div>
       </div>
     );
@@ -494,13 +500,13 @@ export default function ClientProfile() {
   };
 
   return (
-    <div style={screenStyle}>
-      <div style={appStyle}>
+    <div style={screenWrap}>
+      <div style={appWrap}>
         <div style={{ height: 56 }} />
 
         <div className="pt-slide-top" style={{ "--pt-d": "0ms" } as CSSProperties}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 18px 14px" }}>
-            <button onClick={() => setLocation("/trades/clients")} aria-label="Back to clients" style={{ width: 34, height: 34, borderRadius: 999, background: C.gray, border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+            <button onClick={goBack} aria-label="Back to clients" style={{ width: 34, height: 34, borderRadius: 999, background: C.gray, border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
               <ChevronLeft size={18} color={C.ink} strokeWidth={2.2} />
             </button>
             <div style={{ fontWeight: 700, fontSize: 11, color: C.ink, letterSpacing: 0, textTransform: "uppercase" }}>client profile</div>
@@ -513,7 +519,7 @@ export default function ClientProfile() {
         <div style={{ padding: "0 18px" }}>
           <div className="pt-hero" style={{ background: C.ink, borderRadius: 24, padding: "20px 20px 22px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
-              <div style={{ width: 50, height: 50, borderRadius: 999, background: C.cream, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontWeight: 900, fontSize: 16, color: C.ink, letterSpacing: 0 }}>
+              <div style={{ width: 50, height: 50, borderRadius: 999, background: C.panel, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontWeight: 900, fontSize: 16, color: C.ink, letterSpacing: 0 }}>
                 {heroInitials || (isLoading ? "..." : "--")}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -560,15 +566,15 @@ export default function ClientProfile() {
                       <div style={{ background: C.panel, borderRadius: 16, padding: "14px 15px" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
                           <div>
-                            <div style={{ fontWeight: 800, fontSize: 16, color: C.cream }}>{eventLabel(event.eventType)}</div>
-                            <div style={{ fontWeight: 600, fontSize: 12, color: "rgba(244,244,244,0.72)", marginTop: 3 }}>{fmtCents(amountCents)} received</div>
+                            <div style={{ fontWeight: 800, fontSize: 16, color: C.ink }}>{eventLabel(event.eventType)}</div>
+                            <div style={{ fontWeight: 600, fontSize: 12, color: "rgba(4,13,109,0.7)", marginTop: 3 }}>{fmtCents(amountCents)} received</div>
                           </div>
-                          <div style={{ fontWeight: 700, fontSize: 11, color: "rgba(244,244,244,0.72)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{fmtDate(event.createdAt)}</div>
+                          <div style={{ fontWeight: 700, fontSize: 11, color: "rgba(4,13,109,0.7)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{fmtDate(event.createdAt)}</div>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12 }}>
-                          <div style={{ fontWeight: 900, fontSize: 24, color: C.cream, letterSpacing: 0, fontVariantNumeric: "tabular-nums" }}>{fmtCents(amountCents)}</div>
-                          <div style={{ width: 30, height: 30, borderRadius: 999, background: C.cream, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <CheckCircle2 size={17} color={C.ink} strokeWidth={2.4} />
+                          <div style={{ fontWeight: 900, fontSize: 24, color: C.ink, letterSpacing: 0, fontVariantNumeric: "tabular-nums" }}>{fmtCents(amountCents)}</div>
+                          <div style={{ width: 30, height: 30, borderRadius: 999, background: C.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <CheckCircle2 size={17} color={C.panel} strokeWidth={2.4} />
                           </div>
                         </div>
                       </div>

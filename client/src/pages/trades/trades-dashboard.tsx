@@ -27,7 +27,7 @@ const GLASS = {
   backdropFilter: 'blur(16px) saturate(130%)',
   WebkitBackdropFilter: 'blur(16px) saturate(130%)',
   border: '1px solid rgba(255,255,255,0.7)',
-  boxShadow: '0 12px 32px rgba(6,21,14,0.10), inset 0 1px 0 rgba(255,255,255,0.95)',
+  boxShadow: '0 12px 32px rgba(4,13,109,0.10), inset 0 1px 0 rgba(255,255,255,0.95)',
 } as React.CSSProperties;
 
 /* Live (still-collecting) job-invoice statuses — trades has more than property. */
@@ -64,7 +64,7 @@ function Ring({ pct }: { pct: number }) {
     <svg width="130" height="130" viewBox="0 0 130 130" style={{ display: 'block' }}>
       <defs>
         <filter id="tg-disk" x="-90%" y="-90%" width="280%" height="280%">
-          <feDropShadow dx="0" dy="2.5" stdDeviation="7" floodColor="rgba(6,21,14,0.22)" />
+          <feDropShadow dx="0" dy="2.5" stdDeviation="7" floodColor="rgba(4,13,109,0.22)" />
         </filter>
         <filter id="tg-arc" x="-80%" y="-80%" width="260%" height="260%">
           <feDropShadow dx="0" dy="0.5" stdDeviation="4" floodColor={C.ink} floodOpacity="0.32" />
@@ -176,14 +176,14 @@ export default function TradesDashboard() {
       {/* 1 — Active jobs hero */}
       <div style={{ padding: '0 18px' }}>
         <div style={{ background: C.ink, borderRadius: 24, padding: '24px 26px 26px' }}>
-          <div style={{ fontWeight: 900, fontSize: 62, color: C.cream, letterSpacing: '-0.04em', lineHeight: 0.92, fontVariantNumeric: 'tabular-nums' }}>
+          <div style={{ fontWeight: 900, fontSize: 62, color: C.panel, letterSpacing: '-0.04em', lineHeight: 0.92, fontVariantNumeric: 'tabular-nums' }}>
             {activeCount}
           </div>
-          <div style={{ fontWeight: 500, fontSize: 12, color: C.cream, letterSpacing: '0.16em', textTransform: 'uppercase', marginTop: 6 }}>
+          <div style={{ fontWeight: 500, fontSize: 12, color: C.panel, letterSpacing: '0.16em', textTransform: 'uppercase', marginTop: 6 }}>
             active job{activeCount !== 1 ? 's' : ''}
           </div>
-          <div style={{ marginTop: 18, height: 24, borderRadius: 999, border: `1.5px solid ${C.cream}`, padding: 3 }}>
-            <div style={{ width: `${Math.max(4, collectionPct * 100)}%`, height: '100%', borderRadius: 999, background: C.cream, transition: 'width 0.8s ease' }} />
+          <div style={{ marginTop: 18, height: 24, borderRadius: 999, border: `1.5px solid ${C.panel}`, padding: 3 }}>
+            <div style={{ width: `${Math.max(4, collectionPct * 100)}%`, height: '100%', borderRadius: 999, background: C.panel, transition: 'width 0.8s ease' }} />
           </div>
         </div>
       </div>
@@ -191,10 +191,10 @@ export default function TradesDashboard() {
       {/* 2 — Revenue + gauge row */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.32fr 1fr', gap: 14, padding: '16px 18px 0' }}>
         <div style={{ background: C.panel, borderRadius: 22, padding: '24px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div style={{ fontWeight: 900, fontSize: 36, color: C.cream, letterSpacing: '-0.04em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+          <div style={{ fontWeight: 900, fontSize: 36, color: C.ink, letterSpacing: '-0.04em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
             {fmtCents(monthlyRevenue)}
           </div>
-          <div style={{ fontWeight: 500, fontSize: 11, color: C.cream, letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: 12, lineHeight: 1.3 }}>
+          <div style={{ fontWeight: 500, fontSize: 11, color: C.ink, letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: 12, lineHeight: 1.3 }}>
             collected this<br />month
           </div>
         </div>
@@ -206,11 +206,11 @@ export default function TradesDashboard() {
       {/* 3 — Stat strip */}
       <div style={{ padding: '16px 18px 0' }}>
         <div style={{ background: C.ink, borderRadius: 24, padding: '18px 16px' }}>
-          <div style={{ border: '2px solid rgba(244,244,244,0.30)', borderRadius: 20, padding: 10, display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 13 }}>
+          <div style={{ border: '2px solid rgba(88,171,255,0.55)', borderRadius: 20, padding: 10, display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 13 }}>
             {stats.map(({ label, v, Ico }) => (
               <div key={label} style={{ borderRadius: 18, padding: '12px 11px', background: C.panel, minHeight: 92, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', boxSizing: 'border-box' }}>
-                <div style={{ marginBottom: 8 }}><Ico c={C.cream} /></div>
-                <div style={{ fontWeight: 700, fontSize: 7.5, color: C.cream, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6, whiteSpace: 'nowrap' }}>{label}</div>
+                <div style={{ marginBottom: 8 }}><Ico c={C.ink} /></div>
+                <div style={{ fontWeight: 700, fontSize: 7.5, color: C.ink, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6, whiteSpace: 'nowrap' }}>{label}</div>
                 <div style={{ fontWeight: 800, fontSize: 28, color: C.white, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{v}</div>
               </div>
             ))}
@@ -235,7 +235,7 @@ export default function TradesDashboard() {
             const initials = name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
             return (
               <div key={inv.id} onClick={() => setLocation(`/trades/clients/${inv.clientProfileId}`)} style={{ ...GLASS, borderRadius: 18, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 13, cursor: 'pointer' }}>
-                <div style={{ width: 40, height: 40, borderRadius: 999, background: C.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 800, fontSize: 12, color: C.cream, letterSpacing: '0.03em' }}>
+                <div style={{ width: 40, height: 40, borderRadius: 999, background: C.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 800, fontSize: 12, color: C.panel, letterSpacing: '0.03em' }}>
                   {initials}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>

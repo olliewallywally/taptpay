@@ -5,7 +5,7 @@ import { tradesFetch, tradesHeaders } from "@/lib/trades-api";
 import { formatNzd } from "@/lib/trades-money";
 import { TRADES_THEME as T } from "@/lib/trades-theme";
 
-const field = { width: "100%", boxSizing: "border-box" as const, padding: 12, borderRadius: 11, border: "1px solid rgba(6,21,14,.16)", background: "#fff", color: T.INK, font: "inherit" };
+const field = { width: "100%", boxSizing: "border-box" as const, padding: 12, borderRadius: 11, border: "1px solid rgba(4,13,109,.16)", background: "#fff", color: T.INK, font: "inherit" };
 
 export default function RecurringSchedules() {
   const [, setLocation] = useLocation();
@@ -46,7 +46,7 @@ export default function RecurringSchedules() {
     <div style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
       <div><div style={{ fontWeight: 700 }}>Overdue reminders</div><div style={{ color: "#687078", fontSize: 13, marginTop: 3 }}>Automatically chase unpaid job invoices past their due date</div></div>
       <button role="switch" aria-checked={remindersEnabled} aria-label="Toggle trades reminders" onClick={() => toggleReminders.mutate(!remindersEnabled)} disabled={toggleReminders.isPending}
-        style={{ flexShrink: 0, width: 50, height: 30, borderRadius: 999, border: 0, cursor: "pointer", background: remindersEnabled ? T.GREEN : "rgba(6,21,14,.2)", position: "relative", transition: "background .15s" }}>
+        style={{ flexShrink: 0, width: 50, height: 30, borderRadius: 999, border: 0, cursor: "pointer", background: remindersEnabled ? T.GREEN : "rgba(4,13,109,.2)", position: "relative", transition: "background .15s" }}>
         <span style={{ position: "absolute", top: 3, left: remindersEnabled ? 23 : 3, width: 24, height: 24, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
       </button>
     </div>
@@ -55,7 +55,7 @@ export default function RecurringSchedules() {
   </section></main>;
 }
 
-const card = { background: "#fff", borderRadius: 17, padding: 17, marginTop: 16, boxShadow: "0 8px 30px rgba(6,21,14,.05)" };
+const card = { background: "#fff", borderRadius: 17, padding: 17, marginTop: 16, boxShadow: "0 8px 30px rgba(4,13,109,.05)" };
 const primary = { width: "100%", border: 0, borderRadius: 12, padding: 14, background: T.ACCENT, color: "#fff", fontWeight: 800, cursor: "pointer" };
-const secondary = { flex: 1, border: "1px solid rgba(6,21,14,.14)", borderRadius: 10, padding: 10, background: "transparent", color: T.INK, fontWeight: 700, cursor: "pointer" };
+const secondary = { flex: 1, border: "1px solid rgba(4,13,109,.14)", borderRadius: 10, padding: 10, background: "transparent", color: T.INK, fontWeight: 700, cursor: "pointer" };
 const link = { border: 0, background: "none", color: T.ACCENT, fontWeight: 700, padding: "10px 0", cursor: "pointer" };

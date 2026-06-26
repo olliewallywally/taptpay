@@ -1,9 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { tradesFetch, tradesHeaders } from "@/lib/trades-api";
 import { formatNzd, tradesFeeCents } from "@/lib/trades-money";
+import { computeQuoteTotals } from "@shared/trades-gst";
 import { TRADES_THEME } from "@/lib/trades-theme";
+import ClientProfile from "./client-profile";
 
 /* ═══ TOKENS (trades palette via TRADES_THEME — see trades-theme.ts) ═══ */
 const NAVY  = TRADES_THEME.INK;    // charcoal base (was property NAVY)
@@ -231,7 +233,7 @@ function ChooseClient({ clients, invoices, go, onSelect }: any) {
       <div className="stagger" style={{ background: OFFW, color: NAVY, height: '50%', display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={() => go('home', 'down')} onCommit={() => go('home', 'down')} />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div style={{ color: 'rgba(6,21,14,0.35)', fontWeight: 500, fontSize: 18 }}>choose client</div>
+          <div style={{ color: 'rgba(4,13,109,0.35)', fontWeight: 500, fontSize: 18 }}>choose client</div>
         </div>
         <div style={{ height: 52 }} />
       </div>
@@ -255,7 +257,7 @@ function ChooseClient({ clients, invoices, go, onSelect }: any) {
             const dotCls = st === 'paid' ? 'paid' : st === 'failed' ? 'declined' : 'awaiting';
             return (
               <button key={t.id} onClick={() => onSelect(t)}
-                style={{ textAlign: 'left', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(34,34,34,0.15)', borderRadius: 18, padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 13 }}>
+                style={{ textAlign: 'left', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(88,171,255,0.15)', borderRadius: 18, padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 13 }}>
                 <div style={{ width: 38, height: 38, borderRadius: 999, background: BLUE, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, fontWeight: 800, color: OFFW }}>
                   {clientInitials(t)}
                 </div>
@@ -289,9 +291,9 @@ function AmountKeypad({ go, selectedClient, onCommit, backTo = 'invoice' }: any)
       <div className="stagger" style={{ background: OFFW, color: NAVY, height: '50%', display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={() => go(backTo, 'down')} onCommit={commit} />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <div className="tp-amount" style={{ fontSize: 82, color: cents === 0 ? 'rgba(6,21,14,0.25)' : NAVY, marginTop: 18 }}>{fmt(cents)}</div>
+          <div className="tp-amount" style={{ fontSize: 82, color: cents === 0 ? 'rgba(4,13,109,0.25)' : NAVY, marginTop: 18 }}>{fmt(cents)}</div>
           {selectedClient && (
-            <div style={{ fontWeight: 500, fontSize: 15, color: 'rgba(6,21,14,0.5)', paddingBottom: 8 }}>
+            <div style={{ fontWeight: 500, fontSize: 15, color: 'rgba(4,13,109,0.5)', paddingBottom: 8 }}>
               {clientName(selectedClient)} · {selectedClient.siteAddress}
             </div>
           )}
@@ -321,7 +323,7 @@ function QuickInvoice({ go, selectedClient, amount, onEditAmount, jobNote, setJo
         <div className="stagger" style={{ background: OFFW, color: NAVY, height: '50%', display: 'flex', flexDirection: 'column' }}>
           <SubHead onCancel={() => go('home', 'down')} onCommit={() => go('clients')} />
           <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <div style={{ color: 'rgba(6,21,14,0.35)', fontWeight: 500, fontSize: 18 }}>choose a client</div>
+            <div style={{ color: 'rgba(4,13,109,0.35)', fontWeight: 500, fontSize: 18 }}>choose a client</div>
           </div>
           <div style={{ height: 52 }} />
         </div>
@@ -341,14 +343,14 @@ function QuickInvoice({ go, selectedClient, amount, onEditAmount, jobNote, setJo
         <SubHead onCancel={() => go('home', 'down')} onCommit={onSend} />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <button onClick={onEditAmount} style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'baseline', gap: 10 }}>
-            <span className="tp-amount" style={{ fontSize: 82, color: amount === 0 ? 'rgba(6,21,14,0.25)' : NAVY }}>{fmt(amount)}</span>
-            <span style={{ fontWeight: 600, fontSize: 12, color: 'rgba(6,21,14,0.4)', textDecoration: 'underline', textUnderlineOffset: 2 }}>edit</span>
+            <span className="tp-amount" style={{ fontSize: 82, color: amount === 0 ? 'rgba(4,13,109,0.25)' : NAVY }}>{fmt(amount)}</span>
+            <span style={{ fontWeight: 600, fontSize: 12, color: 'rgba(4,13,109,0.4)', textDecoration: 'underline', textUnderlineOffset: 2 }}>edit</span>
           </button>
           <div style={{ marginTop: 14, fontWeight: 500, fontSize: 16, color: NAVY, lineHeight: 1.4 }}>
             {clientName(selectedClient)}
-            <div style={{ fontWeight: 400, fontSize: 14, color: 'rgba(6,21,14,0.5)', marginTop: 4 }}>{selectedClient.siteAddress}</div>
+            <div style={{ fontWeight: 400, fontSize: 14, color: 'rgba(4,13,109,0.5)', marginTop: 4 }}>{selectedClient.siteAddress}</div>
           </div>
-          {amount > 0 && <div style={{ marginTop: 10, fontSize: 12, color: 'rgba(6,21,14,0.48)' }}>TaptPay fee (0.3%): {formatNzd(tradesFeeCents(amount))}</div>}
+          {amount > 0 && <div style={{ marginTop: 10, fontSize: 12, color: 'rgba(4,13,109,0.48)' }}>TaptPay fee (0.3%): {formatNzd(tradesFeeCents(amount))}</div>}
         </div>
         <div style={{ height: 52 }} />
       </div>
@@ -361,7 +363,7 @@ function QuickInvoice({ go, selectedClient, amount, onEditAmount, jobNote, setJo
         </div>
 
         {/* Channel badge */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 22px', background: 'rgba(34,34,34,0.08)', border: `1px solid rgba(34,34,34,0.2)`, borderRadius: 20, width: '100%', boxSizing: 'border-box', marginTop: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 22px', background: 'rgba(88,171,255,0.08)', border: `1px solid rgba(88,171,255,0.2)`, borderRadius: 20, width: '100%', boxSizing: 'border-box', marginTop: 18 }}>
           {channel === 'email' ? <Ic.Mail sz={22} c={OFFW} /> : <Ic.Msg sz={22} c={OFFW} />}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 600, fontSize: 11, color: 'rgba(244,244,244,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 4 }}>sending via {channel}</div>
@@ -397,7 +399,7 @@ function MarkExternal({ go, selectedClient, amount, invoices, onMark, marking }:
         <div className="stagger" style={{ background: OFFW, color: NAVY, height: '50%', display: 'flex', flexDirection: 'column' }}>
           <SubHead onCancel={() => go('home', 'down')} onCommit={() => go('clients')} />
           <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <div style={{ color: 'rgba(6,21,14,0.35)', fontWeight: 500, fontSize: 18 }}>choose a client</div>
+            <div style={{ color: 'rgba(4,13,109,0.35)', fontWeight: 500, fontSize: 18 }}>choose a client</div>
           </div>
           <div style={{ height: 52 }} />
         </div>
@@ -441,8 +443,8 @@ function MarkExternal({ go, selectedClient, amount, invoices, onMark, marking }:
                   const on = inv.id === picked.id;
                   return (
                     <button key={inv.id} onClick={() => setPickedId(inv.id)}
-                      style={{ textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, background: on ? 'rgba(34,34,34,0.18)' : 'rgba(255,255,255,0.05)', border: `1.5px solid ${on ? BLUE : 'rgba(34,34,34,0.12)'}`, borderRadius: 14, padding: '12px 14px', cursor: 'pointer', fontFamily: 'Outfit, system-ui' }}>
-                      <span style={{ width: 18, height: 18, borderRadius: 999, border: `2px solid ${on ? BLUE : 'rgba(34,34,34,0.35)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      style={{ textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, background: on ? 'rgba(88,171,255,0.18)' : 'rgba(255,255,255,0.05)', border: `1.5px solid ${on ? BLUE : 'rgba(88,171,255,0.12)'}`, borderRadius: 14, padding: '12px 14px', cursor: 'pointer', fontFamily: 'Outfit, system-ui' }}>
+                      <span style={{ width: 18, height: 18, borderRadius: 999, border: `2px solid ${on ? BLUE : 'rgba(88,171,255,0.35)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         {on && <span style={{ width: 8, height: 8, borderRadius: 999, background: BLUE }} />}
                       </span>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -510,7 +512,7 @@ function JobActionSheet({ invoice, onClose, onMarkReceived, onSendBalance, onCom
   const Action = ({ label, onClick, danger, primary }: any) => (
     <button onClick={onClick} disabled={busy}
       style={{ width: '100%', padding: '15px 0', borderRadius: 16, border: danger ? '1.5px solid rgba(255,59,78,0.4)' : 'none',
-        background: danger ? 'transparent' : primary ? NAVY : 'rgba(6,21,14,0.06)',
+        background: danger ? 'transparent' : primary ? NAVY : 'rgba(4,13,109,0.06)',
         color: danger ? RED : primary ? OFFW : NAVY,
         fontWeight: 700, fontSize: 15, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1,
         fontFamily: 'Outfit, system-ui', marginBottom: 10, transition: 'opacity 0.15s' }}>
@@ -519,26 +521,26 @@ function JobActionSheet({ invoice, onClose, onMarkReceived, onSendBalance, onCom
   );
 
   return (
-    <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 80, background: 'rgba(6,21,14,0.45)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', animation: 'tp-fade 0.2s ease both' }}>
+    <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 80, background: 'rgba(4,13,109,0.45)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', animation: 'tp-fade 0.2s ease both' }}>
       <style>{`@keyframes tp-fade{from{opacity:0}to{opacity:1}}@keyframes tp-sheetup{from{transform:translateY(100%)}to{transform:translateY(0)}}`}</style>
       <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 430, background: OFFW, borderRadius: '26px 26px 0 0', padding: '12px 22px 28px', animation: 'tp-sheetup 0.32s cubic-bezier(0.16,1,0.3,1) both' }}>
         <div style={{ display: 'flex', justifyContent: 'center', padding: '0 0 14px' }}>
-          <div style={{ width: 38, height: 4, borderRadius: 2, background: 'rgba(6,21,14,0.12)' }} />
+          <div style={{ width: 38, height: 4, borderRadius: 2, background: 'rgba(4,13,109,0.12)' }} />
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 700, fontSize: 17, color: NAVY, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{invoice.clientName || 'client'}</div>
-            <div style={{ fontWeight: 500, fontSize: 12.5, color: 'rgba(6,21,14,0.5)', marginTop: 2 }}>
+            <div style={{ fontWeight: 500, fontSize: 12.5, color: 'rgba(4,13,109,0.5)', marginTop: 2 }}>
               {kindLabel(invoice)} · {fmt(invoice.amountCents)}
             </div>
           </div>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 999, background: st === 'paid' ? 'rgba(27,191,133,0.14)' : st === 'failed' ? 'rgba(255,59,78,0.12)' : 'rgba(34,34,34,0.16)', color: st === 'paid' ? GREEN : st === 'failed' ? RED : '#3C4248', fontWeight: 700, fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{st === 'failed' ? 'not delivered' : st}</div>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 999, background: st === 'paid' ? 'rgba(27,191,133,0.14)' : st === 'failed' ? 'rgba(255,59,78,0.12)' : 'rgba(88,171,255,0.16)', color: st === 'paid' ? GREEN : st === 'failed' ? RED : '#3C4248', fontWeight: 700, fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{st === 'failed' ? 'not delivered' : st}</div>
         </div>
 
         {settled ? (
           invoice.completedAt
-            ? <div style={{ textAlign: 'center', padding: '8px 0 18px', color: 'rgba(6,21,14,0.5)', fontSize: 14, fontWeight: 500 }}>this job is complete</div>
+            ? <div style={{ textAlign: 'center', padding: '8px 0 18px', color: 'rgba(4,13,109,0.5)', fontSize: 14, fontWeight: 500 }}>this job is complete</div>
             : <Action label="mark job complete" onClick={onComplete} primary />
         ) : (
           <>
@@ -548,6 +550,198 @@ function JobActionSheet({ invoice, onClose, onMarkReceived, onSendBalance, onCom
         )}
         {invoice.kind === 'deposit' && settled && !invoice.balanceSent && <Action label="send remaining balance" onClick={onSendBalance} primary />}
         <Action label="close" onClick={onClose} />
+      </div>
+    </div>
+  );
+}
+
+/* ═══ SCREEN: QuoteScreen — build & send a quote, PM ChargeBill layout ═══
+   White top box (20%): action bar + live total + client.
+   Solid navy box (80%, scrollable): client, line items, deposit, notes, total, CTA. */
+type QuoteDraftLine = { id: number; description: string; qty: string; unitPrice: string };
+const Q_LABEL = { fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase' as const, marginBottom: 10 };
+const Q_FIELD = { width: '100%', boxSizing: 'border-box' as const, padding: '13px 15px', borderRadius: 14, background: OFFW, border: 'none', color: NAVY, fontFamily: 'Outfit, system-ui', fontWeight: 500, fontSize: 15, outline: 'none' };
+const Q_TOTROW = { display: 'flex', justifyContent: 'space-between', gap: 16, padding: '5px 0' };
+
+export function QuoteScreen({ onCancel, onExit }: { onCancel: () => void; onExit: () => void }) {
+  const queryClient = useQueryClient();
+  const [clientId, setClientId]             = useState('');
+  const [lines, setLines]                   = useState<QuoteDraftLine[]>([{ id: 1, description: '', qty: '1', unitPrice: '' }]);
+  const [depositEnabled, setDepositEnabled] = useState(false);
+  const [depositType, setDepositType]       = useState<'percent' | 'fixed'>('percent');
+  const [depositValue, setDepositValue]     = useState('20');
+  const [notes, setNotes]                   = useState('');
+  const [created, setCreated]               = useState<any>(null);
+  const [error, setError]                   = useState('');
+
+  const { data: clients = [] } = useQuery<any[]>({
+    queryKey: ['/api/trades/clients'],
+    queryFn: () => tradesFetch('/api/trades/clients').then(r => r.ok ? r.json() : []),
+  });
+  const { data: auth } = useQuery<any>({
+    queryKey: ['/api/auth/me', 'trades-quote'],
+    queryFn: () => tradesFetch('/api/auth/me').then(r => r.ok ? r.json() : null),
+  });
+
+  const gstMode = auth?.user?.tradeGstMode === 'exclusive' ? 'exclusive' : 'inclusive';
+  const totals = useMemo(() => {
+    const lineInputs = lines.map(line => ({
+      qty: Math.max(0, Number(line.qty) || 0),
+      unitPriceCents: Math.max(0, Math.round((Number(line.unitPrice) || 0) * 100)),
+    }));
+    const depositInput = depositEnabled
+      ? depositType === 'percent' ? Number(depositValue) || 0 : Math.round((Number(depositValue) || 0) * 100)
+      : undefined;
+    const computed = computeQuoteTotals(lineInputs, {
+      gstRegistered: !!auth?.user?.gstRegistered,
+      gstMode,
+      depositEnabled,
+      depositType: depositEnabled ? depositType : undefined,
+      depositValue: depositInput,
+    });
+    return { total: computed.totalCents, gst: computed.gstCents, net: computed.subtotalCents, deposit: computed.depositCents ?? 0 };
+  }, [lines, auth?.user?.gstRegistered, gstMode, depositEnabled, depositType, depositValue]);
+
+  const createQuote = useMutation({
+    mutationFn: async () => {
+      setError('');
+      const lineItems = lines.map(line => {
+        const qty = Number(line.qty);
+        const unitPriceCents = Math.round(Number(line.unitPrice) * 100);
+        return { description: line.description.trim(), qty, unitPriceCents, lineTotalCents: Math.round(qty * unitPriceCents) };
+      });
+      if (!clientId) throw new Error('Choose a client');
+      if (lineItems.some(line => !line.description || !Number.isInteger(line.qty) || line.qty <= 0 || line.unitPriceCents < 0)) throw new Error('Complete every line item');
+      const validUntil = new Date(); validUntil.setDate(validUntil.getDate() + 30);
+      const selected = clients.find((client: any) => client.id === clientId);
+      const body = {
+        clientProfileId: clientId,
+        lineItems,
+        deliveryChannel: selected?.preferredChannel || 'email',
+        depositEnabled,
+        depositType: depositEnabled ? depositType : undefined,
+        depositValue: depositEnabled ? (depositType === 'percent' ? Math.round(Number(depositValue)) : Math.round(Number(depositValue) * 100)) : undefined,
+        validUntil: validUntil.toISOString(),
+        notes: notes.trim() || undefined,
+      };
+      const response = await fetch('/api/trades/quotes', { method: 'POST', headers: { 'Content-Type': 'application/json', ...tradesHeaders() }, body: JSON.stringify(body) });
+      if (!response.ok) throw new Error(await response.json().then((d: any) => d.message).catch(() => 'Could not create quote'));
+      return response.json();
+    },
+    onSuccess: quote => { queryClient.invalidateQueries({ queryKey: ['/api/trades/quotes'] }); setCreated(quote); },
+    onError: (err: any) => setError(err?.message || 'Could not create quote'),
+  });
+
+  const updateLine = (id: number, field: keyof QuoteDraftLine, value: string) => setLines(cur => cur.map(l => l.id === id ? { ...l, [field]: value } : l));
+  const selected = clients.find((c: any) => c.id === clientId);
+  const selectedName = selected ? `${selected.firstName} ${selected.lastName}` : '';
+  const gstReg = !!auth?.user?.gstRegistered;
+  const ready = !!clientId && totals.total > 0;
+
+  const publicUrl = created ? `${window.location.origin}/trades/quote/${created.token}` : '';
+  const downloadPdf = async () => {
+    if (!created?.id) return;
+    const response = await fetch(`/api/trades/quotes/${created.id}/pdf`, { headers: tradesHeaders() });
+    if (!response.ok) { setError(await response.json().then((d: any) => d.message).catch(() => 'Could not download PDF')); return; }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url; link.download = `quote-${String(created.token || created.id).slice(0, 8)}.pdf`; link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="tp-screen" style={{ background: NAVY }}>
+      {/* Top — action bar + live total + client (sits at bottom of this white box) */}
+      <div className="stagger" style={{ background: OFFW, color: NAVY, height: '20%', display: 'flex', flexDirection: 'column' }}>
+        <SubHead onCancel={onCancel} onCommit={() => { if (created) { onExit(); return; } if (ready) createQuote.mutate(); }} />
+        <div style={{ flex: 1, minHeight: 0, padding: '2px 28px 10px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <span className="tp-amount" style={{ fontSize: 44, color: totals.total === 0 ? 'rgba(4,13,109,0.25)' : NAVY }}>{fmt(totals.total)}</span>
+          <div style={{ marginTop: 4, fontWeight: 500, fontSize: 13, color: 'rgba(4,13,109,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {created ? 'quote created' : selectedName || 'new quote'}
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom — scrollable builder / created state */}
+      <div className="stagger" style={{ flex: 1, background: NAVY, padding: '26px 22px 0', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        {created ? (
+          <>
+            <div className="tp-thin-scroll" style={{ flex: 1, overflowY: 'auto', paddingBottom: 16 }}>
+              <div style={{ fontWeight: 700, fontSize: 11, color: GREEN, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>quote created</div>
+              <div style={{ fontWeight: 500, fontSize: 14, color: 'rgba(88,171,255,0.75)', marginBottom: 18 }}>
+                {created.delivered ? 'Sent to the client.' : 'Delivery was unavailable — share this link instead.'}
+              </div>
+              <div style={{ ...Q_LABEL }}>customer link</div>
+              <input readOnly value={publicUrl} onFocus={e => e.currentTarget.select()} style={{ ...Q_FIELD, marginBottom: 14 }} />
+              <button className="tp-cta-wire" onClick={() => navigator.clipboard?.writeText(publicUrl)} style={{ width: '100%', marginBottom: 10 }}>copy link</button>
+              <button className="tp-cta-wire" onClick={downloadPdf} style={{ width: '100%' }}>download PDF</button>
+              {error && <p role="alert" style={{ color: RED, fontWeight: 600, marginTop: 12 }}>{error}</p>}
+            </div>
+            <div style={{ flexShrink: 0, padding: '12px 0 20px', display: 'flex', justifyContent: 'center' }}>
+              <button className="tp-cta" onClick={onExit} style={{ minWidth: 220 }}>done</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="tp-thin-scroll" style={{ flex: 1, overflowY: 'auto', paddingBottom: 16 }}>
+              {/* Client */}
+              <div style={Q_LABEL}>client</div>
+              <select value={clientId} onChange={e => setClientId(e.target.value)} style={{ ...Q_FIELD, marginBottom: 20, appearance: 'none' }}>
+                <option value="">choose client</option>
+                {clients.filter((c: any) => c.status !== 'archived').map((c: any) => <option key={c.id} value={c.id}>{c.firstName} {c.lastName} — {c.siteAddress}</option>)}
+              </select>
+
+              {/* Line items */}
+              <div style={Q_LABEL}>line items</div>
+              {lines.map((line, index) => (
+                <div key={line.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 56px 90px 28px', gap: 7, marginBottom: 9 }}>
+                  <input aria-label={`Item ${index + 1} description`} placeholder="description" value={line.description} onChange={e => updateLine(line.id, 'description', e.target.value)} style={Q_FIELD} />
+                  <input aria-label="Quantity" inputMode="numeric" placeholder="qty" value={line.qty} onChange={e => updateLine(line.id, 'qty', e.target.value.replace(/\D/g, ''))} style={{ ...Q_FIELD, padding: '13px 8px', textAlign: 'center' }} />
+                  <input aria-label="Unit price" inputMode="decimal" placeholder="$0.00" value={line.unitPrice} onChange={e => updateLine(line.id, 'unitPrice', e.target.value.replace(/[^\d.]/g, ''))} style={{ ...Q_FIELD, padding: '13px 10px' }} />
+                  <button aria-label="Remove item" disabled={lines.length === 1} onClick={() => setLines(cur => cur.filter(i => i.id !== line.id))} style={{ border: 0, background: 'none', color: lines.length === 1 ? 'rgba(88,171,255,0.25)' : RED, cursor: lines.length === 1 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Ic.X sz={16} /></button>
+                </div>
+              ))}
+              <button onClick={() => setLines(cur => [...cur, { id: Date.now(), description: '', qty: '1', unitPrice: '' }])} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 0, color: BLUE, fontWeight: 700, fontSize: 13.5, cursor: 'pointer', fontFamily: 'Outfit, system-ui', padding: '4px 0 18px' }}><Ic.Plus sz={16} sw={2.4} /> add line</button>
+
+              {/* Deposit */}
+              <button onClick={() => setDepositEnabled(v => !v)} aria-pressed={depositEnabled}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '13px 16px', borderRadius: 16, border: `1px solid ${depositEnabled ? 'rgba(88,171,255,0.4)' : 'rgba(88,171,255,0.15)'}`, background: depositEnabled ? 'rgba(88,171,255,0.1)' : 'rgba(255,255,255,0.04)', cursor: 'pointer', fontFamily: 'Outfit, system-ui' }}>
+                <span style={{ flex: 1, textAlign: 'left', fontWeight: 600, fontSize: 13.5, color: BLUE }}>require deposit</span>
+                <span style={{ width: 42, height: 25, borderRadius: 999, background: depositEnabled ? BLUE : 'rgba(88,171,255,0.25)', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+                  <span style={{ position: 'absolute', top: 3, left: depositEnabled ? 20 : 3, width: 19, height: 19, borderRadius: 999, background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+                </span>
+              </button>
+              {depositEnabled && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9, marginTop: 10 }}>
+                  <select value={depositType} onChange={e => setDepositType(e.target.value as any)} style={{ ...Q_FIELD, appearance: 'none' }}><option value="percent">percentage</option><option value="fixed">fixed amount</option></select>
+                  <input value={depositValue} onChange={e => setDepositValue(e.target.value.replace(/[^\d.]/g, ''))} inputMode="decimal" aria-label="Deposit value" style={Q_FIELD} />
+                </div>
+              )}
+
+              {/* Notes */}
+              <div style={{ ...Q_LABEL, marginTop: 20 }}>notes <span style={{ opacity: 0.6 }}>· optional</span></div>
+              <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="quote notes" maxLength={1000} style={{ ...Q_FIELD, minHeight: 78, resize: 'vertical' }} />
+
+              {/* Totals */}
+              <div style={{ marginTop: 20, background: 'rgba(88,171,255,0.08)', border: '1px solid rgba(88,171,255,0.2)', borderRadius: 16, padding: '14px 16px' }}>
+                {gstReg && <div style={{ ...Q_TOTROW, color: 'rgba(88,171,255,0.7)', fontSize: 13 }}><span>{gstMode === 'exclusive' ? 'subtotal' : 'subtotal (excl. GST)'}</span><span>{fmt(totals.net)}</span></div>}
+                {gstReg && <div style={{ ...Q_TOTROW, color: 'rgba(88,171,255,0.7)', fontSize: 13 }}><span>{gstMode === 'exclusive' ? 'GST (15%)' : 'GST (15%) incl.'}</span><span>{fmt(totals.gst)}</span></div>}
+                {depositEnabled && <div style={{ ...Q_TOTROW, fontSize: 13 }}><span style={{ color: 'rgba(88,171,255,0.7)' }}>deposit on acceptance</span><strong style={{ color: BLUE }}>{fmt(totals.deposit)}</strong></div>}
+                <div style={{ ...Q_TOTROW, borderTop: '1px solid rgba(88,171,255,0.2)', paddingTop: 11, marginTop: 6, fontSize: 17 }}><span style={{ color: '#fff', fontWeight: 700 }}>{gstMode === 'exclusive' && gstReg ? 'total (incl GST)' : 'total'}</span><strong style={{ color: '#fff' }}>{fmt(totals.total)}</strong></div>
+                <div style={{ ...Q_TOTROW, color: 'rgba(88,171,255,0.5)', fontSize: 11.5 }}><span>TaptPay fee (0.3%)</span><span>{fmt(tradesFeeCents(totals.total))}</span></div>
+              </div>
+              {error && <p role="alert" style={{ color: RED, fontWeight: 600, marginTop: 12 }}>{error}</p>}
+            </div>
+
+            {/* CTA */}
+            <div style={{ flexShrink: 0, padding: '12px 0 20px', display: 'flex', justifyContent: 'center' }}>
+              <button className="tp-cta-wire" onClick={() => ready && createQuote.mutate()} disabled={!ready || createQuote.isPending} style={{ minWidth: 220, opacity: !ready ? 0.5 : 1, ...(createQuote.isPending ? { background: BLUE, color: NAVY } : {}) }}>
+                {createQuote.isPending ? 'creating…' : 'create quote'}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -573,6 +767,8 @@ export default function TradesTerminal() {
   const [pendingDest, setPendingDest]       = useState<'invoice' | 'external' | null>(null);
   // Tapped job row → action sheet (mark received / cancel).
   const [rowAction, setRowAction]           = useState<any>(null);
+  // Tapped quote row → in-terminal client profile (never leaves the terminal page).
+  const [profileClientId, setProfileClientId] = useState<string | null>(null);
   const conveyorTimer = useRef<ReturnType<typeof setTimeout>>();
   const viewportRef = useRef<HTMLDivElement>(null);
 
@@ -729,7 +925,7 @@ export default function TradesTerminal() {
   };
 
   const handleRowTap = (inv: any) => {
-    if (inv.isQuote) { setLocation(`/trades/clients/${inv.clientProfileId}`); return; }
+    if (inv.isQuote) { setProfileClientId(inv.clientProfileId); go('profile'); return; }
     setRowAction(inv);
   };
 
@@ -755,7 +951,6 @@ export default function TradesTerminal() {
   const handleSubbarPick = (i: number) => {
     const dest = SUBBAR_ROUTE[i];
     if (!dest || dest === screen) return;
-    if (dest === 'quote') { setLocation('/trades/quote'); return; }
     if ((dest === 'invoice' || dest === 'external') && !selectedClient) {
       setPendingDest(dest as 'invoice' | 'external');
       if (screen === 'home') triggerConveyor(screen, 'up');
@@ -804,6 +999,8 @@ export default function TradesTerminal() {
     if (id === 'clients')  return <ChooseClient clients={clients} invoices={invoices} go={go} onSelect={handleClientSelect} />;
     if (id === 'amount')   return <AmountKeypad go={go} selectedClient={selectedClient} backTo={'invoice'} onCommit={(c: number) => { setAmount(c); go('invoice'); }} />;
     if (id === 'invoice')  return <QuickInvoice go={go} selectedClient={selectedClient} amount={amount} onEditAmount={() => go('amount')} jobNote={jobNote} setJobNote={setJobNote} onSend={() => { if (!selectedClient || amount <= 0) { toast('set an amount first'); return; } invoiceMutation.mutate({ clientId: selectedClient.id, amountCents: amount, channel: selectedClient.preferredChannel || 'email', jobDetails: jobNote }); }} sending={invoiceMutation.isPending} />;
+    if (id === 'quote')    return <QuoteScreen onCancel={() => go('home', 'down')} onExit={() => go('home', 'down')} />;
+    if (id === 'profile')  return <ClientProfile embedded clientId={profileClientId ?? undefined} onClose={() => go('home')} />;
     if (id === 'external') return <MarkExternal go={go} selectedClient={selectedClient} amount={amount} invoices={invoices} onMark={handleMark} marking={markMutation.isPending} />;
     if (id === 'success')  return <SentSuccess amount={amount} label={successLabel} go={go} />;
     return null;
@@ -861,7 +1058,7 @@ export default function TradesTerminal() {
 
 /* ═══ CSS (same shell as SmartTransitions TP_CSS — solid hex interpolated from
    TRADES_THEME so the chrome matches the vertical; rgba tints are deferred to 3c) ═══ */
-const TP_TERM_CSS = `
+export const TP_TERM_CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap');
 .tp-viewport { width: 100%; max-width: 430px; height: 100svh; margin: 0 auto; position: relative; overflow: hidden; font-family: 'Outfit', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
 .tp-screen { position: absolute; inset: 0; display: flex; flex-direction: column; overflow: hidden; }
@@ -872,11 +1069,11 @@ const TP_TERM_CSS = `
 .tp-banner-title { font-weight: 700; font-size: 16px; color: #fff; }
 .tp-subhead { display: flex; justify-content: space-between; align-items: center; padding: 20px 22px 0; }
 .tp-subhead-btn { width: 44px; height: 44px; border-radius: 999px; border: 2px solid ${NAVY}; display: flex; align-items: center; justify-content: center; color: ${NAVY}; background: none; cursor: pointer; transition: transform 120ms, background 120ms; }
-.tp-subhead-btn:active { transform: scale(0.92); background: rgba(6,21,14,0.06); }
+.tp-subhead-btn:active { transform: scale(0.92); background: rgba(4,13,109,0.06); }
 .tp-amount { font-family: 'Outfit', system-ui; font-weight: 900; letter-spacing: -0.04em; line-height: 0.95; }
 .tp-subbar-wrap { display: flex; justify-content: center; }
-.tp-subbar { position: relative; display: inline-flex; align-items: center; justify-content: center; background: ${BLUE}; border-radius: 26px; padding: 5px 11px; gap: 4px; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 16px 48px rgba(6,21,14,0.2), 0 4px 12px rgba(6,21,14,0.1), inset 0 1px 0 rgba(255,255,255,0.25); transform: scale(0.85); transform-origin: center; }
-.tp-subbar-ind { position: absolute; top: 5px; height: 27px; background: ${NAVY}; border-radius: 16px; box-shadow: 0 4px 16px rgba(6,21,14,0.4); pointer-events: none; z-index: 2; opacity: 0; will-change: left, width, opacity; }
+.tp-subbar { position: relative; display: inline-flex; align-items: center; justify-content: center; background: ${BLUE}; border-radius: 26px; padding: 5px 11px; gap: 4px; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 16px 48px rgba(4,13,109,0.2), 0 4px 12px rgba(4,13,109,0.1), inset 0 1px 0 rgba(255,255,255,0.25); transform: scale(0.85); transform-origin: center; }
+.tp-subbar-ind { position: absolute; top: 5px; height: 27px; background: ${NAVY}; border-radius: 16px; box-shadow: 0 4px 16px rgba(4,13,109,0.4); pointer-events: none; z-index: 2; opacity: 0; will-change: left, width, opacity; }
 .tp-subbar-ind.on { opacity: 1; }
 .tp-subbar-ind.animate { transition: left 0.45s cubic-bezier(0.34,1.56,0.64,1), width 0.45s cubic-bezier(0.34,1.56,0.64,1), opacity 0.25s ease; }
 .tp-subbar-btn { position: relative; z-index: 1; height: 27px; padding: 0 22px; display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 16px; border: none; cursor: pointer; background: transparent; color: rgba(244,244,244,0.55); transition: color 0.2s ease, transform 0.18s ease; -webkit-tap-highlight-color: transparent; flex-shrink: 0; }
@@ -885,23 +1082,23 @@ const TP_TERM_CSS = `
 .tp-subbar.compact .tp-subbar-btn { padding: 0 11px; }
 .tp-subbar-label { font-family: 'Outfit', system-ui; font-weight: 600; font-size: 12px; letter-spacing: 0.4px; color: ${OFFW}; white-space: nowrap; animation: tp-labelIn 0.3s ease-out; }
 @keyframes tp-labelIn { from { opacity:0; transform:translateX(-4px); } to { opacity:1; transform:translateX(0); } }
-.tp-send { display: flex; align-items: center; gap: 6px; padding: 4px 14px 4px 4px; border-radius: 26px; background: ${NAVY}; border: none; cursor: pointer; box-shadow: 0 4px 16px rgba(6,21,14,0.25); transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); -webkit-tap-highlight-color: transparent; flex-shrink: 0; height: 37px; }
+.tp-send { display: flex; align-items: center; gap: 6px; padding: 4px 14px 4px 4px; border-radius: 26px; background: ${NAVY}; border: none; cursor: pointer; box-shadow: 0 4px 16px rgba(4,13,109,0.25); transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); -webkit-tap-highlight-color: transparent; flex-shrink: 0; height: 37px; }
 .tp-send:active { transform: scale(0.94); }
 .tp-send-circle { width: 20px; height: 20px; border-radius: 50%; background: ${BLUE}; display: flex; align-items: center; justify-content: center; }
 .tp-send-label { font-size: 11px; font-weight: 700; color: ${OFFW}; letter-spacing: 0.3px; }
-.tp-fab { width: 70px; height: 70px; border-radius: 999px; background: ${BLUE}; color: ${OFFW}; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 18px rgba(6,21,14,0.25); border: none; cursor: pointer; transition: transform 140ms; -webkit-tap-highlight-color: transparent; }
+.tp-fab { width: 70px; height: 70px; border-radius: 999px; background: ${BLUE}; color: ${OFFW}; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 18px rgba(4,13,109,0.25); border: none; cursor: pointer; transition: transform 140ms; -webkit-tap-highlight-color: transparent; }
 .tp-fab:active { transform: scale(0.92); }
 .tp-stack-hdr { display: flex; justify-content: space-between; align-items: center; padding: 0 4px; margin-bottom: 12px; }
 .tp-stack-title { font-weight: 700; font-size: 14px; color: ${NAVY}; letter-spacing: -0.2px; }
-.tp-stack-card { border-radius: 14px; background: #fff; overflow: hidden; box-shadow: 0 2px 12px rgba(6,21,14,0.06); border: 1px solid rgba(6,21,14,0.04); }
+.tp-stack-card { border-radius: 14px; background: #fff; overflow: hidden; box-shadow: 0 2px 12px rgba(4,13,109,0.06); border: 1px solid rgba(4,13,109,0.04); }
 .tp-stack-row { display: flex; align-items: center; padding: 14px 16px; animation: tp-stackIn 0.38s cubic-bezier(0.34,1.56,0.64,1) both; }
-.tp-stack-row + .tp-stack-row { border-top: 1px solid rgba(6,21,14,0.05); }
+.tp-stack-row + .tp-stack-row { border-top: 1px solid rgba(4,13,109,0.05); }
 @keyframes tp-stackIn { from { opacity:0; transform:translateY(-12px) scale(0.97); } to { opacity:1; transform:translateY(0) scale(1); } }
 .tp-stack-name { font-weight: 600; font-size: 14px; color: ${NAVY}; margin-bottom: 1px; }
 .tp-stack-meta { display: flex; align-items: center; gap: 5px; }
-.tp-stack-status { font-weight: 500; font-size: 11px; color: rgba(6,21,14,0.35); }
+.tp-stack-status { font-weight: 500; font-size: 11px; color: rgba(4,13,109,0.35); }
 .tp-stack-price { font-weight: 700; font-size: 15px; color: ${NAVY}; letter-spacing: -0.3px; }
-.tp-stack-empty { padding: 14px 16px; font-size: 13px; color: rgba(6,21,14,0.4); text-align: center; }
+.tp-stack-empty { padding: 14px 16px; font-size: 13px; color: rgba(4,13,109,0.4); text-align: center; }
 .tp-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; animation: tp-pulse 2s ease-in-out infinite; }
 .tp-dot.awaiting { background: ${BLUE}; }
 .tp-dot.payment-sent { background: ${BLUE}; }
@@ -909,19 +1106,21 @@ const TP_TERM_CSS = `
 .tp-dot.declined { background: ${RED}; animation: none; opacity: 1; }
 @keyframes tp-pulse { 0%,100% { opacity:0.4; } 50% { opacity:1; } }
 .tp-field { width: 100%; padding: 18px 24px; border-radius: 999px; background: ${OFFW}; border: none; color: ${NAVY}; font-family: 'Outfit', system-ui; font-weight: 500; font-size: 17px; letter-spacing: -0.01em; outline: none; box-sizing: border-box; }
-.tp-field::placeholder { color: rgba(6,21,14,0.35); }
+.tp-field::placeholder { color: rgba(4,13,109,0.35); }
 .tp-cta { display: inline-flex; align-items: center; justify-content: center; padding: 14px 36px; border-radius: 999px; background: ${BLUE}; color: ${OFFW}; font-family: 'Outfit', system-ui; font-weight: 600; font-size: 15px; transition: transform 120ms, opacity 120ms; white-space: nowrap; border: none; cursor: pointer; box-sizing: border-box; }
 .tp-cta:active { transform: scale(0.96); opacity: 0.92; }
+.tp-cta-wire { display: inline-flex; align-items: center; justify-content: center; padding: 14px 36px; border-radius: 999px; background: transparent; color: ${BLUE}; font-family: 'Outfit', system-ui; font-weight: 600; font-size: 15px; border: 1.5px solid ${BLUE}; transition: background 160ms ease, color 160ms ease, transform 120ms; white-space: nowrap; cursor: pointer; box-sizing: border-box; }
+.tp-cta-wire:active { background: ${BLUE}; color: ${NAVY}; transform: scale(0.96); }
 .tp-kp { width: 76px; height: 76px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-family: 'Outfit', system-ui; font-weight: 700; font-size: 30px; transition: transform 100ms, background 100ms; background: ${BLUE}; color: #fff; border: none; cursor: pointer; }
 .tp-kp:active { transform: scale(0.92); }
 .tp-kp.outline { background: transparent; color: ${OFFW}; box-shadow: inset 0 0 0 2px ${OFFW}; }
-.tp-kp.outline:active { background: rgba(34,34,34,0.12); }
+.tp-kp.outline:active { background: rgba(88,171,255,0.12); }
 .tp-success-check { width: 92px; height: 92px; border-radius: 999px; background: ${BLUE}; display: flex; align-items: center; justify-content: center; color: ${OFFW}; }
 .tp-pulse { animation: tp-pulseDot 1800ms ease-in-out infinite; }
 @keyframes tp-pulseDot { 0%,100% { transform:scale(1); opacity:1; } 50% { transform:scale(1.08); opacity:0.85; } }
-.tp-thin-scroll { scrollbar-width: thin; scrollbar-color: rgba(34,34,34,0) transparent; transition: scrollbar-color 350ms; }
+.tp-thin-scroll { scrollbar-width: thin; scrollbar-color: rgba(88,171,255,0) transparent; transition: scrollbar-color 350ms; }
 .tp-thin-scroll::-webkit-scrollbar { width: 3px; }
-.tp-thin-scroll::-webkit-scrollbar-thumb { background-color: rgba(34,34,34,0); border-radius: 999px; }
+.tp-thin-scroll::-webkit-scrollbar-thumb { background-color: rgba(88,171,255,0); border-radius: 999px; }
 .tp-stack-scroll { scrollbar-width: thin; scrollbar-color: ${NAVY} transparent; }
 .tp-stack-scroll::-webkit-scrollbar { width: 4px; background: transparent; }
 .tp-stack-scroll::-webkit-scrollbar-track { background: transparent; }
