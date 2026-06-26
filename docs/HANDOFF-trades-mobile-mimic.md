@@ -81,7 +81,7 @@ it if the trades API/schema doesn't accept it.
 
 ## STATUS — what's done vs left
 
-### ✅ DONE (committed, build-green)
+### ✅ DONE (committed or current working tree, build-green)
 - **Palette finalised** + on-accent text flipped to off-white (terminal). Commit `14857f8`.
 - **Bottom nav** (`client/src/components/bottom-navigation.tsx`): added a **trades mode** —
   `TRADES_ITEMS` (home `/trades` · clients `/trades/clients` · terminal `/trades/terminal` ·
@@ -94,42 +94,22 @@ it if the trades API/schema doesn't accept it.
 - **Analytics** (`trades-analytics.tsx`): full mirror of `property-analytics.tsx` — period pills,
   revenue total, animated `RevenueChart`, swipeable payment-history sheet. Commit `9ba35ff`.
 - **Terminal** (`trades-terminal.tsx`): was already a close port; palette + off-white-on-forest applied.
+- **Client directory** (`trades/client-directory.tsx`): full property-style mobile port in current working tree — dark hero, floating add, search row, paired client/invoice cards, archived restore flow, mobile add bottom sheet, plain trades navigation. Build-green 2026-06-26.
+- **Client profile** (`trades/client-profile.tsx`): full property-style mobile port in current working tree — top bar, dark hero, activity timeline, mobile edit/archive bottom sheet, trades event labels/statuses. Build-green 2026-06-26.
+- **Settings alignment** (`settings.tsx`): trades GST controls and 3-way switcher aligned to final forest/off-white trades palette; old amber switcher treatment removed. Build-green 2026-06-26.
+- **Trades client restore route** (`server/routes.ts`): added `POST /api/trades/clients/:id/unarchive` for the directory archived restore UI.
+- **Dev startup safety** (`server/index.ts`): automatic `drizzle-kit push` no longer runs on normal dev startup; it now requires `RUN_SCHEMA_PUSH=true` or `RUN_MIGRATIONS=true`.
 
-### ⛔ LEFT TO DO (the remaining tasks)
-1. **Client directory** — `client/src/pages/trades/client-directory.tsx` is a ~60-line partial with a
-   plain inline form. Port `client/src/pages/property/tenant-directory.tsx` (505 lines):
-   - hero (active-clients count + floating `+`), search row, **mobile bottom-sheet add form**
-     (`AddTenantSheet` → `AddClientSheet`, slides up, NOT a desktop modal), tenant/client card pairs
-     (`TenantRow` → `ClientRow`: info card + next-payment card), archived section + restore.
-   - Apply the palette rule above. The add-sheet sits on a **light** `#F4F4F4` sheet → field labels and
-     accents there use `ACCENT` (dark), avatars/dark surfaces use `OFFW` foreground.
-   - Decide on the property `property-transition` hero-morph: it's property-specific
-     (`@/lib/property-transition`). Recommend **plain `setLocation` navigation** for trades (don't import
-     the property transition lib — risk of cross-vertical state). Note this as a deviation; a
-     `trades-transition` could be added later.
-   - Drop the **subtenants** block unless `createClientProfileSchema` supports it (see contract note).
-   - Endpoints: `/api/trades/clients` (+ `?includeArchived=true` if supported — verify), restore via
-     `POST /api/trades/clients/:id/unarchive` (verify this route exists in `server/routes.ts`; if not,
-     either add it or omit the archived/restore UI).
-2. **Client profile** — `client/src/pages/trades/client-profile.tsx` (~250 ln) vs
-   `client/src/pages/property/tenant-profile.tsx` (~600 ln). Same treatment: mirror structure, mobile
-   edit form as a bottom sheet, palette rule, domain rename. Verify trades endpoints for
-   get/update/archive client + the client's invoices/quotes/schedules.
-3. **Settings** — `client/src/pages/settings.tsx` is **shared** across verticals (has the 3-way
-   Retail/Property/Trades switcher ~line 1170, and a trades GST card already). Ensure the trades-relevant
-   settings sections match property's, mobile-formatted. This is a review/align task, not a new file.
-4. **(Cross-cutting) Forms must be mobile bottom sheets** — the user explicitly does NOT want desktop
-   popups. The property `AddTenantSheet` pattern (fixed inset, backdrop blur, sheet slides up from bottom
-   with `@keyframes atSlideUp`, max-width 390, rounded top, pull handle) is the template for every
-   trades form. Apply it to the directory add form and the profile edit form.
+### ⛔ LEFT TO DO
+No remaining code tasks in this handoff are known after the 2026-06-26 continuation. The remaining risk is visual QA: this sandbox still cannot launch a browser, so the mobile pages are build-verified only and need an eyeball pass in a runnable browser.
 
 ### Live task list (TaskCreate IDs in this session)
 - #5 bottom nav — **done**
 - #6 dashboard — **done**
 - #7 analytics — **done**
-- #8 client directory — **in progress / not started in code**
-- #9 client profile — pending
-- #10 trades settings sections — pending
+- #8 client directory — **done in current working tree**
+- #9 client profile — **done in current working tree**
+- #10 trades settings sections — **done in current working tree**
 
 ---
 

@@ -6699,6 +6699,15 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       res.json(await storage.archiveClientProfile(req.params.id));
     } catch (err) { console.error("[TRADES_CLIENTS_ARCHIVE]", err); res.status(500).json({ message: "Failed to archive client" }); }
   });
+  app.post("/api/trades/clients/:id/unarchive", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const existing = await storage.getClientProfile(req.params.id);
+      if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      res.json(await storage.unarchiveClientProfile(req.params.id));
+    } catch (err) { console.error("[TRADES_CLIENTS_UNARCHIVE]", err); res.status(500).json({ message: "Failed to restore client" }); }
+  });
   app.get("/api/trades/clients/:id/events", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;

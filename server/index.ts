@@ -138,19 +138,17 @@ app.use((req, res, next) => {
   }
 
   // ── Schema push (drizzle-kit push) ───────────────────────────────────────
-  // Runs automatically in development. Skipped in production to eliminate the
-  // ~10s cold-start penalty on every restart/deploy. To apply schema changes
-  // in production, either set RUN_MIGRATIONS=true in the environment for a
-  // single controlled run, or execute `npm run db:push` manually.
+  // Never run schema sync as a normal app-start side effect. The trades branch
+  // must use reviewed additive SQL, and drizzle-kit push can propose destructive
+  // live-DB changes. Opt in only for a deliberate, supervised run.
   //
   // DATA SAFETY: --force is intentionally omitted. Without --force, drizzle-kit
   // refuses to apply destructive changes (column drops, table drops) and returns
-  // a non-zero exit code instead of silently destroying live data. Only additive
-  // changes (new tables, new columns) are applied automatically. If you need to
-  // apply a destructive schema change, run `npm run db:push` manually in the
-  // terminal after reviewing exactly what will be dropped.
-  const runMigrations = !isProduction || process.env.RUN_MIGRATIONS === 'true';
-  if (isDatabaseConnected() && runMigrations) {
+  // a non-zero exit code instead of silently destroying live data. If you need
+  // to apply schema changes, run `npm run db:push` manually after reviewing
+  // exactly what will be changed, or start with RUN_SCHEMA_PUSH=true.
+  const runSchemaPush = process.env.RUN_SCHEMA_PUSH === 'true' || process.env.RUN_MIGRATIONS === 'true';
+  if (isDatabaseConnected() && runSchemaPush) {
     log('Running schema push to sync database...');
     try {
       const drizzleConfigPath = path.resolve(process.cwd(), 'drizzle.config.ts');

@@ -14,7 +14,7 @@ import { isNativeApp, isNativeIOS } from "@/lib/native";
 import { TRADES_THEME } from "@/lib/trades-theme";
 import { Switch } from "@/components/ui/switch";
 import { 
-  Upload, CheckCircle, XCircle, LogOut, AlertCircle, Bell, BellOff, ChevronDown, Printer, ArrowRight
+  Upload, CheckCircle, XCircle, LogOut, AlertCircle, Bell, BellOff, ChevronDown, Printer, ArrowRight, CreditCard, Building2, Wrench
 } from "lucide-react";
 
 function SettingsSection({ title, isOpen, onToggle, children }: {
@@ -812,7 +812,7 @@ export default function Settings() {
             <div className="border-t border-gray-100 pt-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <Label className="!text-[#040D6D] font-semibold text-base block">GST registered (Trades)</Label>
+                  <Label className="font-semibold text-base block" style={{ color: TRADES_THEME.INK }}>GST registered (Trades)</Label>
                   <p className="text-sm text-gray-500 mt-1">Show GST on trades quotes and invoices.</p>
                 </div>
                 <Switch
@@ -823,14 +823,15 @@ export default function Settings() {
               </div>
               {gstRegistered && (
                 <div className="mt-4">
-                  <Label className="!text-[#040D6D] font-semibold text-sm block mb-2">Quote prices shown as</Label>
+                  <Label className="font-semibold text-sm block mb-2" style={{ color: TRADES_THEME.INK }}>Quote prices shown as</Label>
                   <div className="grid grid-cols-2 gap-2">
                     {(["inclusive", "exclusive"] as const).map(mode => (
                       <button
                         key={mode}
                         type="button"
                         onClick={() => saveGst({ tradeGstMode: mode })}
-                        className={`rounded-xl py-2 text-sm font-semibold transition-colors ${tradeGstMode === mode ? "bg-[#040D6D] text-white" : "bg-gray-100 text-gray-600"}`}
+                        className="rounded-xl py-2 text-sm font-semibold transition-colors"
+                        style={{ background: tradeGstMode === mode ? TRADES_THEME.INK : "#F3F4F6", color: tradeGstMode === mode ? TRADES_THEME.OFFW : "#4B5563" }}
                         data-testid={`button-gst-mode-${mode}`}
                       >
                         {mode === "inclusive" ? "Incl GST" : "+ GST"}
@@ -1214,18 +1215,18 @@ export default function Settings() {
           </Button>
         </div>
 
-        {/* Mode switcher: Retail · Property · Trades */}
+        {/* Mode switcher: Retail / Property / Trades */}
         <div className="mb-5 flex" style={{ gap: 8 }}>
           <button
             onClick={() => setLocation('/dashboard')}
             style={{ flex: 1, background: '#0055FF', borderRadius: 16, padding: '14px 10px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
           >
             <div style={{ width: 34, height: 34, borderRadius: 11, background: 'rgba(0,229,204,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#00E5CC" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M4 12h10M4 17h7"/><rect x="14" y="13" width="7" height="7" rx="1.5"/></svg>
+              <CreditCard size={18} color="#00E5CC" strokeWidth={1.9} />
             </div>
             <div style={{ textAlign: 'left', minWidth: 0 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: '#00E5CC', letterSpacing: '-0.2px' }}>Retail</div>
-              <div style={{ fontWeight: 400, fontSize: 10, color: 'rgba(0,229,204,0.65)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>terminal · sales</div>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#00E5CC', letterSpacing: 0 }}>Retail</div>
+              <div style={{ fontWeight: 400, fontSize: 10, color: 'rgba(0,229,204,0.65)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>terminal / sales</div>
             </div>
           </button>
           <button
@@ -1233,23 +1234,23 @@ export default function Settings() {
             style={{ flex: 1, background: '#040D6D', borderRadius: 16, padding: '14px 10px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
           >
             <div style={{ width: 34, height: 34, borderRadius: 11, background: 'rgba(88,171,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#58ABFF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1.5 1.5 0 01-1.5 1.5h-15A1.5 1.5 0 013 20V9.5z"/><path d="M9 21.5V14h6v7.5"/></svg>
+              <Building2 size={18} color="#58ABFF" strokeWidth={1.9} />
             </div>
             <div style={{ textAlign: 'left', minWidth: 0 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: '#FFFFFF', letterSpacing: '-0.2px' }}>Property</div>
-              <div style={{ fontWeight: 400, fontSize: 10, color: 'rgba(88,171,255,0.65)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>tenants · rent</div>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#FFFFFF', letterSpacing: 0 }}>Property</div>
+              <div style={{ fontWeight: 400, fontSize: 10, color: 'rgba(88,171,255,0.65)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>tenants / rent</div>
             </div>
           </button>
           <button
             onClick={() => setLocation('/trades')}
             style={{ flex: 1, background: TRADES_THEME.INK, borderRadius: 16, padding: '14px 10px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
           >
-            <div style={{ width: 34, height: 34, borderRadius: 11, background: 'rgba(255,122,26,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={TRADES_THEME.ACCENT} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a4 4 0 00-5.4 5.4l-6 6a1.5 1.5 0 002.1 2.1l6-6a4 4 0 005.4-5.4l-2.3 2.3-2.1-2.1z"/></svg>
+            <div style={{ width: 34, height: 34, borderRadius: 11, background: 'rgba(244,244,244,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Wrench size={18} color={TRADES_THEME.OFFW} strokeWidth={1.9} />
             </div>
             <div style={{ textAlign: 'left', minWidth: 0 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: '#FFFFFF', letterSpacing: '-0.2px' }}>Trades</div>
-              <div style={{ fontWeight: 400, fontSize: 10, color: 'rgba(255,122,26,0.72)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>quotes · jobs</div>
+              <div style={{ fontWeight: 700, fontSize: 13, color: TRADES_THEME.OFFW, letterSpacing: 0 }}>Trades</div>
+              <div style={{ fontWeight: 400, fontSize: 10, color: 'rgba(244,244,244,0.72)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>quotes / jobs</div>
             </div>
           </button>
         </div>
