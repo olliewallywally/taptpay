@@ -316,7 +316,7 @@ function AmountKeypad({ go, selectedClient, onCommit, backTo = 'invoice' }: any)
 }
 
 /* ═══ SCREEN: QuickInvoice — keypad amount → optional note → send (kind: full) ═══ */
-function QuickInvoice({ go, selectedClient, amount, onEditAmount, jobNote, setJobNote, onSend, sending }: any) {
+function QuickInvoice({ go, selectedClient, amount, onEditAmount, jobNote, setJobNote, splitEnabled, setSplitEnabled, onSend, sending }: any) {
   if (!selectedClient) {
     return (
       <div className="tp-screen" style={{ background: NAVY }}>
@@ -372,6 +372,18 @@ function QuickInvoice({ go, selectedClient, amount, onEditAmount, jobNote, setJo
             </div>
           </div>
         </div>
+
+        {/* Split bill — merchant enables; customer divides at pay time */}
+        <button onClick={() => setSplitEnabled((v: boolean) => !v)} aria-pressed={splitEnabled}
+          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '13px 16px', borderRadius: 16, marginTop: 14, border: `1px solid ${splitEnabled ? 'rgba(88,171,255,0.4)' : 'rgba(88,171,255,0.15)'}`, background: splitEnabled ? 'rgba(88,171,255,0.1)' : 'rgba(255,255,255,0.04)', cursor: 'pointer', fontFamily: 'Outfit, system-ui' }}>
+          <span style={{ flex: 1, textAlign: 'left' }}>
+            <span style={{ display: 'block', fontWeight: 600, fontSize: 13.5, color: BLUE }}>split the bill</span>
+            {splitEnabled && <span style={{ display: 'block', fontWeight: 400, fontSize: 11.5, color: 'rgba(88,171,255,0.7)', marginTop: 2 }}>customer can divide this into shares</span>}
+          </span>
+          <span style={{ width: 42, height: 25, borderRadius: 999, background: splitEnabled ? BLUE : 'rgba(88,171,255,0.25)', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+            <span style={{ position: 'absolute', top: 3, left: splitEnabled ? 20 : 3, width: 19, height: 19, borderRadius: 999, background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+          </span>
+        </button>
 
         <div style={{ flex: 1 }} />
 
@@ -757,6 +769,7 @@ export default function TradesTerminal() {
   const [selectedClient, setSelectedClient] = useState<any>(null);
   const [amount, setAmount]                 = useState(0);
   const [jobNote, setJobNote]               = useState('');
+  const [splitEnabled, setSplitEnabled]     = useState(false);
   const [conveyor, setConveyor]             = useState<any>(null);
   const [contentKey, setContentKey]         = useState(0);
   const [toastMsg, setToastMsg]             = useState<string | null>(null);
@@ -809,7 +822,7 @@ export default function TradesTerminal() {
 
   /* Mutations */
   const invoiceMutation = useMutation({
-    mutationFn: async ({ clientId, amountCents, channel, jobDetails }: any) => {
+    mutationFn: async ({ clientId, amountCents, channel, jobDetails, splitEnabled }: any) => {
       const due = new Date(); due.setDate(due.getDate() + 7);
       const r = await fetch('/api/trades/invoices', {
         method: 'POST', headers: { 'Content-Type': 'application/json', ...tradesHeaders() },
@@ -817,6 +830,7 @@ export default function TradesTerminal() {
           clientProfileId: clientId, amountCents, deliveryChannel: channel,
           dueAt: due.toISOString(), kind: 'full',
           jobDetails: jobDetails || undefined,
+          splitEnabled: !!splitEnabled,
         }),
       });
       if (!r.ok) {
@@ -827,6 +841,7 @@ export default function TradesTerminal() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/trades/invoices'] });
+      setSplitEnabled(false);
       setSuccessLabel(selectedClient?.email || selectedClient?.phone || '');
       setContentKey(k => k + 1);
       setScreen('success');
@@ -998,7 +1013,7 @@ export default function TradesTerminal() {
     if (id === 'home')     return <JobsHome invoices={stackRows} outstanding={outstanding} go={go} onRowTap={handleRowTap} />;
     if (id === 'clients')  return <ChooseClient clients={clients} invoices={invoices} go={go} onSelect={handleClientSelect} />;
     if (id === 'amount')   return <AmountKeypad go={go} selectedClient={selectedClient} backTo={'invoice'} onCommit={(c: number) => { setAmount(c); go('invoice'); }} />;
-    if (id === 'invoice')  return <QuickInvoice go={go} selectedClient={selectedClient} amount={amount} onEditAmount={() => go('amount')} jobNote={jobNote} setJobNote={setJobNote} onSend={() => { if (!selectedClient || amount <= 0) { toast('set an amount first'); return; } invoiceMutation.mutate({ clientId: selectedClient.id, amountCents: amount, channel: selectedClient.preferredChannel || 'email', jobDetails: jobNote }); }} sending={invoiceMutation.isPending} />;
+    if (id === 'invoice')  return <QuickInvoice go={go} selectedClient={selectedClient} amount={amount} onEditAmount={() => go('amount')} jobNote={jobNote} setJobNote={setJobNote} splitEnabled={splitEnabled} setSplitEnabled={setSplitEnabled} onSend={() => { if (!selectedClient || amount <= 0) { toast('set an amount first'); return; } invoiceMutation.mutate({ clientId: selectedClient.id, amountCents: amount, channel: selectedClient.preferredChannel || 'email', jobDetails: jobNote, splitEnabled }); }} sending={invoiceMutation.isPending} />;
     if (id === 'quote')    return <QuoteScreen onCancel={() => go('home', 'down')} onExit={() => go('home', 'down')} />;
     if (id === 'profile')  return <ClientProfile embedded clientId={profileClientId ?? undefined} onClose={() => go('home')} />;
     if (id === 'external') return <MarkExternal go={go} selectedClient={selectedClient} amount={amount} invoices={invoices} onMark={handleMark} marking={markMutation.isPending} />;
