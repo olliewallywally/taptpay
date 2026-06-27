@@ -520,6 +520,7 @@ function SentSuccess({ amount, label, go }: any) {
 function JobActionSheet({ invoice, onClose, onMarkReceived, onSendBalance, onComplete, onVoid, busy }: any) {
   const st = invoiceStatusFor(invoice);
   const settled = st === 'paid';
+  const [balanceSplit, setBalanceSplit] = useState(false);
 
   const Action = ({ label, onClick, danger, primary }: any) => (
     <button onClick={onClick} disabled={busy}
@@ -560,7 +561,18 @@ function JobActionSheet({ invoice, onClose, onMarkReceived, onSendBalance, onCom
             <Action label="cancel invoice" onClick={onVoid} danger />
           </>
         )}
-        {invoice.kind === 'deposit' && settled && !invoice.balanceSent && <Action label="send remaining balance" onClick={onSendBalance} primary />}
+        {invoice.kind === 'deposit' && settled && !invoice.balanceSent && (
+          <>
+            <button onClick={() => setBalanceSplit(v => !v)} aria-pressed={balanceSplit}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 16, marginBottom: 10, border: `1px solid ${balanceSplit ? 'rgba(88,171,255,0.4)' : 'rgba(4,13,109,0.1)'}`, background: balanceSplit ? 'rgba(88,171,255,0.1)' : 'rgba(4,13,109,0.04)', cursor: 'pointer', fontFamily: 'Outfit, system-ui' }}>
+              <span style={{ flex: 1, textAlign: 'left', fontWeight: 600, fontSize: 13.5, color: NAVY }}>split the balance</span>
+              <span style={{ width: 42, height: 25, borderRadius: 999, background: balanceSplit ? BLUE : 'rgba(4,13,109,0.15)', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+                <span style={{ position: 'absolute', top: 3, left: balanceSplit ? 20 : 3, width: 19, height: 19, borderRadius: 999, background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+              </span>
+            </button>
+            <Action label="send remaining balance" onClick={() => onSendBalance(balanceSplit)} primary />
+          </>
+        )}
         <Action label="close" onClick={onClose} />
       </div>
     </div>
@@ -880,8 +892,12 @@ export default function TradesTerminal() {
   });
 
   const jobActionMutation = useMutation({
-    mutationFn: async ({ invoiceId, action }: { invoiceId: string; action: 'send-balance' | 'complete' }) => {
-      const r = await fetch(`/api/trades/invoices/${invoiceId}/${action}`, { method: 'POST', headers: tradesHeaders() });
+    mutationFn: async ({ invoiceId, action, splitEnabled }: { invoiceId: string; action: 'send-balance' | 'complete'; splitEnabled?: boolean }) => {
+      const r = await fetch(`/api/trades/invoices/${invoiceId}/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...tradesHeaders() },
+        body: action === 'send-balance' ? JSON.stringify({ splitEnabled: !!splitEnabled }) : undefined,
+      });
       if (!r.ok) throw new Error(await r.json().then((d: any) => d.message).catch(() => 'Action failed'));
       return r.json();
     },
@@ -1061,7 +1077,7 @@ export default function TradesTerminal() {
           invoice={rowAction}
           busy={voidMutation.isPending || markMutation.isPending || jobActionMutation.isPending}
           onClose={() => setRowAction(null)}
-          onSendBalance={() => jobActionMutation.mutate({ invoiceId: rowAction.id, action: 'send-balance' })}
+          onSendBalance={(splitEnabled: boolean) => jobActionMutation.mutate({ invoiceId: rowAction.id, action: 'send-balance', splitEnabled })}
           onComplete={() => jobActionMutation.mutate({ invoiceId: rowAction.id, action: 'complete' })}
           onMarkReceived={() => { markMutation.mutate({ invoiceId: rowAction.id, ref: '' }); }}
           onVoid={handleVoid}

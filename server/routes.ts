@@ -6970,6 +6970,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const { splitEnabled } = (req.body ?? {}) as { splitEnabled?: boolean };
       // Issue the remaining balance for a deposit-paid job.
       const dep = await storage.getJobInvoice(req.params.id);
       if (!dep || dep.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
@@ -6994,6 +6995,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         merchantId: dep.merchantId, clientProfileId: dep.clientProfileId, quoteId: dep.quoteId,
         kind: "balance", amountCents: balanceCents, token: generateInvoiceToken(),
         deliveryChannel: dep.deliveryChannel, status: "pending_dispatch", dueAt: due,
+        splitEnabled: !!splitEnabled,
       });
       await storage.createJobEvent({ merchantId: dep.merchantId, clientProfileId: dep.clientProfileId, jobInvoiceId: bal.id, eventType: "balance_sent" });
       const delivery = await resendTradeInvoice(bal.id, getBaseUrl(req));
