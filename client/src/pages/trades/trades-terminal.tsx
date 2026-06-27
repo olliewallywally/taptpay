@@ -374,7 +374,7 @@ function QuickInvoice({ go, selectedClient, amount, onEditAmount, jobNote, setJo
         </div>
 
         {/* Split bill — merchant enables; customer divides at pay time */}
-        <button onClick={() => setSplitEnabled((v: boolean) => !v)} aria-pressed={splitEnabled}
+        <button type="button" onClick={() => setSplitEnabled((v: boolean) => !v)} aria-pressed={splitEnabled}
           style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '13px 16px', borderRadius: 16, marginTop: 14, border: `1px solid ${splitEnabled ? 'rgba(88,171,255,0.4)' : 'rgba(88,171,255,0.15)'}`, background: splitEnabled ? 'rgba(88,171,255,0.1)' : 'rgba(255,255,255,0.04)', cursor: 'pointer', fontFamily: 'Outfit, system-ui' }}>
           <span style={{ flex: 1, textAlign: 'left' }}>
             <span style={{ display: 'block', fontWeight: 600, fontSize: 13.5, color: BLUE }}>split the bill</span>
@@ -563,7 +563,7 @@ function JobActionSheet({ invoice, onClose, onMarkReceived, onSendBalance, onCom
         )}
         {invoice.kind === 'deposit' && settled && !invoice.balanceSent && (
           <>
-            <button onClick={() => setBalanceSplit(v => !v)} aria-pressed={balanceSplit}
+            <button type="button" onClick={() => setBalanceSplit(v => !v)} aria-pressed={balanceSplit}
               style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 16, marginBottom: 10, border: `1px solid ${balanceSplit ? 'rgba(88,171,255,0.4)' : 'rgba(4,13,109,0.1)'}`, background: balanceSplit ? 'rgba(88,171,255,0.1)' : 'rgba(4,13,109,0.04)', cursor: 'pointer', fontFamily: 'Outfit, system-ui' }}>
               <span style={{ flex: 1, textAlign: 'left', fontWeight: 600, fontSize: 13.5, color: NAVY }}>split the balance</span>
               <span style={{ width: 42, height: 25, borderRadius: 999, background: balanceSplit ? BLUE : 'rgba(4,13,109,0.15)', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
@@ -928,6 +928,7 @@ export default function TradesTerminal() {
       setSelectedClient(null);
       setAmount(0);
       setJobNote('');
+      setSplitEnabled(false);
       setPendingDest(null);
       return;
     }
@@ -952,6 +953,7 @@ export default function TradesTerminal() {
     if (dest === 'external') { setScreen('external'); return; }
     setAmount(0);
     setJobNote('');
+    setSplitEnabled(false);
     setScreen('amount');
   };
 
