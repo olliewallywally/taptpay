@@ -1,0 +1,9 @@
+{
+  "id": "5",
+  "subject": "Write and commit design doc",
+  "description": "Save spec to docs/superpowers/specs/YYYY-MM-DD-trades-split-bill-design.md, self-review, commit.",
+  "activeForm": "Writing design doc",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

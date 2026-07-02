@@ -1,0 +1,14 @@
+---
+name: avoid-playwright-install-replit-nix
+description: Do not install Playwright/Chromium or do heavy /nix scans in this Replit workspace — it crashes the snix-castore FUSE store
+metadata: 
+  node_type: memory
+  type: feedback
+  originSessionId: 88870d7b-59e1-4928-995c-47863a293883
+---
+
+In this Replit workspace, `/nix/store` is served by **snix-castore over FUSE** (see `mount`). It is fragile under heavy I/O and will disconnect (`Transport endpoint is not connected`), which kills `node`, `git`, even `bash` once their cached processes need to re-exec — the whole environment goes down and only a **container reboot** restores it.
+
+**Why:** On 2026-06-26 a request to visually verify a UI change led me to run `npx playwright install chromium` (extracts a ~150MB browser into the Nix cache) + `playwright install-deps` + full `find /nix/store` scans. That crashed the FUSE store and blocked the rest of the session.
+
+**How to apply:** Never run `npx playwright install*`, `playwright install-deps`, browser-binary downloads, or large `/nix/store` traversals here. For "run the app and screenshot" requests, first check whether a browser can even launch (it can't — system libs like `libglib-2.0.so.0` are absent); if not, tell the user and skip the visual step rather than installing anything. Prefer `tsc` + tests + curling the dev server for verification. See [[trades-phase3c-backup-state]].

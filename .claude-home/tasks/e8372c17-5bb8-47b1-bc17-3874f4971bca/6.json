@@ -1,0 +1,9 @@
+{
+  "id": "6",
+  "subject": "Port dashboard to full property parity",
+  "description": "trades-dashboard is a 41-line stub. Port property-dashboard structure (hero, revenue+gauge, stat strip, recent list) with trades theme + domain rename.",
+  "activeForm": "Porting dashboard",
+  "status": "completed",
+  "blocks": [],
+  "blockedBy": []
+}

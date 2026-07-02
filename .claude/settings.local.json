@@ -144,7 +144,20 @@
       "Bash(git status *)",
       "Bash(command -v chromium chromium-browser google-chrome)",
       "Bash(curl -s -o /dev/null -w \"GET / -> %{http_code}\\\\n\" http://localhost:5000/)",
-      "Bash(curl -s -X POST http://localhost:5000/api/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"testcafe@taptpay.co.nz\",\"password\":\"SmokeTest123!\"}')"
+      "Bash(curl -s -X POST http://localhost:5000/api/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"testcafe@taptpay.co.nz\",\"password\":\"SmokeTest123!\"}')",
+      "Bash(GIT_CONFIG_NOSYSTEM=1 git log --oneline -2)",
+      "Bash(GIT_CONFIG_NOSYSTEM=1 git status --short)",
+      "Bash(GIT_CONFIG_NOSYSTEM=1 git stash push -- client/src/pages/trades/trades-terminal.tsx)",
+      "Bash(GIT_CONFIG_NOSYSTEM=1 git stash pop)",
+      "Bash(GIT_CONFIG_NOSYSTEM=1 git add client/src/pages/trades/trades-terminal.tsx)",
+      "Bash(GIT_CONFIG_NOSYSTEM=1 git commit -q -m 'feat\\(trades\\): split-bill toggle on quick invoice *)",
+      "Bash(GIT_CONFIG_NOSYSTEM=1 git rev-parse --short HEAD)",
+      "Bash(GIT_CONFIG_NOSYSTEM=1 git commit *)",
+      "Bash(GIT_CONFIG_NOSYSTEM=1 git rm *)",
+      "Bash(GIT_CONFIG_NOSYSTEM=1 git show --stat dc962e0)",
+      "Bash(GIT_CONFIG_NOSYSTEM=1 git check-ignore .claude-home .superpowers .cache logs)",
+      "Bash(GIT_CONFIG_NOSYSTEM=1 git push -u origin feat/trades-phase3c-cross-cutting)",
+      "Bash(timeout 180 npx --yes knip@5 --no-progress)"
     ]
   },
   "model": "claude-opus-4-8"

@@ -1,0 +1,9 @@
+{
+  "id": "1",
+  "subject": "Recolor trades vertical to PM navy/sky-blue",
+  "description": "Swap INK->#040D6D and ACCENT->#58ABFF in trades-theme.ts; global replace rgba(6,21,14,->rgba(4,13,109, and rgba(34,34,34,->rgba(88,171,255, across client/src/pages/trades/*.tsx. Leave shared status greens.",
+  "activeForm": "Recoloring trades vertical to navy/sky-blue",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

@@ -1,0 +1,9 @@
+{
+  "id": "5",
+  "subject": "Bottom nav: add trades mode + items + theming",
+  "description": "BottomNavigation has no trades mode; nav doesn't render on /trades/*. Add TRADES_ITEMS (home/clients/terminal/analytics/settings), trades-mode detection, include /trades in showNav, theme to trades palette.",
+  "activeForm": "Adding trades mode to bottom nav",
+  "status": "completed",
+  "blocks": [],
+  "blockedBy": []
+}

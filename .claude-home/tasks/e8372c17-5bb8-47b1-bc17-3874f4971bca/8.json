@@ -1,0 +1,9 @@
+{
+  "id": "8",
+  "subject": "Port client directory to property parity (mobile)",
+  "description": "client-directory partial vs tenant-directory. Match structure + mobile forms (no desktop popups).",
+  "activeForm": "Porting client directory",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

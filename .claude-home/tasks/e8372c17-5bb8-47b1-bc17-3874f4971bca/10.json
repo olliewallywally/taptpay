@@ -1,0 +1,9 @@
+{
+  "id": "10",
+  "subject": "Trades settings sections to property parity (mobile)",
+  "description": "Ensure trades settings sections in settings.tsx mirror property, mobile-formatted.",
+  "activeForm": "Aligning trades settings",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

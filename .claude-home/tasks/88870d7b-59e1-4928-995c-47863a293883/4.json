@@ -1,0 +1,9 @@
+{
+  "id": "4",
+  "subject": "Make quote-builder.tsx a standalone wrapper",
+  "description": "Rewrite quote-builder.tsx to render .tp-viewport + injected TP_TERM_CSS + QuoteScreen (onCancel/onExit -> setLocation terminal). Remove old card layout. Remove QuoteBuilder embedded import from terminal.",
+  "activeForm": "Wiring standalone quote route",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

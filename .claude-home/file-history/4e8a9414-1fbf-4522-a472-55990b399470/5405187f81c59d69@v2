@@ -1,0 +1,107 @@
+# TaptPay — Product Brief (for design)
+
+## What TaptPay is
+TaptPay (a.k.a. "Tapt") is a **software-only payment terminal** that turns any
+smartphone or tablet into a full EFTPOS replacement — no hardware to buy, install,
+or maintain. Merchants accept payments two ways:
+
+- **QR code** — the customer scans with any phone camera and pays.
+- **NFC "tap to phone"** — the customer taps their phone or contactless card
+  directly on the merchant's device. Supports **Apple Pay, Google Pay, Samsung
+  Pay, and contactless cards**, with feature detection and graceful fallback.
+
+Every transaction updates in **real time** (Server-Sent Events) on both the
+merchant and customer screens. Payments settle through **Windcave** (PCI-DSS
+compliant hosted payment page); TaptPay is the Merchant of Record.
+
+**Platform:** iOS, Android, and web browser. Built as a React/TypeScript app.
+
+---
+
+## Why it stands out (vs traditional EFTPOS and competitors)
+1. **No hardware.** Runs on phones/tablets the business already owns — no terminal
+   purchase, rental, or maintenance.
+2. **Lower fees.** Retail is **3.4% total (2.9% Windcave + 0.5% platform)** vs the
+   typical 4–6% of legacy terminals — merchants keep ~96.6% of revenue. No monthly
+   fees; pay only per transaction.
+3. **Instant setup.** Start accepting payments in minutes, not weeks.
+4. **Real-time everything.** Live transaction status, push notifications on
+   created/completed/failed/refunded, instant analytics.
+5. **Built for how people actually pay now** — digital wallets and tap, not just
+   chip-and-pin.
+6. **Multi-vertical.** One platform, purpose-built flows for very different
+   businesses (see below) — not a one-size-fits-all terminal.
+
+---
+
+## The three verticals
+TaptPay isn't a single app — it's one payments engine with **three tailored
+verticals**, switchable per merchant.
+
+### 1. Retail
+The classic point-of-sale flow for cafés, shops, food trucks, and markets.
+- Keypad/terminal to charge an amount, stock/product management, transaction
+  history and analytics dashboard.
+- **Split the bill** — merchant enables it; the customer divides the total
+  between 2–10 people at pay time, each getting their own card flow and receipt.
+- Professional receipts: itemised, full business details, **NZ GST (15%)**
+  breakdown, PDF download + native share.
+
+### 2. Property Management
+Rent and recurring-invoice collection for landlords / property managers.
+- Rent invoices with **recurring automation** (scheduled sends), plus an
+  **overdue-reminder engine** (configurable delay, interval, and max count).
+- Hosted checkout links customers pay via card; invoices settle idempotently and
+  mark paid automatically.
+- Same real-time + receipt + split-bill machinery as retail.
+
+### 3. Trades (newest vertical)
+For plumbers, electricians, builders — a quote-to-completion lifecycle.
+- **Lifecycle:** quote → accept → deposit → balance → complete. An accepted quote
+  becomes a *job* that parks in a home "stack".
+- **Two paths:** a full **Quote builder** and a **quick Invoice** (keypad → send,
+  no quote step).
+- **Deposit link** auto-presented to the customer the instant they accept a
+  deposit-enabled quote; the **balance** is a second payment link off the job.
+- **Recurring toggle** for maintenance/retainer work.
+- **Split the balance** supported here too.
+- NZ **GST-inclusive** by default ("GST (15%) incl."), gated by the merchant's
+  GST-registered flag.
+- Low platform fee (0.3%).
+
+---
+
+## Feature highlights (cross-cutting)
+- **QR + NFC tap-to-phone** payment acceptance.
+- **Split the bill** — merchant-gated; customer divides at pay time (retail,
+  property, and trades).
+- **Real-time transaction feed** via SSE.
+- **Web push notifications** for transaction status changes.
+- **Refunds** with dedicated flow and real-time notifications.
+- **Professional receipts** — full business info, NZ GST, PDF + share.
+- **Multi-"stone" support** — multiple isolated payment endpoints per merchant.
+- **Admin/merchant dashboards** — revenue, transactions, analytics.
+- **Security** — JWT auth, per-merchant ownership checks, rate limiting, audit
+  logging, PCI-DSS-compliant processing via Windcave.
+
+---
+
+## Audience & positioning
+- Small-to-medium businesses wanting to ditch bulky, expensive EFTPOS.
+- Cost-conscious merchants (cafés, retail, markets, tradespeople, landlords).
+- Modern, mobile-first operators and pop-ups needing flexible payments.
+
+**Tone:** professional yet approachable, results-focused (cost savings +
+efficiency), technology-forward but jargon-free, trust-building on security.
+
+---
+
+## One-paragraph elevator pitch
+> TaptPay turns any phone or tablet into a modern payment terminal — customers pay
+> by scanning a QR code or tapping their phone or card (Apple Pay, Google Pay,
+> Samsung Pay, contactless). No hardware, no monthly fees, and lower processing
+> costs than traditional EFTPOS, with real-time transaction updates and instant
+> analytics. And it's not one-size-fits-all: purpose-built verticals for **Retail**,
+> **Property Management**, and **Trades** mean the flow fits the business — from a
+> café splitting a bill, to a landlord automating rent, to a plumber quoting a job
+> and collecting a deposit.

@@ -1,0 +1,9 @@
+{
+  "id": "4",
+  "subject": "Present design sections for approval",
+  "description": "Present the design in sections, getting approval after each.",
+  "activeForm": "Presenting design",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

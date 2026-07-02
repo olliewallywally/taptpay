@@ -1,0 +1,9 @@
+{
+  "id": "3",
+  "subject": "Build QuoteScreen in PM tp-screen layout",
+  "description": "Add .tp-cta-wire CSS + export TP_TERM_CSS. Build QuoteScreen in trades-terminal.tsx: white 20% box (SubHead + total + client) and scrollable navy 80% box (client select, line items, deposit toggle, notes, totals, wireframe CTA, created state). Wire into renderScreen.",
+  "activeForm": "Building QuoteScreen",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}
