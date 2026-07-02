@@ -1,5 +1,6 @@
 {
   "numStartups": 1,
+  "promptQueueUseCount": 1,
   "cachedGrowthBookFeatures": {
     "tengu_tangerine_ladder_boost": true,
     "tengu_vscode_review_upsell": false,
@@ -654,6 +655,15 @@
   },
   "claudeCodeFirstTokenDate": "2026-04-24T04:40:58.888226Z",
   "clientDataCacheSlots": {
+    "bi1-53e0dc26a09489e2": {
+      "data": {
+        "cedar_lagoon": {
+          "": true
+        },
+        "cedar_basin": "2026-08-31"
+      },
+      "at": 1783030126208
+    },
     "bi1-fb0aabd6410f9fb3": {
       "data": {
         "cedar_lagoon": {
@@ -736,8 +746,8 @@
       "lastUsedNumStartups": 1
     },
     "superpowers@claude-plugins-official": {
-      "usageCount": 1,
-      "lastUsedAt": 1783029269982,
+      "usageCount": 2,
+      "lastUsedAt": 1783029805732,
       "lastUsedNumStartups": 1
     },
     "context7@claude-plugins-official": {
@@ -791,5 +801,15 @@
   },
   "claudeAiMcpEverConnected": [
     "claude.ai Higgsfield"
-  ]
+  ],
+  "skillUsage": {
+    "superpowers:brainstorming": {
+      "usageCount": 1,
+      "lastUsedAt": 1783029805722
+    },
+    "superpowers:writing-plans": {
+      "usageCount": 1,
+      "lastUsedAt": 1783030426225
+    }
+  }
 }
