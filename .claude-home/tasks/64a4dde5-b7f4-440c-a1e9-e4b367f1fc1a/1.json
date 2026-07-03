@@ -1,0 +1,9 @@
+{
+  "id": "1",
+  "subject": "Task 1: verify & commit data helpers",
+  "description": "Files already created. Run jest on property-dashboard-data.test.ts, typecheck, commit both files.",
+  "activeForm": "Verifying & committing data helpers",
+  "status": "completed",
+  "blocks": [],
+  "blockedBy": []
+}

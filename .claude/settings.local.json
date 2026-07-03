@@ -107,7 +107,10 @@
       "Bash(echo \"---EXIT $?---\")",
       "Bash(grep -nA8 \"export async function createWindcaveRefund\" server/windcave.ts)",
       "Bash(ls -la docs/superpowers/specs/ docs/superpowers/plans/)",
-      "Bash(grep -rl \"refund\\\\|analytics\\\\|gst-invoice\" docs/superpowers/)"
+      "Bash(grep -rl \"refund\\\\|analytics\\\\|gst-invoice\" docs/superpowers/)",
+      "Bash(git update-index *)",
+      "Bash(npx jest *)",
+      "Skill(run)"
     ]
   },
   "model": "claude-opus-4-8"

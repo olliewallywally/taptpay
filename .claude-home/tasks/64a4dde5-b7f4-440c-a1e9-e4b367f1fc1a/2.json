@@ -1,0 +1,9 @@
+{
+  "id": "2",
+  "subject": "Task 2: dashboard rewrite skeleton",
+  "description": "Rewrite property-dashboard.tsx: hero, property dropdown, timeframe bar, stat cards, shortcuts (chart placeholder). Typecheck, smoke tests, commit.",
+  "activeForm": "Rewriting dashboard skeleton",
+  "status": "completed",
+  "blocks": [],
+  "blockedBy": []
+}

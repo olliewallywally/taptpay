@@ -1,0 +1,9 @@
+{
+  "id": "7",
+  "subject": "Task 7: End-to-end verification",
+  "description": "tsc + jest + drive the app per plan Task 7",
+  "activeForm": "Verifying end-to-end",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

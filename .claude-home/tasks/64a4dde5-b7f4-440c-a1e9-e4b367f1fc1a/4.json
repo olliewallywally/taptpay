@@ -1,0 +1,9 @@
+{
+  "id": "4",
+  "subject": "Task 4: micro-interactions",
+  "description": "Extend PD_CSS with hover/press rules, add pulse helper + onPointerDown. Typecheck, smoke tests, commit.",
+  "activeForm": "Adding micro-interactions",
+  "status": "completed",
+  "blocks": [],
+  "blockedBy": []
+}

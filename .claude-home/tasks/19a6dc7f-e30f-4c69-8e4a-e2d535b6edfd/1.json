@@ -1,0 +1,9 @@
+{
+  "id": "1",
+  "subject": "Task 1: Data helpers (TDD)",
+  "description": "Create client/src/lib/property-dashboard-data.ts + tests per plan Task 1",
+  "activeForm": "Building data helpers",
+  "status": "in_progress",
+  "blocks": [],
+  "blockedBy": []
+}

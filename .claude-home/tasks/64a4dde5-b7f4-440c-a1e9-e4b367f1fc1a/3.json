@@ -1,0 +1,9 @@
+{
+  "id": "3",
+  "subject": "Task 3: RentBarChart component",
+  "description": "Add clickable animated SVG bar chart + value pill, wire into hero, extend CSS. Typecheck, smoke tests, commit.",
+  "activeForm": "Building RentBarChart",
+  "status": "completed",
+  "blocks": [],
+  "blockedBy": []
+}

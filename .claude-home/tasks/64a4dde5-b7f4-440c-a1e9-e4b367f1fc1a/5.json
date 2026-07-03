@@ -1,0 +1,9 @@
+{
+  "id": "5",
+  "subject": "Task 5: terminal deep links",
+  "description": "Add stackFilter/remindMode state + mount effect parsing query params in property-terminal.tsx. Typecheck, commit.",
+  "activeForm": "Adding terminal deep links",
+  "status": "completed",
+  "blocks": [],
+  "blockedBy": []
+}
