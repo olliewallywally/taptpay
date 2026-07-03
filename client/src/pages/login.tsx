@@ -42,7 +42,9 @@ export default function Login() {
       } else {
         toast({ title: 'Welcome back!', description: 'Signed in with Google.' });
       }
-      setLocation('/dashboard');
+      // Match password login: force the app-wide AuthProvider to re-mount and
+      // fetch /api/auth/me with the fresh token instead of keeping stale state.
+      window.location.href = '/dashboard';
     } else if (error) {
       window.history.replaceState({}, '', '/login');
       toast({ title: 'Sign in failed', description: decodeURIComponent(error), variant: 'destructive' });
