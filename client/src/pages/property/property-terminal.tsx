@@ -1140,6 +1140,9 @@ export default function PropertyTerminal() {
   const [uploadingDoc, setUploadingDoc]   = useState(false);
   // Tapped invoice row → action sheet (resend / mark received / cancel).
   const [rowAction, setRowAction]         = useState<any>(null);
+  // Active-stack status filter + reminder mode (deep-linked from the dashboard).
+  const [stackFilter, setStackFilter]     = useState<'all' | 'overdue' | 'sent' | 'paid' | 'failed'>('all');
+  const [remindMode, setRemindMode]       = useState(false);
   const conveyorTimer = useRef<ReturnType<typeof setTimeout>>();
   const viewportRef = useRef<HTMLDivElement>(null);
 
@@ -1387,6 +1390,29 @@ export default function PropertyTerminal() {
     setContentKey(k => k + 1);
     setScreen(next);
   };
+
+  /* Dashboard deep links: ?screen=tenants|bill → jump into that flow;
+     ?stack=overdue → home stack pre-filtered; &remind=1 → inline remind buttons.
+     Params are consumed once, then stripped so back/refresh doesn't re-trigger. */
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const scr = params.get('screen');
+    const stack = params.get('stack');
+    if (!scr && !stack) return;
+    if (scr === 'tenants') {
+      go('tenants');
+    } else if (scr === 'bill') {
+      // Mirror handleSubbarPick's no-tenant bill path: pick a tenant first, then bill.
+      setPendingDest('bill');
+      triggerConveyor('home', 'up');
+      setContentKey(k => k + 1);
+      setScreen('tenants');
+    }
+    if (stack === 'overdue') setStackFilter('overdue');
+    if (params.get('remind') === '1') setRemindMode(true);
+    window.history.replaceState({}, '', window.location.pathname);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleTenantSelect = (t: any, preAmount: number) => {
     setSelectedTenant(t);
