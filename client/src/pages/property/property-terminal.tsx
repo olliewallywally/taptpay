@@ -202,11 +202,11 @@ function SubHead({ onCancel, onCommit }: any) {
 }
 
 /* ═══ SCREEN: RequestsHome ═══ */
-function RequestsHome({ invoices, tenants, outstanding, go, onRowTap }: any) {
-  const recent = [...invoices]
+function RequestsHome({ invoices, tenants, outstanding, go, onRowTap, filter = 'all', onFilter, remindMode = false, onRemind, remindBusyId }: any) {
+  const sorted = [...invoices]
     .filter((i: any) => i.status !== 'voided')
-    .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 12);
+    .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const recent = (filter === 'all' ? sorted : sorted.filter((i: any) => invoiceStatusFor(i) === filter)).slice(0, 12);
 
   return (
     <div className="tp-screen">
@@ -220,10 +220,19 @@ function RequestsHome({ invoices, tenants, outstanding, go, onRowTap }: any) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <div className="tp-stack-title">rent requests</div>
         </div>
+        {/* Status filter chips — deep-linkable from the dashboard */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 12, overflowX: 'auto', scrollbarWidth: 'none' as any, WebkitOverflowScrolling: 'touch' }}>
+          {(['all', 'overdue', 'sent', 'paid', 'failed'] as const).map(f => (
+            <button key={f} type="button" onClick={() => onFilter?.(f)}
+              style={{ flexShrink: 0, padding: '6px 14px', borderRadius: 999, border: 'none', cursor: 'pointer', fontFamily: 'Outfit, system-ui', fontWeight: 700, fontSize: 11, letterSpacing: '0.04em', textTransform: 'uppercase', background: filter === f ? NAVY : 'rgba(4,13,109,0.08)', color: filter === f ? BLUE : 'rgba(4,13,109,0.45)', transition: 'all 0.2s ease', WebkitTapHighlightColor: 'transparent' }}>
+              {f}
+            </button>
+          ))}
+        </div>
         <div className="tp-stack-scroll" style={{ flex: 1, overflow: 'auto', paddingRight: 2 }}>
           <div className="tp-stack-card">
             {recent.length === 0 ? (
-              <div className="tp-stack-empty">tap + to send a rent request</div>
+              <div className="tp-stack-empty">{filter === 'all' ? 'tap + to send a rent request' : `no ${filter} requests`}</div>
             ) : recent.map((inv: any) => {
               const st = invoiceStatusFor(inv);
               const dotCls = st === 'paid' ? 'paid' : (st === 'overdue' || st === 'failed') ? 'declined' : st === 'sent' ? 'payment-sent' : 'awaiting';
@@ -259,6 +268,14 @@ function RequestsHome({ invoices, tenants, outstanding, go, onRowTap }: any) {
                           <div className="tp-stack-price">{fmt(showOwing ? (inv.owingCents ?? inv.amountCents) : (inv.amountCents ?? 0))}</div>
                           {showOwing && <div style={{ fontSize: 9.5, color: '#8C8C8C', marginTop: 1 }}>left of {fmt(inv.amountCents)}</div>}
                         </div>
+                        {(remindMode || filter === 'overdue') && st === 'overdue' && (
+                          <button type="button"
+                            onClick={(e) => { e.stopPropagation(); onRemind?.(inv.id); }}
+                            disabled={remindBusyId === inv.id}
+                            style={{ marginLeft: 10, flexShrink: 0, padding: '6px 13px', borderRadius: 999, border: 'none', background: BLUE, color: NAVY, fontWeight: 700, fontSize: 11, cursor: 'pointer', fontFamily: 'Outfit, system-ui', opacity: remindBusyId === inv.id ? 0.5 : 1, transition: 'opacity 0.2s' }}>
+                            {remindBusyId === inv.id ? '…' : 'remind'}
+                          </button>
+                        )}
                       </>
                     );
                   })()}
@@ -1595,7 +1612,10 @@ export default function PropertyTerminal() {
   };
 
   const renderScreen = (id: string) => {
-    if (id === 'home')     return <RequestsHome invoices={invoices} tenants={tenants} outstanding={outstanding} go={go} onRowTap={handleRowTap} />;
+    if (id === 'home')     return <RequestsHome invoices={invoices} tenants={tenants} outstanding={outstanding} go={go} onRowTap={handleRowTap}
+      filter={stackFilter} onFilter={setStackFilter} remindMode={remindMode}
+      onRemind={(id: string) => resendOneMutation.mutate(id)}
+      remindBusyId={resendOneMutation.isPending ? (resendOneMutation.variables as string) : null} />;
     if (id === 'tenants')  return <ChooseTenant tenants={tenants} invoices={invoices} go={go} onSelect={handleTenantSelect} splitMode={splitMode} onToggleSplit={() => setSplitMode(m => !m)} />;
     if (id === 'amount')   return <RentAmount go={go} selectedTenant={selectedTenant} backTo={amountDest} onCommit={(c: number) => { setAmount(c); go(amountDest); }} />;
     if (id === 'send')     return <SendRentLink go={go} selectedTenant={selectedTenant} amount={amount} onSend={handleSend} sending={sendMutation.isPending} frequency={frequency} setFrequency={setFrequency} splitMode={splitMode} onEditAmount={() => { setAmountDest('send'); go('amount'); }} />;
