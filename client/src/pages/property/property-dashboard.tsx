@@ -104,6 +104,68 @@ function TimeframeBar({ tf, onPick }: { tf: Timeframe; onPick: (t: Timeframe) =>
   );
 }
 
+/* ── Bar chart — clickable, animates between timeframes ── */
+const MAX_SLOTS = 12;
+
+function RentBarChart({ buckets, selectedIdx, onSelectBar, animKey }: {
+  buckets: { label: string; valueCents: number }[];
+  selectedIdx: number;
+  onSelectBar: (i: number) => void;
+  animKey: string;
+}) {
+  const W = 375, CH = 190, LABEL_H = 30, H = CH + LABEL_H, PADX = 10, BASE = CH;
+  const n = buckets.length;
+  const gap = n > 8 ? 8 : 14;
+  const bw = (W - PADX * 2 - gap * (n - 1)) / n;
+  const x = (i: number) => PADX + i * (bw + gap);
+
+  const [reveal, setReveal] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setReveal(true), 60); return () => clearTimeout(t); }, []);
+
+  const maxVal = Math.max(...buckets.map(b => b.valueCents), 1);
+  const hOf = (v: number) => v <= 0 ? 6 : 12 + (v / maxVal) * (CH - 40);
+
+  const sel = buckets[selectedIdx];
+  const selX = x(Math.min(selectedIdx, n - 1)) + bw / 2;
+  const selTop = BASE - hOf(sel?.valueCents ?? 0);
+
+  return (
+    <div style={{ position: 'relative', margin: '22px -6px 0' }}>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block', height: 'auto', overflow: 'visible' }}>
+        {Array.from({ length: MAX_SLOTS }, (_, i) => {
+          const active = i < n;
+          const bh = active && reveal ? hOf(buckets[i].valueCents) : 0;
+          const bx = active ? x(i) : W - PADX - bw;
+          return (
+            <rect key={i} className="pd-bar"
+              x={bx} width={Math.max(bw, 1)}
+              y={BASE - bh} height={bh}
+              rx={Math.min(7, bw / 2.4)}
+              fill={i === selectedIdx ? SEL : BAR}
+              style={{ cursor: active ? 'pointer' : 'default', pointerEvents: active ? 'auto' : 'none' }}
+              onClick={() => active && onSelectBar(i)}
+            />
+          );
+        })}
+        {buckets.map((b, i) => (
+          <text key={`${animKey}-${i}`} className="pd-bar-label"
+            x={x(i) + bw / 2} y={CH + 22} textAnchor="middle"
+            fontFamily="Outfit, system-ui" fontWeight="600" fontSize={n > 8 ? 11 : 13} fill={SKY}>
+            {b.label}
+          </text>
+        ))}
+      </svg>
+      {/* Value pill above the selected bar */}
+      {sel && (
+        <div key={`${animKey}-${selectedIdx}`} className="pd-bar-pill"
+          style={{ position: 'absolute', left: `${(selX / W) * 100}%`, top: `${(selTop / H) * 100}%`, transform: 'translate(-50%, calc(-100% - 8px))', background: SEL, color: NAVY, padding: '5px 14px', borderRadius: 999, fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap', boxShadow: '0 6px 16px rgba(88,171,255,0.35)', pointerEvents: 'none' }}>
+          {fmtCompact(sel.valueCents)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PropertyDashboard() {
   const [, setLocation] = useLocation();
   const [tf, setTf] = useState<Timeframe>('week');
@@ -175,8 +237,7 @@ export default function PropertyDashboard() {
             <div style={{ marginTop: 4, color: 'rgba(88,171,255,0.6)', fontWeight: 400, fontSize: 13 }}>{rate}% collection rate</div>
           )}
 
-          {/* Chart slot — Task 3 replaces this placeholder with <RentBarChart /> */}
-          <div style={{ marginTop: 22, minHeight: 220 }} />
+          <RentBarChart buckets={buckets} selectedIdx={selectedIdx} onSelectBar={setSelBar} animKey={`${tf}-${propFilter ?? 'all'}`} />
 
           {/* Notch pointing at the timeframe bar */}
           <svg width="26" height="12" viewBox="0 0 26 12" style={{ position: 'absolute', left: '50%', bottom: -11, transform: 'translateX(-50%)' }}>
@@ -232,4 +293,9 @@ export default function PropertyDashboard() {
 /* ── Injected CSS — indicator slide (Task 4 adds hover/press-glow here) ── */
 const PD_CSS = `
 .pd-tf-ind.animate { transition: left 0.45s cubic-bezier(0.34,1.56,0.64,1), width 0.45s cubic-bezier(0.34,1.56,0.64,1); }
+.pd-bar { transition: x 0.5s cubic-bezier(0.22,1,0.36,1), width 0.5s cubic-bezier(0.22,1,0.36,1), y 0.55s cubic-bezier(0.22,1,0.36,1), height 0.55s cubic-bezier(0.22,1,0.36,1), fill 0.25s ease; }
+.pd-bar-label { animation: pdFadeIn 0.5s ease 0.25s both; }
+.pd-bar-pill { animation: pdPillIn 0.35s cubic-bezier(0.34,1.56,0.64,1) 0.2s both; }
+@keyframes pdFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pdPillIn { from { opacity: 0; transform: translate(-50%, calc(-100% - 2px)) scale(0.85); } to { opacity: 1; transform: translate(-50%, calc(-100% - 8px)) scale(1); } }
 `;
