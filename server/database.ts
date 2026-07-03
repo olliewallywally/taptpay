@@ -1,36 +1,18 @@
-import { drizzle } from 'drizzle-orm/neon-http';
-import { neon } from '@neondatabase/serverless';
-import { merchants, transactions } from '@shared/schema';
-
-let db: ReturnType<typeof drizzle> | null = null;
+// NOTE: This module previously created its own connection via the
+// `neon-http` (fetch-based) driver. That HTTP driver was observed serving
+// stale reads for rows updated moments earlier via the WebSocket `Pool`
+// connection in `./db` (same DATABASE_URL, same table) — e.g. a merchant's
+// `onboardingCompleted`/`emailVerified` flags read back as `false` here long
+// after they were committed as `true`. To keep the whole app reading a
+// single consistent connection, this module now re-exports the same
+// Pool-backed Drizzle instance used everywhere else instead of maintaining
+// a second, independent connection.
+import { db as sharedDb } from './db';
 
 export function getDb() {
-  if (!db) {
-    const connectionString = process.env.DATABASE_URL;
-    
-    if (!connectionString) {
-      console.log('DATABASE_URL not configured. Database operations will not be available.');
-      return null;
-    }
-
-    try {
-      const sql = neon(connectionString);
-      db = drizzle(sql, {
-        schema: { merchants, transactions },
-      });
-      console.log('Database connection established');
-    } catch (error) {
-      console.error('Failed to connect to database:', error);
-      return null;
-    }
-  }
-  
-  return db;
+  return sharedDb;
 }
 
 export function isDatabaseConnected(): boolean {
   return getDb() !== null;
 }
-
-// Initialize database connection
-getDb();
