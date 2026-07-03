@@ -79,7 +79,12 @@ export default function Login() {
 
         const params = new URLSearchParams(window.location.search);
         const returnTo = params.get("returnTo");
-        setLocation(returnTo || "/dashboard");
+        // Use a full navigation (not client-side setLocation) so the
+        // app-wide AuthProvider re-mounts and re-fetches /api/auth/me with
+        // the fresh token. Without this, the auth context stays stuck on
+        // whatever it resolved to before login (e.g. showing onboarding for
+        // an account that has actually already completed it).
+        window.location.href = returnTo || "/dashboard";
       } else {
         localStorage.setItem("adminAuthToken", result.token);
         localStorage.setItem("adminUser", JSON.stringify(result.user));
@@ -89,7 +94,7 @@ export default function Login() {
           description: "Welcome to the Tapt Admin Dashboard",
         });
         
-        setLocation("/admin");
+        window.location.href = "/admin";
       }
     },
     onError: (error: any) => {
