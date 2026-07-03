@@ -26,6 +26,14 @@ const IcoPeeps = () => <svg width={20} height={20} viewBox="0 0 24 24" fill={NAV
 const IcoWarn  = () => <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={SKY} strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5"/><circle cx="12" cy="15.8" r=".9" fill={SKY} stroke="none"/></svg>;
 const IcoChev  = () => <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={SKY} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>;
 
+/* Press → one stroke-glow ring pulse. Remove+reflow+re-add restarts the CSS animation. */
+function pulse(e: React.PointerEvent<HTMLElement>) {
+  const el = e.currentTarget;
+  el.classList.remove('pd-pulse');
+  void el.offsetWidth; // force reflow so the animation restarts
+  el.classList.add('pd-pulse');
+}
+
 /* ── Property filter dropdown — wireframe pill + menu ── */
 function PropertyDropdown({ options, value, onPick }: {
   options: string[]; value: string | null; onPick: (v: string | null) => void;
@@ -44,7 +52,7 @@ function PropertyDropdown({ options, value, onPick }: {
 
   return (
     <div ref={rootRef} style={{ position: 'relative', zIndex: 20 }}>
-      <button type="button" className="pd-tap" onClick={() => setOpen(o => !o)}
+      <button type="button" className="pd-tap" onPointerDown={pulse} onClick={() => setOpen(o => !o)}
         style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 999, background: 'transparent', border: `1.5px solid ${SKY}`, color: SKY, fontWeight: 500, fontSize: 13, cursor: 'pointer', fontFamily: 'Outfit, system-ui', WebkitTapHighlightColor: 'transparent' }}>
         <span style={{ maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value ?? 'all properties'}</span>
         <span style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', display: 'flex' }}><IcoChev /></span>
@@ -94,6 +102,7 @@ function TimeframeBar({ tf, onPick }: { tf: Timeframe; onPick: (t: Timeframe) =>
           style={{ position: 'absolute', top: 4, bottom: 4, left: ind.x, width: ind.w, borderRadius: 999, background: SKY, opacity: ind.on ? 1 : 0 }} />
         {TIMEFRAMES.map((t, i) => (
           <button key={t} type="button" ref={el => (btnRefs.current[i] = el)}
+            className="pd-tap" onPointerDown={pulse}
             onClick={() => onPick(t)}
             style={{ position: 'relative', zIndex: 1, padding: '8px 18px', borderRadius: 999, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'Outfit, system-ui', fontWeight: 600, fontSize: 12.5, textTransform: 'capitalize', color: tf === t ? NAVY : 'rgba(88,171,255,0.75)', transition: 'color 0.25s ease', WebkitTapHighlightColor: 'transparent' }}>
             {t}
@@ -252,7 +261,7 @@ export default function PropertyDashboard() {
 
         {/* ── Stat cards ── */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.15fr', gap: 14, padding: '26px 22px 0' }}>
-          <button type="button" className="pd-card pd-tap" onClick={() => setLocation('/property/tenants')}
+          <button type="button" className="pd-card pd-tap" onPointerDown={pulse} onClick={() => setLocation('/property/tenants')}
             style={{ background: '#FFFFFF', borderRadius: 22, padding: '18px 18px 16px', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'Outfit, system-ui' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ fontWeight: 700, fontSize: 10, color: NAVY, letterSpacing: '0.1em', textTransform: 'uppercase' }}>tenants</div>
@@ -260,7 +269,7 @@ export default function PropertyDashboard() {
             </div>
             <div style={{ marginTop: 22, fontWeight: 800, fontSize: 40, color: NAVY, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{activeTenants}</div>
           </button>
-          <button type="button" className="pd-card pd-tap" onClick={() => setLocation('/property/terminal?stack=overdue')}
+          <button type="button" className="pd-card pd-tap" onPointerDown={pulse} onClick={() => setLocation('/property/terminal?stack=overdue')}
             style={{ background: NAVY, borderRadius: 22, padding: '18px 18px 16px', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'Outfit, system-ui' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ fontWeight: 700, fontSize: 10, color: SKY, letterSpacing: '0.1em', textTransform: 'uppercase' }}>outstanding</div>
@@ -278,7 +287,7 @@ export default function PropertyDashboard() {
             { label: <>send<br />expense</>, Ico: IcoBill, to: '/property/terminal?screen=bill', aria: 'send expense' },
           ].map(({ label, Ico, to, aria }) => (
             <button key={aria} type="button" className="pd-card pd-tap" aria-label={aria}
-              onClick={() => setLocation(to)}
+              onPointerDown={pulse} onClick={() => setLocation(to)}
               style={{ background: '#FFFFFF', borderRadius: 18, padding: '14px 14px 12px', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'Outfit, system-ui', display: 'flex', flexDirection: 'column', gap: 14, minHeight: 88 }}>
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}><Ico /></div>
               <div style={{ fontWeight: 600, fontSize: 12, color: NAVY, lineHeight: 1.3 }}>{label}</div>
@@ -298,4 +307,11 @@ const PD_CSS = `
 .pd-bar-pill { animation: pdPillIn 0.35s cubic-bezier(0.34,1.56,0.64,1) 0.2s both; }
 @keyframes pdFadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes pdPillIn { from { opacity: 0; transform: translate(-50%, calc(-100% - 2px)) scale(0.85); } to { opacity: 1; transform: translate(-50%, calc(-100% - 8px)) scale(1); } }
+.pd-card { box-shadow: 0 4px 14px rgba(4,13,109,0.08); transition: transform 0.18s ease, box-shadow 0.18s ease; -webkit-tap-highlight-color: transparent; }
+.pd-card:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(4,13,109,0.14); }
+.pd-card:active { transform: translateY(0) scale(0.985); }
+.pd-tap { position: relative; }
+.pd-tap::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; box-shadow: 0 0 0 0 rgba(88,171,255,0); }
+.pd-tap.pd-pulse::after { animation: pdRing 0.45s ease-out; }
+@keyframes pdRing { 0% { box-shadow: 0 0 0 0 rgba(88,171,255,0.55); } 100% { box-shadow: 0 0 0 9px rgba(88,171,255,0); } }
 `;
