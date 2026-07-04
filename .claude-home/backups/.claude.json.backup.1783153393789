@@ -1,6 +1,9 @@
 {
   "numStartups": 1,
   "installMethod": "global",
+  "tipsHistory": {
+    "ctx:code-review-before-ship": 1
+  },
   "cachedGrowthBookFeatures": {
     "tengu_shale_finch": false,
     "tengu_basalt_spur": false,
@@ -803,5 +806,8 @@
   "cachedExtraUsageDisabledReason": "out_of_credits",
   "passesUpsellSeenCount": 0,
   "hasVisitedPasses": false,
-  "passesLastSeenRemaining": 3
+  "passesLastSeenRemaining": 3,
+  "tipLifetimeShownCounts": {
+    "ctx:code-review-before-ship": 1
+  }
 }
