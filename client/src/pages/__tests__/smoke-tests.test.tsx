@@ -35,7 +35,6 @@ import SettingsSimple from '../settings-simple';
 import Settings from '../settings';
 import StockManagement from '../stock-management';
 import Transactions from '../transactions';
-import VerifyMerchant from '../verify-merchant';
 
 // Mock auth module
 jest.mock('@/lib/auth', () => ({
@@ -156,7 +155,6 @@ describe('Page Components Smoke Tests', () => {
     { name: 'Settings', component: Settings },
     { name: 'StockManagement', component: StockManagement },
     { name: 'Transactions', component: Transactions },
-    { name: 'VerifyMerchant', component: VerifyMerchant },
   ];
 
   basicComponents.forEach(({ name, component: Component }) => {
@@ -230,7 +228,7 @@ describe('JSX Syntax Validation', () => {
       AdminRevenue, CreateMerchant, CustomerPayment, Dashboard, Exports,
       ForgotPassword, Login, MerchantSignup, MerchantTerminalMobile, MerchantTerminal,
       NfcPayment, NotFound, Receipt, ResetPassword, SettingsSimple, Settings,
-      StockManagement, Transactions, VerifyMerchant
+      StockManagement, Transactions
     ];
 
     // If we reach this point, all imports succeeded (no syntax errors)

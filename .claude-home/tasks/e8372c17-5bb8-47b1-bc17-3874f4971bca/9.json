@@ -1,0 +1,9 @@
+{
+  "id": "9",
+  "subject": "Port client profile to property parity (mobile)",
+  "description": "client-profile partial vs tenant-profile. Match structure + mobile forms.",
+  "activeForm": "Porting client profile",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

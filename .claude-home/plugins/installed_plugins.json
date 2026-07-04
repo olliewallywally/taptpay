@@ -7,16 +7,27 @@
         "installPath": "/home/runner/.claude/plugins/cache/claude-plugins-official/frontend-design/unknown",
         "version": "unknown",
         "installedAt": "2026-06-04T02:45:33.343Z",
+<<<<<<< HEAD
         "lastUpdated": "2026-07-03T19:50:51.392Z"
+=======
+        "lastUpdated": "2026-07-02T22:08:39.414Z"
+>>>>>>> feat/trades-phase3c-cross-cutting
       }
     ],
     "superpowers@claude-plugins-official": [
       {
         "scope": "user",
+<<<<<<< HEAD
         "installPath": "/home/runner/.claude/plugins/cache/claude-plugins-official/superpowers/6.1.1",
         "version": "6.1.1",
         "installedAt": "2026-06-04T02:45:53.764Z",
         "lastUpdated": "2026-07-03T03:52:04.679Z",
+=======
+        "installPath": "/home/runner/.claude/plugins/cache/claude-plugins-official/superpowers/6.1.0",
+        "version": "6.1.0",
+        "installedAt": "2026-06-04T02:45:53.764Z",
+        "lastUpdated": "2026-07-01T20:45:04.926Z",
+>>>>>>> feat/trades-phase3c-cross-cutting
         "gitCommitSha": "6fd4507659784c351abbd2bc264c7162cfd386dc"
       }
     ],
@@ -26,7 +37,11 @@
         "installPath": "/home/runner/.claude/plugins/cache/claude-plugins-official/context7/unknown",
         "version": "unknown",
         "installedAt": "2026-06-04T02:46:20.572Z",
+<<<<<<< HEAD
         "lastUpdated": "2026-07-03T19:50:51.392Z"
+=======
+        "lastUpdated": "2026-07-02T22:08:39.396Z"
+>>>>>>> feat/trades-phase3c-cross-cutting
       }
     ],
     "code-review@claude-plugins-official": [
@@ -35,7 +50,11 @@
         "installPath": "/home/runner/.claude/plugins/cache/claude-plugins-official/code-review/unknown",
         "version": "unknown",
         "installedAt": "2026-06-04T02:46:42.538Z",
+<<<<<<< HEAD
         "lastUpdated": "2026-07-03T19:50:51.392Z"
+=======
+        "lastUpdated": "2026-07-02T22:08:39.405Z"
+>>>>>>> feat/trades-phase3c-cross-cutting
       }
     ],
     "skill-creator@claude-plugins-official": [
@@ -44,7 +63,11 @@
         "installPath": "/home/runner/.claude/plugins/cache/claude-plugins-official/skill-creator/unknown",
         "version": "unknown",
         "installedAt": "2026-06-07T04:49:53.070Z",
+<<<<<<< HEAD
         "lastUpdated": "2026-07-03T19:50:51.390Z"
+=======
+        "lastUpdated": "2026-07-02T22:08:39.443Z"
+>>>>>>> feat/trades-phase3c-cross-cutting
       }
     ],
     "figma@claude-plugins-official": [
@@ -53,7 +76,11 @@
         "installPath": "/home/runner/.claude/plugins/cache/claude-plugins-official/figma/2.2.68",
         "version": "2.2.68",
         "installedAt": "2026-06-07T04:50:10.442Z",
+<<<<<<< HEAD
         "lastUpdated": "2026-07-03T03:52:04.746Z",
+=======
+        "lastUpdated": "2026-06-25T21:47:03.270Z",
+>>>>>>> feat/trades-phase3c-cross-cutting
         "gitCommitSha": "a742f0a700a7772ff5ed85f7c9fc1dad5afa9fcc"
       }
     ]

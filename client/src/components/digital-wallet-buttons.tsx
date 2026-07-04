@@ -251,9 +251,4 @@ export function DigitalWalletButtons({
   );
 }
 
-// Type declarations for Apple Pay
-declare global {
-  interface Window {
-    ApplePaySession: any;
-  }
-}
+// Window augmentations are declared centrally in client/src/global.d.ts.

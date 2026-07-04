@@ -1,0 +1,9 @@
+{
+  "id": "5",
+  "subject": "Verify: tsc, tests, visual run",
+  "description": "tsc --noEmit clean; trades tests pass; grep confirms no forest/graphite rgba left in trades and no property file touched; launch app and screenshot quote screen + dashboard + profile.",
+  "activeForm": "Verifying build and visuals",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

@@ -1,0 +1,103 @@
+import pw from '/home/runner/workspace/node_modules/playwright/index.js';
+const { chromium } = pw;
+import fs from 'fs';
+
+const DIR = '/tmp/claude-1000/-home-runner-workspace/e8372c17-5bb8-47b1-bc17-3874f4971bca/scratchpad/smoke';
+const TOKEN = fs.readFileSync(`${DIR}/token.txt`, 'utf8').trim();
+const BASE = 'http://localhost:5000';
+const log = (...a) => console.log('[drive]', ...a);
+
+const browser = await chromium.launch();
+const ctx = await browser.newContext({ viewport: { width: 430, height: 900 }, acceptDownloads: true });
+const page = await ctx.newPage();
+page.on('console', m => { if (m.type() === 'error') console.log('  [browser console.error]', m.text()); });
+page.on('pageerror', e => console.log('  [browser pageerror]', e.message));
+
+try {
+  // Inject auth token
+  await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' });
+  await page.evaluate(t => localStorage.setItem('authToken', t), TOKEN);
+
+  // --- STEP 1: Settings — toggle GST registered + exclusive (+GST) mode ---
+  await page.goto(`${BASE}/settings`, { waitUntil: 'networkidle' });
+  await page.locator('[data-testid="switch-gst-registered"]').scrollIntoViewIfNeeded();
+  const switchEl = page.locator('[data-testid="switch-gst-registered"]');
+  const before = await switchEl.getAttribute('aria-checked');
+  log('GST switch aria-checked before:', before);
+  if (before !== 'true') await switchEl.click();
+  await page.waitForTimeout(400);
+  // mode toggle appears only when registered
+  await page.locator('[data-testid="button-gst-mode-exclusive"]').click();
+  await page.waitForTimeout(500);
+  const checkedAfter = await switchEl.getAttribute('aria-checked');
+  log('GST switch aria-checked after:', checkedAfter);
+  await page.locator('[data-testid="switch-gst-registered"]').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `${DIR}/01-settings-gst.png` });
+  log('screenshot 01-settings-gst.png');
+
+  // confirm persisted via API
+  const settingsCheck = await page.evaluate(async () => {
+    const r = await fetch('/api/trades/gst-settings', { headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` } });
+    return r.json();
+  });
+  log('persisted gst-settings:', JSON.stringify(settingsCheck));
+
+  // --- STEP 2: Quote builder — build quote, confirm totals labels ---
+  await page.goto(`${BASE}/trades/quote`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(600); // let auth/me + clients load
+  await page.selectOption('select', { index: 1 }); // first real client
+  await page.getByLabel('Item 1 description').fill('Labour');
+  await page.getByLabel('Quantity').first().fill('2');
+  await page.getByLabel('Unit price').first().fill('50');
+  await page.getByRole('button', { name: '+ Add line' }).click();
+  await page.getByLabel('Item 2 description').fill('Callout');
+  await page.getByLabel('Quantity').nth(1).fill('1');
+  await page.getByLabel('Unit price').nth(1).fill('15');
+  await page.waitForTimeout(400);
+
+  // capture the totals card text
+  const totalsText = await page.evaluate(() => {
+    const els = [...document.querySelectorAll('div')];
+    const card = els.find(d => d.textContent.includes('TaptPay fee') && d.textContent.includes('Total'));
+    return card ? card.innerText : '(totals card not found)';
+  });
+  log('TOTALS CARD:\n' + totalsText);
+  await page.locator('text=TaptPay fee').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `${DIR}/02-quote-totals.png` });
+  log('screenshot 02-quote-totals.png');
+
+  // --- STEP 3: Create quote ---
+  await page.getByRole('button', { name: 'Create quote' }).click();
+  await page.waitForSelector('text=Quote created', { timeout: 10000 });
+  const publicUrl = await page.locator('input[readonly]').inputValue();
+  log('quote created. public url:', publicUrl);
+  await page.screenshot({ path: `${DIR}/03-quote-created.png` });
+
+  // --- STEP 4: Merchant download PDF ---
+  const dl1p = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download PDF' }).click();
+  const dl1 = await dl1p;
+  const p1 = `${DIR}/merchant-quote.pdf`;
+  await dl1.saveAs(p1);
+  log('merchant PDF saved:', p1, fs.statSync(p1).size, 'bytes');
+
+  // --- STEP 5: Public quote page download PDF ---
+  const token = publicUrl.split('/').pop();
+  await page.goto(`${BASE}/trades/quote/${token}`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: `${DIR}/04-public-quote.png` });
+  const dl2p = page.waitForEvent('download');
+  await page.getByRole('link', { name: 'Download PDF' }).click();
+  const dl2 = await dl2p;
+  const p2 = `${DIR}/public-quote.pdf`;
+  await dl2.saveAs(p2);
+  log('public PDF saved:', p2, fs.statSync(p2).size, 'bytes');
+
+  log('DONE OK');
+} catch (e) {
+  log('ERROR:', e.message);
+  await page.screenshot({ path: `${DIR}/ERROR.png` }).catch(() => {});
+  process.exitCode = 1;
+} finally {
+  await browser.close();
+}

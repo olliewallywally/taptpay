@@ -518,7 +518,7 @@ function SendRentLink({ go, selectedTenant, amount, onSend, sending, frequency, 
           {splitMode && (
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: BLUE, fontWeight: 600 }}>
               <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={BLUE} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="7" r="3.2"/><circle cx="17" cy="8" r="2.4"/><path d="M3 20c0-3.3 2.7-5.8 6-5.8s6 2.5 6 5.8"/><path d="M17.5 14.3c2.1.3 3.7 2 3.7 4.2"/></svg>
-              split bill enabled — flatmates can divide it
+              split enabled — bill can be divided
             </div>
           )}
         </div>

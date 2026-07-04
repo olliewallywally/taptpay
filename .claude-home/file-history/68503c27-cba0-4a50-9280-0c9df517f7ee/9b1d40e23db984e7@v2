@@ -1,0 +1,29 @@
+# Task 2 Report — Trades quick-invoice split toggle
+
+**Status:** DONE
+**Implemented by:** controller inline (background subagents repeatedly failed on auth/401 mid-run before making any edits; task is single-file transcription with exact code in the plan, so implemented directly to avoid further flaky-auth retries).
+**Commit:** 164bef2 — feat(trades): split-bill toggle on quick invoice
+
+## What changed (all in client/src/pages/trades/trades-terminal.tsx)
+1. Parent state: added `const [splitEnabled, setSplitEnabled] = useState(false);` beside `jobNote` (~line 760).
+2. `invoiceMutation.mutationFn`: added `splitEnabled` to destructured args and `splitEnabled: !!splitEnabled` to the POST body.
+3. `invoiceMutation.onSuccess`: added `setSplitEnabled(false);` to reset after send.
+4. `QuickInvoice` signature: added `splitEnabled, setSplitEnabled` props.
+5. Toggle UI: inserted a split-bill toggle button (mirrors the deposit-toggle pattern, BLUE + rgba(88,171,255,...) accents, no new color literals) after the channel badge and before the `<div style={{ flex: 1 }} />` spacer.
+6. Render usage (`id === 'invoice'`): threaded `splitEnabled`/`setSplitEnabled` props and added `splitEnabled` to the `invoiceMutation.mutate` payload.
+
+Flow verified by reading: state → render prop → mutate payload → mutationFn arg → request body; resets to false on success.
+
+## Tests
+- `npm run check` (tsc): clean, no errors.
+- `npx jest client/src/__tests__/trades-gst.test.ts client/src/__tests__/split-wording.test.ts`: 7/7 PASS, output pristine.
+- Plan-specified smoke tests (`jsx-syntax-smoke`, `syntax-validation`): **cannot run in this environment** — they throw `SyntaxError: Unexpected token '<'` at the test file's own line 39 (`Router: ({ children }) => <div>...`). Confirmed pre-existing: the same suites fail identically on the clean base commit 156302e (with my change stashed), reporting "0 total" — a jest JSX-transform config problem in the harness, not caused by this change. tsc is the meaningful gate for this JSX edit.
+
+## Self-review
+- Completeness: all 5 edit points applied per plan. ✅
+- YAGNI: no extra features; no other screens touched. ✅
+- Pattern match: toggle styled exactly like the existing deposit toggle. ✅
+- No new color literals. ✅
+
+## Concerns
+- The plan's smoke-test verification step is unrunnable in this environment (pre-existing harness config issue). Flagging for the final review / future plans; not a defect in this change.

@@ -30,7 +30,6 @@ const ForgotPassword        = lazy(() => import("@/pages/forgot-password"));
 const ResetPassword         = lazy(() => import("@/pages/reset-password"));
 const NewAdminDashboard     = lazy(() => import("@/pages/admin/AdminDashboard"));
 const CreateMerchant        = lazy(() => import("@/pages/create-merchant"));
-const VerifyMerchant        = lazy(() => import("@/pages/verify-merchant"));
 const StockManagement       = lazy(() => import("@/pages/stock-management"));
 const LegalPage             = lazy(() => import("@/pages/legal"));
 const InfoPage              = lazy(() => import("@/pages/info"));
@@ -48,6 +47,14 @@ const TenantDirectory       = lazy(() => import("@/pages/property/tenant-directo
 const TenantProfile         = lazy(() => import("@/pages/property/tenant-profile"));
 const PropertyAnalytics     = lazy(() => import("@/pages/property/property-analytics"));
 const PropertyTerminal      = lazy(() => import("@/pages/property/property-terminal"));
+const TradesDashboard       = lazy(() => import("@/pages/trades/trades-dashboard"));
+const TradesClientDirectory = lazy(() => import("@/pages/trades/client-directory"));
+const TradesClientProfile   = lazy(() => import("@/pages/trades/client-profile"));
+const TradesAnalytics       = lazy(() => import("@/pages/trades/trades-analytics"));
+const TradesTerminal        = lazy(() => import("@/pages/trades/trades-terminal"));
+const TradesQuoteBuilder    = lazy(() => import("@/pages/trades/quote-builder"));
+const TradesQuoteResponse   = lazy(() => import("@/pages/trades/quote-response"));
+const TradesRecurring       = lazy(() => import("@/pages/trades/recurring-schedules"));
 
 function PageLoader() {
   return (
@@ -65,6 +72,8 @@ type AuthData = {
   merchantId?: string | null;
   role?: string | null;
   onboardingCompleted?: boolean | null;
+  gstRegistered?: boolean;
+  tradeGstMode?: "inclusive" | "exclusive";
 };
 
 const AuthContext = createContext<{ auth: AuthData | null; isChecking: boolean }>({
@@ -92,6 +101,8 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
             merchantId: data?.user?.merchantId ?? null,
             role: data?.user?.role ?? null,
             onboardingCompleted: data?.user?.onboardingCompleted ?? null,
+            gstRegistered: data?.user?.gstRegistered ?? false,
+            tradeGstMode: data?.user?.tradeGstMode === "exclusive" ? "exclusive" : "inclusive",
           });
         } else {
           localStorage.removeItem("authToken");
@@ -267,6 +278,29 @@ function Router() {
           <Route path="/property/terminal">
             <ProtectedRoute><PropertyTerminal /></ProtectedRoute>
           </Route>
+          {/* ── Trades section ── */}
+          <Route path="/trades">
+            <ProtectedRoute><TradesDashboard /></ProtectedRoute>
+          </Route>
+          <Route path="/trades/clients">
+            <ProtectedRoute><TradesClientDirectory /></ProtectedRoute>
+          </Route>
+          <Route path="/trades/clients/:id">
+            <ProtectedRoute><TradesClientProfile /></ProtectedRoute>
+          </Route>
+          <Route path="/trades/analytics">
+            <ProtectedRoute><TradesAnalytics /></ProtectedRoute>
+          </Route>
+          <Route path="/trades/terminal">
+            <ProtectedRoute><TradesTerminal /></ProtectedRoute>
+          </Route>
+          <Route path="/trades/quote">
+            <ProtectedRoute><TradesQuoteBuilder /></ProtectedRoute>
+          </Route>
+          <Route path="/trades/quote/:token" component={TradesQuoteResponse} />
+          <Route path="/trades/recurring">
+            <ProtectedRoute><TradesRecurring /></ProtectedRoute>
+          </Route>
           {/* Public rent/charge checkout — no auth required. Uses the shared
               branded Checkout page (same UI as retail) via the invoice token. */}
           <Route path="/r/:token" component={Checkout} />
@@ -279,7 +313,6 @@ function Router() {
           <Route path="/app-login" component={AppLogin} />
           <Route path="/terms" component={LegalPage} />
           <Route path="/privacy" component={LegalPage} />
-          <Route path="/verify-merchant" component={VerifyMerchant} />
           <Route path="/pay/:merchantId" component={CustomerPayment} />
           <Route path="/pay/:merchantId/stone/:stoneId" component={CustomerPayment} />
           <Route path="/checkout/:transactionId" component={Checkout} />

@@ -11,9 +11,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { isNativeApp, isNativeIOS } from "@/lib/native";
+import { TRADES_THEME } from "@/lib/trades-theme";
 import { Switch } from "@/components/ui/switch";
 import { 
-  Upload, CheckCircle, XCircle, LogOut, AlertCircle, Bell, BellOff, ChevronDown, Printer, ArrowRight
+  Upload, CheckCircle, XCircle, LogOut, AlertCircle, Bell, BellOff, ChevronDown, Printer, ArrowRight, CreditCard, Building2, Wrench
 } from "lucide-react";
 
 function SettingsSection({ title, isOpen, onToggle, children }: {
@@ -124,6 +125,27 @@ export default function Settings() {
   const [pushLoading, setPushLoading] = useState(false);
   const [pushSupported, setPushSupported] = useState(false);
   const [vapidAvailable, setVapidAvailable] = useState(false);
+
+  const [gstRegistered, setGstRegistered] = useState(false);
+  const [tradeGstMode, setTradeGstMode] = useState<"inclusive" | "exclusive">("inclusive");
+
+  useEffect(() => {
+    apiRequest("GET", "/api/trades/gst-settings")
+      .then(r => r.json())
+      .then(data => {
+        setGstRegistered(!!data.gstRegistered);
+        setTradeGstMode(data.tradeGstMode === "exclusive" ? "exclusive" : "inclusive");
+      })
+      .catch(() => {});
+  }, []);
+
+  const saveGst = (patch: { gstRegistered?: boolean; tradeGstMode?: "inclusive" | "exclusive" }) => {
+    if (patch.gstRegistered !== undefined) setGstRegistered(patch.gstRegistered);
+    if (patch.tradeGstMode) setTradeGstMode(patch.tradeGstMode);
+    apiRequest("PUT", "/api/trades/gst-settings", patch).catch(() => {
+      toast({ title: "Could not save GST setting", variant: "destructive" });
+    });
+  };
 
   useEffect(() => {
     if (isNativeIOS()) {
@@ -786,6 +808,39 @@ export default function Settings() {
                 data-testid="input-gst-number"
               />
             </div>
+
+            <div className="border-t border-gray-100 pt-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <Label className="font-semibold text-base block" style={{ color: TRADES_THEME.INK }}>GST registered (Trades)</Label>
+                  <p className="text-sm text-gray-500 mt-1">Show GST on trades quotes and invoices.</p>
+                </div>
+                <Switch
+                  checked={gstRegistered}
+                  onCheckedChange={(value) => saveGst({ gstRegistered: value })}
+                  data-testid="switch-gst-registered"
+                />
+              </div>
+              {gstRegistered && (
+                <div className="mt-4">
+                  <Label className="font-semibold text-sm block mb-2" style={{ color: TRADES_THEME.INK }}>Quote prices shown as</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["inclusive", "exclusive"] as const).map(mode => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => saveGst({ tradeGstMode: mode })}
+                        className="rounded-xl py-2 text-sm font-semibold transition-colors"
+                        style={{ background: tradeGstMode === mode ? TRADES_THEME.INK : "#F3F4F6", color: tradeGstMode === mode ? TRADES_THEME.OFFW : "#4B5563" }}
+                        data-testid={`button-gst-mode-${mode}`}
+                      >
+                        {mode === "inclusive" ? "Incl GST" : "+ GST"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           <Button
@@ -1188,14 +1243,14 @@ export default function Settings() {
           </button>
           <button
             onClick={() => setLocation('/trades')}
-            style={{ flex: 1, background: '#1A1D21', borderRadius: 16, padding: '14px 10px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
+            style={{ flex: 1, background: TRADES_THEME.INK, borderRadius: 16, padding: '14px 10px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
           >
-            <div style={{ width: 34, height: 34, borderRadius: 11, background: 'rgba(255,122,26,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#FF7A1A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a4 4 0 00-5.4 5.4l-6 6a1.5 1.5 0 002.1 2.1l6-6a4 4 0 005.4-5.4l-2.3 2.3-2.1-2.1z"/></svg>
+            <div style={{ width: 34, height: 34, borderRadius: 11, background: 'rgba(244,244,244,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={TRADES_THEME.OFFW} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a4 4 0 00-5.4 5.4l-6 6a1.5 1.5 0 002.1 2.1l6-6a4 4 0 005.4-5.4l-2.3 2.3-2.1-2.1z"/></svg>
             </div>
             <div style={{ textAlign: 'left', minWidth: 0 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: '#FFFFFF', letterSpacing: '-0.2px' }}>Trades</div>
-              <div style={{ fontWeight: 400, fontSize: 10, color: 'rgba(255,122,26,0.72)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>quotes · jobs</div>
+              <div style={{ fontWeight: 700, fontSize: 13, color: TRADES_THEME.OFFW, letterSpacing: '-0.2px' }}>Trades</div>
+              <div style={{ fontWeight: 400, fontSize: 10, color: 'rgba(244,244,244,0.72)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>quotes · jobs</div>
             </div>
           </button>
         </div>

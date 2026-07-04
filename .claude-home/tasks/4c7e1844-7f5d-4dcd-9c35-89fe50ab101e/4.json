@@ -1,0 +1,9 @@
+{
+  "id": "4",
+  "subject": "Write & self-review Phase 2 spec, get user review",
+  "description": "Save spec to docs/superpowers/specs/, self-review for placeholders/consistency, commit, ask user to review.",
+  "activeForm": "Writing and reviewing Phase 2 spec",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

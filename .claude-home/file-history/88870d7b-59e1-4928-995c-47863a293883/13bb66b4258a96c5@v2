@@ -1,0 +1,51 @@
+import pw from '/home/runner/workspace/node_modules/playwright/index.js';
+const { chromium } = pw;
+
+const BASE = 'http://localhost:5000';
+const OUT = '/tmp/claude-1000/-home-runner-workspace/88870d7b-59e1-4928-995c-47863a293883/scratchpad';
+
+// 1. Mint a JWT for an existing verified merchant (no user rows in this DB).
+const jwtMod = await import('/home/runner/workspace/node_modules/jsonwebtoken/index.js');
+const jwt = jwtMod.default;
+const MERCHANT_ID = 32;
+const token = jwt.sign(
+  { userId: MERCHANT_ID, email: 'testcafe@taptpay.co.nz', merchantId: MERCHANT_ID, role: 'merchant' },
+  process.env.JWT_SECRET,
+  { expiresIn: '1h' },
+);
+const data = { token };
+console.log('minted token for merchant', MERCHANT_ID);
+
+const browser = await chromium.launch();
+const ctx = await browser.newContext({ viewport: { width: 430, height: 880 }, deviceScaleFactor: 2 });
+const page = await ctx.newPage();
+page.on('console', m => { if (m.type() === 'error') console.log('PAGE ERR:', m.text()); });
+
+// 2. Seed token into localStorage
+await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' });
+await page.evaluate(t => localStorage.setItem('authToken', t), data.token);
+
+async function shot(path, name, action) {
+  await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1400);
+  if (action) { await action(); await page.waitForTimeout(1200); }
+  await page.screenshot({ path: `${OUT}/${name}.png` });
+  console.log('shot', name);
+}
+
+// 3. Terminal -> tap "quote" subbar item
+await shot('/trades/terminal', 'terminal-home');
+await shot('/trades/terminal', 'terminal-quote', async () => {
+  const btn = page.locator('button[aria-label="quote"], .tp-subbar-btn', { hasText: 'quote' }).first();
+  await btn.click({ timeout: 4000 }).catch(async () => {
+    // fallback: click by text
+    await page.getByText('quote', { exact: true }).first().click({ timeout: 4000 }).catch(() => {});
+  });
+});
+// 4. Dashboard
+await shot('/trades', 'dashboard');
+// 5. Standalone quote route
+await shot('/trades/quote', 'quote-standalone');
+
+await browser.close();
+console.log('done');

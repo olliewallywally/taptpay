@@ -1,0 +1,9 @@
+{
+  "id": "1",
+  "subject": "Explore property frontend structure",
+  "description": "Understand how property vertical's frontend is wired (App.tsx routes, settings switcher, page shells, theme) so Phase 2 trades can mirror it.",
+  "activeForm": "Exploring property frontend structure",
+  "status": "completed",
+  "blocks": [],
+  "blockedBy": []
+}

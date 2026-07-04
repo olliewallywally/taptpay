@@ -81,12 +81,15 @@ export default function Login() {
 
         const params = new URLSearchParams(window.location.search);
         const returnTo = params.get("returnTo");
-        // Use a full navigation (not client-side setLocation) so the
-        // app-wide AuthProvider re-mounts and re-fetches /api/auth/me with
-        // the fresh token. Without this, the auth context stays stuck on
-        // whatever it resolved to before login (e.g. showing onboarding for
-        // an account that has actually already completed it).
-        window.location.href = returnTo || "/dashboard";
+        // Only honour same-origin absolute paths ("/...", not "//host" or
+        // "scheme://"): returnTo is reflected from the URL, and a hard
+        // navigation to it would otherwise be an open redirect.
+        const dest = returnTo && /^\/(?!\/)/.test(returnTo) ? returnTo : "/dashboard";
+        // Full-page navigation (not SPA setLocation): AuthProvider only checks
+        // auth once on mount, so a client-side route change would leave its
+        // cached state stale and ProtectedRoute would bounce back to /login.
+        // A hard navigation re-initialises auth with the just-stored token.
+        window.location.href = dest;
       } else {
         localStorage.setItem("adminAuthToken", result.token);
         localStorage.setItem("adminUser", JSON.stringify(result.user));

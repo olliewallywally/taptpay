@@ -1,0 +1,9 @@
+{
+  "id": "7",
+  "subject": "Port analytics to full property parity",
+  "description": "trades-analytics is a 48-line stub. Mirror property-analytics, trades theme + domain.",
+  "activeForm": "Porting analytics",
+  "status": "completed",
+  "blocks": [],
+  "blockedBy": []
+}

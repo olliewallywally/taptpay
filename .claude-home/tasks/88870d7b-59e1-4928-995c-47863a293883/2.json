@@ -1,0 +1,9 @@
+{
+  "id": "2",
+  "subject": "Fix dashboard/profile dark-surface text contrast",
+  "description": "ACCENT was a dark card surface with light text; now it's sky-blue. Flip text/icon colors on those panels to navy, matching PM dashboard/tenant-profile.",
+  "activeForm": "Fixing dashboard/profile text contrast",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

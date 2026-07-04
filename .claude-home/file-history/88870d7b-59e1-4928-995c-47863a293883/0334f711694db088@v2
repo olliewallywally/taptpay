@@ -1,0 +1,6 @@
+- [TaptPay design language](taptpay-design-language.md) — landing page is the user's own PR #2 design; they prefer implementing their concrete designs over Claude designing from a brief
+- [Trades vertical project](trades-vertical-project.md) — building 3rd vertical (Trades) mirroring Property; approved spec + key decisions
+- [Trades branch git state](trades-branch-git-state.md) — split-bill work safe in a single stash; restore steps
+- [DB schema drift & FK sequences](db-schema-drift-fk-sequences.md) — latent bug: FK cols have rogue auto-increment; never db:push from main-based branch
+- [Trades phase3c backup state](trades-phase3c-backup-state.md) — quote redesign + navy/sky recolor; committed b43e72f + bundle/patch backups after Nix env crashed mid-session
+- [Avoid Playwright install on Replit Nix](avoid-playwright-install-replit-nix.md) — never install browsers / scan /nix here; it crashes the snix-castore FUSE store

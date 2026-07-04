@@ -19,7 +19,11 @@
         "url": "https://github.com/42Crunch-AI/claude-plugins.git",
         "path": "plugins/api-security-testing",
         "ref": "v1.5.5",
+<<<<<<< HEAD
         "sha": "a1539ca3dcc56a9dd396e76a636d56c81cf6cafd"
+=======
+        "sha": "0f325999a7106eadb2d0ecbcccabf6c12dc06aef"
+>>>>>>> feat/trades-phase3c-cross-cutting
       },
       "homepage": "https://42crunch.com"
     },
@@ -191,7 +195,11 @@
       "source": {
         "source": "url",
         "url": "https://github.com/apollographql/skills.git",
+<<<<<<< HEAD
         "sha": "7df6a608dd71f937e664b19183fb60d101bb13a1"
+=======
+        "sha": "7a76acd4b60c41a33cbc4126c98177e51b27b2f3"
+>>>>>>> feat/trades-phase3c-cross-cutting
       },
       "homepage": "https://www.apollographql.com"
     },
@@ -414,7 +422,11 @@
         "url": "https://github.com/awslabs/agent-plugins.git",
         "path": "plugins/aws-transform",
         "ref": "main",
+<<<<<<< HEAD
         "sha": "23dc619d35f848fd03b12d45d0e16c191d40d1e6"
+=======
+        "sha": "283d86f528c2d2269928ab77f707e659a7e597fe"
+>>>>>>> feat/trades-phase3c-cross-cutting
       },
       "homepage": "https://github.com/awslabs/agent-plugins"
     },
@@ -567,7 +579,11 @@
         "url": "https://github.com/carta/plugins.git",
         "path": "plugins/carta-cap-table",
         "ref": "main",
+<<<<<<< HEAD
         "sha": "74dcec2b733f150c11b6d7c59b7a37e63da79a82"
+=======
+        "sha": "0f7d5f3f1c71ae5d5715494621764fda0fbb0776"
+>>>>>>> feat/trades-phase3c-cross-cutting
       },
       "homepage": "https://carta.com"
     },
@@ -599,7 +615,11 @@
         "url": "https://github.com/carta/plugins.git",
         "path": "plugins/carta-investors",
         "ref": "main",
+<<<<<<< HEAD
         "sha": "515c08928d76d3b1b515a63a82bf7272dff1578f"
+=======
+        "sha": "0f7d5f3f1c71ae5d5715494621764fda0fbb0776"
+>>>>>>> feat/trades-phase3c-cross-cutting
       },
       "homepage": "https://carta.com"
     },
@@ -626,7 +646,11 @@
       "source": {
         "source": "url",
         "url": "https://github.com/ChromeDevTools/chrome-devtools-mcp.git",
+<<<<<<< HEAD
         "sha": "913308263bdc8042af74924b68dc39a374ad071d"
+=======
+        "sha": "cf003051706619ca084235020f62a4d6902fb226"
+>>>>>>> feat/trades-phase3c-cross-cutting
       },
       "homepage": "https://github.com/ChromeDevTools/chrome-devtools-mcp"
     },
@@ -920,7 +944,11 @@
       "source": {
         "source": "url",
         "url": "https://github.com/get-convex/convex-backend-skill.git",
+<<<<<<< HEAD
         "sha": "f40fdfe436e90a81b0cccacad320cfeff10ff2d5"
+=======
+        "sha": "1c8025f558df0cd3d2f650bca20f1c93d3ab2aa3"
+>>>>>>> feat/trades-phase3c-cross-cutting
       },
       "homepage": "https://github.com/get-convex/convex-backend-skill",
       "keywords": [
@@ -997,7 +1025,11 @@
       "source": {
         "source": "url",
         "url": "https://github.com/dash0hq/dash0-agent-plugin.git",
+<<<<<<< HEAD
         "sha": "4aed2d535f3ee5e7c7e24f58163c2f369ae2b4b1"
+=======
+        "sha": "28a71f7f0d449197336b941b7186e59d3a5acfa1"
+>>>>>>> feat/trades-phase3c-cross-cutting
       },
       "homepage": "https://dash0.com/"
     },
@@ -1061,7 +1093,11 @@
         "url": "https://github.com/databricks/databricks-agent-skills.git",
         "path": "plugins/databricks/claude",
         "ref": "main",
+<<<<<<< HEAD
         "sha": "579e6bb4dc199f5be59c8597dcd142cbf9c0d036"
+=======
+        "sha": "917055a6e1d82860a98a685f5c15ee9ea57b0f53"
+>>>>>>> feat/trades-phase3c-cross-cutting
       },
       "homepage": "https://developers.databricks.com/"
     },
@@ -1277,7 +1313,11 @@
       "source": {
         "source": "url",
         "url": "https://github.com/fastly/fastly-agent-toolkit.git",
+<<<<<<< HEAD
         "sha": "6351c84a5747eeb56111181a6babae6d78880092"
+=======
+        "sha": "9a273f0b2f7a496355b6ec30c1b34614a80bf805"
+>>>>>>> feat/trades-phase3c-cross-cutting
       },
       "homepage": "https://github.com/fastly/fastly-agent-toolkit/blob/main/README.md"
     },
@@ -1522,7 +1562,11 @@
       "source": {
         "source": "url",
         "url": "https://github.com/huggingface/skills.git",
+<<<<<<< HEAD
         "sha": "4948baec814c92edd91024b76d8c2ffa6df4eb70"
+=======
+        "sha": "35e8c35a1ae5b462e0bb23d444d25569c3bb6700"
+>>>>>>> feat/trades-phase3c-cross-cutting
       },
       "homepage": "https://github.com/huggingface/skills.git"
     },
@@ -1550,7 +1594,11 @@
       "source": {
         "source": "url",
         "url": "https://github.com/heygen-com/hyperframes.git",
+<<<<<<< HEAD
         "sha": "dd774b3692e71656b038cb2d5a11f05ba52c2880"
+=======
+        "sha": "a7c3cc7d689b13c5bb96559f9bad713205edb194"
+>>>>>>> feat/trades-phase3c-cross-cutting
       },
       "homepage": "https://hyperframes.heygen.com"
     },
@@ -1965,7 +2013,11 @@
       "source": {
         "source": "url",
         "url": "https://github.com/mergifyio/mergify-cli.git",
+<<<<<<< HEAD
         "sha": "42ac9048a2bee08f724ee87a9d70589c0b8fb4e1"
+=======
+        "sha": "4efb5cbc393e5e10a0c27aff5a854c187e5e5ac9"
+>>>>>>> feat/trades-phase3c-cross-cutting
       },
       "homepage": "https://mergify.com"
     },
@@ -1992,7 +2044,11 @@
         "url": "https://github.com/awslabs/startups.git",
         "path": "migrate/plugins/migration-to-aws",
         "ref": "main",
+<<<<<<< HEAD
         "sha": "cc6609038a5cb89c1b85f1f97283439eb0ee256b"
+=======
+        "sha": "5c85895eef7fab5bc0839a0704f940a726c55b10"
+>>>>>>> feat/trades-phase3c-cross-cutting
       },
       "homepage": "https://github.com/awslabs/startups"
     },
@@ -2143,7 +2199,11 @@
         "url": "https://github.com/NVIDIA/skills.git",
         "path": "plugins/nvidia-skills",
         "ref": "main",
+<<<<<<< HEAD
         "sha": "63c02e122e3c9cbf85e2dbc4d3b56425a5465926"
+=======
+        "sha": "55f8f7a5a4d77ed14f57e74c786fa04d193b6541"
+>>>>>>> feat/trades-phase3c-cross-cutting
       },
       "homepage": "https://github.com/NVIDIA/skills"
     },
@@ -2221,7 +2281,11 @@
         "url": "https://github.com/growthxai/output.git",
         "path": "coding_assistants/claude/plugins/outputai",
         "ref": "main",
+<<<<<<< HEAD
         "sha": "9d7a8708d9f9d13f91895263f90f583568239828"
+=======
+        "sha": "38ae07ca87a97251f6e44886c4f3737c06960546"
+>>>>>>> feat/trades-phase3c-cross-cutting
       },
       "homepage": "https://output.ai"
     },
@@ -2517,7 +2581,11 @@
         "url": "https://github.com/railwayapp/railway-skills.git",
         "path": "plugins/railway",
         "ref": "main",
+<<<<<<< HEAD
         "sha": "770b6d16afd8257cc968a0ada598a2e52ecc8a9d"
+=======
+        "sha": "fb1956d20ffae1a5a7ddc2673f58f9bfa15fce93"
+>>>>>>> feat/trades-phase3c-cross-cutting
       },
       "homepage": "https://docs.railway.com/ai/claude-code-plugin"
     },
@@ -2540,7 +2608,11 @@
         "source": "url",
         "url": "https://github.com/RevenueCat/rc-claude-code-plugin.git",
         "path": "revenuecat",
+<<<<<<< HEAD
         "sha": "f9c61f12e434b3933f556a5ca169eff20cb27094"
+=======
+        "sha": "7d922e9d756dc330a369a761345f88495c3a5a1f"
+>>>>>>> feat/trades-phase3c-cross-cutting
       },
       "homepage": "https://www.revenuecat.com"
     },
@@ -2606,7 +2678,11 @@
         "source": "url",
         "url": "https://github.com/RevenueCat/rc-claude-code-plugin.git",
         "path": "revenuecat",
+<<<<<<< HEAD
         "sha": "f9c61f12e434b3933f556a5ca169eff20cb27094"
+=======
+        "sha": "7d922e9d756dc330a369a761345f88495c3a5a1f"
+>>>>>>> feat/trades-phase3c-cross-cutting
       },
       "homepage": "https://www.revenuecat.com"
     },
@@ -2753,7 +2829,11 @@
         "url": "https://github.com/SAP/open-ux-tools.git",
         "path": "packages/fiori-mcp-server",
         "ref": "main",
+<<<<<<< HEAD
         "sha": "fd246c48345d6405d7686aeeccab86a9b62a91d1"
+=======
+        "sha": "c5ecab3c1fefedc12ec39e326c658a15adee1877"
+>>>>>>> feat/trades-phase3c-cross-cutting
       },
       "homepage": "https://github.com/SAP/open-ux-tools/tree/main/packages/fiori-mcp-server"
     },
@@ -2852,7 +2932,11 @@
         "url": "https://github.com/getsentry/cli.git",
         "path": "plugins/sentry-cli",
         "ref": "main",
+<<<<<<< HEAD
         "sha": "564f0fc7e091a88c5b92d135432add7e23de1412"
+=======
+        "sha": "332b27f562b4f992133fb39e76304c1327706668"
+>>>>>>> feat/trades-phase3c-cross-cutting
       },
       "homepage": "https://sentry.io"
     },
@@ -2939,7 +3023,11 @@
       "source": {
         "source": "url",
         "url": "https://github.com/slackapi/slack-mcp-plugin.git",
+<<<<<<< HEAD
         "sha": "39066985fc32cede7d953a679f931003368a2cdc"
+=======
+        "sha": "44af86dab9ccc227a6ae6c4371727185cf530e6e"
+>>>>>>> feat/trades-phase3c-cross-cutting
       },
       "homepage": "https://github.com/slackapi/slack-mcp-plugin/tree/main"
     },
@@ -2969,7 +3057,11 @@
       "source": {
         "source": "url",
         "url": "https://github.com/SonarSource/sonarqube-agent-plugins.git",
+<<<<<<< HEAD
         "sha": "63c286b56fe9a6b142c117bc347d1a1bd5abadff"
+=======
+        "sha": "5b4783d8749074e8e0c26ca8590990b1489771eb"
+>>>>>>> feat/trades-phase3c-cross-cutting
       },
       "homepage": "https://www.sonarsource.com"
     },
@@ -3029,7 +3121,11 @@
         "url": "https://github.com/stripe/ai.git",
         "path": "providers/claude/plugin",
         "ref": "main",
+<<<<<<< HEAD
         "sha": "b8d7e28d0cc5690fb0c0be54c84cbfdd7df6e4cd"
+=======
+        "sha": "b2157ec24d37736756cb077f0681f366f5aed591"
+>>>>>>> feat/trades-phase3c-cross-cutting
       },
       "homepage": "https://github.com/stripe/ai/tree/main/providers/claude/plugin"
     },
@@ -3063,7 +3159,11 @@
       "source": {
         "source": "url",
         "url": "https://github.com/obra/superpowers.git",
+<<<<<<< HEAD
         "sha": "d884ae04edebef577e82ff7c4e143debd0bbec99"
+=======
+        "sha": "f268f7c953744036f0fa7e9d4b73535c04e57cb8"
+>>>>>>> feat/trades-phase3c-cross-cutting
       },
       "homepage": "https://github.com/obra/superpowers.git"
     },
@@ -3204,7 +3304,11 @@
         "url": "https://github.com/UI5/plugins-coding-agents.git",
         "path": "plugins/ui5",
         "ref": "main",
+<<<<<<< HEAD
         "sha": "c61e0b7fc7e38168f1df4f705f54c57e59d44c98"
+=======
+        "sha": "d1e3a43fa80ef160cb42689b88d665e25a5a81a1"
+>>>>>>> feat/trades-phase3c-cross-cutting
       },
       "homepage": "https://github.com/UI5/plugins-coding-agents"
     },
@@ -3362,7 +3466,11 @@
       "source": {
         "source": "url",
         "url": "https://github.com/wix/skills.git",
+<<<<<<< HEAD
         "sha": "39165b47e23b613312c5dcf5eecc2275d428682b"
+=======
+        "sha": "483d35bb7bf5e59268d938cc03802cac9a324508"
+>>>>>>> feat/trades-phase3c-cross-cutting
       },
       "homepage": "https://dev.wix.com/docs/wix-cli/guides/development/about-wix-skills"
     },
@@ -3497,7 +3605,11 @@
       "source": {
         "source": "url",
         "url": "https://github.com/zytedata/claude-skills.git",
+<<<<<<< HEAD
         "sha": "adb02df6aca7bce7c4d8614e1dd24ea1682e8ad5"
+=======
+        "sha": "7f9d853e65c917692142c5813b7442787544ca95"
+>>>>>>> feat/trades-phase3c-cross-cutting
       },
       "homepage": "https://www.zyte.com"
     }

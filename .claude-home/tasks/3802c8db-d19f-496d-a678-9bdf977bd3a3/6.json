@@ -1,0 +1,9 @@
+{
+  "id": "6",
+  "subject": "User reviews spec, then writing-plans",
+  "description": "Get user spec approval, then invoke writing-plans skill.",
+  "activeForm": "Finalizing spec and planning",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

@@ -1,0 +1,16 @@
+the graph at the top is clickable able on each bar and small pill bubble above appears with total rent collected that day, week, month etc. the action bar below allows you to select the day, week or year to view revenue by i want that action bar to have the same slup effect as the action bar on the terminal page.
+
+above the graph is a collection rate, this will be the % of rent payments sent that action get paid
+the small pill wire frame next to the large hero $$ figure shows how much you are up on rent % from eith the previous week, month or year depending which is selected in the action bar.
+
+The graph will smoothly animate when selecting betweek day, week, month, year etc, thge bars will smoothly move over and more bars will smoothly animated in by fill up from button to top etc and same way in reverse to go away depending what filer you are on. 
+
+there is a all properties drop down on the top right, this allows them toi filter per property or the whole portfolio. button is a wireframe pill design 
+
+Dashboard - Overdue - clicks and takes you to active stack, need to add a filter to the active stack to filer based on status 
+send reminder - takes you to active stack list with a filter turned to the overdue payments that have a reminder button on it.
+send expenses - takes you to the bills feature page on the termianal
+set up rent payment - takes you to the first feature page on the terminal when you click the plus button, the page that links to is where i want this shortcut to take you
+active tenants takes to tenant profile page 
+
+each button will have a suttle stroke glow that rings around the button when you press it, hover effect and sublte drop shadow
