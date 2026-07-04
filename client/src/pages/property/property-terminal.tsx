@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { propFetch } from "@/lib/property-api";
+import { WireframeLiquidButton } from "@/components/wireframe-liquid-button";
 
 /* ═══ TOKENS ═══ */
 const NAVY = '#040D6D';
@@ -539,14 +540,9 @@ function SendRentLink({ go, selectedTenant, amount, onSend, sending, frequency, 
 
         <div style={{ flex: 1 }} />
 
-        <button
-          className="tp-cta"
-          onClick={onSend}
-          disabled={sending}
-          style={{ minWidth: 220, opacity: sending ? 0.65 : 1 }}
-        >
+        <WireframeLiquidButton onClick={onSend} busy={sending} style={{ minWidth: 220 }}>
           {sending ? 'sending…' : recurring ? 'send & automate' : 'send rent request'}
-        </button>
+        </WireframeLiquidButton>
       </div>
     </div>
   );
