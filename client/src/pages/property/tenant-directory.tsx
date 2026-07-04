@@ -370,20 +370,21 @@ export default function TenantDirectory() {
 
   return (
     <div style={{ background: C.white, minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
-    <div style={{ width: '100%', maxWidth: 369, minHeight: '100svh', background: C.sheet, paddingBottom: 128, fontFamily: "'Outfit', system-ui, sans-serif", overflow: 'hidden' }}>
+    <div style={{ width: '100%', maxWidth: 430, minHeight: '100svh', background: C.sheet, paddingBottom: 128, fontFamily: "'Outfit', system-ui, sans-serif", overflow: 'hidden' }}>
       <style>{DIRECTORY_CSS}</style>
 
       {/* Hero — carries view-transition-name so it morphs into the profile hero */}
       <section ref={heroRef} className="pt-hero tdir-hero">
-        <div className="tdir-hero-count">{activeTenants.length}</div>
-        <div className="tdir-hero-label">{tenantCountLabel}</div>
+        {/* Contents bounce, not the section — its view-transition morph needs a stable box */}
+        <div className="pt-bounce tdir-hero-count" style={{ '--pt-d': '0ms' } as any}>{activeTenants.length}</div>
+        <div className="pt-bounce tdir-hero-label" style={{ '--pt-d': '60ms' } as any}>{tenantCountLabel}</div>
       </section>
 
       <main className="tdir-body">
         <button type="button" className="tdir-add" onPointerDown={pulse} onClick={() => setShowAdd(true)} aria-label="Add tenant">
           <svg width={26} height={26} viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="2.6" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
         </button>
-        <div className="tdir-search-row">
+        <div className="pt-bounce tdir-search-row" style={{ '--pt-d': '140ms' } as any}>
           <label className="tdir-search">
             <input
               value={search}
@@ -408,15 +409,15 @@ export default function TenantDirectory() {
 
         <div className="tdir-list">
           {isLoading ? (
-            <div className="tdir-empty">loading tenants...</div>
+            <div className="pt-bounce tdir-empty" style={{ '--pt-d': '190ms' } as any}>loading tenants...</div>
           ) : filtered.length === 0 ? (
-            <div className="tdir-empty">
+            <div className="pt-bounce tdir-empty" style={{ '--pt-d': '190ms' } as any}>
               {search ? `no tenants match "${search}"` : 'no tenants yet - tap + to add your first'}
             </div>
           ) : (
-            filtered.map((t: any) => (
+            filtered.map((t: any, i: number) => (
+              <div key={t.id} className="pt-bounce" style={{ '--pt-d': `${190 + Math.min(i, 12) * 45}ms` } as any}>
               <TenantRow
-                key={t.id}
                 tenant={t}
                 nextInvoice={invoiceByTenant(t.id)}
                 onClick={() => {
@@ -434,11 +435,12 @@ export default function TenantDirectory() {
                   );
                 }}
               />
+              </div>
             ))
           )}
         </div>
 
-        <div className="tdir-archived">
+        <div className="pt-bounce tdir-archived" style={{ '--pt-d': `${190 + (Math.min(filtered.length, 12) + 1) * 45}ms` } as any}>
           <button type="button" onClick={() => setShowArchived(s => !s)}>
             {showArchived ? 'hide archived' : 'show archived'}
           </button>
@@ -507,6 +509,9 @@ const DIRECTORY_CSS = `
   width: 68px;
   height: 68px;
   transform: translateX(-50%);
+  /* Own bounce keyframes — the generic pt-bounce would wipe the centering translateX */
+  opacity: 0;
+  animation: tdirAddPop 0.52s cubic-bezier(0.34, 1.56, 0.64, 1) 90ms both;
   border: none;
   border-radius: 999px;
   background: #58AAFD;
@@ -527,6 +532,13 @@ const DIRECTORY_CSS = `
 }
 .tdir-add.tdir-pulse::after {
   animation: tdirAddRing 0.48s ease-out;
+}
+@keyframes tdirAddPop {
+  0%   { opacity: 0; transform: translateX(-50%) translateY(30px) scale(0.86); }
+  55%  { opacity: 1; transform: translateX(-50%) translateY(-7px) scale(1.045); }
+  74%  { transform: translateX(-50%) translateY(3px) scale(0.983); }
+  88%  { transform: translateX(-50%) translateY(-1.5px) scale(1.007); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
 }
 @keyframes tdirAddRing {
   0% { box-shadow: 0 0 0 0 rgba(88,170,253,0.48); }
