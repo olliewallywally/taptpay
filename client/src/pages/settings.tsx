@@ -13,20 +13,22 @@ import { apiRequest } from "@/lib/queryClient";
 import { isNativeApp, isNativeIOS } from "@/lib/native";
 import { TRADES_THEME } from "@/lib/trades-theme";
 import { Switch } from "@/components/ui/switch";
+import { WireframeLiquidButton } from "@/components/wireframe-liquid-button";
 import { 
   Upload, CheckCircle, XCircle, LogOut, AlertCircle, Bell, BellOff, ChevronDown, Printer, ArrowRight, CreditCard, Building2, Wrench
 } from "lucide-react";
 
-function SettingsSection({ title, isOpen, onToggle, children }: {
+function SettingsSection({ title, isOpen, onToggle, children, delay = 0 }: {
   title: string;
   isOpen: boolean;
   onToggle: () => void;
   children: React.ReactNode;
+  delay?: number;
 }) {
   return (
     <div
-      className="bg-white rounded-3xl mb-4 overflow-hidden transition-shadow"
-      style={{ boxShadow: isOpen ? '0 10px 30px rgba(4,13,109,0.10)' : '0 4px 16px rgba(4,13,109,0.06)' }}
+      className="pt-bounce bg-white mb-4 overflow-hidden transition-shadow"
+      style={{ '--pt-d': `${delay}ms`, borderRadius: 22, boxShadow: isOpen ? '0 10px 30px rgba(4,13,109,0.10)' : '0 4px 14px rgba(4,13,109,0.08)' } as any}
     >
       <button
         onClick={onToggle}
@@ -669,8 +671,10 @@ export default function Settings() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#F4F4F4' }}>
-        <div className="w-8 h-8 border-2 border-[#040D6D] border-t-transparent rounded-full animate-spin"></div>
+      <div style={{ background: '#FFFFFF', minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
+        <div className="flex items-center justify-center" style={{ width: '100%', maxWidth: 430, minHeight: '100svh', background: '#F4F4F4' }}>
+          <div className="w-8 h-8 border-2 border-[#040D6D] border-t-transparent rounded-full animate-spin"></div>
+        </div>
       </div>
     );
   }
@@ -680,40 +684,37 @@ export default function Settings() {
   const statusActive = merchant?.status === 'active';
 
   return (
-    <div className="min-h-screen pb-32" style={{ background: '#F4F4F4', fontFamily: "'Outfit', system-ui, sans-serif" }}>
-      {/* Safe-area spacer */}
-      <div style={{ height: 54 }} />
+    <div style={{ background: '#FFFFFF', minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
+    <div className="pb-32" style={{ width: '100%', maxWidth: 430, minHeight: '100svh', background: '#F4F4F4', fontFamily: "'Outfit', system-ui, sans-serif" }}>
 
-      {/* Navy header card */}
-      <div style={{ padding: '0 18px' }}>
-        <div style={{ background: '#040D6D', borderRadius: 24, padding: '24px 26px 26px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{ width: 56, height: 56, borderRadius: 999, background: '#58ABFF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <span style={{ fontWeight: 700, fontSize: 20, color: '#040D6D' }}>{initials}</span>
+      {/* Navy hero — full-bleed with the app's rounded-bottom sheet edge */}
+      <div style={{ background: '#040D6D', borderRadius: '0 0 28px 28px', padding: '64px 22px 28px' }}>
+        <div className="pt-bounce" style={{ '--pt-d': '0ms', display: 'flex', alignItems: 'center', gap: 16 } as any}>
+          <div style={{ width: 56, height: 56, borderRadius: 999, background: '#58ABFF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <span style={{ fontWeight: 700, fontSize: 20, color: '#040D6D' }}>{initials}</span>
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 18, color: '#FFFFFF', letterSpacing: '-0.2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {businessName}
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 700, fontSize: 18, color: '#FFFFFF', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {businessName}
-              </div>
-              <div style={{ fontWeight: 500, fontSize: 11, color: '#58ABFF', letterSpacing: '0.16em', textTransform: 'uppercase', marginTop: 3 }}>
-                settings
-              </div>
+            <div style={{ fontWeight: 500, fontSize: 11, color: '#58ABFF', letterSpacing: '0.16em', textTransform: 'uppercase', marginTop: 3 }}>
+              settings
             </div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 11px', borderRadius: 10, background: statusActive ? 'rgba(19,194,154,0.18)' : 'rgba(255,176,46,0.20)', color: statusActive ? '#13C29A' : '#FFB02E', fontWeight: 600, fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', flexShrink: 0 }}>
-              <span style={{ width: 6, height: 6, borderRadius: 999, background: statusActive ? '#13C29A' : '#FFB02E', flexShrink: 0 }} />
-              {statusActive ? 'active' : 'pending'}
-            </div>
+          </div>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 11px', borderRadius: 10, background: statusActive ? 'rgba(19,194,154,0.18)' : 'rgba(255,176,46,0.20)', color: statusActive ? '#13C29A' : '#FFB02E', fontWeight: 600, fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', flexShrink: 0 }}>
+            <span style={{ width: 6, height: 6, borderRadius: 999, background: statusActive ? '#13C29A' : '#FFB02E', flexShrink: 0 }} />
+            {statusActive ? 'active' : 'pending'}
           </div>
         </div>
       </div>
 
       {/* Content */}
-      <div className="max-w-md mx-auto px-4 sm:px-6" style={{ paddingTop: 20 }}>
+      <div style={{ padding: '20px 18px 0' }}>
         {/* Payment Board Builder Shortcut */}
         <button
           onClick={() => setLocation('/board-builder')}
-          className="w-full bg-white rounded-3xl p-5 flex items-center justify-between mb-4 transition-all hover:shadow-lg text-left"
-          style={{ boxShadow: '0 4px 16px rgba(4,13,109,0.06)' }}
+          className="pt-bounce w-full bg-white p-5 flex items-center justify-between mb-4 transition-all hover:shadow-lg text-left"
+          style={{ '--pt-d': '90ms', borderRadius: 22, boxShadow: '0 4px 14px rgba(4,13,109,0.08)' } as any}
         >
           <div className="flex items-center gap-4">
             <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(4,13,109,0.08)' }}>
@@ -728,7 +729,7 @@ export default function Settings() {
         </button>
 
         {/* Business Details Section */}
-        <SettingsSection title="Business Details" isOpen={openSections.has('business')} onToggle={() => toggle('business')}>
+        <SettingsSection title="Business Details" delay={140} isOpen={openSections.has('business')} onToggle={() => toggle('business')}>
           <div className="space-y-4 mt-1">
             <div>
               <Label htmlFor="businessName" className="!text-[#040D6D] font-semibold text-base mb-2 block">Company Name</Label>
@@ -843,18 +844,20 @@ export default function Settings() {
             </div>
           </div>
 
-          <Button
-            className="w-full bg-[#040D6D] hover:bg-[#0a1580] text-[#58ABFF] mt-5"
+          <WireframeLiquidButton
             onClick={handleSaveDetails}
-            disabled={updateMerchantMutation.isPending}
+            busy={updateMerchantMutation.isPending}
+            accent="#040D6D"
+            filledTextColor="#58ABFF"
+            style={{ width: '100%', marginTop: 20, padding: '12px 27px', fontSize: 14 }}
             data-testid="button-save"
           >
             {updateMerchantMutation.isPending ? "Saving..." : "Save Business Details"}
-          </Button>
+          </WireframeLiquidButton>
         </SettingsSection>
 
         {/* Dashboard Preferences Section */}
-        <SettingsSection title="Dashboard Preferences" isOpen={openSections.has('preferences')} onToggle={() => toggle('preferences')}>
+        <SettingsSection title="Dashboard Preferences" delay={185} isOpen={openSections.has('preferences')} onToggle={() => toggle('preferences')}>
           <div className="space-y-4 mt-1">
             <div>
               <Label htmlFor="dailyGoal" className="text-gray-700 text-sm mb-1.5 block">
@@ -875,14 +878,16 @@ export default function Settings() {
                   placeholder="500.00"
                   data-testid="input-daily-goal"
                 />
-                <Button
+                <WireframeLiquidButton
                   onClick={() => updateDailyGoalMutation.mutate(dailyGoal)}
-                  disabled={updateDailyGoalMutation.isPending}
-                  className="bg-[#040D6D] hover:bg-[#0a1580]"
+                  busy={updateDailyGoalMutation.isPending}
+                  accent="#040D6D"
+                  filledTextColor="#58ABFF"
+                  style={{ padding: '10px 20px', fontSize: 13 }}
                   data-testid="button-save-daily-goal"
                 >
                   {updateDailyGoalMutation.isPending ? "Saving..." : "Save"}
-                </Button>
+                </WireframeLiquidButton>
               </div>
             </div>
           </div>
@@ -890,7 +895,7 @@ export default function Settings() {
 
         {/* Subscription & Billing Section */}
         {isNativeApp() ? (
-          <div className="bg-white rounded-3xl mb-4 overflow-hidden" style={{ boxShadow: '0 4px 16px rgba(4,13,109,0.06)' }}>
+          <div className="pt-bounce bg-white mb-4 overflow-hidden" style={{ '--pt-d': '230ms', borderRadius: 22, boxShadow: '0 4px 14px rgba(4,13,109,0.08)' } as any}>
             <div className="px-5 sm:px-6 py-5">
               <h2 style={{ fontWeight: 600, fontSize: 17, color: '#040D6D', letterSpacing: '-0.01em' }} className="mb-4">Subscription &amp; Billing</h2>
               <div className="p-5 rounded-xl text-center space-y-3" style={{ background: 'rgba(4,13,109,0.05)' }}>
@@ -908,7 +913,7 @@ export default function Settings() {
             </div>
           </div>
         ) : (
-        <SettingsSection title="Subscription & Billing" isOpen={openSections.has('billing')} onToggle={() => toggle('billing')}>
+        <SettingsSection title="Subscription & Billing" delay={230} isOpen={openSections.has('billing')} onToggle={() => toggle('billing')}>
           <div className="space-y-5 mt-1">
             {/* Current Tier */}
             <div className="flex items-center justify-between p-4 bg-gradient-to-r from-[#040D6D]/10 to-[#58ABFF]/12 rounded-xl">
@@ -1148,7 +1153,7 @@ export default function Settings() {
         )}
 
         {/* Account Section */}
-        <SettingsSection title="Account" isOpen={openSections.has('account')} onToggle={() => toggle('account')}>
+        <SettingsSection title="Account" delay={275} isOpen={openSections.has('account')} onToggle={() => toggle('account')}>
           <div className="space-y-3 mt-1">
             <div className={`flex items-center justify-between p-4 rounded-xl ${merchant?.status === 'active' ? 'bg-green-50' : 'bg-amber-50 border border-amber-200'}`}>
               <div>
@@ -1171,7 +1176,7 @@ export default function Settings() {
         </SettingsSection>
 
         {/* Push Notifications */}
-        <SettingsSection title="Transaction Notifications" isOpen={openSections.has('notifications')} onToggle={() => toggle('notifications')}>
+        <SettingsSection title="Transaction Notifications" delay={320} isOpen={openSections.has('notifications')} onToggle={() => toggle('notifications')}>
           <div className="mt-1">
             {pushSupported ? (
               !vapidAvailable ? (
@@ -1205,7 +1210,7 @@ export default function Settings() {
         </SettingsSection>
 
         {/* Customer Payment Page Button */}
-        <div className="mb-5">
+        <div className="pt-bounce mb-5" style={{ '--pt-d': '365ms' } as any}>
           <Button
             onClick={() => setLocation(`/pay/${merchantId}`)}
             className="w-full bg-[#040D6D] hover:bg-[#0a1580] text-[#58ABFF] py-6 rounded-2xl text-lg"
@@ -1216,7 +1221,7 @@ export default function Settings() {
         </div>
 
         {/* Mode switcher: Retail · Property · Trades */}
-        <div className="mb-5 flex" style={{ gap: 8 }}>
+        <div className="pt-bounce mb-5 flex" style={{ '--pt-d': '405ms', gap: 8 } as any}>
           <button
             onClick={() => setLocation('/dashboard')}
             style={{ flex: 1, background: '#0055FF', borderRadius: 16, padding: '14px 10px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
@@ -1256,7 +1261,7 @@ export default function Settings() {
         </div>
 
         {/* Logout Button */}
-        <div className="mb-8">
+        <div className="pt-bounce mb-8" style={{ '--pt-d': '445ms' } as any}>
           <Button
             onClick={handleLogout}
             className="w-full bg-red-500 hover:bg-red-600 text-white py-6 rounded-2xl text-lg flex items-center justify-center gap-2"
@@ -1267,6 +1272,7 @@ export default function Settings() {
           </Button>
         </div>
       </div>
+    </div>
     </div>
   );
 }
