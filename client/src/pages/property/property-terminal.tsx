@@ -202,24 +202,35 @@ function SubHead({ onCancel, onCommit }: any) {
 }
 
 /* ═══ SCREEN: RequestsHome ═══ */
-function RequestsHome({ invoices, tenants, outstanding, outstandingExpenses = 0, go, onRowTap, filter = 'all', onFilter, remindMode = false, onRemind, remindBusyId }: any) {
+function RequestsHome({ invoices, tenants, outstanding, outstandingExpenses = 0, go, onRowTap, filter = 'all', onFilter, remindMode = false, onRemind, remindBusyId, feedOpen = false, onToggleFeed }: any) {
   const sorted = [...invoices]
     .filter((i: any) => i.status !== 'voided')
     .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  const recent = (filter === 'all' ? sorted : sorted.filter((i: any) => invoiceStatusFor(i) === filter)).slice(0, 12);
+  const filtered = filter === 'all' ? sorted : sorted.filter((i: any) => invoiceStatusFor(i) === filter);
+  // Expanded feed shows everything; the resting stack keeps its short window.
+  const recent = feedOpen ? filtered : filtered.slice(0, 12);
 
   return (
     <div className="tp-screen">
-      {/* Top — navy */}
-      <div className="stagger" style={{ background: NAVY, height: '50%', padding: '100px 28px 28px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
-        <div className="tp-amount" style={{ fontSize: 82, color: BLUE }}>{fmt(outstanding)}</div>
-        <div style={{ marginTop: 10, color: BLUE, fontWeight: 500, fontSize: 16 }}>outstanding rent</div>
-        <div style={{ marginTop: 4, color: 'rgba(88,171,255,0.55)', fontWeight: 400, fontSize: 13 }}>{fmt(outstandingExpenses)} outstanding expenses</div>
+      {/* Top — navy. Collapses to 0 and slides its content up when the feed expands. */}
+      <div className="stagger tp-feed-hero" style={{ background: NAVY, height: feedOpen ? 0 : '50%', padding: feedOpen ? '0 28px' : '100px 28px 28px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
+        <div className={`tp-feed-hero-inner${feedOpen ? ' off' : ''}`}>
+          <div className="tp-amount" style={{ fontSize: 82, color: BLUE }}>{fmt(outstanding)}</div>
+          <div style={{ marginTop: 10, color: BLUE, fontWeight: 500, fontSize: 16 }}>outstanding rent</div>
+          <div style={{ marginTop: 4, color: 'rgba(88,171,255,0.55)', fontWeight: 400, fontSize: 13 }}>{fmt(outstandingExpenses)} outstanding expenses</div>
+        </div>
       </div>
-      {/* Bottom — OFFW */}
-      <div className="stagger" style={{ flex: 1, background: OFFW, padding: '154px 22px 110px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* Bottom — OFFW. Rises to the top of the page as the hero leaves. */}
+      <div className="stagger tp-feed-body" style={{ flex: 1, background: OFFW, padding: feedOpen ? '64px 22px 110px' : '154px 22px 110px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <div className="tp-stack-title">rent requests</div>
+          <button type="button" onClick={() => onToggleFeed?.()} aria-expanded={feedOpen}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'Outfit, system-ui', WebkitTapHighlightColor: 'transparent' }}>
+            <span className="tp-stack-title">rent requests</span>
+            <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={NAVY} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"
+              style={{ transform: feedOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1)' }}>
+              <path d="M18 15l-6-6-6 6"/>
+            </svg>
+          </button>
         </div>
         {/* Status filter chips — deep-linkable from the dashboard */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 12, overflowX: 'auto', scrollbarWidth: 'none' as any, WebkitOverflowScrolling: 'touch' }}>
@@ -234,11 +245,11 @@ function RequestsHome({ invoices, tenants, outstanding, outstandingExpenses = 0,
           <div className="tp-stack-card">
             {recent.length === 0 ? (
               <div className="tp-stack-empty">{filter === 'all' ? 'tap + to send a rent request' : `no ${filter} requests`}</div>
-            ) : recent.map((inv: any) => {
+            ) : recent.map((inv: any, i: number) => {
               const st = invoiceStatusFor(inv);
               const dotCls = st === 'paid' ? 'paid' : (st === 'overdue' || st === 'failed') ? 'declined' : st === 'sent' ? 'payment-sent' : 'awaiting';
               return (
-                <div key={inv.id} className="tp-stack-row" style={{ cursor: 'pointer' }} onClick={() => onRowTap?.(inv)}>
+                <div key={inv.id} className="tp-stack-row" style={{ cursor: 'pointer', animationDelay: `${Math.min(i, 12) * 45}ms` }} onClick={() => onRowTap?.(inv)}>
                   <div style={{ width: 34, height: 34, borderRadius: 999, background: NAVY, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 11, fontWeight: 800, color: BLUE, letterSpacing: '0.02em', marginRight: 12 }}>
                     {(inv.tenantName || '??').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()}
                   </div>
@@ -1161,6 +1172,7 @@ export default function PropertyTerminal() {
   // Active-stack status filter + reminder mode (deep-linked from the dashboard).
   const [stackFilter, setStackFilter]     = useState<'all' | 'overdue' | 'sent' | 'paid' | 'failed'>('all');
   const [remindMode, setRemindMode]       = useState(false);
+  const [feedOpen, setFeedOpen]           = useState(false); // rent-request feed pulled to the top of the page
   const conveyorTimer = useRef<ReturnType<typeof setTimeout>>();
   const viewportRef = useRef<HTMLDivElement>(null);
 
@@ -1578,6 +1590,7 @@ export default function PropertyTerminal() {
     if ((dest === 'send' || dest === 'external') && !selectedTenant) setPendingDest(dest);
     if (screen === 'home') triggerConveyor(screen, 'up');
     setContentKey(k => k + 1);
+    setFeedOpen(false); // leaving home always lands back on the resting layout
     setScreen(dest);
   };
 
@@ -1606,10 +1619,11 @@ export default function PropertyTerminal() {
     return () => ro.disconnect();
   }, [isFeatureScreen, screen, conveyor]);
 
-  const subbarVisible   = screen !== 'success';
+  const feedExpanded    = screen === 'home' && feedOpen;
+  const subbarVisible   = screen !== 'success' && !feedExpanded;
   const subbarActiveIdx = SCREEN_TO_SUBBAR[screen] ?? -1;
-  const fabVisible      = screen === 'home';
-  const sendVisible     = screen === 'home' && !!selectedTenant;
+  const fabVisible      = screen === 'home' && !feedExpanded;
+  const sendVisible     = screen === 'home' && !feedExpanded && !!selectedTenant;
   const conveyorDir     = conveyor?.dir || 'up';
 
   const batchAutoProps = {
@@ -1622,7 +1636,8 @@ export default function PropertyTerminal() {
     if (id === 'home')     return <RequestsHome invoices={invoices} tenants={tenants} outstanding={outstanding} outstandingExpenses={outstandingExpenses} go={go} onRowTap={handleRowTap}
       filter={stackFilter} onFilter={setStackFilter} remindMode={remindMode}
       onRemind={(id: string) => resendOneMutation.mutate(id)}
-      remindBusyId={resendOneMutation.isPending ? (resendOneMutation.variables as string) : null} />;
+      remindBusyId={resendOneMutation.isPending ? (resendOneMutation.variables as string) : null}
+      feedOpen={feedOpen} onToggleFeed={() => setFeedOpen(o => !o)} />;
     if (id === 'tenants')  return <ChooseTenant tenants={tenants} invoices={invoices} go={go} onSelect={handleTenantSelect} splitMode={splitMode} onToggleSplit={() => setSplitMode(m => !m)} />;
     if (id === 'amount')   return <RentAmount go={go} selectedTenant={selectedTenant} backTo={amountDest} onCommit={(c: number) => { setAmount(c); go(amountDest); }} />;
     if (id === 'send')     return <SendRentLink go={go} selectedTenant={selectedTenant} amount={amount} onSend={handleSend} sending={sendMutation.isPending} frequency={frequency} setFrequency={setFrequency} splitMode={splitMode} onEditAmount={() => { setAmountDest('send'); go('amount'); }} />;
@@ -1732,6 +1747,12 @@ const TP_TERM_CSS = `
 .tp-stack-hdr { display: flex; justify-content: space-between; align-items: center; padding: 0 4px; margin-bottom: 12px; }
 .tp-stack-title { font-weight: 700; font-size: 14px; color: #040D6D; letter-spacing: -0.2px; }
 .tp-stack-card { border-radius: 14px; background: #fff; overflow: hidden; box-shadow: 0 2px 12px rgba(4,13,109,0.06); border: 1px solid rgba(4,13,109,0.04); }
+/* Feed expansion — hero collapses + slides its content up and off the page,
+   the request stack rises to the top. Same springy curve as the layer moves. */
+.tp-feed-hero { overflow: hidden; transition: height 0.55s cubic-bezier(0.34,1.56,0.64,1), padding 0.55s cubic-bezier(0.34,1.56,0.64,1); }
+.tp-feed-hero-inner { transition: transform 0.55s cubic-bezier(0.34,1.56,0.64,1), opacity 0.35s ease; }
+.tp-feed-hero-inner.off { transform: translateY(-120%); opacity: 0; }
+.tp-feed-body { transition: padding 0.55s cubic-bezier(0.34,1.56,0.64,1); }
 .tp-stack-row { display: flex; align-items: center; padding: 14px 16px; animation: tp-stackIn 0.38s cubic-bezier(0.34,1.56,0.64,1) both; }
 .tp-stack-row + .tp-stack-row { border-top: 1px solid rgba(4,13,109,0.05); }
 @keyframes tp-stackIn { from { opacity:0; transform:translateY(-12px) scale(0.97); } to { opacity:1; transform:translateY(0) scale(1); } }
