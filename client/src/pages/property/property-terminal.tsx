@@ -202,7 +202,7 @@ function SubHead({ onCancel, onCommit }: any) {
 }
 
 /* ═══ SCREEN: RequestsHome ═══ */
-function RequestsHome({ invoices, tenants, outstanding, go, onRowTap, filter = 'all', onFilter, remindMode = false, onRemind, remindBusyId }: any) {
+function RequestsHome({ invoices, tenants, outstanding, outstandingExpenses = 0, go, onRowTap, filter = 'all', onFilter, remindMode = false, onRemind, remindBusyId }: any) {
   const sorted = [...invoices]
     .filter((i: any) => i.status !== 'voided')
     .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -214,6 +214,7 @@ function RequestsHome({ invoices, tenants, outstanding, go, onRowTap, filter = '
       <div className="stagger" style={{ background: NAVY, height: '50%', padding: '100px 28px 28px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
         <div className="tp-amount" style={{ fontSize: 82, color: BLUE }}>{fmt(outstanding)}</div>
         <div style={{ marginTop: 10, color: BLUE, fontWeight: 500, fontSize: 16 }}>outstanding rent</div>
+        <div style={{ marginTop: 4, color: 'rgba(88,171,255,0.55)', fontWeight: 400, fontSize: 13 }}>{fmt(outstandingExpenses)} outstanding expenses</div>
       </div>
       {/* Bottom — OFFW */}
       <div className="stagger" style={{ flex: 1, background: OFFW, padding: '154px 22px 110px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -1368,9 +1369,11 @@ export default function PropertyTerminal() {
 
   /* Helpers */
   const toast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 1600); };
-  const outstanding = (invoices as any[])
-    .filter((i: any) => ['pending_dispatch', 'dispatched', 'overdue', 'dispatch_failed'].includes(i.status))
-    .reduce((s: number, i: any) => s + (i.owingCents ?? i.amountCents ?? 0), 0);
+  const unpaid = (invoices as any[])
+    .filter((i: any) => ['pending_dispatch', 'dispatched', 'overdue', 'dispatch_failed'].includes(i.status));
+  const owing = (list: any[]) => list.reduce((s: number, i: any) => s + (i.owingCents ?? i.amountCents ?? 0), 0);
+  const outstanding = owing(unpaid.filter((i: any) => i.kind !== 'charge'));
+  const outstandingExpenses = owing(unpaid.filter((i: any) => i.kind === 'charge'));
 
   const triggerConveyor = (prevId: string, dir: string) => {
     setConveyor({ prevId, dir });
@@ -1616,7 +1619,7 @@ export default function PropertyTerminal() {
   };
 
   const renderScreen = (id: string) => {
-    if (id === 'home')     return <RequestsHome invoices={invoices} tenants={tenants} outstanding={outstanding} go={go} onRowTap={handleRowTap}
+    if (id === 'home')     return <RequestsHome invoices={invoices} tenants={tenants} outstanding={outstanding} outstandingExpenses={outstandingExpenses} go={go} onRowTap={handleRowTap}
       filter={stackFilter} onFilter={setStackFilter} remindMode={remindMode}
       onRemind={(id: string) => resendOneMutation.mutate(id)}
       remindBusyId={resendOneMutation.isPending ? (resendOneMutation.variables as string) : null} />;
