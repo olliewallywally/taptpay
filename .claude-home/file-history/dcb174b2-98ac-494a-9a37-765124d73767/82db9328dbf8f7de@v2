@@ -1,0 +1,777 @@
+import { useState, useRef, useLayoutEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import { startPropertyNavigation, startPropertyBack, signalPropertyReady } from "@/lib/property-transition";
+import { propFetch } from "@/lib/property-api";
+
+/* ── Design tokens ── */
+const C = {
+  navy:  '#040D6D',
+  sky:   '#58AAFD',
+  btn:   '#58AAFD',
+  white: '#FFFFFF',
+  gray:  '#D9D7D7',
+  sheet: '#E8E8E8',
+  row:   '#F7F7F7',
+  mute:  '#8C8C8C',
+};
+
+function fmtCents(c: number) { return '$' + (c / 100).toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function propHeaders(): HeadersInit {
+  const token = localStorage.getItem('authToken');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function pulse(e: any) {
+  const el = e.currentTarget;
+  el.classList.remove('tdir-pulse');
+  void el.offsetWidth;
+  el.classList.add('tdir-pulse');
+}
+
+/* ── Shared field input ── */
+function Field({ label, value, onChange, placeholder, required, type = 'text' }: any) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: C.sky, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>
+        {label}{required ? ' *' : ''}
+      </div>
+      <input
+        type={type}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{ width: '100%', padding: '14px 16px', borderRadius: 14, background: C.gray, border: 'none', outline: 'none', color: C.navy, fontSize: 15, fontWeight: 500, boxSizing: 'border-box', fontFamily: 'inherit' }}
+      />
+    </div>
+  );
+}
+
+/* ── Add Tenant Sheet ── */
+function AddTenantSheet({ onClose, onSave, saving, saveError }: {
+  onClose: () => void;
+  onSave: (data: any) => void;
+  saving: boolean;
+  saveError: string | null;
+}) {
+  const [form, setForm] = useState({
+    firstName: '', lastName: '', email: '', phone: '',
+    propertyAddress: '', preferredChannel: 'email' as 'email' | 'whatsapp' | 'sms',
+  });
+  const [subtenants, setSubtenants] = useState<{ name: string; email: string; phone: string }[]>([]);
+  const [subForm, setSubForm]       = useState({ name: '', email: '', phone: '' });
+  const [subOpen, setSubOpen]       = useState(false);
+  const [closing, setClosing]       = useState(false);
+
+  const set    = (k: string) => (v: string) => setForm(f => ({ ...f, [k]: v }));
+  const setSub = (k: string) => (v: string) => setSubForm(f => ({ ...f, [k]: v }));
+
+  // The chosen delivery channel must have a matching contact, or the rent link
+  // can't be delivered: email → email address; whatsapp/sms → phone number.
+  const channelContactOk = form.preferredChannel === 'email' ? !!form.email.trim() : !!form.phone.trim();
+  const valid = form.firstName.trim() && form.lastName.trim() && form.propertyAddress.trim() && channelContactOk;
+
+  const handleClose = () => {
+    setClosing(true);
+    setTimeout(onClose, 320);
+  };
+
+  const confirmSubtenant = () => {
+    if (!subForm.name.trim()) return;
+    setSubtenants(p => [...p, { ...subForm }]);
+    setSubForm({ name: '', email: '', phone: '' });
+    setSubOpen(false);
+  };
+
+  const handleSave = () => {
+    if (!valid || saving) return;
+    const coTenantsText = subtenants.length > 0
+      ? subtenants.map(s => {
+          const detail = [s.email, s.phone].filter(Boolean).join(', ');
+          return detail ? `${s.name} (${detail})` : s.name;
+        }).join('\n')
+      : '';
+    onSave({ ...form, coTenantsText });
+  };
+
+  const ANIM_IN  = 'atSlideUp 0.38s cubic-bezier(0.16,1,0.3,1) both';
+  const ANIM_OUT = 'atSlideDown 0.32s cubic-bezier(0.4,0,0.2,1) both';
+  const FD_IN    = 'atFdIn 0.28s ease both';
+  const FD_OUT   = 'atFdOut 0.28s ease both';
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 100 }}>
+      <style>{`
+        @keyframes atSlideUp   { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        @keyframes atSlideDown { from { transform: translateY(0); } to { transform: translateY(100%); } }
+        @keyframes atFdIn      { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes atFdOut     { from { opacity: 1; } to { opacity: 0; } }
+      `}</style>
+
+      {/* Backdrop */}
+      <div
+        onClick={handleClose}
+        style={{
+          position: 'absolute', inset: 0,
+          background: 'rgba(4,13,109,0.55)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          animation: closing ? FD_OUT : FD_IN,
+        }}
+      />
+
+      {/* Centering wrapper — keeps sheet at 390px on desktop */}
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', justifyContent: 'center' }}>
+      {/* Sheet — slides up from bottom */}
+      <div style={{
+        width: '100%', maxWidth: 390,
+        background: '#F4F4F4',
+        borderRadius: '28px 28px 0 0',
+        maxHeight: '92vh',
+        overflowY: 'auto',
+        animation: closing ? ANIM_OUT : ANIM_IN,
+      }}>
+        {/* Pull handle */}
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '14px 0 2px' }}>
+          <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.1)' }} />
+        </div>
+
+        <div style={{ padding: '12px 24px 52px' }}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+            <span style={{ fontWeight: 700, fontSize: 20, color: C.navy, letterSpacing: '-0.3px' }}>add tenant</span>
+            <button onClick={handleClose} style={{ width: 32, height: 32, borderRadius: 999, background: C.gray, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="2.4" strokeLinecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>
+            </button>
+          </div>
+
+          {/* Main tenant fields */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
+            <Field label="first name" value={form.firstName} onChange={set('firstName')} required />
+            <Field label="last name"  value={form.lastName}  onChange={set('lastName')}  required />
+          </div>
+          <Field label="property address" value={form.propertyAddress} onChange={set('propertyAddress')} required />
+          <Field label="email" value={form.email} onChange={set('email')} type="email" />
+          <Field label="phone" value={form.phone} onChange={set('phone')} type="tel" />
+
+          {/* Preferred channel */}
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: C.sky, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>send rent link via</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {(['email', 'whatsapp', 'sms'] as const).map(ch => (
+                <button key={ch} onClick={() => setForm(f => ({ ...f, preferredChannel: ch }))}
+                  style={{ flex: 1, padding: '13px 0', borderRadius: 14, border: 'none', background: form.preferredChannel === ch ? C.navy : C.gray, color: form.preferredChannel === ch ? C.white : C.navy, fontWeight: 600, fontSize: 12.5, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.04em', transition: 'background 0.18s, color 0.18s' }}>
+                  {ch}
+                </button>
+              ))}
+            </div>
+            {!channelContactOk && (
+              <div style={{ marginTop: 8, fontSize: 12, color: '#C71A2A', fontWeight: 500 }}>
+                add {form.preferredChannel === 'email' ? 'an email address' : 'a phone number'} above to send via {form.preferredChannel}
+              </div>
+            )}
+          </div>
+
+          {/* ── Subtenants ── */}
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: C.sky, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 10 }}>subtenants</div>
+
+            {/* Added subtenants list */}
+            {subtenants.map((s, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', marginBottom: 8, borderRadius: 14, background: C.gray }}>
+                <div style={{ width: 30, height: 30, borderRadius: 999, background: C.navy, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 11, fontWeight: 700, color: C.sky }}>
+                  {s.name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: C.navy }}>{s.name}</div>
+                  {(s.email || s.phone) && (
+                    <div style={{ fontWeight: 400, fontSize: 12, color: C.mute, marginTop: 1 }}>
+                      {[s.email, s.phone].filter(Boolean).join(' · ')}
+                    </div>
+                  )}
+                </div>
+                <button onClick={() => setSubtenants(p => p.filter((_, j) => j !== i))}
+                  style={{ width: 26, height: 26, borderRadius: 999, background: 'rgba(4,13,109,0.08)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="2.4" strokeLinecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>
+                </button>
+              </div>
+            ))}
+
+            {/* Add subtenant toggle button */}
+            <button
+              onClick={() => setSubOpen(o => !o)}
+              style={{ width: '100%', padding: '13px 0', borderRadius: 14, border: `1.5px dashed ${subOpen ? C.sky : 'rgba(4,13,109,0.18)'}`, background: subOpen ? 'rgba(88,171,255,0.06)' : 'transparent', color: C.navy, fontWeight: 600, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all 0.22s ease' }}>
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={C.sky} strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              <span style={{ color: C.navy }}>add subtenant</span>
+            </button>
+
+            {/* Expandable subtenant form — smooth slide */}
+            <div style={{
+              overflow: 'hidden',
+              maxHeight: subOpen ? '320px' : '0px',
+              transition: 'max-height 0.38s cubic-bezier(0.16,1,0.3,1)',
+            }}>
+              <div style={{ paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <Field label="name" value={subForm.name} onChange={setSub('name')} required />
+                <Field label="email" value={subForm.email} onChange={setSub('email')} type="email" />
+                <Field label="phone" value={subForm.phone} onChange={setSub('phone')} type="tel" />
+                <button
+                  onClick={confirmSubtenant}
+                  disabled={!subForm.name.trim()}
+                  style={{ padding: '13px 0', borderRadius: 14, background: subForm.name.trim() ? C.navy : C.gray, color: subForm.name.trim() ? C.white : C.mute, fontWeight: 600, fontSize: 14, border: 'none', cursor: subForm.name.trim() ? 'pointer' : 'default', transition: 'background 0.18s' }}>
+                  confirm subtenant
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Error */}
+          {saveError && (
+            <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 14, background: 'rgba(255,59,78,0.07)', border: '1px solid rgba(255,59,78,0.18)' }}>
+              <p style={{ color: '#C71A2A', fontSize: 13, fontWeight: 500, margin: 0 }}>{saveError}</p>
+            </div>
+          )}
+
+          {/* Save */}
+          <button
+            onClick={handleSave}
+            disabled={!valid || saving}
+            style={{ width: '100%', padding: '18px 0', borderRadius: 999, background: valid && !saving ? C.navy : C.gray, color: valid && !saving ? C.white : C.mute, fontWeight: 700, fontSize: 16, border: 'none', cursor: valid && !saving ? 'pointer' : 'default', transition: 'background 0.2s, color 0.2s' }}>
+            {saving ? 'adding…' : 'add tenant'}
+          </button>
+        </div>
+      </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Tenant list row ── */
+function initials(tenant: any) {
+  return `${tenant.firstName?.[0] ?? ''}${tenant.lastName?.[0] ?? ''}`.toUpperCase() || '?';
+}
+
+function fmtDue(nextInvoice: any) {
+  if (!nextInvoice?.dueAt) return '';
+  return new Date(nextInvoice.dueAt).toLocaleDateString('en-NZ', { day: '2-digit', month: '2-digit' });
+}
+
+function TenantRow({ tenant, nextInvoice, onClick }: { tenant: any; nextInvoice: any; onClick: () => void }) {
+  const fullName = `${tenant.firstName} ${tenant.lastName}`.trim();
+  const overdue = nextInvoice?.status === 'overdue';
+
+  return (
+    <button type="button" className="tdir-row" onClick={onClick}>
+      <span className="tdir-avatar">{initials(tenant)}</span>
+      <span className="tdir-copy">
+        <span className="tdir-name">{fullName}</span>
+        <span className="tdir-address">{tenant.propertyAddress}</span>
+      </span>
+      <span className="tdir-money">
+        <span>{nextInvoice ? fmtCents(nextInvoice.amountCents) : '—'}</span>
+        {nextInvoice ? (
+          <small className={overdue ? 'overdue' : ''}>{overdue ? 'overdue' : 'next payment'}<br />{fmtDue(nextInvoice)}</small>
+        ) : (
+          <small>no invoice</small>
+        )}
+      </span>
+    </button>
+  );
+}
+
+export default function TenantDirectory() {
+  const [, setLocation] = useLocation();
+  const [search,    setSearch]    = useState('');
+  const [showAdd,   setShowAdd]   = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const heroRef = useRef<HTMLDivElement>(null);
+
+  // Signal the hero is mounted so a reverse hero-morph (profile → directory)
+  // can capture and play (see property-transition.ts).
+  useLayoutEffect(() => { signalPropertyReady(); }, []);
+
+  const { data: tenants = [], isLoading } = useQuery<any[]>({
+    queryKey: ['/api/property/tenants'],
+    queryFn: () => propFetch('/api/property/tenants').then(r => r.ok ? r.json() : []),
+    staleTime: 60000,
+    retry: false,
+  });
+
+  const { data: invoices = [] } = useQuery<any[]>({
+    queryKey: ['/api/property/invoices'],
+    queryFn: () => propFetch('/api/property/invoices').then(r => r.ok ? r.json() : []),
+    staleTime: 30000,
+    retry: false,
+  });
+
+  // Archived tenants — fetched lazily only when the merchant expands the section.
+  const { data: archivedTenants = [] } = useQuery<any[]>({
+    queryKey: ['/api/property/tenants', 'archived'],
+    queryFn: () => propFetch('/api/property/tenants?includeArchived=true').then(r => r.ok ? r.json() : []),
+    select: (list: any[]) => list.filter((t: any) => t.status === 'archived'),
+    enabled: showArchived,
+    staleTime: 30000,
+    retry: false,
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const r = await fetch(`/api/property/tenants/${id}/unarchive`, { method: 'POST', headers: propHeaders() });
+      if (!r.ok) throw new Error('Failed to restore');
+      return r.json();
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/property/tenants'] }); },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const r = await fetch('/api/property/tenants', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...propHeaders() },
+        body: JSON.stringify(data),
+      });
+      if (!r.ok) {
+        const msg = await r.json().then(d => d.message).catch(() => `Error ${r.status}`);
+        throw new Error(msg);
+      }
+      return r.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/property/tenants'] });
+      setSaveError(null);
+      setShowAdd(false);
+    },
+    onError: (err: any) => {
+      setSaveError(err?.message || 'Failed to add tenant. The backend may not be connected yet.');
+    },
+  });
+
+  /* Helpers */
+  const activeTenants = tenants.filter((t: any) => t.status !== 'archived');
+  const term = search.trim().toLowerCase();
+  const filtered = activeTenants.filter((t: any) =>
+    !term || `${t.firstName} ${t.lastName}`.toLowerCase().includes(term) || t.propertyAddress.toLowerCase().includes(term)
+  );
+  const tenantCountLabel = `active tenant${activeTenants.length !== 1 ? 's' : ''}`;
+
+  // Return the invoice that represents the worst-case status for this tenant
+  // (overdue > dispatched/pending > paid). Fallback to most recent for display.
+  const invoiceByTenant = (tenantId: string) => {
+    const live = invoices.filter((i: any) => i.tenantProfileId === tenantId && i.status !== 'voided');
+    if (live.length === 0) return undefined;
+    const overdue = live.find((i: any) => i.status === 'overdue');
+    if (overdue) return overdue;
+    const pending = live.find((i: any) => ['dispatched', 'pending_dispatch', 'dispatch_failed'].includes(i.status));
+    if (pending) return pending;
+    return [...live].sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+  };
+
+  return (
+    <div style={{ background: C.white, minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
+    <div style={{ width: '100%', maxWidth: 430, minHeight: '100svh', background: C.sheet, paddingBottom: 128, fontFamily: "'Outfit', system-ui, sans-serif", overflow: 'hidden' }}>
+      <style>{DIRECTORY_CSS}</style>
+
+      {/* Hero — carries view-transition-name so it morphs into the profile hero */}
+      <section ref={heroRef} className="pt-hero tdir-hero">
+        {/* Contents bounce, not the section — its view-transition morph needs a stable box */}
+        <div className="pt-bounce tdir-hero-count" style={{ '--pt-d': '0ms' } as any}>{activeTenants.length}</div>
+        <div className="pt-bounce tdir-hero-label" style={{ '--pt-d': '60ms' } as any}>{tenantCountLabel}</div>
+      </section>
+
+      <main className="tdir-body">
+        <button type="button" className="tdir-add" onPointerDown={pulse} onClick={() => setShowAdd(true)} aria-label="Add tenant">
+          <svg width={26} height={26} viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="2.6" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+        </button>
+        <div className="pt-bounce tdir-search-row" style={{ '--pt-d': '140ms' } as any}>
+          <label className="tdir-search">
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="search tenants or address"
+            />
+            {search && (
+              <button type="button" onClick={() => setSearch('')} aria-label="Clear search">
+                <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={C.mute} strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
+              </button>
+            )}
+          </label>
+          <button
+            type="button"
+            onClick={() => startPropertyBack(() => setLocation('/property'), { expectHero: false })}
+            aria-label="Go to property dashboard"
+            className="tdir-grid-btn"
+          >
+            <svg width={17} height={17} viewBox="0 0 20 20" fill={C.sky}><rect x="1" y="1" width="7" height="7" rx="1.5" /><rect x="12" y="1" width="7" height="7" rx="1.5" /><rect x="1" y="12" width="7" height="7" rx="1.5" /><rect x="12" y="12" width="7" height="7" rx="1.5" /></svg>
+          </button>
+        </div>
+
+        <div className="tdir-list">
+          {isLoading ? (
+            <div className="pt-bounce tdir-empty" style={{ '--pt-d': '190ms' } as any}>loading tenants...</div>
+          ) : filtered.length === 0 ? (
+            <div className="pt-bounce tdir-empty" style={{ '--pt-d': '190ms' } as any}>
+              {search ? `no tenants match "${search}"` : 'no tenants yet - tap + to add your first'}
+            </div>
+          ) : (
+            filtered.map((t: any, i: number) => (
+              <div key={t.id} className="pt-bounce" style={{ '--pt-d': `${190 + Math.min(i, 12) * 45}ms` } as any}>
+              <TenantRow
+                tenant={t}
+                nextInvoice={invoiceByTenant(t.id)}
+                onClick={() => {
+                  const inv = invoiceByTenant(t.id);
+                  startPropertyNavigation(
+                    {
+                      id: t.id,
+                      firstName: t.firstName,
+                      lastName: t.lastName,
+                      propertyAddress: t.propertyAddress,
+                      preferredChannel: t.preferredChannel,
+                      invoiceStatus: inv?.status,
+                    },
+                    () => setLocation(`/property/tenants/${t.id}`)
+                  );
+                }}
+              />
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="pt-bounce tdir-archived" style={{ '--pt-d': `${190 + (Math.min(filtered.length, 12) + 1) * 45}ms` } as any}>
+          <button type="button" onClick={() => setShowArchived(s => !s)}>
+            {showArchived ? 'hide archived' : 'show archived'}
+          </button>
+          {showArchived && (
+            archivedTenants.length === 0 ? (
+              <div className="tdir-archived-empty">no archived tenants</div>
+            ) : (
+              <div className="tdir-archived-list">
+                {archivedTenants.map((t: any) => (
+                  <div key={t.id} className="tdir-archive-row">
+                    <div>
+                      <strong>{t.firstName} {t.lastName}</strong>
+                      <span>{t.propertyAddress}</span>
+                    </div>
+                    <button type="button" onClick={() => restoreMutation.mutate(t.id)} disabled={restoreMutation.isPending}>restore</button>
+                  </div>
+                ))}
+              </div>
+            )
+          )}
+        </div>
+      </main>
+
+      {/* Add tenant sheet */}
+      {showAdd && (
+        <AddTenantSheet
+          onClose={() => { setShowAdd(false); setSaveError(null); }}
+          onSave={data => { setSaveError(null); createMutation.mutate(data); }}
+          saving={createMutation.isPending}
+          saveError={saveError}
+        />
+      )}
+    </div>
+    </div>
+  );
+}
+const DIRECTORY_CSS = `
+.tdir-hero {
+  position: relative;
+  height: 265px;
+  background: #040D6D;
+  color: #58AAFD;
+  padding: 78px 34px 0;
+  box-sizing: border-box;
+}
+.tdir-hero-count {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 100px;
+  line-height: 0.85;
+  font-weight: 800;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+.tdir-hero-label {
+  margin-top: 16px;
+  font-size: 13px;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.tdir-add {
+  position: absolute;
+  left: 50%;
+  top: -34px;
+  width: 68px;
+  height: 68px;
+  transform: translateX(-50%);
+  /* Own bounce keyframes — the generic pt-bounce would wipe the centering translateX */
+  opacity: 0;
+  animation: tdirAddPop 0.52s cubic-bezier(0.34, 1.56, 0.64, 1) 90ms both;
+  border: none;
+  border-radius: 999px;
+  background: #58AAFD;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(4,13,109,0.16);
+  -webkit-tap-highlight-color: transparent;
+}
+.tdir-add::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 0 0 rgba(88,170,253,0);
+}
+.tdir-add.tdir-pulse::after {
+  animation: tdirAddRing 0.48s ease-out;
+}
+@keyframes tdirAddPop {
+  0%   { opacity: 0; transform: translateX(-50%) translateY(30px) scale(0.86); }
+  55%  { opacity: 1; transform: translateX(-50%) translateY(-7px) scale(1.045); }
+  74%  { transform: translateX(-50%) translateY(3px) scale(0.983); }
+  88%  { transform: translateX(-50%) translateY(-1.5px) scale(1.007); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+@keyframes tdirAddRing {
+  0% { box-shadow: 0 0 0 0 rgba(88,170,253,0.48); }
+  100% { box-shadow: 0 0 0 10px rgba(88,170,253,0); }
+}
+.tdir-body {
+  position: relative;
+  background: #E8E8E8;
+  margin-top: -28px;
+  border-radius: 28px 28px 0 0;
+  min-height: calc(100svh - 237px);
+  padding: 50px 13px 0;
+  box-sizing: border-box;
+}
+.tdir-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 40px;
+  gap: 8px;
+  align-items: center;
+}
+.tdir-search {
+  height: 40px;
+  border-radius: 999px;
+  background: #D9D7D7;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 18px;
+  box-sizing: border-box;
+}
+.tdir-search input {
+  min-width: 0;
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #040D6D;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.tdir-search input::placeholder { color: rgba(4,13,109,0.4); }
+.tdir-search button {
+  border: none;
+  background: transparent;
+  padding: 0;
+  display: flex;
+  cursor: pointer;
+}
+.tdir-grid-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 13px;
+  background: #040D6D;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.tdir-list {
+  display: flex;
+  flex-direction: column;
+  padding-top: 12px;
+}
+.tdir-row {
+  width: 100%;
+  border: none;
+  background: transparent;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 15px;
+  padding: 15px 4px;
+  box-sizing: border-box;
+  color: #040D6D;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.tdir-row:active { transform: scale(0.99); opacity: 0.75; }
+.tdir-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1.5px solid #58AAFD;
+  color: #040D6D;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+.tdir-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.tdir-name {
+  color: #040D6D;
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1.15;
+  text-transform: lowercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tdir-address {
+  color: rgba(4,13,109,0.75);
+  font-weight: 500;
+  font-size: 13.5px;
+  line-height: 1.2;
+  text-transform: lowercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tdir-money {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 76px;
+  color: #040D6D;
+  justify-self: end;
+}
+.tdir-money span {
+  font-size: 17px;
+  line-height: 1;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.tdir-money small {
+  font-size: 10px;
+  line-height: 1.35;
+  color: rgba(4,13,109,0.75);
+  font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
+}
+.tdir-money small.overdue { color: #C71A2A; font-weight: 700; }
+.tdir-empty {
+  padding: 34px 18px;
+  color: rgba(4,13,109,0.55);
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+}
+.tdir-archived {
+  padding: 23px 2px 0;
+}
+.tdir-archived > button {
+  border: none;
+  background: transparent;
+  color: rgba(4,13,109,0.48);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 850;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0;
+}
+.tdir-archived-empty {
+  padding: 14px 0;
+  color: rgba(4,13,109,0.48);
+  font-size: 13px;
+  font-weight: 650;
+}
+.tdir-archived-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+.tdir-archive-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: #D9D7D7;
+}
+.tdir-archive-row div {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.tdir-archive-row strong {
+  color: #040D6D;
+  font-size: 13px;
+  font-weight: 850;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tdir-archive-row span {
+  color: rgba(4,13,109,0.55);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tdir-archive-row button {
+  border: none;
+  border-radius: 11px;
+  background: #040D6D;
+  color: #FFFFFF;
+  padding: 8px 13px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+@media (max-width: 350px) {
+  .tdir-body { padding-left: 10px; padding-right: 10px; }
+  .tdir-row { grid-template-columns: 42px minmax(0, 1fr) auto; gap: 10px; padding-left: 2px; padding-right: 2px; }
+  .tdir-avatar { width: 42px; height: 42px; }
+  .tdir-money { min-width: 68px; }
+  .tdir-money span { font-size: 15px; }
+}
+`;
