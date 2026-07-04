@@ -14,6 +14,9 @@ const AMBER = '#FFB02E';
 
 const fmt = (c: number) => `$${(c / 100).toFixed(2)}`;
 
+/* One CTA size for every feature-screen confirm button (25% down from the old tp-cta) */
+const CTA_SIZE: React.CSSProperties = { padding: '10px 27px', fontSize: 13, minWidth: 165 };
+
 function tenantInitials(t: any) {
   return `${t.firstName?.[0] ?? ''}${t.lastName?.[0] ?? ''}`.toUpperCase();
 }
@@ -218,8 +221,8 @@ function RequestsHome({ invoices, tenants, outstanding, outstandingExpenses = 0,
         <div className={`tp-feed-hero-inner${feedOpen ? ' off' : ''}`}>
           <div className="tp-amount" style={{ fontSize: 82, color: BLUE }}>{fmt(outstanding)}</div>
           <div style={{ marginTop: 10, color: BLUE, fontWeight: 500, fontSize: 16 }}>outstanding rent</div>
-          {/* Expenses — 35% smaller than the hero figure, same weight, faded */}
-          <div className="tp-amount" style={{ marginTop: 12, fontSize: 53, color: 'rgba(88,171,255,0.55)' }}>{fmt(outstandingExpenses)}</div>
+          {/* Expenses — smaller and lighter than the hero figure, faded */}
+          <div className="tp-amount" style={{ marginTop: 12, fontSize: 42, fontWeight: 500, color: 'rgba(88,171,255,0.55)' }}>{fmt(outstandingExpenses)}</div>
           <div style={{ marginTop: 4, color: 'rgba(88,171,255,0.55)', fontWeight: 400, fontSize: 13 }}>outstanding expenses</div>
         </div>
       </div>
@@ -453,7 +456,7 @@ function SendRentLink({ go, selectedTenant, amount, onSend, sending, frequency, 
           <div style={{ height: 52 }} />
         </div>
         <div className="stagger" style={{ flex: 1, background: NAVY, padding: '52px 28px 100px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <button className="tp-cta" onClick={() => go('tenants')}>choose tenant →</button>
+          <WireframeLiquidButton onClick={() => go('tenants')} style={CTA_SIZE}>choose tenant →</WireframeLiquidButton>
         </div>
       </div>
     );
@@ -540,7 +543,7 @@ function SendRentLink({ go, selectedTenant, amount, onSend, sending, frequency, 
 
         <div style={{ flex: 1 }} />
 
-        <WireframeLiquidButton onClick={onSend} busy={sending} style={{ minWidth: 220 }}>
+        <WireframeLiquidButton onClick={onSend} busy={sending} style={CTA_SIZE}>
           {sending ? 'sending…' : recurring ? 'send & automate' : 'send rent request'}
         </WireframeLiquidButton>
       </div>
@@ -562,7 +565,7 @@ function ChargeBill({ go, selectedTenant, amount, onEditAmount, chargeType, setC
           <div style={{ height: 52 }} />
         </div>
         <div className="stagger" style={{ flex: 1, background: NAVY, padding: '52px 28px 100px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <button className="tp-cta" onClick={() => go('tenants')}>choose tenant →</button>
+          <WireframeLiquidButton onClick={() => go('tenants')} style={CTA_SIZE}>choose tenant →</WireframeLiquidButton>
         </div>
       </div>
     );
@@ -674,11 +677,11 @@ function ChargeBill({ go, selectedTenant, amount, onEditAmount, chargeType, setC
           </div>
         </div>
 
-        {/* CTA */}
-        <div style={{ flexShrink: 0, padding: '12px 0 20px', display: 'flex', justifyContent: 'center' }}>
-          <button className="tp-cta-wire" onClick={() => ready && onSend()} disabled={!ready || sending} style={{ minWidth: 220, opacity: !ready ? 0.5 : 1, ...(sending ? { background: BLUE, color: NAVY } : {}) }}>
+        {/* CTA — lifted clear of the floating bottom nav */}
+        <div style={{ flexShrink: 0, padding: '12px 0 90px', display: 'flex', justifyContent: 'center' }}>
+          <WireframeLiquidButton onClick={() => ready && onSend()} disabled={!ready} busy={sending} style={CTA_SIZE}>
             {sending ? 'sending…' : 'send bill'}
-          </button>
+          </WireframeLiquidButton>
         </div>
       </div>
     </div>
@@ -826,7 +829,7 @@ function MarkExternal({ go, selectedTenant, amount, invoices, onMark, marking }:
           <div style={{ height: 52 }} />
         </div>
         <div className="stagger" style={{ flex: 1, background: NAVY, padding: '52px 28px 100px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <button className="tp-cta" onClick={() => go('tenants')}>choose tenant →</button>
+          <WireframeLiquidButton onClick={() => go('tenants')} style={CTA_SIZE}>choose tenant →</WireframeLiquidButton>
         </div>
       </div>
     );
@@ -892,9 +895,9 @@ function MarkExternal({ go, selectedTenant, amount, invoices, onMark, marking }:
             </div>
             <div style={{ flex: 1 }} />
             <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <button className="tp-cta" onClick={() => onMark(picked.id, ref)} disabled={marking} style={{ opacity: marking ? 0.65 : 1 }}>
+              <WireframeLiquidButton onClick={() => onMark(picked.id, ref)} busy={marking} style={CTA_SIZE}>
                 {marking ? 'marking…' : 'confirm received'}
-              </button>
+              </WireframeLiquidButton>
             </div>
           </>
         )}
@@ -989,10 +992,10 @@ function BatchAndAutoScreen({ go, tenants, invoices, onBatchSend, sending, sched
               );
             })}
           </div>
-          <div style={{ flexShrink: 0, padding: '12px 0 20px', display: 'flex', justifyContent: 'center' }}>
-            <button className="tp-cta" onClick={() => selected.size > 0 && onBatchSend(Array.from(selected))} disabled={selected.size === 0 || sending} style={{ opacity: selected.size === 0 ? 0.4 : 1 }}>
+          <div style={{ flexShrink: 0, padding: '12px 0 90px', display: 'flex', justifyContent: 'center' }}>
+            <WireframeLiquidButton onClick={() => selected.size > 0 && onBatchSend(Array.from(selected))} disabled={selected.size === 0} busy={sending} style={CTA_SIZE}>
               {sending ? 'sending…' : `send to ${selected.size || 'selected'}`}
-            </button>
+            </WireframeLiquidButton>
           </div>
         </div>
       )}
@@ -1067,7 +1070,7 @@ function SentSuccess({ amount, label, go, kind = 'rent' }: any) {
         <div className="tp-success-check tp-pulse" style={{ marginTop: 14 }}><Ic.Check sz={40} sw={3.2} /></div>
         {label && <div style={{ marginTop: 18, color: 'rgba(88,171,255,0.6)', fontWeight: 500, fontSize: 14 }}>{label}</div>}
         <div style={{ flex: 1 }} />
-        <button className="tp-cta" onClick={() => go('home', 'down')}>done</button>
+        <WireframeLiquidButton onClick={() => go('home', 'down')} style={CTA_SIZE}>done</WireframeLiquidButton>
       </div>
     </div>
   );
