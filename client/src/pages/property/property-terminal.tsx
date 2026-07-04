@@ -213,16 +213,18 @@ function RequestsHome({ invoices, tenants, outstanding, outstandingExpenses = 0,
   return (
     <div className="tp-screen">
       {/* Top — navy. Collapses to 0 and slides its content up when the feed expands. */}
-      <div className="stagger tp-feed-hero" style={{ background: NAVY, height: feedOpen ? 0 : '50%', padding: feedOpen ? '0 28px' : '100px 28px 28px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
+      <div className="stagger tp-feed-hero" style={{ background: NAVY, height: feedOpen ? 0 : '40%', padding: feedOpen ? '0 28px' : '86px 28px 24px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
         <div className={`tp-feed-hero-inner${feedOpen ? ' off' : ''}`}>
           <div className="tp-amount" style={{ fontSize: 82, color: BLUE }}>{fmt(outstanding)}</div>
           <div style={{ marginTop: 10, color: BLUE, fontWeight: 500, fontSize: 16 }}>outstanding rent</div>
-          <div style={{ marginTop: 4, color: 'rgba(88,171,255,0.55)', fontWeight: 400, fontSize: 13 }}>{fmt(outstandingExpenses)} outstanding expenses</div>
+          {/* Expenses — 35% smaller than the hero figure, same weight, faded */}
+          <div className="tp-amount" style={{ marginTop: 12, fontSize: 53, color: 'rgba(88,171,255,0.55)' }}>{fmt(outstandingExpenses)}</div>
+          <div style={{ marginTop: 4, color: 'rgba(88,171,255,0.55)', fontWeight: 400, fontSize: 13 }}>outstanding expenses</div>
         </div>
       </div>
       {/* Bottom — OFFW. Rises to the top of the page as the hero leaves. */}
-      <div className="stagger tp-feed-body" style={{ flex: 1, background: OFFW, padding: feedOpen ? '64px 22px 110px' : '154px 22px 110px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+      <div className="stagger tp-feed-body" style={{ flex: 1, background: OFFW, padding: feedOpen ? '64px 22px 100px' : '154px 22px 100px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 9 }}>
           <button type="button" onClick={() => onToggleFeed?.()} aria-expanded={feedOpen}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'Outfit, system-ui', WebkitTapHighlightColor: 'transparent' }}>
             <span className="tp-stack-title">rent requests</span>
@@ -233,7 +235,7 @@ function RequestsHome({ invoices, tenants, outstanding, outstandingExpenses = 0,
           </button>
         </div>
         {/* Status filter chips — deep-linkable from the dashboard */}
-        <div style={{ display: 'flex', gap: 6, marginBottom: 12, overflowX: 'auto', scrollbarWidth: 'none' as any, WebkitOverflowScrolling: 'touch' }}>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 9, overflowX: 'auto', scrollbarWidth: 'none' as any, WebkitOverflowScrolling: 'touch' }}>
           {(['all', 'overdue', 'sent', 'paid', 'failed'] as const).map(f => (
             <button key={f} type="button" onClick={() => onFilter?.(f)}
               style={{ flexShrink: 0, padding: '6px 14px', borderRadius: 999, border: 'none', cursor: 'pointer', fontFamily: 'Outfit, system-ui', fontWeight: 700, fontSize: 11, letterSpacing: '0.04em', textTransform: 'uppercase', background: filter === f ? NAVY : 'rgba(4,13,109,0.08)', color: filter === f ? BLUE : 'rgba(4,13,109,0.45)', transition: 'all 0.2s ease', WebkitTapHighlightColor: 'transparent' }}>
@@ -1664,7 +1666,7 @@ export default function PropertyTerminal() {
       <div className="tp-overlay">
         <TopBanner msg={banner} />
 
-        <div className={`tp-pfab${fabVisible ? ' show' : ' hide'}`}>
+        <div className={`tp-pfab${fabVisible ? ' show' : ' hide'}${screen === 'home' ? ' raised' : ''}`}>
           <FabBtn onClick={() => go('tenants')} />
         </div>
 
@@ -1672,7 +1674,7 @@ export default function PropertyTerminal() {
             space to its right, send pinned right. They are flex siblings, so they
             can never overlap regardless of how wide the bar gets. */}
         <div
-          className={`tp-psubbar${subbarVisible ? ' show' : ' hide'}${isFeatureScreen ? ' feature' : ''}`}
+          className={`tp-psubbar${subbarVisible ? ' show' : ' hide'}${isFeatureScreen ? ' feature' : ''}${screen === 'home' ? ' raised' : ''}`}
           style={isFeatureScreen ? { transform: `translateY(calc(${boundaryDelta}px - 100% - 20px))` } : undefined}
         >
           <div className={`tp-split-slot${screen === 'tenants' ? ' show' : ''}`}>
@@ -1753,7 +1755,7 @@ const TP_TERM_CSS = `
 .tp-feed-hero-inner { transition: transform 0.55s cubic-bezier(0.34,1.56,0.64,1), opacity 0.35s ease; }
 .tp-feed-hero-inner.off { transform: translateY(-120%); opacity: 0; }
 .tp-feed-body { transition: padding 0.55s cubic-bezier(0.34,1.56,0.64,1); }
-.tp-stack-row { display: flex; align-items: center; padding: 14px 16px; animation: tp-stackIn 0.38s cubic-bezier(0.34,1.56,0.64,1) both; }
+.tp-stack-row { display: flex; align-items: center; padding: 12px 16px; animation: tp-stackIn 0.38s cubic-bezier(0.34,1.56,0.64,1) both; }
 .tp-stack-row + .tp-stack-row { border-top: 1px solid rgba(4,13,109,0.05); }
 @keyframes tp-stackIn { from { opacity:0; transform:translateY(-12px) scale(0.97); } to { opacity:1; transform:translateY(0) scale(1); } }
 .tp-stack-name { font-weight: 600; font-size: 14px; color: #040D6D; margin-bottom: 1px; }
@@ -1807,10 +1809,13 @@ const TP_TERM_CSS = `
 .stagger > *:nth-child(4) { animation-delay: 0.18s; }
 .tp-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 30; }
 .tp-overlay > * { pointer-events: auto; }
-.tp-pfab { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); transition: opacity 240ms cubic-bezier(0,0,0.2,1), transform 360ms cubic-bezier(0.34,1.56,0.64,1); will-change: opacity, transform; }
+.tp-pfab { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); transition: opacity 240ms cubic-bezier(0,0,0.2,1), transform 360ms cubic-bezier(0.34,1.56,0.64,1), top 0.45s cubic-bezier(0.34,1.56,0.64,1); will-change: opacity, transform; }
+/* Home raises the hero/stack boundary to 40% so the request feed shows more rows. */
+.tp-pfab.raised { top: 40%; }
 .tp-pfab.hide { opacity: 0; transform: translate(-50%, -50%) translateY(8px) scale(0.7); pointer-events: none; }
 .tp-pfab.show { opacity: 1; }
-.tp-psubbar { position: absolute; top: 50%; left: 0; right: 0; padding: 0 22px; box-sizing: border-box; transform: translateY(67px); display: flex; align-items: center; gap: 8px; transition: opacity 220ms cubic-bezier(0,0,0.2,1), transform 300ms cubic-bezier(0.4,0,0.2,1); will-change: opacity, transform; height: 37px; pointer-events: none; }
+.tp-psubbar { position: absolute; top: 50%; left: 0; right: 0; padding: 0 22px; box-sizing: border-box; transform: translateY(67px); display: flex; align-items: center; gap: 8px; transition: opacity 220ms cubic-bezier(0,0,0.2,1), transform 300ms cubic-bezier(0.4,0,0.2,1), top 0.45s cubic-bezier(0.34,1.56,0.64,1); will-change: opacity, transform; height: 37px; pointer-events: none; }
+.tp-psubbar.raised { top: 40%; }
 /* Only the visible pills capture taps — the bar's empty full-width area passes
    taps through to the screen beneath (e.g. the "send bill" CTA). */
 .tp-psubbar.show .tp-subbar, .tp-psubbar.show .tp-split-slot, .tp-psubbar.show .tp-send-slot { pointer-events: auto; }
