@@ -242,7 +242,7 @@ function RequestsHome({ invoices, tenants, outstanding, outstandingExpenses = 0,
         <div style={{ display: 'flex', gap: 6, marginBottom: 9, overflowX: 'auto', scrollbarWidth: 'none' as any, WebkitOverflowScrolling: 'touch' }}>
           {(['all', 'overdue', 'sent', 'paid', 'failed'] as const).map(f => (
             <button key={f} type="button" onClick={() => onFilter?.(f)}
-              style={{ flexShrink: 0, padding: '6px 14px', borderRadius: 999, border: 'none', cursor: 'pointer', fontFamily: 'Outfit, system-ui', fontWeight: 700, fontSize: 11, letterSpacing: '0.04em', textTransform: 'uppercase', background: filter === f ? NAVY : 'rgba(4,13,109,0.08)', color: filter === f ? BLUE : 'rgba(4,13,109,0.45)', transition: 'all 0.2s ease', WebkitTapHighlightColor: 'transparent' }}>
+              style={{ flexShrink: 0, padding: '6px 14px', borderRadius: 999, border: `1.5px solid ${filter === f ? NAVY : 'rgba(4,13,109,0.25)'}`, cursor: 'pointer', fontFamily: 'Outfit, system-ui', fontWeight: 700, fontSize: 11, letterSpacing: '0.04em', textTransform: 'uppercase', background: filter === f ? NAVY : 'transparent', color: filter === f ? BLUE : 'rgba(4,13,109,0.45)', transition: 'all 0.2s ease', WebkitTapHighlightColor: 'transparent' }}>
               {f}
             </button>
           ))}
@@ -383,7 +383,7 @@ function ChooseTenant({ tenants, invoices, go, onSelect, splitMode, onToggleSpli
             const dotCls = st === 'paid' ? 'paid' : (st === 'overdue' || st === 'failed') ? 'declined' : 'awaiting';
             return (
               <button key={t.id} onClick={() => onSelect(t, amount)}
-                style={{ textAlign: 'left', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(88,171,255,0.15)', borderRadius: 18, padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 13 }}>
+                style={{ textAlign: 'left', background: 'transparent', border: '1.5px solid rgba(88,171,255,0.28)', borderRadius: 18, padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 13 }}>
                 <div style={{ width: 38, height: 38, borderRadius: 999, background: BLUE, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, fontWeight: 800, color: NAVY }}>
                   {tenantInitials(t)}
                 </div>
@@ -518,7 +518,7 @@ function SendRentLink({ go, selectedTenant, amount, onSend, sending, frequency, 
               const on = frequency === id;
               return (
                 <button key={id} onClick={() => setFrequency(id)}
-                  style={{ padding: '12px 4px', borderRadius: 14, border: `1.5px solid ${on ? BLUE : 'rgba(88,171,255,0.18)'}`, background: on ? BLUE : 'rgba(255,255,255,0.05)', color: on ? NAVY : BLUE, fontWeight: 700, fontSize: 12.5, cursor: 'pointer', transition: 'all 0.18s ease', fontFamily: 'Outfit, system-ui' }}>
+                  style={{ padding: '12px 4px', borderRadius: 14, border: `1.5px solid ${on ? BLUE : 'rgba(88,171,255,0.35)'}`, background: on ? BLUE : 'transparent', color: on ? NAVY : BLUE, fontWeight: 700, fontSize: 12.5, cursor: 'pointer', transition: 'all 0.18s ease', fontFamily: 'Outfit, system-ui' }}>
                   {label}
                 </button>
               );
@@ -613,7 +613,7 @@ function ChargeBill({ go, selectedTenant, amount, onEditAmount, chargeType, setC
               const on = chargeType === c.id;
               return (
                 <button key={c.id} onClick={() => pickType(c.id)}
-                  style={{ padding: '10px 16px', borderRadius: 999, border: `1.5px solid ${on ? BLUE : 'rgba(88,171,255,0.2)'}`, background: on ? BLUE : 'rgba(255,255,255,0.05)', color: on ? NAVY : BLUE, fontWeight: 700, fontSize: 13, cursor: 'pointer', transition: 'all 0.16s ease', fontFamily: 'Outfit, system-ui' }}>
+                  style={{ padding: '10px 16px', borderRadius: 999, border: `1.5px solid ${on ? BLUE : 'rgba(88,171,255,0.35)'}`, background: on ? BLUE : 'transparent', color: on ? NAVY : BLUE, fontWeight: 700, fontSize: 13, cursor: 'pointer', transition: 'all 0.16s ease', fontFamily: 'Outfit, system-ui' }}>
                   {c.label}
                 </button>
               );
@@ -650,7 +650,7 @@ function ChargeBill({ go, selectedTenant, amount, onEditAmount, chargeType, setC
               const on = dueSel === d.id;
               return (
                 <button key={d.id} onClick={() => setDueSel(d.id)}
-                  style={{ padding: '12px 4px', borderRadius: 14, border: `1.5px solid ${on ? BLUE : 'rgba(88,171,255,0.18)'}`, background: on ? BLUE : 'rgba(255,255,255,0.05)', color: on ? NAVY : BLUE, fontWeight: 700, fontSize: 12.5, cursor: 'pointer', transition: 'all 0.18s ease', fontFamily: 'Outfit, system-ui' }}>
+                  style={{ padding: '12px 4px', borderRadius: 14, border: `1.5px solid ${on ? BLUE : 'rgba(88,171,255,0.35)'}`, background: on ? BLUE : 'transparent', color: on ? NAVY : BLUE, fontWeight: 700, fontSize: 12.5, cursor: 'pointer', transition: 'all 0.18s ease', fontFamily: 'Outfit, system-ui' }}>
                   {d.label}
                 </button>
               );
@@ -704,7 +704,7 @@ function ReminderSettingsCard({ settings, onUpdate }: any) {
           const on = value === o;
           return (
             <button key={o} onClick={() => onPick(o)}
-              style={{ flex: 1, padding: '9px 2px', borderRadius: 11, border: `1.5px solid ${on ? BLUE : 'rgba(88,171,255,0.18)'}`, background: on ? BLUE : 'rgba(255,255,255,0.04)', color: on ? NAVY : BLUE, fontWeight: 700, fontSize: 12.5, cursor: 'pointer', fontFamily: 'Outfit, system-ui', transition: 'all 0.16s ease' }}>
+              style={{ flex: 1, padding: '9px 2px', borderRadius: 11, border: `1.5px solid ${on ? BLUE : 'rgba(88,171,255,0.35)'}`, background: on ? BLUE : 'transparent', color: on ? NAVY : BLUE, fontWeight: 700, fontSize: 12.5, cursor: 'pointer', fontFamily: 'Outfit, system-ui', transition: 'all 0.16s ease' }}>
               {fmt(o)}
             </button>
           );
@@ -871,7 +871,7 @@ function MarkExternal({ go, selectedTenant, amount, invoices, onMark, marking }:
                   const on = inv.id === picked.id;
                   return (
                     <button key={inv.id} onClick={() => setPickedId(inv.id)}
-                      style={{ textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, background: on ? 'rgba(88,171,255,0.18)' : 'rgba(255,255,255,0.05)', border: `1.5px solid ${on ? BLUE : 'rgba(88,171,255,0.12)'}`, borderRadius: 14, padding: '12px 14px', cursor: 'pointer', fontFamily: 'Outfit, system-ui' }}>
+                      style={{ textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, background: on ? 'rgba(88,171,255,0.18)' : 'transparent', border: `1.5px solid ${on ? BLUE : 'rgba(88,171,255,0.28)'}`, borderRadius: 14, padding: '12px 14px', cursor: 'pointer', fontFamily: 'Outfit, system-ui' }}>
                       <span style={{ width: 18, height: 18, borderRadius: 999, border: `2px solid ${on ? BLUE : 'rgba(88,171,255,0.35)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         {on && <span style={{ width: 8, height: 8, borderRadius: 999, background: BLUE }} />}
                       </span>
@@ -943,7 +943,7 @@ function BatchAndAutoScreen({ go, tenants, invoices, onBatchSend, sending, sched
   /* ── Tab toggle ── */
   const TabPill = ({ id, label }: { id: 'batch' | 'auto'; label: string }) => (
     <button onClick={() => setTab(id)}
-      style={{ flex: 1, padding: '8px 0', borderRadius: 999, border: 'none', fontFamily: 'Outfit, system-ui', fontWeight: 700, fontSize: 12, letterSpacing: '0.04em', textTransform: 'uppercase', background: tab === id ? NAVY : 'rgba(4,13,109,0.08)', color: tab === id ? BLUE : 'rgba(4,13,109,0.45)', cursor: 'pointer', transition: 'all 0.2s ease', WebkitTapHighlightColor: 'transparent' }}>
+      style={{ flex: 1, padding: '8px 0', borderRadius: 999, border: `1.5px solid ${tab === id ? NAVY : 'rgba(4,13,109,0.25)'}`, fontFamily: 'Outfit, system-ui', fontWeight: 700, fontSize: 12, letterSpacing: '0.04em', textTransform: 'uppercase', background: tab === id ? NAVY : 'transparent', color: tab === id ? BLUE : 'rgba(4,13,109,0.45)', cursor: 'pointer', transition: 'all 0.2s ease', WebkitTapHighlightColor: 'transparent' }}>
       {label}
     </button>
   );
@@ -976,7 +976,7 @@ function BatchAndAutoScreen({ go, tenants, invoices, onBatchSend, sending, sched
               const inv = liveInvoiceFor(t.id);
               return (
                 <button key={t.id} onClick={() => toggle(t.id)}
-                  style={{ textAlign: 'left', background: on ? 'rgba(88,171,255,0.18)' : 'rgba(255,255,255,0.05)', border: `1.5px solid ${on ? BLUE : 'rgba(88,171,255,0.12)'}`, borderRadius: 16, padding: '12px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  style={{ textAlign: 'left', background: on ? 'rgba(88,171,255,0.18)' : 'transparent', border: `1.5px solid ${on ? BLUE : 'rgba(88,171,255,0.28)'}`, borderRadius: 16, padding: '12px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{ width: 22, height: 22, borderRadius: 6, border: `2px solid ${on ? BLUE : 'rgba(88,171,255,0.35)'}`, background: on ? BLUE : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     {on && <Ic.Check sz={12} sw={3} />}
                   </div>
@@ -1718,7 +1718,7 @@ const TP_TERM_CSS = `
 .tp-subhead { display: flex; justify-content: space-between; align-items: center; padding: 20px 22px 0; }
 .tp-subhead-btn { width: 44px; height: 44px; border-radius: 999px; border: 2px solid #040D6D; display: flex; align-items: center; justify-content: center; color: #040D6D; background: none; cursor: pointer; transition: transform 120ms, background 120ms; }
 .tp-subhead-btn:active { transform: scale(0.92); background: rgba(4,13,109,0.06); }
-.tp-amount { font-family: 'Outfit', system-ui; font-weight: 900; letter-spacing: -0.04em; line-height: 0.95; }
+.tp-amount { font-family: 'Outfit', system-ui; font-weight: 800; letter-spacing: -0.04em; line-height: 0.95; }
 .tp-pill { display: inline-flex; align-items: center; justify-content: center; border-radius: 9999px; padding: 6px 20px; font-family: 'Outfit', system-ui; font-weight: 400; font-size: 14px; transition: transform 120ms, background 120ms; line-height: 1; cursor: pointer; border: none; }
 .tp-pill:active { transform: scale(0.96); }
 .tp-pill.solid { background: #58ABFF; color: #040D6D; }

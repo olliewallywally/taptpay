@@ -1103,7 +1103,7 @@ export const TP_TERM_CSS = `
 .tp-subhead { display: flex; justify-content: space-between; align-items: center; padding: 20px 22px 0; }
 .tp-subhead-btn { width: 44px; height: 44px; border-radius: 999px; border: 2px solid ${NAVY}; display: flex; align-items: center; justify-content: center; color: ${NAVY}; background: none; cursor: pointer; transition: transform 120ms, background 120ms; }
 .tp-subhead-btn:active { transform: scale(0.92); background: rgba(4,13,109,0.06); }
-.tp-amount { font-family: 'Outfit', system-ui; font-weight: 900; letter-spacing: -0.04em; line-height: 0.95; }
+.tp-amount { font-family: 'Outfit', system-ui; font-weight: 800; letter-spacing: -0.04em; line-height: 0.95; }
 .tp-subbar-wrap { display: flex; justify-content: center; }
 .tp-subbar { position: relative; display: inline-flex; align-items: center; justify-content: center; background: ${BLUE}; border-radius: 26px; padding: 5px 11px; gap: 4px; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 16px 48px rgba(4,13,109,0.2), 0 4px 12px rgba(4,13,109,0.1), inset 0 1px 0 rgba(255,255,255,0.25); transform: scale(0.85); transform-origin: center; }
 .tp-subbar-ind { position: absolute; top: 5px; height: 27px; background: ${NAVY}; border-radius: 16px; box-shadow: 0 4px 16px rgba(4,13,109,0.4); pointer-events: none; z-index: 2; opacity: 0; will-change: left, width, opacity; }

@@ -370,7 +370,7 @@ export default function ClientDirectory() {
 
         <div style={{ padding: "0 18px" }}>
           <div style={{ background: C.ink, borderRadius: 24, padding: "26px 26px 30px", position: "relative" }}>
-            <div style={{ fontWeight: 900, fontSize: 64, color: C.cream, letterSpacing: 0, lineHeight: 0.92, fontVariantNumeric: "tabular-nums" }}>
+            <div style={{ fontWeight: 800, fontSize: 64, color: C.cream, letterSpacing: 0, lineHeight: 0.92, fontVariantNumeric: "tabular-nums" }}>
               {activeClients.length}
             </div>
             <div style={{ fontWeight: 600, fontSize: 12, color: C.cream, letterSpacing: 0, textTransform: "uppercase", marginTop: 6 }}>
