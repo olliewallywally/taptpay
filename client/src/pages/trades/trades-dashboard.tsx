@@ -1,267 +1,356 @@
+import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { tradesFetch } from "@/lib/trades-api";
 import { TRADES_THEME } from "@/lib/trades-theme";
+import {
+  type Timeframe, buildBuckets, periodWindow, collectedCents,
+  growthPct, collectionRate, fmtCompact, currentBucketIdx,
+} from "@/lib/property-dashboard-data";
 
-/* ── Design tokens (trades palette; mirrors property-dashboard structure) ──
-   The trades accent is near-black, so where property put navy/sky text on a
-   dark or accent surface, trades uses off-white (CREAM) to stay legible. */
-const C = {
-  ink:   TRADES_THEME.INK,    // deep forest base (property's navy)
-  panel: TRADES_THEME.ACCENT, // graphite card surface (property's sky-blue cards)
-  cream: TRADES_THEME.OFFW,   // off-white foreground on dark surfaces
-  white: '#FFFFFF',
-  mute:  '#8C8C8C',
-};
+/* ── Design tokens — trades palette on the property-dashboard layout.
+   TRADES_THEME's final palette matches property's navy/sky family, so the
+   chart accents (SEL/CYAN) carry over from the property mockup. ── */
+const INK  = TRADES_THEME.INK;
+const SKY  = TRADES_THEME.ACCENT;
+const BAR  = TRADES_THEME.ACCENT;        // resting bar
+const SEL  = '#007FFF';                  // selected bar — brighter azure (mockup)
+const CYAN = '#35C0FF';                  // timeframe indicator (mockup)
+const SHEET = '#F4F4F4';
 
-const STATUS_MAP: Record<string, { dot: string; bg: string; fg: string; label: string }> = {
-  paid:     { dot: '#13C29A', bg: 'rgba(19,194,154,0.14)',  fg: '#0B7D63', label: 'paid' },
-  overdue:  { dot: '#FF3B4E', bg: 'rgba(255,59,78,0.12)',   fg: '#C71A2A', label: 'overdue' },
-  failed:   { dot: '#FF8A00', bg: 'rgba(255,138,0,0.14)',   fg: '#B25A00', label: 'not delivered' },
-  dueSoon:  { dot: '#FFB02E', bg: 'rgba(255,176,46,0.18)',  fg: '#9A6A00', label: 'due soon' },
-  upcoming: { dot: '#3F9BFF', bg: 'rgba(63,155,255,0.16)',  fg: '#1A5FCC', label: 'upcoming' },
-};
+const TIMEFRAMES: Timeframe[] = ['day', 'week', 'month', 'year'];
 
-const GLASS = {
-  background: 'linear-gradient(140deg, rgba(255,255,255,0.92) 0%, rgba(234,238,244,0.72) 50%, rgba(220,227,240,0.62) 100%)',
-  backdropFilter: 'blur(16px) saturate(130%)',
-  WebkitBackdropFilter: 'blur(16px) saturate(130%)',
-  border: '1px solid rgba(255,255,255,0.7)',
-  boxShadow: '0 12px 32px rgba(4,13,109,0.10), inset 0 1px 0 rgba(255,255,255,0.95)',
-} as React.CSSProperties;
+const fmtWhole = (c: number) => '$' + Math.round(c / 100).toLocaleString('en-NZ');
 
-/* Live (still-collecting) job-invoice statuses — trades has more than property. */
-const LIVE_STATUSES = ['pending_dispatch', 'dispatched', 'viewed', 'deposit_paid', 'balance_due', 'dispatch_failed'];
+/* ── Icons ── */
+const IcoPlus  = () => <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={INK} strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>;
+const IcoBill  = () => <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={INK} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>;
+const IcoRepeat = () => <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={INK} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>;
+const IcoPeeps = () => <svg width={20} height={20} viewBox="0 0 24 24" fill={INK}><circle cx="8.5" cy="8" r="3"/><circle cx="16" cy="8.5" r="2.4"/><path d="M2.6 19c0-3.2 2.6-5.6 5.9-5.6s5.9 2.4 5.9 5.6z"/><path d="M15.4 13.6c2.6.2 4.9 2.3 4.9 5.1z"/></svg>;
+const IcoWarn  = () => <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={SKY} strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5"/><circle cx="12" cy="15.8" r=".9" fill={SKY} stroke="none"/></svg>;
+const IcoChev  = () => <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={SKY} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>;
 
-/* ── Helpers ── */
-function fmtCents(c: number) { return '$' + (c / 100).toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-
-function invoiceStatus(inv: any): string {
-  if (inv.status === 'paid' || inv.status === 'paid_external') return 'paid';
-  if (inv.status === 'overdue') return 'overdue';
-  if (inv.status === 'dispatch_failed') return 'failed';
-  return 'upcoming';
+/* Press → one stroke-glow ring pulse. Remove+reflow+re-add restarts the CSS animation. */
+function pulse(e: React.PointerEvent<HTMLElement>) {
+  const el = e.currentTarget;
+  el.classList.remove('td-pulse');
+  void el.offsetWidth; // force reflow so the animation restarts
+  el.classList.add('td-pulse');
 }
 
-/* ── Status badge ── */
-function StatusBox({ status }: { status: string }) {
-  const s = STATUS_MAP[status] ?? STATUS_MAP.upcoming;
+/* ── Site filter — trades' analogue of property's portfolio filter. addr=null
+   → everything. Invoices missing siteAddress fall back to their client's. ── */
+function filterBySite(invoices: any[], clients: any[], addr: string | null) {
+  if (!addr) return { invoices, clients };
+  const byId = new Map(clients.map((c: any) => [c.id, c]));
+  return {
+    invoices: invoices.filter((i: any) =>
+      (i.siteAddress ?? byId.get(i.clientProfileId)?.siteAddress) === addr),
+    clients: clients.filter((c: any) => c.siteAddress === addr),
+  };
+}
+
+/* ── Site filter dropdown — wireframe pill + menu ── */
+function SiteDropdown({ options, value, onPick }: {
+  options: string[]; value: string | null; onPick: (v: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: PointerEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', close);
+    return () => document.removeEventListener('pointerdown', close);
+  }, [open]);
+
   return (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 9px', borderRadius: 8, background: s.bg, color: s.fg, fontWeight: 600, fontSize: 9.5, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-      <span style={{ width: 6, height: 6, borderRadius: 999, background: s.dot, flexShrink: 0 }} />
-      {s.label}
+    <div ref={rootRef} style={{ position: 'relative', zIndex: 20 }}>
+      <button type="button" className="td-tap" onPointerDown={pulse} onClick={() => setOpen(o => !o)}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 999, background: 'transparent', border: `1.5px solid ${SKY}`, color: SKY, fontWeight: 500, fontSize: 13, cursor: 'pointer', fontFamily: 'Outfit, system-ui', WebkitTapHighlightColor: 'transparent' }}>
+        <span style={{ maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value ?? 'all sites'}</span>
+        <span style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', display: 'flex' }}><IcoChev /></span>
+      </button>
+      {open && (
+        <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, minWidth: 200, maxHeight: 260, overflowY: 'auto', background: INK, border: `1.5px solid rgba(88,171,255,0.4)`, borderRadius: 16, padding: 6, boxShadow: '0 16px 40px rgba(0,0,0,0.35)' }}>
+          {[null, ...options].map(opt => (
+            <button key={opt ?? '__all'} type="button"
+              onClick={() => { onPick(opt); setOpen(false); }}
+              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', borderRadius: 11, border: 'none', cursor: 'pointer', fontFamily: 'Outfit, system-ui', fontSize: 13, fontWeight: (value ?? null) === opt ? 700 : 400, background: (value ?? null) === opt ? 'rgba(88,171,255,0.16)' : 'transparent', color: SKY, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {opt ?? 'all sites'}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-/* ── Collection gauge ── */
-function Ring({ pct }: { pct: number }) {
-  const cx = 65, cy = 65, r = 48, diskR = 37;
-  const circ = 2 * Math.PI * r;
-  const p = Math.max(0.01, Math.min(1, pct));
-  const endAng = (135 + 360 * p) * Math.PI / 180;
+/* ── Timeframe selector — sliding indicator, terminal SubBar pattern ──
+   Reports the active button's viewport center-x via onIndicator so the
+   hero notch can follow the selection. */
+function TimeframeBar({ tf, onPick, onIndicator }: {
+  tf: Timeframe; onPick: (t: Timeframe) => void;
+  onIndicator?: (centerX: number, animate: boolean) => void;
+}) {
+  const btnRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const mounted = useRef(false);
+  const [ind, setInd] = useState({ x: 0, w: 0, on: false });
+  const [animate, setAnim] = useState(false);
+  const activeIdx = TIMEFRAMES.indexOf(tf);
+
+  useEffect(() => {
+    const tick = (anim: boolean) => {
+      const el = btnRefs.current[activeIdx];
+      if (!el) return;
+      setInd({ x: el.offsetLeft, w: el.offsetWidth, on: true });
+      const r = el.getBoundingClientRect();
+      onIndicator?.(r.left + r.width / 2, anim);
+    };
+    const remeasure = () => tick(false);
+    window.addEventListener('resize', remeasure);
+    if (!mounted.current) {
+      requestAnimationFrame(() => requestAnimationFrame(() => { tick(false); mounted.current = true; }));
+      return () => window.removeEventListener('resize', remeasure);
+    }
+    setAnim(true);
+    requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => tick(true))));
+    const t = setTimeout(() => setAnim(false), 520);
+    return () => { clearTimeout(t); window.removeEventListener('resize', remeasure); };
+  }, [activeIdx]);
+
   return (
-    <svg width="130" height="130" viewBox="0 0 130 130" style={{ display: 'block' }}>
-      <defs>
-        <filter id="tg-disk" x="-90%" y="-90%" width="280%" height="280%">
-          <feDropShadow dx="0" dy="2.5" stdDeviation="7" floodColor="rgba(4,13,109,0.22)" />
-        </filter>
-        <filter id="tg-arc" x="-80%" y="-80%" width="260%" height="260%">
-          <feDropShadow dx="0" dy="0.5" stdDeviation="4" floodColor={C.ink} floodOpacity="0.32" />
-        </filter>
-      </defs>
-      <circle cx={cx} cy={cy} r={diskR} fill="#EAEAEA" filter="url(#tg-disk)" />
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#FFFFFF" strokeOpacity="0.8" strokeWidth="1.5" />
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke={C.ink} strokeWidth="2.5" strokeLinecap="round"
-        strokeDasharray={`${circ * p} ${circ}`} transform={`rotate(135 ${cx} ${cy})`} filter="url(#tg-arc)" />
-      <circle cx={cx + r * Math.cos(endAng)} cy={cy + r * Math.sin(endAng)} r="5.5" fill={C.ink} filter="url(#tg-arc)" />
-      <text x={cx} y={cy + 6} textAnchor="middle" fontFamily="system-ui,sans-serif" fontWeight="400" fontSize="19" fill={C.ink}>
-        {Math.round(p * 100)}%
-      </text>
-    </svg>
+    <div style={{ display: 'flex', justifyContent: 'center' }}>
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: 'min(300px, 100%)', background: INK, borderRadius: 999, padding: 3, boxShadow: '0 6px 18px rgba(4,13,109,0.22)' }}>
+        <div className={`td-tf-ind${animate ? ' animate' : ''}`}
+          style={{ position: 'absolute', top: 3, bottom: 3, left: ind.x, width: ind.w, borderRadius: 999, background: CYAN, opacity: ind.on ? 1 : 0 }} />
+        {TIMEFRAMES.map((t, i) => (
+          <button key={t} type="button" ref={el => (btnRefs.current[i] = el)}
+            className="td-tap" onPointerDown={pulse}
+            onClick={() => onPick(t)}
+            style={{ position: 'relative', zIndex: 1, flex: 1, padding: '7px 0', borderRadius: 999, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'Outfit, system-ui', fontWeight: tf === t ? 700 : 600, fontSize: 12, textTransform: 'capitalize', color: tf === t ? INK : 'rgba(88,171,255,0.55)', transition: 'color 0.25s ease', WebkitTapHighlightColor: 'transparent' }}>
+            {t}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
-/* ── Stat icon SVGs (off-white on the dark stat tiles) ── */
-function IcoClients({ c }: { c: string }) {
-  return <svg width={17} height={17} viewBox="0 0 24 24" fill={c}><circle cx="8.5" cy="8" r="3"/><circle cx="16" cy="8.5" r="2.4"/><path d="M2.6 19c0-3.2 2.6-5.6 5.9-5.6s5.9 2.4 5.9 5.6z"/><path d="M15.4 13.6c2.6.2 4.9 2.3 4.9 5.1"/></svg>;
-}
-function IcoWarn({ c }: { c: string }) {
-  return <svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round"><path d="M12 3.6 21 19H3z"/><path d="M12 10v4.1"/><circle cx="12" cy="16.6" r=".95" fill={c} stroke="none"/></svg>;
-}
-function IcoPage({ c }: { c: string }) {
-  return <svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 12h6M9 15.5h6"/></svg>;
-}
-function IcoPause({ c }: { c: string }) {
-  return <svg width={17} height={17} viewBox="0 0 24 24" fill={c}><rect x="6.5" y="4.5" width="3.6" height="15" rx="1.3"/><rect x="13.9" y="4.5" width="3.6" height="15" rx="1.3"/></svg>;
-}
+/* ── Bar chart — clickable, animates between timeframes ── */
+const MAX_SLOTS = 12;
 
-const STAT_ICONS = [IcoClients, IcoWarn, IcoPage, IcoPause];
+function JobsBarChart({ buckets, selectedIdx, onSelectBar, animKey }: {
+  buckets: { label: string; valueCents: number }[];
+  selectedIdx: number;
+  onSelectBar: (i: number) => void;
+  animKey: string;
+}) {
+  const W = 375, CH = 190, LABEL_H = 30, H = CH + LABEL_H, PADX = 16, BASE = CH;
+  const n = buckets.length;
+  const gap = n > 8 ? 10 : 24;
+  const bw = (W - PADX * 2 - gap * (n - 1)) / n;
+  const x = (i: number) => PADX + i * (bw + gap);
+
+  const [reveal, setReveal] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setReveal(true), 60); return () => clearTimeout(t); }, []);
+
+  const maxVal = Math.max(...buckets.map(b => b.valueCents), 1);
+  const hOf = (v: number) => v <= 0 ? 6 : 12 + (v / maxVal) * (CH - 40);
+
+  const sel = buckets[selectedIdx];
+  const selX = x(Math.min(selectedIdx, n - 1)) + bw / 2;
+  const selTop = BASE - hOf(sel?.valueCents ?? 0);
+
+  return (
+    <div style={{ position: 'relative', margin: '22px -6px 0' }}>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block', height: 'auto', overflow: 'visible' }}>
+        {Array.from({ length: MAX_SLOTS }, (_, i) => {
+          const active = i < n;
+          const bh = active && reveal ? hOf(buckets[i].valueCents) : 0;
+          const bx = active ? x(i) : W - PADX - bw;
+          return (
+            <rect key={i} className="td-bar"
+              x={bx} width={Math.max(bw, 1)}
+              y={BASE - bh} height={bh}
+              rx={bw / 2}
+              fill={i === selectedIdx ? SEL : BAR}
+              style={{ cursor: active ? 'pointer' : 'default', pointerEvents: active ? 'auto' : 'none' }}
+              onClick={() => active && onSelectBar(i)}
+            />
+          );
+        })}
+        {buckets.map((b, i) => (
+          <text key={`${animKey}-${i}`} className="td-bar-label"
+            x={x(i) + bw / 2} y={CH + 22} textAnchor="middle"
+            fontFamily="Outfit, system-ui" fontWeight="600" fontSize={n > 8 ? 11 : 13} fill={SKY}>
+            {b.label}
+          </text>
+        ))}
+      </svg>
+      {/* Value pill above the selected bar */}
+      {sel && (
+        <div key={`${animKey}-${selectedIdx}`} className="td-bar-pill"
+          style={{ position: 'absolute', left: `${(selX / W) * 100}%`, top: `${(selTop / H) * 100}%`, transform: 'translate(-50%, calc(-100% - 8px))', background: SEL, color: INK, padding: '5px 14px', borderRadius: 999, fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap', boxShadow: '0 6px 16px rgba(0,127,255,0.35)', pointerEvents: 'none' }}>
+          {fmtCompact(sel.valueCents)}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function TradesDashboard() {
   const [, setLocation] = useLocation();
+  const [tf, setTf] = useState<Timeframe>('week');
+  const [siteFilter, setSiteFilter] = useState<string | null>(null);
+  const [selBar, setSelBar] = useState(-1); // -1 → default to last bucket
+  const colRef = useRef<HTMLDivElement>(null);
+  const [notch, setNotch] = useState<{ x: number; anim: boolean } | null>(null);
+
+  // Notch follows the active timeframe button (x is relative to the column).
+  const handleIndicator = (centerX: number, anim: boolean) => {
+    const col = colRef.current?.getBoundingClientRect();
+    if (col) setNotch({ x: centerX - col.left, anim });
+  };
 
   const { data: clients = [] } = useQuery<any[]>({
     queryKey: ['/api/trades/clients'],
     queryFn: () => tradesFetch('/api/trades/clients').then(r => { if (!r.ok) throw new Error('load failed'); return r.json(); }),
-    staleTime: 60000,
-    retry: false,
+    staleTime: 60000, retry: false,
   });
 
   const { data: invoices = [], isLoading: invLoading, isError: invError, refetch: refetchInv } = useQuery<any[]>({
     queryKey: ['/api/trades/invoices'],
     queryFn: () => tradesFetch('/api/trades/invoices').then(r => { if (!r.ok) throw new Error('load failed'); return r.json(); }),
-    staleTime: 30000,
-    retry: false,
+    staleTime: 30000, retry: false,
   });
 
-  const { data: schedules = [] } = useQuery<any[]>({
-    queryKey: ['/api/trades/schedules'],
-    queryFn: () => tradesFetch('/api/trades/schedules').then(r => { if (!r.ok) throw new Error('load failed'); return r.json(); }),
-    staleTime: 60000,
-    retry: false,
-  });
+  /* Site filter, then all figures derive from the filtered sets */
+  const sites = Array.from(new Set(clients.map((c: any) => c.siteAddress).filter(Boolean))) as string[];
+  const { invoices: fInv, clients: fCli } = filterBySite(invoices, clients, siteFilter);
 
-  const clientName = (inv: any) => {
-    if (inv.clientName) return inv.clientName;
-    const c = clients.find((x: any) => x.id === inv.clientProfileId);
-    return c ? `${c.firstName} ${c.lastName}` : '—';
-  };
-  const clientSite = (inv: any) => {
-    if (inv.siteAddress) return inv.siteAddress;
-    const c = clients.find((x: any) => x.id === inv.clientProfileId);
-    return c?.siteAddress || '—';
-  };
+  const win = periodWindow(tf);
+  const collected = collectedCents(fInv, win.start, win.end);
+  const prevCollected = collectedCents(fInv, win.prevStart, win.prevEnd);
+  const growth = growthPct(collected, prevCollected);
+  const rate = collectionRate(fInv, win.start, win.end);
 
-  /* Derived stats — voided invoices are excluded so a cancelled request never
-     drags the collection rate or shows as a live job. */
-  const liveInvoices  = invoices.filter((i: any) => i.status !== 'voided');
-  const activeClients = clients.filter((t: any) => t.status !== 'archived').length;
-  const overdueCount  = invoices.filter((i: any) => i.status === 'overdue').length;
-  const queuedCount   = invoices.filter((i: any) => i.status === 'pending_dispatch').length;
-  const activeCount   = invoices.filter((i: any) => LIVE_STATUSES.includes(i.status)).length;
-  const paidCount     = liveInvoices.filter((i: any) => i.status === 'paid' || i.status === 'paid_external').length;
-  const collectionPct = liveInvoices.length > 0 ? paidCount / liveInvoices.length : 0;
+  const buckets = buildBuckets(fInv, tf);
+  const selectedIdx = selBar >= 0 && selBar < buckets.length
+    ? selBar
+    : Math.min(currentBucketIdx(tf), buckets.length - 1);
 
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthlyRevenue = invoices
-    .filter((i: any) => (i.status === 'paid' || i.status === 'paid_external') && i.paidAt && new Date(i.paidAt) >= monthStart)
-    .reduce((s: number, i: any) => s + (i.amountCents ?? 0), 0);
+  const activeClients = fCli.filter((c: any) => c.status !== 'archived').length;
+  const overdueCount = fInv.filter((i: any) => i.status === 'overdue').length;
 
-  const recent = [...liveInvoices]
-    .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 3);
-
-  const stats = [
-    { label: 'clients',     v: activeClients, Ico: STAT_ICONS[0] },
-    { label: 'outstanding', v: overdueCount,  Ico: STAT_ICONS[1] },
-    { label: 'queued',      v: queuedCount,   Ico: STAT_ICONS[2] },
-    { label: 'paused',      v: schedules.filter((s: any) => s.status === 'paused').length, Ico: STAT_ICONS[3] },
-  ];
+  const pickTf = (t: Timeframe) => { setTf(t); setSelBar(-1); };
 
   return (
     <div style={{ background: '#FFFFFF', minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
-    <div style={{ width: '100%', maxWidth: 430, minHeight: '100svh', background: '#F4F4F4', paddingBottom: 130, fontFamily: "'Outfit', system-ui, sans-serif" }}>
-      <div style={{ height: 54 }} />
+      <div ref={colRef} style={{ width: '100%', maxWidth: 430, minHeight: '100svh', background: SHEET, paddingBottom: 130, fontFamily: "'Outfit', system-ui, sans-serif" }}>
+        <style>{TD_CSS}</style>
 
-      {/* Load error — show a retry instead of silently rendering zeros */}
-      {invError && (
-        <div style={{ margin: '0 18px 12px', padding: '14px 16px', borderRadius: 16, background: 'rgba(255,59,78,0.08)', border: '1px solid rgba(255,59,78,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <span style={{ color: '#C71A2A', fontSize: 13, fontWeight: 500 }}>{invLoading ? 'loading…' : "couldn't load your data"}</span>
-          <button onClick={() => refetchInv()} style={{ background: C.ink, color: C.cream, border: 'none', borderRadius: 10, padding: '8px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>retry</button>
-        </div>
-      )}
+        {/* ── Ink hero ── */}
+        <div style={{ position: 'relative', background: INK, borderRadius: '0 0 28px 28px', padding: '54px 22px 30px' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <SiteDropdown options={sites} value={siteFilter} onPick={s => { setSiteFilter(s); setSelBar(-1); }} />
+          </div>
 
-      {/* 1 — Active jobs hero */}
-      <div style={{ padding: '0 18px' }}>
-        <div style={{ background: C.ink, borderRadius: 24, padding: '24px 26px 26px' }}>
-          <div style={{ fontWeight: 900, fontSize: 62, color: C.panel, letterSpacing: '-0.04em', lineHeight: 0.92, fontVariantNumeric: 'tabular-nums' }}>
-            {activeCount}
-          </div>
-          <div style={{ fontWeight: 500, fontSize: 12, color: C.panel, letterSpacing: '0.16em', textTransform: 'uppercase', marginTop: 6 }}>
-            active job{activeCount !== 1 ? 's' : ''}
-          </div>
-          <div style={{ marginTop: 18, height: 24, borderRadius: 999, border: `1.5px solid ${C.panel}`, padding: 3 }}>
-            <div style={{ width: `${Math.max(4, collectionPct * 100)}%`, height: '100%', borderRadius: 999, background: C.panel, transition: 'width 0.8s ease' }} />
-          </div>
-        </div>
-      </div>
+          {/* Load error — retry instead of silently rendering zeros */}
+          {invError && (
+            <div style={{ margin: '14px 0 0', padding: '12px 16px', borderRadius: 14, background: 'rgba(255,59,78,0.14)', border: '1px solid rgba(255,59,78,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <span style={{ color: '#FF8A94', fontSize: 13, fontWeight: 500 }}>{invLoading ? 'loading…' : "couldn't load your data"}</span>
+              <button type="button" onClick={() => refetchInv()} style={{ background: SKY, color: INK, border: 'none', borderRadius: 10, padding: '8px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>retry</button>
+            </div>
+          )}
 
-      {/* 2 — Revenue + gauge row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.32fr 1fr', gap: 14, padding: '16px 18px 0' }}>
-        <div style={{ background: C.panel, borderRadius: 22, padding: '24px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div style={{ fontWeight: 900, fontSize: 36, color: C.ink, letterSpacing: '-0.04em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
-            {fmtCents(monthlyRevenue)}
-          </div>
-          <div style={{ fontWeight: 500, fontSize: 11, color: C.ink, letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: 12, lineHeight: 1.3 }}>
-            collected this<br />month
-          </div>
-        </div>
-        <div style={{ background: '#F2F0F0', borderRadius: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Ring pct={collectionPct} />
-        </div>
-      </div>
-
-      {/* 3 — Stat strip */}
-      <div style={{ padding: '16px 18px 0' }}>
-        <div style={{ background: C.ink, borderRadius: 24, padding: '18px 16px' }}>
-          <div style={{ border: '2px solid rgba(88,171,255,0.55)', borderRadius: 20, padding: 10, display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 13 }}>
-            {stats.map(({ label, v, Ico }) => (
-              <div key={label} style={{ borderRadius: 18, padding: '12px 11px', background: C.panel, minHeight: 92, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', boxSizing: 'border-box' }}>
-                <div style={{ marginBottom: 8 }}><Ico c={C.ink} /></div>
-                <div style={{ fontWeight: 700, fontSize: 7.5, color: C.ink, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6, whiteSpace: 'nowrap' }}>{label}</div>
-                <div style={{ fontWeight: 800, fontSize: 28, color: C.white, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{v}</div>
+          {/* Hero figure + growth pill */}
+          <div style={{ marginTop: 18, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+            <div style={{ fontWeight: 800, fontSize: 54, color: SKY, letterSpacing: '-0.04em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+              {fmtWhole(collected)}
+            </div>
+            {growth !== null && (
+              <div style={{ padding: '5px 12px', borderRadius: 999, border: `1.5px solid ${SKY}`, color: SKY, fontWeight: 600, fontSize: 12.5 }}>
+                {growth > 0 ? `+${growth}%` : `${growth}%`}
               </div>
-            ))}
+            )}
           </div>
+          <div style={{ marginTop: 10, color: SKY, fontWeight: 500, fontSize: 15 }}>revenue collected</div>
+          {rate !== null && (
+            <div style={{ marginTop: 4, color: 'rgba(88,171,255,0.6)', fontWeight: 400, fontSize: 13 }}>{rate}% collection rate</div>
+          )}
+
+          <JobsBarChart buckets={buckets} selectedIdx={selectedIdx} onSelectBar={setSelBar} animKey={`${tf}-${siteFilter ?? 'all'}`} />
+
+          {/* Notch — rounded wave flowing out of the hero, follows the active timeframe */}
+          <svg width="84" height="14" viewBox="0 0 84 14"
+            className={notch?.anim ? 'td-notch animate' : 'td-notch'}
+            style={{ position: 'absolute', left: notch ? notch.x : '50%', bottom: -13, transform: 'translateX(-50%)' }}>
+            <path d="M0 0 C 20 0 26 13 42 13 C 58 13 64 0 84 0 Z" fill={INK} />
+          </svg>
+        </div>
+
+        {/* ── Timeframe selector ── */}
+        <div style={{ padding: '15px 22px 0' }}>
+          <TimeframeBar tf={tf} onPick={pickTf} onIndicator={handleIndicator} />
+        </div>
+
+        {/* ── Stat cards ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.15fr', gap: 14, padding: '26px 22px 0' }}>
+          <button type="button" className="td-card td-tap" onPointerDown={pulse} onClick={() => setLocation('/trades/clients')}
+            style={{ background: '#FFFFFF', borderRadius: 22, padding: '16px 18px', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'Outfit, system-ui' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+              <div style={{ fontWeight: 700, fontSize: 11, color: INK, letterSpacing: '0.08em', textTransform: 'uppercase' }}>clients</div>
+              <IcoPeeps />
+            </div>
+            <div style={{ marginTop: 10, fontWeight: 800, fontSize: 42, color: INK, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{activeClients}</div>
+          </button>
+          <button type="button" className="td-card td-tap" onPointerDown={pulse} onClick={() => setLocation('/trades/terminal')}
+            style={{ background: INK, borderRadius: 22, padding: '16px 18px', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'Outfit, system-ui' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+              <div style={{ fontWeight: 700, fontSize: 11, color: SKY, letterSpacing: '0.08em', textTransform: 'uppercase' }}>outstanding</div>
+              <IcoWarn />
+            </div>
+            <div style={{ marginTop: 10, fontWeight: 800, fontSize: 42, color: SKY, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{overdueCount}</div>
+          </button>
+        </div>
+
+        {/* ── Action shortcuts ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr 1fr', gap: 12, padding: '18px 22px 0' }}>
+          {[
+            { label: <>new<br />quote</>, Ico: IcoPlus, to: '/trades/quote', aria: 'new quote' },
+            { label: <>quick<br />invoice</>, Ico: IcoBill, to: '/trades/terminal', aria: 'quick invoice' },
+            { label: <>recurring<br />jobs</>, Ico: IcoRepeat, to: '/trades/recurring', aria: 'recurring jobs' },
+          ].map(({ label, Ico, to, aria }) => (
+            <button key={aria} type="button" className="td-card td-tap" aria-label={aria}
+              onPointerDown={pulse} onClick={() => setLocation(to)}
+              style={{ background: '#FFFFFF', borderRadius: 18, padding: '14px 14px 12px', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'Outfit, system-ui', display: 'flex', flexDirection: 'column', gap: 14, minHeight: 88 }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}><Ico /></div>
+              <div style={{ fontWeight: 600, fontSize: 12, color: INK, lineHeight: 1.3 }}>{label}</div>
+            </button>
+          ))}
         </div>
       </div>
-
-      {/* 4 — Job invoices */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '22px 20px 12px' }}>
-        <div style={{ fontWeight: 600, fontSize: 12, color: C.ink, letterSpacing: '0.12em', textTransform: 'uppercase' }}>job invoices</div>
-        <button onClick={() => setLocation('/trades/clients')} style={{ fontSize: 13, fontWeight: 600, color: C.ink, background: 'none', border: 'none', cursor: 'pointer' }}>view all →</button>
-      </div>
-
-      {recent.length === 0 ? (
-        <div style={{ padding: '32px 18px', textAlign: 'center', color: C.mute, fontSize: 13 }}>
-          no invoices yet — add clients to get started
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '0 18px' }}>
-          {recent.map((inv: any) => {
-            const name     = clientName(inv);
-            const initials = name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
-            return (
-              <div key={inv.id} onClick={() => setLocation(`/trades/clients/${inv.clientProfileId}`)} style={{ ...GLASS, borderRadius: 18, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 13, cursor: 'pointer' }}>
-                <div style={{ width: 40, height: 40, borderRadius: 999, background: C.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 800, fontSize: 12, color: C.panel, letterSpacing: '0.03em' }}>
-                  {initials}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 500, fontSize: 13.5, color: C.ink, textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
-                  <div style={{ fontWeight: 400, fontSize: 11, color: C.mute, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{clientSite(inv)}</div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
-                  {(() => {
-                    const isSplit = inv.splitEnabled && inv.splitCount > 1;
-                    const paid = inv.splitPaidCount || 0;
-                    const showOwing = isSplit && paid > 0 && invoiceStatus(inv) !== 'paid';
-                    return (
-                      <>
-                        <div style={{ fontWeight: 700, fontSize: 14, color: C.ink, fontVariantNumeric: 'tabular-nums' }}>{fmtCents(showOwing ? (inv.owingCents ?? inv.amountCents) : (inv.amountCents ?? 0))}</div>
-                        {isSplit && <div style={{ fontSize: 9.5, fontWeight: 700, color: '#0B7D63' }}>{paid}/{inv.splitCount} split</div>}
-                      </>
-                    );
-                  })()}
-                  <StatusBox status={invoiceStatus(inv)} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
     </div>
   );
 }
+
+/* ── Injected CSS — mirrors the property dashboard's PD_CSS in trades tokens ── */
+const TD_CSS = `
+.td-tf-ind.animate { transition: left 0.45s cubic-bezier(0.34,1.56,0.64,1), width 0.45s cubic-bezier(0.34,1.56,0.64,1); }
+.td-notch.animate { transition: left 0.45s cubic-bezier(0.34,1.56,0.64,1); }
+.td-bar { transition: x 0.5s cubic-bezier(0.22,1,0.36,1), width 0.5s cubic-bezier(0.22,1,0.36,1), y 0.55s cubic-bezier(0.22,1,0.36,1), height 0.55s cubic-bezier(0.22,1,0.36,1), fill 0.25s ease; }
+.td-bar-label { animation: tdFadeIn 0.5s ease 0.25s both; }
+.td-bar-pill { animation: tdPillIn 0.35s cubic-bezier(0.34,1.56,0.64,1) 0.2s both; }
+@keyframes tdFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes tdPillIn { from { opacity: 0; transform: translate(-50%, calc(-100% - 2px)) scale(0.85); } to { opacity: 1; transform: translate(-50%, calc(-100% - 8px)) scale(1); } }
+.td-card { box-shadow: 0 4px 14px rgba(4,13,109,0.08); transition: transform 0.18s ease, box-shadow 0.18s ease; -webkit-tap-highlight-color: transparent; }
+.td-card:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(4,13,109,0.14); }
+.td-card:active { transform: translateY(0) scale(0.985); }
+.td-tap { position: relative; }
+.td-tap::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; box-shadow: 0 0 0 0 rgba(88,171,255,0); }
+.td-tap.td-pulse::after { animation: tdRing 0.45s ease-out; }
+@keyframes tdRing { 0% { box-shadow: 0 0 0 0 rgba(88,171,255,0.55); } 100% { box-shadow: 0 0 0 9px rgba(88,171,255,0); } }
+`;
