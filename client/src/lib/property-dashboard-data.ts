@@ -49,13 +49,9 @@ export function collectionRate(invoices: any[], start: Date, end: Date): number 
   return Math.round((sent.filter(isPaid).length / sent.length) * 100);
 }
 
-/* Calendar buckets of collected rent for the bar chart.
+/* The calendar bucket windows every chart series shares.
    day = 8×3h blocks · week = M-start 7 days · month = W1..W4/5 · year = J..D */
-export function buildBuckets(invoices: any[], tf: Timeframe, now = new Date()): Bucket[] {
-  const paid = notVoided(invoices).filter(isPaid);
-  const bucket = (s: Date, e: Date, label: string): Bucket =>
-    ({ label, valueCents: sumCents(paid.filter((i: any) => inWin(paidAt(i), s, e))) });
-
+function bucketWindows(tf: Timeframe, now: Date): { label: string; s: Date; e: Date }[] {
   if (tf === 'day') {
     // End of the current 3-hour block, then 8 blocks backwards.
     const end = new Date(now); end.setMinutes(0, 0, 0);
@@ -65,7 +61,7 @@ export function buildBuckets(invoices: any[], tf: Timeframe, now = new Date()): 
       const e = new Date(end.getTime() - (7 - k) * 3 * 3600000);
       const h = s.getHours();
       const label = h === 0 ? '12a' : h < 12 ? `${h}a` : h === 12 ? '12p' : `${h - 12}p`;
-      return bucket(s, e, label);
+      return { label, s, e };
     });
   }
   if (tf === 'week') {
@@ -73,7 +69,7 @@ export function buildBuckets(invoices: any[], tf: Timeframe, now = new Date()): 
     return ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((label, d) => {
       const s = new Date(start); s.setDate(start.getDate() + d);
       const e = new Date(start); e.setDate(start.getDate() + d + 1);
-      return bucket(s, e, label);
+      return { label, s, e };
     });
   }
   if (tf === 'month') {
@@ -82,11 +78,28 @@ export function buildBuckets(invoices: any[], tf: Timeframe, now = new Date()): 
     return Array.from({ length: Math.ceil(days / 7) }, (_, w) => {
       const s = new Date(first); s.setDate(1 + w * 7);
       const e = new Date(first); e.setDate(1 + (w + 1) * 7);
-      return bucket(s, e, `W${w + 1}`);
+      return { label: `W${w + 1}`, s, e };
     });
   }
   return ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'].map((label, m) =>
-    bucket(new Date(now.getFullYear(), m, 1), new Date(now.getFullYear(), m + 1, 1), label));
+    ({ label, s: new Date(now.getFullYear(), m, 1), e: new Date(now.getFullYear(), m + 1, 1) }));
+}
+
+/* Calendar buckets of collected rent (paid invoices, by paid date). */
+export function buildBuckets(invoices: any[], tf: Timeframe, now = new Date()): Bucket[] {
+  const paid = notVoided(invoices).filter(isPaid);
+  return bucketWindows(tf, now).map(({ label, s, e }) =>
+    ({ label, valueCents: sumCents(paid.filter((i: any) => inWin(paidAt(i), s, e))) }));
+}
+
+/* Calendar buckets of BILLED amounts (every non-voided invoice, by sent date) —
+   the ghost series behind collected, so a request shows on the chart the moment
+   it leaves the terminal, before any money lands. Same windows as buildBuckets
+   by construction, so the two series can never drift apart. */
+export function buildBilledBuckets(invoices: any[], tf: Timeframe, now = new Date()): Bucket[] {
+  const sent = notVoided(invoices);
+  return bucketWindows(tf, now).map(({ label, s, e }) =>
+    ({ label, valueCents: sumCents(sent.filter((i: any) => inWin(new Date(i.createdAt), s, e))) }));
 }
 
 /* Index of the bucket containing `now` — the default bar selection. Day's

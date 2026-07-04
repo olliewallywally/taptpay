@@ -1,5 +1,5 @@
 import {
-  buildBuckets, periodWindow, collectedCents, growthPct,
+  buildBuckets, buildBilledBuckets, periodWindow, collectedCents, growthPct,
   collectionRate, filterByProperty, fmtCompact,
 } from '../property-dashboard-data';
 
@@ -63,6 +63,24 @@ describe('buildBuckets', () => {
     expect(b).toHaveLength(8);
     expect(b[7].valueCents).toBe(25000);
     expect(b[6].valueCents).toBe(10000);
+  });
+});
+
+describe('buildBilledBuckets', () => {
+  it('counts every non-voided invoice by SENT date, so an unpaid request shows immediately', () => {
+    const tue = new Date(2026, 5, 30, 10, 0);     // Tue 30 Jun
+    const b = buildBilledBuckets([
+      paid(tue, 50000, { status: 'dispatched' }),  // unpaid — still billed
+      paid(tue, 20000),                            // paid — billed too
+      paid(tue, 99900, { status: 'voided' }),      // cancelled — never billed
+    ], 'week', NOW);
+    expect(b[1].valueCents).toBe(70000);
+  });
+  it('shares bucket windows and labels with buildBuckets so the series never drift', () => {
+    const billed = buildBilledBuckets([], 'week', NOW);
+    const collected = buildBuckets([], 'week', NOW);
+    expect(billed.map(x => x.label)).toEqual(collected.map(x => x.label));
+    expect(billed).toHaveLength(collected.length);
   });
 });
 

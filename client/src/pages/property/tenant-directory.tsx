@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { startPropertyNavigation, startPropertyBack, signalPropertyReady } from "@/lib/property-transition";
 import { propFetch } from "@/lib/property-api";
+import { usePropertyTenants, usePropertyInvoices } from "@/lib/property-data";
 
 /* ── Design tokens ── */
 const C = {
@@ -292,19 +293,8 @@ export default function TenantDirectory() {
   // can capture and play (see property-transition.ts).
   useLayoutEffect(() => { signalPropertyReady(); }, []);
 
-  const { data: tenants = [], isLoading } = useQuery<any[]>({
-    queryKey: ['/api/property/tenants'],
-    queryFn: () => propFetch('/api/property/tenants').then(r => r.ok ? r.json() : []),
-    staleTime: 60000,
-    retry: false,
-  });
-
-  const { data: invoices = [] } = useQuery<any[]>({
-    queryKey: ['/api/property/invoices'],
-    queryFn: () => propFetch('/api/property/invoices').then(r => r.ok ? r.json() : []),
-    staleTime: 30000,
-    retry: false,
-  });
+  const { data: tenants = [], isLoading } = usePropertyTenants();
+  const { data: invoices = [] } = usePropertyInvoices();
 
   // Archived tenants — fetched lazily only when the merchant expands the section.
   const { data: archivedTenants = [] } = useQuery<any[]>({

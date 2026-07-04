@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { tradesFetch } from "@/lib/trades-api";
 import { TRADES_THEME } from "@/lib/trades-theme";
 import {
-  type Timeframe, buildBuckets, periodWindow, collectedCents,
+  type Timeframe, buildBuckets, buildBilledBuckets, periodWindow, collectedCents,
   growthPct, collectionRate, fmtCompact, currentBucketIdx,
 } from "@/lib/property-dashboard-data";
 
@@ -142,8 +142,9 @@ function TimeframeBar({ tf, onPick, onIndicator }: {
 /* ── Bar chart — clickable, animates between timeframes ── */
 const MAX_SLOTS = 12;
 
-function JobsBarChart({ buckets, selectedIdx, onSelectBar, animKey }: {
+function JobsBarChart({ buckets, billed = [], selectedIdx, onSelectBar, animKey }: {
   buckets: { label: string; valueCents: number }[];
+  billed?: { label: string; valueCents: number }[];
   selectedIdx: number;
   onSelectBar: (i: number) => void;
   animKey: string;
@@ -157,7 +158,8 @@ function JobsBarChart({ buckets, selectedIdx, onSelectBar, animKey }: {
   const [reveal, setReveal] = useState(false);
   useEffect(() => { const t = setTimeout(() => setReveal(true), 60); return () => clearTimeout(t); }, []);
 
-  const maxVal = Math.max(...buckets.map(b => b.valueCents), 1);
+  // Both series share one scale so ghost (billed) and solid (collected) compare truthfully.
+  const maxVal = Math.max(...buckets.map(b => b.valueCents), ...billed.map(b => b.valueCents), 1);
   const hOf = (v: number) => v <= 0 ? 6 : 12 + (v / maxVal) * (CH - 40);
 
   const sel = buckets[selectedIdx];
@@ -167,6 +169,21 @@ function JobsBarChart({ buckets, selectedIdx, onSelectBar, animKey }: {
   return (
     <div style={{ position: 'relative', margin: '22px -6px 0' }}>
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block', height: 'auto', overflow: 'visible' }}>
+        {/* Ghost bars — wireframe outline of billed-but-uncollected work, visible
+            the moment a quote/invoice goes out. */}
+        {billed.map((b, i) => {
+          if (i >= n || b.valueCents <= (buckets[i]?.valueCents ?? 0)) return null;
+          const gh = reveal ? hOf(b.valueCents) : 0;
+          return (
+            <rect key={`g${animKey}-${i}`} className="td-bar"
+              x={x(i) + 0.75} width={Math.max(bw - 1.5, 1)}
+              y={BASE - gh} height={gh}
+              rx={(bw - 1.5) / 2}
+              fill="none" stroke={BAR} strokeWidth={1.5} opacity={0.45}
+              style={{ pointerEvents: 'none' }}
+            />
+          );
+        })}
         {Array.from({ length: MAX_SLOTS }, (_, i) => {
           const active = i < n;
           const bh = active && reveal ? hOf(buckets[i].valueCents) : 0;
@@ -238,6 +255,7 @@ export default function TradesDashboard() {
   const rate = collectionRate(fInv, win.start, win.end);
 
   const buckets = buildBuckets(fInv, tf);
+  const billedBuckets = buildBilledBuckets(fInv, tf);
   const selectedIdx = selBar >= 0 && selBar < buckets.length
     ? selBar
     : Math.min(currentBucketIdx(tf), buckets.length - 1);
@@ -282,7 +300,7 @@ export default function TradesDashboard() {
             <div style={{ marginTop: 4, color: 'rgba(88,171,255,0.6)', fontWeight: 400, fontSize: 13 }}>{rate}% collection rate</div>
           )}
 
-          <JobsBarChart buckets={buckets} selectedIdx={selectedIdx} onSelectBar={setSelBar} animKey={`${tf}-${siteFilter ?? 'all'}`} />
+          <JobsBarChart buckets={buckets} billed={billedBuckets} selectedIdx={selectedIdx} onSelectBar={setSelBar} animKey={`${tf}-${siteFilter ?? 'all'}`} />
 
           {/* Notch — rounded wave flowing out of the hero, follows the active timeframe */}
           <svg width="84" height="14" viewBox="0 0 84 14"

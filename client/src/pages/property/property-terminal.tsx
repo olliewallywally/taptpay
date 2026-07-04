@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { propFetch } from "@/lib/property-api";
+import { usePropertyTenants, usePropertyInvoices } from "@/lib/property-data";
 import { WireframeLiquidButton } from "@/components/wireframe-liquid-button";
 
 /* ═══ TOKENS ═══ */
@@ -1177,18 +1178,10 @@ export default function PropertyTerminal() {
   const conveyorTimer = useRef<ReturnType<typeof setTimeout>>();
   const viewportRef = useRef<HTMLDivElement>(null);
 
-  /* Data */
-  const { data: tenants = [] } = useQuery<any[]>({
-    queryKey: ['/api/property/tenants'],
-    queryFn: () => propFetch('/api/property/tenants').then(r => r.ok ? r.json() : []),
-    staleTime: 60000, retry: false,
-  });
-
-  const { data: invoices = [] } = useQuery<any[]>({
-    queryKey: ['/api/property/invoices'],
-    queryFn: () => propFetch('/api/property/invoices').then(r => r.ok ? r.json() : []),
-    staleTime: 30000, retry: false,
-  });
+  /* Data — shared hooks so the stack, dashboard chart, and analytics all read
+     the same cache entry and refresh together */
+  const { data: tenants = [] } = usePropertyTenants();
+  const { data: invoices = [] } = usePropertyInvoices();
 
   const { data: schedules = [] } = useQuery<any[]>({
     queryKey: ['/api/property/schedules'],

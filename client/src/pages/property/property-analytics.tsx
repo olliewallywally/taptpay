@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { propFetch } from "@/lib/property-api";
+import { usePropertyInvoices } from "@/lib/property-data";
+import { periodWindow, collectedCents, type Timeframe } from "@/lib/property-dashboard-data";
 
 /* ── Design tokens (matches AnalyticsScreen_(2)) ── */
 const C = {
@@ -15,8 +15,6 @@ const C = {
   green:    '#22C55E',
   red:      '#EF4444',
 };
-
-type Timeframe = 'day' | 'week' | 'month' | 'year';
 
 /* ── SVG chart helpers ── */
 function toSmooth(pts: number[], W: number, H: number, pad = 8) {
@@ -122,32 +120,30 @@ function TxRow({ inv, delay = 0 }: { inv: any; delay?: number }) {
   );
 }
 
-/* ── Compute chart series from invoices ── */
+/* ── Compute chart series from invoices ──
+   Windows come from periodWindow so this chart and the dashboard's always agree.
+   Invoices outside the window are SKIPPED (never clamped into the edge bucket —
+   that used to pile all history onto the left edge of the chart). */
 function buildChartData(invoices: any[], tf: Timeframe) {
   const now = new Date();
-  let buckets: number;
-  let getKey: (d: Date) => number;
-
-  if (tf === 'day') {
-    buckets = 10; getKey = d => Math.floor((now.getTime() - d.getTime()) / (2.4 * 3600000));
-  } else if (tf === 'week') {
-    buckets = 10; getKey = d => Math.floor((now.getTime() - d.getTime()) / (16.8 * 3600000));
-  } else if (tf === 'month') {
-    buckets = 10; getKey = d => Math.floor((now.getTime() - d.getTime()) / (72 * 3600000));
-  } else {
-    buckets = 10; getKey = d => Math.floor((now.getTime() - d.getTime()) / (876 * 3600000));
-  }
+  const { start } = periodWindow(tf, now);
+  const buckets = 10;
+  const spanMs = Math.max(now.getTime() - start.getTime(), 1);
+  const getKey = (d: Date) => Math.floor(((d.getTime() - start.getTime()) / spanMs) * buckets);
 
   const paid: number[] = Array(buckets).fill(0);
   const outstanding: number[] = Array(buckets).fill(0);
 
   invoices.forEach((inv: any) => {
     if (inv.status === 'voided') return; // cancelled requests aren't revenue or outstanding
-    const date = new Date(inv.paidAt ?? inv.createdAt);
-    const bucket = Math.max(0, Math.min(buckets - 1, getKey(date)));
+    const isPaid = inv.status === 'paid' || inv.status === 'paid_external';
+    // Paid revenue sits at its paid date; outstanding at its sent date.
+    const date = new Date(isPaid ? (inv.paidAt ?? inv.createdAt) : inv.createdAt);
+    const bucket = getKey(date);
+    if (bucket < 0 || bucket > buckets - 1) return; // outside the window
     const val = Math.round((inv.amountCents ?? 0) / 100);
-    if (inv.status === 'paid' || inv.status === 'paid_external') paid[buckets - 1 - bucket] += val;
-    else outstanding[buckets - 1 - bucket] += val;
+    if (isPaid) paid[bucket] += val;
+    else outstanding[bucket] += val;
   });
 
   const maxVal = Math.max(...paid, ...outstanding, 1);
@@ -162,30 +158,20 @@ export default function PropertyAnalytics() {
   const [tf, setTf] = useState<Timeframe>('week');
   const [totVis, setTotVis] = useState(true);
 
-  const { data: invoices = [] } = useQuery<any[]>({
-    queryKey: ['/api/property/invoices'],
-    queryFn: () => propFetch('/api/property/invoices').then(r => r.ok ? r.json() : []),
-    staleTime: 30000,
-    retry: false,
-  });
+  const { data: invoices = [] } = usePropertyInvoices();
 
-  /* Filter invoices by timeframe */
+  /* Filter invoices by timeframe — same calendar windows as the dashboard */
   const now = new Date();
-  const cutoff = {
-    day:   new Date(now.getTime() - 24 * 3600000),
-    week:  new Date(now.getTime() - 7 * 86400000),
-    month: new Date(now.getTime() - 30 * 86400000),
-    year:  new Date(now.getTime() - 365 * 86400000),
-  }[tf];
+  const win = periodWindow(tf, now);
+  const cutoff = win.start;
 
   // Voided (cancelled) invoices are never revenue or history — drop them up front.
   const liveInvoices = invoices.filter((i: any) => i.status !== 'voided');
   const filtered = liveInvoices.filter((i: any) => new Date(i.createdAt) >= cutoff);
 
-  /* Revenue total */
-  const totalRevenue = filtered
-    .filter((i: any) => i.status === 'paid' || i.status === 'paid_external')
-    .reduce((s: number, i: any) => s + (i.amountCents ?? 0), 0);
+  /* Revenue total — collectedCents is the same math the dashboard hero uses,
+     so the two pages can never disagree on what was collected this period. */
+  const totalRevenue = collectedCents(invoices, win.start, win.end);
   const totalStr = '$' + (totalRevenue / 100).toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   /* Chart — only built from real property invoice data, never retail transactions */
