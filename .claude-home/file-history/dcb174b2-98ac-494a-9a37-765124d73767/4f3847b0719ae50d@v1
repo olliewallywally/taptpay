@@ -33,9 +33,6 @@ Built via subagent-driven-development on branch `feat/trades-vertical` (off main
 - DB: 5 trades tables + merchants.gst_registered applied via ADDITIVE SQL (migrations/0007_trades_vertical.sql), NOT db:push. Property data intact.
 - **LANDMINE: never `npm run db:push` on this branch** — live DB is ahead of main; push wants to DROP invoices_rent_requests.scheduled_send_at + truncate tables. Use additive SQL only.
 
-## MERGED INTO PROPERTY-REDESIGN BRANCH (2026-07-04)
-User's settings Trades button 404'd because trades only lived on `feat/trades-phase3c-cross-cutting`. Merged that branch (51 commits) into `feat/property-dashboard-redesign` (merge commit 8a21448). Conflict resolutions: settings.tsx mode-switcher kept user's redesign styling (custom SVGs, "·" separators) with final TRADES_THEME colors on the Trades button; login.tsx took trades side (open-redirect guard on returnTo); landing-page.tsx kept HEAD wholesale (user's flat-navy carousel design — trades side's nav login button was dropped, on an older base). `bill-split.tsx` and `verify-merchant.tsx` deletions from trades branch confirmed dead code. tsc + vite build pass; /trades serves 200, /api/trades/* returns 401 not 404. Note: `.claude-home/` is tracked and live-churned — merges block on `.credentials.json`; workaround is committing the other branch's version of that file first so the merge doesn't need to touch it.
-
 ## RESUME NEXT SESSION (see ledger for detail)
 1. Run superpowers:finishing-a-development-branch for Phase 1 (merge/PR decision). 
 2. Phase 2 = nav & shells: 3-way settings switch (settings.tsx ~line 1170, currently Retail/Property → add Trades `/trades`), `/trades/*` routes in App.tsx mirroring property, TRADES_THEME tokens, empty page shells. Then Phases 3-6 per plan roadmap.
