@@ -11,7 +11,7 @@ const C = {
   btn:   '#58AAFD',
   white: '#FFFFFF',
   gray:  '#D9D7D7',
-  sheet: '#E8E8E8',
+  sheet: '#F4F4F4', // same off-white as the dashboard/terminal sheets
   row:   '#F7F7F7',
   mute:  '#8C8C8C',
 };
@@ -487,11 +487,12 @@ const DIRECTORY_CSS = `
   box-sizing: border-box;
 }
 .tdir-hero-count {
+  /* Matches the terminal's .tp-amount metrics so heroes read as one type system */
   font-family: 'Outfit', system-ui, sans-serif;
   font-size: 100px;
-  line-height: 0.85;
+  line-height: 0.95;
   font-weight: 800;
-  letter-spacing: 0;
+  letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
 }
 .tdir-hero-label {
