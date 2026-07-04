@@ -1427,11 +1427,7 @@ export default function PropertyTerminal() {
     }
     if (stack === 'overdue') setStackFilter('overdue');
     if (params.get('remind') === '1') setRemindMode(true);
-    // Strip the params only once this instance survives: during the route
-    // transition (Suspense + AnimatePresence) the first mount can be discarded
-    // along with its state — stripping there starves the real mount.
-    const strip = setTimeout(() => window.history.replaceState({}, '', window.location.pathname), 800);
-    return () => clearTimeout(strip);
+    window.history.replaceState({}, '', window.location.pathname);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

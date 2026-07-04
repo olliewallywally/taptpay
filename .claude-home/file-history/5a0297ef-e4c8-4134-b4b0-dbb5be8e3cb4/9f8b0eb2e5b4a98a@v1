@@ -4,15 +4,14 @@ import { useLocation } from "wouter";
 import { propFetch } from "@/lib/property-api";
 import {
   type Timeframe, buildBuckets, periodWindow, collectedCents,
-  growthPct, collectionRate, filterByProperty, fmtCompact, currentBucketIdx,
+  growthPct, collectionRate, filterByProperty, fmtCompact,
 } from "@/lib/property-dashboard-data";
 
 /* ── Design tokens ── */
 const NAVY = '#040D6D';
 const SKY  = '#58ABFF';
-const BAR  = '#58ABFF';                  // resting bar
-const SEL  = '#007FFF';                  // selected bar — brighter azure (mockup)
-const CYAN = '#35C0FF';                  // timeframe indicator (mockup)
+const BAR  = 'rgba(88,171,255,0.72)';   // resting bar
+const SEL  = '#58ABFF';                  // selected bar (full sky)
 const SHEET = '#F4F4F4';
 
 const TIMEFRAMES: Timeframe[] = ['day', 'week', 'month', 'year'];
@@ -73,13 +72,8 @@ function PropertyDropdown({ options, value, onPick }: {
   );
 }
 
-/* ── Timeframe selector — sliding indicator, terminal SubBar pattern ──
-   Reports the active button's viewport center-x via onIndicator so the
-   hero notch can follow the selection. */
-function TimeframeBar({ tf, onPick, onIndicator }: {
-  tf: Timeframe; onPick: (t: Timeframe) => void;
-  onIndicator?: (centerX: number, animate: boolean) => void;
-}) {
+/* ── Timeframe selector — sliding indicator, terminal SubBar pattern ── */
+function TimeframeBar({ tf, onPick }: { tf: Timeframe; onPick: (t: Timeframe) => void }) {
   const btnRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const mounted = useRef(false);
   const [ind, setInd] = useState({ x: 0, w: 0, on: false });
@@ -87,35 +81,30 @@ function TimeframeBar({ tf, onPick, onIndicator }: {
   const activeIdx = TIMEFRAMES.indexOf(tf);
 
   useEffect(() => {
-    const tick = (anim: boolean) => {
+    const tick = () => {
       const el = btnRefs.current[activeIdx];
-      if (!el) return;
-      setInd({ x: el.offsetLeft, w: el.offsetWidth, on: true });
-      const r = el.getBoundingClientRect();
-      onIndicator?.(r.left + r.width / 2, anim);
+      if (el) setInd({ x: el.offsetLeft, w: el.offsetWidth, on: true });
     };
-    const remeasure = () => tick(false);
-    window.addEventListener('resize', remeasure);
     if (!mounted.current) {
-      requestAnimationFrame(() => requestAnimationFrame(() => { tick(false); mounted.current = true; }));
-      return () => window.removeEventListener('resize', remeasure);
+      requestAnimationFrame(() => requestAnimationFrame(() => { tick(); mounted.current = true; }));
+    } else {
+      setAnim(true);
+      requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(tick)));
+      const t = setTimeout(() => setAnim(false), 520);
+      return () => clearTimeout(t);
     }
-    setAnim(true);
-    requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => tick(true))));
-    const t = setTimeout(() => setAnim(false), 520);
-    return () => { clearTimeout(t); window.removeEventListener('resize', remeasure); };
   }, [activeIdx]);
 
   return (
     <div style={{ display: 'flex', justifyContent: 'center' }}>
-      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: 'min(300px, 100%)', background: NAVY, borderRadius: 999, padding: 3, boxShadow: '0 6px 18px rgba(4,13,109,0.22)' }}>
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', background: NAVY, borderRadius: 999, padding: 4, boxShadow: '0 6px 18px rgba(4,13,109,0.22)' }}>
         <div className={`pd-tf-ind${animate ? ' animate' : ''}`}
-          style={{ position: 'absolute', top: 3, bottom: 3, left: ind.x, width: ind.w, borderRadius: 999, background: CYAN, opacity: ind.on ? 1 : 0 }} />
+          style={{ position: 'absolute', top: 4, bottom: 4, left: ind.x, width: ind.w, borderRadius: 999, background: SKY, opacity: ind.on ? 1 : 0 }} />
         {TIMEFRAMES.map((t, i) => (
           <button key={t} type="button" ref={el => (btnRefs.current[i] = el)}
             className="pd-tap" onPointerDown={pulse}
             onClick={() => onPick(t)}
-            style={{ position: 'relative', zIndex: 1, flex: 1, padding: '7px 0', borderRadius: 999, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'Outfit, system-ui', fontWeight: tf === t ? 700 : 600, fontSize: 12, textTransform: 'capitalize', color: tf === t ? NAVY : 'rgba(88,171,255,0.55)', transition: 'color 0.25s ease', WebkitTapHighlightColor: 'transparent' }}>
+            style={{ position: 'relative', zIndex: 1, padding: '8px 18px', borderRadius: 999, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'Outfit, system-ui', fontWeight: 600, fontSize: 12.5, textTransform: 'capitalize', color: tf === t ? NAVY : 'rgba(88,171,255,0.75)', transition: 'color 0.25s ease', WebkitTapHighlightColor: 'transparent' }}>
             {t}
           </button>
         ))}
@@ -133,9 +122,9 @@ function RentBarChart({ buckets, selectedIdx, onSelectBar, animKey }: {
   onSelectBar: (i: number) => void;
   animKey: string;
 }) {
-  const W = 375, CH = 190, LABEL_H = 30, H = CH + LABEL_H, PADX = 16, BASE = CH;
+  const W = 375, CH = 190, LABEL_H = 30, H = CH + LABEL_H, PADX = 10, BASE = CH;
   const n = buckets.length;
-  const gap = n > 8 ? 10 : 24;
+  const gap = n > 8 ? 8 : 14;
   const bw = (W - PADX * 2 - gap * (n - 1)) / n;
   const x = (i: number) => PADX + i * (bw + gap);
 
@@ -160,7 +149,7 @@ function RentBarChart({ buckets, selectedIdx, onSelectBar, animKey }: {
             <rect key={i} className="pd-bar"
               x={bx} width={Math.max(bw, 1)}
               y={BASE - bh} height={bh}
-              rx={bw / 2}
+              rx={Math.min(7, bw / 2.4)}
               fill={i === selectedIdx ? SEL : BAR}
               style={{ cursor: active ? 'pointer' : 'default', pointerEvents: active ? 'auto' : 'none' }}
               onClick={() => active && onSelectBar(i)}
@@ -178,7 +167,7 @@ function RentBarChart({ buckets, selectedIdx, onSelectBar, animKey }: {
       {/* Value pill above the selected bar */}
       {sel && (
         <div key={`${animKey}-${selectedIdx}`} className="pd-bar-pill"
-          style={{ position: 'absolute', left: `${(selX / W) * 100}%`, top: `${(selTop / H) * 100}%`, transform: 'translate(-50%, calc(-100% - 8px))', background: SEL, color: NAVY, padding: '5px 14px', borderRadius: 999, fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap', boxShadow: '0 6px 16px rgba(0,127,255,0.35)', pointerEvents: 'none' }}>
+          style={{ position: 'absolute', left: `${(selX / W) * 100}%`, top: `${(selTop / H) * 100}%`, transform: 'translate(-50%, calc(-100% - 8px))', background: SEL, color: NAVY, padding: '5px 14px', borderRadius: 999, fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap', boxShadow: '0 6px 16px rgba(88,171,255,0.35)', pointerEvents: 'none' }}>
           {fmtCompact(sel.valueCents)}
         </div>
       )}
@@ -191,14 +180,6 @@ export default function PropertyDashboard() {
   const [tf, setTf] = useState<Timeframe>('week');
   const [propFilter, setPropFilter] = useState<string | null>(null);
   const [selBar, setSelBar] = useState(-1); // -1 → default to last bucket
-  const colRef = useRef<HTMLDivElement>(null);
-  const [notch, setNotch] = useState<{ x: number; anim: boolean } | null>(null);
-
-  // Notch follows the active timeframe button (x is relative to the column).
-  const handleIndicator = (centerX: number, anim: boolean) => {
-    const col = colRef.current?.getBoundingClientRect();
-    if (col) setNotch({ x: centerX - col.left, anim });
-  };
 
   const { data: tenants = [] } = useQuery<any[]>({
     queryKey: ['/api/property/tenants'],
@@ -223,9 +204,7 @@ export default function PropertyDashboard() {
   const rate = collectionRate(fInv, win.start, win.end);
 
   const buckets = buildBuckets(fInv, tf);
-  const selectedIdx = selBar >= 0 && selBar < buckets.length
-    ? selBar
-    : Math.min(currentBucketIdx(tf), buckets.length - 1);
+  const selectedIdx = selBar >= 0 && selBar < buckets.length ? selBar : buckets.length - 1;
 
   const activeTenants = fTen.filter((t: any) => t.status !== 'archived').length;
   const overdueCount = fInv.filter((i: any) => i.status === 'overdue').length;
@@ -234,7 +213,7 @@ export default function PropertyDashboard() {
 
   return (
     <div style={{ background: '#FFFFFF', minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
-      <div ref={colRef} style={{ width: '100%', maxWidth: 430, minHeight: '100svh', background: SHEET, paddingBottom: 130, fontFamily: "'Outfit', system-ui, sans-serif" }}>
+      <div style={{ width: '100%', maxWidth: 430, minHeight: '100svh', background: SHEET, paddingBottom: 130, fontFamily: "'Outfit', system-ui, sans-serif" }}>
         <style>{PD_CSS}</style>
 
         {/* ── Navy hero ── */}
@@ -269,36 +248,34 @@ export default function PropertyDashboard() {
 
           <RentBarChart buckets={buckets} selectedIdx={selectedIdx} onSelectBar={setSelBar} animKey={`${tf}-${propFilter ?? 'all'}`} />
 
-          {/* Notch — rounded wave flowing out of the hero, follows the active timeframe */}
-          <svg width="84" height="14" viewBox="0 0 84 14"
-            className={notch?.anim ? 'pd-notch animate' : 'pd-notch'}
-            style={{ position: 'absolute', left: notch ? notch.x : '50%', bottom: -13, transform: 'translateX(-50%)' }}>
-            <path d="M0 0 C 20 0 26 13 42 13 C 58 13 64 0 84 0 Z" fill={NAVY} />
+          {/* Notch pointing at the timeframe bar */}
+          <svg width="26" height="12" viewBox="0 0 26 12" style={{ position: 'absolute', left: '50%', bottom: -11, transform: 'translateX(-50%)' }}>
+            <path d="M0 0h26L13 12z" fill={NAVY} />
           </svg>
         </div>
 
         {/* ── Timeframe selector ── */}
-        <div style={{ padding: '15px 22px 0' }}>
-          <TimeframeBar tf={tf} onPick={pickTf} onIndicator={handleIndicator} />
+        <div style={{ padding: '24px 22px 0' }}>
+          <TimeframeBar tf={tf} onPick={pickTf} />
         </div>
 
         {/* ── Stat cards ── */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.15fr', gap: 14, padding: '26px 22px 0' }}>
           <button type="button" className="pd-card pd-tap" onPointerDown={pulse} onClick={() => setLocation('/property/tenants')}
-            style={{ background: '#FFFFFF', borderRadius: 22, padding: '16px 18px', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'Outfit, system-ui' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-              <div style={{ fontWeight: 700, fontSize: 11, color: NAVY, letterSpacing: '0.08em', textTransform: 'uppercase' }}>tenants</div>
+            style={{ background: '#FFFFFF', borderRadius: 22, padding: '18px 18px 16px', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'Outfit, system-ui' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ fontWeight: 700, fontSize: 10, color: NAVY, letterSpacing: '0.1em', textTransform: 'uppercase' }}>tenants</div>
               <IcoPeeps />
             </div>
-            <div style={{ marginTop: 10, fontWeight: 800, fontSize: 42, color: NAVY, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{activeTenants}</div>
+            <div style={{ marginTop: 22, fontWeight: 800, fontSize: 40, color: NAVY, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{activeTenants}</div>
           </button>
           <button type="button" className="pd-card pd-tap" onPointerDown={pulse} onClick={() => setLocation('/property/terminal?stack=overdue')}
-            style={{ background: NAVY, borderRadius: 22, padding: '16px 18px', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'Outfit, system-ui' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-              <div style={{ fontWeight: 700, fontSize: 11, color: SKY, letterSpacing: '0.08em', textTransform: 'uppercase' }}>outstanding</div>
+            style={{ background: NAVY, borderRadius: 22, padding: '18px 18px 16px', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'Outfit, system-ui' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ fontWeight: 700, fontSize: 10, color: SKY, letterSpacing: '0.1em', textTransform: 'uppercase' }}>outstanding</div>
               <IcoWarn />
             </div>
-            <div style={{ marginTop: 10, fontWeight: 800, fontSize: 42, color: SKY, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{overdueCount}</div>
+            <div style={{ marginTop: 22, fontWeight: 800, fontSize: 40, color: SKY, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{overdueCount}</div>
           </button>
         </div>
 
@@ -325,7 +302,6 @@ export default function PropertyDashboard() {
 /* ── Injected CSS — indicator slide (Task 4 adds hover/press-glow here) ── */
 const PD_CSS = `
 .pd-tf-ind.animate { transition: left 0.45s cubic-bezier(0.34,1.56,0.64,1), width 0.45s cubic-bezier(0.34,1.56,0.64,1); }
-.pd-notch.animate { transition: left 0.45s cubic-bezier(0.34,1.56,0.64,1); }
 .pd-bar { transition: x 0.5s cubic-bezier(0.22,1,0.36,1), width 0.5s cubic-bezier(0.22,1,0.36,1), y 0.55s cubic-bezier(0.22,1,0.36,1), height 0.55s cubic-bezier(0.22,1,0.36,1), fill 0.25s ease; }
 .pd-bar-label { animation: pdFadeIn 0.5s ease 0.25s both; }
 .pd-bar-pill { animation: pdPillIn 0.35s cubic-bezier(0.34,1.56,0.64,1) 0.2s both; }

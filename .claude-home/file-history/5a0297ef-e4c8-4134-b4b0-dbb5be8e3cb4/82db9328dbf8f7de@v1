@@ -16,6 +16,13 @@ const C = {
   mute:  '#8C8C8C',
 };
 
+const STATUS_MAP: Record<string, { dot: string; bg: string; fg: string; label: string }> = {
+  paid:     { dot: '#13C29A', bg: 'rgba(19,194,154,0.14)',  fg: '#0B7D63', label: 'paid' },
+  overdue:  { dot: '#FF3B4E', bg: 'rgba(255,59,78,0.12)',   fg: '#C71A2A', label: 'overdue' },
+  dueSoon:  { dot: '#FFB02E', bg: 'rgba(255,176,46,0.18)',  fg: '#9A6A00', label: 'due soon' },
+  upcoming: { dot: '#58AAFD', bg: 'rgba(88,170,253,0.16)',  fg: '#2449A6', label: 'upcoming' },
+};
+
 function fmtCents(c: number) { return '$' + (c / 100).toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function propHeaders(): HeadersInit {
   const token = localStorage.getItem('authToken');
@@ -251,14 +258,27 @@ function initials(tenant: any) {
   return `${tenant.firstName?.[0] ?? ''}${tenant.lastName?.[0] ?? ''}`.toUpperCase() || '?';
 }
 
+function invoiceStatus(nextInvoice: any) {
+  if (!nextInvoice) return 'upcoming';
+  if (nextInvoice.status === 'paid' || nextInvoice.status === 'paid_external') return 'paid';
+  if (nextInvoice.status === 'overdue') return 'overdue';
+  if (nextInvoice.dueAt) {
+    const due = new Date(nextInvoice.dueAt).getTime();
+    const soon = Date.now() + 5 * 24 * 60 * 60 * 1000;
+    if (!Number.isNaN(due) && due <= soon) return 'dueSoon';
+  }
+  return 'upcoming';
+}
+
 function fmtDue(nextInvoice: any) {
-  if (!nextInvoice?.dueAt) return '';
-  return new Date(nextInvoice.dueAt).toLocaleDateString('en-NZ', { day: '2-digit', month: '2-digit' });
+  if (!nextInvoice?.dueAt) return 'no invoice';
+  return new Date(nextInvoice.dueAt).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short' }).toUpperCase();
 }
 
 function TenantRow({ tenant, nextInvoice, onClick }: { tenant: any; nextInvoice: any; onClick: () => void }) {
   const fullName = `${tenant.firstName} ${tenant.lastName}`.trim();
-  const overdue = nextInvoice?.status === 'overdue';
+  const status = invoiceStatus(nextInvoice);
+  const s = STATUS_MAP[status] ?? STATUS_MAP.upcoming;
 
   return (
     <button type="button" className="tdir-row" onClick={onClick}>
@@ -266,14 +286,14 @@ function TenantRow({ tenant, nextInvoice, onClick }: { tenant: any; nextInvoice:
       <span className="tdir-copy">
         <span className="tdir-name">{fullName}</span>
         <span className="tdir-address">{tenant.propertyAddress}</span>
+        <span className="tdir-status" style={{ color: s.fg }}>
+          <span style={{ background: s.dot }} />
+          {s.label}
+        </span>
       </span>
       <span className="tdir-money">
-        <span>{nextInvoice ? fmtCents(nextInvoice.amountCents) : '—'}</span>
-        {nextInvoice ? (
-          <small className={overdue ? 'overdue' : ''}>{overdue ? 'overdue' : 'next payment'}<br />{fmtDue(nextInvoice)}</small>
-        ) : (
-          <small>no invoice</small>
-        )}
+        <span>{nextInvoice ? fmtCents(nextInvoice.amountCents) : '$0.00'}</span>
+        <small>{fmtDue(nextInvoice)}</small>
       </span>
     </button>
   );
@@ -377,14 +397,15 @@ export default function TenantDirectory() {
       <section ref={heroRef} className="pt-hero tdir-hero">
         <div className="tdir-hero-count">{activeTenants.length}</div>
         <div className="tdir-hero-label">{tenantCountLabel}</div>
+        <button type="button" className="tdir-add" onPointerDown={pulse} onClick={() => setShowAdd(true)} aria-label="Add tenant">
+          <svg width={31} height={31} viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="2.3" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+        </button>
       </section>
 
       <main className="tdir-body">
-        <button type="button" className="tdir-add" onPointerDown={pulse} onClick={() => setShowAdd(true)} aria-label="Add tenant">
-          <svg width={26} height={26} viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="2.6" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
-        </button>
         <div className="tdir-search-row">
           <label className="tdir-search">
+            <svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="6.5" /><path d="m20 20-3.5-3.5" /></svg>
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -402,7 +423,7 @@ export default function TenantDirectory() {
             aria-label="Go to property dashboard"
             className="tdir-grid-btn"
           >
-            <svg width={17} height={17} viewBox="0 0 20 20" fill={C.sky}><rect x="1" y="1" width="7" height="7" rx="1.5" /><rect x="12" y="1" width="7" height="7" rx="1.5" /><rect x="1" y="12" width="7" height="7" rx="1.5" /><rect x="12" y="12" width="7" height="7" rx="1.5" /></svg>
+            <svg width={20} height={20} viewBox="0 0 20 20" fill={C.sky}><rect x="1" y="1" width="7" height="7" rx="2" /><rect x="12" y="1" width="7" height="7" rx="2" /><rect x="1" y="12" width="7" height="7" rx="2" /><rect x="12" y="12" width="7" height="7" rx="2" /></svg>
           </button>
         </div>
 
@@ -478,49 +499,50 @@ export default function TenantDirectory() {
 const DIRECTORY_CSS = `
 .tdir-hero {
   position: relative;
-  height: 265px;
+  height: 369px;
   background: #040D6D;
   color: #58AAFD;
   padding: 78px 34px 0;
   box-sizing: border-box;
+  border-radius: 0 0 28px 28px;
 }
 .tdir-hero-count {
   font-family: 'Outfit', system-ui, sans-serif;
-  font-size: 100px;
-  line-height: 0.85;
-  font-weight: 800;
+  font-size: 118px;
+  line-height: 0.82;
+  font-weight: 900;
   letter-spacing: 0;
   font-variant-numeric: tabular-nums;
 }
 .tdir-hero-label {
-  margin-top: 16px;
-  font-size: 13px;
+  margin-top: 26px;
+  font-size: 14px;
   line-height: 1;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
 }
 .tdir-add {
   position: absolute;
   left: 50%;
-  top: -34px;
-  width: 68px;
-  height: 68px;
+  bottom: -48px;
+  width: 96px;
+  height: 96px;
   transform: translateX(-50%);
-  border: none;
+  border: 12px solid #E8E8E8;
   border-radius: 999px;
   background: #58AAFD;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 6px 16px rgba(4,13,109,0.16);
+  box-shadow: 0 12px 24px rgba(4,13,109,0.18), 0 2px 8px rgba(88,170,253,0.16);
   -webkit-tap-highlight-color: transparent;
 }
 .tdir-add::after {
   content: '';
   position: absolute;
-  inset: 0;
+  inset: -7px;
   border-radius: inherit;
   pointer-events: none;
   box-shadow: 0 0 0 0 rgba(88,170,253,0);
@@ -533,28 +555,25 @@ const DIRECTORY_CSS = `
   100% { box-shadow: 0 0 0 10px rgba(88,170,253,0); }
 }
 .tdir-body {
-  position: relative;
   background: #E8E8E8;
-  margin-top: -28px;
-  border-radius: 28px 28px 0 0;
-  min-height: calc(100svh - 237px);
-  padding: 50px 13px 0;
+  min-height: calc(100svh - 369px);
+  padding: 68px 13px 0;
   box-sizing: border-box;
 }
 .tdir-search-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 40px;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) 47px;
+  gap: 10px;
   align-items: center;
 }
 .tdir-search {
-  height: 40px;
-  border-radius: 999px;
+  height: 47px;
+  border-radius: 16px;
   background: #D9D7D7;
   display: flex;
   align-items: center;
   gap: 9px;
-  padding: 0 18px;
+  padding: 0 14px;
   box-sizing: border-box;
 }
 .tdir-search input {
@@ -565,11 +584,11 @@ const DIRECTORY_CSS = `
   background: transparent;
   color: #040D6D;
   font-family: inherit;
-  font-size: 13.5px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 700;
   letter-spacing: 0;
 }
-.tdir-search input::placeholder { color: rgba(4,13,109,0.4); }
+.tdir-search input::placeholder { color: rgba(4,13,109,0.45); }
 .tdir-search button {
   border: none;
   background: transparent;
@@ -578,10 +597,10 @@ const DIRECTORY_CSS = `
   cursor: pointer;
 }
 .tdir-grid-btn {
-  width: 40px;
-  height: 40px;
+  width: 47px;
+  height: 47px;
   border: none;
-  border-radius: 13px;
+  border-radius: 16px;
   background: #040D6D;
   display: flex;
   align-items: center;
@@ -592,99 +611,116 @@ const DIRECTORY_CSS = `
 .tdir-list {
   display: flex;
   flex-direction: column;
-  padding-top: 12px;
+  gap: 15px;
+  padding-top: 18px;
 }
 .tdir-row {
   width: 100%;
+  min-height: 78px;
   border: none;
-  background: transparent;
+  border-radius: 22px;
+  background: #F7F7F7;
   display: grid;
-  grid-template-columns: 46px minmax(0, 1fr) auto;
+  grid-template-columns: 49px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 15px;
-  padding: 15px 4px;
+  gap: 12px;
+  padding: 13px 14px 13px 12px;
   box-sizing: border-box;
   color: #040D6D;
   font-family: inherit;
   text-align: left;
   cursor: pointer;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.75);
   -webkit-tap-highlight-color: transparent;
 }
-.tdir-row:active { transform: scale(0.99); opacity: 0.75; }
+.tdir-row:active { transform: scale(0.992); }
 .tdir-avatar {
-  width: 46px;
-  height: 46px;
+  width: 49px;
+  height: 49px;
   border-radius: 999px;
-  background: transparent;
-  border: 1.5px solid #58AAFD;
-  color: #040D6D;
+  background: #040D6D;
+  color: #58AAFD;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 800;
-  font-size: 13px;
+  font-weight: 900;
+  font-size: 14px;
   letter-spacing: 0.02em;
   flex-shrink: 0;
-  box-sizing: border-box;
 }
 .tdir-copy {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
 }
 .tdir-name {
   color: #040D6D;
-  font-weight: 700;
-  font-size: 15px;
-  line-height: 1.15;
-  text-transform: lowercase;
+  font-weight: 850;
+  font-size: 14px;
+  line-height: 1.05;
+  text-transform: uppercase;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .tdir-address {
-  color: rgba(4,13,109,0.75);
-  font-weight: 500;
-  font-size: 13.5px;
+  color: rgba(4,13,109,0.56);
+  font-weight: 700;
+  font-size: 10.8px;
   line-height: 1.2;
-  text-transform: lowercase;
+  text-transform: uppercase;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.tdir-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 850;
+  font-size: 9.5px;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.tdir-status span {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+}
 .tdir-money {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
-  gap: 4px;
+  gap: 6px;
   min-width: 76px;
   color: #040D6D;
-  justify-self: end;
 }
 .tdir-money span {
-  font-size: 17px;
+  font-size: 15px;
   line-height: 1;
-  font-weight: 800;
+  font-weight: 900;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 .tdir-money small {
   font-size: 10px;
-  line-height: 1.35;
-  color: rgba(4,13,109,0.75);
-  font-weight: 500;
-  text-align: center;
+  line-height: 1;
+  color: rgba(4,13,109,0.45);
+  font-weight: 800;
+  text-transform: uppercase;
   white-space: nowrap;
 }
-.tdir-money small.overdue { color: #C71A2A; font-weight: 700; }
 .tdir-empty {
-  padding: 34px 18px;
+  border-radius: 22px;
+  background: #F7F7F7;
+  padding: 28px 18px;
   color: rgba(4,13,109,0.55);
   text-align: center;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 750;
 }
 .tdir-archived {
   padding: 23px 2px 0;
@@ -757,9 +793,9 @@ const DIRECTORY_CSS = `
 }
 @media (max-width: 350px) {
   .tdir-body { padding-left: 10px; padding-right: 10px; }
-  .tdir-row { grid-template-columns: 42px minmax(0, 1fr) auto; gap: 10px; padding-left: 2px; padding-right: 2px; }
-  .tdir-avatar { width: 42px; height: 42px; }
+  .tdir-row { grid-template-columns: 44px minmax(0, 1fr) auto; gap: 9px; padding-left: 10px; padding-right: 10px; }
+  .tdir-avatar { width: 44px; height: 44px; }
   .tdir-money { min-width: 68px; }
-  .tdir-money span { font-size: 15px; }
+  .tdir-money span { font-size: 13px; }
 }
 `;

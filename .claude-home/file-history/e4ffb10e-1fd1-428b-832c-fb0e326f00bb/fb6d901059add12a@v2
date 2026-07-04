@@ -1,0 +1,48 @@
+# TaptPay — Visual Demo Build
+
+A static, **front-end-only** replica of the TaptPay app. It *looks* like the live,
+logged-in app but has **no backend** — auth is bypassed and all data is fake
+(baked-in demo data). Nothing here talks to a real server, database, or payment
+provider. Intended for embedding the app's visuals (e.g. onto a 3D model screen).
+
+## How to run it
+
+Because it's a single-page app that loads JavaScript modules, it must be served
+over **http://**, not opened directly as a `file://` path (browsers block module
+loading and absolute asset paths on `file://`).
+
+Any static server works. From inside this folder:
+
+```bash
+# Python (built in on Mac/Linux)
+python3 -m http.server 8080
+
+# …or Node
+npx serve .
+```
+
+Then open **http://localhost:8080** — it boots straight into the dashboard.
+
+## What you'll see
+
+The app opens on the merchant **Dashboard**. Bottom nav + the Settings screen let
+you move around. Everything is populated with demo data for a fictional NZ café,
+**"Harbourside Café"**:
+
+- **Dashboard** — revenue, transaction counts, charts
+- **Settings** — business details, billing, and the three-way
+  **Retail · Property · Trades** mode switcher
+- **Property** — rent collected, collection rate, tenants
+- **Property ▸ Tenants** — tenant directory
+- **Transactions** — transaction history + analytics
+
+## Notes / limitations
+
+- Buttons that would perform real actions (take a payment, send an invoice, save
+  settings) do nothing meaningful — this is a visual shell only.
+- A few screens that need live device features (NFC, camera, real QR codes) won't
+  render those parts.
+- This is **not** the production build. It was built from a dedicated
+  `vite.mock.config.ts` with a mock API layer (`client/src/mocks/mock-api.ts`).
+
+Built from branch `feat/property-dashboard-redesign`.

@@ -89,16 +89,6 @@ export function buildBuckets(invoices: any[], tf: Timeframe, now = new Date()): 
     bucket(new Date(now.getFullYear(), m, 1), new Date(now.getFullYear(), m + 1, 1), label));
 }
 
-/* Index of the bucket containing `now` — the default bar selection. Day's
-   buckets are rolling so the last one is always current; the calendar
-   timeframes can have future buckets (rest of the week/month/year). */
-export function currentBucketIdx(tf: Timeframe, now = new Date()): number {
-  if (tf === 'day') return 7;
-  if (tf === 'week') return (now.getDay() + 6) % 7;              // Monday-start
-  if (tf === 'month') return Math.floor((now.getDate() - 1) / 7);
-  return now.getMonth();
-}
-
 /* Portfolio filter. addr=null → everything. Invoices missing propertyAddress
    fall back to their tenant's address via tenantProfileId. */
 export function filterByProperty(invoices: any[], tenants: any[], addr: string | null) {

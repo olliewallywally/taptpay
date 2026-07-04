@@ -1,0 +1,59 @@
+import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
+import { chromium } from 'playwright';
+
+const ROOT = '/home/runner/workspace/dist/public';
+const PORT = 4318;
+const OUT = '/tmp/claude-1000/-home-runner-workspace/e4ffb10e-1fd1-428b-832c-fb0e326f00bb/scratchpad';
+
+const MIME = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.json':'application/json', '.png':'image/png', '.svg':'image/svg+xml', '.mp4':'video/mp4', '.woff2':'font/woff2', '.ico':'image/x-icon' };
+
+// Static server with SPA fallback to index.html
+const server = http.createServer((req, res) => {
+  let p = decodeURIComponent(req.url.split('?')[0]);
+  let file = path.join(ROOT, p);
+  if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) {
+    const ext = path.extname(p);
+    if (ext && ext !== '.html') { res.writeHead(404); return res.end('nf'); } // let missing assets 404
+    file = path.join(ROOT, 'index.html'); // SPA fallback
+  }
+  fs.readFile(file, (e, data) => {
+    if (e) { res.writeHead(404); return res.end('nf'); }
+    res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream' });
+    res.end(data);
+  });
+});
+
+await new Promise(r => server.listen(PORT, r));
+const base = `http://localhost:${PORT}`;
+
+const browser = await chromium.launch({ executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium', args: ['--no-sandbox'] });
+const page = await browser.newPage({ viewport: { width: 430, height: 932 } });
+
+const errors = [];
+page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+page.on('pageerror', e => errors.push('PAGEERROR: ' + e.message));
+
+async function shoot(route, name) {
+  errors.length = 0;
+  await page.goto(base + route, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: `${OUT}/verify-${name}.png`, fullPage: true });
+  const bodyText = (await page.innerText('body')).replace(/\s+/g, ' ').slice(0, 240);
+  const url = page.url();
+  console.log(`\n=== ${route} -> ${url} ===`);
+  console.log('TEXT:', bodyText);
+  console.log('ERRORS:', errors.length ? errors.slice(0, 6) : 'none');
+}
+
+await shoot('/dashboard', 'dashboard');
+await shoot('/settings', 'settings');
+await shoot('/property', 'property');
+await shoot('/property/tenants', 'tenants');
+await shoot('/transactions', 'transactions');
+await shoot('/', 'root');
+
+await browser.close();
+server.close();
+console.log('\nDONE');
