@@ -1,0 +1,24 @@
+{
+  "firstStartTime": "2026-07-06T10:13:52.774Z",
+  "machineID": "11daf40da7f96bc7da144adb8f51cc57d96e74a19953e7391cb5e18758a26da3",
+  "opusProMigrationComplete": true,
+  "sonnet1m45MigrationComplete": true,
+  "seenNotifications": {},
+  "migrationVersion": 13,
+  "userID": "a5acfdb825563aac123c4ba0bcbf09c45f0fb9d62b139a48902ddbbfbc761185",
+  "oauthAccount": {
+    "accountUuid": "1b954f1c-6aec-4d49-a8f9-4bbb3177bce4",
+    "emailAddress": "oliverleonard.professional@gmail.com",
+    "organizationUuid": "31d37aa3-df32-4366-ac7c-2a691dde207d",
+    "hasExtraUsageEnabled": true,
+    "billingType": "stripe_subscription",
+    "accountCreatedAt": "2025-07-12T22:26:29.565968Z",
+    "subscriptionCreatedAt": "2026-04-24T04:05:45.353320Z",
+    "ccOnboardingFlags": {},
+    "claudeCodeTrialEndsAt": null,
+    "claudeCodeTrialDurationDays": null,
+    "seatTier": null,
+    "displayName": "ollie",
+    "profileFetchedAt": 1783332833307
+  }
+}

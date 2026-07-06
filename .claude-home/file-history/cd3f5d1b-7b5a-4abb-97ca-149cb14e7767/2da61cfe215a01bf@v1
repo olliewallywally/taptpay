@@ -392,11 +392,8 @@ const ROUTES: Array<{ re: RegExp; data: Handler }> = [
   { re: /\/api\/merchants\/\d+\/(details|business-details)$/, data: () => MERCHANT },
   { re: /\/api\/merchants\/\d+$/, data: () => MERCHANT },
   { re: /\/api\/merchants$/, data: () => [MERCHANT] },
-  // Property vertical — specific sub-routes before the list route.
-  { re: /\/api\/property\/tenants\/(\d+)\/events/, data: () => [] },
-  { re: /\/api\/property\/tenants\/(\d+)(\?|$)/, data: (m) => TENANTS.find((t) => t.id === Number(m[1])) ?? null },
   { re: /\/api\/property\/tenants(\?|$)/, data: () => TENANTS },
-  { re: /\/api\/property\/invoices(\?|$)/, data: (_m, url) => { const tid = url.searchParams.get('tenantProfileId'); return tid ? INVOICES.filter((i) => i.tenantProfileId === Number(tid)) : INVOICES; } },
+  { re: /\/api\/property\/invoices(\?|$)/, data: () => INVOICES },
   { re: /\/api\/property\/schedules(\?|$)/, data: () => [] },
   { re: /\/api\/property\/reminder-settings$/, data: () => ({ rentReminderEnabled: true, rentReminderDelayDays: 3, rentReminderIntervalDays: 3, rentReminderMaxCount: 3 }) },
   // Trades vertical — order matters: specific sub-routes before the list route.
@@ -475,10 +472,8 @@ export function installMockApi() {
   };
 
   // Boot straight into the app instead of the marketing landing page.
-  // The demo build uses hash routing (see App.tsx) so it works on any static
-  // host — set the hash, not the pathname.
-  if (!window.location.hash || window.location.hash === '#' || window.location.hash === '#/') {
-    window.location.hash = '#/dashboard';
+  if (window.location.pathname === '/' || window.location.pathname === '') {
+    window.history.replaceState(null, '', '/dashboard');
   }
 
   // eslint-disable-next-line no-console

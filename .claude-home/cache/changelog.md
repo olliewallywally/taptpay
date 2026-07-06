@@ -1,6 +1,5 @@
 # Changelog
 
-<<<<<<< HEAD
 ## 2.1.201
 
 - Claude Sonnet 5 sessions no longer use the mid-conversation system role for harness reminders
@@ -55,10 +54,6 @@
 ## 2.1.198
 
 - Subagents now run in the background by default, so Claude keeps working while they run and is notified when they finish (previously a gradual rollout)
-=======
-## 2.1.198
-
->>>>>>> feat/trades-phase3c-cross-cutting
 - Claude in Chrome is now generally available
 - Added background agent notifications in `claude agents` — sessions that need input or finish now fire the `Notification` hook (`agent_needs_input` / `agent_completed`)
 - Added `/dataviz` skill for chart and dashboard design guidance with a runnable color-palette validator

@@ -1,0 +1,195 @@
+{
+  "plugins": [
+    "react",
+    "import"
+  ],
+  "rules": {
+    "react/forbid-elements": [
+      "warn",
+      {
+        "forbid": []
+      }
+    ],
+    "no-restricted-imports": [
+      "warn",
+      {
+        "patterns": []
+      }
+    ],
+    "no-restricted-syntax": [
+      "warn",
+      {
+        "selector": "Literal[value=/#[0-9a-fA-F]{3,8}\\b/]",
+        "message": "Raw hex color — use a design-system color token via var()."
+      },
+      {
+        "selector": "Literal[value=/\\b\\d+px\\b/]",
+        "message": "Raw px value — use a design-system spacing token via var()."
+      },
+      {
+        "selector": "Literal[value=/font-family\\s*:\\s*(?!['\\\"]?(?:Larken|Outfit|Plus Jakarta Sans))/i]",
+        "message": "Font not provided by the design system. Available: Larken, Outfit, Plus Jakarta Sans."
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": [
+        "**/index.js"
+      ],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ],
+  "x-omelette": {
+    "components": {},
+    "tokens": [
+      "--action-dark",
+      "--action-on-dark",
+      "--action-on-primary",
+      "--action-primary",
+      "--bg-dark",
+      "--bg-light",
+      "--blue",
+      "--blue-soft",
+      "--border-hairline",
+      "--border-on-light",
+      "--border-on-navy",
+      "--duration-base",
+      "--duration-fast",
+      "--ease-out",
+      "--font-display",
+      "--font-logo",
+      "--font-sans",
+      "--leading-none",
+      "--leading-normal",
+      "--leading-snug",
+      "--leading-tight",
+      "--navy",
+      "--navy-deep",
+      "--navy-tint",
+      "--off-white",
+      "--radius-lg",
+      "--radius-md",
+      "--radius-pill",
+      "--radius-sm",
+      "--radius-xl",
+      "--shadow-none",
+      "--space-1",
+      "--space-10",
+      "--space-12",
+      "--space-16",
+      "--space-2",
+      "--space-3",
+      "--space-4",
+      "--space-5",
+      "--space-6",
+      "--space-8",
+      "--status-dot",
+      "--surface-card",
+      "--surface-card-dark",
+      "--text-2xl",
+      "--text-3xl",
+      "--text-4xl",
+      "--text-5xl",
+      "--text-6xl",
+      "--text-accent",
+      "--text-lg",
+      "--text-md",
+      "--text-on-dark",
+      "--text-on-light",
+      "--text-on-light-muted",
+      "--text-sm",
+      "--text-xl",
+      "--text-xs",
+      "--tracking-normal",
+      "--tracking-tight",
+      "--tracking-wide",
+      "--weight-black",
+      "--weight-bold",
+      "--weight-extrabold",
+      "--weight-light",
+      "--weight-medium",
+      "--weight-regular",
+      "--weight-semibold",
+      "--white"
+    ],
+    "tokenKinds": {
+      "--navy": "color",
+      "--navy-deep": "color",
+      "--navy-tint": "color",
+      "--blue": "color",
+      "--blue-soft": "color",
+      "--off-white": "color",
+      "--white": "color",
+      "--bg-light": "color",
+      "--bg-dark": "color",
+      "--surface-card": "color",
+      "--surface-card-dark": "color",
+      "--text-on-light": "font",
+      "--text-on-light-muted": "font",
+      "--text-on-dark": "font",
+      "--text-accent": "font",
+      "--action-primary": "color",
+      "--action-on-primary": "color",
+      "--action-dark": "color",
+      "--action-on-dark": "color",
+      "--status-dot": "color",
+      "--border-on-navy": "color",
+      "--border-on-light": "color",
+      "--border-hairline": "color",
+      "--font-logo": "font",
+      "--font-display": "font",
+      "--font-sans": "font",
+      "--text-xs": "font",
+      "--text-sm": "font",
+      "--text-md": "font",
+      "--text-lg": "font",
+      "--text-xl": "font",
+      "--text-2xl": "font",
+      "--text-3xl": "font",
+      "--text-4xl": "font",
+      "--text-5xl": "font",
+      "--text-6xl": "font",
+      "--weight-light": "font",
+      "--weight-regular": "font",
+      "--weight-medium": "font",
+      "--weight-semibold": "font",
+      "--weight-bold": "font",
+      "--weight-extrabold": "font",
+      "--weight-black": "font",
+      "--leading-none": "font",
+      "--leading-tight": "font",
+      "--leading-snug": "font",
+      "--leading-normal": "font",
+      "--tracking-tight": "font",
+      "--tracking-normal": "font",
+      "--tracking-wide": "font",
+      "--space-1": "spacing",
+      "--space-2": "spacing",
+      "--space-3": "spacing",
+      "--space-4": "spacing",
+      "--space-5": "spacing",
+      "--space-6": "spacing",
+      "--space-8": "spacing",
+      "--space-10": "spacing",
+      "--space-12": "spacing",
+      "--space-16": "spacing",
+      "--radius-sm": "radius",
+      "--radius-md": "radius",
+      "--radius-lg": "radius",
+      "--radius-xl": "radius",
+      "--radius-pill": "radius",
+      "--shadow-none": "shadow",
+      "--ease-out": "other",
+      "--duration-fast": "other",
+      "--duration-base": "other"
+    },
+    "fontFamilies": [
+      "Larken",
+      "Outfit",
+      "Plus Jakarta Sans"
+    ]
+  }
+}

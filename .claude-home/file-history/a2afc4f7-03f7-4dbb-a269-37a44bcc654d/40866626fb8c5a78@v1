@@ -78,11 +78,6 @@ function CheckoutInner() {
   const urlParams = new URLSearchParams(search);
   const overrideAmount = urlParams.get("amount");
 
-  // Demo/visual build only: there is no Windcave backend, so the card flow is
-  // short-circuited to the success screen and the Hosted Fields are replaced by
-  // static demo values. Compile-time constant → tree-shaken from real builds.
-  const IS_MOCK = import.meta.env.VITE_MOCK === "1";
-
   // Source-specific endpoints — keyed by token for invoices, numeric id for txns.
   const sessionEndpoint = isInvoice ? `/api/checkout/${token}/session` : `/api/transactions/${txId}/pay`;
   const hfCompleteEndpoint = isInvoice ? `/api/checkout/${token}/hosted-fields-complete` : `/api/transactions/${txId}/hosted-fields-complete`;
@@ -752,14 +747,6 @@ function CheckoutInner() {
   }
 
   async function handleCardPay() {
-    if (IS_MOCK) {
-      setPayState("processing");
-      setTimeout(() => {
-        setPayState("success");
-        navigateAfterSuccess({ redirectPath: isInvoice ? undefined : `/receipt/${txId}` });
-      }, 900);
-      return;
-    }
     setPayState("processing");
     const session = await createSession();
     if (!session?.sessionId) {
@@ -1349,7 +1336,7 @@ function CheckoutInner() {
               transition: "max-height 0.4s ease, padding 0.4s ease",
             }}>
               {/* Loading state while hosted fields initialise */}
-              {cardOpen && !hfReady && !IS_MOCK && (
+              {cardOpen && !hfReady && (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "24px 0", color: "#0055FF" }}>
                   <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} />
                   <span style={{ fontSize: 13, fontWeight: 500 }}>Loading payment form…</span>
@@ -1357,37 +1344,29 @@ function CheckoutInner() {
               )}
 
               {/* Card fields — only visible once hosted fields are ready */}
-              <div style={{ display: (hfReady || IS_MOCK) ? "block" : "none" }}>
+              <div style={{ display: hfReady ? "block" : "none" }}>
                 {/* Card Number */}
                 <div style={{ marginBottom: 10 }}>
                   <label style={formLabelStyle}>Card Number</label>
-                  {IS_MOCK
-                    ? <div style={{ ...hfContainerStyle, display: "flex", alignItems: "center", color: "#0a2540", fontWeight: 600, letterSpacing: "0.08em" }}>4242 4242 4242 4242</div>
-                    : <div id="hf-number" style={hfContainerStyle} />}
+                  <div id="hf-number" style={hfContainerStyle} />
                 </div>
 
                 {/* Expiry + CVV row */}
                 <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
                   <div style={{ flex: 1 }}>
                     <label style={formLabelStyle}>Expiry</label>
-                    {IS_MOCK
-                      ? <div style={{ ...hfContainerStyle, display: "flex", alignItems: "center", color: "#0a2540", fontWeight: 600 }}>08 / 28</div>
-                      : <div id="hf-expiry" style={hfContainerStyle} />}
+                    <div id="hf-expiry" style={hfContainerStyle} />
                   </div>
                   <div style={{ flex: 1 }}>
                     <label style={formLabelStyle}>CVC</label>
-                    {IS_MOCK
-                      ? <div style={{ ...hfContainerStyle, display: "flex", alignItems: "center", color: "#0a2540", fontWeight: 600, letterSpacing: "0.2em" }}>•••</div>
-                      : <div id="hf-cvv" style={hfContainerStyle} />}
+                    <div id="hf-cvv" style={hfContainerStyle} />
                   </div>
                 </div>
 
                 {/* Cardholder Name */}
                 <div style={{ marginBottom: 10 }}>
                   <label style={formLabelStyle}>Cardholder Name</label>
-                  {IS_MOCK
-                    ? <div style={{ ...hfContainerStyle, display: "flex", alignItems: "center", color: "#0a2540", fontWeight: 600 }}>Ava Thompson</div>
-                    : <div id="hf-name" style={hfContainerStyle} />}
+                  <div id="hf-name" style={hfContainerStyle} />
                 </div>
 
                 {/* Pay button */}

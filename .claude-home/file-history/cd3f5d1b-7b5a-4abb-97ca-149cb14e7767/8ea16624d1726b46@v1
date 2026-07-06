@@ -24,10 +24,6 @@ export default defineConfig({
     },
   },
   root: path.resolve(import.meta.dirname, "client"),
-  // Demo/visual build (VITE_MOCK=1) is distributed as loose static files and
-  // may be opened from a subpath or file://, so emit relative asset URLs.
-  // Combined with hash routing this makes the demo work on any host.
-  base: process.env.VITE_MOCK === "1" ? "./" : "/",
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
@@ -39,18 +35,7 @@ export default defineConfig({
           if (id.includes("@tanstack")) return "vendor-query";
           if (id.includes("@radix-ui") || id.includes("radix-ui")) return "vendor-radix";
           if (id.includes("lucide-react")) return "vendor-lucide";
-          // Keep React core, react-dom and scheduler in ONE chunk. Splitting
-          // react core into the catch-all "vendor" chunk creates a circular
-          // cross-chunk import (react-dom -> react) that loads react-dom before
-          // React initialises, crashing with a __SECRET_INTERNALS undefined error.
-          if (
-            id.includes("node_modules/react-dom") ||
-            id.includes("node_modules/react/") ||
-            id.includes("node_modules/scheduler/") ||
-            id.includes("react/jsx-runtime") ||
-            id.includes("react/jsx-dev-runtime")
-          )
-            return "vendor-react";
+          if (id.includes("react-dom") || id.includes("react/jsx-runtime") || id.includes("react/jsx-dev-runtime")) return "vendor-react";
           if (id.includes("wouter")) return "vendor-router";
           if (id.includes("zod") || id.includes("drizzle-zod") || id.includes("@hookform")) return "vendor-forms";
           return "vendor";

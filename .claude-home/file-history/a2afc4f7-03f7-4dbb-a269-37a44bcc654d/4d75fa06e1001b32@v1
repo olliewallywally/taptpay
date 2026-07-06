@@ -108,6 +108,7 @@
       "Bash(grep -nA8 \"export async function createWindcaveRefund\" server/windcave.ts)",
       "Bash(ls -la docs/superpowers/specs/ docs/superpowers/plans/)",
       "Bash(grep -rl \"refund\\\\|analytics\\\\|gst-invoice\" docs/superpowers/)",
+<<<<<<< HEAD
       "Bash(git update-index *)",
       "Bash(npx jest *)",
       "Skill(run)",
@@ -137,7 +138,8 @@
       "Bash(pkill -f \"http.server 4320\")",
       "Bash(pkill -f \"http.server 4318\")",
       "Bash(grep -iB5 \"trade\")",
-      "Bash(git ls-tree *)",
+      "Bash(git ls-tree *)"
+=======
       "Bash(git rev-parse *)",
       "Bash(cat \"$\\(git rev-parse --git-path sdd\\)/progress.md\")",
       "Bash(:)",
@@ -148,6 +150,9 @@
       "Bash(echo \"relaunched db:push, pid $!\")",
       "Bash(echo \"=== EXIT $? ===\")",
       "Bash(xargs -I{} echo \"total tsc errors in repo \\(pre-existing + any new\\): {}\")",
+      "Bash(npx jest *)",
+      "Bash(git log *)",
+      "Bash(git ls-tree *)",
       "Bash(git switch *)",
       "Bash(git reset *)",
       "Bash(git restore *)",
@@ -185,10 +190,8 @@
       "Bash(GIT_CONFIG_NOSYSTEM=1 git check-ignore .claude-home .superpowers .cache logs)",
       "Bash(GIT_CONFIG_NOSYSTEM=1 git push -u origin feat/trades-phase3c-cross-cutting)",
       "Bash(timeout 180 npx --yes knip@5 --no-progress)",
-      "Bash(git cherry-pick *)",
-      "Bash(grep -rhoE \"/api/[a-zA-Z0-9/_:{}\\\\.\\\\$-]+\" client/src/pages/checkout.tsx)",
-      "Bash(grep -rnoE 'path=\"[^\"]+\"|path=\\\\{`[^`]+`\\\\}' client/src/App.tsx)",
-      "Bash(git mv *)"
+      "Bash(git cherry-pick *)"
+>>>>>>> feat/trades-phase3c-cross-cutting
     ]
   },
   "model": "claude-opus-4-8"

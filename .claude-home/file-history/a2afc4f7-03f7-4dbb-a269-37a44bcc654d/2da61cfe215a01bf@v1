@@ -229,145 +229,6 @@ function buildInvoices() {
 }
 const INVOICES = buildInvoices();
 
-/* ---- trades vertical demo data ---------------------------------------- */
-const TRADE_CLIENT_SEED: Array<[string, string, string, string]> = [
-  ['Daniel', 'Foster', '22 Kauri Grove, Titirangi, Auckland 0604', 'Kitchen renovation — stage 2'],
-  ['Emma', 'Sullivan', '9 Marine Parade, Mount Maunganui, Tauranga 3116', 'Bathroom re-fit'],
-  ['Ryan', 'Coleman', '145 Hakarimata Road, Ngaruawahia, Waikato 3720', 'Deck rebuild'],
-  ['Olivia', 'Barnes', '3 Fitzherbert Avenue, Palmerston North 4410', 'Full rewire'],
-  ['Mason', 'Reid', '58 Stanmore Road, Linwood, Christchurch 8011', 'Roof repairs'],
-];
-const TRADE_CLIENTS = TRADE_CLIENT_SEED.map(([firstName, lastName, siteAddress, notes], i) => ({
-  id: i + 1,
-  merchantId: MERCHANT_ID,
-  firstName,
-  lastName,
-  email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@example.co.nz`,
-  phone: `+64 21 ${300 + i}${400 + i}${500 + i}`,
-  siteAddress,
-  preferredChannel: i % 2 === 0 ? 'email' : 'sms',
-  status: 'active',
-  notes,
-  archivedAt: null,
-  createdAt: iso(now - (150 - i * 14) * DAY),
-  updatedAt: iso(now - (i + 1) * DAY),
-}));
-
-function buildTradeInvoices() {
-  const invs: any[] = [];
-  let id = 7000;
-  TRADE_CLIENTS.forEach((c, ci) => {
-    const jobValue = 1800 + ci * 650; // dollars per job
-    for (let m = 3; m >= 0; m--) {
-      const created = now - m * 26 * DAY;
-      const due = created + 14 * DAY;
-      let status: string;
-      let paidAt: string | null = null;
-      if (m === 0) {
-        const roll = seeded(id);
-        if (roll > 0.4) { status = 'paid'; paidAt = iso(now - Math.floor(seeded(id * 2) * 6) * DAY); }
-        else if (roll > 0.2) { status = 'sent'; }
-        else { status = 'overdue'; }
-      } else {
-        status = 'paid';
-        paidAt = iso(due - 2 * DAY);
-      }
-      invs.push({
-        id,
-        merchantId: MERCHANT_ID,
-        clientProfileId: c.id,
-        siteAddress: c.siteAddress,
-        amountCents: jobValue * 100,
-        token: `job_${id}`,
-        kind: 'job',
-        chargeType: 'job',
-        description: `${c.notes} — invoice #${id}`,
-        status,
-        dueAt: iso(due),
-        sentAt: iso(created),
-        paidAt,
-        voidedAt: null,
-        reminderCount: status === 'overdue' ? 2 : status === 'sent' ? 1 : 0,
-        splitEnabled: false,
-        splitPaidCount: 0,
-        deliveryChannel: c.preferredChannel,
-        createdAt: iso(created),
-        updatedAt: iso(created),
-      });
-      id++;
-    }
-  });
-  return invs.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
-}
-const TRADE_INVOICES = buildTradeInvoices();
-
-const TRADE_QUOTES = TRADE_CLIENTS.slice(0, 3).map((c, i) => ({
-  id: 8000 + i,
-  merchantId: MERCHANT_ID,
-  clientProfileId: c.id,
-  siteAddress: c.siteAddress,
-  token: `quote_${8000 + i}`,
-  amountCents: (2400 + i * 900) * 100,
-  status: ['sent', 'accepted', 'draft'][i],
-  description: `Quote — ${c.notes}`,
-  validUntil: iso(now + (14 - i * 3) * DAY),
-  createdAt: iso(now - (i + 2) * DAY),
-  updatedAt: iso(now - (i + 1) * DAY),
-}));
-
-/* ---- retail checkout / customer-payment demo flow --------------------- */
-const DEMO_TX = {
-  id: 90210,
-  merchantId: MERCHANT_ID,
-  itemName: 'In-store purchase',
-  price: '24.50',
-  status: 'completed',
-  paymentMethod: 'card_reader',
-  windcaveFeeRate: '0.0290',
-  platformFeeRate: '0.0020',
-  merchantNet: '23.96',
-  totalRefunded: '0.00',
-  taptStoneId: null,
-  isSplit: false,
-  splitEnabled: false,
-  totalSplits: 1,
-  completedSplits: 1,
-  createdAt: iso(now),
-};
-
-// Resolve a checkout token to the invoice-shape the checkout page expects.
-// Falls back to a fresh payable rent invoice so any demo link is payable.
-function resolveInvoice(rawToken: string) {
-  const inv = [...INVOICES, ...TRADE_INVOICES].find((i: any) => i.token === rawToken);
-  if (inv) {
-    const isTrade = String(inv.token).startsWith('job_');
-    return {
-      invoiceId: inv.id,
-      merchantId: MERCHANT_ID,
-      amountCents: inv.amountCents,
-      kind: inv.kind ?? (isTrade ? 'job' : 'rent'),
-      description: inv.description,
-      vertical: isTrade ? 'trades' : 'property',
-      alreadyPaid: inv.status === 'paid' || inv.status === 'paid_external',
-      splitEnabled: false,
-      splitCount: 0,
-      splitPaidCount: 0,
-    };
-  }
-  return {
-    invoiceId: 5999,
-    merchantId: MERCHANT_ID,
-    amountCents: 62000,
-    kind: 'rent',
-    description: 'Rent — this month',
-    vertical: 'property',
-    alreadyPaid: false,
-    splitEnabled: false,
-    splitCount: 0,
-    splitPaidCount: 0,
-  };
-}
-
 const SUBSCRIPTION = {
   plan: 'Growth',
   status: 'active',
@@ -392,27 +253,10 @@ const ROUTES: Array<{ re: RegExp; data: Handler }> = [
   { re: /\/api\/merchants\/\d+\/(details|business-details)$/, data: () => MERCHANT },
   { re: /\/api\/merchants\/\d+$/, data: () => MERCHANT },
   { re: /\/api\/merchants$/, data: () => [MERCHANT] },
-  // Property vertical — specific sub-routes before the list route.
-  { re: /\/api\/property\/tenants\/(\d+)\/events/, data: () => [] },
-  { re: /\/api\/property\/tenants\/(\d+)(\?|$)/, data: (m) => TENANTS.find((t) => t.id === Number(m[1])) ?? null },
   { re: /\/api\/property\/tenants(\?|$)/, data: () => TENANTS },
-  { re: /\/api\/property\/invoices(\?|$)/, data: (_m, url) => { const tid = url.searchParams.get('tenantProfileId'); return tid ? INVOICES.filter((i) => i.tenantProfileId === Number(tid)) : INVOICES; } },
+  { re: /\/api\/property\/invoices(\?|$)/, data: () => INVOICES },
   { re: /\/api\/property\/schedules(\?|$)/, data: () => [] },
   { re: /\/api\/property\/reminder-settings$/, data: () => ({ rentReminderEnabled: true, rentReminderDelayDays: 3, rentReminderIntervalDays: 3, rentReminderMaxCount: 3 }) },
-  // Trades vertical — order matters: specific sub-routes before the list route.
-  { re: /\/api\/trades\/clients\/(\d+)\/events/, data: () => [] },
-  { re: /\/api\/trades\/clients\/(\d+)(\?|$)/, data: (m) => TRADE_CLIENTS.find((c) => c.id === Number(m[1])) ?? null },
-  { re: /\/api\/trades\/clients(\?|$)/, data: () => TRADE_CLIENTS },
-  { re: /\/api\/trades\/invoices(\?|$)/, data: (_m, url) => { const cid = url.searchParams.get('clientProfileId'); return cid ? TRADE_INVOICES.filter((i) => i.clientProfileId === Number(cid)) : TRADE_INVOICES; } },
-  { re: /\/api\/trades\/quotes(\?|$)/, data: () => TRADE_QUOTES },
-  { re: /\/api\/trades\/schedules(\?|$)/, data: () => [] },
-  { re: /\/api\/trades\/reminder-settings$/, data: () => ({ reminderEnabled: true, reminderDelayDays: 3, reminderIntervalDays: 5, reminderMaxCount: 3 }) },
-  // Retail checkout / customer-payment flow.
-  { re: /\/api\/merchants\/\d+\/active-transaction/, data: () => ({ ...DEMO_TX, id: 90211, status: 'pending' }) },
-  { re: /\/api\/transactions\/(\d+)\/receipt/, data: () => ({}) },
-  { re: /\/api\/transactions\/(\d+)$/, data: (m) => ({ ...DEMO_TX, id: Number(m[1]) }) },
-  { re: /\/api\/checkout\/resolve\/([^/?]+)/, data: (m) => resolveInvoice(m[1]) },
-  { re: /\/api\/windcave\/env$/, data: () => ({ env: 'sec' }) },
   { re: /\/api\/subscription$/, data: () => SUBSCRIPTION },
   { re: /\/api\/billing\/card$/, data: () => ({ last4: '4242', brand: 'Visa', expiry: '08/28' }) },
   { re: /\/api\/push\/capabilities$/, data: () => ({ webPush: { available: false }, nativePush: { available: false } }) },
@@ -475,10 +319,8 @@ export function installMockApi() {
   };
 
   // Boot straight into the app instead of the marketing landing page.
-  // The demo build uses hash routing (see App.tsx) so it works on any static
-  // host — set the hash, not the pathname.
-  if (!window.location.hash || window.location.hash === '#' || window.location.hash === '#/') {
-    window.location.hash = '#/dashboard';
+  if (window.location.pathname === '/' || window.location.pathname === '') {
+    window.history.replaceState(null, '', '/dashboard');
   }
 
   // eslint-disable-next-line no-console

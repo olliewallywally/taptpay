@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face { font-family:'Outfit'; src:url('fonts/Outfit-Light.otf') format('opentype'); font-weight:300; font-style:normal; font-display:swap; }
+@font-face { font-family:'Outfit'; src:url('fonts/Outfit-Regular.otf') format('opentype'); font-weight:400; font-style:normal; font-display:swap; }
+@font-face { font-family:'Outfit'; src:url('fonts/Outfit-Medium.otf') format('opentype'); font-weight:500; font-style:normal; font-display:swap; }
+@font-face { font-family:'Outfit'; src:url('fonts/Outfit-SemiBold.otf') format('opentype'); font-weight:600; font-style:normal; font-display:swap; }
+html,body{margin:0;padding:0;background:#040D6D;}
+*{box-sizing:border-box;}
+::selection{background:#5E9DFF;color:#040D6D;}
+@keyframes attHint{0%,100%{transform:translateY(0);opacity:.5;}50%{transform:translateY(9px);opacity:1;}}
+#att-cform input::placeholder, #att-cform textarea::placeholder{color:rgba(244,241,232,0.4);}
+#att-cform input:focus, #att-cform textarea:focus{border-color:rgba(94,157,255,0.7) !important;background:rgba(244,241,232,0.09) !important;}
+</style>
+</helmet>
+
+<div id="att-root" style="position:relative;background:#040D6D;background-attachment:fixed;color:#F4F1E8;font-family:'Outfit',system-ui,sans-serif;font-weight:400;-webkit-font-smoothing:antialiased;">
+
+  <!-- fixed chrome -->
+  <div style="position:fixed;top:0;left:0;width:100%;height:2px;z-index:90;background:rgba(244,241,232,0.08);">
+    <div id="att-bar" style="height:100%;width:0%;background:#5E9DFF;"></div>
+  </div>
+  <div id="att-toplabel" style="position:fixed;top:31px;right:40px;z-index:90;font-family:'Outfit';font-weight:500;font-size:12px;letter-spacing:0.22em;text-transform:uppercase;color:rgba(244,241,232,0.45);">about the tech</div>
+  <div id="att-grain" style="position:fixed;inset:0;pointer-events:none;z-index:80;opacity:0.045;mix-blend-mode:overlay;background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E&quot;);"></div>
+
+  <!-- ============ ACT 1 — HERO ============ -->
+  <section data-screen-label="hero" style="position:relative;height:100vh;overflow:hidden;">
+    <div id="att-hero-phone" style="position:absolute;top:50%;right:7vw;height:84vh;transform:translateY(-50%);will-change:transform;z-index:3;">
+      <img src="assets/phone-retail.png" alt="taptpay terminal" style="position:relative;height:100%;width:auto;filter:drop-shadow(0 50px 80px rgba(0,0,0,0.45));" />
+    </div>
+
+    <div id="att-hero-content" style="position:absolute;left:7vw;top:50%;transform:translateY(-50%);max-width:44vw;z-index:4;will-change:transform,opacity;">
+      <h1 style="margin:0;font-family:'Outfit';font-weight:300;font-size:clamp(54px,8vw,124px);line-height:0.95;letter-spacing:-0.03em;color:#F4F1E8;">all software.<br/><span style="color:#5E9DFF;font-weight:400;">no hardware.</span></h1>
+      <p style="margin:32px 0 0;font-family:'Outfit';font-weight:400;font-size:clamp(16px,1.3vw,20px);line-height:1.65;color:rgba(244,241,232,0.66);max-width:30em;">a 100% digital, multi-stack payment system. no terminal, no machine to carry — if you can quote it, invoice it, or charge for it, <span style="color:#F4F1E8;font-weight:500;">taptpay collects it instantly,</span> on the phone you already own.</p>
+      <div style="margin-top:42px;display:flex;align-items:center;gap:10px;font-family:'Outfit';font-weight:500;font-size:12px;letter-spacing:0.24em;text-transform:uppercase;color:rgba(244,241,232,0.45);">
+        <span>scroll to explore</span>
+        <span style="display:inline-block;animation:attHint 1.6s ease-in-out infinite;">↓</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ACT 2 — THE BIG IDEA (collapse) ============ -->
+  <div id="att-collapse-wrap" style="position:relative;height:340vh;">
+    <div id="att-collapse-stage" data-screen-label="big idea" style="position:sticky;top:0;height:100vh;overflow:hidden;perspective:1500px;">
+
+      <!-- headlines -->
+      <div style="position:absolute;top:11vh;left:0;width:100%;text-align:center;padding:0 6vw;z-index:20;pointer-events:none;">
+        <div id="att-c-head-a" style="will-change:transform,opacity;">
+          <div style="font-family:'Outfit';font-weight:500;font-size:13px;letter-spacing:0.32em;text-transform:uppercase;color:rgba(244,241,232,0.45);margin-bottom:18px;">the big idea</div>
+          <h2 style="margin:0;font-family:'Outfit';font-weight:300;font-size:clamp(32px,4.4vw,68px);line-height:1.05;letter-spacing:-0.02em;color:#F4F1E8;">every other payment tool<br/>is built for <span style="font-weight:500;color:#5E9DFF;">one</span> job.</h2>
+        </div>
+        <div id="att-c-head-b" style="position:absolute;top:0;left:0;width:100%;padding:0 6vw;opacity:0;will-change:transform,opacity;">
+          <div style="font-family:'Outfit';font-weight:500;font-size:13px;letter-spacing:0.32em;text-transform:uppercase;color:#5E9DFF;margin-bottom:18px;">one digital stack</div>
+          <h2 style="margin:0;font-family:'Outfit';font-weight:300;font-size:clamp(32px,4.4vw,68px);line-height:1.05;letter-spacing:-0.02em;color:#F4F1E8;">taptpay collapses all of it<br/>into <span style="color:#5E9DFF;font-weight:400;">one digital stack.</span></h2>
+        </div>
+      </div>
+
+      <!-- unified phone -->
+      <div id="att-unified" style="position:absolute;top:54%;left:50%;height:62vh;transform:translate(-50%,-50%) scale(0.55);opacity:0;will-change:transform,opacity;z-index:10;">
+        <img src="assets/phone-retail.png" alt="" style="height:100%;width:auto;filter:drop-shadow(0 40px 70px rgba(0,0,0,0.45));" />
+      </div>
+
+      <!-- legacy tool cards -->
+      <div class="att-legacy" data-i="0" style="position:absolute;top:50%;left:50%;width:210px;height:262px;margin:-131px 0 0 -105px;border-radius:20px;background:#F4F1E8;border:1px solid rgba(4,13,109,0.06);box-shadow:0 24px 60px rgba(0,0,0,0.45);will-change:transform,opacity;z-index:12;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px;">
+        <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#5E9DFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><rect x="7" y="5" width="10" height="5" rx="1"/><circle cx="8.5" cy="14" r="0.6" fill="#5E9DFF"/><circle cx="12" cy="14" r="0.6" fill="#5E9DFF"/><circle cx="15.5" cy="14" r="0.6" fill="#5E9DFF"/><circle cx="8.5" cy="17.5" r="0.6" fill="#5E9DFF"/><circle cx="12" cy="17.5" r="0.6" fill="#5E9DFF"/><circle cx="15.5" cy="17.5" r="0.6" fill="#5E9DFF"/></svg>
+        <div style="text-align:center;"><div style="font-family:'Outfit';font-weight:500;font-size:18px;color:#040D6D;">eftpos terminal</div><div style="font-family:'Outfit';font-weight:400;font-size:12px;letter-spacing:0.04em;color:rgba(4,13,109,0.5);margin-top:6px;">hardware · for retail</div></div>
+      </div>
+      <div class="att-legacy" data-i="1" style="position:absolute;top:50%;left:50%;width:210px;height:262px;margin:-131px 0 0 -105px;border-radius:20px;background:#5E9DFF;border:1px solid rgba(244,241,232,0.25);box-shadow:0 24px 60px rgba(0,0,0,0.45);will-change:transform,opacity;z-index:11;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px;">
+        <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#040D6D" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="15" rx="2"/><path d="M3 8h18"/><circle cx="6" cy="6" r="0.5" fill="#040D6D"/><circle cx="8" cy="6" r="0.5" fill="#040D6D"/><path d="M7 12h7M7 15h4"/></svg>
+        <div style="text-align:center;"><div style="font-family:'Outfit';font-weight:500;font-size:18px;color:#F4F1E8;">rent portal</div><div style="font-family:'Outfit';font-weight:400;font-size:12px;letter-spacing:0.04em;color:rgba(244,241,232,0.78);margin-top:6px;">login · for landlords</div></div>
+      </div>
+      <div class="att-legacy" data-i="2" style="position:absolute;top:50%;left:50%;width:210px;height:262px;margin:-131px 0 0 -105px;border-radius:20px;background:#F4F1E8;border:1px solid rgba(4,13,109,0.06);box-shadow:0 24px 60px rgba(0,0,0,0.45);will-change:transform,opacity;z-index:13;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px;">
+        <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#5E9DFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20"/><path d="M6 15h5"/></svg>
+        <div style="text-align:center;"><div style="font-family:'Outfit';font-weight:500;font-size:18px;color:#040D6D;">card reader</div><div style="font-family:'Outfit';font-weight:400;font-size:12px;letter-spacing:0.04em;color:rgba(4,13,109,0.5);margin-top:6px;">+ monthly lease · for trades</div></div>
+      </div>
+
+      <!-- footer line -->
+      <div id="att-c-foot" style="position:absolute;bottom:9vh;left:0;width:100%;text-align:center;font-family:'Outfit';font-weight:400;font-size:clamp(15px,1.25vw,19px);color:rgba(244,241,232,0.6);padding:0 8vw;opacity:0;will-change:opacity;z-index:20;">same system. infinite use cases. <span style="color:#F4F1E8;font-weight:500;">it bends to whatever you do.</span></div>
+    </div>
+  </div>
+
+  <!-- ============ ACT 3 — VERTICALS (3D coverflow) ============ -->
+  <div id="att-verticals-wrap" style="position:relative;height:480vh;">
+    <div id="att-verticals-stage" data-screen-label="verticals" style="position:sticky;top:0;height:100vh;overflow:hidden;perspective:1600px;">
+
+      <div style="position:absolute;top:9vh;left:7vw;display:flex;align-items:center;gap:12px;z-index:30;">
+        <span style="width:30px;height:1px;background:#5E9DFF;"></span>
+        <span style="font-family:'Outfit';font-weight:500;font-size:13px;letter-spacing:0.32em;text-transform:uppercase;color:#5E9DFF;">what that unlocks</span>
+      </div>
+
+      <!-- text stack -->
+      <div style="position:absolute;top:50%;left:7vw;width:38vw;transform:translateY(-50%);z-index:30;">
+        <div class="att-vtext" data-i="0" style="will-change:transform,opacity;">
+          <div style="font-family:'Outfit';font-weight:600;font-size:clamp(60px,7vw,120px);line-height:0.9;color:rgba(244,241,232,0.1);margin-bottom:6px;">01</div>
+          <h3 style="margin:0;font-family:'Outfit';font-weight:600;font-size:clamp(15px,1.1vw,17px);letter-spacing:0.2em;text-transform:uppercase;color:#5E9DFF;">property management</h3>
+          <div style="margin:14px 0 18px;font-family:'Outfit';font-weight:400;font-size:clamp(30px,3.4vw,52px);line-height:1.05;letter-spacing:-0.02em;color:#F4F1E8;">get rent without the chase</div>
+          <p style="margin:0;font-family:'Outfit';font-weight:400;font-size:clamp(15px,1.15vw,18px);line-height:1.6;color:rgba(244,241,232,0.66);max-width:26em;">collect rent, bond and one-off charges 100% digitally. no pestering tenants, no manual bank-transfer reconciliation, no &ldquo;did it come through?&rdquo; — money lands, and the receipt and record write themselves.</p>
+        </div>
+        <div class="att-vtext" data-i="1" style="position:absolute;top:0;left:0;width:100%;opacity:0;will-change:transform,opacity;">
+          <div style="font-family:'Outfit';font-weight:600;font-size:clamp(60px,7vw,120px);line-height:0.9;color:rgba(244,241,232,0.1);margin-bottom:6px;">02</div>
+          <h3 style="margin:0;font-family:'Outfit';font-weight:600;font-size:clamp(15px,1.1vw,17px);letter-spacing:0.2em;text-transform:uppercase;color:#5E9DFF;">trades &amp; industries</h3>
+          <div style="margin:14px 0 18px;font-family:'Outfit';font-weight:400;font-size:clamp(30px,3.4vw,52px);line-height:1.05;letter-spacing:-0.02em;color:#F4F1E8;">quote, invoice, paid on the spot</div>
+          <p style="margin:0;font-family:'Outfit';font-weight:400;font-size:clamp(15px,1.15vw,18px);line-height:1.6;color:rgba(244,241,232,0.66);max-width:26em;">finish the job and get paid before you&rsquo;ve packed up the van. no eftpos machine to lug around, no waiting 30 days on an emailed invoice. quote → invoice → instant payment, from the phone in your pocket, on-site.</p>
+        </div>
+        <div class="att-vtext" data-i="2" style="position:absolute;top:0;left:0;width:100%;opacity:0;will-change:transform,opacity;">
+          <div style="font-family:'Outfit';font-weight:600;font-size:clamp(60px,7vw,120px);line-height:0.9;color:rgba(244,241,232,0.1);margin-bottom:6px;">03</div>
+          <h3 style="margin:0;font-family:'Outfit';font-weight:600;font-size:clamp(15px,1.1vw,17px);letter-spacing:0.2em;text-transform:uppercase;color:#5E9DFF;">hospitality &amp; retail</h3>
+          <div style="margin:14px 0 18px;font-family:'Outfit';font-weight:400;font-size:clamp(30px,3.4vw,52px);line-height:1.05;letter-spacing:-0.02em;color:#F4F1E8;">tap and go</div>
+          <p style="margin:0;font-family:'Outfit';font-weight:400;font-size:clamp(15px,1.15vw,18px);line-height:1.6;color:rgba(244,241,232,0.66);max-width:26em;">tap-to-pay, QR and payment links turn any phone into the till. no counter hardware, no lease — ideal for pop-ups, markets, food trucks and floor service.</p>
+        </div>
+        <div class="att-vtext" data-i="3" style="position:absolute;top:0;left:0;width:100%;opacity:0;will-change:transform,opacity;">
+          <div style="font-family:'Outfit';font-weight:600;font-size:clamp(60px,7vw,120px);line-height:0.9;color:rgba(244,241,232,0.1);margin-bottom:6px;">+</div>
+          <h3 style="margin:0;font-family:'Outfit';font-weight:600;font-size:clamp(15px,1.1vw,17px);letter-spacing:0.2em;text-transform:uppercase;color:#5E9DFF;">and the list keeps going</h3>
+          <div style="margin:14px 0 18px;font-family:'Outfit';font-weight:400;font-size:clamp(30px,3.4vw,52px);line-height:1.05;letter-spacing:-0.02em;color:#F4F1E8;">split it, share it, settle it</div>
+          <p style="margin:0;font-family:'Outfit';font-weight:400;font-size:clamp(15px,1.15vw,18px);line-height:1.6;color:rgba(244,241,232,0.66);max-width:26em;">split a bill across any number of payers, share a link, settle on the spot. anything you charge for fits the same system — <span style="color:#F4F1E8;font-weight:500;">one stack, every vertical.</span></p>
+        </div>
+      </div>
+
+      <!-- phones rail -->
+      <img class="att-vphone" data-i="0" src="assets/phone-rent.png" alt="property management terminal" style="position:absolute;top:50%;left:64%;height:74vh;width:auto;transform:translate(-50%,-50%);filter:drop-shadow(0 40px 70px rgba(0,0,0,0.4));will-change:transform,opacity;" />
+      <img class="att-vphone" data-i="1" src="assets/phone-bill.png" alt="trades terminal" style="position:absolute;top:50%;left:64%;height:74vh;width:auto;transform:translate(-50%,-50%);filter:drop-shadow(0 40px 70px rgba(0,0,0,0.4));will-change:transform,opacity;" />
+      <img class="att-vphone" data-i="2" src="assets/phone-retail.png" alt="hospitality terminal" style="position:absolute;top:50%;left:64%;height:74vh;width:auto;transform:translate(-50%,-50%);filter:drop-shadow(0 40px 70px rgba(0,0,0,0.4));will-change:transform,opacity;" />
+      <img class="att-vphone" data-i="3" src="assets/phone-split.png" alt="split payment" style="position:absolute;top:50%;left:64%;height:74vh;width:auto;transform:translate(-50%,-50%);filter:drop-shadow(0 40px 70px rgba(0,0,0,0.4));will-change:transform,opacity;" />
+
+      <!-- progress dots -->
+      <div id="att-v-dots" style="position:absolute;bottom:8vh;left:64%;transform:translateX(-50%);display:flex;gap:10px;z-index:30;">
+        <span class="att-dot" data-i="0" style="width:8px;height:8px;border-radius:50%;background:rgba(244,241,232,0.2);transition:background .2s,width .2s;"></span>
+        <span class="att-dot" data-i="1" style="width:8px;height:8px;border-radius:50%;background:rgba(244,241,232,0.2);transition:background .2s,width .2s;"></span>
+        <span class="att-dot" data-i="2" style="width:8px;height:8px;border-radius:50%;background:rgba(244,241,232,0.2);transition:background .2s,width .2s;"></span>
+        <span class="att-dot" data-i="3" style="width:8px;height:8px;border-radius:50%;background:rgba(244,241,232,0.2);transition:background .2s,width .2s;"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ACT 4 — BENEFITS (horizontal track) ============ -->
+  <div id="att-benefits-wrap" style="position:relative;height:340vh;">
+    <div id="att-benefits-stage" data-screen-label="benefits" style="position:sticky;top:0;height:100vh;overflow:hidden;perspective:1500px;display:flex;flex-direction:column;">
+      <div style="position:absolute;top:9vh;left:7vw;display:flex;align-items:center;gap:12px;z-index:30;">
+        <span id="att-bline" style="width:30px;height:1px;background:#040D6D;"></span>
+        <span id="att-bhead" style="font-family:'Outfit';font-weight:500;font-size:13px;letter-spacing:0.32em;text-transform:uppercase;color:#040D6D;">the new benefits we&rsquo;re leading with</span>
+      </div>
+      <div id="att-btrack" style="position:absolute;top:50%;left:0;transform:translateY(-50%);display:flex;gap:30px;padding:0 7vw;will-change:transform;align-items:stretch;">
+        <div class="att-bcard" style="flex:0 0 auto;width:380px;height:62vh;border-radius:28px;background:#040D6D;border:1px solid rgba(244,241,232,0.14);padding:42px;display:flex;flex-direction:column;justify-content:space-between;will-change:transform;box-shadow:0 30px 60px rgba(0,0,0,0.35);">
+          <div style="font-family:'Outfit';font-weight:600;font-size:16px;color:rgba(244,241,232,0.28);letter-spacing:0.1em;">01</div>
+          <div><div style="font-family:'Outfit';font-weight:500;font-size:clamp(28px,2.6vw,40px);line-height:1.05;letter-spacing:-0.01em;color:#5E9DFF;margin-bottom:16px;">100% digital</div><p style="margin:0;font-family:'Outfit';font-weight:400;font-size:17px;line-height:1.55;color:rgba(244,241,232,0.66);">nothing physical to buy, rent, lose or maintain. no tech to go wrong.</p></div>
+        </div>
+        <div class="att-bcard" style="flex:0 0 auto;width:380px;height:62vh;border-radius:28px;background:#040D6D;border:1px solid rgba(244,241,232,0.14);padding:42px;display:flex;flex-direction:column;justify-content:space-between;will-change:transform;box-shadow:0 30px 60px rgba(0,0,0,0.35);">
+          <div style="font-family:'Outfit';font-weight:600;font-size:16px;color:rgba(244,241,232,0.28);letter-spacing:0.1em;">02</div>
+          <div><div style="font-family:'Outfit';font-weight:500;font-size:clamp(28px,2.6vw,40px);line-height:1.05;letter-spacing:-0.01em;color:#F4F1E8;margin-bottom:16px;">one stack,<br/>every vertical</div><p style="margin:0;font-family:'Outfit';font-weight:400;font-size:17px;line-height:1.55;color:rgba(244,241,232,0.66);">rent, trades, hospo, retail — all running on the same rails.</p></div>
+        </div>
+        <div class="att-bcard" style="flex:0 0 auto;width:380px;height:62vh;border-radius:28px;background:#5E9DFF;border:1px solid #5E9DFF;padding:42px;display:flex;flex-direction:column;justify-content:space-between;will-change:transform;box-shadow:0 30px 60px rgba(0,0,0,0.35);">
+          <div style="font-family:'Outfit';font-weight:600;font-size:16px;color:rgba(4,13,109,0.4);letter-spacing:0.1em;">03</div>
+          <div><div style="font-family:'Outfit';font-weight:500;font-size:clamp(28px,2.6vw,40px);line-height:1.05;letter-spacing:-0.01em;color:#040D6D;margin-bottom:16px;">instant collection</div><p style="margin:0;font-family:'Outfit';font-weight:400;font-size:17px;line-height:1.55;color:rgba(4,13,109,0.78);">paid the moment the work is done — not weeks later.</p></div>
+        </div>
+        <div class="att-bcard" style="flex:0 0 auto;width:380px;height:62vh;border-radius:28px;background:#040D6D;border:1px solid rgba(244,241,232,0.14);padding:42px;display:flex;flex-direction:column;justify-content:space-between;will-change:transform;box-shadow:0 30px 60px rgba(0,0,0,0.35);">
+          <div style="font-family:'Outfit';font-weight:600;font-size:16px;color:rgba(244,241,232,0.28);letter-spacing:0.1em;">04</div>
+          <div><div style="font-family:'Outfit';font-weight:500;font-size:clamp(28px,2.6vw,40px);line-height:1.05;letter-spacing:-0.01em;color:#F4F1E8;margin-bottom:16px;">zero chasing</div><p style="margin:0;font-family:'Outfit';font-weight:400;font-size:17px;line-height:1.55;color:rgba(244,241,232,0.66);">automated requests, receipts, GST invoices and reminders do the follow-up for you.</p></div>
+        </div>
+        <div class="att-bcard" style="flex:0 0 auto;width:380px;height:62vh;border-radius:28px;background:#040D6D;border:1px solid rgba(94,157,255,0.55);padding:42px;display:flex;flex-direction:column;justify-content:space-between;will-change:transform;box-shadow:0 30px 60px rgba(0,0,0,0.35);">
+          <div style="font-family:'Outfit';font-weight:600;font-size:16px;color:rgba(244,241,232,0.28);letter-spacing:0.1em;">05</div>
+          <div><div style="font-family:'Outfit';font-weight:500;font-size:clamp(28px,2.6vw,40px);line-height:1.05;letter-spacing:-0.01em;color:#5E9DFF;margin-bottom:16px;">carry nothing</div><p style="margin:0;font-family:'Outfit';font-weight:400;font-size:17px;line-height:1.55;color:rgba(244,241,232,0.66);">your phone is the terminal, anywhere you are.</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ BLANK — placeholder for later ============ -->
+  <section id="att-blank" data-screen-label="blank section" style="position:relative;min-height:100vh;display:flex;align-items:center;justify-content:center;">
+    <div style="font-family:'Outfit';font-weight:500;font-size:12px;letter-spacing:0.34em;text-transform:uppercase;color:rgba(4,13,109,0.2);">section coming soon</div>
+  </section>
+
+  <!-- ============ ACT 5 — CONTACT ============ -->
+  <section id="att-finale" data-screen-label="contact" style="position:relative;min-height:112vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:18vh 8vw;overflow:hidden;">
+    <div style="position:relative;z-index:5;width:100%;max-width:560px;display:flex;flex-direction:column;align-items:center;">
+
+      <div class="att-fline" style="display:flex;align-items:center;gap:12px;margin-bottom:26px;will-change:transform,opacity;">
+        <span style="width:30px;height:1px;background:#5E9DFF;"></span>
+        <span style="font-family:'Outfit';font-weight:500;font-size:13px;letter-spacing:0.32em;text-transform:uppercase;color:#5E9DFF;">get in touch</span>
+      </div>
+
+      <h2 class="att-fline" style="margin:0;font-family:'Outfit';font-weight:300;font-size:clamp(44px,6.4vw,96px);line-height:1;letter-spacing:-0.02em;color:#F4F1E8;will-change:transform,opacity;">let&rsquo;s talk.</h2>
+
+      <p class="att-fline" style="margin:26px 0 0;font-family:'Outfit';font-weight:400;font-size:clamp(17px,1.5vw,22px);line-height:1.55;color:rgba(244,241,232,0.66);max-width:24em;will-change:transform,opacity;">ready to throw out your old eftpos machine? <span style="color:#F4F1E8;font-weight:500;">i&rsquo;ll get you set up.</span></p>
+
+      <!-- name -->
+      <div class="att-fline" style="margin-top:46px;will-change:transform,opacity;">
+        <div style="font-family:'Outfit';font-weight:500;font-size:clamp(26px,2.6vw,36px);color:#F4F1E8;letter-spacing:-0.01em;">oliver leonard</div>
+      </div>
+
+      <!-- wireframe contact buttons (go solid on click) -->
+      <div class="att-fline" style="margin-top:30px;display:flex;flex-wrap:wrap;gap:14px;justify-content:center;will-change:transform,opacity;">
+        <a class="att-wire" data-solid="0" href="tel:0212094672" style="display:inline-flex;align-items:center;gap:9px;padding:14px 24px;border-radius:9999px;background:transparent;border:1.5px solid #5E9DFF;color:#5E9DFF;font-family:'Outfit';font-weight:500;font-size:15px;letter-spacing:0.01em;cursor:pointer;text-decoration:none;transition:background .25s ease,color .25s ease;">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h3l2 5-2.5 1.5a11 11 0 0 0 5 5L16 13l5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>
+          021 209 4672
+        </a>
+        <a class="att-wire" data-solid="0" href="mailto:oliverleonard@taptpay.co.nz" style="display:inline-flex;align-items:center;gap:9px;padding:14px 24px;border-radius:9999px;background:transparent;border:1.5px solid #5E9DFF;color:#5E9DFF;font-family:'Outfit';font-weight:500;font-size:14px;letter-spacing:0.01em;cursor:pointer;text-decoration:none;transition:background .25s ease,color .25s ease;">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+          oliverleonard@taptpay.co.nz
+        </a>
+      </div>
+
+      <!-- morphing pill → form -->
+      <div class="att-fline" style="margin-top:30px;display:flex;justify-content:center;width:100%;will-change:transform,opacity;">
+        <div id="att-cform" style="width:248px;height:58px;border-radius:9999px;overflow:hidden;background:rgba(244,241,232,0.05);border:1.5px solid rgba(94,157,255,0.55);text-align:left;transition:width .5s cubic-bezier(.22,1,.36,1),height .5s cubic-bezier(.22,1,.36,1),border-radius .45s ease,background .4s ease;">
+          <div id="att-cform-head" style="display:flex;align-items:center;justify-content:space-between;width:100%;height:58px;padding:0 22px 0 26px;cursor:pointer;flex:0 0 auto;">
+            <span id="att-cform-label" style="font-family:'Outfit';font-weight:500;font-size:15px;letter-spacing:0.01em;color:#5E9DFF;">send a message</span>
+            <svg id="att-cform-plus" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5E9DFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .45s cubic-bezier(.16,1,.3,1);flex:0 0 auto;"><path d="M12 5v14M5 12h14"/></svg>
+          </div>
+          <div id="att-cform-body" style="opacity:0;pointer-events:none;transition:opacity .3s ease;">
+            <div id="att-cform-fields" style="display:flex;flex-direction:column;gap:12px;padding:4px 26px 26px;">
+              <input type="text" placeholder="your name" style="width:100%;background:rgba(244,241,232,0.06);border:1px solid rgba(244,241,232,0.14);border-radius:12px;padding:14px 16px;font-family:'Outfit';font-weight:400;font-size:15px;color:#F4F1E8;outline:none;transition:border-color .2s ease,background .2s ease;" />
+              <input type="email" placeholder="your email" style="width:100%;background:rgba(244,241,232,0.06);border:1px solid rgba(244,241,232,0.14);border-radius:12px;padding:14px 16px;font-family:'Outfit';font-weight:400;font-size:15px;color:#F4F1E8;outline:none;transition:border-color .2s ease,background .2s ease;" />
+              <textarea placeholder="what do you need?" rows="3" style="width:100%;resize:none;background:rgba(244,241,232,0.06);border:1px solid rgba(244,241,232,0.14);border-radius:12px;padding:14px 16px;font-family:'Outfit';font-weight:400;font-size:15px;color:#F4F1E8;outline:none;transition:border-color .2s ease,background .2s ease;"></textarea>
+              <button id="att-cform-send" class="att-wire" data-solid="0" type="button" style="width:100%;display:inline-flex;align-items:center;justify-content:center;gap:9px;padding:15px 24px;margin-top:4px;border-radius:9999px;background:transparent;border:1.5px solid #5E9DFF;color:#5E9DFF;font-family:'Outfit';font-weight:500;font-size:15px;letter-spacing:0.01em;cursor:pointer;transition:background .25s ease,color .25s ease;">
+                send message
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+              </button>
+            </div>
+            <div id="att-cform-thanks" style="display:none;flex-direction:column;align-items:center;gap:14px;padding:34px 26px 40px;text-align:center;">
+              <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#5E9DFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg>
+              <div style="font-family:'Outfit';font-weight:500;font-size:18px;color:#F4F1E8;">got it — i&rsquo;ll be in touch.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  componentDidMount() {
+    const $ = (s, r=document) => r.querySelector(s);
+    const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
+    const clamp = (v,a=0,b=1)=>Math.max(a,Math.min(b,v));
+    const lerp = (a,b,t)=>a+(b-a)*t;
+    const smooth = t=>t*t*(3-2*t);
+    const NAVY=[4,13,109], OFFW=[244,241,232];
+    const mixC=(a,b,t)=>`rgb(${Math.round(lerp(a[0],b[0],t))},${Math.round(lerp(a[1],b[1],t))},${Math.round(lerp(a[2],b[2],t))})`;
+
+    const root       = $('#att-root');
+    const toplabel   = $('#att-toplabel');
+    const bhead      = $('#att-bhead');
+    const bline      = $('#att-bline');
+    const bar        = $('#att-bar');
+    const heroPhone  = $('#att-hero-phone');
+    const heroContent= $('#att-hero-content');
+
+    const collapseWrap = $('#att-collapse-wrap');
+    const headA = $('#att-c-head-a');
+    const headB = $('#att-c-head-b');
+    const cFoot = $('#att-c-foot');
+    const unified = $('#att-unified');
+    const legacy = $$('.att-legacy');
+
+    const vWrap = $('#att-verticals-wrap');
+    const vphones = $$('.att-vphone');
+    const vtexts = $$('.att-vtext');
+    const vdots = $$('.att-dot');
+
+    const bWrap = $('#att-benefits-wrap');
+    const bTrack = $('#att-btrack');
+    const bcards = $$('.att-bcard');
+
+    const finale = $('#att-finale');
+    const flines = $$('.att-fline');
+
+    let tmx=0, tmy=0, mx=0, my=0;
+    window.addEventListener('pointermove', e=>{
+      tmx = e.clientX/window.innerWidth - 0.5;
+      tmy = e.clientY/window.innerHeight - 0.5;
+    }, {passive:true});
+
+    const prog = (el)=>{
+      const r = el.getBoundingClientRect();
+      const total = el.offsetHeight - window.innerHeight;
+      return clamp((-r.top)/(total||1));
+    };
+
+    const legacyDef = [
+      { s:{x:-0.30, y:-46, z:-160, ry:30, rx:-7, rz:-13}, e:{x:-0.022, y:-6, z:-50} },
+      { s:{x: 0.30, y: 64, z:-340, ry:-26, rx:7, rz:11}, e:{x: 0.022, y: 6, z:-90} },
+      { s:{x:-0.04, y:0.23, z:-540, ry:14, rx:18, rz:-8}, e:{x:0, y:0, z:-130} }
+    ];
+    const easeOutCubic = t=>1-Math.pow(1-t,3);
+    const easeOutBack = t=>{ const c1=1.70158, c3=c1+1; return 1 + c3*Math.pow(t-1,3) + c1*Math.pow(t-1,2); };
+
+    const update = ()=>{
+      mx = lerp(mx, tmx, 0.07);
+      my = lerp(my, tmy, 0.07);
+      const vh = window.innerHeight;
+      const vw = window.innerWidth;
+      const sy = window.scrollY || document.documentElement.scrollTop || 0;
+      const docH = document.documentElement.scrollHeight - vh;
+      if (bar) bar.style.width = (clamp(sy/(docH||1))*100).toFixed(2) + '%';
+
+      // ---- BACKGROUND: navy → off-white (benefits + blank) → back to navy (finale) ----
+      const bTop = bWrap ? bWrap.getBoundingClientRect().top : vh*3;
+      const fTopBg = finale ? finale.getBoundingClientRect().top : vh*9;
+      const floodIn = smooth(clamp((vh*0.55 - bTop)/(vh*0.8)));   // off-white floods up at benefits, stays
+      const fadeBack = smooth(clamp((vh*0.55 - fTopBg)/(vh*0.8))); // navy returns at the finale
+      const w = clamp(floodIn - fadeBack);                         // 1 = off-white, 0 = navy
+      if (root){
+        root.style.backgroundImage = 'none';                 // flat, uniform colour crossfade (no directional wipe)
+        root.style.backgroundColor = mixC(NAVY, OFFW, w);
+      }
+      const wTop = smooth(clamp((w-0.4)/0.32));               // text/chrome inverts around the crossfade midpoint
+      const inv = mixC(OFFW, NAVY, wTop);
+      if (toplabel) toplabel.style.color = `rgba(${Math.round(lerp(244,4,wTop))},${Math.round(lerp(241,13,wTop))},${Math.round(lerp(232,109,wTop))},${lerp(0.45,0.5,wTop).toFixed(2)})`;
+      if (bhead) bhead.style.color = inv;
+      if (bline) bline.style.background = inv;
+
+      // ---- HERO ----
+      const hp = clamp(sy/vh);
+      if (heroContent){ heroContent.style.transform = `translateY(calc(-50% + ${hp*-130}px))`; heroContent.style.opacity = (1 - hp*1.15).toFixed(3); }
+      if (heroPhone){ heroPhone.style.transform = `translate3d(${mx*42}px, calc(-50% + ${my*30 + hp*-180}px), 0) rotateY(${-12 + mx*16}deg) rotateX(${my*-9}deg) rotateZ(-3deg) scale(${1 - hp*0.12})`; }
+
+      // ---- COLLAPSE ----
+      if (collapseWrap){
+        const t = performance.now()/1000;
+        const cwRect = collapseWrap.getBoundingClientRect();
+        const cpRaw = prog(collapseWrap);
+        const cp = smooth(clamp(cpRaw/0.85));
+        // time-based trigger — bounce-pop + shape morph plays once, start to finish, on entry
+        const inView = cwRect.top < vh*0.5 && cwRect.bottom > vh*0.4;
+        if (inView && this._popT == null) this._popT = performance.now();
+        else if (!inView && (cwRect.top > vh*0.8 || cwRect.bottom < vh*0.2)) this._popT = null;
+        const el0 = this._popT != null ? (performance.now() - this._popT)/1000 : -1;
+        legacy.forEach((el,i)=>{
+          const d = legacyDef[i]; if(!d) return;
+          // entrance — bounce pop, then morph capsule → rounded square, then reveal content
+          const le = el0 < 0 ? 0 : clamp((el0 - i*0.08)/0.5);
+          const pop = el0 < 0 ? 0 : easeOutBack(le);
+          const grow = el0 < 0 ? 0 : smooth(clamp((el0 - i*0.08 - 0.34)/0.5));   // small circle → full rounded square
+          const co = el0 < 0 ? 0 : smooth(clamp((el0 - i*0.08 - 0.64)/0.4));
+          const circleSize = lerp(0.46, 1, grow);             // grows from a small circle
+          const yFactor = lerp(210/262, 1, grow);             // squash portrait box into a circle, then release
+          el.style.borderRadius = lerp(131, 22, grow).toFixed(1) + 'px';
+          for (const ch of el.children) ch.style.opacity = co.toFixed(2);
+          // collapse — scroll-driven convergence into the phone (held briefly so the pop reads)
+          const cpi = smooth(clamp((cpRaw - 0.12 - i*0.05)/0.7));
+          const idle = (1 - cpi) * clamp(le);
+          const bob = Math.sin(t*1.05 + i*2.1) * 15 * idle;   // gentle float (after pop settles)
+          const wob = Math.sin(t*0.85 + i*1.3) * 4.0 * idle;  // rotational sway
+          const x = lerp(d.s.x, d.e.x, cpi)*vw + mx*42*idle;
+          const ys = (Math.abs(d.s.y)<=1? d.s.y*vh : d.s.y);
+          const yy = lerp(ys, d.e.y, cpi) + bob + my*30*idle;
+          const z = lerp(d.s.z, d.e.z, cpi);
+          const ry = lerp(d.s.ry, 0, cpi) + mx*8*idle + wob;
+          const rx = lerp(d.s.rx, 0, cpi) + my*-6*idle;
+          const rz = lerp(d.s.rz, 0, cpi) + wob*0.5;
+          const base = lerp(1, 0.72, cpi) * pop * circleSize;
+          const scX = base, scY = base * yFactor;
+          el.style.transform = `translate3d(${x}px, ${yy}px, ${z}px) rotateX(${rx}deg) rotateY(${ry}deg) rotateZ(${rz}deg) scale(${scX.toFixed(4)}, ${scY.toFixed(4)})`;
+          el.style.opacity = (1 - clamp((cpi-0.55)/0.35)).toFixed(3);
+        });
+        const upO = clamp((cp-0.32)/0.4);
+        if (unified){
+          const arr = easeOutCubic(clamp((cp-0.28)/0.72));
+          const pop = Math.sin(clamp((cp-0.55)/0.4)*Math.PI)*0.035;   // overshoot bump
+          const fly = Math.sin(t*0.6)*6, swing = Math.sin(t*0.5)*5;
+          unified.style.opacity = upO.toFixed(3);
+          unified.style.transform = `translate(-50%,calc(-50% + ${my*18 + fly*upO}px)) scale(${lerp(0.5,1,arr)+pop}) rotateY(${mx*10 + swing*upO}deg)`;
+        }
+        if (headA){ headA.style.opacity = clamp(1 - cp*2.3).toFixed(3); headA.style.transform = `translateY(${cp*-40}px)`; }
+        if (headB){ headB.style.opacity = clamp((cp-0.5)*2.6).toFixed(3); headB.style.transform = `translateY(${(1-cp)*40}px)`; }
+        if (cFoot){ cFoot.style.opacity = clamp((cp-0.62)/0.3).toFixed(3); }
+      }
+
+      // ---- VERTICALS ----
+      if (vWrap){
+        const vp = prog(vWrap);
+        const n = vphones.length;
+        const d3 = vp*(n-1);
+        const active = Math.round(d3);
+        vphones.forEach((el)=>{
+          const i = +el.dataset.i;
+          const d = d3 - i;
+          const ad = Math.abs(d);
+          const x = d*0.17*vw;
+          const z = -ad*380;
+          const ry = -d*32 + mx*7;
+          const rx = my*-4;
+          const sc = 1 - Math.min(ad,1.5)*0.24;
+          const op = 1 - Math.min(ad,1.7)*0.46;
+          el.style.transform = `translate(-50%,calc(-50% + ${my*16}px)) translate3d(${x}px,0,${z}px) rotateY(${ry}deg) rotateX(${rx}deg) scale(${sc})`;
+          el.style.opacity = clamp(op).toFixed(3);
+          el.style.zIndex = Math.round(200 - ad*20);
+        });
+        vtexts.forEach((el)=>{
+          const i = +el.dataset.i;
+          const d = d3 - i;
+          el.style.opacity = clamp(1 - Math.abs(d)*1.7).toFixed(3);
+          el.style.transform = `translateY(${d*38}px)`;
+        });
+        vdots.forEach((el)=>{
+          const i = +el.dataset.i;
+          const on = i===active;
+          el.style.background = on ? '#5E9DFF' : 'rgba(244,241,232,0.2)';
+          el.style.width = on ? '26px' : '8px';
+          el.style.borderRadius = on ? '9999px' : '50%';
+        });
+      }
+
+      // ---- BENEFITS ----
+      if (bWrap){
+        const bp = smooth(prog(bWrap));
+        const shift = Math.max(0, bTrack.scrollWidth - vw + vw*0.02);
+        bTrack.style.transform = `translateY(-50%) translateX(${-bp*shift}px)`;
+        const cardW = bcards[0] ? bcards[0].offsetWidth : 380;
+        const gap = 30;
+        const padL = vw*0.07;
+        bcards.forEach((el,i)=>{
+          const baseCenter = padL + i*(cardW+gap) + cardW/2;
+          const screenCenter = baseCenter - bp*shift;
+          const off = (screenCenter - vw/2)/vw;
+          const ry = clamp(off,-1.4,1.4)*-15;
+          const tz = -Math.abs(off)*150;
+          const sc = 1 - Math.min(Math.abs(off),1.2)*0.07;
+          el.style.transform = `perspective(1500px) translateZ(${tz}px) rotateY(${ry}deg) scale(${sc})`;
+          el.style.opacity = clamp(1 - Math.abs(off)*0.55).toFixed(3);
+        });
+      }
+
+      // ---- FINALE ----
+      if (finale){
+        const r = finale.getBoundingClientRect();
+        const fp = clamp((vh - r.top)/(vh*0.9));
+        flines.forEach((el,i)=>{
+          const t = clamp((fp - 0.12 - i*0.1)/0.26);
+          el.style.opacity = t.toFixed(3);
+          el.style.transform = `translateY(${(1-t)*44}px)`;
+        });
+      }
+
+      requestAnimationFrame(update);
+    };
+
+    // ---- CONTACT: wireframe buttons go solid on click ----
+    $$('.att-wire').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const on = btn.getAttribute('data-solid')==='1';
+        btn.setAttribute('data-solid', on ? '0' : '1');
+        btn.style.background = on ? 'transparent' : '#5E9DFF';
+        btn.style.color = on ? '#5E9DFF' : '#040D6D';
+      });
+    });
+
+    // ---- CONTACT: pill morphs open/closed into a form ----
+    const cshell = $('#att-cform');
+    const chead  = $('#att-cform-head');
+    const cbody  = $('#att-cform-body');
+    const cplus  = $('#att-cform-plus');
+    let cOpen = false;
+    if (chead && cshell){
+      const EASE = 'cubic-bezier(.22,1,.36,1)';
+      chead.addEventListener('click', ()=>{
+        cOpen = !cOpen;
+        if (cOpen){
+          // OPEN: width expands first, then height drops down (Apple-style sequence)
+          cshell.style.transition = `width .42s ${EASE}, height .55s ${EASE} .34s, border-radius .42s ease, background .4s ease`;
+          cbody.style.transition = 'opacity .35s ease .82s';
+          cshell.style.width = 'min(480px,92vw)';
+          cshell.style.height = '452px';
+          cshell.style.borderRadius = '28px';
+          cshell.style.background = 'rgba(244,241,232,0.04)';
+          cbody.style.opacity = '1';
+          cbody.style.pointerEvents = 'auto';
+          if (cplus) cplus.style.transform = 'rotate(45deg)';
+        } else {
+          // CLOSE: reverse — height collapses first, then width shrinks back to a pill
+          cshell.style.transition = `width .42s ${EASE} .42s, height .5s ${EASE}, border-radius .42s ease .42s, background .4s ease .42s`;
+          cbody.style.transition = 'opacity .18s ease';
+          cbody.style.opacity = '0';
+          cbody.style.pointerEvents = 'none';
+          cshell.style.width = '248px';
+          cshell.style.height = '58px';
+          cshell.style.borderRadius = '9999px';
+          cshell.style.background = 'rgba(244,241,232,0.05)';
+          if (cplus) cplus.style.transform = 'rotate(0deg)';
+        }
+      });
+    }
+    const csend = $('#att-cform-send');
+    if (csend){
+      csend.addEventListener('click', ()=>{
+        const fields = $('#att-cform-fields');
+        const thanks = $('#att-cform-thanks');
+        if (fields) fields.style.display = 'none';
+        if (thanks) thanks.style.display = 'flex';
+      });
+    }
+
+    requestAnimationFrame(update);
+  }
+}
+</script>
+</body>
+</html>

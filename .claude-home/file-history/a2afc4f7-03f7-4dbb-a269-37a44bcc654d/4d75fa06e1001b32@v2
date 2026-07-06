@@ -185,10 +185,7 @@
       "Bash(GIT_CONFIG_NOSYSTEM=1 git check-ignore .claude-home .superpowers .cache logs)",
       "Bash(GIT_CONFIG_NOSYSTEM=1 git push -u origin feat/trades-phase3c-cross-cutting)",
       "Bash(timeout 180 npx --yes knip@5 --no-progress)",
-      "Bash(git cherry-pick *)",
-      "Bash(grep -rhoE \"/api/[a-zA-Z0-9/_:{}\\\\.\\\\$-]+\" client/src/pages/checkout.tsx)",
-      "Bash(grep -rnoE 'path=\"[^\"]+\"|path=\\\\{`[^`]+`\\\\}' client/src/App.tsx)",
-      "Bash(git mv *)"
+      "Bash(git cherry-pick *)"
     ]
   },
   "model": "claude-opus-4-8"
