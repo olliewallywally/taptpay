@@ -188,7 +188,11 @@
       "Bash(git cherry-pick *)",
       "Bash(grep -rhoE \"/api/[a-zA-Z0-9/_:{}\\\\.\\\\$-]+\" client/src/pages/checkout.tsx)",
       "Bash(grep -rnoE 'path=\"[^\"]+\"|path=\\\\{`[^`]+`\\\\}' client/src/App.tsx)",
-      "Bash(git mv *)"
+      "Bash(git mv *)",
+      "Bash(unzip -l \"demo app v2.zip\")",
+      "Bash(rm -rf demov2)",
+      "Bash(mkdir demov2 *)",
+      "Bash(unzip -q \"/home/runner/workspace/demo app v2.zip\" -d demov2)"
     ]
   },
   "model": "claude-opus-4-8"
