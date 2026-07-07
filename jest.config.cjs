@@ -6,16 +6,25 @@ module.exports = {
     '<rootDir>/client/src/**/*.(test|spec).{js,jsx,ts,tsx}'
   ],
   moduleFileExtensions: ['js', 'jsx', 'ts', 'tsx', 'json'],
+  // wouter and nanoid ship ESM-only builds; Jest ignores node_modules by default,
+  // so let babel-jest transform these packages to CJS for the test environment.
+  transformIgnorePatterns: ['/node_modules/(?!(wouter|nanoid)/)'],
   transform: {
-    '^.+\\.(ts|tsx)$': 'ts-jest',
+    // The project tsconfig sets jsx:"preserve" (Vite/esbuild transforms JSX at build
+    // time). ts-jest inherits that and would emit untransformed JSX, causing
+    // "Unexpected token '<'" at import time. Override to react-jsx just for tests.
+    '^.+\\.(ts|tsx)$': ['ts-jest', { tsconfig: { jsx: 'react-jsx' } }],
     '^.+\\.(js|jsx)$': 'babel-jest',
   },
   moduleNameMapper: {
+    // Asset/style stubs MUST come before the @assets path alias — moduleNameMapper
+    // uses the first matching pattern, and @assets/*.png would otherwise resolve to
+    // a real binary PNG that Jest tries to parse as JS ("Invalid or unexpected token").
+    '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
+    '\\.(gif|ttf|eot|svg|png|jpg|jpeg|webp|avif)$': 'jest-transform-stub',
     '^@/(.*)$': '<rootDir>/client/src/$1',
     '^@assets/(.*)$': '<rootDir>/attached_assets/$1',
     '^@shared/(.*)$': '<rootDir>/shared/$1',
-    '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
-    '\\.(gif|ttf|eot|svg|png|jpg|jpeg)$': 'jest-transform-stub'
   },
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   testEnvironment: 'jsdom',

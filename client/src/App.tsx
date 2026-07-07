@@ -229,7 +229,7 @@ function Router() {
       <GA4PageTracker />
       <Suspense fallback={<PageLoader />}>
         <Switch>
-          <Route path="/" component={LandingPage} />
+          <Route path="/"><LandingPage /></Route>
           <Route path="/info" component={InfoPage} />
           <Route path="/business-details" component={BusinessDetails} />
           <Route path="/check-email" component={CheckEmail} />

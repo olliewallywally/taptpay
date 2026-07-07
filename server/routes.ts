@@ -1278,9 +1278,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(404).json({ message: "Transaction not found" });
       }
 
-      // Only the owning merchant can update
+      // Only the owning merchant (or an admin) can update
       const user = (req as any).user;
-      if (!user.isAdmin && transaction.merchantId !== user.merchantId) {
+      if (user?.role !== 'admin' && transaction.merchantId !== user?.merchantId) {
         return res.status(403).json({ message: "Forbidden" });
       }
 
@@ -2264,8 +2264,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Mock crypto payment confirmation (simulates blockchain confirmation)
+  // Mock crypto payment confirmation (simulates blockchain confirmation).
+  // SECURITY: This endpoint marks a transaction paid WITHOUT verifying any real
+  // payment, so it must never be reachable in production — real confirmations arrive
+  // via the signature-verified Coinbase webhook below. Disabled outside development.
   app.post("/api/crypto-transactions/:id/confirm", async (req, res) => {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(404).json({ message: "Not found" });
+    }
     try {
       const cryptoTransactionId = parseInt(req.params.id);
       const cryptoTransaction = await storage.getCryptoTransaction(cryptoTransactionId);
@@ -2593,6 +2599,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.put("/api/merchants/:id/details", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = parseInt(req.params.id);
+      if (!checkMerchantOwnership(req, merchantId)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       const validation = updateMerchantDetailsSchema.safeParse(req.body);
       
       if (!validation.success) {
@@ -2657,6 +2666,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.put("/api/merchants/:id/bank-account", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = parseInt(req.params.id);
+      if (!checkMerchantOwnership(req, merchantId)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       const validation = updateBankAccountSchema.safeParse(req.body);
       
       if (!validation.success) {
@@ -2998,11 +3010,17 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
       const stoneId = parseInt(req.params.stoneId);
       const { name } = req.body;
-      
+
       if (!name || typeof name !== 'string' || name.trim().length === 0) {
         return res.status(400).json({ message: "Valid stone name is required" });
       }
-      
+
+      // Verify the stone belongs to this merchant (cross-tenant guard)
+      const existingStone = await storage.getTaptStone(stoneId);
+      if (!existingStone || existingStone.merchantId !== merchantId) {
+        return res.status(404).json({ message: "Tapt stone not found" });
+      }
+
       const updatedStone = await storage.updateTaptStone(stoneId, { name: name.trim() });
       
       if (!updatedStone) {
@@ -3024,12 +3042,19 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(403).json({ message: "Access denied" });
       }
       const stoneId = parseInt(req.params.stoneId);
+
+      // Verify the stone belongs to this merchant (cross-tenant guard)
+      const existingStone = await storage.getTaptStone(stoneId);
+      if (!existingStone || existingStone.merchantId !== merchantId) {
+        return res.status(404).json({ message: "Tapt stone not found" });
+      }
+
       const success = await storage.deleteTaptStone(stoneId);
-      
+
       if (!success) {
         return res.status(404).json({ message: "Tapt stone not found" });
       }
-      
+
       res.json({ message: "Tapt stone deleted successfully" });
     } catch (error) {
       console.error("Error deleting tapt stone:", error);
@@ -3979,81 +4004,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Debug route to sync verified merchants
-  app.post("/api/debug/sync-merchants", async (req, res) => {
-    try {
-      const { syncVerifiedMerchants } = await import('./auth');
-      await syncVerifiedMerchants();
-      res.json({ success: true, message: "Verified merchants synced successfully" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  // Debug route to check auth users
-  app.get("/api/debug/auth-users", async (req, res) => {
-    try {
-      const { getUserByEmail } = await import('./auth');
-      const user = getUserByEmail('oliverharryleonard@gmail.com');
-      if (user) {
-        res.json({ 
-          found: true, 
-          user: { 
-            id: user.id, 
-            email: user.email, 
-            merchantId: user.merchantId, 
-            role: user.role,
-            hasPassword: !!user.password 
-          } 
-        });
-      } else {
-        res.json({ found: false });
-      }
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  // Debug route to test password
-  app.post("/api/debug/test-password", async (req, res) => {
-    try {
-      const bcrypt = await import('bcrypt');
-      const { hash, password } = req.body;
-      const isValid = await bcrypt.compare(password, hash);
-      res.json({ isValid, hash: hash.substring(0, 20) + "...", password });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  // Debug route to fix missing auth user
-  app.post("/api/debug/fix-auth-user", async (req, res) => {
-    try {
-      // Get the verified merchant
-      const merchant = await storage.getMerchant(22);
-      if (!merchant) {
-        return res.status(404).json({ message: "Merchant not found" });
-      }
-
-      // Create auth user with default password
-      try {
-        const user = await createUser(merchant.email, "123456", merchant.id, 'merchant');
-        res.json({ 
-          success: true, 
-          message: `Auth user created for ${merchant.email}`,
-          user: { id: user.id, email: user.email, merchantId: user.merchantId }
-        });
-      } catch (error: any) {
-        if (error.message.includes("already exists")) {
-          res.json({ success: true, message: "Auth user already exists" });
-        } else {
-          throw error;
-        }
-      }
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
+  // NOTE: The former /api/debug/* routes (sync-merchants, auth-users, test-password,
+  // fix-auth-user) were removed. They were unauthenticated and dangerous: fix-auth-user
+  // was an account-takeover backdoor (set a merchant's login password to "123456"),
+  // test-password was a bcrypt oracle, and auth-users leaked account existence.
+  // Merchant auth sync now happens automatically on verification; use the admin-gated
+  // endpoints for any operational needs.
 
   // Public merchant verification endpoint
   app.post("/api/merchants/verify", async (req, res) => {
@@ -5019,9 +4975,15 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (req.user?.role !== 'admin' && req.user?.merchantId !== merchantId) {
         return res.status(403).json({ message: "Access denied" });
       }
-      
+
+      // Verify the item actually belongs to this merchant (prevents cross-tenant edits by item id)
+      const existingItem = await storage.getStockItem(itemId);
+      if (!existingItem || existingItem.merchantId !== merchantId) {
+        return res.status(404).json({ message: "Stock item not found" });
+      }
+
       const validatedData = updateStockItemSchema.parse(req.body);
-      
+
       const stockItem = await storage.updateStockItem(itemId, validatedData);
       
       if (!stockItem) {
@@ -5048,7 +5010,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (req.user?.role !== 'admin' && req.user?.merchantId !== merchantId) {
         return res.status(403).json({ message: "Access denied" });
       }
-      
+
+      // Verify the item belongs to this merchant before deleting (cross-tenant guard)
+      const existingItem = await storage.getStockItem(itemId);
+      if (!existingItem || existingItem.merchantId !== merchantId) {
+        return res.status(404).json({ message: "Stock item not found" });
+      }
+
       const success = await storage.deleteStockItem(itemId);
       
       if (!success) {

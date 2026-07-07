@@ -424,9 +424,12 @@ export interface AttendedPaymentResult {
 export async function createAttendedSession(
   amount: string,
   merchantReference: string,
-  retries = 0
+  retries = 0,
+  // X-ID is Windcave's idempotency key. It MUST stay constant across retries so a
+  // request that actually reached Windcave (but whose response we lost to a timeout)
+  // is de-duplicated instead of creating a second session/charge.
+  xId = crypto.randomBytes(8).toString("hex")
 ): Promise<AttendedSessionResult> {
-  const xId = crypto.randomBytes(8).toString("hex");
   logAudit("ATTENDED_SESSION_CREATE", { merchantReference, amount, xId, retries });
 
   const body = {
@@ -452,7 +455,7 @@ export async function createAttendedSession(
     logAudit("ATTENDED_SESSION_NETWORK_ERROR", { xId, error: err.message });
     if (retries < RETRY_LIMIT) {
       await delay(5000);
-      return createAttendedSession(amount, merchantReference, retries + 1);
+      return createAttendedSession(amount, merchantReference, retries + 1, xId);
     }
     return { success: false, error: err.message };
   }
@@ -470,7 +473,7 @@ export async function createAttendedSession(
 
   if (response.status >= 500 && retries < RETRY_LIMIT) {
     await delay(5000);
-    return createAttendedSession(amount, merchantReference, retries + 1);
+    return createAttendedSession(amount, merchantReference, retries + 1, xId);
   }
 
   return { success: false, error: `Windcave ${response.status}: ${text.slice(0, 200)}` };
@@ -486,9 +489,11 @@ export async function createAttendedSession(
 export async function submitTapToPayToken(
   sessionId: string,
   windcaveToken: string,
-  retries = 0
+  retries = 0,
+  // Stable idempotency key across retries — prevents a lost-response retry from
+  // submitting (and charging) the same card twice.
+  xId = crypto.randomBytes(8).toString("hex")
 ): Promise<AttendedPaymentResult> {
-  const xId = crypto.randomBytes(8).toString("hex");
   logAudit("TAP_TO_PAY_SUBMIT", { sessionId, xId, retries });
 
   const body = {
@@ -513,7 +518,7 @@ export async function submitTapToPayToken(
     logAudit("TAP_TO_PAY_NETWORK_ERROR", { xId, error: err.message });
     if (retries < RETRY_LIMIT) {
       await delay(5000);
-      return submitTapToPayToken(sessionId, windcaveToken, retries + 1);
+      return submitTapToPayToken(sessionId, windcaveToken, retries + 1, xId);
     }
     return { success: false, error: err.message };
   }
@@ -530,7 +535,7 @@ export async function submitTapToPayToken(
 
   if (response.status >= 500 && retries < RETRY_LIMIT) {
     await delay(5000);
-    return submitTapToPayToken(sessionId, windcaveToken, retries + 1);
+    return submitTapToPayToken(sessionId, windcaveToken, retries + 1, xId);
   }
 
   return { success: false, error: `Windcave ${response.status}: ${text.slice(0, 200)}` };
