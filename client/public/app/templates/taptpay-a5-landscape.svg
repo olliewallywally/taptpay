@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="3508" height="2480" viewBox="0 0 3508 2480">
+  <defs>
+    
+  </defs>
+  <image id="Background" width="3508" height="2480"></image>
+  <image x="-119" y="-860" width="3686" height="5212"></image>
+  <rect id="bg-fill" width="3508" height="2480" fill="var(--background, transparent)"></rect>
+  <image id="qr-placeholder" x="2679" y="415" width="500" height="500" href="" preserveAspectRatio="xMidYMid meet"></image>
+  <image id="Layer_6.svg" data-name="Layer 6.svg" x="2770" y="1148" width="318" height="404"></image>
+  <path class="cls-2" d="M341,383H2191a112,112,0,0,1,112,112V1517a112,112,0,0,1-112,112H341a112,112,0,0,1-112-112V495A112,112,0,0,1,341,383Z"></path>
+  <path class="cls-2" d="M2720,380h418a76,76,0,0,1,76,76V874a76,76,0,0,1-76,76H2720a76,76,0,0,1-76-76V456A76,76,0,0,1,2720,380Zm0,0h418a76,76,0,0,1,76,76V874a76,76,0,0,1-76,76H2720a76,76,0,0,1-76-76V456A76,76,0,0,1,2720,380Z"></path>
+  <path id="Rectangle_2_copy" data-name="Rectangle 2 copy" class="cls-2" d="M2720,1058.84h418a76,76,0,0,1,76,76v418a76,76,0,0,1-76,76H2720a76,76,0,0,1-76-76v-418A76,76,0,0,1,2720,1058.84Zm0,0h418a76,76,0,0,1,76,76v418a76,76,0,0,1-76,76H2720a76,76,0,0,1-76-76v-418A76,76,0,0,1,2720,1058.84Z"></path>
+  <image id="Rectangle_3.svg" data-name="Rectangle 3.svg" x="229" y="2019" width="486" height="218"></image>
+  <image id="Rectangle_3.svg-2" data-name="Rectangle 3.svg" x="983" y="2015" width="503" height="225"></image>
+  <image id="logo-placeholder" x="2550" y="1760" width="780" height="390" href="" preserveAspectRatio="xMidYMid meet"></image>
+  <text id="logo" class="cls-3" style="fill: #00f1d7" transform="translate(2714.634 2181.723) scale(1.672)">logo</text>
+  <text id="text-instructions" data-name="simply scan or tap to pay  " class="cls-4" x="473.731" y="688.222">simply scan or tap<tspan x="473.731" dy="240">to pay</tspan></text>
+  <text id="accept_any_digital_payments" data-name="accept any digital payments" class="cls-5" x="463.649" y="1240.035">accept any digital<tspan x="463.649" dy="245">payments</tspan></text>
+</svg>

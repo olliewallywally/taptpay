@@ -207,7 +207,12 @@
       "Bash(xargs -n1 basename)",
       "Bash(grep -vE \"console\\\\.\\(log|error|warn\\)|^\\\\s+at |^\\\\s+\\\\d+ \\\\||^\\\\s+>|reactjs\\\\.org|Consider adding|Visit https|^\\\\s+act\\\\\\(|fire events|assert on|ensures that|Learn more|^\\\\s*$\")",
       "Bash(awk '{print $2, $11, $12, $13}')",
-      "Bash(grep -vE \"^\\\\s*$\")"
+      "Bash(grep -vE \"^\\\\s*$\")",
+      "Read(//dev/**)",
+      "Bash(wait)",
+      "Bash(pkill -f jest)",
+      "Bash(git check-ignore *)",
+      "Bash(echo \"=== EXIT: $? ===\")"
     ]
   },
   "model": "claude-opus-4-8"

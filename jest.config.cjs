@@ -21,6 +21,11 @@ module.exports = {
       'ts-jest',
       {
         tsconfig: { jsx: 'react-jsx' },
+        // Smoke tests only assert that JSX parses and components import — they do
+        // not need full type-checking. isolatedModules transpiles each file in
+        // isolation (no cross-file type graph), which turns a multi-minute run
+        // that type-checks three.js et al. into seconds.
+        isolatedModules: true,
         diagnostics: { ignoreCodes: [1343] },
         astTransformers: {
           before: ['<rootDir>/jest.import-meta-transformer.cjs'],
