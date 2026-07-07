@@ -41,6 +41,15 @@ jest.mock('@/lib/auth', () => ({
   isAuthenticated: () => true,
 }));
 
+jest.mock('@/lib/sse-client', () => ({
+  sseClient: {
+    connect: jest.fn(),
+    disconnect: jest.fn(),
+    subscribe: jest.fn(),
+    unsubscribe: jest.fn(),
+  },
+}));
+
 jest.mock('wouter', () => ({
   Router: ({ children }: any) => <div>{children}</div>,
   useParams: () => ({ merchantId: '1', transactionId: '1' }),

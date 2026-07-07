@@ -29,6 +29,8 @@ const transactionFormSchema = z.object({
   price: z.string().regex(/^\d+(\.\d{2})?$/, "Please enter a valid price (e.g., 4.50)"),
 });
 
+const EMPTY_STOCK_ITEMS: any[] = [];
+
 type TransactionFormData = z.infer<typeof transactionFormSchema>;
 
 export default function MerchantTerminal() {
@@ -161,7 +163,7 @@ export default function MerchantTerminal() {
   });
 
   // Get stock items for this merchant
-  const { data: stockItems = [] } = useQuery({
+  const { data: stockItems = EMPTY_STOCK_ITEMS } = useQuery({
     queryKey: ["/api/merchants", merchantId, "stock-items"],
     queryFn: async () => {
       const response = await fetch(`/api/merchants/${merchantId}/stock-items`, {
