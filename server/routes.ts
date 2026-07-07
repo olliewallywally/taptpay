@@ -1321,14 +1321,20 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Cancel transaction
-  app.post("/api/transactions/:id/cancel", async (req, res) => {
+  // Cancel transaction — merchant-initiated only (called from the terminal UI)
+  app.post("/api/transactions/:id/cancel", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const transactionId = parseInt(req.params.id);
       const transaction = await storage.getTransaction(transactionId);
-      
+
       if (!transaction) {
         return res.status(404).json({ message: "Transaction not found" });
+      }
+
+      // Only the owning merchant (or an admin) can cancel — prevents cancelling
+      // an arbitrary transaction by guessing its numeric id.
+      if (!checkMerchantOwnership(req, transaction.merchantId!)) {
+        return res.status(403).json({ message: "Access denied" });
       }
 
       // Only allow canceling pending or processing transactions
@@ -1391,8 +1397,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         splitEnabled: false,
       });
       
-      // Generate NFC session for contactless payment
-      const nfcSessionId = `NFC_${transaction.id}_${Date.now()}`;
+      // Generate NFC session for contactless payment. Include a cryptographically
+      // random component so the session id (later accepted by the public
+      // /complete endpoint) cannot be guessed from the transaction id + time.
+      const nfcSessionId = `NFC_${transaction.id}_${crypto.randomBytes(16).toString('hex')}`;
       
       // Update transaction with NFC session ID
       await storage.updateTransactionNfcSession(transaction.id, nfcSessionId);
@@ -3062,22 +3070,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Legacy endpoint for backwards compatibility
-  app.delete("/api/tapt-stones/:id", async (req, res) => {
-    try {
-      const stoneId = parseInt(req.params.id);
-      const success = await storage.deleteTaptStone(stoneId);
-      
-      if (!success) {
-        return res.status(404).json({ message: "Tapt stone not found" });
-      }
-      
-      res.json({ message: "Tapt stone deleted successfully" });
-    } catch (error) {
-      console.error("Error deleting tapt stone:", error);
-      res.status(500).json({ message: "Failed to delete tapt stone" });
-    }
-  });
+  // (Removed unauthenticated legacy DELETE /api/tapt-stones/:id — it let anyone
+  // delete any merchant's stone by id. Clients use the authenticated, ownership-checked
+  // /api/merchants/:merchantId/tapt-stones/:stoneId route.)
 
   // Get specific tapt stone details
   app.get("/api/tapt-stones/:id", async (req, res) => {
@@ -3663,63 +3658,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     });
   });
 
-  // Old create merchant endpoint
-  app.post("/api/admin/merchants-old", async (req, res) => {
-    try {
-      const authHeader = req.headers['authorization'];
-      const token = authHeader && authHeader.split(' ')[1];
-
-      if (!token) {
-        return res.status(401).json({ message: 'Access token required' });
-      }
-
-      const decoded = jwt.verify(token, JWT_SECRET) as any;
-
-      if (decoded.role !== 'admin' || decoded.email !== 'admin@tapt.co.nz') {
-        return res.status(403).json({ message: "Admin access required" });
-      }
-
-      const merchantData = req.body;
-      
-      // Create merchant  
-      const newMerchant = await storage.createMerchantWithPassword({
-        name: merchantData.name,
-        email: merchantData.contactEmail,
-        businessName: merchantData.businessName,
-        contactEmail: merchantData.contactEmail,
-        contactPhone: merchantData.contactPhone,
-        businessAddress: merchantData.businessAddress,
-        currentProviderRate: merchantData.currentProviderRate,
-        bankName: merchantData.bankName,
-        bankAccountNumber: merchantData.bankAccountNumber,
-        bankBranch: merchantData.bankBranch,
-        accountHolderName: merchantData.accountHolderName,
-        qrCodeUrl: generateQrCodeUrl(0, undefined, req), // Will be updated with actual merchant ID
-        paymentUrl: generatePaymentUrl(0, undefined, req) // Will be updated with actual merchant ID
-      }, "tempPassword");
-
-      // Update URLs with actual merchant ID
-      await storage.updateMerchantDetails(newMerchant.id, {
-        businessName: newMerchant.businessName || "",
-        contactEmail: newMerchant.contactEmail || "",
-        contactPhone: newMerchant.contactPhone || "",
-        businessAddress: newMerchant.businessAddress || "",
-      });
-
-      // Create login credentials for the merchant
-      await createUser(merchantData.loginEmail, merchantData.loginPassword, newMerchant.id, 'merchant');
-
-      res.json({
-        id: newMerchant.id,
-        name: newMerchant.name,
-        businessName: newMerchant.businessName,
-        message: "Merchant account created successfully"
-      });
-    } catch (error) {
-      console.error("Error creating merchant:", error);
-      res.status(500).json({ message: "Failed to create merchant account" });
-    }
-  });
+  // (Removed legacy POST /api/admin/merchants-old — it used a hardcoded admin email
+  // check and created merchants with a literal "tempPassword". Superseded by
+  // POST /api/admin/merchants/signup.)
 
   // Admin merchant management endpoints
   app.put("/api/admin/merchants/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
@@ -3941,26 +3882,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Test email endpoint
-  // Clear all merchants  
-  app.post("/api/admin/clear-merchants", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
-    try {
-      const merchantsBefore = await storage.getAllMerchants();
-      
-      // Clear all merchants  
-      for (const merchant of merchantsBefore) {
-        await storage.deleteMerchant(merchant.id);
-      }
-
-      res.json({ 
-        message: `Cleared ${merchantsBefore.length} merchants successfully`,
-        deletedMerchants: merchantsBefore.length
-      });
-    } catch (error) {
-      console.error("Error clearing merchants:", error);
-      res.status(500).json({ message: "Failed to clear merchants" });
-    }
-  });
+  // (Removed a duplicate POST /api/admin/clear-merchants handler here — it was dead
+  // code shadowed by the earlier registration of the same route.)
 
   app.post("/api/admin/test-email", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {
