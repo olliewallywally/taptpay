@@ -9,11 +9,8 @@
 // Dynamic imports to test JSX syntax - syntax errors will cause import failures
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { NotificationProvider } from '@/components/notification-system';
-import { TooltipProvider } from '@/components/ui/tooltip';
 
-// Test wrapper for React Query. NotificationProvider/TooltipProvider are required
-// by the terminal pages (useNotifications / tooltip) or they throw at render.
+// Test wrapper for React Query
 const createTestWrapper = () => {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -25,11 +22,7 @@ const createTestWrapper = () => {
   return function TestWrapper({ children }: { children: React.ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>
-        <NotificationProvider>
-          <TooltipProvider>
-            {children}
-          </TooltipProvider>
-        </NotificationProvider>
+        {children}
       </QueryClientProvider>
     );
   };
@@ -45,8 +38,6 @@ jest.mock('wouter', () => ({
   Router: ({ children }: any) => <div>{children}</div>,
   useParams: () => ({ merchantId: '1', transactionId: '1' }),
   useLocation: () => ['/', jest.fn()],
-  // reset-password / receipt read query params via useSearch.
-  useSearch: () => '',
   Link: ({ children }: any) => <div>{children}</div>,
 }));
 
@@ -255,9 +246,8 @@ describe('Import Validation', () => {
       throw new Error(`${failures.length} components failed to import, likely due to JSX syntax errors`);
     }
 
-    // All components should import successfully and have default exports.
-    // Count is 23 since verify-merchant was removed in the onboarding consolidation.
-    expect(results).toHaveLength(23);
+    // All components should import successfully and have default exports
+    expect(results).toHaveLength(24);
     expect(results.every(result => result.success && result.hasDefault)).toBe(true);
   });
 });

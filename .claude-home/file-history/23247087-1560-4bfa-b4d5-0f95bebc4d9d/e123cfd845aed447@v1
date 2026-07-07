@@ -13,20 +13,7 @@ module.exports = {
     // The project tsconfig sets jsx:"preserve" (Vite/esbuild transforms JSX at build
     // time). ts-jest inherits that and would emit untransformed JSX, causing
     // "Unexpected token '<'" at import time. Override to react-jsx just for tests.
-    //
-    // The astTransformer rewrites Vite's `import.meta.env.*` (used in the
-    // merchant-terminal pages) into a plain object literal; ignoreCodes:[1343]
-    // silences the TS syntax diagnostic that fires before the transform runs.
-    '^.+\\.(ts|tsx)$': [
-      'ts-jest',
-      {
-        tsconfig: { jsx: 'react-jsx' },
-        diagnostics: { ignoreCodes: [1343] },
-        astTransformers: {
-          before: ['<rootDir>/jest.import-meta-transformer.cjs'],
-        },
-      },
-    ],
+    '^.+\\.(ts|tsx)$': ['ts-jest', { tsconfig: { jsx: 'react-jsx' } }],
     '^.+\\.(js|jsx)$': 'babel-jest',
   },
   moduleNameMapper: {

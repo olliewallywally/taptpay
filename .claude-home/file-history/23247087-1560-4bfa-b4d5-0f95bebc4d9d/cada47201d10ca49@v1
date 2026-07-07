@@ -2,7 +2,6 @@ import { render } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Router } from 'wouter';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { NotificationProvider } from '@/components/notification-system';
 
 // Type definitions for Jest globals
 declare const jest: any;
@@ -98,11 +97,9 @@ const TestWrapper = ({ children }: { children: React.ReactNode }) => {
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
-        <NotificationProvider>
-          <TooltipProvider>
-            {children}
-          </TooltipProvider>
-        </NotificationProvider>
+        <TooltipProvider>
+          {children}
+        </TooltipProvider>
       </Router>
     </QueryClientProvider>
   );
@@ -234,9 +231,8 @@ describe('JSX Syntax Validation', () => {
       StockManagement, Transactions
     ];
 
-    // If we reach this point, all imports succeeded (no syntax errors).
-    // Count is 23 since verify-merchant was removed in the onboarding consolidation.
-    expect(allComponents).toHaveLength(23);
+    // If we reach this point, all imports succeeded (no syntax errors)
+    expect(allComponents).toHaveLength(24);
     allComponents.forEach(component => {
       expect(typeof component).toBe('function');
     });

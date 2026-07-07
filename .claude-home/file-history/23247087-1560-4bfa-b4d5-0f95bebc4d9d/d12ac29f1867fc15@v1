@@ -20,21 +20,6 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 });
 
-// Mock EventSource — jsdom has no SSE, and pages that call sseClient.connect()
-// (customer-payment, merchant-terminal*) would otherwise throw "EventSource is
-// not defined" at render.
-global.EventSource = class EventSource {
-  constructor() {
-    this.readyState = 0;
-    this.onopen = null;
-    this.onmessage = null;
-    this.onerror = null;
-  }
-  addEventListener() {}
-  removeEventListener() {}
-  close() {}
-};
-
 // Mock IntersectionObserver
 global.IntersectionObserver = class IntersectionObserver {
   constructor() {}

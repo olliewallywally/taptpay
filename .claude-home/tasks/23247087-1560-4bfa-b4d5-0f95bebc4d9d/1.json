@@ -1,0 +1,9 @@
+{
+  "id": "1",
+  "subject": "Fix 9 failing jest smoke tests (import.meta)",
+  "description": "The 3 merchant-terminal* pages use import.meta.env, failing TS1343 under ts-jest CommonJS. Add a local ts-jest AST transformer to rewrite import.meta, wire into jest.config.cjs, get all tests green.",
+  "activeForm": "Fixing failing jest smoke tests",
+  "status": "in_progress",
+  "blocks": [],
+  "blockedBy": []
+}

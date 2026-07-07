@@ -3,4 +3,3 @@
 - [Trades branch git state](trades-branch-git-state.md) — split-bill work safe in a single stash; restore steps
 - [DB schema drift & FK sequences](db-schema-drift-fk-sequences.md) — latent bug: FK cols have rogue auto-increment; never db:push from main-based branch
 - [Split-bill cross-vertical](split-bill-cross-vertical.md) — shipped to PR 2026-06-27; merchant-gated split to trades + neutral wording; webview verify still owed
-- [Bug audit 2026-07-07](audit-2026-07-07-bugfixes.md) — fixed IDORs, debug backdoors, Windcave double-charge, jest config; remaining flaws + plan

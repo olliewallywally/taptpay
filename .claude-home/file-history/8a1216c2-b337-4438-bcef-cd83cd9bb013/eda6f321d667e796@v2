@@ -1,0 +1,40 @@
+import { chromium } from 'playwright';
+
+const errors = [];
+const pageErrors = [];
+const browser = await chromium.launch();
+const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+const page = await ctx.newPage();
+page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+page.on('pageerror', (e) => pageErrors.push(String(e)));
+
+await page.goto('http://localhost:5000/', { waitUntil: 'networkidle', timeout: 30000 });
+await page.waitForTimeout(2500);
+
+const probe = await page.evaluate(() => {
+  const q = (s) => document.querySelector(s);
+  const canvasHas = (s) => { const c = q(s); return c ? { w: c.width, h: c.height } : null; };
+  return {
+    root: !!q('#tp-root'),
+    nav: !!q('#tp-nav'),
+    hero: !!q('#tp-hero'),
+    contact: !!q('#tp-contact'),
+    coinsCanvas: canvasHas('#tp-coins'),
+    phoneGl: canvasHas('#tp3-gl'),
+    industriesTabs: document.querySelectorAll('.tp-tab').length,
+    indPanelHtml: (q('#tp-ind-panel')?.innerHTML || '').length,
+    progressBar: !!q('#tp-bar'),
+    fontFaces: document.fonts ? document.fonts.size : -1,
+  };
+});
+
+const title = await page.title();
+console.log('TITLE:', title);
+console.log('PROBE:', JSON.stringify(probe, null, 2));
+console.log('CONSOLE ERRORS (' + errors.length + '):');
+errors.slice(0, 20).forEach((e) => console.log('  - ' + e));
+console.log('PAGE EXCEPTIONS (' + pageErrors.length + '):');
+pageErrors.slice(0, 20).forEach((e) => console.log('  - ' + e));
+
+await page.screenshot({ path: '/tmp/claude-1000/-home-runner-workspace/8a1216c2-b337-4438-bcef-cd83cd9bb013/scratchpad/landing-hero.png' });
+await browser.close();
