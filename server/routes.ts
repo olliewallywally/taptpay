@@ -4,7 +4,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
 import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, simulateCreateSession, simulateQuerySession, simulateRentSession, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, simulateAttendedTapToPay } from "./windcave";
-import { authenticateUser, generateToken, authenticateToken, createUser, getUserByEmail, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
+import { authenticateUser, generateToken, authenticateToken, createUser, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
 import { generateQuotePdf } from "./trades-quote-pdf";
 import { generateBusinessReportPdf } from "./report-generator";
@@ -422,13 +422,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         isNewUser = true;
       }
 
-      // Get or create the in-memory auth user
-      let authUser = getUserByEmail(email);
-      if (!authUser) {
-        // Create with a random unguessable password (Google users won't use password login)
-        const randomPwd = crypto.randomBytes(32).toString('hex');
-        authUser = await createUser(email, randomPwd, merchant.id);
-      }
+      // Ensure the merchant can be resolved for token auth, which requires a
+      // passwordHash on the record. Google users never log in with a password, so
+      // seed a random unguessable one if absent (createUser is idempotent).
+      const randomPwd = crypto.randomBytes(32).toString('hex');
+      const authUser = await createUser(email, randomPwd, merchant.id);
 
       const token = generateToken(authUser);
       const redirectParams = new URLSearchParams({

@@ -200,69 +200,35 @@ export interface AuthenticatedRequest extends Request {
   user?: User;
 }
 
-// In-memory user storage (replace with database in production)
-const users: Map<number, User> = new Map();
-let currentUserId = 2; // Start at 2; slot 1 is reserved but admin is verified via token, not this Map.
+// Merchant auth is backed directly by the `merchants` table (email + passwordHash
+// are the source of truth). There is no in-memory user store: it did not survive
+// restarts and was inconsistent across multiple server instances, which could make a
+// valid merchant fail to log in ("Invalid email or password") after a redeploy or on
+// an instance that had not yet synced.
 
-export function clearAllUsers() {
-  // Clear all users except admin
-  const adminUser = users.get(1);
-  users.clear();
-  if (adminUser) {
-    users.set(1, adminUser);
-  }
-  currentUserId = 2;
-  console.log("All user accounts cleared except admin");
+// Build the auth User view of a merchant record.
+function merchantToUser(merchant: {
+  id: number;
+  email: string;
+  passwordHash?: string | null;
+}): User {
+  return {
+    // For merchants the identity IS the merchant id — no separate synthetic id.
+    id: merchant.id,
+    email: merchant.email,
+    password: merchant.passwordHash || '',
+    merchantId: merchant.id,
+    role: 'merchant',
+    createdAt: new Date(),
+  };
 }
 
-// Function to recreate auth users for verified merchants
-export async function syncVerifiedMerchants() {
-  let synced = 0;
-  let alreadyPresent = 0;
-  let failed = 0;
-  try {
-    const { storage } = await import('./storage');
-    const allMerchants = await storage.getAllMerchants();
-
-    for (const merchant of allMerchants) {
-      if ((merchant.status === 'verified' || merchant.status === 'active') && merchant.passwordHash) {
-        const existingUser = getUserByEmail(merchant.email);
-        if (!existingUser) {
-          try {
-            const id = currentUserId++;
-            const user: User = {
-              id,
-              email: merchant.email,
-              password: merchant.passwordHash,
-              merchantId: merchant.id,
-              role: 'merchant',
-              createdAt: new Date(),
-            };
-            users.set(id, user);
-            synced++;
-          } catch {
-            failed++;
-            console.error(`Failed to recreate auth user for merchant: ${merchant.email} (ID: ${merchant.id})`);
-          }
-        } else {
-          alreadyPresent++;
-        }
-      }
-    }
-
-    const total = synced + alreadyPresent + failed;
-    if (failed > 0) {
-      console.error(`⚠️  Auth sync: ${total} verified merchants — ${synced} registered, ${alreadyPresent} already present, ${failed} FAILED`);
-    } else {
-      console.log(`✅ Auth sync: ${total} verified merchants — ${synced} registered, ${alreadyPresent} already present`);
-    }
-  } catch (error) {
-    console.error('❌ Auth sync failed entirely — merchants may not be able to log in:', error);
-  }
+// Retained as a no-op for backwards compatibility: callers (index.ts, verify /
+// confirm-email routes) used to call this to rebuild the in-memory store. With the DB
+// as the source of truth there is nothing to sync.
+export async function syncVerifiedMerchants(): Promise<void> {
+  // no-op — merchant auth reads live from the merchants table
 }
-
-// Initialize auth system by syncing verified merchants
-syncVerifiedMerchants();
 
 export const JWT_SECRET = process.env.JWT_SECRET ?? (() => {
   if (process.env.NODE_ENV === 'production') {
@@ -272,13 +238,17 @@ export const JWT_SECRET = process.env.JWT_SECRET ?? (() => {
 })();
 
 export async function authenticateUser(email: string, password: string): Promise<User | null> {
-  const user = Array.from(users.values()).find(u => u.email === email);
-  if (!user) return null;
-  
-  const isValid = await bcrypt.compare(password, user.password);
+  const { storage } = await import('./storage');
+  const merchant = await storage.getMerchantByEmail(email);
+  if (!merchant || !merchant.passwordHash) return null;
+
+  // Only verified/active merchants may log in.
+  if (merchant.status !== 'verified' && merchant.status !== 'active') return null;
+
+  const isValid = await bcrypt.compare(password, merchant.passwordHash);
   if (!isValid) return null;
-  
-  return user;
+
+  return merchantToUser(merchant);
 }
 
 export function generateToken(user: User): string {
@@ -328,66 +298,47 @@ export async function authenticateToken(req: AuthenticatedRequest, res: Response
     return next();
   }
 
-  // For regular users, check if user exists. If not, do a targeted single-merchant lookup
-  // rather than syncing all merchants (which is O(N) and a DoS vector).
-  let user = users.get(decoded.userId);
-  if (!user && decoded.merchantId) {
-    try {
-      const { storage } = await import('./storage');
-      const merchant = await storage.getMerchant(decoded.merchantId);
-      if (merchant && (merchant.status === 'verified' || merchant.status === 'active') && merchant.passwordHash) {
-        user = {
-          id: decoded.userId,
-          email: merchant.email,
-          password: merchant.passwordHash,
-          merchantId: merchant.id,
-          role: 'merchant',
-          createdAt: new Date(),
-        };
-        users.set(decoded.userId, user);
-      }
-    } catch {
-      // fall through to user not found below
-    }
-  }
-  if (!user) {
+  // Regular merchant: resolve from the merchants table (source of truth).
+  if (!decoded.merchantId) {
     return res.status(404).json({ message: 'User not found' });
   }
-
-  req.user = user;
-  next();
+  try {
+    const { storage } = await import('./storage');
+    const merchant = await storage.getMerchant(decoded.merchantId);
+    if (merchant && (merchant.status === 'verified' || merchant.status === 'active') && merchant.passwordHash) {
+      req.user = merchantToUser(merchant);
+      return next();
+    }
+  } catch {
+    // fall through to user not found below
+  }
+  return res.status(404).json({ message: 'User not found' });
 }
 
+// Enable password login for a merchant by ensuring its passwordHash is set.
+// (Merchant auth is DB-backed, so "creating a user" means writing the hash onto the
+// merchant record.) Idempotent: won't clobber an already-set hash. Returns the User view.
 export async function createUser(email: string, password: string, merchantId: number, role: 'merchant' | 'admin' = 'merchant'): Promise<User> {
-  // Check if user already exists
-  const existingUser = getUserByEmail(email);
-  if (existingUser) {
-    throw new Error(`User with email ${email} already exists`);
+  const { storage } = await import('./storage');
+  const merchant = await storage.getMerchant(merchantId);
+  if (!merchant) {
+    throw new Error(`Cannot create login for unknown merchant ${merchantId}`);
   }
 
-  const hashedPassword = await bcrypt.hash(password, 12);
-  const id = currentUserId++;
-  
-  const user: User = {
-    id,
-    email,
-    password: hashedPassword,
-    merchantId,
-    role,
-    createdAt: new Date(),
-  };
-  
-  users.set(id, user);
-  console.log(`User created successfully: ${email} with ID ${id} for merchant ${merchantId}`);
-  return user;
+  if (!merchant.passwordHash) {
+    const hashedPassword = await bcrypt.hash(password, 12);
+    await storage.updateMerchantPasswordHash(merchantId, hashedPassword);
+    merchant.passwordHash = hashedPassword;
+  }
+
+  console.log(`Login enabled for ${email} (merchant ${merchantId})`);
+  return merchantToUser(merchant);
 }
 
-export function getUserByEmail(email: string): User | undefined {
-  return Array.from(users.values()).find(u => u.email === email);
-}
-
-export function getUserById(id: number): User | undefined {
-  return users.get(id);
+export async function getUserByEmail(email: string): Promise<User | undefined> {
+  const { storage } = await import('./storage');
+  const merchant = await storage.getMerchantByEmail(email);
+  return merchant ? merchantToUser(merchant) : undefined;
 }
 
 // Password reset functionality
@@ -412,14 +363,6 @@ export async function requestPasswordReset(email: string, baseUrl?: string): Pro
       resetToken,
       resetTokenExpiry,
     } as any);
-
-    // Also update in-memory user if exists
-    const memUser = getUserByEmail(email);
-    if (memUser) {
-      memUser.resetToken = resetToken;
-      memUser.resetTokenExpiry = resetTokenExpiry;
-      users.set(memUser.id, memUser);
-    }
   } catch (error) {
     console.error('Failed to store reset token in database:', error);
     return false;
@@ -450,15 +393,6 @@ export async function resetPassword(token: string, newPassword: string): Promise
       resetToken: null,
       resetTokenExpiry: null,
     } as any);
-
-    // Also update in-memory user if exists
-    const memUser = getUserByEmail(merchant.email);
-    if (memUser) {
-      memUser.password = hashedPassword;
-      memUser.resetToken = undefined;
-      memUser.resetTokenExpiry = undefined;
-      users.set(memUser.id, memUser);
-    }
 
     return true;
   } catch (error) {

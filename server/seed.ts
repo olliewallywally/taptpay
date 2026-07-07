@@ -28,6 +28,9 @@ export async function seedDatabase() {
       name: "Demo Store",
       businessName: "Demo Store",
       email: "demo@tapt.co.nz",
+      // Demo account must be login-capable: merchant auth requires a verified/active
+      // status (createUser below sets the passwordHash).
+      status: "active",
       qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=https://tapt.co.nz/pay/1",
       paymentUrl: `https://${process.env.REPLIT_DOMAINS?.split(',')[0] || 'localhost:5000'}/pay/1`,
       currentProviderRate: "2.9000", // 2.9%
