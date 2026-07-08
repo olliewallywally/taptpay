@@ -142,7 +142,10 @@ export const transactions = pgTable("transactions", {
   splitEnabled: boolean("split_enabled").default(false),
   
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => ({
+  merchantIdIdx: index("transactions_merchant_id_idx").on(t.merchantId),
+  taptStoneIdIdx: index("transactions_tapt_stone_id_idx").on(t.taptStoneId),
+}));
 
 // Crypto transactions table for cryptocurrency payments
 export const cryptoTransactions = pgTable("crypto_transactions", {
@@ -196,7 +199,10 @@ export const splitPayments = pgTable("split_payments", {
   
   paidAt: timestamp("paid_at"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => ({
+  transactionIdIdx: index("split_payments_transaction_id_idx").on(t.transactionId),
+  merchantIdIdx: index("split_payments_merchant_id_idx").on(t.merchantId),
+}));
 
 // Refunds table to track all refund activities
 export const refunds = pgTable("refunds", {
@@ -217,7 +223,10 @@ export const refunds = pgTable("refunds", {
   customerNotified: boolean("customer_notified").default(false),
   completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => ({
+  transactionIdIdx: index("refunds_transaction_id_idx").on(t.transactionId),
+  merchantIdIdx: index("refunds_merchant_id_idx").on(t.merchantId),
+}));
 
 // Platform settlements - tracks money owed to merchants (Marketplace Model)
 export const merchantSettlements = pgTable("merchant_settlements", {

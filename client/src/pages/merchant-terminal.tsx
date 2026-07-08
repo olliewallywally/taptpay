@@ -57,6 +57,18 @@ export default function MerchantTerminal() {
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const prevTransactionStatusRef = useRef<string | null>(null);
   const successOverlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tapToPayOverlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const copiedPaymentLinkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear any pending timers on unmount so they never fire against an
+  // unmounted component (state-update-after-unmount / memory leak).
+  useEffect(() => {
+    return () => {
+      if (successOverlayTimerRef.current) clearTimeout(successOverlayTimerRef.current);
+      if (tapToPayOverlayTimerRef.current) clearTimeout(tapToPayOverlayTimerRef.current);
+      if (copiedPaymentLinkTimerRef.current) clearTimeout(copiedPaymentLinkTimerRef.current);
+    };
+  }, []);
 
   // Persistent AudioContext — created once and unlocked on first user gesture so
   // the chime can play even when the payment completion arrives via polling.
@@ -298,7 +310,8 @@ export default function MerchantTerminal() {
       setTapToPayStatus(data.approved ? "completed" : "failed");
       queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
 
-      setTimeout(() => {
+      if (tapToPayOverlayTimerRef.current) clearTimeout(tapToPayOverlayTimerRef.current);
+      tapToPayOverlayTimerRef.current = setTimeout(() => {
         setShowTapToPayOverlay(false);
         setTapToPayStatus("idle");
       }, 3500);
@@ -550,7 +563,8 @@ export default function MerchantTerminal() {
         title: "Link Copied!",
         description: "Payment link has been copied to clipboard",
       });
-      setTimeout(() => setCopiedPaymentLink(false), 2000);
+      if (copiedPaymentLinkTimerRef.current) clearTimeout(copiedPaymentLinkTimerRef.current);
+      copiedPaymentLinkTimerRef.current = setTimeout(() => setCopiedPaymentLink(false), 2000);
     } catch (error) {
       console.error('Failed to copy link:', error);
       toast({

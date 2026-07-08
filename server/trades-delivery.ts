@@ -239,9 +239,14 @@ export async function runTradesReminderPass(
   now: Date = new Date()
 ): Promise<{ sent: number; skipped: number; errors: number }> {
   const result = { sent: 0, skipped: 0, errors: 0 };
+  const merchantCache = new Map<number, any>();
   for (const invoice of await storage.getReminderEligibleJobInvoices()) {
     try {
-      const merchant = await storage.getMerchant(invoice.merchantId);
+      let merchant = merchantCache.get(invoice.merchantId);
+      if (!merchant) {
+        merchant = await storage.getMerchant(invoice.merchantId);
+        if (merchant) merchantCache.set(invoice.merchantId, merchant);
+      }
       if (!merchant || merchant.tradeRemindersEnabled === false) {
         result.skipped++;
         continue;

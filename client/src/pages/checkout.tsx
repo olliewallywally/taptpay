@@ -117,6 +117,17 @@ function CheckoutInner() {
   // Incrementing this triggers the pre-session useEffect to create a fresh session
   const [preSessionTrigger, setPreSessionTrigger] = useState(0);
 
+  // Timers that schedule state updates — tracked so they can be cancelled on
+  // unmount and never fire against an unmounted component.
+  const navigateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const linkCopiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => {
+      if (navigateTimerRef.current) clearTimeout(navigateTimerRef.current);
+      if (linkCopiedTimerRef.current) clearTimeout(linkCopiedTimerRef.current);
+    };
+  }, []);
+
   // Google Pay pre-session — mirrors Apple Pay's approach so the Windcave session
   // is ready the moment the user approves Google Pay (no blocking network call).
   const googlePreSessionRef = useRef<any>(null);
@@ -186,7 +197,8 @@ function CheckoutInner() {
   // success screen and refresh split progress (each payer pays on their own link).
   const navigateAfterSuccess = (result: any) => {
     if (isInvoice) { refetchInvoice(); return; }
-    setTimeout(() => setLocation(result.redirectPath || `/receipt/${txId}`), 1200);
+    if (navigateTimerRef.current) clearTimeout(navigateTimerRef.current);
+    navigateTimerRef.current = setTimeout(() => setLocation(result.redirectPath || `/receipt/${txId}`), 1200);
   };
 
   const { data: envData } = useQuery({
@@ -754,7 +766,8 @@ function CheckoutInner() {
   async function handleCardPay() {
     if (IS_MOCK) {
       setPayState("processing");
-      setTimeout(() => {
+      if (navigateTimerRef.current) clearTimeout(navigateTimerRef.current);
+      navigateTimerRef.current = setTimeout(() => {
         setPayState("success");
         navigateAfterSuccess({ redirectPath: isInvoice ? undefined : `/receipt/${txId}` });
       }, 900);
@@ -1248,7 +1261,8 @@ function CheckoutInner() {
                     onClick={() => {
                       navigator.clipboard.writeText(window.location.href).then(() => {
                         setLinkCopied(true);
-                        setTimeout(() => setLinkCopied(false), 2500);
+                        if (linkCopiedTimerRef.current) clearTimeout(linkCopiedTimerRef.current);
+                        linkCopiedTimerRef.current = setTimeout(() => setLinkCopied(false), 2500);
                       });
                     }}
                     style={{
