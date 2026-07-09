@@ -60,7 +60,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
           {' '}
           <a href="#tp-pricing" className="tp-anchor tp-navlink" style={{ textDecoration: "none", fontFamily: "'Outfit'", fontWeight: "500", fontSize: "14px", letterSpacing: "0.04em", color: "rgba(244,241,232,0.66)", cursor: "pointer", transition: "color .2s ease" }}>{"pricing"}</a>
           {' '}
-          <a href="#tp-contact" className="tp-anchor tp-navlink" style={{ textDecoration: "none", fontFamily: "'Outfit'", fontWeight: "500", fontSize: "14px", letterSpacing: "0.04em", color: "rgba(244,241,232,0.66)", cursor: "pointer", transition: "color .2s ease" }}>{"log in"}</a>
+          <a href="/login" className="tp-navlink" style={{ textDecoration: "none", fontFamily: "'Outfit'", fontWeight: "500", fontSize: "14px", letterSpacing: "0.04em", color: "rgba(244,241,232,0.66)", cursor: "pointer", transition: "color .2s ease" }}>{"log in"}</a>
           {' '}
           <a href="#tp-contact" className="tp-anchor tp-wire" data-solid="0" style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", padding: "11px 22px", borderRadius: "9999px", border: "1.5px solid #5E9DFF", color: "#5E9DFF", background: "transparent", fontFamily: "'Outfit'", fontWeight: "500", fontSize: "14px", cursor: "pointer", transition: "background .25s ease,color .25s ease" }}>{"get started"}</a>
           {' '}
@@ -94,7 +94,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
         {' '}
         <a href="#tp-pricing" className="tp-anchor tp-menulink" style={{ textDecoration: "none", fontFamily: "'Outfit'", fontWeight: "300", fontSize: "clamp(32px,8.4vw,50px)", color: "#F4F1E8", padding: "9px 0" }}>{"pricing"}</a>
         {' '}
-        <a href="#tp-contact" className="tp-anchor tp-menulink" style={{ textDecoration: "none", fontFamily: "'Outfit'", fontWeight: "300", fontSize: "clamp(32px,8.4vw,50px)", color: "rgba(244,241,232,0.7)", padding: "9px 0" }}>{"log in"}</a>
+        <a href="/login" className="tp-menulink" style={{ textDecoration: "none", fontFamily: "'Outfit'", fontWeight: "300", fontSize: "clamp(32px,8.4vw,50px)", color: "rgba(244,241,232,0.7)", padding: "9px 0" }}>{"log in"}</a>
         {' '}
         <a href="#tp-contact" className="tp-anchor tp-menulink" style={{ textDecoration: "none", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "clamp(32px,8.4vw,50px)", color: "#5E9DFF", padding: "9px 0" }}>{"get started"}</a>
         {' '}
