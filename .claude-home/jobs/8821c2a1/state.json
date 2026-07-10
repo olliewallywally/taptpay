@@ -1,0 +1,44 @@
+{
+  "state": "blocked",
+  "detail": "You've hit your session limit · resets 3:10am (UTC)",
+  "tempo": "blocked",
+  "inFlight": {
+    "tasks": 0,
+    "queued": 1,
+    "kinds": []
+  },
+  "fan": [
+    {
+      "id": "bjqx8wvel",
+      "kind": "shell",
+      "label": "cd /home/runner/workspace; npx jest client/src/lib/__tests__/report-utils.test.ts 2>&1 | tail -35",
+      "startedAt": 1783636909787
+    }
+  ],
+  "output": null,
+  "children": null,
+  "linkScanOffset": 506917,
+  "template": "bg",
+  "respawnFlags": [
+    "--reply-on-resume",
+    "--permission-mode",
+    "default",
+    "--model",
+    "claude-opus-4-8"
+  ],
+  "bgIsolation": "none",
+  "providerEnv": {},
+  "intent": "buiild",
+  "name": "Review plan 59 and identify improvements",
+  "nameSource": "auto",
+  "sessionId": "8821c2a1-7630-4e33-a44c-d6ec58f74340",
+  "resumeSessionId": "8821c2a1-7630-4e33-a44c-d6ec58f74340",
+  "daemonShort": "8821c2a1",
+  "cwd": "/home/runner/workspace",
+  "createdAt": "2026-07-09T22:37:23.217Z",
+  "updatedAt": "2026-07-09T22:57:11.725Z",
+  "firstTerminalAt": null,
+  "backend": "daemon",
+  "needs": "rate limited — wait and retry · You've hit your session limit · resets 3:10am (UTC)",
+  "linkScanPath": "/home/runner/.claude/projects/-home-runner-workspace/8821c2a1-7630-4e33-a44c-d6ec58f74340.jsonl"
+}

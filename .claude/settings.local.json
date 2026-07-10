@@ -212,7 +212,10 @@
       "Bash(wait)",
       "Bash(pkill -f jest)",
       "Bash(git check-ignore *)",
-      "Bash(echo \"=== EXIT: $? ===\")"
+      "Bash(echo \"=== EXIT: $? ===\")",
+      "Bash(gh issue *)",
+      "Bash(awk '/tradeInvoices = pgTable|trade_invoices|tradesInvoices/,/^}\\\\\\);/' shared/schema.ts)",
+      "Bash(curl -sL -o client/src/assets/fonts/Outfit-Regular.ttf \"https://github.com/google/fonts/raw/main/ofl/outfit/Outfit%5Bwght%5D.ttf\")"
     ]
   },
   "model": "claude-opus-4-8"

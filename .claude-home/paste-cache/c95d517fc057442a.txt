@@ -1,0 +1,101 @@
+#59 - Report Generation Across All Industry Verticals
+What & Why
+Merchants need to get their data out — for accountants, landlords needing end-of-month statements, tradespeople chasing overdue clients, and retailers reconciling with their bank. Each vertical has different reporting needs driven by real NZ business workflows (GST returns, property managers' rent rolls, trades aged receivables). This adds a "Generate Report" entry point to every analytics/dashboard page across all three verticals, producing downloadable PDFs and CSVs with zero new backend dependencies (all data is already fetched client-side).
+
+Reports per Vertical
+Retail / Payments (3 reports)
+1. Sales Summary Report Period-level overview: gross revenue, transaction count, average transaction value, breakdown of completed / failed / refunded transactions, net revenue after refunds, GST component (NZ 15%: amount ÷ 1.15 × 0.15), and a split-payment sub-total. One page. PDF output.
+
+2. Transaction Ledger Full line-by-line export: date/time, item name, amount, status (Completed / Refunded / Failed), split indicator. Running subtotals at the bottom. This is the document a merchant emails to their accountant. PDF + CSV.
+
+3. Refunds Report All refunded transactions in the selected period: original date, item, original amount, refund amount, net received. Only offered when at least one refund exists. PDF.
+
+Property Management (4 reports)
+1. Rent Roll (industry-standard document) A snapshot (not period-filtered) of every active tenant: property address, tenant name, weekly/fortnightly/monthly rent, last payment received, current status (Paid / Overdue / Sent), outstanding balance. Sorted by property address. This is what every property manager hands to an owner. PDF only (formal document).
+
+2. Collection Statement Period-filtered: every invoice sent, one row each — date, tenant, property, amount, status, paid date. Footer totals: total invoiced, total collected, collection rate %, count of overdue invoices. PDF + CSV.
+
+3. Aged Arrears Report All currently overdue invoices grouped into age buckets: 1–7 days, 8–30 days, 31–60 days, 60+ days. Each row: tenant name, email, property address, invoice amount, days overdue. Bucket subtotals + grand total at risk. Used to escalate collections. PDF only.
+
+4. Annual Income Statement Full year view (hardcoded to calendar year or financial year): rent collected per property, broken out month by month in columns, annual total per property, grand total. GST breakdown if merchant is GST-registered. Suitable for handing to an NZ accountant or including with an IR3R property income return. PDF only.
+
+Trades (4 reports)
+1. Invoice Summary Report Period-filtered: all trade invoices, grouped by job type. Each group shows: invoice count, total invoiced, total collected, collection rate %. A GST summary block (using the gstAmount column already stored per invoice): total excl-GST, total GST, total incl-GST. PDF + CSV.
+
+2. Quote Conversion Report All quotes in the selected period: status breakdown (Draft / Sent / Accepted / Rejected / Expired) with count and total value per status. Conversion rate = Accepted ÷ Sent. Average quote value. Average time from sent to accepted (where available). Helps a tradesperson understand their sales pipeline. PDF.
+
+3. Aged Receivables Report All outstanding trade invoices, bucketed identically to Property Aged Arrears (1–7, 8–30, 31–60, 60+). Each row: client name, email, site address, job type, invoice amount, days overdue. Bucket and grand totals. This is used to chase payment. PDF only.
+
+4. Client Statement Either a single client (user selects from a dropdown in the modal) or all clients. For each client: every invoice in the period with status and paid date, balance outstanding. Professional letter format — looks like a statement a firm would post to a debtor. PDF only (the PDF itself gets emailed or printed).
+
+Shared Infrastructure to Build
+client/src/lib/report-utils.ts
+Utility functions used by all report files:
+
+fmtNZD(cents) — formats cents to "$1,234.56 NZD"
+fmtDate(date) — NZ date format (dd/mm/yyyy)
+calcGST(centsInclGST) — returns { excl, gst, incl } at NZ 15% rate
+buildCSV(headers, rows) — builds a CSV string and triggers a browser download
+printReport(htmlString, title) — opens a new browser window, injects the HTML (which includes @page { size: A4; margin: 18mm; } and the brand header CSS), then calls window.print(). The user saves as PDF from the browser's native print dialog. Zero npm dependencies.
+dateRangeLabel(start, end) — human-readable period label for report headers
+client/src/components/reports/ReportModal.tsx
+A shared bottom-sheet style modal (matching the app's existing mobile-first design) that:
+
+Lists available report types for the current vertical as selectable cards
+Offers a date range picker: presets matching existing timeframe pills (day / week / month / year) plus a "Custom" option with two date inputs
+For Client Statement: adds a client selector dropdown (populated from already-fetched client data)
+Has two action buttons: "Download CSV" (where applicable) and "Generate PDF"
+Uses the existing app colour scheme (no new design tokens)
+Report template files (one per vertical)
+Each file exports functions that accept the already-fetched invoice/transaction arrays and a date range, compute the report data, and return an HTML string ready for printReport() and a data array ready for buildCSV().
+
+client/src/components/reports/retailReports.ts — 3 retail reports
+client/src/components/reports/propertyReports.ts — 4 property reports
+client/src/components/reports/tradesReports.ts — 4 trades reports
+PDF brand header (included in every report HTML string)
+Merchant business name (from the merchant profile already in app state)
+GST number and NZBN (already stored in the merchant record)
+Report title + period
+"Generated by TaptPay · {date}" footer with page numbers via CSS counter
+Entry Points (where the Generate button lives)
+Vertical    File    Placement
+Retail    client/src/pages/dashboard.tsx    Icon button in the top-right of the header, alongside existing nav icons
+Property    client/src/pages/property/property-analytics.tsx    Right side of the "Payment History" h2 row in the swipeable sheet
+Property (dashboard)    client/src/pages/property/property-dashboard.tsx    Same position in dashboard header
+Trades    client/src/pages/trades/trades-analytics.tsx    Right side of the "Payment History" h2 row
+Trades (dashboard)    client/src/pages/trades/trades-dashboard.tsx    Same position in dashboard header
+The button is a small icon button (document/download icon from lucide-react) labelled "Export" — compact enough not to crowd the existing UI.
+
+Done Looks Like
+A small "Export" button appears on every analytics and dashboard page across all three verticals.
+Tapping it opens a bottom-sheet modal listing the available reports for that vertical.
+Choosing a report type, selecting a date range, and tapping "Generate PDF" opens a new browser tab with a print dialog — the user saves as PDF.
+Where CSV is available, "Download CSV" saves the file directly.
+Every PDF includes the merchant's business name, GST number, NZBN, the report period, and a TaptPay footer.
+All amounts are NZD. GST calculations use 15%.
+Reports only use data already in the TanStack Query cache — no new API endpoints are needed.
+No new npm packages are added.
+Out of Scope
+Server-side PDF rendering (not needed; browser print-to-PDF is sufficient for NZ SMB use)
+Scheduled / emailed reports (future feature)
+Admin-level cross-merchant reporting
+The retail merchant-terminal.tsx page (that is the payment entry screen, not an analytics view)
+Steps
+Build report-utils.ts — shared utilities: NZD formatter, NZ date formatter, GST calculator, CSV download helper, printReport() (new-window + print), date range label.
+Build ReportModal.tsx — mobile-first modal component: report type card list, timeframe/custom date picker, optional client selector for Client Statement, CSV and PDF action buttons. Accept vertical, reportTypes, and data props.
+Build retailReports.ts — implement Sales Summary, Transaction Ledger, and Refunds Report HTML/CSV generators. Use merchant profile for brand header.
+Build propertyReports.ts — implement Rent Roll, Collection Statement, Aged Arrears, Annual Income Statement generators. Rent Roll uses all active tenants regardless of date filter.
+Build tradesReports.ts — implement Invoice Summary, Quote Conversion, Aged Receivables, Client Statement generators. Quote Conversion fetches from /api/trades/quotes (already available).
+Wire up Retail — add Export button to dashboard.tsx, connect ReportModal with retail report types and currently fetched transaction data.
+Wire up Property — add Export button to property-analytics.tsx and property-dashboard.tsx, pass tenant + invoice data to the modal.
+Wire up Trades — add Export button to trades-analytics.tsx and trades-dashboard.tsx, pass client + invoice data (and quotes, fetched on demand) to the modal.
+Relevant Files
+client/src/pages/dashboard.tsx
+client/src/pages/property/property-analytics.tsx
+client/src/pages/property/property-dashboard.tsx
+client/src/pages/trades/trades-analytics.tsx
+client/src/pages/trades/trades-dashboard.tsx
+client/src/lib/property-dashboard-data.ts
+client/src/lib/trades-api.ts
+client/src/lib/property-data.ts
+shared/schema.ts

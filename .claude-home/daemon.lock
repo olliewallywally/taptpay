@@ -1,15 +1,15 @@
 {
-  "pid": 3425,
-  "version": "2.1.168",
+  "pid": 6634,
+  "version": "2.1.206",
   "jsonPath": "/home/runner/.claude/daemon.json",
   "logPath": "/home/runner/.claude/daemon.log",
-  "startedAt": 1780884106216,
+  "startedAt": 1783646974847,
   "origin": "transient",
   "spawnedBy": {
-    "label": "claude",
+    "label": "claude agents",
     "cwd": "/home/runner/workspace",
-    "pid": 1490
+    "pid": 923
   },
-  "procStart": "987398",
+  "procStart": "1425698",
   "launchTarget": "/home/runner/workspace/.config/npm/node_global/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe"
 }
