@@ -15,6 +15,11 @@ import {
   getPortConflictHelp 
 } from "./port-manager";
 
+// Replit injects VITE_MOCK=1 at the platform level for some projects.
+// Delete it before Vite reads process.env so the dev server never
+// activates demo/mock mode — only the explicit mock build does that.
+delete process.env.VITE_MOCK;
+
 const app = express();
 
 // ============================================
