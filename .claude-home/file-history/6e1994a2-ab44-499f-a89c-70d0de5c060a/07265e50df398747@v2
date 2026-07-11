@@ -1,0 +1,53 @@
+import { chromium } from '/home/runner/workspace/node_modules/playwright/index.mjs';
+import fs from 'fs';
+const CHROMIUM = '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium';
+const OUT = '/tmp/claude-1000/-home-runner-workspace/6e1994a2-ab44-499f-a89c-70d0de5c060a/scratchpad';
+const token = fs.readFileSync(OUT + '/qtoken.txt', 'utf8').trim();
+const URL = `http://localhost:5000/trades/quote/${token}`;
+
+const browser = await chromium.launch({ executablePath: CHROMIUM, args: ['--no-sandbox'] });
+const ctx = await browser.newContext({ viewport: { width: 430, height: 900 } });
+const page = await ctx.newPage();
+
+const errs = [], cerrs = [], popups = [];
+page.on('pageerror', e => errs.push(`${e.name}: ${e.message}`));
+page.on('console', m => { if (m.type()==='error') cerrs.push(m.text()); });
+ctx.on('page', p => popups.push(p.url()));  // any new tab/popup
+
+const shot = (n) => page.screenshot({ path: `${OUT}/q-${n}.png` });
+const btnText = async () => (await page.evaluate(() => {
+  const btns = [...document.querySelectorAll('button')].map(b => (b.innerText||'').trim()).filter(Boolean);
+  return btns;
+}));
+
+await page.goto(URL, { waitUntil: 'networkidle', timeout: 20000 });
+await page.waitForTimeout(2500);
+console.log('STEP 1 (view). buttons:', JSON.stringify(await btnText()));
+console.log('  body:', (await page.evaluate(()=>document.body.innerText)).replace(/\s+/g,' ').trim().slice(0,200));
+await shot('01-view');
+
+// Click primary button (view quote)
+const primary = page.locator('button', { hasText: /view quote|confirm/i }).first();
+if (await primary.count()) {
+  await primary.click().catch(e=>console.log('click1 err', String(e).slice(0,100)));
+  await page.waitForTimeout(1800);
+}
+console.log('\nSTEP 2 (after 1st click → confirm). buttons:', JSON.stringify(await btnText()));
+console.log('  popups so far:', JSON.stringify(popups));
+await shot('02-confirm');
+
+// Click primary again (confirm → accept)
+const confirmBtn = page.locator('button', { hasText: /^confirm$/i }).first();
+if (await confirmBtn.count()) {
+  await confirmBtn.click().catch(e=>console.log('click2 err', String(e).slice(0,100)));
+  await page.waitForTimeout(3500);
+}
+console.log('\nSTEP 3 (after confirm → accept/pay). buttons:', JSON.stringify(await btnText()));
+console.log('  body:', (await page.evaluate(()=>document.body.innerText)).replace(/\s+/g,' ').trim().slice(0,260));
+console.log('  final URL:', page.url());
+await shot('03-after-confirm');
+
+console.log('\n=== POPUPS (stray tabs) ===', JSON.stringify(popups));
+console.log('=== PAGE ERRORS ===', errs.length? errs.join('\n'):'(none)');
+console.log('=== CONSOLE ERRORS ===', cerrs.length? cerrs.slice(0,10).join('\n'):'(none)');
+await browser.close();

@@ -1,0 +1,42 @@
+import { chromium } from '/home/runner/workspace/node_modules/playwright/index.mjs';
+const CHROMIUM = '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium';
+const OUT = '/tmp/claude-1000/-home-runner-workspace/6e1994a2-ab44-499f-a89c-70d0de5c060a/scratchpad';
+const browser = await chromium.launch({ executablePath: CHROMIUM, args: ['--no-sandbox'] });
+const ctx = await browser.newContext({ viewport: { width: 430, height: 900 } });
+
+// Install capture BEFORE any app code runs — mirrors what the runtime-error-plugin hooks.
+await ctx.addInitScript(() => {
+  window.__caught = [];
+  window.addEventListener('error', (e) => {
+    window.__caught.push({ kind: 'error', message: e.message, filename: e.filename, lineno: e.lineno, stack: e.error?.stack?.split('\n').slice(0,8).join('\n') });
+  });
+  window.addEventListener('unhandledrejection', (e) => {
+    const r = e.reason;
+    window.__caught.push({ kind: 'unhandledrejection', message: (r && (r.message||String(r))) || 'unknown', stack: r?.stack?.split('\n').slice(0,8).join('\n') });
+  });
+});
+
+const page = await ctx.newPage();
+const pe = [], ce = [], reqFail = [];
+page.on('pageerror', e => pe.push(`${e.name}: ${e.message}`));
+page.on('console', m => { if (m.type()==='error') ce.push(m.text()); });
+page.on('requestfailed', r => { const u=r.url(); if(!/google-analytics|replit-dev-banner|doubleclick/.test(u)) reqFail.push(`${r.failure()?.errorText} ${u}`); });
+
+const routes = ['/', '/login', '/trades/quote/BOGUS', '/r/BOGUS'];
+for (const route of routes) {
+  await page.goto('http://localhost:5000' + route, { waitUntil: 'networkidle', timeout: 25000 }).catch(e=>pe.push('NAV '+String(e).split('\n')[0]));
+  await page.waitForTimeout(3500);
+  const caught = await page.evaluate(() => window.__caught || []);
+  // Detect the runtime-error-plugin overlay in DOM (shadow or element)
+  const overlay = await page.evaluate(() => {
+    const hit = [...document.querySelectorAll('*')].find(el => /runtime-error|plugin-runtime|error-modal|vite-error/i.test(el.tagName + ' ' + (el.id||'') + ' ' + (el.className||'')));
+    return hit ? (hit.tagName + '#' + hit.id + '.' + hit.className) : null;
+  });
+  console.log(`\n===== ${route} =====`);
+  console.log('  overlay in DOM:', overlay || '(none)');
+  console.log('  window-caught errors:', caught.length ? JSON.stringify(caught, null, 1) : '(none)');
+}
+console.log('\n=== pageerror ===', pe.length? pe.join('\n') : '(none)');
+console.log('=== console.error ===', ce.length? ce.slice(0,12).join('\n') : '(none)');
+console.log('=== failed requests (non-analytics) ===', reqFail.length? [...new Set(reqFail)].slice(0,15).join('\n') : '(none)');
+await browser.close();

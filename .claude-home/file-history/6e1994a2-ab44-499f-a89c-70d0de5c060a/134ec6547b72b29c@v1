@@ -6771,12 +6771,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       let quote = await storage.getQuoteByToken(req.params.token);
       if (!quote) return res.status(404).json({ message: "Quote not found" });
-      // Did the customer open this quote BEFORE this request? A freshly-sent quote
-      // has status "sent"; anything else means it was already viewed/responded. The
-      // GET marks a "sent" quote "viewed" below, so the returned viewedAt is always
-      // set — the client must use this pre-mutation flag to decide whether to show
-      // the "view quote" step (first open) or skip straight to "confirm" (revisit).
-      const previouslyViewed = quote.status !== "sent";
       if (!["accepted", "declined", "expired"].includes(quote.status) && quote.validUntil && new Date(quote.validUntil) < new Date()) {
         quote = await storage.updateQuote(quote.id, { status: "expired" }) ?? quote;
       } else if (quote.status === "sent") {
@@ -6807,7 +6801,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           tradeGstMode: merchant.tradeGstMode === "exclusive" ? "exclusive" : "inclusive",
         },
         invoice,
-        previouslyViewed,
       });
     } catch (err) { console.error("[TRADES_QUOTES_TOKEN_GET]", err); res.status(500).json({ message: "Failed to fetch quote" }); }
   });

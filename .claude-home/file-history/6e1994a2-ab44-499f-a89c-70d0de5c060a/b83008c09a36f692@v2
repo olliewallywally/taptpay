@@ -1,0 +1,48 @@
+import { chromium } from '/home/runner/workspace/node_modules/playwright/index.mjs';
+
+const CHROMIUM = '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium';
+const url = process.argv[2] || 'http://localhost:5000/';
+const shot = process.argv[3] || '/tmp/claude-1000/-home-runner-workspace/6e1994a2-ab44-499f-a89c-70d0de5c060a/scratchpad/shot.png';
+const waitMs = Number(process.argv[4] || 4000);
+
+const browser = await chromium.launch({ executablePath: CHROMIUM, args: ['--no-sandbox'] });
+const page = await browser.newPage({ viewport: { width: 430, height: 900 } });
+
+const consoleMsgs = [];
+const pageErrors = [];
+const failedReqs = [];
+
+page.on('console', (m) => consoleMsgs.push(`[${m.type()}] ${m.text()}`));
+page.on('pageerror', (e) => pageErrors.push(`${e.name}: ${e.message}\n${(e.stack||'').split('\n').slice(0,6).join('\n')}`));
+page.on('requestfailed', (r) => failedReqs.push(`${r.failure()?.errorText} ${r.url()}`));
+page.on('response', (r) => { if (r.status() >= 400) failedReqs.push(`HTTP ${r.status()} ${r.url()}`); });
+
+let navErr = null;
+try {
+  await page.goto(url, { waitUntil: 'networkidle', timeout: 20000 });
+} catch (e) {
+  navErr = String(e);
+}
+await page.waitForTimeout(waitMs);
+
+// Grab what the app rendered
+const bodyText = (await page.evaluate(() => document.body?.innerText || '')).slice(0, 500);
+const rootHtmlLen = await page.evaluate(() => document.getElementById('root')?.innerHTML?.length || 0);
+const title = await page.title();
+
+await page.screenshot({ path: shot, fullPage: false });
+await browser.close();
+
+console.log('URL:', url);
+console.log('NAV ERROR:', navErr || '(none)');
+console.log('TITLE:', title);
+console.log('#root innerHTML length:', rootHtmlLen);
+console.log('--- BODY TEXT (first 500) ---');
+console.log(bodyText || '(empty)');
+console.log('--- PAGE ERRORS (' + pageErrors.length + ') ---');
+console.log(pageErrors.join('\n---\n') || '(none)');
+console.log('--- CONSOLE (' + consoleMsgs.length + ') ---');
+console.log(consoleMsgs.slice(-40).join('\n') || '(none)');
+console.log('--- FAILED REQUESTS (' + failedReqs.length + ') ---');
+console.log([...new Set(failedReqs)].slice(0, 30).join('\n') || '(none)');
+console.log('SCREENSHOT:', shot);

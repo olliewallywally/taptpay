@@ -1,0 +1,35 @@
+import { chromium } from '/home/runner/workspace/node_modules/playwright/index.mjs';
+const CHROMIUM = '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium';
+const DOMAIN = process.env.REPLIT_DEV_DOMAIN;
+const targets = [
+  ['localhost',  'http://localhost:5000/'],
+  ['replit-domain', `https://${DOMAIN}/`],
+];
+const browser = await chromium.launch({ executablePath: CHROMIUM, args: ['--no-sandbox'] });
+for (const [name, url] of targets) {
+  const ctx = await browser.newContext({ viewport: { width: 430, height: 900 }, ignoreHTTPSErrors: true });
+  await ctx.addInitScript(() => {
+    window.__caught = [];
+    window.addEventListener('error', e => window.__caught.push('error: ' + e.message));
+    window.addEventListener('unhandledrejection', e => window.__caught.push('reject: ' + ((e.reason&&(e.reason.message||String(e.reason)))||'?')));
+  });
+  const page = await ctx.newPage();
+  const conn = [];
+  page.on('console', m => { const t=m.text(); if (/\[vite\]|WebSocket|hmr/i.test(t)) conn.push(`[${m.type()}] ${t}`); });
+  let navOk = true;
+  try { await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 25000 }); }
+  catch(e){ navOk=false; conn.push('NAV FAIL: '+String(e).split('\n')[0]); }
+  await page.waitForTimeout(4000);
+  const caught = await page.evaluate(() => window.__caught || []);
+  const socketHost = await page.evaluate(async () => {
+    try { const r = await fetch('/@vite/client'); const t = await r.text();
+      const m = t.match(/socketHost = `([^`]+)`/); return m ? m[1] : '(not found)'; } catch(e){ return 'fetch-fail'; }
+  });
+  console.log(`\n===== ${name}  (${url}) =====`);
+  console.log('  nav ok:', navOk);
+  console.log('  @vite/client socketHost template:', socketHost);
+  console.log('  vite/ws console:', conn.length? conn.join('\n    ') : '(none)');
+  console.log('  window-caught:', caught.length? JSON.stringify(caught) : '(none — HMR OK)');
+  await ctx.close();
+}
+await browser.close();

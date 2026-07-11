@@ -246,12 +246,8 @@ app.use((req, res, next) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    if (!res.headersSent) {
-      res.status(status).json({ message });
-    }
-    // Log instead of re-throwing: a re-thrown error here escapes Express and
-    // (combined with process-level handlers) previously took the server down.
-    console.error("[EXPRESS_ERROR]", err);
+    res.status(status).json({ message });
+    throw err;
   });
 
 

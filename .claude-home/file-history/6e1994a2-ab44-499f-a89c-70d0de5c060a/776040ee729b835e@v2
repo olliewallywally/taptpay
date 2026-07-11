@@ -15,6 +15,11 @@ import {
   getPortConflictHelp 
 } from "./port-manager";
 
+// Replit injects VITE_MOCK=1 at the platform level for some projects.
+// Delete it before Vite reads process.env so the dev server never
+// activates demo/mock mode — only the explicit mock build does that.
+delete process.env.VITE_MOCK;
+
 const app = express();
 
 // ============================================
@@ -246,12 +251,8 @@ app.use((req, res, next) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    if (!res.headersSent) {
-      res.status(status).json({ message });
-    }
-    // Log instead of re-throwing: a re-thrown error here escapes Express and
-    // (combined with process-level handlers) previously took the server down.
-    console.error("[EXPRESS_ERROR]", err);
+    res.status(status).json({ message });
+    throw err;
   });
 
 

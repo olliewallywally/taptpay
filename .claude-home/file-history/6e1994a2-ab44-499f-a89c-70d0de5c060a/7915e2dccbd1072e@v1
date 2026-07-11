@@ -1,4 +1,5 @@
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route, useLocation, Router as WouterRouter } from "wouter";
+import { useHashLocation } from "wouter/use-hash-location";
 import { createContext, useContext, useEffect, useState, lazy, Suspense } from "react";
 import { queryClient } from "./lib/queryClient";
 import "@/plugins/TaptPayPlugin";
@@ -378,6 +379,12 @@ function Router() {
   );
 }
 
+// Demo/visual build serves as static files with no server-side SPA fallback,
+// so it must not depend on the host rewriting deep paths (e.g. /trades) to
+// index.html. Hash routing (#/trades) keeps every route 100% client-side, so
+// navigation works on any static host, a subpath, or file://.
+const IS_MOCK = import.meta.env.VITE_MOCK === "1";
+
 function AppRoutes() {
   // Only warm app chunks for signed-in merchants — marketing visitors on the
   // landing page shouldn't download the entire app in the background.
@@ -398,7 +405,13 @@ function App() {
         <NotificationProvider>
           <AuthProvider>
             <Toaster />
-            <AppRoutes />
+            {IS_MOCK ? (
+              <WouterRouter hook={useHashLocation}>
+                <AppRoutes />
+              </WouterRouter>
+            ) : (
+              <AppRoutes />
+            )}
           </AuthProvider>
         </NotificationProvider>
       </TooltipProvider>

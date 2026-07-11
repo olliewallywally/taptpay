@@ -1,0 +1,60 @@
+import { chromium } from '/home/runner/workspace/node_modules/playwright/index.mjs';
+import fs from 'fs';
+const CHROMIUM = '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium';
+const OUT = '/tmp/claude-1000/-home-runner-workspace/6e1994a2-ab44-499f-a89c-70d0de5c060a/scratchpad';
+const token = fs.readFileSync(OUT + '/qtoken.txt', 'utf8').trim();
+const URL = `http://localhost:5000/trades/quote/${token}`;
+
+const browser = await chromium.launch({ executablePath: CHROMIUM, args: ['--no-sandbox'] });
+const ctx = await browser.newContext({ viewport: { width: 430, height: 900 } });
+const page = await ctx.newPage();
+let popupCount = 0;
+ctx.on('page', () => { popupCount++; });
+const errs = [], cerrs = [];
+page.on('pageerror', e => errs.push(`${e.name}: ${e.message}`));
+page.on('console', m => { if (m.type()==='error') cerrs.push(m.text()); });
+const btns = () => page.evaluate(() => [...document.querySelectorAll('button')].map(b=>(b.innerText||'').trim()).filter(Boolean));
+let pass = true;
+const check = (name, cond) => { console.log(`  ${cond?'✅ PASS':'❌ FAIL'} — ${name}`); if(!cond) pass=false; };
+
+await page.goto(URL, { waitUntil: 'networkidle', timeout: 20000 });
+await page.waitForTimeout(2500);
+const b1 = await btns();
+console.log('STEP 1 (first load):', JSON.stringify(b1));
+check('BUG#1: first load shows "view quote" (not "confirm")', b1.some(t=>/view quote/i.test(t)) && !b1.some(t=>/^confirm$/i.test(t)));
+await page.screenshot({ path: `${OUT}/v-01-view.png` });
+
+// click "view quote" → should open PDF popup AND advance to confirm
+const popBefore = popupCount;
+await page.locator('button', { hasText: /view quote/i }).first().click().catch(()=>{});
+await page.waitForTimeout(1800);
+const b2 = await btns();
+console.log('STEP 2 (after "view quote"):', JSON.stringify(b2), '| popups opened:', popupCount - popBefore);
+check('"view quote" advances to "confirm" step', b2.some(t=>/^confirm$/i.test(t)));
+check('"view quote" opens the quote PDF (1 popup)', (popupCount - popBefore) === 1);
+await page.screenshot({ path: `${OUT}/v-02-confirm.png` });
+
+// click "confirm" → should accept WITHOUT opening a popup, reach payment step
+const popBefore2 = popupCount;
+await page.locator('button', { hasText: /^confirm$/i }).first().click().catch(()=>{});
+await page.waitForTimeout(3500);
+const b3 = await btns();
+console.log('STEP 3 (after "confirm"):', JSON.stringify(b3), '| popups opened:', popupCount - popBefore2);
+const body3 = (await page.evaluate(()=>document.body.innerText)).replace(/\s+/g,' ').trim();
+console.log('  body:', body3.slice(0,200));
+check('BUG#2: "confirm" opens NO stray popup', (popupCount - popBefore2) === 0);
+check('acceptance reaches deposit payment step ("Pay $...")', b3.some(t=>/Pay \$/i.test(t)) || /enter credit card/i.test(body3));
+check('deposit amount + subtitle correct ($250 · deposit of $2,500)', /\$250\b/.test(body3) && /deposit of \$2,500/i.test(body3));
+await page.screenshot({ path: `${OUT}/v-03-pay.png` });
+
+// REVISIT test: reload the now-accepted quote → should land on payment step directly
+await page.goto(URL, { waitUntil: 'networkidle', timeout: 20000 });
+await page.waitForTimeout(3000);
+const bodyR = (await page.evaluate(()=>document.body.innerText)).replace(/\s+/g,' ').trim();
+console.log('\nREVISIT (reload accepted quote) body:', bodyR.slice(0,160));
+check('revisit of accepted quote jumps to payment (not quote steps)', /enter credit card/i.test(bodyR) && !/decline quote/i.test(bodyR));
+
+console.log('\n=== ERRORS ===', errs.length?errs.join('\n'):'(no page errors)', '|', cerrs.length?cerrs.slice(0,5).join('\n'):'(no console errors)');
+console.log(pass ? '\n🎉 ALL CHECKS PASSED' : '\n⚠️  SOME CHECKS FAILED');
+await browser.close();
+process.exit(pass?0:1);

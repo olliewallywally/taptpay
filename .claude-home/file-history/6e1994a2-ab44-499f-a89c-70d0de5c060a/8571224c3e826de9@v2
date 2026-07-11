@@ -1,0 +1,25 @@
+import { chromium } from '/home/runner/workspace/node_modules/playwright/index.mjs';
+const CHROMIUM = '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium';
+const browser = await chromium.launch({ executablePath: CHROMIUM, args: ['--no-sandbox'] });
+const page = await browser.newPage({ viewport: { width: 430, height: 900 } });
+const all = [];
+page.on('console', (m) => all.push(`[${m.type()}] ${m.text()}`));
+await page.goto('http://localhost:5000/', { waitUntil: 'networkidle', timeout: 20000 });
+await page.waitForTimeout(3500);
+
+const info = await page.evaluate(async () => {
+  const regs = navigator.serviceWorker ? await navigator.serviceWorker.getRegistrations() : [];
+  return {
+    finalURL: location.href,
+    hash: location.hash,
+    fetchIsNative: /\[native code\]/.test(window.fetch.toString()),
+    authToken: localStorage.getItem('authToken'),
+    merchantId: localStorage.getItem('merchantId'),
+    swControlled: !!(navigator.serviceWorker && navigator.serviceWorker.controller),
+    swRegs: regs.map(r => r.active?.scriptURL || r.installing?.scriptURL || 'reg'),
+  };
+});
+await browser.close();
+console.log(JSON.stringify(info, null, 2));
+console.log('--- CONSOLE ---');
+console.log(all.join('\n'));

@@ -56,11 +56,8 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "ln -sfn /home/runner/workspace/.claude-home /home/runner/.claude 2>/dev/null; while true; do npm run dev; echo \"[supervisor] dev server exited (code $?) — restarting in 2s\"; sleep 2; done"
+args = "ln -sfn /home/runner/workspace/.claude-home /home/runner/.claude 2>/dev/null; npm run dev"
 waitForPort = 5000
-
-[workflows.workflow.metadata]
-outputType = "webview"
 
 [agent]
 integrations = ["stripe:1.0.0"]
