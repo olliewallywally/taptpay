@@ -1,0 +1,77 @@
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "path";
+import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
+
+export default defineConfig({
+  plugins: [
+    react(),
+    runtimeErrorOverlay(),
+    ...(process.env.NODE_ENV !== "production" &&
+    process.env.REPL_ID !== undefined
+      ? [
+          await import("@replit/vite-plugin-cartographer").then((m) =>
+            m.cartographer(),
+          ),
+        ]
+      : []),
+  ],
+  resolve: {
+    alias: {
+      "@": path.resolve(import.meta.dirname, "client", "src"),
+      "@shared": path.resolve(import.meta.dirname, "shared"),
+      "@assets": path.resolve(import.meta.dirname, "attached_assets"),
+    },
+  },
+  root: path.resolve(import.meta.dirname, "client"),
+  // Demo/visual build (VITE_MOCK=1) is distributed as loose static files and
+  // may be opened from a subpath or file://, so emit relative asset URLs.
+  // Combined with hash routing this makes the demo work on any host.
+  base: process.env.VITE_MOCK === "1" ? "./" : "/",
+  build: {
+    outDir: path.resolve(import.meta.dirname, "dist/public"),
+    emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+          // @react-pdf and its pdf-only dependency tree are heavy (~1 MB min)
+          // and only reachable via the dynamic import() in the reports buttons,
+          // so keep them out of the eager catch-all "vendor" chunk. Shared deps
+          // (pako, scheduler, tslib, …) intentionally stay in their usual chunks.
+          if (
+            /node_modules\/(@react-pdf|fontkit|yoga-layout|brotli|restructure|dfa|tiny-inflate|unicode-properties|unicode-trie|linebreak|png-js|jay-peg|bidi-js|hyphen|media-engine|browserify-zlib|vite-compatible-readable-stream|js-md5|abs-svg-path|normalize-svg-path|svg-arc-to-cubic-bezier|parse-svg-path|hsl-to-hex|hsl-to-rgb-for-reals|emoji-regex-xs)\//.test(
+              id,
+            )
+          )
+            return "vendor-pdf";
+          if (id.includes("motion") || id.includes("framer-motion")) return "vendor-motion";
+          if (id.includes("@tanstack")) return "vendor-query";
+          if (id.includes("@radix-ui") || id.includes("radix-ui")) return "vendor-radix";
+          if (id.includes("lucide-react")) return "vendor-lucide";
+          // Keep React core, react-dom and scheduler in ONE chunk. Splitting
+          // react core into the catch-all "vendor" chunk creates a circular
+          // cross-chunk import (react-dom -> react) that loads react-dom before
+          // React initialises, crashing with a __SECRET_INTERNALS undefined error.
+          if (
+            id.includes("node_modules/react-dom") ||
+            id.includes("node_modules/react/") ||
+            id.includes("node_modules/scheduler/") ||
+            id.includes("react/jsx-runtime") ||
+            id.includes("react/jsx-dev-runtime")
+          )
+            return "vendor-react";
+          if (id.includes("wouter")) return "vendor-router";
+          if (id.includes("zod") || id.includes("drizzle-zod") || id.includes("@hookform")) return "vendor-forms";
+          return "vendor";
+        },
+      },
+    },
+  },
+  server: {
+    fs: {
+      strict: true,
+      deny: ["**/.*"],
+    },
+  },
+});

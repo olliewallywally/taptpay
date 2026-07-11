@@ -1,0 +1,17 @@
+# Checkout Pages Redesign — Integration Plan (DRAFT)
+
+## Mockup review (attached_assets, uploaded 2026-07-11)
+
+All 6 mockups share one visual language: light gray page background, centered rounded-corner navy card (~#0a1145 deep navy), "tapt*pay*" logo in light blue serif/italic mix at top, light blue (#5aa0f7-ish) text, huge amount figure, minimal chrome.
+
+1. **retail_hospo_customer_payment_page.png** — single step: label ("lunch"), big amount ($25.00), dark Google Pay pill button, footer link "enter credit card ∨" (expandable card form).
+2. **property_management_-_customer_payment_page.png** — same as retail but with property address as title ("5 bellbird rise. murrays bay"), amount $650, subtitle "weekly rent payment", GPay + enter credit card.
+3. **trade_-_customer_payment_page.png (step 1)** — quote summary: title "deck replacement", amount $2,500 (full quote), subtitle "10% deposit required", single outline button "view quote". No pay controls yet.
+4. **trade_step_2_customer_payment_page.png** — same info, buttons: outline "confirm" + small square QR-code icon button beside it (presumably to view/download quote doc or open quote in new view).
+5. **trade_step_3_customer_payment_page.png** — payment step: title "deck replacement", amount $250 (deposit), subtitle "10% deposit of $2,500", GPay button + "enter credit card ∨". This step IS the whole flow when no deposit is required (then amount = full total).
+6. **customer_split_payment_page.png** — split flow: chip "Person 1 of 2", label "lunch", amount $25.00, stepper (− 2 +) to set number of people, "enter amount" input (custom amount option), two blank underline fields (per-person amounts?), outline "confirm" button.
+
+User note: trades has 3 steps only when deposit required; otherwise just the last (payment) step.
+
+## Open questions
+- (pending codebase exploration)

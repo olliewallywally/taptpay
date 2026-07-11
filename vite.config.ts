@@ -34,7 +34,22 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          // Rollup/Vite virtual helper modules (\0commonjsHelpers.js,
+          // \0vite/modulepreload-polyfill, …) are imported by nearly every
+          // chunk. Left unassigned, Rollup can inline them into whichever chunk
+          // it visits first — if that's a big lazy chunk, every other chunk
+          // gains a static import of it and it loads eagerly. Pin them to a
+          // tiny shared chunk with no imports of its own. Deliberately narrow:
+          // a blanket \0 match would also catch ?commonjs-proxy modules and
+          // drag whole libraries (pako, qrcode, …) into this eager chunk.
+          if (id.includes("commonjsHelpers") || id.startsWith("\0vite")) return "helpers";
           if (!id.includes("node_modules")) return undefined;
+          // No manual chunk for @react-pdf: pinning it (and its dep tree) to a
+          // "vendor-pdf" chunk forced eager loading — a package in that chunk was
+          // also reachable from the eager graph, so index.js had to import the
+          // whole 1.4 MB chunk to preserve execution order. Unassigned, Rollup
+          // colocates the PDF engine with its only importers: the dynamically
+          // imported report generators under lib/report-pdf/reports/.
           if (id.includes("motion") || id.includes("framer-motion")) return "vendor-motion";
           if (id.includes("@tanstack")) return "vendor-query";
           if (id.includes("@radix-ui") || id.includes("radix-ui")) return "vendor-radix";
@@ -53,7 +68,12 @@ export default defineConfig({
             return "vendor-react";
           if (id.includes("wouter")) return "vendor-router";
           if (id.includes("zod") || id.includes("drizzle-zod") || id.includes("@hookform")) return "vendor-forms";
-          return "vendor";
+          // No catch-all "vendor" bucket: it merged every remaining node_module
+          // (incl. @react-pdf + yoga, recharts, stripe — ~3.5 MB) into a single
+          // chunk that index.html loaded eagerly, defeating the dynamic import()
+          // of the PDF generators. Returning undefined lets Rollup place each dep
+          // with the chunk(s) that import it, so dynamic-only deps stay lazy.
+          return undefined;
         },
       },
     },

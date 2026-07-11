@@ -1,0 +1,20 @@
+import { chromium } from '/home/runner/workspace/node_modules/playwright/index.mjs';
+const OUT = '/tmp/claude-1000/-home-runner-workspace/48ba60f3-59cf-44b6-bbb6-81892778133a/scratchpad';
+const BASE = 'http://localhost:5000';
+const CHROME = '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium';
+
+const browser = await chromium.launch({ executablePath: CHROME });
+const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+page.on('pageerror', e => console.log('[pageerror]', e.message));
+
+// Decline flow: open a fresh quote, view → decline
+await page.goto(`${BASE}/#/trades/quote/quote_8000`, { waitUntil: 'networkidle' });
+await page.waitForTimeout(1400);
+// go to confirm step first, then decline
+const view = page.getByRole('button', { name: /view quote/i });
+if (await view.count()) { await view.first().click(); await page.waitForTimeout(700); }
+const decline = page.getByRole('button', { name: /decline quote/i });
+console.log('decline count:', await decline.count());
+if (await decline.count()) { await decline.first().click(); await page.waitForTimeout(1200); }
+await page.screenshot({ path: `${OUT}/quote-declined.png` });
+await browser.close();

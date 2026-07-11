@@ -1,7 +1,6 @@
 // @ts-nocheck — ported verbatim from the July 2026 prototype export; inline
 // styles use string values (fontWeight:"500", rows:"3", …) for 1:1 fidelity.
 import { useEffect } from 'react';
-import { LandingRuntime } from './landingRuntime';
 import './landing.css';
 
 export interface LandingPageProps {
@@ -21,10 +20,20 @@ export interface LandingPageProps {
  */
 export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', reducedMotion = false }: LandingPageProps) {
   useEffect(() => {
-    const rt = new LandingRuntime({ coinDensity, defaultIndustry, reducedMotion });
-    rt.init();
+    // The runtime pulls in three.js (~1.2 MB min), so it's loaded on demand:
+    // the static markup paints immediately and the scroll/3D rig attaches a
+    // beat later. Keeping it out of the entry chunk means app users who never
+    // see the landing page never download three.js.
+    let cancelled = false;
+    import('./landingRuntime').then(({ LandingRuntime }) => {
+      if (cancelled) return;
+      const rt = new LandingRuntime({ coinDensity, defaultIndustry, reducedMotion });
+      rt.init();
+    });
     // Prototype parity: the runtime registers window-level listeners and rAF
     // loops once and does not tear down — mount this page once per app load.
+    // The cancelled flag only guards the unmount-before-load race.
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

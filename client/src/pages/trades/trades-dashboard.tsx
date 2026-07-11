@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { tradesFetch } from "@/lib/trades-api";
 import { TRADES_THEME } from "@/lib/trades-theme";
+import { TradesReportsButton } from "@/components/reports/TradesReportsButton";
 import {
   type Timeframe, buildBuckets, buildBilledBuckets, periodWindow, collectedCents,
   growthPct, collectionRate, fmtCompact, currentBucketIdx,
@@ -272,7 +273,8 @@ export default function TradesDashboard() {
 
         {/* ── Ink hero ── */}
         <div style={{ position: 'relative', background: INK, borderRadius: '0 0 28px 28px', padding: '54px 22px 30px' }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <TradesReportsButton tone="onDark" siteFilter={siteFilter} />
             <SiteDropdown options={sites} value={siteFilter} onPick={s => { setSiteFilter(s); setSelBar(-1); }} />
           </div>
 

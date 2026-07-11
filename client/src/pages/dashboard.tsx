@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { getCurrentMerchantId } from "@/lib/auth";
+import { RetailReportsButton } from "@/components/reports/RetailReportsButton";
 import {
   type Timeframe, buildBuckets, buildBilledBuckets, periodWindow, collectedCents,
   growthPct, fmtCompact, currentBucketIdx,
@@ -242,6 +243,9 @@ export default function Dashboard() {
 
         {/* ── Blue hero ── */}
         <div style={{ position: 'relative', background: BLUE, borderRadius: '0 0 28px 28px', padding: '54px 22px 30px' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <RetailReportsButton tone="onDark" />
+          </div>
 
           {/* Load error — retry instead of silently rendering zeros */}
           {txError && (
@@ -251,19 +255,28 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Hero figure + growth pill */}
+          {/* Hero figure + growth pill — shimmer placeholders on first load so
+              the page never flashes $0 before the data lands */}
           <div style={{ marginTop: 18, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-            <div style={{ fontWeight: 800, fontSize: 54, color: TEAL, letterSpacing: '-0.04em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
-              {fmtWhole(collected)}
-            </div>
-            {growth !== null && (
+            {txLoading ? (
+              <div className="rd-skel" style={{ width: 190, height: 54, borderRadius: 14, background: 'rgba(0,229,204,0.25)' }} />
+            ) : (
+              <div style={{ fontWeight: 800, fontSize: 54, color: TEAL, letterSpacing: '-0.04em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+                {fmtWhole(collected)}
+              </div>
+            )}
+            {!txLoading && growth !== null && (
               <div style={{ padding: '5px 12px', borderRadius: 999, border: `1.5px solid ${TEAL}`, color: TEAL, fontWeight: 600, fontSize: 12.5 }}>
                 {growth > 0 ? `+${growth}%` : `${growth}%`}
               </div>
             )}
           </div>
           <div style={{ marginTop: 10, color: TEAL, fontWeight: 500, fontSize: 15 }}>sales revenue</div>
-          <div style={{ marginTop: 4, color: 'rgba(0,229,204,0.6)', fontWeight: 400, fontSize: 13 }}>{salesCount} completed sale{salesCount !== 1 ? 's' : ''}</div>
+          {txLoading ? (
+            <div className="rd-skel" style={{ marginTop: 6, width: 118, height: 13, borderRadius: 7, background: 'rgba(0,229,204,0.2)' }} />
+          ) : (
+            <div style={{ marginTop: 4, color: 'rgba(0,229,204,0.6)', fontWeight: 400, fontSize: 13 }}>{salesCount} completed sale{salesCount !== 1 ? 's' : ''}</div>
+          )}
 
           <SalesBarChart buckets={buckets} billed={billedBuckets} selectedIdx={selectedIdx} onSelectBar={setSelBar} animKey={tf} />
 
@@ -301,7 +314,11 @@ export default function Dashboard() {
               <div style={{ fontWeight: 700, fontSize: 11, color: BLUE, letterSpacing: '0.08em', textTransform: 'uppercase' }}>sales</div>
               <IcoTag />
             </div>
-            <div style={{ marginTop: 10, fontWeight: 800, fontSize: 42, color: BLUE, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{salesCount}</div>
+            {txLoading ? (
+              <div className="rd-skel" style={{ marginTop: 10, width: 54, height: 42, borderRadius: 10, background: 'rgba(0,85,255,0.12)' }} />
+            ) : (
+              <div style={{ marginTop: 10, fontWeight: 800, fontSize: 42, color: BLUE, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{salesCount}</div>
+            )}
           </button>
           <button type="button" className="rd-card rd-tap" onPointerDown={pulse} onClick={() => setLocation('/transactions')}
             style={{ background: BLUE, borderRadius: 22, padding: '16px 18px', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'Outfit, system-ui' }}>
@@ -309,7 +326,11 @@ export default function Dashboard() {
               <div style={{ fontWeight: 700, fontSize: 11, color: TEAL, letterSpacing: '0.08em', textTransform: 'uppercase' }}>active</div>
               <IcoWarn />
             </div>
-            <div style={{ marginTop: 10, fontWeight: 800, fontSize: 42, color: TEAL, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{activeCount}</div>
+            {txLoading ? (
+              <div className="rd-skel" style={{ marginTop: 10, width: 54, height: 42, borderRadius: 10, background: 'rgba(0,229,204,0.22)' }} />
+            ) : (
+              <div style={{ marginTop: 10, fontWeight: 800, fontSize: 42, color: TEAL, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{activeCount}</div>
+            )}
           </button>
         </div>
 
@@ -349,4 +370,6 @@ const RD_CSS = `
 .rd-tap::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; box-shadow: 0 0 0 0 rgba(0,229,204,0); }
 .rd-tap.rd-pulse::after { animation: rdRing 0.45s ease-out; }
 @keyframes rdRing { 0% { box-shadow: 0 0 0 0 rgba(0,229,204,0.55); } 100% { box-shadow: 0 0 0 9px rgba(0,229,204,0); } }
+.rd-skel { animation: rdSkel 1.1s ease-in-out infinite; }
+@keyframes rdSkel { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
 `;

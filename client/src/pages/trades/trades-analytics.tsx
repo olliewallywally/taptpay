@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { tradesFetch } from "@/lib/trades-api";
 import { TRADES_THEME } from "@/lib/trades-theme";
+import { TradesReportsButton } from "@/components/reports/TradesReportsButton";
 
 /* ── Design tokens (trades palette; mirrors property-analytics) ──
    The trades accent is near-black, so property's bright sky-blue accent role
@@ -325,6 +326,7 @@ export default function TradesAnalytics() {
         <div style={{ padding: '0 24px 130px', marginTop: 2 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <h2 style={{ fontSize: 20, fontWeight: 700, color: C.textDark, margin: 0, letterSpacing: '-0.4px' }}>Payment History</h2>
+            <TradesReportsButton tone="onLight" />
           </div>
 
           {filtered.length === 0 ? (

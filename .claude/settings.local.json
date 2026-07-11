@@ -215,7 +215,25 @@
       "Bash(echo \"=== EXIT: $? ===\")",
       "Bash(gh issue *)",
       "Bash(awk '/tradeInvoices = pgTable|trade_invoices|tradesInvoices/,/^}\\\\\\);/' shared/schema.ts)",
-      "Bash(curl -sL -o client/src/assets/fonts/Outfit-Regular.ttf \"https://github.com/google/fonts/raw/main/ofl/outfit/Outfit%5Bwght%5D.ttf\")"
+      "Bash(curl -sL -o client/src/assets/fonts/Outfit-Regular.ttf \"https://github.com/google/fonts/raw/main/ofl/outfit/Outfit%5Bwght%5D.ttf\")",
+      "Bash(echo \"TSC_EXIT=$?\")",
+      "Bash(echo \"VITE_EXIT=$?\")",
+      "Bash(sort -t'│' -k2 -h)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(npm ls *)",
+      "Bash(xargs ls -la)",
+      "Bash(awk '{print $5, $9}')",
+      "Bash(grep -o 'import[^;]\\\\{0,120\\\\}vendor-pdf[^;]\\\\{0,40\\\\}' dist/public/assets/index-BF4dQHFJ.js)",
+      "Bash(sort -k5 -rn)",
+      "Bash(awk '{printf \"%.0f kB  %s\\\\n\", $5/1024, $9}')",
+      "Bash(npx esbuild *)",
+      "Bash(mkdir -p out)",
+      "Bash(OUT_DIR=out node out/harness.cjs)",
+      "Bash(OUT_DIR=/tmp/claude-1000/-home-runner-workspace/ddcf64f1-e776-4b31-ad2d-458c76daada1/scratchpad/pdf-verify/out node /tmp/claude-1000/-home-runner-workspace/ddcf64f1-e776-4b31-ad2d-458c76daada1/scratchpad/pdf-verify/out/harness.cjs)",
+      "Bash(VITE_MOCK=1 npm run dev)",
+      "Bash(break)",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' --max-time 3 http://localhost:5000/)",
+      "Skill(code-review)"
     ]
   },
   "model": "claude-opus-4-8"

@@ -1,0 +1,9 @@
+{
+  "id": "1",
+  "subject": "Stage 1: shared brand foundation (checkout-theme, checkout.css, wordmark)",
+  "description": "Create client/src/lib/checkout-theme.ts (re-export TRADES_THEME + shared style constants + money()), client/src/styles/checkout.css (Larken @font-face from landing.css:7-8), client/src/components/checkout/tapt-wordmark.tsx (Larken 900 \"tapt\"+italic \"pay\", customLogoUrl swap). npm run check passes.",
+  "activeForm": "Building shared brand foundation",
+  "status": "completed",
+  "blocks": [],
+  "blockedBy": []
+}

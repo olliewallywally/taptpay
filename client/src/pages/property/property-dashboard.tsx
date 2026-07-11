@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { usePropertyTenants, usePropertyInvoices } from "@/lib/property-data";
+import { PropertyReportsButton } from "@/components/reports/PropertyReportsButton";
 import {
   type Timeframe, buildBuckets, buildBilledBuckets, periodWindow, collectedCents,
   growthPct, collectionRate, filterByProperty, fmtCompact,
@@ -259,7 +260,8 @@ export default function PropertyDashboard() {
 
         {/* ── Navy hero ── */}
         <div style={{ position: 'relative', background: NAVY, borderRadius: '0 0 28px 28px', padding: '54px 22px 30px' }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <PropertyReportsButton tone="onDark" propertyFilter={propFilter} />
             <PropertyDropdown options={addresses} value={propFilter} onPick={p => { setPropFilter(p); setSelBar(-1); }} />
           </div>
 
@@ -271,20 +273,29 @@ export default function PropertyDashboard() {
             </div>
           )}
 
-          {/* Hero figure + growth pill */}
+          {/* Hero figure + growth pill — shimmer placeholders on first load so
+              the page never flashes $0 before the data lands */}
           <div style={{ marginTop: 18, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-            <div style={{ fontWeight: 800, fontSize: 54, color: SKY, letterSpacing: '-0.04em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
-              {fmtWhole(collected)}
-            </div>
-            {growth !== null && (
+            {invLoading ? (
+              <div className="pd-skel" style={{ width: 190, height: 54, borderRadius: 14, background: 'rgba(88,171,255,0.22)' }} />
+            ) : (
+              <div style={{ fontWeight: 800, fontSize: 54, color: SKY, letterSpacing: '-0.04em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+                {fmtWhole(collected)}
+              </div>
+            )}
+            {!invLoading && growth !== null && (
               <div style={{ padding: '5px 12px', borderRadius: 999, border: `1.5px solid ${SKY}`, color: SKY, fontWeight: 600, fontSize: 12.5 }}>
                 {growth > 0 ? `+${growth}%` : `${growth}%`}
               </div>
             )}
           </div>
           <div style={{ marginTop: 10, color: SKY, fontWeight: 500, fontSize: 15 }}>rent collected</div>
-          {rate !== null && (
-            <div style={{ marginTop: 4, color: 'rgba(88,171,255,0.6)', fontWeight: 400, fontSize: 13 }}>{rate}% collection rate</div>
+          {invLoading ? (
+            <div className="pd-skel" style={{ marginTop: 6, width: 118, height: 13, borderRadius: 7, background: 'rgba(88,171,255,0.18)' }} />
+          ) : (
+            rate !== null && (
+              <div style={{ marginTop: 4, color: 'rgba(88,171,255,0.6)', fontWeight: 400, fontSize: 13 }}>{rate}% collection rate</div>
+            )
           )}
 
           <RentBarChart buckets={buckets} billed={billedBuckets} selectedIdx={selectedIdx} onSelectBar={pickBar} animKey={`${tf}-${propFilter ?? 'all'}`} />
@@ -310,7 +321,11 @@ export default function PropertyDashboard() {
               <div style={{ fontWeight: 700, fontSize: 11, color: NAVY, letterSpacing: '0.08em', textTransform: 'uppercase' }}>tenants</div>
               <IcoPeeps />
             </div>
-            <div style={{ marginTop: 10, fontWeight: 800, fontSize: 42, color: NAVY, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{activeTenants}</div>
+            {invLoading ? (
+              <div className="pd-skel" style={{ marginTop: 10, width: 54, height: 42, borderRadius: 10, background: 'rgba(2,9,61,0.10)' }} />
+            ) : (
+              <div style={{ marginTop: 10, fontWeight: 800, fontSize: 42, color: NAVY, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{activeTenants}</div>
+            )}
           </button>
           <button type="button" className="pd-card pd-tap" onPointerDown={pulse} onClick={() => setLocation('/property/terminal?stack=overdue')}
             style={{ background: NAVY, borderRadius: 22, padding: '16px 18px', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'Outfit, system-ui' }}>
@@ -318,7 +333,11 @@ export default function PropertyDashboard() {
               <div style={{ fontWeight: 700, fontSize: 11, color: SKY, letterSpacing: '0.08em', textTransform: 'uppercase' }}>outstanding</div>
               <IcoWarn />
             </div>
-            <div style={{ marginTop: 10, fontWeight: 800, fontSize: 42, color: SKY, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{overdueCount}</div>
+            {invLoading ? (
+              <div className="pd-skel" style={{ marginTop: 10, width: 54, height: 42, borderRadius: 10, background: 'rgba(88,171,255,0.22)' }} />
+            ) : (
+              <div style={{ marginTop: 10, fontWeight: 800, fontSize: 42, color: SKY, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{overdueCount}</div>
+            )}
           </button>
         </div>
 

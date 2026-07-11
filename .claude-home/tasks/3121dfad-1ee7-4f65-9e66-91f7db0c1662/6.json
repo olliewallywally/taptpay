@@ -1,0 +1,9 @@
+{
+  "id": "6",
+  "subject": "Stage 6: final verification (tsc, mock screenshots, real-mode walkthrough)",
+  "description": "npm run check; VITE_MOCK=1 playwright screenshots at 390x844 of all states (retail, property, trades 1/2/3, split both payers, expanded panel, success/error/already-paid, customLogoUrl); real-mode invoice/quote walkthroughs.",
+  "activeForm": "Running final verification",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

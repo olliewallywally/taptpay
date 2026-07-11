@@ -101,6 +101,25 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   if (url.pathname.startsWith('/api/')) return;
 
+  if (url.pathname.startsWith('/assets/')) {
+    // Vite build output is content-hashed (index-B1PJVunW.js), so a cached
+    // copy can never be stale — serve cache-first for instant repeat loads
+    // and only hit the network for files we've never seen.
+    event.respondWith(
+      caches.open(STATIC_CACHE).then((cache) =>
+        cache.match(request).then(
+          (hit) =>
+            hit ||
+            fetch(request).then((response) => {
+              if (response.ok) cache.put(request, response.clone());
+              return response;
+            })
+        )
+      )
+    );
+    return;
+  }
+
   if (url.pathname.match(/\.(js|css|woff2?|ttf|eot|svg|png|jpg|jpeg|gif|ico)$/)) {
     // Network-first with cache fallback: always try to get the freshest
     // asset first, only falling back to the cached copy if the network is
