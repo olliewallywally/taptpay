@@ -215,10 +215,10 @@ function JobsHome({ invoices, outstanding, go, onRowTap }: any) {
 }
 
 /* ═══ SCREEN: ChooseClient ═══ */
-function ChooseClient({ clients, invoices, go, onSelect }: any) {
+function ChooseClient({ clients, invoices, go, onSelect, onQuickInvoice }: any) {
   const [q, setQ] = useState('');
   const term = q.trim().toLowerCase();
-  const active = clients.filter((t: any) => t.status !== 'archived');
+  const active = clients.filter((t: any) => !['archived', 'prospect'].includes(t.status));
   const filtered = active.filter((t: any) =>
     !term || clientName(t).toLowerCase().includes(term) || (t.siteAddress || '').toLowerCase().includes(term)
   );
@@ -248,6 +248,19 @@ function ChooseClient({ clients, invoices, go, onSelect }: any) {
           />
         </div>
         <div className="tp-thin-scroll" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 130 }}>
+          {/* Invoice flow only: skip the client entirely — type details inline */}
+          {onQuickInvoice && !q && (
+            <button onClick={onQuickInvoice}
+              style={{ textAlign: 'left', background: 'rgba(88,171,255,0.1)', border: '1.5px dashed rgba(88,171,255,0.45)', borderRadius: 18, padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 13 }}>
+              <div style={{ width: 38, height: 38, borderRadius: 999, border: `1.5px solid ${BLUE}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: BLUE }}>
+                <Ic.Plus sz={18} sw={2.6} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: 14, color: OFFW }}>quick invoice</div>
+                <div style={{ fontWeight: 400, fontSize: 11.5, color: 'rgba(244,244,244,0.55)', marginTop: 2 }}>no client — just enter their details</div>
+              </div>
+            </button>
+          )}
           {filtered.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '32px 0', color: 'rgba(244,244,244,0.4)', fontSize: 13 }}>no clients found</div>
           ) : filtered.map((t: any) => {
@@ -315,9 +328,10 @@ function AmountKeypad({ go, selectedClient, onCommit, backTo = 'invoice' }: any)
   );
 }
 
-/* ═══ SCREEN: QuickInvoice — keypad amount → optional note → send (kind: full) ═══ */
-function QuickInvoice({ go, selectedClient, amount, onEditAmount, jobNote, setJobNote, splitEnabled, setSplitEnabled, onSend, sending }: any) {
-  if (!selectedClient) {
+/* ═══ SCREEN: QuickInvoice — keypad amount → optional note → send (kind: full)
+   quickMode: no client — the merchant types recipient details inline instead. ═══ */
+function QuickInvoice({ go, selectedClient, quickMode, recipient, setRecipient, amount, onEditAmount, jobNote, setJobNote, splitEnabled, setSplitEnabled, onSend, sending }: any) {
+  if (!selectedClient && !quickMode) {
     return (
       <div className="tp-screen" style={{ background: NAVY }}>
         <div className="stagger" style={{ background: OFFW, color: NAVY, height: '50%', display: 'flex', flexDirection: 'column' }}>
@@ -334,8 +348,13 @@ function QuickInvoice({ go, selectedClient, amount, onEditAmount, jobNote, setJo
     );
   }
 
-  const channel = selectedClient.preferredChannel || 'email';
-  const dest    = channel === 'email' ? selectedClient.email : selectedClient.phone;
+  const isQuick  = quickMode && !selectedClient;
+  const channel  = isQuick ? recipient.channel : (selectedClient.preferredChannel || 'email');
+  const dest     = isQuick
+    ? (channel === 'email' ? recipient.email : recipient.phone)
+    : (channel === 'email' ? selectedClient.email : selectedClient.phone);
+  const quickOk  = !isQuick || (recipient.name.trim() && (channel === 'email' ? recipient.email.trim() : recipient.phone.trim()));
+  const QI_LABEL = { fontWeight: 600, fontSize: 11, color: 'rgba(244,244,244,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase' as const, marginBottom: 10 };
 
   return (
     <div className="tp-screen" style={{ background: NAVY }}>
@@ -347,17 +366,45 @@ function QuickInvoice({ go, selectedClient, amount, onEditAmount, jobNote, setJo
             <span style={{ fontWeight: 600, fontSize: 12, color: 'rgba(4,13,109,0.4)', textDecoration: 'underline', textUnderlineOffset: 2 }}>edit</span>
           </button>
           <div style={{ marginTop: 14, fontWeight: 500, fontSize: 16, color: NAVY, lineHeight: 1.4 }}>
-            {clientName(selectedClient)}
-            <div style={{ fontWeight: 400, fontSize: 14, color: 'rgba(4,13,109,0.5)', marginTop: 4 }}>{selectedClient.siteAddress}</div>
+            {isQuick ? (recipient.name.trim() || 'new customer') : clientName(selectedClient)}
+            {!isQuick && <div style={{ fontWeight: 400, fontSize: 14, color: 'rgba(4,13,109,0.5)', marginTop: 4 }}>{selectedClient.siteAddress}</div>}
+            {isQuick && <div style={{ fontWeight: 400, fontSize: 14, color: 'rgba(4,13,109,0.5)', marginTop: 4 }}>quick invoice</div>}
           </div>
           {amount > 0 && <div style={{ marginTop: 10, fontSize: 12, color: 'rgba(4,13,109,0.48)' }}>TaptPay fee (0.3%): {formatNzd(tradesFeeCents(amount))}</div>}
         </div>
         <div style={{ height: 52 }} />
       </div>
-      <div className="stagger" style={{ flex: 1, background: NAVY, padding: '40px 28px 100px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <div className="stagger" style={{ flex: 1, background: NAVY, padding: isQuick ? '30px 28px 100px' : '40px 28px 100px', display: 'flex', flexDirection: 'column', alignItems: 'center', overflowY: isQuick ? 'auto' : undefined }}>
+        {/* Quick mode: inline recipient details */}
+        {isQuick && (
+          <div style={{ width: '100%', marginBottom: 18 }}>
+            <div style={QI_LABEL}>send to</div>
+            <input className="tp-field" value={recipient.name} maxLength={120}
+              onChange={e => setRecipient((r: any) => ({ ...r, name: e.target.value }))}
+              placeholder="customer name" />
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              {(['email', 'sms'] as const).map(ch => (
+                <button key={ch} type="button" onClick={() => setRecipient((r: any) => ({ ...r, channel: ch }))} aria-pressed={channel === ch}
+                  style={{ flex: 1, padding: '11px 0', borderRadius: 999, border: `1.5px solid ${channel === ch ? BLUE : 'rgba(88,171,255,0.25)'}`, background: channel === ch ? BLUE : 'transparent', color: channel === ch ? NAVY : 'rgba(244,244,244,0.65)', fontWeight: 700, fontSize: 12.5, letterSpacing: '0.06em', textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Outfit, system-ui', transition: 'background 0.18s, color 0.18s, border-color 0.18s' }}>
+                  {ch === 'sms' ? 'text' : 'email'}
+                </button>
+              ))}
+            </div>
+            {channel === 'email' ? (
+              <input key="qi-email" className="tp-field" type="email" inputMode="email" autoComplete="email" value={recipient.email} maxLength={200}
+                onChange={e => setRecipient((r: any) => ({ ...r, email: e.target.value }))}
+                placeholder="customer email" style={{ marginTop: 10 }} />
+            ) : (
+              <input key="qi-phone" className="tp-field" type="tel" inputMode="tel" autoComplete="tel" value={recipient.phone} maxLength={40}
+                onChange={e => setRecipient((r: any) => ({ ...r, phone: e.target.value }))}
+                placeholder="mobile number" style={{ marginTop: 10 }} />
+            )}
+          </div>
+        )}
+
         {/* Job note */}
         <div style={{ width: '100%' }}>
-          <div style={{ fontWeight: 600, fontSize: 11, color: 'rgba(244,244,244,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>job note <span style={{ opacity: 0.6 }}>· optional</span></div>
+          <div style={QI_LABEL}>job note <span style={{ opacity: 0.6 }}>· optional</span></div>
           <input className="tp-field" value={jobNote} onChange={e => setJobNote(e.target.value)} maxLength={500}
             placeholder="what's this invoice for?" />
         </div>
@@ -366,9 +413,9 @@ function QuickInvoice({ go, selectedClient, amount, onEditAmount, jobNote, setJo
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 22px', background: 'rgba(88,171,255,0.08)', border: `1px solid rgba(88,171,255,0.2)`, borderRadius: 20, width: '100%', boxSizing: 'border-box', marginTop: 18 }}>
           {channel === 'email' ? <Ic.Mail sz={22} c={OFFW} /> : <Ic.Msg sz={22} c={OFFW} />}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 600, fontSize: 11, color: 'rgba(244,244,244,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 4 }}>sending via {channel}</div>
+            <div style={{ fontWeight: 600, fontSize: 11, color: 'rgba(244,244,244,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 4 }}>sending via {channel === 'sms' ? 'text' : channel}</div>
             <div style={{ fontWeight: 500, fontSize: 14, color: OFFW, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {dest || `client's ${channel}`}
+              {dest || (isQuick ? 'enter details above' : `client's ${channel}`)}
             </div>
           </div>
         </div>
@@ -390,8 +437,8 @@ function QuickInvoice({ go, selectedClient, amount, onEditAmount, jobNote, setJo
         <button
           className="tp-cta"
           onClick={onSend}
-          disabled={sending || amount <= 0}
-          style={{ minWidth: 220, opacity: sending || amount <= 0 ? 0.65 : 1 }}
+          disabled={sending || amount <= 0 || !quickOk}
+          style={{ minWidth: 220, opacity: sending || amount <= 0 || !quickOk ? 0.65 : 1, flexShrink: 0 }}
         >
           {sending ? 'sending…' : 'send invoice'}
         </button>
@@ -493,8 +540,9 @@ function MarkExternal({ go, selectedClient, amount, invoices, onMark, marking }:
   );
 }
 
-/* ═══ SCREEN: SentSuccess ═══ */
-function SentSuccess({ amount, label, go }: any) {
+/* ═══ SCREEN: SentSuccess — quick invoices offer "add client" (promotes the
+   hidden prospect profile into a real directory client) ═══ */
+function SentSuccess({ amount, label, go, showAddClient, onAddClient, addState }: any) {
   return (
     <div className="tp-screen" style={{ background: NAVY }}>
       <div className="stagger" style={{ background: OFFW, color: NAVY, height: '50%', display: 'flex', flexDirection: 'column' }}>
@@ -510,6 +558,16 @@ function SentSuccess({ amount, label, go }: any) {
         <div className="tp-success-check tp-pulse" style={{ marginTop: 14 }}><Ic.Check sz={40} sw={3.2} /></div>
         {label && <div style={{ marginTop: 18, color: 'rgba(244,244,244,0.6)', fontWeight: 500, fontSize: 14 }}>{label}</div>}
         <div style={{ flex: 1 }} />
+        {showAddClient && (
+          <button
+            className="tp-cta-wire"
+            onClick={addState === 'idle' ? onAddClient : undefined}
+            disabled={addState !== 'idle'}
+            style={{ marginBottom: 12, minWidth: 220, opacity: addState === 'saving' ? 0.65 : 1, ...(addState === 'saved' ? { borderColor: GREEN, color: GREEN, cursor: 'default' } : {}) }}
+          >
+            {addState === 'saving' ? 'saving…' : addState === 'saved' ? 'client saved ✓' : 'add client'}
+          </button>
+        )}
         <button className="tp-cta" onClick={() => go('home', 'down')}>done</button>
       </div>
     </div>
@@ -713,7 +771,7 @@ export function QuoteScreen({ onCancel, onExit }: { onCancel: () => void; onExit
               <div style={Q_LABEL}>client</div>
               <select value={clientId} onChange={e => setClientId(e.target.value)} style={{ ...Q_FIELD, marginBottom: 20, appearance: 'none' }}>
                 <option value="">choose client</option>
-                {clients.filter((c: any) => c.status !== 'archived').map((c: any) => <option key={c.id} value={c.id}>{c.firstName} {c.lastName} — {c.siteAddress}</option>)}
+                {clients.filter((c: any) => !['archived', 'prospect'].includes(c.status)).map((c: any) => <option key={c.id} value={c.id}>{c.firstName} {c.lastName} — {c.siteAddress}</option>)}
               </select>
 
               {/* Line items */}
@@ -788,6 +846,11 @@ export default function TradesTerminal() {
   const [banner, setBanner]                 = useState<string | null>(null);
   const [successLabel, setSuccessLabel]     = useState('');
   const [boundaryDelta, setBoundaryDelta]   = useState(0);
+  // Quick invoice: no client required — recipient details are typed inline and
+  // the server creates a hidden 'prospect' profile behind the scenes.
+  const [quickMode, setQuickMode]           = useState(false);
+  const [recipient, setRecipient]           = useState({ name: '', email: '', phone: '', channel: 'email' as 'email' | 'sms' });
+  const [sentInvoice, setSentInvoice]       = useState<any>(null);
   // When invoice/external is tapped from the subbar without a client, remember where to go after selection.
   const [pendingDest, setPendingDest]       = useState<'invoice' | 'external' | null>(null);
   // Tapped job row → action sheet (mark received / cancel).
@@ -796,6 +859,17 @@ export default function TradesTerminal() {
   const [profileClientId, setProfileClientId] = useState<string | null>(null);
   const conveyorTimer = useRef<ReturnType<typeof setTimeout>>();
   const viewportRef = useRef<HTMLDivElement>(null);
+
+  // Dashboard "quick invoice" tile deep-links here with ?quick=1 — jump straight
+  // into the amount keypad in quick mode (no client picker). Strip the param so
+  // refresh/back doesn't re-trigger.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('quick') === '1') {
+      setQuickMode(true);
+      setScreen('amount');
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, []);
 
   /* Data */
   const { data: clients = [] } = useQuery<any[]>({
@@ -834,12 +908,17 @@ export default function TradesTerminal() {
 
   /* Mutations */
   const invoiceMutation = useMutation({
-    mutationFn: async ({ clientId, amountCents, channel, jobDetails, splitEnabled }: any) => {
+    mutationFn: async ({ clientId, recipient, amountCents, channel, jobDetails, splitEnabled }: any) => {
       const due = new Date(); due.setDate(due.getDate() + 7);
       const r = await fetch('/api/trades/invoices', {
         method: 'POST', headers: { 'Content-Type': 'application/json', ...tradesHeaders() },
         body: JSON.stringify({
-          clientProfileId: clientId, amountCents, deliveryChannel: channel,
+          // Quick invoice sends inline recipient details; the server creates a
+          // hidden prospect profile. Otherwise a normal client-linked invoice.
+          ...(recipient
+            ? { recipient: { name: recipient.name, email: recipient.email || undefined, phone: recipient.phone || undefined, channel: recipient.channel } }
+            : { clientProfileId: clientId }),
+          amountCents, deliveryChannel: channel,
           dueAt: due.toISOString(), kind: 'full',
           jobDetails: jobDetails || undefined,
           splitEnabled: !!splitEnabled,
@@ -851,14 +930,31 @@ export default function TradesTerminal() {
       }
       return r.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: any, vars: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/trades/invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/trades/clients'] });
       setSplitEnabled(false);
-      setSuccessLabel(selectedClient?.email || selectedClient?.phone || '');
+      setSuccessLabel(vars.recipient
+        ? (vars.recipient.email || vars.recipient.phone || '')
+        : (selectedClient?.email || selectedClient?.phone || ''));
+      setSentInvoice(data);
+      promoteMutation.reset();
       setContentKey(k => k + 1);
       setScreen('success');
     },
     onError: (err: any) => { toast(err?.message || 'Failed to send invoice'); },
+  });
+
+  // "add client" on the quick-invoice success screen — turns the hidden
+  // prospect profile into a real directory client.
+  const promoteMutation = useMutation({
+    mutationFn: async (clientProfileId: string) => {
+      const r = await fetch(`/api/trades/clients/${clientProfileId}/promote`, { method: 'POST', headers: tradesHeaders() });
+      if (!r.ok) throw new Error(await r.json().then((d: any) => d.message).catch(() => 'Could not save client'));
+      return r.json();
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/trades/clients'] }); },
+    onError: (e: any) => toast(e?.message || 'Could not save client'),
   });
 
   const markMutation = useMutation({
@@ -930,10 +1026,14 @@ export default function TradesTerminal() {
       setJobNote('');
       setSplitEnabled(false);
       setPendingDest(null);
+      setQuickMode(false);
+      setRecipient({ name: '', email: '', phone: '', channel: 'email' });
+      setSentInvoice(null);
       return;
     }
     // invoice/external with no client: remember destination, go to client picker
-    if ((next === 'invoice' || next === 'external') && !selectedClient) {
+    // (quick mode is the exception — its invoice screen takes inline details)
+    if ((next === 'invoice' || next === 'external') && !selectedClient && !(quickMode && next === 'invoice')) {
       setPendingDest(next as 'invoice' | 'external');
       if (screen === 'home') triggerConveyor(screen, 'up');
       setContentKey(k => k + 1);
@@ -947,6 +1047,7 @@ export default function TradesTerminal() {
 
   const handleClientSelect = (c: any) => {
     setSelectedClient(c);
+    setQuickMode(false);
     setContentKey(k => k + 1);
     const dest = pendingDest || 'invoice';
     setPendingDest(null);
@@ -954,6 +1055,18 @@ export default function TradesTerminal() {
     setAmount(0);
     setJobNote('');
     setSplitEnabled(false);
+    setScreen('amount');
+  };
+
+  // "quick invoice · no client" from the client picker — enter quick mode.
+  const handleQuickInvoice = () => {
+    setQuickMode(true);
+    setSelectedClient(null);
+    setPendingDest(null);
+    setAmount(0);
+    setJobNote('');
+    setSplitEnabled(false);
+    setContentKey(k => k + 1);
     setScreen('amount');
   };
 
@@ -984,7 +1097,7 @@ export default function TradesTerminal() {
   const handleSubbarPick = (i: number) => {
     const dest = SUBBAR_ROUTE[i];
     if (!dest || dest === screen) return;
-    if ((dest === 'invoice' || dest === 'external') && !selectedClient) {
+    if ((dest === 'invoice' || dest === 'external') && !selectedClient && !(quickMode && dest === 'invoice')) {
       setPendingDest(dest as 'invoice' | 'external');
       if (screen === 'home') triggerConveyor(screen, 'up');
       setContentKey(k => k + 1);
@@ -1029,13 +1142,24 @@ export default function TradesTerminal() {
 
   const renderScreen = (id: string) => {
     if (id === 'home')     return <JobsHome invoices={stackRows} outstanding={outstanding} go={go} onRowTap={handleRowTap} />;
-    if (id === 'clients')  return <ChooseClient clients={clients} invoices={invoices} go={go} onSelect={handleClientSelect} />;
+    if (id === 'clients')  return <ChooseClient clients={clients} invoices={invoices} go={go} onSelect={handleClientSelect} onQuickInvoice={pendingDest === 'invoice' ? handleQuickInvoice : undefined} />;
     if (id === 'amount')   return <AmountKeypad go={go} selectedClient={selectedClient} backTo={'invoice'} onCommit={(c: number) => { setAmount(c); go('invoice'); }} />;
-    if (id === 'invoice')  return <QuickInvoice go={go} selectedClient={selectedClient} amount={amount} onEditAmount={() => go('amount')} jobNote={jobNote} setJobNote={setJobNote} splitEnabled={splitEnabled} setSplitEnabled={setSplitEnabled} onSend={() => { if (!selectedClient || amount <= 0) { toast('set an amount first'); return; } invoiceMutation.mutate({ clientId: selectedClient.id, amountCents: amount, channel: selectedClient.preferredChannel || 'email', jobDetails: jobNote, splitEnabled }); }} sending={invoiceMutation.isPending} />;
+    if (id === 'invoice')  return <QuickInvoice go={go} selectedClient={selectedClient} quickMode={quickMode} recipient={recipient} setRecipient={setRecipient} amount={amount} onEditAmount={() => go('amount')} jobNote={jobNote} setJobNote={setJobNote} splitEnabled={splitEnabled} setSplitEnabled={setSplitEnabled} onSend={() => {
+      if (amount <= 0) { toast('set an amount first'); return; }
+      if (selectedClient) {
+        invoiceMutation.mutate({ clientId: selectedClient.id, amountCents: amount, channel: selectedClient.preferredChannel || 'email', jobDetails: jobNote, splitEnabled });
+      } else if (quickMode) {
+        if (!recipient.name.trim() || (recipient.channel === 'email' ? !recipient.email.trim() : !recipient.phone.trim())) { toast('enter the customer details first'); return; }
+        invoiceMutation.mutate({ recipient, amountCents: amount, channel: recipient.channel, jobDetails: jobNote, splitEnabled });
+      }
+    }} sending={invoiceMutation.isPending} />;
     if (id === 'quote')    return <QuoteScreen onCancel={() => go('home', 'down')} onExit={() => go('home', 'down')} />;
     if (id === 'profile')  return <ClientProfile embedded clientId={profileClientId ?? undefined} onClose={() => go('home')} />;
     if (id === 'external') return <MarkExternal go={go} selectedClient={selectedClient} amount={amount} invoices={invoices} onMark={handleMark} marking={markMutation.isPending} />;
-    if (id === 'success')  return <SentSuccess amount={amount} label={successLabel} go={go} />;
+    if (id === 'success')  return <SentSuccess amount={amount} label={successLabel} go={go}
+      showAddClient={quickMode && !!sentInvoice?.clientProfileId}
+      onAddClient={() => sentInvoice?.clientProfileId && promoteMutation.mutate(sentInvoice.clientProfileId)}
+      addState={promoteMutation.isSuccess ? 'saved' : promoteMutation.isPending ? 'saving' : 'idle'} />;
     return null;
   };
 

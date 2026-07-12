@@ -1,38 +1,20 @@
-import { useState, type CSSProperties } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { LayoutGrid, Pencil, Plus, RotateCcw, Search, X } from "lucide-react";
+import { X } from "lucide-react";
 import { tradesFetch, tradesHeaders } from "@/lib/trades-api";
 import { TRADES_THEME } from "@/lib/trades-theme";
 
+/* ── Design tokens — mirrors the tenant directory (property) page ── */
 const C = {
   ink: TRADES_THEME.INK,
-  panel: TRADES_THEME.ACCENT,
-  cream: TRADES_THEME.OFFW,
+  sky: TRADES_THEME.ACCENT,
   white: "#FFFFFF",
-  gray: "#E7E6E5",
+  gray: "#D9D7D7",
+  sheet: TRADES_THEME.OFFW,
+  body: "#E8E8E8",
   mute: "#8C8C8C",
-  green: TRADES_THEME.GREEN,
-  red: TRADES_THEME.RED,
-  amber: TRADES_THEME.AMBER,
-};
-
-const STATUS_MAP: Record<string, { dot: string; bg: string; fg: string; label: string }> = {
-  paid: { dot: C.green, bg: "rgba(27,191,133,0.14)", fg: "#0B7D63", label: "paid" },
-  overdue: { dot: C.red, bg: "rgba(255,59,78,0.12)", fg: "#C71A2A", label: "overdue" },
-  failed: { dot: C.amber, bg: "rgba(255,176,46,0.18)", fg: "#9A6A00", label: "not delivered" },
-  dueSoon: { dot: C.amber, bg: "rgba(255,176,46,0.18)", fg: "#9A6A00", label: "due soon" },
-  upcoming: { dot: C.panel, bg: "rgba(88,171,255,0.12)", fg: C.panel, label: "upcoming" },
-};
-
-const LIVE_STATUSES = ["pending_dispatch", "dispatched", "viewed", "deposit_paid", "balance_due", "dispatch_failed"];
-
-const GLASS: CSSProperties = {
-  background: "linear-gradient(140deg, rgba(255,255,255,0.92) 0%, rgba(234,238,244,0.72) 50%, rgba(220,227,240,0.62) 100%)",
-  backdropFilter: "blur(16px) saturate(130%)",
-  WebkitBackdropFilter: "blur(16px) saturate(130%)",
-  border: "1px solid rgba(255,255,255,0.7)",
-  boxShadow: "0 12px 32px rgba(4,13,109,0.10), inset 0 1px 0 rgba(255,255,255,0.95)",
+  red: "#C71A2A",
 };
 
 type Channel = "email" | "whatsapp" | "sms";
@@ -61,16 +43,14 @@ function fmtCents(c: number) {
   return "$" + (c / 100).toLocaleString("en-NZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function StatusBox({ status }: { status: string }) {
-  const s = STATUS_MAP[status] ?? STATUS_MAP.upcoming;
-  return (
-    <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 11px", borderRadius: 8, background: s.bg, color: s.fg, fontWeight: 600, fontSize: 11, letterSpacing: 0, textTransform: "uppercase" }}>
-      <span style={{ width: 6, height: 6, borderRadius: 999, background: s.dot, flexShrink: 0 }} />
-      {s.label}
-    </div>
-  );
+function pulse(e: any) {
+  const el = e.currentTarget;
+  el.classList.remove("cdir-pulse");
+  void el.offsetWidth;
+  el.classList.add("cdir-pulse");
 }
 
+/* ── Shared field input (same as tenant directory sheet) ── */
 function Field({ label, value, onChange, placeholder, required, type = "text" }: {
   label: string;
   value: string;
@@ -81,7 +61,7 @@ function Field({ label, value, onChange, placeholder, required, type = "text" }:
 }) {
   return (
     <div style={{ marginBottom: 14 }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: C.panel, letterSpacing: 0, textTransform: "uppercase", marginBottom: 6 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: C.sky, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>
         {label}{required ? " *" : ""}
       </div>
       <input
@@ -103,7 +83,7 @@ function TextAreaField({ label, value, onChange, placeholder }: {
 }) {
   return (
     <div style={{ marginBottom: 14 }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: C.panel, letterSpacing: 0, textTransform: "uppercase", marginBottom: 6 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: C.sky, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>
         {label}
       </div>
       <textarea
@@ -116,6 +96,7 @@ function TextAreaField({ label, value, onChange, placeholder }: {
   );
 }
 
+/* ── Add Client Sheet (mirrors AddTenantSheet) ── */
 function AddClientSheet({ onClose, onSave, saving, saveError }: {
   onClose: () => void;
   onSave: (data: ClientForm) => void;
@@ -169,14 +150,14 @@ function AddClientSheet({ onClose, onSave, saving, saveError }: {
       />
 
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, display: "flex", justifyContent: "center" }}>
-        <div style={{ width: "100%", maxWidth: 390, background: C.cream, borderRadius: "28px 28px 0 0", maxHeight: "92vh", overflowY: "auto", animation: closing ? animOut : animIn }}>
+        <div style={{ width: "100%", maxWidth: 390, background: C.sheet, borderRadius: "28px 28px 0 0", maxHeight: "92vh", overflowY: "auto", animation: closing ? animOut : animIn }}>
           <div style={{ display: "flex", justifyContent: "center", padding: "14px 0 2px" }}>
             <div style={{ width: 36, height: 4, borderRadius: 2, background: "rgba(0,0,0,0.1)" }} />
           </div>
 
           <div style={{ padding: "12px 24px 52px" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-              <span style={{ fontWeight: 700, fontSize: 20, color: C.ink, letterSpacing: 0 }}>add client</span>
+              <span style={{ fontWeight: 700, fontSize: 20, color: C.ink, letterSpacing: "-0.3px" }}>add client</span>
               <button
                 onClick={handleClose}
                 aria-label="Close add client sheet"
@@ -195,20 +176,20 @@ function AddClientSheet({ onClose, onSave, saving, saveError }: {
             <Field label="phone" value={form.phone} onChange={setText("phone")} type="tel" />
 
             <div style={{ marginBottom: 24 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: C.panel, letterSpacing: 0, textTransform: "uppercase", marginBottom: 8 }}>send invoice via</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: C.sky, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>send invoice via</div>
               <div style={{ display: "flex", gap: 8 }}>
                 {(["email", "whatsapp", "sms"] as const).map((channel) => (
                   <button
                     key={channel}
                     onClick={() => setForm((current) => ({ ...current, preferredChannel: channel }))}
-                    style={{ flex: 1, padding: "13px 0", borderRadius: 14, border: "none", background: form.preferredChannel === channel ? C.ink : C.gray, color: form.preferredChannel === channel ? C.cream : C.ink, fontWeight: 700, fontSize: 12.5, cursor: "pointer", textTransform: "uppercase", letterSpacing: 0, transition: "background 0.18s, color 0.18s" }}
+                    style={{ flex: 1, padding: "13px 0", borderRadius: 14, border: "none", background: form.preferredChannel === channel ? C.ink : C.gray, color: form.preferredChannel === channel ? C.white : C.ink, fontWeight: 600, fontSize: 12.5, cursor: "pointer", textTransform: "uppercase", letterSpacing: "0.04em", transition: "background 0.18s, color 0.18s" }}
                   >
                     {channel}
                   </button>
                 ))}
               </div>
               {!channelContactOk && (
-                <div style={{ marginTop: 8, fontSize: 12, color: "#C71A2A", fontWeight: 600 }}>
+                <div style={{ marginTop: 8, fontSize: 12, color: C.red, fontWeight: 500 }}>
                   add {form.preferredChannel === "email" ? "an email address" : "a phone number"} above to send via {form.preferredChannel}
                 </div>
               )}
@@ -218,16 +199,16 @@ function AddClientSheet({ onClose, onSave, saving, saveError }: {
 
             {saveError && (
               <div style={{ marginBottom: 16, padding: "12px 16px", borderRadius: 14, background: "rgba(255,59,78,0.07)", border: "1px solid rgba(255,59,78,0.18)" }}>
-                <p style={{ color: "#C71A2A", fontSize: 13, fontWeight: 600, margin: 0 }}>{saveError}</p>
+                <p style={{ color: C.red, fontSize: 13, fontWeight: 500, margin: 0 }}>{saveError}</p>
               </div>
             )}
 
             <button
               onClick={handleSave}
               disabled={!valid || saving}
-              style={{ width: "100%", padding: "18px 0", borderRadius: 999, background: valid && !saving ? C.ink : C.gray, color: valid && !saving ? C.cream : C.mute, fontWeight: 700, fontSize: 16, border: "none", cursor: valid && !saving ? "pointer" : "default", transition: "background 0.2s, color 0.2s" }}
+              style={{ width: "100%", padding: "18px 0", borderRadius: 999, background: valid && !saving ? C.ink : C.gray, color: valid && !saving ? C.white : C.mute, fontWeight: 700, fontSize: 16, border: "none", cursor: valid && !saving ? "pointer" : "default", transition: "background 0.2s, color 0.2s" }}
             >
-              {saving ? "adding..." : "add client"}
+              {saving ? "adding…" : "add client"}
             </button>
           </div>
         </div>
@@ -236,43 +217,48 @@ function AddClientSheet({ onClose, onSave, saving, saveError }: {
   );
 }
 
-function invoiceStatus(invoice: any): string {
-  if (!invoice) return "upcoming";
-  if (invoice.status === "paid" || invoice.status === "paid_external") return "paid";
-  if (invoice.status === "overdue") return "overdue";
-  if (invoice.status === "dispatch_failed") return "failed";
-  if (invoice.dueAt && new Date(invoice.dueAt).getTime() < Date.now() && !["paid", "paid_external", "voided"].includes(invoice.status)) return "overdue";
-  return "upcoming";
+/* ── Client list row (mirrors TenantRow) ── */
+function initials(client: any) {
+  return `${client.firstName?.[0] ?? ""}${client.lastName?.[0] ?? ""}`.toUpperCase() || "?";
+}
+
+const LIVE_STATUSES = ["pending_dispatch", "dispatched", "viewed", "deposit_paid", "balance_due", "dispatch_failed"];
+
+function isOverdue(invoice: any) {
+  if (!invoice) return false;
+  if (invoice.status === "overdue") return true;
+  return !!invoice.dueAt
+    && new Date(invoice.dueAt).getTime() < Date.now()
+    && !["paid", "paid_external", "voided"].includes(invoice.status);
+}
+
+function fmtDue(invoice: any) {
+  if (!invoice?.dueAt) return "";
+  return new Date(invoice.dueAt).toLocaleDateString("en-NZ", { day: "2-digit", month: "2-digit" });
 }
 
 function ClientRow({ client, nextInvoice, onClick }: { client: any; nextInvoice: any; onClick: () => void }) {
-  const fullName = `${client.firstName ?? ""} ${client.lastName ?? ""}`.trim() || "Client";
-  const status = invoiceStatus(nextInvoice);
-  const dueDate = nextInvoice?.dueAt ? new Date(nextInvoice.dueAt).toLocaleDateString("en-NZ", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "-";
+  const fullName = `${client.firstName ?? ""} ${client.lastName ?? ""}`.trim() || "client";
+  const overdue = isOverdue(nextInvoice);
+  const paid = nextInvoice && ["paid", "paid_external"].includes(nextInvoice.status);
+  const label = overdue ? "overdue" : paid ? "paid" : "next invoice";
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1.7fr 1fr", gap: 12 }}>
-      <div style={{ ...GLASS, borderRadius: 18, padding: "16px 16px 14px", position: "relative", display: "flex", flexDirection: "column", cursor: "pointer" }} onClick={onClick}>
-        <button
-          onClick={(event) => { event.stopPropagation(); onClick(); }}
-          aria-label={`Open ${fullName}`}
-          style={{ position: "absolute", top: 12, right: 12, width: 28, height: 28, borderRadius: 999, background: C.white, border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 1px 3px rgba(4,13,109,0.12)" }}
-        >
-          <Pencil size={14} color={C.ink} strokeWidth={1.9} />
-        </button>
-        <div style={{ fontWeight: 600, fontSize: 14, color: C.ink, textTransform: "uppercase", letterSpacing: 0, paddingRight: 30, lineHeight: 1.25 }}>{fullName}</div>
-        <div style={{ fontWeight: 500, fontSize: 12.5, color: C.ink, textTransform: "uppercase", letterSpacing: 0, marginTop: 5, lineHeight: 1.35 }}>{client.siteAddress || "site address needed"}</div>
-        <div style={{ marginTop: 12 }}><StatusBox status={status} /></div>
-      </div>
-
-      <div style={{ ...GLASS, borderRadius: 18, padding: "16px 12px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
-        <div style={{ fontWeight: 900, fontSize: 27, color: C.ink, letterSpacing: 0, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
-          {nextInvoice ? fmtCents(nextInvoice.amountCents ?? 0) : "-"}
-        </div>
-        <div style={{ fontWeight: 500, fontSize: 11, color: C.mute, marginTop: 8 }}>next invoice</div>
-        <div style={{ fontWeight: 600, fontSize: 11, color: C.mute, marginTop: 1, fontVariantNumeric: "tabular-nums" }}>{dueDate}</div>
-      </div>
-    </div>
+    <button type="button" className="cdir-row" onClick={onClick}>
+      <span className="cdir-avatar">{initials(client)}</span>
+      <span className="cdir-copy">
+        <span className="cdir-name">{fullName}</span>
+        <span className="cdir-address">{client.siteAddress || "no site address"}</span>
+      </span>
+      <span className="cdir-money">
+        <span>{nextInvoice ? fmtCents(nextInvoice.amountCents ?? 0) : "—"}</span>
+        {nextInvoice ? (
+          <small className={overdue ? "overdue" : ""}>{label}<br />{fmtDue(nextInvoice)}</small>
+        ) : (
+          <small>no invoice</small>
+        )}
+      </span>
+    </button>
   );
 }
 
@@ -298,6 +284,7 @@ export default function ClientDirectory() {
     retry: false,
   });
 
+  // Archived clients — fetched lazily only when the merchant expands the section.
   const { data: archivedClients = [] } = useQuery<any[]>({
     queryKey: ["/api/trades/clients", "archived"],
     queryFn: () => tradesFetch("/api/trades/clients?includeArchived=true").then((response) => response.ok ? response.json() : []),
@@ -341,13 +328,17 @@ export default function ClientDirectory() {
     },
   });
 
-  const activeClients = clients.filter((client: any) => client.status !== "archived");
+  /* Helpers — prospects are hidden quick-invoice profiles, never listed */
+  const activeClients = clients.filter((client: any) => !["archived", "prospect"].includes(client.status));
   const term = search.trim().toLowerCase();
   const filtered = activeClients.filter((client: any) => {
     const haystack = `${client.firstName ?? ""} ${client.lastName ?? ""} ${client.siteAddress ?? ""}`.toLowerCase();
     return !term || haystack.includes(term);
   });
+  const clientCountLabel = `active client${activeClients.length !== 1 ? "s" : ""}`;
 
+  // Return the invoice that represents the worst-case status for this client
+  // (failed > overdue > live > most recent) — same idea as the tenant directory.
   const invoiceByClient = (clientId: string) => {
     const live = invoices
       .filter((invoice: any) => invoice.clientProfileId === clientId && invoice.status !== "voided")
@@ -356,7 +347,7 @@ export default function ClientDirectory() {
 
     const failed = live.find((invoice: any) => invoice.status === "dispatch_failed");
     if (failed) return failed;
-    const overdue = live.find((invoice: any) => invoice.status === "overdue" || (invoice.dueAt && new Date(invoice.dueAt).getTime() < Date.now() && !["paid", "paid_external"].includes(invoice.status)));
+    const overdue = live.find((invoice: any) => isOverdue(invoice));
     if (overdue) return overdue;
     const active = live.find((invoice: any) => LIVE_STATUSES.includes(invoice.status));
     if (active) return active;
@@ -365,112 +356,396 @@ export default function ClientDirectory() {
 
   return (
     <div style={{ background: C.white, minHeight: "100svh", display: "flex", justifyContent: "center" }}>
-      <div style={{ width: "100%", maxWidth: 430, minHeight: "100svh", background: C.cream, paddingBottom: 130, fontFamily: "'Outfit', system-ui, sans-serif" }}>
-        <div style={{ height: 54 }} />
+    <div style={{ width: "100%", maxWidth: 430, minHeight: "100svh", background: C.sheet, paddingBottom: 128, fontFamily: "'Outfit', system-ui, sans-serif", overflow: "hidden" }}>
+      <style>{DIRECTORY_CSS}</style>
 
-        <div style={{ padding: "0 18px" }}>
-          <div style={{ background: C.ink, borderRadius: 24, padding: "26px 26px 30px", position: "relative" }}>
-            <div style={{ fontWeight: 800, fontSize: 64, color: C.cream, letterSpacing: 0, lineHeight: 0.92, fontVariantNumeric: "tabular-nums" }}>
-              {activeClients.length}
-            </div>
-            <div style={{ fontWeight: 600, fontSize: 12, color: C.cream, letterSpacing: 0, textTransform: "uppercase", marginTop: 6 }}>
-              active client{activeClients.length !== 1 ? "s" : ""}
-            </div>
-            <button
-              onClick={() => setShowAdd(true)}
-              aria-label="Add client"
-              style={{ position: "absolute", right: 24, bottom: -20, width: 46, height: 46, borderRadius: 999, background: C.cream, color: C.ink, border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 6px 16px rgba(4,13,109,0.32)" }}
-            >
-              <Plus size={22} strokeWidth={2.6} />
-            </button>
-          </div>
-        </div>
+      {/* Hero — big count over ink, same metrics as the tenant directory hero */}
+      <section className="cdir-hero">
+        <div className="pt-bounce cdir-hero-count" style={{ "--pt-d": "0ms" } as any}>{activeClients.length}</div>
+        <div className="pt-bounce cdir-hero-label" style={{ "--pt-d": "60ms" } as any}>{clientCountLabel}</div>
+      </section>
 
-        <div style={{ padding: "38px 18px 0", display: "flex", gap: 10 }}>
-          <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, background: C.gray, borderRadius: 14, padding: "0 14px", height: 46 }}>
-            <Search size={18} color={C.ink} strokeWidth={2} />
+      <main className="cdir-body">
+        <button type="button" className="cdir-add" onPointerDown={pulse} onClick={() => setShowAdd(true)} aria-label="Add client">
+          <svg width={26} height={26} viewBox="0 0 24 24" fill="none" stroke={C.ink} strokeWidth="2.6" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+        </button>
+        <div className="pt-bounce cdir-search-row" style={{ "--pt-d": "140ms" } as any}>
+          <label className="cdir-search">
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="search clients or site"
-              style={{ flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent", fontFamily: "inherit", fontWeight: 500, fontSize: 14, color: C.ink }}
             />
             {search && (
-              <button onClick={() => setSearch("")} aria-label="Clear search" style={{ border: "none", background: "transparent", cursor: "pointer", display: "flex", padding: 0 }}>
-                <X size={16} color={C.mute} strokeWidth={2.2} />
+              <button type="button" onClick={() => setSearch("")} aria-label="Clear search">
+                <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={C.mute} strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
               </button>
             )}
-          </div>
+          </label>
           <button
+            type="button"
             onClick={() => setLocation("/trades")}
             aria-label="Go to trades dashboard"
-            style={{ width: 46, height: 46, borderRadius: 14, background: C.ink, color: C.cream, border: "none", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer" }}
+            className="cdir-grid-btn"
           >
-            <LayoutGrid size={20} fill={C.cream} strokeWidth={0} />
+            <svg width={17} height={17} viewBox="0 0 20 20" fill={C.sky}><rect x="1" y="1" width="7" height="7" rx="1.5" /><rect x="12" y="1" width="7" height="7" rx="1.5" /><rect x="1" y="12" width="7" height="7" rx="1.5" /><rect x="12" y="12" width="7" height="7" rx="1.5" /></svg>
           </button>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 14, padding: "16px 18px 0" }}>
+        <div className="cdir-list">
           {isLoading ? (
-            <div style={{ textAlign: "center", padding: "48px 0", color: C.mute, fontSize: 13 }}>loading clients...</div>
+            <div className="pt-bounce cdir-empty" style={{ "--pt-d": "190ms" } as any}>loading clients...</div>
           ) : filtered.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "48px 0", color: C.mute, fontSize: 13 }}>
+            <div className="pt-bounce cdir-empty" style={{ "--pt-d": "190ms" } as any}>
               {search ? `no clients match "${search}"` : "no clients yet - tap + to add your first"}
             </div>
           ) : (
-            filtered.map((client: any) => (
-              <ClientRow
-                key={client.id}
-                client={client}
-                nextInvoice={invoiceByClient(client.id)}
-                onClick={() => setLocation(`/trades/clients/${client.id}`)}
-              />
+            filtered.map((client: any, i: number) => (
+              <div key={client.id} className="pt-bounce" style={{ "--pt-d": `${190 + Math.min(i, 12) * 45}ms` } as any}>
+                <ClientRow
+                  client={client}
+                  nextInvoice={invoiceByClient(client.id)}
+                  onClick={() => setLocation(`/trades/clients/${client.id}`)}
+                />
+              </div>
             ))
           )}
         </div>
 
-        <div style={{ padding: "22px 18px 0" }}>
-          <button
-            onClick={() => setShowArchived((current) => !current)}
-            style={{ background: "none", border: "none", color: C.mute, fontSize: 12, fontWeight: 700, cursor: "pointer", textTransform: "uppercase", letterSpacing: 0, padding: 0 }}
-          >
+        <div className="pt-bounce cdir-archived" style={{ "--pt-d": `${190 + (Math.min(filtered.length, 12) + 1) * 45}ms` } as any}>
+          <button type="button" onClick={() => setShowArchived((current) => !current)}>
             {showArchived ? "hide archived" : "show archived"}
           </button>
           {showArchived && (
             archivedClients.length === 0 ? (
-              <div style={{ padding: "14px 0", color: C.mute, fontSize: 13 }}>no archived clients</div>
+              <div className="cdir-archived-empty">no archived clients</div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
+              <div className="cdir-archived-list">
                 {archivedClients.map((client: any) => (
-                  <div key={client.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 16, background: "#EDEDED" }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 13.5, color: C.ink, textTransform: "capitalize", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{client.firstName} {client.lastName}</div>
-                      <div style={{ fontSize: 11.5, color: C.mute, marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{client.siteAddress}</div>
+                  <div key={client.id} className="cdir-archive-row">
+                    <div>
+                      <strong>{client.firstName} {client.lastName}</strong>
+                      <span>{client.siteAddress}</span>
                     </div>
-                    <button
-                      onClick={() => restoreMutation.mutate(client.id)}
-                      disabled={restoreMutation.isPending}
-                      style={{ flexShrink: 0, background: C.ink, color: C.cream, border: "none", borderRadius: 10, padding: "8px 12px", fontSize: 12, fontWeight: 700, cursor: restoreMutation.isPending ? "default" : "pointer", opacity: restoreMutation.isPending ? 0.6 : 1, display: "flex", alignItems: "center", gap: 6 }}
-                    >
-                      <RotateCcw size={13} />
-                      restore
-                    </button>
+                    <button type="button" onClick={() => restoreMutation.mutate(client.id)} disabled={restoreMutation.isPending}>restore</button>
                   </div>
                 ))}
               </div>
             )
           )}
         </div>
+      </main>
 
-        {showAdd && (
-          <AddClientSheet
-            onClose={() => { setShowAdd(false); setSaveError(null); }}
-            onSave={(data) => { setSaveError(null); createMutation.mutate(data); }}
-            saving={createMutation.isPending}
-            saveError={saveError}
-          />
-        )}
-      </div>
+      {/* Add client sheet */}
+      {showAdd && (
+        <AddClientSheet
+          onClose={() => { setShowAdd(false); setSaveError(null); }}
+          onSave={(data) => { setSaveError(null); createMutation.mutate(data); }}
+          saving={createMutation.isPending}
+          saveError={saveError}
+        />
+      )}
+    </div>
     </div>
   );
 }
+
+/* Mirrors the tenant directory's DIRECTORY_CSS with trades theme tokens.
+   (cdir- prefix so the two pages' styles never collide.) */
+const DIRECTORY_CSS = `
+.cdir-hero {
+  position: relative;
+  height: 265px;
+  background: ${C.ink};
+  color: ${C.sky};
+  padding: 78px 34px 0;
+  box-sizing: border-box;
+}
+.cdir-hero-count {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 100px;
+  line-height: 0.95;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+.cdir-hero-label {
+  margin-top: 16px;
+  font-size: 13px;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.cdir-add {
+  position: absolute;
+  left: 50%;
+  top: -34px;
+  width: 68px;
+  height: 68px;
+  transform: translateX(-50%);
+  opacity: 0;
+  animation: cdirAddPop 0.52s cubic-bezier(0.34, 1.56, 0.64, 1) 90ms both;
+  border: none;
+  border-radius: 999px;
+  background: ${C.sky};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(4,13,109,0.16);
+  -webkit-tap-highlight-color: transparent;
+}
+.cdir-add::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 0 0 rgba(88,171,255,0);
+}
+.cdir-add.cdir-pulse::after {
+  animation: cdirAddRing 0.48s ease-out;
+}
+@keyframes cdirAddPop {
+  0%   { opacity: 0; transform: translateX(-50%) translateY(30px) scale(0.86); }
+  55%  { opacity: 1; transform: translateX(-50%) translateY(-7px) scale(1.045); }
+  74%  { transform: translateX(-50%) translateY(3px) scale(0.983); }
+  88%  { transform: translateX(-50%) translateY(-1.5px) scale(1.007); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+@keyframes cdirAddRing {
+  0% { box-shadow: 0 0 0 0 rgba(88,171,255,0.48); }
+  100% { box-shadow: 0 0 0 10px rgba(88,171,255,0); }
+}
+.cdir-body {
+  position: relative;
+  background: ${C.body};
+  margin-top: -28px;
+  border-radius: 28px 28px 0 0;
+  min-height: calc(100svh - 237px);
+  padding: 50px 13px 0;
+  box-sizing: border-box;
+}
+.cdir-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 40px;
+  gap: 8px;
+  align-items: center;
+}
+.cdir-search {
+  height: 40px;
+  border-radius: 999px;
+  background: ${C.gray};
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 18px;
+  box-sizing: border-box;
+}
+.cdir-search input {
+  min-width: 0;
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: ${C.ink};
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.cdir-search input::placeholder { color: rgba(4,13,109,0.4); }
+.cdir-search button {
+  border: none;
+  background: transparent;
+  padding: 0;
+  display: flex;
+  cursor: pointer;
+}
+.cdir-grid-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 13px;
+  background: ${C.ink};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.cdir-list {
+  display: flex;
+  flex-direction: column;
+  padding-top: 12px;
+}
+.cdir-row {
+  width: 100%;
+  border: none;
+  background: transparent;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 15px;
+  padding: 15px 4px;
+  box-sizing: border-box;
+  color: ${C.ink};
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.cdir-row:active { transform: scale(0.99); opacity: 0.75; }
+.cdir-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1.5px solid ${C.sky};
+  color: ${C.ink};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+.cdir-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.cdir-name {
+  color: ${C.ink};
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1.15;
+  text-transform: lowercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cdir-address {
+  color: rgba(4,13,109,0.75);
+  font-weight: 500;
+  font-size: 13.5px;
+  line-height: 1.2;
+  text-transform: lowercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cdir-money {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 76px;
+  color: ${C.ink};
+  justify-self: end;
+}
+.cdir-money span {
+  font-size: 17px;
+  line-height: 1;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.cdir-money small {
+  font-size: 10px;
+  line-height: 1.35;
+  color: rgba(4,13,109,0.75);
+  font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
+}
+.cdir-money small.overdue { color: ${C.red}; font-weight: 700; }
+.cdir-empty {
+  padding: 34px 18px;
+  color: rgba(4,13,109,0.55);
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+}
+.cdir-archived {
+  padding: 23px 2px 0;
+}
+.cdir-archived > button {
+  border: none;
+  background: transparent;
+  color: rgba(4,13,109,0.48);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 850;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0;
+}
+.cdir-archived-empty {
+  padding: 14px 0;
+  color: rgba(4,13,109,0.48);
+  font-size: 13px;
+  font-weight: 650;
+}
+.cdir-archived-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+.cdir-archive-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: ${C.gray};
+}
+.cdir-archive-row div {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.cdir-archive-row strong {
+  color: ${C.ink};
+  font-size: 13px;
+  font-weight: 850;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cdir-archive-row span {
+  color: rgba(4,13,109,0.55);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cdir-archive-row button {
+  border: none;
+  border-radius: 11px;
+  background: ${C.ink};
+  color: ${C.white};
+  padding: 8px 13px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+@media (max-width: 350px) {
+  .cdir-body { padding-left: 10px; padding-right: 10px; }
+  .cdir-row { grid-template-columns: 42px minmax(0, 1fr) auto; gap: 10px; padding-left: 2px; padding-right: 2px; }
+  .cdir-avatar { width: 42px; height: 42px; }
+  .cdir-money { min-width: 68px; }
+  .cdir-money span { font-size: 15px; }
+}
+`;

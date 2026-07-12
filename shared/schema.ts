@@ -1142,7 +1142,15 @@ export const acceptQuoteSchema = z.object({
 });
 
 export const createJobInvoiceSchema = z.object({
-  clientProfileId: z.string().uuid(),
+  // Either an existing client profile OR inline recipient details (quick
+  // invoice — the server creates a hidden 'prospect' profile from these).
+  clientProfileId: z.string().uuid().optional(),
+  recipient: z.object({
+    name: z.string().trim().min(1, "Name is required").max(120),
+    email: optionalEmailSchema,
+    phone: optionalPhoneSchema,
+    channel: z.enum(["email", "sms"]).default("email"),
+  }).optional(),
   amountCents: z.number().int().positive().max(100_000_000),
   deliveryChannel: z.enum(["email", "whatsapp", "sms"]),
   dueAt: z.string().datetime().or(z.date()).transform(v => new Date(v as any)),
@@ -1158,6 +1166,17 @@ export const createJobInvoiceSchema = z.object({
   // quote-linked or send-balance can never compute a remaining amount.
   message: "A deposit invoice must be linked to a quote",
   path: ["quoteId"],
+}).refine(d => !!d.clientProfileId !== !!d.recipient, {
+  message: "Provide a client or recipient details",
+  path: ["clientProfileId"],
+}).refine(d => !d.recipient || (d.recipient.channel === "email" ? !!d.recipient.email : !!d.recipient.phone), {
+  message: "Recipient email or phone is required for the chosen channel",
+  path: ["recipient"],
+}).refine(d => !d.recipient || (d.kind === "full" && !d.quoteId), {
+  // Quick invoices are standalone: deposits/balances derive from a quote whose
+  // client already exists, so an inline recipient never makes sense there.
+  message: "Quick invoices must be standalone full invoices",
+  path: ["recipient"],
 });
 
 export const markJobPaidExternalSchema = z.object({

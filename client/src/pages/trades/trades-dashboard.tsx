@@ -261,7 +261,7 @@ export default function TradesDashboard() {
     ? selBar
     : Math.min(currentBucketIdx(tf), buckets.length - 1);
 
-  const activeClients = fCli.filter((c: any) => c.status !== 'archived').length;
+  const activeClients = fCli.filter((c: any) => !['archived', 'prospect'].includes(c.status)).length;
   const overdueCount = fInv.filter((i: any) => i.status === 'overdue').length;
 
   const pickTf = (t: Timeframe) => { setTf(t); setSelBar(-1); };
@@ -341,7 +341,7 @@ export default function TradesDashboard() {
         <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr 1fr', gap: 12, padding: '18px 22px 0' }}>
           {[
             { label: <>new<br />quote</>, Ico: IcoPlus, to: '/trades/quote', aria: 'new quote' },
-            { label: <>quick<br />invoice</>, Ico: IcoBill, to: '/trades/terminal', aria: 'quick invoice' },
+            { label: <>quick<br />invoice</>, Ico: IcoBill, to: '/trades/terminal?quick=1', aria: 'quick invoice' },
             { label: <>recurring<br />jobs</>, Ico: IcoRepeat, to: '/trades/recurring', aria: 'recurring jobs' },
           ].map(({ label, Ico, to, aria }) => (
             <button key={aria} type="button" className="td-card td-tap" aria-label={aria}

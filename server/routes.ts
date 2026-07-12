@@ -6629,6 +6629,17 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       res.json(await storage.unarchiveClientProfile(req.params.id));
     } catch (err) { console.error("[TRADES_CLIENTS_UNARCHIVE]", err); res.status(500).json({ message: "Failed to restore client" }); }
   });
+  // Promote a quick-invoice 'prospect' profile into a real (visible) client.
+  app.post("/api/trades/clients/:id/promote", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const existing = await storage.getClientProfile(req.params.id);
+      if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      if (existing.status !== "prospect") return res.status(400).json({ message: "Client is already saved" });
+      res.json(await storage.updateClientProfile(req.params.id, { status: "active" }));
+    } catch (err) { console.error("[TRADES_CLIENTS_PROMOTE]", err); res.status(500).json({ message: "Failed to save client" }); }
+  });
   app.get("/api/trades/clients/:id/events", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
@@ -6870,14 +6881,34 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
       const parsed = createJobInvoiceSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
-      const client = await storage.getClientProfile(parsed.data.clientProfileId);
-      if (!client || client.merchantId !== merchantId) return res.status(404).json({ message: "Client not found" });
+      let client: any;
+      if (parsed.data.recipient) {
+        // Quick invoice: no pre-existing client. Create a HIDDEN 'prospect'
+        // profile carrying the typed contact details so the NOT NULL FK and
+        // all downstream systems (dispatch, checkout, events) work unchanged.
+        // The merchant can promote it to a real client from the success screen.
+        const nm = parsed.data.recipient.name.trim();
+        const spaceIdx = nm.indexOf(" ");
+        client = await storage.createClientProfile({
+          merchantId,
+          firstName: spaceIdx > 0 ? nm.slice(0, spaceIdx) : nm,
+          lastName: spaceIdx > 0 ? nm.slice(spaceIdx + 1) : "",
+          email: parsed.data.recipient.email ?? null,
+          phone: parsed.data.recipient.phone ?? null,
+          siteAddress: "",
+          preferredChannel: parsed.data.recipient.channel,
+          status: "prospect",
+        });
+      } else {
+        client = await storage.getClientProfile(parsed.data.clientProfileId!);
+        if (!client || client.merchantId !== merchantId) return res.status(404).json({ message: "Client not found" });
+      }
       if (parsed.data.quoteId) {
         const linkedQuote = await storage.getQuote(parsed.data.quoteId);
         if (!linkedQuote || linkedQuote.merchantId !== merchantId) return res.status(404).json({ message: "Quote not found" });
       }
       const row = await storage.createJobInvoice({
-        merchantId, clientProfileId: parsed.data.clientProfileId,
+        merchantId, clientProfileId: client.id,
         quoteId: parsed.data.quoteId ?? null, kind: parsed.data.kind,
         amountCents: parsed.data.amountCents, token: generateInvoiceToken(),
         deliveryChannel: parsed.data.deliveryChannel, jobDetails: parsed.data.jobDetails ?? null,

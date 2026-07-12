@@ -275,9 +275,14 @@ function Router() {
 
   return (
     <PageTransition>
+      {/* Pin the Switch to the wrapper's location — matching from context would
+          let the exiting page re-render as the destination during the exit
+          animation (a double mount that eats one-shot params like ?quick=1). */}
+      {(transitionLocation) => (
+      <>
       <GA4PageTracker />
       <Suspense fallback={<PageLoader />}>
-        <Switch>
+        <Switch location={transitionLocation}>
           <Route path="/"><LandingPage /></Route>
           <Route path="/info" component={InfoPage} />
           <Route path="/business-details" component={BusinessDetails} />
@@ -374,6 +379,8 @@ function Router() {
           <Route component={NotFound} />
         </Switch>
       </Suspense>
+      </>
+      )}
     </PageTransition>
   );
 }
