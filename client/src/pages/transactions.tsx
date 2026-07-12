@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { csvCell } from "@/lib/report-utils";
 import QRCode from "qrcode";
 
 interface Transaction {
@@ -312,8 +313,8 @@ export default function Transactions() {
     });
 
     const csvContent = [
-      headers.join(','),
-      ...rows.map((row: any[]) => row.map((cell: any) => `"${cell}"`).join(',')),
+      headers.map(csvCell).join(','),
+      ...rows.map((row: any[]) => row.map(csvCell).join(',')),
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -359,10 +360,9 @@ export default function Transactions() {
       }
     });
 
-    const escapeCSV = (val: string) => `"${val.replace(/"/g, '""')}"`;
     const csvContent = [
-      headers.join(','),
-      ...rows.map((row) => row.map(escapeCSV).join(',')),
+      headers.map(csvCell).join(','),
+      ...rows.map((row) => row.map(csvCell).join(',')),
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv' });

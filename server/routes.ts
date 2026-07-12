@@ -2157,18 +2157,28 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         "Payment Reference"
       ];
       
+      // Escape one CSV field: RFC-4180 quote-wrap (doubling internal quotes) and
+      // neutralise formula injection (a leading = + - @ makes Excel/Sheets execute
+      // the cell). Mirrors client csvCell() in report-utils.
+      const csvCell = (value: unknown): string => {
+        let s = value == null ? "" : String(value);
+        if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+        if (/[",\n\r]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+        return s;
+      };
+
       // Generate CSV content
-      const csvRows = [headers.join(",")];
-      
+      const csvRows = [headers.map(csvCell).join(",")];
+
       transactions.forEach(transaction => {
         const row = [
           transaction.id,
           transaction.createdAt ? new Date(transaction.createdAt).toLocaleString('en-NZ') : 'N/A',
-          `"${transaction.itemName}"`, // Quote item names to handle commas
+          transaction.itemName,
           `$${parseFloat(transaction.price).toFixed(2)}`,
           transaction.status,
           transaction.windcaveTransactionId || 'N/A'
-        ];
+        ].map(csvCell);
         csvRows.push(row.join(","));
       });
       
