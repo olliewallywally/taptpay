@@ -73,6 +73,9 @@ export const merchants = pgTable("merchants", {
 
   // GST registration (Trades vertical)
   gstRegistered: boolean("gst_registered").notNull().default(false),
+  // Trades quote price presentation: inclusive prices already contain GST;
+  // exclusive prices are net prices with GST added on top.
+  tradeGstMode: text("trade_gst_mode").notNull().default("inclusive"),
 
   // Dashboard preferences
   dailyGoal: decimal("daily_goal", { precision: 10, scale: 2 }).default("500.00"), // Daily revenue goal in dollars
@@ -91,6 +94,9 @@ export const merchants = pgTable("merchants", {
   rentReminderDelayDays: integer("rent_reminder_delay_days").notNull().default(3),     // days after due before first reminder
   rentReminderIntervalDays: integer("rent_reminder_interval_days").notNull().default(3), // days between subsequent reminders
   rentReminderMaxCount: integer("rent_reminder_max_count").notNull().default(3),        // max reminders (0 = unlimited)
+  // Trades — own reminder on/off switch so disabling rent reminders does not
+  // silently stop trades job-invoice reminders (cadence reuses the rent* days).
+  tradeRemindersEnabled: boolean("trade_reminders_enabled").notNull().default(true),
 
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -253,7 +259,7 @@ export const createSplitPaymentSchema = z.object({
     const num = parseFloat(val);
     return !isNaN(num) && num > 0;
   }, "Amount must be a positive number"),
-  paymentMethod: z.enum(["qr_code", "nfc_tap", "card_reader", "manual", "cash", "tap_to_pay"]).default("qr_code"),
+  paymentMethod: z.enum(["qr_code", "nfc_tap", "card_reader", "manual", "cash", "tap_to_pay", "crypto", "api"]).default("qr_code"),
 });
 
 // Bill split creation schema
@@ -393,7 +399,7 @@ export const insertTransactionSchema = createInsertSchema(transactions).omit({
   merchantId: z.number(),
   price: z.string().regex(/^\d+(\.\d{2})?$/, "Price must be a valid decimal"),
   status: z.enum(["pending", "processing", "completed", "failed"]).default("pending"),
-  paymentMethod: z.enum(["qr_code", "nfc_tap", "card_reader", "manual", "cash", "tap_to_pay"]).default("qr_code"),
+  paymentMethod: z.enum(["qr_code", "nfc_tap", "card_reader", "manual", "cash", "tap_to_pay", "crypto", "api"]).default("qr_code"),
   selectedStoneId: z.number().optional(),
   splitEnabled: z.boolean().optional().default(false),
 });
@@ -912,6 +918,15 @@ export const updateRentReminderSettingsSchema = z.object({
   rentReminderMaxCount: z.number().int().min(0).max(20).optional(),
 });
 
+export const updateTradeReminderSettingsSchema = z.object({
+  tradeRemindersEnabled: z.boolean(),
+});
+
+export const updateTradeGstSettingsSchema = z.object({
+  gstRegistered: z.boolean().optional(),
+  tradeGstMode: z.enum(["inclusive", "exclusive"]).optional(),
+});
+
 export const createAdHocInvoiceSchema = z.object({
   tenantProfileId: z.string().uuid(),
   amountCents: z.number().int().positive().max(100_000_000),
@@ -944,7 +959,7 @@ export type InsertTransactionEvent = typeof transactionEvents.$inferInsert;
 
 /* ═══════════════ TRADES VERTICAL ═══════════════ */
 
-export const GST_RATE = 0.15; // NZ GST; amounts are GST-inclusive
+export { GST_RATE } from "./trades-gst";
 
 export const clientProfiles = pgTable("client_profiles", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -973,6 +988,7 @@ export const quotes = pgTable("quotes", {
   lineItems: jsonb("line_items").notNull(),
   subtotalCents: integer("subtotal_cents").notNull(),
   gstCents: integer("gst_cents").notNull().default(0),
+  gstMode: text("gst_mode"),
   totalCents: integer("total_cents").notNull(),
   depositEnabled: boolean("deposit_enabled").notNull().default(false),
   depositType: text("deposit_type"),        // 'percent' | 'fixed'
@@ -1055,6 +1071,11 @@ export const jobInvoices = pgTable("job_invoices", {
   statusDueIdx: index("job_invoices_status_due_idx").on(t.status, t.dueAt),
   merchantStatusIdx: index("job_invoices_merchant_status_idx").on(t.merchantId, t.status),
   tokenIdx: index("job_invoices_token_idx").on(t.token),
+  // One LIVE recurring invoice per (schedule, due date) — makes cron generation
+  // idempotent under concurrent/retried runs. Partial so non-recurring invoices
+  // (null scheduleId) never collide, and voided rows are excluded so a cancelled
+  // duplicate can't wedge the index.
+  scheduleDueUq: uniqueIndex("job_invoices_schedule_due_uq").on(t.scheduleId, t.dueAt).where(sql`${t.scheduleId} IS NOT NULL AND ${t.status} <> 'voided'`),
 }));
 
 export const jobEvents = pgTable("job_events", {
@@ -1123,6 +1144,11 @@ export const createJobInvoiceSchema = z.object({
   splitEnabled: z.boolean().optional(),
   documentUrl: z.string().trim().max(500).optional().or(z.literal("")).transform(v => v || undefined),
   documentName: z.string().trim().max(255).optional().or(z.literal("")).transform(v => v || undefined),
+}).refine(d => d.kind !== "deposit" || !!d.quoteId, {
+  // A deposit's balance is derived from its quote total, so a deposit must be
+  // quote-linked or send-balance can never compute a remaining amount.
+  message: "A deposit invoice must be linked to a quote",
+  path: ["quoteId"],
 });
 
 export const markJobPaidExternalSchema = z.object({

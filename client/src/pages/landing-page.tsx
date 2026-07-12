@@ -1,812 +1,505 @@
-import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence, LayoutGroup } from "motion/react";
-import {
-  Smartphone, Zap, CreditCard, BarChart3,
-  ArrowRight, ChevronLeft, ArrowUpRight,
-} from "lucide-react";
 import { useLocation } from "wouter";
-import logoImage from "@assets/logo_1762915255857.png";
+import { useState } from "react";
+import { motion } from "motion/react";
+import { ChevronDown, ArrowRight, Check } from "lucide-react";
+import { SEOHead } from "@/components/SEOHead";
+import skyLogo from "@assets/Logo_-_sky_blue_1780811546035.png";
 
-// ─── Palette ──────────────────────────────────────────────────────────────────
-const BG       = "#060D1F";
-const NAVY2    = "#0A1628";
-const PANEL    = "#08121F";
-const SKY      = "#38B2FF";
-const SKY2     = "#63CBFF";
-const WHITE    = "#EBF0FF";
-const WHITE55  = "rgba(235,240,255,0.55)";
-const WHITE25  = "rgba(235,240,255,0.25)";
-const WHITE08  = "rgba(235,240,255,0.08)";
-const WHITE06  = "rgba(235,240,255,0.06)";
-const SKYG     = "rgba(56,178,255,0.18)";
-const SKYG_SM  = "rgba(56,178,255,0.08)";
+// ─── Brand palette (sampled from the uploaded artboards) ───────────────────────
+const NAVY = "#070D51";
+const SKY = "#58ABFF";
+const GREY = "#E6E6E6";
 
-// ─── Panel data ───────────────────────────────────────────────────────────────
-const PANELS = [
-  {
-    Icon: Smartphone,
-    tag: "01",
-    title: "Zero Hardware",
-    headline: "Your device\nis the terminal.",
-    body: "Turn any iPhone or Android into a fully-certified payment point. No EFTPOS machines, no rentals, no courier wait — just tap.",
-    cta: "See How It Works",
-    angle: "135deg",
-  },
-  {
-    Icon: Zap,
-    tag: "02",
-    title: "Instant Velocity",
-    headline: "Live in minutes,\nnot days.",
-    body: "From signup to first transaction in under 10 minutes. Streamlined verification, instant merchant approval, zero setup friction.",
-    cta: "Start Onboarding",
-    angle: "155deg",
-  },
-  {
-    Icon: CreditCard,
-    tag: "03",
-    title: "EFTPOS Redefined",
-    headline: "No legacy.\nNo compromise.",
-    body: "Cut ties with terminal contracts and hidden hardware fees. Tapt Pay is fully software-defined — you own the experience.",
-    cta: "View Pricing",
-    angle: "120deg",
-  },
-  {
-    Icon: BarChart3,
-    tag: "04",
-    title: "Full Visibility",
-    headline: "Real-time intel,\nevery transaction.",
-    body: "A live analytics dashboard gives you instant insight into revenue, settlements, and merchant performance — anywhere.",
-    cta: "Explore Dashboard",
-    angle: "148deg",
-  },
-] as const;
-
-// ─── Keyframe block ───────────────────────────────────────────────────────────
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
-*{box-sizing:border-box;margin:0;padding:0;}
-body{background:${BG};overflow:hidden;}
-
-@keyframes orb1{0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(50px,-70px) scale(1.1)} 66%{transform:translate(-30px,40px) scale(.95)}}
-@keyframes orb2{0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(-60px,35px) scale(1.05)} 66%{transform:translate(55px,-45px) scale(1.1)}}
-@keyframes orb3{0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(25px,60px) scale(1.15)}}
-@keyframes gridPulse{0%,100%{opacity:.03} 50%{opacity:.055}}
-@keyframes ringA{from{transform:rotate(0deg)} to{transform:rotate(360deg)}}
-@keyframes ringB{from{transform:rotate(0deg)} to{transform:rotate(-360deg)}}
-@keyframes orbitDot{0%,100%{opacity:.35;transform:scale(.8)} 50%{opacity:1;transform:scale(1)}}
-@keyframes cardFloat{0%,100%{transform:translateY(0) rotate(-4deg)} 50%{transform:translateY(-14px) rotate(-4deg)}}
-@keyframes chipFloat{0%,100%{transform:translateY(0) rotate(7deg)} 50%{transform:translateY(-10px) rotate(7deg)}}
-@keyframes corePulse{0%,100%{box-shadow:0 0 0 0 rgba(56,178,255,.5),0 0 40px rgba(56,178,255,.2)} 50%{box-shadow:0 0 0 16px rgba(56,178,255,0),0 0 60px rgba(56,178,255,.35)}}
-@keyframes nfcPing{0%{transform:scale(.7);opacity:.7} 100%{transform:scale(2.4);opacity:0}}
+html{scroll-behavior:smooth;}
+.tp-root{font-family:'Outfit','Inter',system-ui,sans-serif;}
+@keyframes tpBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(8px)}}
+.tp-bounce{animation:tpBounce 1.8s ease-in-out infinite;}
 `;
 
-// ─── Gradient mesh background ─────────────────────────────────────────────────
-function Mesh() {
-  return (
-    <div style={{ position:"absolute", inset:0, overflow:"hidden", pointerEvents:"none" }}>
-      <div style={{ position:"absolute", top:"-15%", right:"-8%", width:"65vw", height:"65vw",
-        maxWidth:760, maxHeight:760, borderRadius:"50%",
-        background:`radial-gradient(circle,${SKYG} 0%,rgba(56,178,255,.04) 55%,transparent 72%)`,
-        filter:"blur(45px)", animation:"orb1 14s ease-in-out infinite" }} />
-      <div style={{ position:"absolute", bottom:"-5%", left:"-12%", width:"55vw", height:"55vw",
-        maxWidth:640, maxHeight:640, borderRadius:"50%",
-        background:`radial-gradient(circle,rgba(56,178,255,.1) 0%,transparent 70%)`,
-        filter:"blur(55px)", animation:"orb2 17s ease-in-out infinite" }} />
-      <div style={{ position:"absolute", top:"25%", left:"28%", width:"42vw", height:"42vw",
-        maxWidth:520, maxHeight:520, borderRadius:"50%",
-        background:`radial-gradient(circle,rgba(14,40,90,.2) 0%,transparent 70%)`,
-        filter:"blur(65px)", animation:"orb3 20s ease-in-out infinite" }} />
-      <div style={{ position:"absolute", inset:0,
-        backgroundImage:"linear-gradient(rgba(235,240,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(235,240,255,.04) 1px,transparent 1px)",
-        backgroundSize:"80px 80px", animation:"gridPulse 9s ease-in-out infinite" }} />
-    </div>
-  );
-}
+const fadeUp = {
+  initial: { opacity: 0, y: 28, filter: "blur(8px)" },
+  whileInView: { opacity: 1, y: 0, filter: "blur(0px)" },
+  viewport: { once: true, amount: 0.3 },
+  transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] as const },
+};
 
-// ─── Hero visual ──────────────────────────────────────────────────────────────
-function HeroVisual() {
-  return (
-    <div style={{ position:"relative", width:300, height:300, flexShrink:0 }}>
-      {/* NFC pings */}
-      {[0,1,2].map(i => (
-        <div key={i} style={{
-          position:"absolute", inset:0, margin:"auto",
-          width:90, height:90, borderRadius:"50%",
-          border:`1px solid ${SKY}`,
-          animation:`nfcPing ${2.2}s ease-out infinite`,
-          animationDelay:`${i * 0.72}s`,
-        }} />
-      ))}
+const scrollTo = (id: string) =>
+  document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
-      {/* Outer slow-rotating ring */}
-      <div style={{
-        position:"absolute", inset:0, margin:"auto",
-        width:230, height:230, borderRadius:"50%",
-        border:"1px solid rgba(56,178,255,.18)",
-        borderTopColor: SKY,
-        borderRightColor:"rgba(56,178,255,.4)",
-        animation:"ringA 12s linear infinite",
-      }} />
-
-      {/* Inner counter-rotating dashed ring */}
-      <div style={{
-        position:"absolute", inset:0, margin:"auto",
-        width:175, height:175, borderRadius:"50%",
-        border:"1px dashed rgba(56,178,255,.25)",
-        animation:"ringB 8s linear infinite",
-      }} />
-
-      {/* Orbital dots */}
-      {[0,60,120,180,240,300].map((deg,i) => (
-        <div key={i} style={{
-          position:"absolute", inset:0, margin:"auto",
-          width:230, height:230,
-          transform:`rotate(${deg}deg)`,
-        }}>
-          <div style={{
-            position:"absolute", top:-4, left:"50%",
-            width:8, height:8, marginLeft:-4,
-            borderRadius:"50%",
-            background: i % 2 === 0 ? SKY : "rgba(56,178,255,.4)",
-            boxShadow: i % 2 === 0 ? `0 0 8px ${SKY}` : "none",
-            animation:`orbitDot ${2.5 + i*0.3}s ease-in-out infinite`,
-            animationDelay:`${i*0.4}s`,
-          }} />
-        </div>
-      ))}
-
-      {/* Core */}
-      <div style={{
-        position:"absolute", inset:0, margin:"auto",
-        width:90, height:90, borderRadius:"50%",
-        background:`radial-gradient(circle, rgba(56,178,255,.35) 0%, rgba(56,178,255,.08) 65%, transparent 100%)`,
-        border:`1px solid rgba(56,178,255,.5)`,
-        display:"flex", alignItems:"center", justifyContent:"center",
-        animation:"corePulse 3s ease-in-out infinite",
-      }}>
-        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-          <path d="M16 4C9.37 4 4 9.37 4 16s5.37 12 12 12 12-5.37 12-12S22.63 4 16 4" stroke={SKY} strokeWidth="1.2" fill="none" opacity=".5" strokeDasharray="5 4"/>
-          <path d="M16 9C12.13 9 9 12.13 9 16s3.13 7 7 7 7-3.13 7-7-3.13-7-7-7" stroke={SKY} strokeWidth="1.5" fill="none" opacity=".8"/>
-          <circle cx="16" cy="16" r="3.5" fill={SKY}/>
-        </svg>
-      </div>
-
-      {/* Floating phone card */}
-      <div style={{
-        position:"absolute", top:10, right:-18,
-        width:72, height:120, borderRadius:14,
-        background:`linear-gradient(150deg, #0E2040 0%, #091826 100%)`,
-        border:"1px solid rgba(56,178,255,.28)",
-        boxShadow:"0 18px 50px rgba(0,0,0,.45), 0 0 20px rgba(56,178,255,.1)",
-        padding:"10px 9px",
-        display:"flex", flexDirection:"column", gap:7,
-        animation:"cardFloat 4.2s ease-in-out infinite",
-      }}>
-        <div style={{ width:"100%", height:3, borderRadius:2, background:"rgba(56,178,255,.5)" }} />
-        <div style={{ width:"70%", height:2, borderRadius:1, background:WHITE08 }} />
-        <div style={{
-          flex:1, borderRadius:8,
-          background:"linear-gradient(140deg, rgba(56,178,255,.22), rgba(56,178,255,.04))",
-          display:"flex", alignItems:"center", justifyContent:"center",
-        }}>
-          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-            <rect x="2" y="4" width="18" height="14" rx="3" stroke={SKY} strokeWidth="1.4" fill="none" opacity=".7"/>
-            <path d="M2 8h18" stroke={SKY} strokeWidth="1.2" opacity=".5"/>
-          </svg>
-        </div>
-        <div style={{ width:"100%", height:2, borderRadius:1, background:"rgba(56,178,255,.18)" }} />
-        <div style={{ display:"flex", gap:3 }}>
-          {[0,1,2,3].map(i=>(
-            <div key={i} style={{ width:13, height:3, borderRadius:1, background:WHITE08 }} />
-          ))}
-        </div>
-      </div>
-
-      {/* Floating chip card */}
-      <div style={{
-        position:"absolute", bottom:14, left:-28,
-        width:105, height:66, borderRadius:10,
-        background:`linear-gradient(130deg, #122540 0%, #0A1628 100%)`,
-        border:"1px solid rgba(56,178,255,.22)",
-        boxShadow:"0 14px 38px rgba(0,0,0,.5)",
-        padding:"9px 11px",
-        display:"flex", flexDirection:"column", justifyContent:"space-between",
-        animation:"chipFloat 5.1s ease-in-out infinite",
-        animationDelay:".6s",
-      }}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-          <div style={{
-            width:22, height:16, borderRadius:3,
-            background:`linear-gradient(135deg, rgba(56,178,255,.65), rgba(56,178,255,.2))`,
-            border:"1px solid rgba(56,178,255,.3)",
-          }} />
-          <div style={{
-            display:"flex", gap:-4,
-          }}>
-            {[0,1].map(i=>(
-              <div key={i} style={{
-                width:18, height:18, borderRadius:"50%",
-                background:`rgba(56,178,255,.${i===0?'25':'15'})`,
-                border:"1px solid rgba(56,178,255,.3)",
-                marginLeft: i===1 ? -8 : 0,
-              }} />
-            ))}
-          </div>
-        </div>
-        <div style={{ display:"flex", gap:4 }}>
-          {[0,1,2,3].map(i=>(
-            <div key={i} style={{ width:16, height:3, borderRadius:1.5, background:WHITE08 }} />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Feature panel ────────────────────────────────────────────────────────────
-function Panel({
-  panel, index, isActive, anyActive, onClick,
-}: {
-  panel: typeof PANELS[number];
-  index: number;
-  isActive: boolean;
-  anyActive: boolean;
-  onClick: () => void;
-}) {
-  const { Icon, tag, title, headline, body, cta, angle } = panel;
-  const [hovered, setHovered] = useState(false);
-
-  const flexVal = isActive ? 5 : anyActive ? 0.55 : 1;
-
-  return (
-    <motion.div
-      layout
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      transition={{ layout: { duration: 0.58, ease: [0.22, 1, 0.36, 1] } }}
-      style={{
-        flex: flexVal,
-        position: "relative",
-        overflow: "hidden",
-        cursor: "pointer",
-        background: (hovered && !anyActive) ? "#0B1A2E" : PANEL,
-        borderRight: index < PANELS.length - 1 ? `1px solid ${WHITE06}` : "none",
-        display: "flex",
-        flexDirection: "column",
-        padding: "36px 28px 32px",
-        minWidth: 0,
-        transition: "background 0.3s ease, flex 0s",
-      }}
-    >
-      {/* Active accent gradient */}
-      <motion.div
-        animate={{ opacity: isActive ? 1 : 0 }}
-        transition={{ duration: 0.4 }}
-        style={{
-          position: "absolute", inset: 0, pointerEvents: "none",
-          background: `linear-gradient(${angle}, rgba(56,178,255,.1) 0%, transparent 55%)`,
-        }}
-      />
-
-      {/* Top shimmer bar */}
-      <motion.div
-        animate={{ scaleX: isActive ? 1 : 0, opacity: isActive ? 1 : 0 }}
-        initial={{ scaleX: 0, opacity: 0 }}
-        transition={{ duration: 0.5, delay: isActive ? 0.08 : 0 }}
-        style={{
-          position: "absolute", top: 0, left: 0, right: 0, height: 2,
-          background: `linear-gradient(90deg, ${SKY}, ${SKY2})`,
-          transformOrigin: "left",
-        }}
-      />
-
-      {/* Tag */}
-      <span style={{
-        fontSize: 10, fontWeight: 700, letterSpacing: "0.14em",
-        color: SKY, textTransform: "uppercase",
-        opacity: anyActive && !isActive ? 0.25 : 0.55,
-        transition: "opacity 0.3s",
-        marginBottom: "auto",
-      }}>
-        {tag}
-      </span>
-
-      {/* Icon */}
-      <motion.div
-        animate={{ color: isActive ? SKY : "rgba(235,240,255,0.35)", scale: isActive ? 1.05 : 1 }}
-        transition={{ duration: 0.35 }}
-        style={{ marginBottom: 14 }}
-      >
-        <Icon size={28} strokeWidth={1.5} />
-      </motion.div>
-
-      {/* Title */}
-      <motion.div
-        animate={{
-          fontSize: isActive ? "10px" : "14px",
-          color: isActive ? SKY : WHITE,
-          letterSpacing: isActive ? "0.12em" : "0.01em",
-        }}
-        transition={{ duration: 0.35 }}
-        style={{
-          fontWeight: isActive ? 600 : 700,
-          textTransform: isActive ? "uppercase" : "none",
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          lineHeight: 1.2,
-          marginBottom: isActive ? 8 : 0,
-        }}
-      >
-        {title}
-      </motion.div>
-
-      {/* Expanded content */}
-      <motion.div
-        animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 12 }}
-        transition={{ duration: 0.38, delay: isActive ? 0.18 : 0 }}
-        style={{ overflow: "hidden", pointerEvents: isActive ? "auto" : "none" }}
-      >
-        <h2 style={{
-          fontSize: "clamp(26px, 2.6vw, 40px)",
-          fontWeight: 800, lineHeight: 1.1,
-          letterSpacing: "-0.03em",
-          color: WHITE,
-          marginBottom: 18,
-          whiteSpace: "pre-line",
-        }}>
-          {headline}
-        </h2>
-
-        <p style={{
-          fontSize: 14, color: WHITE55, lineHeight: 1.72,
-          marginBottom: 28, maxWidth: 340, fontWeight: 300,
-        }}>
-          {body}
-        </p>
-
-        <PanelCTA label={cta} />
-      </motion.div>
-
-      {/* Subtle hover indicator for collapsed panels */}
-      {!anyActive && (
-        <motion.div
-          animate={{ opacity: hovered ? 1 : 0 }}
-          transition={{ duration: 0.2 }}
-          style={{
-            position: "absolute", bottom: 24, right: 20,
-            color: "rgba(56,178,255,.5)",
-          }}
-        >
-          <ArrowUpRight size={14} strokeWidth={2} />
-        </motion.div>
-      )}
-    </motion.div>
-  );
-}
-
-function PanelCTA({ label }: { label: string }) {
-  const [hov, setHov] = useState(false);
-  return (
-    <button
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      style={{
-        display: "inline-flex", alignItems: "center", gap: 8,
-        background: hov ? SKY : "transparent",
-        border: `1px solid ${SKY}`,
-        borderRadius: 100,
-        padding: "11px 24px",
-        color: hov ? BG : SKY,
-        fontSize: 12, fontWeight: 600,
-        letterSpacing: "0.07em", textTransform: "uppercase",
-        cursor: "pointer",
-        fontFamily: "inherit",
-        transition: "all 0.22s ease",
-      }}
-    >
-      {label}
-      <ArrowUpRight size={13} strokeWidth={2.5} />
-    </button>
-  );
-}
-
-// ─── Wipe overlay ─────────────────────────────────────────────────────────────
-function WipeOverlay({ phase }: { phase: "in" | "out" }) {
-  return (
-    <motion.div
-      initial={{ y: phase === "in" ? "100%" : "0%" }}
-      animate={{ y: phase === "in" ? "0%" : "-100%" }}
-      transition={{ duration: 0.46, ease: [0.76, 0, 0.24, 1] }}
-      style={{
-        position: "fixed", inset: 0, zIndex: 9999,
-        background: `linear-gradient(145deg, #1A6FBF 0%, ${SKY} 45%, ${SKY2} 75%, #88EDFF 100%)`,
-      }}
-    />
-  );
-}
-
-// ─── Hero section ─────────────────────────────────────────────────────────────
-function HeroSection({ onExplore }: { onExplore: () => void }) {
+// ─── Top navigation ────────────────────────────────────────────────────────────
+function Nav() {
   const [, setLocation] = useLocation();
-  const [btnHov, setBtnHov] = useState(false);
-  const [signHov, setSignHov] = useState(false);
-  const [startHov, setStartHov] = useState(false);
-
+  const links: [string, () => void][] = [
+    ["home", () => window.scrollTo({ top: 0, behavior: "smooth" })],
+    ["products", () => scrollTo("verticals")],
+    ["services", () => scrollTo("verticals")],
+    ["pricing", () => scrollTo("pricing")],
+    ["about us", () => scrollTo("tech")],
+    ["contact", () => scrollTo("contact")],
+  ];
   return (
-    <motion.div
-      key="hero"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.28 }}
-      style={{
-        position: "fixed", inset: 0,
-        background: BG,
-        display: "flex", flexDirection: "column",
-        overflow: "hidden",
-        fontFamily: "'Outfit', 'Inter', system-ui, sans-serif",
-      }}
+    <nav className="fixed top-0 inset-x-0 z-50 flex justify-center pt-5 md:pt-7 pointer-events-none">
+      <div className="pointer-events-auto flex items-center gap-3 sm:gap-5 md:gap-7">
+        {links.map(([label, fn], i) => (
+          <button
+            key={label}
+            onClick={fn}
+            className={`${i < 2 ? "hidden sm:inline" : ""} text-[#58ABFF]/90 hover:text-white transition-colors text-[11px] md:text-sm tracking-wide lowercase`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <button
+        onClick={() => setLocation("/login")}
+        className="pointer-events-auto absolute right-4 md:right-6 top-5 md:top-7 rounded-full bg-[#58ABFF] text-[#070D51] hover:bg-white transition-colors font-semibold lowercase text-[11px] md:text-sm px-4 md:px-5 py-1.5 md:py-2"
+      >
+        log in
+      </button>
+    </nav>
+  );
+}
+
+// ─── Hero ──────────────────────────────────────────────────────────────────────
+function Hero() {
+  return (
+    <section
+      className="relative h-screen w-full flex flex-col items-center justify-center text-center px-6"
+      style={{ backgroundColor: NAVY }}
     >
-      <Mesh />
-
-      {/* Header */}
-      <header style={{
-        position: "relative", zIndex: 10,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "22px 44px",
-      }}>
-        <motion.img
-          initial={{ opacity: 0, x: -16 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          src={logoImage}
-          alt="Tapt Pay"
-          style={{ height: 30, width: "auto" }}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.94 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
+        className="flex items-end justify-center"
+      >
+        <img
+          src={skyLogo}
+          alt="taptpay"
+          className="h-16 sm:h-24 md:h-32 lg:h-36 w-auto select-none"
+          draggable={false}
         />
-        <motion.nav
-          initial={{ opacity: 0, x: 16 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          style={{ display: "flex", alignItems: "center", gap: 28 }}
-        >
-          <button
-            onMouseEnter={() => setSignHov(true)}
-            onMouseLeave={() => setSignHov(false)}
-            onClick={() => setLocation("/login")}
-            style={{
-              background: "none", border: "none", cursor: "pointer",
-              color: signHov ? WHITE : WHITE55,
-              fontSize: 12, fontWeight: 500,
-              letterSpacing: "0.09em", textTransform: "uppercase",
-              fontFamily: "inherit",
-              transition: "color 0.2s",
-            }}
-          >
-            Sign In
-          </button>
-          <button
-            onMouseEnter={() => setStartHov(true)}
-            onMouseLeave={() => setStartHov(false)}
-            onClick={() => setLocation("/signup")}
-            style={{
-              background: startHov ? SKY2 : SKY,
-              color: BG,
-              border: "none", borderRadius: 100,
-              padding: "9px 22px",
-              fontSize: 12, fontWeight: 700,
-              letterSpacing: "0.07em", textTransform: "uppercase",
-              cursor: "pointer", fontFamily: "inherit",
-              transform: startHov ? "scale(1.04)" : "scale(1)",
-              transition: "all 0.22s ease",
-            }}
-          >
-            Get Started
-          </button>
-        </motion.nav>
-      </header>
+      </motion.div>
 
-      {/* Main */}
-      <main style={{
-        flex: 1, position: "relative", zIndex: 5,
-        display: "flex", flexDirection: "column",
-        alignItems: "center", justifyContent: "center",
-        padding: "0 24px", gap: 44, textAlign: "center",
-      }}>
-        {/* Copy */}
-        <motion.div
-          initial={{ opacity: 0, y: 48 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.85, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
-          style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 22 }}
-        >
-          {/* Pill badge */}
-          <div style={{
-            display: "inline-flex", alignItems: "center", gap: 8,
-            background: SKYG_SM,
-            border: "1px solid rgba(56,178,255,.22)",
-            borderRadius: 100, padding: "6px 16px",
-          }}>
-            <span style={{
-              width: 6, height: 6, borderRadius: "50%",
-              background: SKY,
-              boxShadow: `0 0 8px ${SKY}`,
-              display: "inline-block",
-            }} />
-            <span style={{
-              color: SKY, fontSize: 10, fontWeight: 700,
-              letterSpacing: "0.14em", textTransform: "uppercase",
-            }}>
-              Software-First Payments
-            </span>
-          </div>
+      <motion.p
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, delay: 0.45 }}
+        className="mt-6 md:mt-8 text-white/85 text-base sm:text-xl md:text-2xl font-light tracking-wide"
+      >
+        multi-stack digital payment solution
+      </motion.p>
 
-          {/* Headline */}
-          <h1 style={{
-            fontSize: "clamp(50px, 8.5vw, 116px)",
-            fontWeight: 900, lineHeight: 0.96,
-            letterSpacing: "-0.045em",
-            color: WHITE, margin: 0,
-          }}>
-            Replacing
-            <br />
-            the{" "}
-            <span style={{
-              background: `linear-gradient(130deg, ${SKY} 0%, ${SKY2} 55%, #9FEFFF 100%)`,
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-            }}>
-              Terminal.
-            </span>
-          </h1>
-
-          {/* Sub */}
-          <p style={{
-            fontSize: "clamp(14px, 1.7vw, 18px)",
-            color: WHITE55, maxWidth: 460,
-            lineHeight: 1.65, fontWeight: 300, margin: 0,
-          }}>
-            No hardware. No legacy contracts. Accept payments instantly — your phone is the terminal.
-          </p>
-        </motion.div>
-
-        {/* Visual */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.78 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 1.1, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <HeroVisual />
-        </motion.div>
-
-        {/* CTA block */}
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.65, delay: 0.62, ease: [0.22, 1, 0.36, 1] }}
-          style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}
-        >
-          <button
-            onMouseEnter={() => setBtnHov(true)}
-            onMouseLeave={() => setBtnHov(false)}
-            onClick={onExplore}
-            style={{
-              background: `linear-gradient(130deg, ${SKY} 0%, ${SKY2} 100%)`,
-              color: BG, border: "none", borderRadius: 100,
-              padding: "15px 42px",
-              fontSize: 14, fontWeight: 800,
-              letterSpacing: "0.07em", textTransform: "uppercase",
-              cursor: "pointer", fontFamily: "inherit",
-              display: "flex", alignItems: "center", gap: 10,
-              boxShadow: btnHov
-                ? `0 0 70px rgba(56,178,255,.55), 0 18px 55px rgba(0,0,0,.35)`
-                : `0 0 40px rgba(56,178,255,.3), 0 10px 35px rgba(0,0,0,.3)`,
-              transform: btnHov ? "scale(1.055) translateY(-3px)" : "scale(1) translateY(0)",
-              transition: "all 0.32s cubic-bezier(0.22,1,0.36,1)",
-            }}
-          >
-            Explore the Platform
-            <ArrowRight size={15} strokeWidth={2.8} />
-          </button>
-          <p style={{
-            color: WHITE25, fontSize: 10,
-            letterSpacing: "0.08em", textTransform: "uppercase",
-          }}>
-            No credit card required · Instant setup
-          </p>
-        </motion.div>
-      </main>
-
-      {/* Bottom status bar */}
-      <motion.footer
+      <motion.button
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, delay: 1 }}
-        style={{
-          position: "relative", zIndex: 5,
-          display: "flex", justifyContent: "center",
-          gap: 36, padding: "16px 44px",
-          borderTop: `1px solid ${WHITE06}`,
-        }}
+        transition={{ duration: 0.8, delay: 0.9 }}
+        onClick={() => scrollTo("tech")}
+        className="absolute bottom-10 md:bottom-12 flex flex-col items-center gap-2 text-[#58ABFF] hover:text-white transition-colors"
       >
-        {[["10k+", "Active Merchants"], ["< 10min", "Onboarding Time"], ["0", "Hardware Required"]].map(([v, l]) => (
-          <div key={l} style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 15, fontWeight: 800, color: SKY, letterSpacing: "-0.02em" }}>{v}</div>
-            <div style={{ fontSize: 10, color: WHITE25, letterSpacing: "0.08em", textTransform: "uppercase", marginTop: 2 }}>{l}</div>
-          </div>
-        ))}
-      </motion.footer>
-    </motion.div>
+        <span className="text-base md:text-xl font-light">what can i use tapt for?</span>
+        <ChevronDown className="w-5 h-5 md:w-6 md:h-6 tp-bounce" strokeWidth={2.4} />
+      </motion.button>
+    </section>
   );
 }
 
-// ─── Feature section ──────────────────────────────────────────────────────────
-function FeatureSection({ onBack }: { onBack: () => void }) {
-  const [active, setActive] = useState<number | null>(null);
-  const [backHov, setBackHov] = useState(false);
-
+// ─── About the tech ────────────────────────────────────────────────────────────
+function TechSection() {
+  const tiles = [
+    {
+      title: "tap to pay",
+      body: "Turn any phone into a terminal. Accept Apple Pay, Google Pay and contactless cards — no hardware, no rentals.",
+    },
+    {
+      title: "qr & payment links",
+      body: "Send a link or show a QR. Customers pay instantly from their own device, wherever they are.",
+    },
+    {
+      title: "multi-stack payments",
+      body: "Run unlimited payments at once. Stack jobs, tabs and tickets and collect them all from one live screen.",
+    },
+    {
+      title: "real-time dashboard",
+      body: "Every transaction, settlement and GST receipt — tracked live. Everything you need, nothing you don't.",
+    },
+  ];
   return (
-    <motion.div
-      key="features"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.28 }}
-      style={{
-        position: "fixed", inset: 0,
-        background: BG,
-        display: "flex", flexDirection: "column",
-        overflow: "hidden",
-        fontFamily: "'Outfit', 'Inter', system-ui, sans-serif",
-      }}
-    >
-      {/* Subtle top glow */}
-      <div style={{
-        position: "absolute", top: -80, left: "50%",
-        transform: "translateX(-50%)",
-        width: 600, height: 200, borderRadius: "50%",
-        background: `radial-gradient(ellipse, rgba(56,178,255,.07) 0%, transparent 70%)`,
-        pointerEvents: "none",
-      }} />
-
-      {/* Header */}
-      <header style={{
-        position: "relative", zIndex: 10,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "20px 32px",
-        borderBottom: `1px solid ${WHITE06}`,
-      }}>
-        <button
-          onMouseEnter={() => setBackHov(true)}
-          onMouseLeave={() => setBackHov(false)}
-          onClick={onBack}
-          style={{
-            display: "flex", alignItems: "center", gap: 7,
-            background: backHov ? WHITE08 : "transparent",
-            border: `1px solid ${backHov ? "rgba(235,240,255,.18)" : WHITE06}`,
-            borderRadius: 100,
-            padding: "8px 18px",
-            color: backHov ? WHITE : WHITE55,
-            fontSize: 12, fontWeight: 500,
-            letterSpacing: "0.06em",
-            cursor: "pointer", fontFamily: "inherit",
-            transition: "all 0.2s ease",
-          }}
+    <section id="tech" className="w-full py-24 md:py-32 px-6 md:px-12" style={{ backgroundColor: NAVY }}>
+      <div className="max-w-6xl mx-auto">
+        <motion.p {...fadeUp} className="text-[#58ABFF] text-xs md:text-sm tracking-[0.28em] uppercase mb-5">
+          the tech
+        </motion.p>
+        <motion.h2
+          {...fadeUp}
+          transition={{ ...fadeUp.transition, delay: 0.08 }}
+          className="text-white font-bold leading-[1.05] tracking-tight text-4xl md:text-6xl lg:text-7xl max-w-4xl"
         >
-          <ChevronLeft size={15} strokeWidth={2.2} />
-          Back
-        </button>
+          one app.{" "}
+          <span style={{ color: SKY }}>every way to get paid.</span>
+        </motion.h2>
+        <motion.p
+          {...fadeUp}
+          transition={{ ...fadeUp.transition, delay: 0.16 }}
+          className="mt-6 text-white/70 text-base md:text-xl font-light max-w-2xl leading-relaxed"
+        >
+          Tapt replaces clunky EFTPOS machines and expensive POS systems with one piece of
+          software. Powered by Windcave and PCI-DSS compliant — bank-grade security, none of
+          the hardware.
+        </motion.p>
 
-        <img src={logoImage} alt="Tapt Pay" style={{ height: 26, width: "auto", opacity: 0.6 }} />
-
-        <div style={{ width: 88 }} />
-      </header>
-
-      {/* Section heading */}
-      <motion.div
-        initial={{ opacity: 0, y: 18 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.08 }}
-        style={{ padding: "26px 36px 16px", flexShrink: 0 }}
-      >
-        <span style={{
-          color: SKY, fontSize: 10, fontWeight: 700,
-          letterSpacing: "0.16em", textTransform: "uppercase",
-        }}>
-          The Platform
-        </span>
-        <h2 style={{
-          fontSize: "clamp(22px, 2.8vw, 34px)",
-          fontWeight: 800, color: WHITE,
-          letterSpacing: "-0.03em",
-          margin: "7px 0 0", lineHeight: 1.15,
-        }}>
-          Everything you need.{" "}
-          <span style={{ color: WHITE25 }}>Nothing you don't.</span>
-        </h2>
-      </motion.div>
-
-      {/* Panels */}
-      <motion.div
-        initial={{ opacity: 0, y: 28 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.55, delay: 0.16 }}
-        style={{
-          flex: 1,
-          display: "flex",
-          margin: "0 20px 20px",
-          borderRadius: 18,
-          overflow: "hidden",
-          border: `1px solid ${WHITE06}`,
-          minHeight: 0,
-        }}
-      >
-        <LayoutGroup>
-          {PANELS.map((panel, i) => (
-            <Panel
-              key={panel.tag}
-              panel={panel}
-              index={i}
-              isActive={active === i}
-              anyActive={active !== null}
-              onClick={() => setActive(active === i ? null : i)}
-            />
+        <div className="mt-14 md:mt-20 grid grid-cols-1 md:grid-cols-2 gap-px rounded-3xl overflow-hidden" style={{ backgroundColor: "rgba(88,171,255,0.18)" }}>
+          {tiles.map((t, i) => (
+            <motion.div
+              key={t.title}
+              {...fadeUp}
+              transition={{ ...fadeUp.transition, delay: 0.1 + i * 0.08 }}
+              className="p-8 md:p-10"
+              style={{ backgroundColor: NAVY }}
+            >
+              <h3 className="text-2xl md:text-3xl font-semibold lowercase" style={{ color: SKY }}>
+                {t.title}
+              </h3>
+              <p className="mt-3 text-white/65 text-sm md:text-base font-light leading-relaxed">
+                {t.body}
+              </p>
+            </motion.div>
           ))}
-        </LayoutGroup>
-      </motion.div>
-
-      {/* Hint */}
-      <AnimatePresence>
-        {active === null && (
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            style={{
-              textAlign: "center", color: WHITE25,
-              fontSize: 10, letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              paddingBottom: 14, flexShrink: 0,
-            }}
-          >
-            Click any panel to explore
-          </motion.p>
-        )}
-      </AnimatePresence>
-    </motion.div>
+        </div>
+      </div>
+    </section>
   );
 }
 
-// ─── Root ─────────────────────────────────────────────────────────────────────
-export function LandingPage() {
-  const [view, setView] = useState<"hero" | "features">("hero");
-  const [wipe, setWipe] = useState<"in" | "out" | null>(null);
+// ─── Vertical (reusable feature block) ─────────────────────────────────────────
+function Vertical({
+  id,
+  heading,
+  sub,
+  lead,
+  perfectFor,
+  bullets,
+  phone,
+  onLearnMore,
+}: {
+  id?: string;
+  heading: React.ReactNode;
+  sub: string;
+  lead?: string;
+  perfectFor?: string[];
+  bullets: string[];
+  phone: string;
+  onLearnMore: () => void;
+}) {
+  return (
+    <section
+      id={id}
+      className="w-full min-h-screen flex items-center py-20 md:py-24 px-6 md:px-12"
+      style={{ backgroundColor: GREY }}
+    >
+      <div className="max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
+        {/* Copy */}
+        <motion.div {...fadeUp} className="order-2 lg:order-1">
+          <h2
+            className="font-bold leading-[0.95] tracking-tight lowercase text-4xl sm:text-5xl md:text-6xl"
+            style={{ color: NAVY }}
+          >
+            {heading}
+          </h2>
+          <p className="mt-4 text-lg md:text-2xl font-medium" style={{ color: SKY }}>
+            {sub}
+          </p>
 
-  const transition = (next: "hero" | "features") => {
-    if (wipe) return;
-    setWipe("in");
-    setTimeout(() => {
-      setView(next);
-      setWipe("out");
-    }, 460);
-    setTimeout(() => setWipe(null), 920);
+          {lead && (
+            <p className="mt-5 max-w-md text-base md:text-lg font-light leading-relaxed" style={{ color: NAVY }}>
+              {lead}
+            </p>
+          )}
+
+          {perfectFor && (
+            <div className="mt-7">
+              <p className="text-lg md:text-xl font-semibold" style={{ color: NAVY }}>
+                perfect for
+              </p>
+              <ul className="mt-3 space-y-1.5">
+                {perfectFor.map((p) => (
+                  <li key={p} className="flex items-center gap-3 text-lg md:text-xl font-medium" style={{ color: SKY }}>
+                    <span className="font-bold">&gt;</span>
+                    {p}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <ul className="mt-7 space-y-2.5">
+            {bullets.map((b) => (
+              <li key={b} className="flex items-start gap-3 text-base md:text-lg" style={{ color: NAVY }}>
+                <span className="font-bold mt-0.5" style={{ color: SKY }}>
+                  &gt;
+                </span>
+                <span className="font-light">{b}</span>
+              </li>
+            ))}
+          </ul>
+
+          <button
+            onClick={onLearnMore}
+            className="mt-9 inline-flex items-center gap-2 rounded-full border-2 px-7 py-2.5 text-sm md:text-base font-medium transition-colors duration-300 hover:text-white"
+            style={{ borderColor: NAVY, color: NAVY }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = NAVY)}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+          >
+            learn more
+          </button>
+        </motion.div>
+
+        {/* Phone */}
+        <motion.div
+          initial={{ opacity: 0, y: 36, filter: "blur(10px)" }}
+          whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ duration: 0.85, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
+          className="order-1 lg:order-2 flex justify-center lg:justify-end"
+        >
+          <img
+            src={phone}
+            alt=""
+            loading="lazy"
+            draggable={false}
+            className="h-auto w-[230px] sm:w-[270px] md:w-[300px] select-none"
+            style={{ filter: "drop-shadow(0 30px 50px rgba(7,13,81,0.22))" }}
+          />
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Pricing ───────────────────────────────────────────────────────────────────
+function Pricing({ onGetStarted }: { onGetStarted: () => void }) {
+  const items = [
+    "$0.10 per transaction",
+    "Flexible software fee — pay $9.99 only if you go over 100 transactions in a month",
+    "No contract, cancel anytime",
+    "Free technical support",
+    "$25.99 per A5 payment board — design service free for your first two",
+    "Custom payment board sizes priced on request",
+  ];
+  return (
+    <section id="pricing" className="w-full py-24 md:py-32 px-6 md:px-12" style={{ backgroundColor: NAVY }}>
+      <div className="max-w-5xl mx-auto">
+        <motion.p {...fadeUp} className="text-[#58ABFF] text-xs md:text-sm tracking-[0.28em] uppercase mb-5">
+          pricing
+        </motion.p>
+        <motion.h2
+          {...fadeUp}
+          transition={{ ...fadeUp.transition, delay: 0.08 }}
+          className="text-white font-bold leading-[1.05] tracking-tight text-4xl md:text-6xl lg:text-7xl"
+        >
+          simple, honest <span style={{ color: SKY }}>pricing.</span>
+        </motion.h2>
+        <motion.p
+          {...fadeUp}
+          transition={{ ...fadeUp.transition, delay: 0.16 }}
+          className="mt-5 text-white/70 text-base md:text-xl font-light max-w-2xl"
+        >
+          No hardware to buy, no monthly lock-in. Pay as you grow.
+        </motion.p>
+
+        <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
+          {items.map((item, i) => (
+            <motion.div
+              key={item}
+              {...fadeUp}
+              transition={{ ...fadeUp.transition, delay: 0.08 + i * 0.06 }}
+              className="flex items-start gap-4 rounded-2xl p-6"
+              style={{ backgroundColor: "rgba(88,171,255,0.08)", border: "1px solid rgba(88,171,255,0.18)" }}
+            >
+              <span
+                className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+                style={{ backgroundColor: SKY }}
+              >
+                <Check className="h-4 w-4" strokeWidth={3} style={{ color: NAVY }} />
+              </span>
+              <span className="text-white/90 text-sm md:text-base font-light leading-relaxed">{item}</span>
+            </motion.div>
+          ))}
+        </div>
+
+        <motion.div {...fadeUp} transition={{ ...fadeUp.transition, delay: 0.2 }} className="mt-12">
+          <button
+            onClick={onGetStarted}
+            className="inline-flex items-center gap-2 rounded-full px-8 py-3.5 text-sm md:text-base font-semibold uppercase tracking-wide transition-transform hover:scale-105"
+            style={{ backgroundColor: SKY, color: NAVY }}
+          >
+            get started <ArrowRight className="h-4 w-4" strokeWidth={2.6} />
+          </button>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Contact ───────────────────────────────────────────────────────────────────
+function Contact() {
+  const [form, setForm] = useState({ name: "", email: "", message: "" });
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const subject = encodeURIComponent(`Enquiry from ${form.name || "the TaptPay site"}`);
+    const body = encodeURIComponent(`${form.message}\n\n— ${form.name}\n${form.email}`);
+    window.location.href = `mailto:hello@taptpay.co.nz?subject=${subject}&body=${body}`;
   };
 
+  const field =
+    "w-full rounded-xl border-2 bg-transparent px-4 py-3 text-base outline-none transition-colors placeholder:text-[#070D51]/40 focus:border-[#58ABFF]";
+
   return (
-    <div style={{ height: "100vh", overflow: "hidden" }}>
+    <section id="contact" className="w-full py-24 md:py-32 px-6 md:px-12" style={{ backgroundColor: GREY }}>
+      <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+        <motion.div {...fadeUp}>
+          <p className="text-xs md:text-sm tracking-[0.28em] uppercase mb-5" style={{ color: SKY }}>
+            contact us
+          </p>
+          <h2 className="font-bold leading-[0.95] tracking-tight lowercase text-4xl md:text-6xl" style={{ color: NAVY }}>
+            let&apos;s get you<br />paid.
+          </h2>
+          <p className="mt-6 text-base md:text-lg font-light max-w-md leading-relaxed" style={{ color: NAVY }}>
+            Tell us a little about your business and we&apos;ll get you set up. 100% kiwi owned and operated.
+          </p>
+          <a
+            href="mailto:hello@taptpay.co.nz"
+            className="mt-6 inline-block text-lg md:text-xl font-medium"
+            style={{ color: SKY }}
+          >
+            hello@taptpay.co.nz
+          </a>
+        </motion.div>
+
+        <motion.form
+          {...fadeUp}
+          transition={{ ...fadeUp.transition, delay: 0.12 }}
+          onSubmit={submit}
+          className="space-y-4"
+        >
+          <input
+            required
+            placeholder="your name"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            className={field}
+            style={{ borderColor: "rgba(7,13,81,0.18)", color: NAVY }}
+          />
+          <input
+            required
+            type="email"
+            placeholder="your email"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+            className={field}
+            style={{ borderColor: "rgba(7,13,81,0.18)", color: NAVY }}
+          />
+          <textarea
+            required
+            rows={4}
+            placeholder="how can we help?"
+            value={form.message}
+            onChange={(e) => setForm({ ...form, message: e.target.value })}
+            className={`${field} resize-none`}
+            style={{ borderColor: "rgba(7,13,81,0.18)", color: NAVY }}
+          />
+          <button
+            type="submit"
+            className="inline-flex items-center gap-2 rounded-full px-8 py-3.5 text-sm md:text-base font-semibold uppercase tracking-wide transition-transform hover:scale-105"
+            style={{ backgroundColor: NAVY, color: "#fff" }}
+          >
+            send message <ArrowRight className="h-4 w-4" strokeWidth={2.6} />
+          </button>
+        </motion.form>
+      </div>
+    </section>
+  );
+}
+
+// ─── Footer ────────────────────────────────────────────────────────────────────
+function Footer() {
+  return (
+    <footer className="w-full py-10 px-6 md:px-12 flex flex-col sm:flex-row items-center justify-between gap-4" style={{ backgroundColor: NAVY }}>
+      <img src={skyLogo} alt="taptpay" className="h-7 w-auto" draggable={false} />
+      <p className="text-white/45 text-xs tracking-wide">
+        © {new Date().getFullYear()} TaptPay · 100% kiwi owned and operated
+      </p>
+    </footer>
+  );
+}
+
+// ─── Page ──────────────────────────────────────────────────────────────────────
+export function LandingPage() {
+  const [, setLocation] = useLocation();
+  const start = () => setLocation("/signup");
+
+  return (
+    <div className="tp-root" style={{ backgroundColor: NAVY }}>
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
+      <SEOHead
+        title="TaptPay — multi-stack digital payment solution"
+        description="TaptPay turns any phone into a payment terminal. Tap to pay, QR, invoicing and multi-stack POS for property management, trades, hospitality and retail. No hardware, no contracts."
+        keywords="tap to pay, digital eftpos, POS New Zealand, payment terminal app, invoicing, split bill, Windcave"
+      />
 
-      <AnimatePresence mode="wait">
-        {view === "hero"
-          ? <HeroSection key="hero" onExplore={() => transition("features")} />
-          : <FeatureSection key="features" onBack={() => transition("hero")} />
-        }
-      </AnimatePresence>
+      <Nav />
+      <Hero />
+      <TechSection />
 
-      <AnimatePresence>
-        {wipe && <WipeOverlay key={`wipe-${wipe}`} phase={wipe} />}
-      </AnimatePresence>
+      <div id="verticals">
+        <Vertical
+          id="property"
+          heading="property management"
+          sub="automated rent & bill collection"
+          bullets={[
+            "Track rent & bill payment links as they're sent out",
+            "Tenants pay instantly with their digital wallet",
+            "Auto-generated GST receipts for every payment",
+          ]}
+          phone="/design/phones/phone-property.png"
+          onLearnMore={start}
+        />
+
+        <Vertical
+          id="trades"
+          heading={<>trades, industries<br />&amp; hospo</>}
+          sub="quote, invoice & collect payment digitally"
+          perfectFor={["the trades", "industries", "retail", "hospitality"]}
+          bullets={[
+            "Send quotes & invoices in seconds",
+            "Customers pay instantly — tap, QR or link",
+            "Auto-generated GST receipts",
+          ]}
+          phone="/design/phones/phone-invoicing.png"
+          onLearnMore={start}
+        />
+
+        <Vertical
+          id="retail"
+          heading="retail"
+          sub="digital p.o.s & eftpos system"
+          lead="Throw out your old brick. Tapt's digital POS & EFTPOS is perfect for collecting payments when you're on the go."
+          bullets={[
+            "Multi-stack payments — unlimited payments at once",
+            "Auto-generated GST receipts",
+            "Live dashboard to track everything you need, nothing you don't",
+          ]}
+          phone="/design/phones/phone-pos.png"
+          onLearnMore={start}
+        />
+      </div>
+
+      <Pricing onGetStarted={start} />
+      <Contact />
+      <Footer />
     </div>
   );
 }

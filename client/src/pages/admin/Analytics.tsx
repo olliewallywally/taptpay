@@ -8,9 +8,8 @@ import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
-import {
-  ComposableMap, Geographies, Geography, ZoomableGroup
-} from 'react-simple-maps';
+// @ts-ignore - react-simple-maps ships no type declarations and has no @types package
+import { ComposableMap, Geographies, Geography, ZoomableGroup } from 'react-simple-maps';
 
 const GEO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
 
@@ -94,7 +93,7 @@ const DEVICE_COLORS = [BLUE, TEAL, GREEN];
 
 function WorldMap({ countries }: { countries: { code: string; users: number }[] }) {
   const [tooltip, setTooltip] = useState<{ name: string; users: number } | null>(null);
-  const countryMap = new Map<number, number>();
+  const countryMap = new globalThis.Map<number, number>(); // global Map — bare `Map` is the lucide icon import
   let maxUsers = 0;
   for (const c of countries) {
     const num = ISO2_TO_NUM[c.code];
@@ -119,8 +118,8 @@ function WorldMap({ countries }: { countries: { code: string; users: number }[] 
       >
         <ZoomableGroup>
           <Geographies geography={GEO_URL}>
-            {({ geographies }) =>
-              geographies.map(geo => {
+            {({ geographies }: any) =>
+              geographies.map((geo: any) => {
                 const num = parseInt(geo.id);
                 const users = countryMap.get(num) || 0;
                 return (

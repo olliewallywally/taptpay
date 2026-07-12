@@ -2,12 +2,26 @@ import { storage } from './storage';
 import { sendEmail } from './email-service';
 import { isWhatsAppConfigured, sendWhatsApp } from './whatsapp-service';
 import { isSmsConfigured, sendSms } from './sms-service';
+import { GST_RATE } from '@shared/schema';
+import { generateQuotePdf } from './trades-quote-pdf';
 
 type DeliveryResult = {
   sent: boolean;
   channel?: string;
   reason?: string;
   messageId?: string;
+};
+
+type EmailAttachment = {
+  filename: string;
+  content: Buffer | string;
+};
+
+type DeliveryCopy = {
+  subject: string;
+  text: string;
+  html: string;
+  short: string;
 };
 
 const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
@@ -68,7 +82,8 @@ function quoteCopy(quote: any, client: any, merchant: any, baseUrl: string) {
 async function deliver(
   channel: string,
   client: any,
-  copy: { subject: string; text: string; html: string; short: string }
+  copy: DeliveryCopy,
+  attachments: EmailAttachment[] = []
 ): Promise<DeliveryResult> {
   if (channel === 'whatsapp' && client.phone && isWhatsAppConfigured()) {
     const result = await sendWhatsApp({
@@ -90,6 +105,7 @@ async function deliver(
       subject: copy.subject,
       html: copy.html,
       text: copy.text,
+      attachments,
     });
     return { sent, channel: 'email', reason: sent ? undefined : 'send_failed' };
   }
@@ -107,10 +123,13 @@ export async function sendTradeQuote(
     storage.getMerchant(quote.merchantId),
   ]);
   if (!client || !merchant) return { sent: false, reason: 'missing_data' };
+  const ref = String(quote.token || quote.id).slice(0, 8).toUpperCase();
+  const pdf = generateQuotePdf(quote, client, merchant, baseUrl);
   const result = await deliver(
     quote.deliveryChannel || client.preferredChannel || 'email',
     client,
-    quoteCopy(quote, client, merchant, baseUrl)
+    quoteCopy(quote, client, merchant, baseUrl),
+    [{ filename: `quote-${ref}.pdf`, content: pdf }]
   );
   await storage.createJobEvent({
     merchantId: quote.merchantId,
@@ -223,7 +242,7 @@ export async function runTradesReminderPass(
   for (const invoice of await storage.getReminderEligibleJobInvoices()) {
     try {
       const merchant = await storage.getMerchant(invoice.merchantId);
-      if (!merchant || merchant.rentReminderEnabled === false) {
+      if (!merchant || merchant.tradeRemindersEnabled === false) {
         result.skipped++;
         continue;
       }
@@ -269,7 +288,7 @@ export async function sendTradePaymentInvoice(invoice: any): Promise<number> {
   ]);
   if (!client?.email || !merchant) return 0;
   const total = invoice.amountCents;
-  const gst = merchant.gstRegistered ? Math.round((total * 3) / 23) : 0;
+  const gst = merchant.gstRegistered ? Math.round(total - total / (1 + GST_RATE)) : 0;
   const net = total - gst;
   const merchantName = merchant.businessName || merchant.name;
   const label = paymentLabel(invoice);

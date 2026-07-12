@@ -1,0 +1,5 @@
+- [TaptPay design language](taptpay-design-language.md) — landing page is the user's own PR #2 design; they prefer implementing their concrete designs over Claude designing from a brief
+- [TaptPay target verticals](taptpay-target-verticals.md) — priority order: property mgmt #1, trades #2, then retail/ecommerce/hospitality; NZ primary + AU expansion
+- [TaptPay business facts](taptpay-business-facts.md) — canonical domain taptpay.co.nz; real pricing (0.3% trades/property, $0.10 retail/hospitality, $6.99–8.99/mo subs); old 3.4% copy obsolete
+- [Responsive/mobile standing rule](responsive-mobile-standing-rule.md) — every UI must be extremely responsive & mobile-fit; verify scaling/padding/button sizes, no orphaned grid rows
+- [Session state: launch review](session-state-landing-seo.md) — launch-readiness review COMPLETE, written to docs/launch-readiness.md; open: commit tree, jest fix, lost "about the tech" section, prod env (VAPID/Resend/Windcave)

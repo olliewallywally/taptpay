@@ -1,0 +1,1 @@
+- [TaptPay design language](taptpay-design-language.md) — landing page is the user's own PR #2 design; they prefer implementing their concrete designs over Claude designing from a brief

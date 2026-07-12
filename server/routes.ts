@@ -2,11 +2,13 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, verifyMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, GST_RATE } from "@shared/schema";
+import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
 import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, simulateCreateSession, simulateQuerySession, simulateRentSession, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, simulateAttendedTapToPay } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, createUser, getUserByEmail, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
+import { generateQuotePdf } from "./trades-quote-pdf";
 import { generateBusinessReportPdf } from "./report-generator";
+import { computeQuoteTotals } from "@shared/trades-gst";
 import { getBaseUrl, generatePaymentUrl, generateQrCodeUrl, generateStonePaymentUrl, generateNfcTagUrl } from "./url-utils";
 import { sendEmail } from "./email-service";
 import QRCode from "qrcode";
@@ -671,11 +673,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     let onboardingCompleted = true; // default for non-merchant users
     let merchantStatus: string | null = null;
     let gstRegistered = false;
+    let tradeGstMode = "inclusive";
     if (merchantId) {
       const merchant = await storage.getMerchant(merchantId);
       onboardingCompleted = merchant?.onboardingCompleted ?? false;
       merchantStatus = merchant?.status ?? null;
       gstRegistered = merchant?.gstRegistered ?? false;
+      tradeGstMode = merchant?.tradeGstMode === "exclusive" ? "exclusive" : "inclusive";
     }
     res.json({
       user: {
@@ -686,6 +690,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         onboardingCompleted,
         merchantStatus,
         gstRegistered,
+        tradeGstMode,
       },
     });
   });
@@ -3936,10 +3941,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const testEmail = await sendEmail({
         to: req.user?.email || 'test@example.com',
-        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@tapt.co.nz',
-        subject: 'Tapt SendGrid Test Email',
-        text: 'This is a test email to verify SendGrid configuration.',
-        html: '<h2>SendGrid Test</h2><p>This is a test email to verify SendGrid configuration.</p>'
+        from: process.env.RESEND_FROM_EMAIL || 'noreply@taptpay.co.nz',
+        subject: 'TaptPay Email Test',
+        text: 'This is a test email to verify the Resend email configuration.',
+        html: '<h2>TaptPay Email Test</h2><p>This is a test email to verify the Resend email configuration.</p>'
       });
 
       if (testEmail) {
@@ -3950,6 +3955,27 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     } catch (error) {
       console.error('Test email error:', error);
       res.status(500).json({ success: false, message: 'Failed to send test email', error: error });
+    }
+  });
+
+  // Email configuration diagnostics — confirms at a glance whether auto-emails
+  // (verification, admin notifications) can actually be delivered in this env.
+  app.get("/api/admin/email-status", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { getEmailServiceStatus } = await import('./email-service-multi');
+      const status = getEmailServiceStatus();
+      res.json({
+        ...status,
+        nodeEnv: process.env.NODE_ENV || 'development',
+        fromAddress: process.env.RESEND_FROM_EMAIL || 'noreply@taptpay.co.nz',
+        adminNotifyConfigured: !!(process.env.ADMIN_EMAIL || process.env.ADMIN_NOTIFY_EMAIL),
+        // In production with no real provider, emails are NOT delivered (and no
+        // longer silently "simulated" as success).
+        willDeliver: status.availableProviders.length > 0,
+      });
+    } catch (error) {
+      console.error('Email status error:', error);
+      res.status(500).json({ message: 'Failed to read email status' });
     }
   });
 
@@ -4254,6 +4280,29 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         console.warn('Failed to send verification email, but merchant account was created');
       }
 
+      // Notify the TaptPay admin of the new signup immediately (lead capture) so a
+      // merchant who abandons before completing KYC is still surfaced. Non-fatal.
+      const signupNotifyEmail = process.env.ADMIN_EMAIL || process.env.ADMIN_NOTIFY_EMAIL;
+      if (signupNotifyEmail) {
+        try {
+          await sendEmail({
+            to: signupNotifyEmail,
+            from: process.env.RESEND_FROM_EMAIL || 'noreply@taptpay.co.nz',
+            subject: `New TaptPay signup — ${(name || '').replace(/[\r\n]/g, '')}`,
+            html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
+              <h2 style="color:#0055ff;margin-top:0">New signup started</h2>
+              <p>A new merchant created an account and was sent a verification email.</p>
+              <table style="width:100%;border-collapse:collapse">
+                <tr><td style="padding:8px 0;color:#666;width:40%">Name</td><td style="padding:8px 0;font-weight:600">${escHtml(name)}</td></tr>
+                <tr><td style="padding:8px 0;color:#666">Email</td><td style="padding:8px 0">${escHtml(email)}</td></tr>
+              </table>
+              <p style="margin-top:24px;color:#999;font-size:12px">They'll appear again with full details once they complete KYC onboarding.</p>
+            </div>`,
+            text: `New TaptPay signup: ${name} <${email}>. Verification email sent; awaiting email confirmation and KYC.`,
+          });
+        } catch (e) { console.error('[SIGNUP_NOTIFY]', e); }
+      }
+
       res.json({
         message: "Account created. Please check your email to continue.",
         merchant: {
@@ -4313,34 +4362,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         address: businessAddress || '',
       });
 
-      // Notify admin of new merchant registration (ADMIN_EMAIL env var required)
-      const notifyEmail = process.env.ADMIN_EMAIL;
-      if (notifyEmail) {
-        const { sendEmail } = await import('./email-service');
-        const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@taptpay.co.nz';
-        await sendEmail({
-          to: notifyEmail,
-          from: fromEmail,
-          subject: `New Merchant Registration — ${(businessName || '').replace(/[\r\n]/g, '')}`,
-          html: `
-            <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
-              <h2 style="color:#0055ff;margin-top:0">New Merchant Registered</h2>
-              <table style="width:100%;border-collapse:collapse">
-                <tr><td style="padding:8px 0;color:#666;width:40%">Business Name</td><td style="padding:8px 0;font-weight:600">${escHtml(businessName)}</td></tr>
-                <tr><td style="padding:8px 0;color:#666">Director</td><td style="padding:8px 0;font-weight:600">${escHtml(director)}</td></tr>
-                <tr><td style="padding:8px 0;color:#666">Account Name</td><td style="padding:8px 0">${escHtml(merchant.name)}</td></tr>
-                <tr><td style="padding:8px 0;color:#666">Email</td><td style="padding:8px 0">${escHtml(contactEmail)}</td></tr>
-                <tr><td style="padding:8px 0;color:#666">Phone</td><td style="padding:8px 0">${escHtml(contactPhone)}</td></tr>
-                <tr><td style="padding:8px 0;color:#666">GST Number</td><td style="padding:8px 0">${escHtml(gstNumber)}</td></tr>
-                <tr><td style="padding:8px 0;color:#666">Business Address</td><td style="padding:8px 0">${escHtml(businessAddress)}</td></tr>
-                <tr><td style="padding:8px 0;color:#666">NZBN</td><td style="padding:8px 0">${escHtml(nzbn)}</td></tr>
-              </table>
-              <p style="margin-top:24px;color:#999;font-size:12px">Submitted via TaptPay merchant registration</p>
-            </div>
-          `,
-          text: `New merchant registered:\nBusiness: ${businessName}\nDirector: ${director}\nEmail: ${contactEmail}\nPhone: ${contactPhone}\nGST: ${gstNumber}\nAddress: ${businessAddress || '—'}\nNZBN: ${nzbn || '—'}`,
-        });
-      }
+      // Admin is notified at signup (lead) and again with the full record at KYC
+      // onboarding, so this mid-funnel step no longer sends a third, redundant
+      // email — its fields are all included in the KYC submission notification.
 
       res.json({ message: "Business details saved successfully." });
 
@@ -4412,57 +4436,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Verify merchant and create password
-  app.post("/api/verify-merchant", async (req, res) => {
-    try {
-      const validation = verifyMerchantSchema.safeParse(req.body);
-      if (!validation.success) {
-        return res.status(400).json({ 
-          message: "Invalid input", 
-          errors: validation.error.issues 
-        });
-      }
-
-      const { token, password } = validation.data;
-
-      // Find merchant by token
-      const merchant = await storage.getMerchantByToken(token);
-      if (!merchant) {
-        return res.status(400).json({ message: "Invalid or expired verification token" });
-      }
-
-      // Hash password and verify merchant
-      const passwordHash = await bcrypt.hash(password, 12);
-      
-      const verifiedMerchant = await storage.verifyMerchant(token, passwordHash);
-      if (!verifiedMerchant) {
-        return res.status(500).json({ message: "Failed to verify merchant" });
-      }
-
-      // Create user account for the verified merchant
-      try {
-        await createUser(verifiedMerchant.email, password, verifiedMerchant.id, 'merchant');
-        console.log("User account created successfully for merchant:", verifiedMerchant.email);
-      } catch (error) {
-        console.error("Error creating user account:", error);
-        // Don't fail verification if user creation fails, but log it
-      }
-
-      res.json({ 
-        message: "Merchant verified successfully. You can now log in.",
-        merchant: {
-          id: verifiedMerchant.id,
-          name: verifiedMerchant.name,
-          businessName: verifiedMerchant.businessName,
-          email: verifiedMerchant.email,
-          status: verifiedMerchant.status
-        }
-      });
-    } catch (error) {
-      console.error("Error verifying merchant:", error);
-      res.status(500).json({ message: "Failed to verify merchant" });
-    }
-  });
+  // (Removed legacy POST /api/verify-merchant — superseded by the signup +
+  // /api/auth/confirm-email flow. Nothing navigated to its /verify-merchant page.)
 
   // Server-Sent Events for real-time updates
   app.get("/api/merchants/:id/events", (req, res) => {
@@ -4555,7 +4530,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(400).json({ message: "Invalid push subscription" });
       }
 
-      const merchantId = req.merchantId;
+      const merchantId = req.user?.merchantId;
       if (!merchantId) {
         return res.status(401).json({ message: "Authentication required" });
       }
@@ -4583,7 +4558,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(400).json({ message: "Endpoint required" });
       }
 
-      const merchantId = req.merchantId;
+      const merchantId = req.user?.merchantId;
       if (!merchantId) {
         return res.status(401).json({ message: "Authentication required" });
       }
@@ -4610,7 +4585,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(400).json({ message: "Invalid device token" });
       }
 
-      const merchantId = req.merchantId;
+      const merchantId = req.user?.merchantId;
       if (!merchantId) {
         return res.status(401).json({ message: "Authentication required" });
       }
@@ -4634,7 +4609,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Remove native iOS device token (unsubscribe)
   app.post("/api/push/native-unsubscribe", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
-      const merchantId = req.merchantId;
+      const merchantId = req.user?.merchantId;
       if (!merchantId) {
         return res.status(401).json({ message: "Authentication required" });
       }
@@ -4655,7 +4630,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Get push notification status for current merchant
   app.get("/api/push/status", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
-      const merchantId = req.merchantId;
+      const merchantId = req.user?.merchantId;
       if (!merchantId) {
         return res.status(401).json({ message: "Authentication required" });
       }
@@ -5868,12 +5843,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         ...(fullyPaid ? { status: "paid", paidAt: new Date() } : {}),
         windcaveTransactionId: windcaveTransactionId ?? invoice.windcaveTransactionId,
       });
-      await storage.createJobEvent({ merchantId: invoice.merchantId, clientProfileId: invoice.clientProfileId, jobInvoiceId: invoice.id, eventType: fullyPaid ? "payment_received" : "split_share_paid", payload: { share: claimed.splitPaidCount, of: invoice.splitCount, channel: "card" } });
+      await storage.createJobEvent({ merchantId: invoice.merchantId, clientProfileId: invoice.clientProfileId, jobInvoiceId: invoice.id, eventType: fullyPaid ? "payment_received" : "split_share_paid", payload: { share: claimed.splitPaidCount, of: invoice.splitCount, channel: "card", windcaveTransactionId: windcaveTransactionId ?? null } });
       if (fullyPaid) await sendTradePaymentInvoice(updated);
       return updated;
     }
     const updated = await storage.updateJobInvoice(invoiceId, { status: "paid", paidAt: new Date(), windcaveTransactionId: windcaveTransactionId ?? null });
-    await storage.createJobEvent({ merchantId: invoice.merchantId, clientProfileId: invoice.clientProfileId, jobInvoiceId: invoice.id, eventType: "payment_received", payload: { channel: "card", amountCents: invoice.amountCents } });
+    await storage.createJobEvent({ merchantId: invoice.merchantId, clientProfileId: invoice.clientProfileId, jobInvoiceId: invoice.id, eventType: "payment_received", payload: { channel: "card", amountCents: invoice.amountCents, windcaveTransactionId: windcaveTransactionId ?? null } });
     await sendTradePaymentInvoice(updated);
     return updated;
   }
@@ -6285,7 +6260,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         sessionResult = simulateRentSession(token, baseUrl);
       }
       if (!sessionResult.success) return res.status(502).json({ message: "Payment gateway error. Please try again." });
-      if (sessionResult.sessionId) await updateCheckoutInvoice(invoice, { windcaveSessionId: sessionResult.sessionId });
+      // Pin single-payment invoices to their one Windcave session so a stale or
+      // foreign session can't finalize them. Split invoices legitimately create
+      // one session per payer; pinning a single shared value would 403 every
+      // payer but the most recent, so we skip it and rely on per-session dedup
+      // (splitPaidSessions) instead.
+      if (sessionResult.sessionId && !isSplit) await updateCheckoutInvoice(invoice, { windcaveSessionId: sessionResult.sessionId });
       // Duplicate X-ID — Windcave reports the session already completed; finalize now
       // and bounce the payer back to the checkout page to see the result.
       if (sessionResult.alreadyComplete) {
@@ -6346,7 +6326,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         sessionResult = simulateCreateSession(merchantRef, baseUrl);
       }
       if (!sessionResult.success) return res.status(502).json({ message: "Payment gateway error. Please try again." });
-      if (sessionResult.sessionId) await updateCheckoutInvoice(invoice, { windcaveSessionId: sessionResult.sessionId });
+      // Pin single-payment invoices to their one Windcave session so a stale or
+      // foreign session can't finalize them. Split invoices legitimately create
+      // one session per payer; pinning a single shared value would 403 every
+      // payer but the most recent, so we skip it and rely on per-session dedup
+      // (splitPaidSessions) instead.
+      if (sessionResult.sessionId && !isSplit) await updateCheckoutInvoice(invoice, { windcaveSessionId: sessionResult.sessionId });
 
       // Duplicate X-ID — Windcave reports the session already completed; finalize now
       // and tell the page to show its success/declined state without a second submit.
@@ -6381,7 +6366,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!sessionId) return res.status(400).json({ message: "sessionId required" });
       const invoice = await getCheckoutInvoiceByToken(token);
       if (!invoice) return res.status(404).json({ message: "Payment link not found" });
-      if (invoice.windcaveSessionId && invoice.windcaveSessionId !== sessionId) {
+      // Split invoices have one session per payer (not pinned on the invoice), so
+      // the single-session equality check only applies to single payments.
+      const isSplit = invoice.splitEnabled && invoice.splitCount && invoice.splitCount > 1;
+      if (!isSplit && invoice.windcaveSessionId && invoice.windcaveSessionId !== sessionId) {
         console.error(`[checkout-complete] sessionId mismatch for invoice ${invoice.id}`);
         return res.status(403).json({ message: "Session ID mismatch" });
       }
@@ -6406,7 +6394,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!sessionId) return res.status(400).json({ message: "sessionId required" });
       const invoice = await getCheckoutInvoiceByToken(token);
       if (!invoice) return res.status(404).json({ message: "Payment link not found" });
-      if (invoice.windcaveSessionId && invoice.windcaveSessionId !== sessionId) {
+      // Split invoices have one session per payer (not pinned on the invoice), so
+      // the single-session equality check only applies to single payments.
+      const isSplit = invoice.splitEnabled && invoice.splitCount && invoice.splitCount > 1;
+      if (!isSplit && invoice.windcaveSessionId && invoice.windcaveSessionId !== sessionId) {
         console.error(`[checkout-gpay] sessionId mismatch for invoice ${invoice.id}`);
         return res.status(403).json({ message: "Session ID mismatch" });
       }
@@ -6603,26 +6594,63 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
   // ═══════════════ TRADES ═══════════════
 
-  // Compute subtotal/GST/total/deposit for a quote from its line items.
-  // Amounts are GST-INCLUSIVE: gst is the portion already inside the total.
-  function computeQuoteTotals(
-    lineItems: Array<{ qty: number; unitPriceCents: number }>,
-    gstRegistered: boolean,
-    depositEnabled: boolean,
-    depositType?: string,
-    depositValue?: number,
-  ) {
-    const totalCents = lineItems.reduce((s, li) => s + Math.round(li.qty * li.unitPriceCents), 0);
-    const gstCents = gstRegistered ? Math.round(totalCents - totalCents / (1 + GST_RATE)) : 0;
-    const subtotalCents = totalCents - gstCents;
-    let depositCents: number | null = null;
-    if (depositEnabled && depositType && depositValue != null) {
-      depositCents = depositType === "percent"
-        ? Math.round(totalCents * (Math.min(100, Math.max(0, depositValue)) / 100))
-        : Math.min(depositValue, totalCents);
+  // Trades job-invoice reminders have their own on/off switch (cadence reuses the
+  // rent* day settings) so disabling rent reminders doesn't silently stop them.
+  app.get("/api/trades/reminder-settings", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) return res.status(404).json({ message: "Merchant not found" });
+      res.json({ tradeRemindersEnabled: merchant.tradeRemindersEnabled ?? true });
+    } catch (err) { console.error("[TRADES_REMINDER_GET]", err); res.status(500).json({ message: "Failed to fetch reminder settings" }); }
+  });
+
+  app.put("/api/trades/reminder-settings", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const data = updateTradeReminderSettingsSchema.parse(req.body);
+      const merchant = await storage.updateMerchant(merchantId, data as any);
+      res.json({ tradeRemindersEnabled: merchant?.tradeRemindersEnabled ?? true });
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
+      console.error("[TRADES_REMINDER_PUT]", err); res.status(500).json({ message: "Failed to update reminder settings" });
     }
-    return { subtotalCents, gstCents, totalCents, depositCents };
-  }
+  });
+
+  app.get("/api/trades/gst-settings", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) return res.status(404).json({ message: "Merchant not found" });
+      res.json({
+        gstRegistered: merchant.gstRegistered ?? false,
+        tradeGstMode: merchant.tradeGstMode === "exclusive" ? "exclusive" : "inclusive",
+      });
+    } catch (err) {
+      console.error("[TRADES_GST_GET]", err);
+      res.status(500).json({ message: "Failed to fetch GST settings" });
+    }
+  });
+
+  app.put("/api/trades/gst-settings", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const data = updateTradeGstSettingsSchema.parse(req.body);
+      const merchant = await storage.updateMerchant(merchantId, data as any);
+      res.json({
+        gstRegistered: merchant?.gstRegistered ?? false,
+        tradeGstMode: merchant?.tradeGstMode === "exclusive" ? "exclusive" : "inclusive",
+      });
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: err.errors });
+      console.error("[TRADES_GST_PUT]", err);
+      res.status(500).json({ message: "Failed to update GST settings" });
+    }
+  });
 
   app.get("/api/trades/clients", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
@@ -6671,6 +6699,15 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       res.json(await storage.archiveClientProfile(req.params.id));
     } catch (err) { console.error("[TRADES_CLIENTS_ARCHIVE]", err); res.status(500).json({ message: "Failed to archive client" }); }
   });
+  app.post("/api/trades/clients/:id/unarchive", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const existing = await storage.getClientProfile(req.params.id);
+      if (!existing || existing.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      res.json(await storage.unarchiveClientProfile(req.params.id));
+    } catch (err) { console.error("[TRADES_CLIENTS_UNARCHIVE]", err); res.status(500).json({ message: "Failed to restore client" }); }
+  });
   app.get("/api/trades/clients/:id/events", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
@@ -6705,15 +6742,24 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         ...item,
         lineTotalCents: Math.round(item.qty * item.unitPriceCents),
       }));
-      const totals = computeQuoteTotals(lineItems, !!merchant?.gstRegistered,
-        parsed.data.depositEnabled, parsed.data.depositType, parsed.data.depositValue);
+      const gstMode = merchant?.tradeGstMode === "exclusive" ? "exclusive" : "inclusive";
+      const totals = computeQuoteTotals(lineItems, {
+        gstRegistered: !!merchant?.gstRegistered,
+        gstMode,
+        depositEnabled: parsed.data.depositEnabled,
+        depositType: parsed.data.depositType,
+        depositValue: parsed.data.depositValue,
+      });
       const token = generateInvoiceToken();
       const row = await storage.createQuote({
         merchantId,
         clientProfileId: parsed.data.clientProfileId,
         token, status: "sent",
         lineItems,
-        subtotalCents: totals.subtotalCents, gstCents: totals.gstCents, totalCents: totals.totalCents,
+        subtotalCents: totals.subtotalCents,
+        gstCents: totals.gstCents,
+        gstMode: merchant?.gstRegistered ? gstMode : null,
+        totalCents: totals.totalCents,
         depositEnabled: parsed.data.depositEnabled,
         depositType: parsed.data.depositType ?? null,
         depositValue: parsed.data.depositValue ?? null,
@@ -6727,6 +6773,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       });
       await storage.createJobEvent({ merchantId, clientProfileId: client.id, quoteId: row.id, eventType: "quote_sent" });
       const delivery = await sendTradeQuote(row.id, getBaseUrl(req));
+      // Record undelivered quotes so the list/timeline can distinguish them from
+      // ones the client actually received (status stays "sent" so the manually
+      // shared link still works).
+      if (!delivery.sent) await storage.createJobEvent({ merchantId, clientProfileId: client.id, quoteId: row.id, eventType: "quote_dispatch_failed", payload: { reason: delivery.reason } });
       res.status(201).json({ ...row, delivered: delivery.sent, deliveryReason: delivery.reason });
     } catch (err) { console.error("[TRADES_QUOTES_POST]", err); res.status(500).json({ message: "Failed to create quote" }); }
   });
@@ -6739,6 +6789,48 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       res.json(row);
     } catch (err) { console.error("[TRADES_QUOTES_GET_ID]", err); res.status(500).json({ message: "Failed to fetch quote" }); }
   });
+
+  async function streamQuotePdf(quote: any, req: any, res: any) {
+    const [client, merchant] = await Promise.all([
+      storage.getClientProfile(quote.clientProfileId),
+      storage.getMerchant(quote.merchantId),
+    ]);
+    if (!client || !merchant) return res.status(404).json({ message: "Quote details unavailable" });
+    const pdf = generateQuotePdf(quote, client, merchant, getBaseUrl(req));
+    const safeName = String(merchant.businessName || merchant.name || "quote")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "") || "quote";
+    const ref = String(quote.token || quote.id || "quote").slice(0, 8).toUpperCase();
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="quote-${safeName}-${ref}.pdf"`);
+    res.send(pdf);
+  }
+
+  app.get("/api/trades/quotes/:id/pdf", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const quote = await storage.getQuote(req.params.id);
+      if (!quote || quote.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      await streamQuotePdf(quote, req, res);
+    } catch (err) {
+      console.error("[TRADES_QUOTE_PDF]", err);
+      res.status(500).json({ message: "Failed to generate quote PDF" });
+    }
+  });
+
+  app.get("/api/trades/quotes/token/:token/pdf", async (req, res) => {
+    try {
+      const quote = await storage.getQuoteByToken(req.params.token);
+      if (!quote) return res.status(404).json({ message: "Quote not found" });
+      await streamQuotePdf(quote, req, res);
+    } catch (err) {
+      console.error("[TRADES_QUOTE_TOKEN_PDF]", err);
+      res.status(500).json({ message: "Failed to generate quote PDF" });
+    }
+  });
+
   app.post("/api/trades/quotes/:id/resend", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
@@ -6772,7 +6864,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       res.json({
         quote,
         client: { firstName: client.firstName, lastName: client.lastName, siteAddress: client.siteAddress },
-        merchant: { name: merchant.name, businessName: merchant.businessName, gstRegistered: merchant.gstRegistered },
+        merchant: {
+          name: merchant.name,
+          businessName: merchant.businessName,
+          gstRegistered: merchant.gstRegistered,
+          tradeGstMode: merchant.tradeGstMode === "exclusive" ? "exclusive" : "inclusive",
+        },
       });
     } catch (err) { console.error("[TRADES_QUOTES_TOKEN_GET]", err); res.status(500).json({ message: "Failed to fetch quote" }); }
   });
@@ -6873,23 +6970,32 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      const { splitEnabled } = (req.body ?? {}) as { splitEnabled?: boolean };
       // Issue the remaining balance for a deposit-paid job.
       const dep = await storage.getJobInvoice(req.params.id);
       if (!dep || dep.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
       if (dep.kind !== "deposit") return res.status(400).json({ message: "Balance can only be sent for a deposit invoice" });
       if (!["paid", "paid_external", "deposit_paid"].includes(dep.status))
         return res.status(409).json({ message: "Deposit must be paid before sending the balance" });
-      const quote = dep.quoteId ? await storage.getQuote(dep.quoteId) : null;
+      if (!dep.quoteId) return res.status(400).json({ message: "This deposit is not linked to a quote, so a balance can't be calculated" });
+      const quote = await storage.getQuote(dep.quoteId);
+      if (!quote) return res.status(404).json({ message: "Linked quote not found" });
       const existingInvoices = await storage.getJobInvoicesByMerchant(merchantId, { clientProfileId: dep.clientProfileId });
-      if (existingInvoices.some((invoice: any) => invoice.quoteId === dep.quoteId && invoice.kind === "balance" && invoice.status !== "voided"))
+      const onQuote = existingInvoices.filter((invoice: any) => invoice.quoteId === dep.quoteId && invoice.status !== "voided");
+      if (onQuote.some((invoice: any) => invoice.kind === "balance"))
         return res.status(409).json({ message: "Balance invoice already exists" });
-      const balanceCents = quote ? Math.max(quote.totalCents - (dep.amountCents || 0), 0) : 0;
+      // Subtract everything already billed against this quote (the deposit plus any
+      // other non-voided invoices), not just this one deposit, so a balance can
+      // never double-bill amounts already covered.
+      const alreadyBilled = onQuote.reduce((sum: number, invoice: any) => sum + (invoice.amountCents || 0), 0);
+      const balanceCents = Math.max(quote.totalCents - alreadyBilled, 0);
       if (balanceCents <= 0) return res.status(400).json({ message: "No balance remaining" });
       const due = new Date(); due.setDate(due.getDate() + 7);
       const bal = await storage.createJobInvoice({
         merchantId: dep.merchantId, clientProfileId: dep.clientProfileId, quoteId: dep.quoteId,
         kind: "balance", amountCents: balanceCents, token: generateInvoiceToken(),
         deliveryChannel: dep.deliveryChannel, status: "pending_dispatch", dueAt: due,
+        splitEnabled: !!splitEnabled,
       });
       await storage.createJobEvent({ merchantId: dep.merchantId, clientProfileId: dep.clientProfileId, jobInvoiceId: bal.id, eventType: "balance_sent" });
       const delivery = await resendTradeInvoice(bal.id, getBaseUrl(req));
@@ -6919,6 +7025,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
       const inv = await storage.getJobInvoice(req.params.id);
       if (!inv || inv.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      // A paid deposit is only part-payment — the balance must still be collected,
+      // so don't let a deposit invoice close out the job.
+      if (inv.kind === "deposit")
+        return res.status(409).json({ message: "Send and collect the balance before completing the job" });
       if (!["paid", "paid_external"].includes(inv.status))
         return res.status(409).json({ message: "Invoice must be paid before completing the job" });
       const row = await storage.updateJobInvoice(req.params.id, { completedAt: new Date() });

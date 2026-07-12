@@ -1,0 +1,9 @@
+{
+  "id": "5",
+  "subject": "Transition to writing-plans for Phase 2",
+  "description": "After spec approval, invoke writing-plans skill to create the Phase 2 implementation plan.",
+  "activeForm": "Transitioning to writing-plans",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

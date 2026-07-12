@@ -380,11 +380,4 @@ export function NativePaymentButtons({
   );
 }
 
-// Add type declarations for payment APIs
-declare global {
-  interface Window {
-    ApplePaySession: any;
-    google: any;
-    PaymentRequest: any;
-  }
-}
+// Window augmentations are declared centrally in client/src/global.d.ts.

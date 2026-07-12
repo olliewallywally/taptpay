@@ -5,14 +5,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Loader2, CheckCircle, XCircle } from "lucide-react";
 import taptLogo from "@assets/IMG_6592_1755070818452.png";
 import googlePayLogo from "@assets/Google_Pay_Logo.svg_1773556576322.png";
-
-declare global {
-  interface Window {
-    WindcavePayments?: any;
-    ApplePaySession?: any;
-    google?: any;
-  }
-}
+// Window augmentations are declared centrally in client/src/global.d.ts.
 
 // ── Error boundary — catches any render crash and shows a safe fallback ──
 class CheckoutErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
@@ -185,7 +178,7 @@ function CheckoutInner() {
   };
 
   // Post-success navigation. Retail → receipt page; invoice → stay on the branded
-  // success screen and refresh split progress (each flatmate pays on their own link).
+  // success screen and refresh split progress (each payer pays on their own link).
   const navigateAfterSuccess = (result: any) => {
     if (isInvoice) { refetchInvoice(); return; }
     setTimeout(() => setLocation(result.redirectPath || `/receipt/${txId}`), 1200);
@@ -968,7 +961,7 @@ function CheckoutInner() {
     setGooglePreSessionTrigger(t => t + 1);
   }
 
-  // Invoice split: tenant picks how many flatmates share the bill. Calls the
+  // Invoice split: payer picks how many people share the bill. Calls the
   // existing invoice split endpoint, then refreshes so the share amount updates.
   async function setupSplit(count: number) {
     if (!isInvoice || splitBusy) return;
@@ -1149,7 +1142,7 @@ function CheckoutInner() {
                     </div>
                   )}
 
-                  {/* Chooser: pick how many flatmates */}
+                  {/* Chooser: pick how many people are splitting */}
                   {!splitActive && splitChoosing && (
                     <div style={{ background: "rgba(255,255,255,0.1)", borderRadius: 16, padding: "14px" }}>
                       <p style={{ color: "#fff", fontSize: 13, fontWeight: 600, marginBottom: 10, textAlign: "center" }}>How many of you are splitting?</p>
@@ -1169,7 +1162,7 @@ function CheckoutInner() {
                   {!splitActive && !splitChoosing && (
                     <button onClick={() => setSplitChoosing(true)} disabled={isProcessing}
                       style={{ width: "100%", padding: "12px 0", borderRadius: 14, border: "1.5px solid rgba(0,229,204,0.6)", background: "transparent", color: "#00E5CC", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
-                      Split with flatmates
+                      Split the bill
                     </button>
                   )}
 

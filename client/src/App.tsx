@@ -30,7 +30,6 @@ const ForgotPassword        = lazy(() => import("@/pages/forgot-password"));
 const ResetPassword         = lazy(() => import("@/pages/reset-password"));
 const NewAdminDashboard     = lazy(() => import("@/pages/admin/AdminDashboard"));
 const CreateMerchant        = lazy(() => import("@/pages/create-merchant"));
-const VerifyMerchant        = lazy(() => import("@/pages/verify-merchant"));
 const StockManagement       = lazy(() => import("@/pages/stock-management"));
 const LegalPage             = lazy(() => import("@/pages/legal"));
 const InfoPage              = lazy(() => import("@/pages/info"));
@@ -74,6 +73,7 @@ type AuthData = {
   role?: string | null;
   onboardingCompleted?: boolean | null;
   gstRegistered?: boolean;
+  tradeGstMode?: "inclusive" | "exclusive";
 };
 
 const AuthContext = createContext<{ auth: AuthData | null; isChecking: boolean }>({
@@ -102,6 +102,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
             role: data?.user?.role ?? null,
             onboardingCompleted: data?.user?.onboardingCompleted ?? null,
             gstRegistered: data?.user?.gstRegistered ?? false,
+            tradeGstMode: data?.user?.tradeGstMode === "exclusive" ? "exclusive" : "inclusive",
           });
         } else {
           localStorage.removeItem("authToken");
@@ -312,7 +313,6 @@ function Router() {
           <Route path="/app-login" component={AppLogin} />
           <Route path="/terms" component={LegalPage} />
           <Route path="/privacy" component={LegalPage} />
-          <Route path="/verify-merchant" component={VerifyMerchant} />
           <Route path="/pay/:merchantId" component={CustomerPayment} />
           <Route path="/pay/:merchantId/stone/:stoneId" component={CustomerPayment} />
           <Route path="/checkout/:transactionId" component={Checkout} />

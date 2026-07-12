@@ -97,11 +97,6 @@ describe('JSX Syntax Smoke Tests', () => {
       const { default: CreateMerchant } = await import('../create-merchant');
       expect(() => render(<CreateMerchant />, { wrapper: TestWrapper })).not.toThrow();
     });
-
-    test('VerifyMerchant component has valid JSX', async () => {
-      const { default: VerifyMerchant } = await import('../verify-merchant');
-      expect(() => render(<VerifyMerchant />, { wrapper: TestWrapper })).not.toThrow();
-    });
   });
 
   describe('Authenticated Page Components JSX Syntax', () => {
@@ -223,7 +218,6 @@ describe('Import Validation', () => {
       () => import('../settings'),
       () => import('../stock-management'),
       () => import('../transactions'),
-      () => import('../verify-merchant'),
     ];
 
     // Test all imports simultaneously

@@ -1,44 +1,359 @@
-import { useMemo, useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
 import { tradesFetch } from "@/lib/trades-api";
-import { formatNzd, includedGstCents, tradesFeeCents } from "@/lib/trades-money";
-import { TRADES_THEME as T } from "@/lib/trades-theme";
+import { TRADES_THEME } from "@/lib/trades-theme";
 
-type Period = "week" | "month" | "quarter" | "year";
-const periodDays: Record<Period, number> = { week: 7, month: 30, quarter: 90, year: 365 };
+/* ── Design tokens (trades palette; mirrors property-analytics) ──
+   The trades accent is near-black, so property's bright sky-blue accent role
+   (chart line, active pill, tooltip) becomes off-white to stay legible on the
+   dark base. */
+const C = {
+  base:      TRADES_THEME.INK,        // deep forest base (property's navy)
+  accent:    TRADES_THEME.OFFW,       // off-white (property's bright accent role)
+  accentDim: 'rgba(244,244,244,0.3)',
+  white:     '#FFFFFF',
+  sheet:     '#F4F4F4',
+  handle:    'rgba(0,0,0,0.08)',
+  textDark:  TRADES_THEME.INK,
+  textMuted: 'rgba(0,0,0,0.35)',
+  green:     '#22C55E',
+  red:       '#EF4444',
+};
 
-export default function TradesAnalytics() {
-  const [, setLocation] = useLocation();
-  const [period, setPeriod] = useState<Period>("month");
-  const { data: invoices = [] } = useQuery<any[]>({ queryKey: ["/api/trades/invoices"], queryFn: () => tradesFetch("/api/trades/invoices").then(r => r.ok ? r.json() : []) });
-  const { data: quotes = [] } = useQuery<any[]>({ queryKey: ["/api/trades/quotes"], queryFn: () => tradesFetch("/api/trades/quotes").then(r => r.ok ? r.json() : []) });
-  const { data: auth } = useQuery<any>({ queryKey: ["/api/auth/me", "trades-analytics"], queryFn: () => tradesFetch("/api/auth/me").then(r => r.ok ? r.json() : null) });
-  const cutoff = new Date(Date.now() - periodDays[period] * 86400000);
-  const filtered = invoices.filter((invoice: any) => invoice.status !== "voided" && new Date(invoice.createdAt) >= cutoff);
-  const paid = filtered.filter((invoice: any) => ["paid", "paid_external"].includes(invoice.status));
-  const revenue = paid.reduce((sum: number, invoice: any) => sum + invoice.amountCents, 0);
-  const outstanding = filtered.filter((invoice: any) => !["paid", "paid_external"].includes(invoice.status)).reduce((sum: number, invoice: any) => sum + invoice.amountCents, 0);
-  const accepted = quotes.filter((quote: any) => quote.status === "accepted" && new Date(quote.createdAt) >= cutoff).length;
-  const declined = quotes.filter((quote: any) => quote.status === "declined" && new Date(quote.createdAt) >= cutoff).length;
-  const conversion = accepted + declined ? Math.round(accepted / (accepted + declined) * 100) : 0;
-  const bars = useMemo(() => Array.from({ length: 8 }, (_, index) => {
-    const end = new Date(Date.now() - (7 - index) * periodDays[period] / 8 * 86400000);
-    const start = new Date(Date.now() - (8 - index) * periodDays[period] / 8 * 86400000);
-    return paid.filter((invoice: any) => { const date = new Date(invoice.paidAt || invoice.createdAt); return date >= start && date < end; }).reduce((sum: number, invoice: any) => sum + invoice.amountCents, 0);
-  }), [paid, period]);
-  const maxBar = Math.max(...bars, 1);
+type Timeframe = 'day' | 'week' | 'month' | 'year';
 
-  return <main style={{ minHeight: "100vh", background: T.INK, color: "#fff", padding: "24px 16px 80px", fontFamily: "Outfit, system-ui, sans-serif" }}><section style={{ maxWidth: 620, margin: "0 auto" }}>
-    <button onClick={() => setLocation("/trades")} style={link}>Back to jobs</button><div style={{ color: T.ACCENT, fontWeight: 900, fontSize: 11, letterSpacing: ".13em", textTransform: "uppercase" }}>Trades</div><h1 style={{ margin: "7px 0 4px" }}>Analytics</h1><p style={{ margin: 0, color: "rgba(255,255,255,.5)" }}>Revenue, GST and job performance</p>
-    <div style={{ display: "flex", background: "rgba(255,255,255,.07)", padding: 4, borderRadius: 999, marginTop: 20 }}>{(["week","month","quarter","year"] as Period[]).map(item => <button key={item} onClick={() => setPeriod(item)} style={{ flex: 1, border: 0, borderRadius: 999, padding: 9, background: item === period ? T.ACCENT : "transparent", color: item === period ? "#fff" : "rgba(255,255,255,.55)", fontWeight: 700, textTransform: "capitalize", cursor: "pointer" }}>{item}</button>)}</div>
-    <div style={{ marginTop: 26, textAlign: "center" }}><small style={{ color: "rgba(255,255,255,.45)", textTransform: "uppercase", letterSpacing: ".1em" }}>Collected revenue</small><div style={{ fontSize: 48, fontWeight: 900, marginTop: 7 }}>{formatNzd(revenue)}</div></div>
-    <div style={{ height: 150, display: "flex", alignItems: "end", gap: 8, marginTop: 20, padding: "0 6px" }}>{bars.map((value, index) => <div key={index} title={formatNzd(value)} style={{ flex: 1, minHeight: 5, height: `${Math.max(4, value / maxBar * 100)}%`, borderRadius: "7px 7px 2px 2px", background: value ? T.ACCENT : "rgba(255,255,255,.1)" }}/>)}</div>
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 10, marginTop: 24 }}><Stat label="Outstanding" value={formatNzd(outstanding)}/><Stat label="Quote conversion" value={`${conversion}%`}/><Stat label="TaptPay fee (0.3%)" value={formatNzd(tradesFeeCents(revenue))}/><Stat label="GST (15%) included" value={auth?.user?.gstRegistered ? formatNzd(includedGstCents(revenue)) : "Not registered"}/></div>
-    <div style={{ ...panel, marginTop: 18 }}><h2 style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: ".1em", marginTop: 0 }}>Invoice status</h2>{["paid", "paid_external", "pending_dispatch", "dispatched", "viewed", "dispatch_failed"].map(status => { const count = filtered.filter((invoice: any) => invoice.status === status).length; return count ? <div key={status} style={{ display: "flex", justifyContent: "space-between", padding: "9px 0", borderBottom: "1px solid rgba(255,255,255,.07)", textTransform: "capitalize" }}><span style={{ color: "rgba(255,255,255,.65)" }}>{status.replace(/_/g, " ")}</span><strong>{count}</strong></div> : null; })}</div>
-  </section></main>;
+/* ── SVG chart helpers ── */
+function toSmooth(pts: number[], W: number, H: number, pad = 8) {
+  const n = pts.length;
+  const sx = (W - pad * 2) / (n - 1);
+  const coords = pts.map((v, i) => ({ x: pad + i * sx, y: pad + ((100 - v) / 100) * (H - pad * 2) }));
+  let d = `M${coords[0].x},${coords[0].y}`;
+  for (let i = 1; i < coords.length; i++) {
+    const prev = coords[i - 1], curr = coords[i];
+    const cpx = (prev.x + curr.x) / 2;
+    d += ` C${cpx},${prev.y} ${cpx},${curr.y} ${curr.x},${curr.y}`;
+  }
+  return { d, coords };
+}
+function toArea(pts: number[], W: number, H: number, pad = 8) {
+  const { d } = toSmooth(pts, W, H, pad);
+  return d + ` L${W - pad},${H} L${pad},${H} Z`;
 }
 
-function Stat({ label, value }: { label: string; value: string }) { return <div style={panel}><small style={{ color: "rgba(255,255,255,.48)", textTransform: "uppercase", letterSpacing: ".07em", fontWeight: 700 }}>{label}</small><div style={{ fontSize: 21, fontWeight: 900, marginTop: 8 }}>{value}</div></div>; }
-const panel = { background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 16, padding: 16 };
-const link = { border: 0, background: "none", color: T.ACCENT, fontWeight: 700, padding: "10px 0", cursor: "pointer" };
+/* ── Revenue chart ── */
+function RevenueChart({ primary, secondary, tipIdx, animKey, tipLabel }: { primary: number[]; secondary: number[]; tipIdx: number; animKey: string; tipLabel?: string }) {
+  const W = 342, H = 100, pad = 8;
+  const [reveal, setReveal] = useState(false);
+
+  useEffect(() => {
+    setReveal(false);
+    const t = setTimeout(() => setReveal(true), 80);
+    return () => clearTimeout(t);
+  }, [animKey]);
+
+  const { d: pLine, coords: pCoords } = toSmooth(primary, W, H, pad);
+  const { d: sLine } = toSmooth(secondary, W, H, pad);
+  const pArea = toArea(primary, W, H, pad);
+  const sArea = toArea(secondary, W, H, pad);
+  const tipPt = pCoords[tipIdx];
+
+  return (
+    <div style={{ position: 'relative', margin: '8px 0 4px', padding: '0 4px' }}>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block', height: 'auto', overflow: 'visible' }}>
+        <defs>
+          <linearGradient id="ta1" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={C.accent} stopOpacity="0.22" />
+            <stop offset="100%" stopColor={C.accent} stopOpacity="0.01" />
+          </linearGradient>
+          <linearGradient id="ta2" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={C.accent} stopOpacity="0.08" />
+            <stop offset="100%" stopColor={C.accent} stopOpacity="0.0" />
+          </linearGradient>
+          <clipPath id="trc">
+            <rect x="0" y="0" width={reveal ? W : 0} height={H}
+              style={{ transition: 'width 1.6s cubic-bezier(0.22,1,0.36,1)' }} />
+          </clipPath>
+        </defs>
+        {[20, 40, 60, 80].map(y => (
+          <line key={y} x1="0" y1={y} x2={W} y2={y} stroke="rgba(244,244,244,0.06)" strokeWidth="0.5" />
+        ))}
+        <g clipPath="url(#trc)">
+          <path d={sArea} fill="url(#ta2)" />
+          <path d={sLine} fill="none" stroke={C.accentDim} strokeWidth="1.5" strokeLinecap="round" />
+          <path d={pArea} fill="url(#ta1)" />
+          <path d={pLine} fill="none" stroke={C.accent} strokeWidth="2.2" strokeLinecap="round" />
+          <line x1={tipPt.x} y1={tipPt.y} x2={tipPt.x} y2={H} stroke="rgba(255,255,255,0.15)" strokeWidth="0.5" strokeDasharray="2 2" />
+          <circle cx={tipPt.x} cy={tipPt.y} r="8" fill="rgba(244,244,244,0.15)" />
+          <circle cx={tipPt.x} cy={tipPt.y} r="4" fill={C.white} stroke={C.accent} strokeWidth="2" />
+        </g>
+      </svg>
+      {/* Tooltip */}
+      {tipLabel && (
+        <div style={{ position: 'absolute', left: `${(tipPt.x / W) * 100}%`, top: `${(tipPt.y / H) * 100 - 18}%`, transform: 'translate(-50%, -100%)', background: C.accent, color: C.base, padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', opacity: reveal ? 1 : 0, transition: 'opacity 0.5s ease 1.2s' }}>
+          {tipLabel}
+        </div>
+      )}
+      <div style={{ position: 'absolute', left: `${(tipPt.x / W) * 100}%`, bottom: -6, transform: 'translateX(-50%)', width: 12, height: 12, borderRadius: '50%', background: C.white, boxShadow: '0 2px 8px rgba(0,0,0,0.3)', opacity: reveal ? 1 : 0, transition: 'opacity 0.3s ease 1s' }} />
+    </div>
+  );
+}
+
+/* ── Transaction row ── */
+function TxRow({ inv, delay = 0 }: { inv: any; delay?: number }) {
+  const [vis, setVis] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setVis(true), 400 + delay); return () => clearTimeout(t); }, [delay]);
+
+  const name    = inv.clientName || inv.siteAddress || 'Invoice';
+  const initials = name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
+  const isPaid  = inv.status === 'paid' || inv.status === 'paid_external';
+  const isOverdue = inv.status === 'overdue';
+  const isFailed = inv.status === 'dispatch_failed';
+  const amount  = inv.amountCents ? `${isPaid ? '+' : ''}$${(inv.amountCents / 100).toFixed(2)}` : '—';
+  const label   = isPaid ? 'Paid' : isOverdue ? 'Overdue' : isFailed ? 'Not delivered' : inv.status === 'pending_dispatch' ? 'Queued' : 'Sent';
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 0', borderBottom: '1px solid rgba(0,0,0,0.04)', opacity: vis ? 1 : 0, transform: vis ? 'translateY(0) scale(1)' : 'translateY(8px) scale(0.98)', transition: 'all 0.5s cubic-bezier(0.34,1.56,0.64,1)' }}>
+      <div style={{ width: 40, height: 40, borderRadius: 12, background: C.sheet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: C.base, flexShrink: 0 }}>{initials}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontSize: 14, fontWeight: 600, color: C.textDark, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</p>
+        <p style={{ fontSize: 11, color: C.textMuted, margin: 0, marginTop: 2 }}>{inv.siteAddress || (inv.dueAt ? new Date(inv.dueAt).toLocaleDateString('en-NZ') : '')}</p>
+      </div>
+      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+        <p style={{ fontSize: 15, fontWeight: 700, color: isPaid ? C.green : (isOverdue || isFailed) ? C.red : C.textDark, margin: 0, fontVariantNumeric: 'tabular-nums' }}>{amount}</p>
+        <p style={{ fontSize: 10, color: C.textMuted, margin: 0, marginTop: 1 }}>{label}</p>
+      </div>
+    </div>
+  );
+}
+
+/* ── Compute chart series from invoices ── */
+function buildChartData(invoices: any[], tf: Timeframe) {
+  const now = new Date();
+  let buckets: number;
+  let getKey: (d: Date) => number;
+
+  if (tf === 'day') {
+    buckets = 10; getKey = d => Math.floor((now.getTime() - d.getTime()) / (2.4 * 3600000));
+  } else if (tf === 'week') {
+    buckets = 10; getKey = d => Math.floor((now.getTime() - d.getTime()) / (16.8 * 3600000));
+  } else if (tf === 'month') {
+    buckets = 10; getKey = d => Math.floor((now.getTime() - d.getTime()) / (72 * 3600000));
+  } else {
+    buckets = 10; getKey = d => Math.floor((now.getTime() - d.getTime()) / (876 * 3600000));
+  }
+
+  const paid: number[] = Array(buckets).fill(0);
+  const outstanding: number[] = Array(buckets).fill(0);
+
+  invoices.forEach((inv: any) => {
+    if (inv.status === 'voided') return; // cancelled requests aren't revenue or outstanding
+    const date = new Date(inv.paidAt ?? inv.createdAt);
+    const bucket = Math.max(0, Math.min(buckets - 1, getKey(date)));
+    const val = Math.round((inv.amountCents ?? 0) / 100);
+    if (inv.status === 'paid' || inv.status === 'paid_external') paid[buckets - 1 - bucket] += val;
+    else outstanding[buckets - 1 - bucket] += val;
+  });
+
+  const maxVal = Math.max(...paid, ...outstanding, 1);
+  const norm = (arr: number[]) => arr.map(v => Math.round((v / maxVal) * 90) + 5);
+
+  return { primary: norm(paid), secondary: norm(outstanding), paidRaw: paid };
+}
+
+export default function TradesAnalytics() {
+  const [tf, setTf] = useState<Timeframe>('week');
+  const [totVis, setTotVis] = useState(true);
+
+  const { data: invoices = [] } = useQuery<any[]>({
+    queryKey: ['/api/trades/invoices'],
+    queryFn: () => tradesFetch('/api/trades/invoices').then(r => r.ok ? r.json() : []),
+    staleTime: 30000,
+    retry: false,
+  });
+
+  /* Filter invoices by timeframe */
+  const now = new Date();
+  const cutoff = {
+    day:   new Date(now.getTime() - 24 * 3600000),
+    week:  new Date(now.getTime() - 7 * 86400000),
+    month: new Date(now.getTime() - 30 * 86400000),
+    year:  new Date(now.getTime() - 365 * 86400000),
+  }[tf];
+
+  // Voided (cancelled) invoices are never revenue or history — drop them up front.
+  const liveInvoices = invoices.filter((i: any) => i.status !== 'voided');
+  const filtered = liveInvoices.filter((i: any) => new Date(i.createdAt) >= cutoff);
+
+  /* Revenue total */
+  const totalRevenue = filtered
+    .filter((i: any) => i.status === 'paid' || i.status === 'paid_external')
+    .reduce((s: number, i: any) => s + (i.amountCents ?? 0), 0);
+  const totalStr = '$' + (totalRevenue / 100).toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  /* Chart — only built from real trades invoice data */
+  const FLAT = [5, 5, 5, 5, 5, 5, 5, 5, 5, 5];
+  const chart = liveInvoices.length > 0
+    ? buildChartData(liveInvoices, tf)
+    : { primary: FLAT, secondary: FLAT };
+  const tipIdx = 7;
+
+  const tipBucket = (chart as any).paidRaw?.[tipIdx] ?? 0;
+  const tipLabel = tipBucket > 0 ? `$${tipBucket}` : undefined;
+
+  /* Switch timeframe */
+  const switchTf = (p: Timeframe) => {
+    if (p === tf) return;
+    setTotVis(false);
+    setTimeout(() => { setTf(p); setTotVis(true); }, 150);
+  };
+
+  /* Transaction groups */
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+
+  const byNewest = (a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  const todayInvoices = filtered.filter((i: any) => new Date(i.createdAt) >= today).sort(byNewest);
+  const yesterdayInvoices = filtered.filter((i: any) => new Date(i.createdAt) >= yesterday && new Date(i.createdAt) < today).sort(byNewest);
+  const earlierInvoices = filtered.filter((i: any) => new Date(i.createdAt) < yesterday).sort(byNewest).slice(0, 50);
+
+  /* ── Swipeable sheet state ── */
+  const topRef   = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const touchStartY  = useRef(0);
+  const touchStartOff = useRef(0);
+  const [sheetOffset, setSheetOffset] = useState<number | null>(null); // null = not yet measured
+  const [snapped, setSnapped]   = useState<'default' | 'full'>('default');
+  const [dragging, setDragging] = useState(false);
+
+  useEffect(() => {
+    const measure = () => {
+      if (topRef.current) setSheetOffset(topRef.current.offsetHeight + 12);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (topRef.current) ro.observe(topRef.current);
+    return () => ro.disconnect();
+  }, []);
+
+  const defaultOffset = sheetOffset ?? 320;
+  const snapFull = 0; // fully covers the screen
+
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartY.current   = e.touches[0].clientY;
+    touchStartOff.current = snapped === 'full' ? snapFull : defaultOffset;
+    setDragging(true);
+  }, [snapped, defaultOffset]);
+
+  const onTouchMove = useCallback((e: React.TouchEvent) => {
+    const dy  = e.touches[0].clientY - touchStartY.current;
+    const raw = touchStartOff.current + dy;
+    setSheetOffset(Math.max(snapFull - 24, Math.min(defaultOffset + 60, raw)));
+  }, [defaultOffset]);
+
+  const onTouchEnd = useCallback(() => {
+    setDragging(false);
+    const effective = sheetOffset ?? defaultOffset;
+    if (effective < defaultOffset / 2) {
+      setSnapped('full');
+      setSheetOffset(snapFull);
+    } else {
+      setSnapped('default');
+      setSheetOffset(defaultOffset);
+    }
+  }, [sheetOffset, defaultOffset]);
+
+  return (
+    <div style={{ background: C.white, minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
+    <div style={{ width: '100%', maxWidth: 430, height: '100svh', fontFamily: "'Outfit', system-ui, sans-serif", background: C.base, position: 'relative', overflow: 'hidden' }}>
+
+      {/* ── Dark top ── */}
+      <div ref={topRef} style={{ padding: '52px 24px 0' }}>
+        <div style={{ marginBottom: 20 }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: C.white }}>analytics</span>
+        </div>
+
+        {/* Period pills */}
+        <div style={{ display: 'flex', gap: 0, background: 'rgba(255,255,255,0.06)', borderRadius: 999, padding: 3, marginBottom: 20 }}>
+          {(['day', 'week', 'month', 'year'] as Timeframe[]).map(p => (
+            <button key={p} onClick={() => switchTf(p)} style={{ flex: 1, padding: '8px 0', borderRadius: 999, border: 'none', fontSize: 13, fontWeight: tf === p ? 600 : 500, textTransform: 'capitalize', background: tf === p ? C.accent : 'transparent', color: tf === p ? C.base : 'rgba(255,255,255,0.4)', transition: 'all 0.3s cubic-bezier(0.34,1.56,0.64,1)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+              {p}
+            </button>
+          ))}
+        </div>
+
+        {/* Total */}
+        <div style={{ textAlign: 'center', marginBottom: 4 }}>
+          <p style={{ fontSize: 13, fontWeight: 400, color: 'rgba(255,255,255,0.4)', margin: 0, letterSpacing: '0.04em' }}>Total Revenue</p>
+          <p style={{ fontSize: 46, fontWeight: 700, color: C.white, margin: 0, letterSpacing: '-2px', marginTop: 6, fontVariantNumeric: 'tabular-nums', opacity: totVis ? 1 : 0, transform: totVis ? 'translateY(0)' : 'translateY(6px)', transition: 'all 0.45s cubic-bezier(0.34,1.56,0.64,1)' }}>
+            {totalStr}
+          </p>
+        </div>
+
+        {/* Chart — bleeds past horizontal padding to fill full width */}
+        <div style={{ margin: '8px -32px 4px', overflow: 'visible' }}>
+          <RevenueChart primary={chart.primary} secondary={chart.secondary} tipIdx={tipIdx} animKey={tf} tipLabel={tipLabel} />
+        </div>
+      </div>
+
+      {/* ── Swipeable white sheet ── */}
+      <div
+        ref={sheetRef}
+        style={{
+          position: 'absolute', top: 0, left: 0, right: 0,
+          height: '100svh',
+          background: C.sheet,
+          borderRadius: '32px 32px 0 0',
+          transform: `translateY(${sheetOffset ?? defaultOffset}px)`,
+          transition: dragging ? 'none' : 'transform 0.38s cubic-bezier(0.34,1.56,0.64,1)',
+          overflowY: snapped === 'full' ? 'auto' : 'hidden',
+          overflowX: 'hidden',
+          willChange: 'transform',
+          msOverflowStyle: 'none' as any,
+          scrollbarWidth: 'none' as any,
+        }}
+      >
+        <div
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+          onTouchCancel={onTouchEnd}
+          style={{ width: '100%', height: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'grab', flexShrink: 0, touchAction: 'none' }}
+        >
+          <div style={{ width: 40, height: 5, borderRadius: 3, background: C.handle }} />
+        </div>
+
+        <div style={{ padding: '0 24px 130px', marginTop: 2 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <h2 style={{ fontSize: 20, fontWeight: 700, color: C.textDark, margin: 0, letterSpacing: '-0.4px' }}>Payment History</h2>
+          </div>
+
+          {filtered.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '48px 0', color: C.textMuted, fontSize: 13 }}>no payments in this period</div>
+          ) : (
+            <>
+              {todayInvoices.length > 0 && (
+                <>
+                  <p style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.14em', marginBottom: 6 }}>Today</p>
+                  {todayInvoices.map((inv: any, i: number) => <TxRow key={inv.id} inv={inv} delay={i * 55} />)}
+                </>
+              )}
+              {yesterdayInvoices.length > 0 && (
+                <>
+                  <p style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.14em', marginBottom: 6, marginTop: 20 }}>Yesterday</p>
+                  {yesterdayInvoices.map((inv: any, i: number) => <TxRow key={inv.id} inv={inv} delay={(i + 3) * 55} />)}
+                </>
+              )}
+              {earlierInvoices.length > 0 && (
+                <>
+                  <p style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.14em', marginBottom: 6, marginTop: 20 }}>Earlier</p>
+                  {earlierInvoices.map((inv: any, i: number) => <TxRow key={inv.id} inv={inv} delay={Math.min(i + 6, 12) * 55} />)}
+                </>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+    </div>
+  );
+}
