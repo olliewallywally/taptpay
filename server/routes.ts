@@ -4249,6 +4249,17 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(403).json({ message: "Email address must be verified before submitting business details" });
       }
 
+      // SECURITY (IDOR): this endpoint is necessarily unauthenticated — it is the
+      // pre-login onboarding step reached straight after email confirmation, with
+      // the merchant id taken from the URL query. Bind it to the onboarding window
+      // so it can NEVER overwrite an established merchant's details (business name,
+      // contact email, GST number, address). Once the merchant is active or has
+      // completed onboarding, edits must go through the authenticated settings API
+      // (PUT /api/merchants/:id/details, which enforces ownership).
+      if (merchant.status === "active" || merchant.onboardingCompleted === true) {
+        return res.status(403).json({ message: "Business details can no longer be edited here. Please sign in to update your details." });
+      }
+
       const validation = businessDetailsSchema.safeParse(req.body);
       if (!validation.success) {
         return res.status(400).json({
