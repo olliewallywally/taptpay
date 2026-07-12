@@ -28,6 +28,38 @@ import { sendGstInvoices, extractEmails } from "./gst-invoice";
 // stoneId can be null for merchant-level connections
 const sseConnections = new Map<number, Map<number | null, Set<any>>>();
 
+// ── Merchant response sanitizers ──────────────────────────────────────────
+// getMerchant() returns the full row (SELECT *), which includes server-only
+// secrets and financial PII. These must never reach a client. No client page
+// reads any of these fields for display (bank/card are write-only onboarding
+// form inputs; auth secrets/API keys are server-side only), so stripping them
+// is non-breaking.
+const MERCHANT_SECRET_FIELDS = [
+  "passwordHash", "resetToken", "resetTokenExpiry", "verificationToken", "googleId",
+  "windcaveApiKey", "coinbaseCommerceApiKey", "coinbaseWebhookSecret",
+] as const;
+const MERCHANT_FINANCIAL_FIELDS = [
+  "bankAccountNumber", "bankName", "bankBranch", "accountHolderName",
+  "billingCardLast4", "billingCardBrand", "billingCardExpiry",
+] as const;
+
+// Strip auth secrets + payment-processor API keys. Safe for ANY merchant
+// response (owner, admin, public) — nothing on the client consumes them.
+function stripMerchantSecrets<T extends Record<string, any>>(m: T): T {
+  if (!m || typeof m !== "object") return m;
+  const out: Record<string, any> = { ...m };
+  for (const f of MERCHANT_SECRET_FIELDS) delete out[f];
+  return out as T;
+}
+
+// Public-facing merchant view: additionally drops bank/card financial PII.
+// Used for the unauthenticated payment/receipt pages.
+function publicMerchant<T extends Record<string, any>>(m: T): T {
+  const out: Record<string, any> = stripMerchantSecrets(m);
+  for (const f of MERCHANT_FINANCIAL_FIELDS) delete out[f];
+  return out as T;
+}
+
 // Server-side cache of Windcave AJAX submit URLs per transaction.
 // Populated at session creation; consumed once at payment completion.
 // Prevents SSRF by never accepting these URLs from client bodies.
@@ -933,7 +965,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         qrCodeUrl: currentQrCodeUrl
       };
       
-      res.json(merchantWithCurrentUrls);
+      res.json(publicMerchant(merchantWithCurrentUrls));
     } catch (error) {
       res.status(500).json({ message: "Failed to get merchant" });
     }
@@ -3749,7 +3781,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.get("/api/admin/merchants", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       const merchants = await storage.getAllMerchants();
-      res.json(merchants);
+      res.json(merchants.map(stripMerchantSecrets));
     } catch (error) {
       console.error("Error fetching merchants:", error);
       res.status(500).json({ message: "Failed to fetch merchants" });
@@ -3763,7 +3795,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchant) {
         return res.status(404).json({ message: "Merchant not found" });
       }
-      res.json(merchant);
+      res.json(stripMerchantSecrets(merchant));
     } catch (error) {
       console.error("Error fetching merchant:", error);
       res.status(500).json({ message: "Failed to fetch merchant" });
