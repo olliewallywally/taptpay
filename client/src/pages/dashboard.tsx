@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { RetailReportsButton } from "@/components/reports/RetailReportsButton";
 import {
-  type Timeframe, buildBuckets, buildBilledBuckets, periodWindow, collectedCents,
+  type Timeframe, buildBuckets, periodWindow, collectedCents,
   growthPct, fmtCompact, currentBucketIdx,
 } from "@/lib/property-dashboard-data";
 
@@ -88,9 +88,8 @@ function TimeframeBar({ tf, onPick, onIndicator }: {
 /* ── Bar chart — clickable, animates between timeframes ── */
 const MAX_SLOTS = 12;
 
-function SalesBarChart({ buckets, billed = [], selectedIdx, onSelectBar, animKey }: {
+function SalesBarChart({ buckets, selectedIdx, onSelectBar, animKey }: {
   buckets: { label: string; valueCents: number }[];
-  billed?: { label: string; valueCents: number }[];
   selectedIdx: number;
   onSelectBar: (i: number) => void;
   animKey: string;
@@ -104,9 +103,10 @@ function SalesBarChart({ buckets, billed = [], selectedIdx, onSelectBar, animKey
   const [reveal, setReveal] = useState(false);
   useEffect(() => { const t = setTimeout(() => setReveal(true), 60); return () => clearTimeout(t); }, []);
 
-  // Both series share one scale so ghost (pending) and solid (completed) compare truthfully.
-  const maxVal = Math.max(...buckets.map(b => b.valueCents), ...billed.map(b => b.valueCents), 1);
-  const hOf = (v: number) => v <= 0 ? 6 : 12 + (v / maxVal) * (CH - 40);
+  // Zero-value buckets render as a small resting dot instead of a bar.
+  const DOT = 7;
+  const maxVal = Math.max(...buckets.map(b => b.valueCents), 1);
+  const hOf = (v: number) => v <= 0 ? DOT : 12 + (v / maxVal) * (CH - 40);
 
   const sel = buckets[selectedIdx];
   const selX = x(Math.min(selectedIdx, n - 1)) + bw / 2;
@@ -115,30 +115,19 @@ function SalesBarChart({ buckets, billed = [], selectedIdx, onSelectBar, animKey
   return (
     <div style={{ position: 'relative', margin: '22px -6px 0' }}>
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block', height: 'auto', overflow: 'visible' }}>
-        {/* Ghost bars — wireframe outline of pending/processing sales not yet completed. */}
-        {billed.map((b, i) => {
-          if (i >= n || b.valueCents <= (buckets[i]?.valueCents ?? 0)) return null;
-          const gh = reveal ? hOf(b.valueCents) : 0;
-          return (
-            <rect key={`g${animKey}-${i}`} className="rd-bar"
-              x={x(i) + 0.75} width={Math.max(bw - 1.5, 1)}
-              y={BASE - gh} height={gh}
-              rx={(bw - 1.5) / 2}
-              fill="none" stroke={BAR} strokeWidth={1.5} opacity={0.45}
-              style={{ pointerEvents: 'none' }}
-            />
-          );
-        })}
         {Array.from({ length: MAX_SLOTS }, (_, i) => {
           const active = i < n;
+          const zero = active && buckets[i].valueCents <= 0;
           const bh = active && reveal ? hOf(buckets[i].valueCents) : 0;
-          const bx = active ? x(i) : W - PADX - bw;
+          const w  = zero ? DOT : Math.max(bw, 1);
+          const bx = active ? x(i) + (zero ? (bw - DOT) / 2 : 0) : W - PADX - bw;
           return (
             <rect key={i} className="rd-bar"
-              x={bx} width={Math.max(bw, 1)}
+              x={bx} width={w}
               y={BASE - bh} height={bh}
-              rx={bw / 2}
+              rx={w / 2}
               fill={i === selectedIdx ? SEL : BAR}
+              opacity={zero ? 0.45 : 1}
               style={{ cursor: active ? 'pointer' : 'default', pointerEvents: active ? 'auto' : 'none' }}
               onClick={() => active && onSelectBar(i)}
             />
@@ -225,7 +214,6 @@ export default function Dashboard() {
   const growth = growthPct(collected, prevCollected);
 
   const buckets = buildBuckets(sales, tf);
-  const billedBuckets = buildBilledBuckets(sales, tf);
   const selectedIdx = selBar >= 0 && selBar < buckets.length
     ? selBar
     : Math.min(currentBucketIdx(tf), buckets.length - 1);
@@ -278,7 +266,7 @@ export default function Dashboard() {
             <div style={{ marginTop: 4, color: 'rgba(0,229,204,0.6)', fontWeight: 400, fontSize: 13 }}>{salesCount} completed sale{salesCount !== 1 ? 's' : ''}</div>
           )}
 
-          <SalesBarChart buckets={buckets} billed={billedBuckets} selectedIdx={selectedIdx} onSelectBar={setSelBar} animKey={tf} />
+          <SalesBarChart buckets={buckets} selectedIdx={selectedIdx} onSelectBar={setSelBar} animKey={tf} />
 
           {/* Notch — rounded wave flowing out of the hero, follows the active timeframe */}
           <svg width="84" height="14" viewBox="0 0 84 14"

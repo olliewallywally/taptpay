@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { usePropertyTenants, usePropertyInvoices } from "@/lib/property-data";
 import { PropertyReportsButton } from "@/components/reports/PropertyReportsButton";
 import {
-  type Timeframe, buildBuckets, buildBilledBuckets, periodWindow, collectedCents,
+  type Timeframe, buildBuckets, periodWindow, collectedCents,
   growthPct, collectionRate, filterByProperty, fmtCompact,
 } from "@/lib/property-dashboard-data";
 
@@ -127,9 +127,8 @@ function TimeframeBar({ tf, onPick, onIndicator }: {
 /* ── Bar chart — clickable, animates between timeframes ── */
 const MAX_SLOTS = 12;
 
-function RentBarChart({ buckets, billed = [], selectedIdx, onSelectBar, animKey }: {
+function RentBarChart({ buckets, selectedIdx, onSelectBar, animKey }: {
   buckets: { label: string; valueCents: number }[];
-  billed?: { label: string; valueCents: number }[];
   selectedIdx: number;
   onSelectBar: (i: number) => void;
   animKey: string;
@@ -143,11 +142,10 @@ function RentBarChart({ buckets, billed = [], selectedIdx, onSelectBar, animKey 
   const [reveal, setReveal] = useState(false);
   useEffect(() => { const t = setTimeout(() => setReveal(true), 60); return () => clearTimeout(t); }, []);
 
-  // Solid bars own the scale; ghosts are capped hints so a big unpaid request
-  // can never render as a full-height wireframe bar dwarfing everything.
+  // Zero-value buckets render as a small resting dot instead of a bar.
+  const DOT = 7;
   const maxVal = Math.max(...buckets.map(b => b.valueCents), 1);
-  const hOf = (v: number) => v <= 0 ? 6 : 12 + (v / maxVal) * (CH - 40);
-  const GHOST_CAP = 12 + (CH - 40) * 0.62;
+  const hOf = (v: number) => v <= 0 ? DOT : 12 + (v / maxVal) * (CH - 40);
 
   const sel = buckets[selectedIdx];
   const selX = x(Math.min(selectedIdx, n - 1)) + bw / 2;
@@ -156,33 +154,19 @@ function RentBarChart({ buckets, billed = [], selectedIdx, onSelectBar, animKey 
   return (
     <div style={{ position: 'relative', margin: '22px -6px 0' }}>
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block', height: 'auto', overflow: 'visible' }}>
-        {/* Ghost bars — wireframe outline of what's been billed but not yet collected,
-            so a rent request shows here the moment it's sent from the terminal. */}
-        {billed.map((b, i) => {
-          if (i >= n || b.valueCents <= (buckets[i]?.valueCents ?? 0)) return null;
-          const capped = Math.min(hOf(b.valueCents), GHOST_CAP);
-          if (capped <= hOf(buckets[i]?.valueCents ?? 0) + 4) return null;
-          const gh = reveal ? capped : 0;
-          return (
-            <rect key={`g${animKey}-${i}`} className="pd-bar"
-              x={x(i) + 0.75} width={Math.max(bw - 1.5, 1)}
-              y={BASE - gh} height={gh}
-              rx={(bw - 1.5) / 2}
-              fill="none" stroke={BAR} strokeWidth={1.5} strokeDasharray="3 5" opacity={0.35}
-              style={{ pointerEvents: 'none' }}
-            />
-          );
-        })}
         {Array.from({ length: MAX_SLOTS }, (_, i) => {
           const active = i < n;
+          const zero = active && buckets[i].valueCents <= 0;
           const bh = active && reveal ? hOf(buckets[i].valueCents) : 0;
-          const bx = active ? x(i) : W - PADX - bw;
+          const w  = zero ? DOT : Math.max(bw, 1);
+          const bx = active ? x(i) + (zero ? (bw - DOT) / 2 : 0) : W - PADX - bw;
           return (
             <rect key={i} className="pd-bar"
-              x={bx} width={Math.max(bw, 1)}
+              x={bx} width={w}
               y={BASE - bh} height={bh}
-              rx={bw / 2}
+              rx={w / 2}
               fill={i === selectedIdx ? SEL : BAR}
+              opacity={zero ? 0.45 : 1}
               style={{ cursor: active ? 'pointer' : 'default', pointerEvents: active ? 'auto' : 'none' }}
               onClick={(e) => { if (!active) return; e.stopPropagation(); onSelectBar(i); }}
             />
@@ -243,7 +227,6 @@ export default function PropertyDashboard() {
   const rate = collectionRate(fInv, win.start, win.end);
 
   const buckets = buildBuckets(fInv, tf);
-  const billedBuckets = buildBilledBuckets(fInv, tf);
   // Pill only appears for an explicit tap; tapping the same bar again dismisses it.
   const selectedIdx = selBar >= 0 && selBar < buckets.length ? selBar : -1;
   const pickBar = (i: number) => setSelBar(p => (p === i ? -1 : i));
@@ -298,7 +281,7 @@ export default function PropertyDashboard() {
             )
           )}
 
-          <RentBarChart buckets={buckets} billed={billedBuckets} selectedIdx={selectedIdx} onSelectBar={pickBar} animKey={`${tf}-${propFilter ?? 'all'}`} />
+          <RentBarChart buckets={buckets} selectedIdx={selectedIdx} onSelectBar={pickBar} animKey={`${tf}-${propFilter ?? 'all'}`} />
 
           {/* Notch — rounded wave flowing out of the hero, follows the active timeframe */}
           <svg width="84" height="14" viewBox="0 0 84 14"
