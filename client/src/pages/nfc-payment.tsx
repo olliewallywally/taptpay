@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Smartphone, Waves, CreditCard, CheckCircle, XCircle, Loader2, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function NFCPayment() {
   const [nfcCapabilities, setNfcCapabilities] = useState<any>(null);
@@ -53,22 +54,12 @@ export default function NFCPayment() {
     setPaymentStatus("creating");
     
     try {
-      const response = await fetch(`/api/merchants/${merchantId}/nfc-pay`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          amount: parseFloat(amount),
-          itemName,
-          deviceId: navigator.userAgent,
-          nfcCapabilities: nfcCapabilities
-        }),
+      const response = await apiRequest("POST", `/api/merchants/${merchantId}/nfc-pay`, {
+        amount: parseFloat(amount),
+        itemName,
+        deviceId: navigator.userAgent,
+        nfcCapabilities: nfcCapabilities
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to create NFC payment session');
-      }
 
       const result = await response.json();
       setNfcSession(result.nfcSession);

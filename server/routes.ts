@@ -1439,27 +1439,39 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   // NFC Tap to Phone Payment API
-  app.post("/api/merchants/:merchantId/nfc-pay", async (req, res) => {
+  // The merchant's own phone is the terminal, so only the authenticated owner may
+  // open a charge. Leaving this public let anyone create pending transactions with
+  // an arbitrary itemName/amount on any merchant — polluting their transaction list,
+  // spamming fake nfc_transaction_created events onto their live SSE feed, and
+  // planting CSV-formula-injection payloads in their export.
+  app.post("/api/merchants/:merchantId/nfc-pay", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = parseInt(req.params.merchantId);
+      if (!checkMerchantOwnership(req, merchantId)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       const { amount, itemName, deviceId, nfcCapabilities } = req.body;
-      
+
       // Validate required fields
       if (!amount || !itemName) {
         return res.status(400).json({ message: "Amount and item name are required" });
       }
-      
+      const priceNum = parseFloat(amount);
+      if (isNaN(priceNum) || priceNum <= 0) {
+        return res.status(400).json({ message: "Invalid amount" });
+      }
+
       // Check if merchant exists
       const merchant = await storage.getMerchant(merchantId);
       if (!merchant) {
         return res.status(404).json({ message: "Merchant not found" });
       }
-      
+
       // Create transaction with NFC payment method
       const transaction = await storage.createTransaction({
         merchantId,
         itemName,
-        price: amount.toString(),
+        price: priceNum.toFixed(2),
         paymentMethod: "nfc_tap",
         deviceId: deviceId || "unknown",
         status: "pending",

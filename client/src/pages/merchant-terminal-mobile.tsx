@@ -332,22 +332,12 @@ export default function MerchantTerminalMobile() {
     setNfcPaymentStatus("creating");
     
     try {
-      const response = await fetch(`/api/merchants/${merchantId}/nfc-pay`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          amount: parseFloat(transaction.price),
-          itemName: transaction.itemName,
-          deviceId: navigator.userAgent,
-          nfcCapabilities: nfcCapabilities
-        }),
+      const response = await apiRequest("POST", `/api/merchants/${merchantId}/nfc-pay`, {
+        amount: parseFloat(transaction.price),
+        itemName: transaction.itemName,
+        deviceId: navigator.userAgent,
+        nfcCapabilities: nfcCapabilities
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to create NFC payment session');
-      }
 
       const result = await response.json();
       setNfcSession(result.nfcSession);
