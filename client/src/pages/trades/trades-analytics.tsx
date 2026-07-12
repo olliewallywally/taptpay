@@ -217,18 +217,22 @@ export default function TradesAnalytics() {
   const yesterdayInvoices = filtered.filter((i: any) => new Date(i.createdAt) >= yesterday && new Date(i.createdAt) < today).sort(byNewest);
   const earlierInvoices = filtered.filter((i: any) => new Date(i.createdAt) < yesterday).sort(byNewest).slice(0, 50);
 
-  /* ── Swipeable sheet state ── */
+  /* ── Freely slidable sheet state ──
+     The sheet parks wherever the drag releases it — anywhere between fully
+     covering the graph (0) and fully revealing it (defaultOffset). No snapping;
+     only a spring back inside the bounds if the drag overshot them.
+     Pointer events cover touch AND mouse, so it slides on desktop too. */
   const topRef   = useRef<HTMLDivElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
-  const touchStartY  = useRef(0);
-  const touchStartOff = useRef(0);
-  const [sheetOffset, setSheetOffset] = useState<number | null>(null); // null = not yet measured
-  const [snapped, setSnapped]   = useState<'default' | 'full'>('default');
+  const dragStartY   = useRef(0);
+  const dragStartOff = useRef(0);
+  const [measuredTop, setMeasuredTop] = useState<number | null>(null);
+  const [sheetOffset, setSheetOffset] = useState<number | null>(null); // null = resting at default
   const [dragging, setDragging] = useState(false);
 
   useEffect(() => {
     const measure = () => {
-      if (topRef.current) setSheetOffset(topRef.current.offsetHeight + 12);
+      if (topRef.current) setMeasuredTop(topRef.current.offsetHeight + 12);
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -236,32 +240,28 @@ export default function TradesAnalytics() {
     return () => ro.disconnect();
   }, []);
 
-  const defaultOffset = sheetOffset ?? 320;
-  const snapFull = 0; // fully covers the screen
+  const defaultOffset = measuredTop ?? 320;
+  const currentOffset = sheetOffset ?? defaultOffset;
 
-  const onTouchStart = useCallback((e: React.TouchEvent) => {
-    touchStartY.current   = e.touches[0].clientY;
-    touchStartOff.current = snapped === 'full' ? snapFull : defaultOffset;
+  const onDragStart = useCallback((e: React.PointerEvent) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragStartY.current   = e.clientY;
+    dragStartOff.current = currentOffset;
     setDragging(true);
-  }, [snapped, defaultOffset]);
+  }, [currentOffset]);
 
-  const onTouchMove = useCallback((e: React.TouchEvent) => {
-    const dy  = e.touches[0].clientY - touchStartY.current;
-    const raw = touchStartOff.current + dy;
-    setSheetOffset(Math.max(snapFull - 24, Math.min(defaultOffset + 60, raw)));
-  }, [defaultOffset]);
+  const onDragMove = useCallback((e: React.PointerEvent) => {
+    if (!dragging) return;
+    const raw = dragStartOff.current + (e.clientY - dragStartY.current);
+    // Small rubber-band past both ends while the finger is down
+    setSheetOffset(Math.max(-24, Math.min(defaultOffset + 40, raw)));
+  }, [dragging, defaultOffset]);
 
-  const onTouchEnd = useCallback(() => {
+  const onDragEnd = useCallback(() => {
     setDragging(false);
-    const effective = sheetOffset ?? defaultOffset;
-    if (effective < defaultOffset / 2) {
-      setSnapped('full');
-      setSheetOffset(snapFull);
-    } else {
-      setSnapped('default');
-      setSheetOffset(defaultOffset);
-    }
-  }, [sheetOffset, defaultOffset]);
+    // Stay put — just spring back inside the bounds if overshot
+    setSheetOffset(o => o === null ? null : Math.max(0, Math.min(defaultOffset, o)));
+  }, [defaultOffset]);
 
   return (
     <div style={{ background: C.white, minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
@@ -304,9 +304,9 @@ export default function TradesAnalytics() {
           height: '100svh',
           background: C.sheet,
           borderRadius: '32px 32px 0 0',
-          transform: `translateY(${sheetOffset ?? defaultOffset}px)`,
+          transform: `translateY(${currentOffset}px)`,
           transition: dragging ? 'none' : 'transform 0.38s cubic-bezier(0.34,1.56,0.64,1)',
-          overflowY: snapped === 'full' ? 'auto' : 'hidden',
+          overflowY: currentOffset < 40 ? 'auto' : 'hidden',
           overflowX: 'hidden',
           willChange: 'transform',
           msOverflowStyle: 'none' as any,
@@ -314,11 +314,11 @@ export default function TradesAnalytics() {
         }}
       >
         <div
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
-          onTouchCancel={onTouchEnd}
-          style={{ width: '100%', height: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'grab', flexShrink: 0, touchAction: 'none' }}
+          onPointerDown={onDragStart}
+          onPointerMove={onDragMove}
+          onPointerUp={onDragEnd}
+          onPointerCancel={onDragEnd}
+          style={{ width: '100%', height: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: dragging ? 'grabbing' : 'grab', flexShrink: 0, touchAction: 'none' }}
         >
           <div style={{ width: 40, height: 5, borderRadius: 3, background: C.handle }} />
         </div>
