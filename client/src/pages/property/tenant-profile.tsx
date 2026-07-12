@@ -166,7 +166,7 @@ export default function TenantProfile() {
   if (!isLoading && !tenant && !snap) {
     return (
       <div style={{ minHeight: '100svh', background: C.white, display: 'flex', justifyContent: 'center' }}>
-        <div style={{ width: '100%', maxWidth: 390, background: '#F4F4F4', paddingTop: 100, textAlign: 'center' }}>
+        <div style={{ width: '100%', maxWidth: 430, background: '#F4F4F4', paddingTop: 100, textAlign: 'center' }}>
           <p style={{ color: C.mute }}>tenant not found</p>
           <button onClick={() => startPropertyBack(() => setLocation('/property/tenants'))} style={{ marginTop: 16, color: C.btn, background: 'none', border: 'none', cursor: 'pointer', fontSize: 14 }}>← back to tenants</button>
         </div>
@@ -218,7 +218,7 @@ export default function TenantProfile() {
 
   return (
     <div style={{ background: C.white, minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
-    <div style={{ width: '100%', maxWidth: 390, minHeight: '100svh', background: '#F4F4F4', paddingBottom: 130, fontFamily: "'Outfit', system-ui, sans-serif" }}>
+    <div style={{ width: '100%', maxWidth: 430, minHeight: '100svh', background: '#F4F4F4', paddingBottom: 130, fontFamily: "'Outfit', system-ui, sans-serif" }}>
       <div style={{ height: 56 }} />
 
       {/* Top bar — slides down from above as the hero morphs into place */}
@@ -357,7 +357,7 @@ export default function TenantProfile() {
       {/* Edit sheet */}
       {editing && editForm && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(4,13,109,0.55)', backdropFilter: 'blur(8px)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>
-          <div style={{ width: '100%', maxWidth: 390, margin: '0 auto', background: '#F4F4F4', borderRadius: '28px 28px 0 0', padding: '24px 24px 48px' }}>
+          <div style={{ width: '100%', maxWidth: 430, margin: '0 auto', background: '#F4F4F4', borderRadius: '28px 28px 0 0', padding: '24px 24px 48px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
               <span style={{ fontWeight: 700, fontSize: 18, color: C.navy }}>edit tenant</span>
               <button onClick={() => setEditing(false)} style={{ width: 32, height: 32, borderRadius: 999, background: C.gray, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

@@ -34,7 +34,7 @@ export default function RecurringSchedules() {
     action.mutate({ url: "/api/trades/schedules", method: "POST", body: { clientProfileId: form.clientProfileId, amountCents, frequency: form.frequency, deliveryChannel: form.deliveryChannel, startDate: new Date(`${form.startDate}T09:00:00Z`).toISOString() } });
   };
 
-  return <main style={{ minHeight: "100vh", background: T.OFFW, color: T.INK, padding: "22px 16px 70px", fontFamily: "Outfit, system-ui, sans-serif" }}><section style={{ maxWidth: 620, margin: "0 auto" }}>
+  return <main style={{ minHeight: "100vh", background: "#FFFFFF", color: T.INK, fontFamily: "Outfit, system-ui, sans-serif", display: "flex", justifyContent: "center" }}><section style={{ width: "100%", maxWidth: 430, background: T.OFFW, minHeight: "100vh", padding: "22px 16px 70px", boxSizing: "border-box" }}>
     <button onClick={() => setLocation("/trades")} style={link}>Back to jobs</button>
     <div style={{ color: T.ACCENT, fontWeight: 900, fontSize: 11, textTransform: "uppercase", letterSpacing: ".13em" }}>Trades</div><h1 style={{ margin: "7px 0 4px" }}>Recurring invoices</h1><p style={{ margin: 0, color: "#687078" }}>Maintenance retainers and repeat jobs</p>
     <div style={card}>

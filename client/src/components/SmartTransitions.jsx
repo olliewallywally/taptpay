@@ -1464,7 +1464,7 @@ const TP_CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap');
 
 .tp-viewport {
-  width: 100%; max-width: 390px; height: 100vh;
+  width: 100%; max-width: 430px; height: 100vh;
   margin: 0 auto; position: relative; overflow: hidden;
   font-family: 'Outfit', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;

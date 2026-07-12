@@ -125,7 +125,7 @@ function AddTenantSheet({ onClose, onSave, saving, saveError }: {
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', justifyContent: 'center' }}>
       {/* Sheet — slides up from bottom */}
       <div style={{
-        width: '100%', maxWidth: 390,
+        width: '100%', maxWidth: 430,
         background: '#F4F4F4',
         borderRadius: '28px 28px 0 0',
         maxHeight: '92vh',
