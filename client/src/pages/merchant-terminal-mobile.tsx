@@ -261,8 +261,8 @@ export default function MerchantTerminalMobile() {
 
   // Set up SSE connection
   useEffect(() => {
-    sseClient.connect(merchantId);
-    
+    sseClient.connect(merchantId, null, localStorage.getItem("authToken"));
+
     sseClient.subscribe("transaction_updated", (message) => {
       // Route through the query cache only — the [activeTransaction] effect
       // handles all state transitions including completion detection & cleanup.

@@ -136,23 +136,59 @@ setInterval(() => {
 }, RATE_LIMIT_WINDOW);
 
 // Helper function to broadcast to stone-specific connections
+// ── SSE payload redaction for unauthenticated subscribers ─────────────────
+// /api/merchants/:id/events is consumed by BOTH the authenticated merchant
+// terminal (token in query string) and the anonymous customer payment page.
+// Authenticated connections get the full event; anonymous ones get a redacted
+// view with the merchant's fee/margin internals and payment-processor ids
+// stripped (item name / price / status / split counts stay — the paying
+// customer legitimately sees their own transaction).
+const SSE_TXN_SENSITIVE = [
+  "windcaveFeeRate", "windcaveFeeAmount", "platformFeeRate", "platformFeeAmount", "merchantNet",
+  "windcaveTransactionId", "windcaveSessionId", "windcaveXId", "windcaveSessionState",
+  "nfcSessionId", "deviceId",
+];
+const SSE_CRYPTO_SENSITIVE = ["walletAddress"];
+
+function stripFields<T extends Record<string, any>>(obj: T, fields: string[]): T {
+  if (!obj || typeof obj !== "object") return obj;
+  const out: Record<string, any> = { ...obj };
+  for (const f of fields) delete out[f];
+  return out as T;
+}
+
+function publicSseData(data: any): any {
+  if (!data || typeof data !== "object") return data;
+  const out: Record<string, any> = { ...data };
+  if (out.transaction) out.transaction = stripFields(out.transaction, SSE_TXN_SENSITIVE);
+  if (out.cryptoTransaction) out.cryptoTransaction = stripFields(out.cryptoTransaction, SSE_CRYPTO_SENSITIVE);
+  if (out.refund) delete out.refund; // refund internals are merchant-only
+  return out;
+}
+
+// Write one SSE frame to a connection, redacting for unauthenticated subscribers
+// (connection tagged with __sseAuthed at connect time in /api/merchants/:id/events).
+function sseWrite(conn: any, data: any) {
+  const payload = conn && conn.__sseAuthed ? data : publicSseData(data);
+  conn.write(`data: ${JSON.stringify(payload)}\n\n`);
+}
+
 function broadcastToStone(merchantId: number, stoneId: number | null | undefined, data: any) {
   const merchantConnections = sseConnections.get(merchantId);
   if (!merchantConnections) return;
 
   const targetStoneId = stoneId === undefined ? null : stoneId;
-  const payload = `data: ${JSON.stringify(data)}\n\n`;
   const sent = new Set<any>();
 
   const stoneConnections = merchantConnections.get(targetStoneId);
   if (stoneConnections) {
-    stoneConnections.forEach(conn => { conn.write(payload); sent.add(conn); });
+    stoneConnections.forEach(conn => { sseWrite(conn, data); sent.add(conn); });
   }
 
   if (targetStoneId !== null) {
     const merchantWide = merchantConnections.get(null);
     if (merchantWide) {
-      merchantWide.forEach(conn => { if (!sent.has(conn)) conn.write(payload); });
+      merchantWide.forEach(conn => { if (!sent.has(conn)) sseWrite(conn, data); });
     }
   }
 }
@@ -2255,11 +2291,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (connections) {
         connections.forEach((connSet) => {
           connSet.forEach(conn => {
-            conn.write(`data: ${JSON.stringify({ 
-              type: 'crypto_transaction_created', 
-              transaction,
-              cryptoTransaction 
-            })}\n\n`);
+            sseWrite(conn, { type: 'crypto_transaction_created', transaction, cryptoTransaction });
           });
         });
       }
@@ -2355,10 +2387,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (connections) {
         connections.forEach((connSet) => {
           connSet.forEach(conn => {
-            conn.write(`data: ${JSON.stringify({ 
-              type: 'crypto_payment_confirmed', 
-              cryptoTransaction: updatedCryptoTx 
-            })}\n\n`);
+            sseWrite(conn, { type: 'crypto_payment_confirmed', cryptoTransaction: updatedCryptoTx });
           });
         });
       }
@@ -2443,11 +2472,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           const transaction = await storage.getTransaction(cryptoTx.transactionId!);
           connections.forEach((connSet) => {
             connSet.forEach(client => {
-              client.write(`data: ${JSON.stringify({ 
-                type: 'transaction_update', 
-                transaction,
-                cryptoTransaction: cryptoTx 
-              })}\n\n`);
+              sseWrite(client, { type: 'transaction_update', transaction, cryptoTransaction: cryptoTx });
             });
           });
         }
@@ -2462,11 +2487,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           const transaction = await storage.getTransaction(cryptoTx.transactionId!);
           connections.forEach((connSet) => {
             connSet.forEach(client => {
-              client.write(`data: ${JSON.stringify({ 
-                type: 'transaction_update', 
-                transaction,
-                cryptoTransaction: cryptoTx 
-              })}\n\n`);
+              sseWrite(client, { type: 'transaction_update', transaction, cryptoTransaction: cryptoTx });
             });
           });
         }
@@ -4366,7 +4387,22 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.get("/api/merchants/:id/events", (req, res) => {
     const merchantId = parseInt(req.params.id);
     const stoneId = req.query.stoneId ? parseInt(req.query.stoneId as string) : null;
-    
+
+    // SSE can't send Authorization headers, so an authenticated merchant passes its
+    // JWT in the query string. A valid token for THIS merchant (or an admin) unlocks
+    // the full event payload; everyone else — the anonymous customer payment page —
+    // gets a redacted view (see sseWrite/publicSseData). Cross-tenant subscribers
+    // therefore can no longer read a merchant's fee/margin internals or processor ids.
+    let sseAuthed = false;
+    const qToken = typeof req.query.token === "string" ? req.query.token : "";
+    if (qToken) {
+      try {
+        const decoded: any = jwt.verify(qToken, JWT_SECRET);
+        sseAuthed = decoded?.role === "admin" || decoded?.merchantId === merchantId;
+      } catch { /* invalid/expired token → treat as anonymous */ }
+    }
+    (res as any).__sseAuthed = sseAuthed;
+
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',

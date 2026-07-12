@@ -7,14 +7,21 @@ export class SSEClient {
   private eventSource: EventSource | null = null;
   private listeners: Map<string, ((data: any) => void)[]> = new Map();
 
-  connect(merchantId: number, stoneId?: number | null) {
+  connect(merchantId: number, stoneId?: number | null, token?: string | null) {
     if (this.eventSource) {
       this.eventSource.close();
     }
 
-    const stoneParam = stoneId ? `?stoneId=${stoneId}` : '';
+    // EventSource can't send an Authorization header, so an authenticated merchant
+    // passes its JWT in the query string to unlock the full event payload. The
+    // anonymous customer payment page connects without a token and receives a
+    // redacted view (server strips fee/margin internals for unauthenticated subs).
+    const params = new URLSearchParams();
+    if (stoneId) params.set('stoneId', String(stoneId));
+    if (token) params.set('token', token);
+    const qs = params.toString();
     console.log(`Connecting to SSE for merchant ${merchantId}${stoneId ? ` and stone ${stoneId}` : ''}`);
-    this.eventSource = new EventSource(`/api/merchants/${merchantId}/events${stoneParam}`);
+    this.eventSource = new EventSource(`/api/merchants/${merchantId}/events${qs ? `?${qs}` : ''}`);
     
     this.eventSource.onopen = () => {
       console.log(`SSE connection opened for merchant ${merchantId}`);
