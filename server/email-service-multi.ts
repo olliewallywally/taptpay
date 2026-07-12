@@ -193,6 +193,15 @@ Need help? Contact us at support@taptpay.co.nz`;
   });
 }
 
+// Escape user-supplied text before interpolating into email HTML. The board
+// builder submit endpoint is public/unauthenticated, so these fields are
+// attacker-controlled and must not be rendered raw into the admin's inbox.
+function escHtml(s: string | null | undefined): string {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
 export async function sendBoardBuilderEmail(params: {
   pdfBase64: string;
   businessName: string;
@@ -208,10 +217,10 @@ export async function sendBoardBuilderEmail(params: {
   const html = `
     <h2>Payment Board Print Request</h2>
     <table style="border-collapse:collapse;width:100%;max-width:480px;">
-      <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Business</td><td style="padding:6px 0;font-weight:600;">${params.businessName}</td></tr>
-      <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Submitted by</td><td style="padding:6px 0;">${params.submitterName} &lt;${params.submitterEmail}&gt;</td></tr>
-      <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Layout</td><td style="padding:6px 0;">${params.layout}</td></tr>
-      <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Stone / QR</td><td style="padding:6px 0;">${params.stoneId === 'main' ? 'Main Payment Link' : `Stone ID ${params.stoneId}`}</td></tr>
+      <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Business</td><td style="padding:6px 0;font-weight:600;">${escHtml(params.businessName)}</td></tr>
+      <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Submitted by</td><td style="padding:6px 0;">${escHtml(params.submitterName)} &lt;${escHtml(params.submitterEmail)}&gt;</td></tr>
+      <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Layout</td><td style="padding:6px 0;">${escHtml(params.layout)}</td></tr>
+      <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Stone / QR</td><td style="padding:6px 0;">${params.stoneId === 'main' ? 'Main Payment Link' : `Stone ID ${escHtml(params.stoneId)}`}</td></tr>
     </table>
     <p style="margin-top:16px;color:#374151;">The payment board PDF is attached to this email.</p>
     <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
