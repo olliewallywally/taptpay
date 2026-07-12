@@ -514,7 +514,8 @@ export default function StockManagement() {
   const initials = businessName.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
 
   return (
-    <div className="min-h-screen pb-32" style={{ background: '#F4F4F4', fontFamily: "'Outfit', system-ui, sans-serif" }}>
+    <div style={{ background: '#FFFFFF', minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
+    <div className="min-h-screen pb-32 w-full" style={{ maxWidth: 430, background: '#F4F4F4', fontFamily: "'Outfit', system-ui, sans-serif" }}>
       {/* Safe-area spacer */}
       <div style={{ height: 54 }} />
 
@@ -545,7 +546,7 @@ export default function StockManagement() {
 
       {/* White rounded-top content area */}
       <div style={{ background: '#FFFFFF', borderRadius: '40px 40px 0 0', marginTop: 16 }}>
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8">
+        <div className="px-4 sm:px-6 pt-6 sm:pt-8">
 
         {/* Search row with + button */}
         <div className="relative flex items-center gap-3 mb-4">
@@ -679,6 +680,7 @@ export default function StockManagement() {
           )}
         </SheetContent>
       </Sheet>
+    </div>
     </div>
   );
 }
