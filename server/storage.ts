@@ -63,7 +63,14 @@ export interface IStorage {
   getRefundsByMerchant(merchantId: number): Promise<Refund[]>;
   updateRefundStatus(id: number, status: string, windcaveRefundId?: string): Promise<Refund | undefined>;
   updateTransactionAfterRefund(id: number, refundAmount: number): Promise<Transaction | undefined>;
-  
+  // Atomically reserve a refund against the remaining refundable balance, guarding
+  // against concurrent/double-submitted refunds over-refunding. Returns the updated
+  // transaction, or null if the reservation would exceed the refundable amount.
+  reserveRefundAmount(id: number, refundAmount: number): Promise<Transaction | null | undefined>;
+  // Compensating action: release a previously-reserved amount (e.g. the gateway
+  // refund failed), restoring the refundable balance.
+  releaseRefundAmount(id: number, refundAmount: number): Promise<void>;
+
   // Tapt Stone operations
   createTaptStone(data: InsertTaptStone): Promise<TaptStone>;
   getTaptStone(id: number): Promise<TaptStone | undefined>;
@@ -737,6 +744,41 @@ export class MemStorage implements IStorage {
     };
     this.transactions.set(id, updated);
     return updated;
+  }
+
+  async reserveRefundAmount(id: number, refundAmount: number): Promise<Transaction | null | undefined> {
+    const transaction = this.transactions.get(id);
+    if (!transaction) return undefined;
+    if (transaction.status !== "completed" && transaction.status !== "partially_refunded") return null;
+    const prevRefunded = parseFloat(transaction.totalRefunded || "0");
+    const price = parseFloat(transaction.price);
+    // Guard against over-refund (epsilon for float noise on 2dp money).
+    if (refundAmount > price - prevRefunded + 1e-9) return null;
+    const newTotalRefunded = prevRefunded + refundAmount;
+    const newRefundableAmount = Math.max(0, price - newTotalRefunded);
+    const updated = {
+      ...transaction,
+      totalRefunded: newTotalRefunded.toFixed(2),
+      refundableAmount: newRefundableAmount.toFixed(2),
+      status: newRefundableAmount <= 0 ? "refunded" : "partially_refunded",
+    };
+    this.transactions.set(id, updated);
+    return updated;
+  }
+
+  async releaseRefundAmount(id: number, refundAmount: number): Promise<void> {
+    const transaction = this.transactions.get(id);
+    if (!transaction) return;
+    const prevRefunded = parseFloat(transaction.totalRefunded || "0");
+    const price = parseFloat(transaction.price);
+    const newTotalRefunded = Math.max(0, prevRefunded - refundAmount);
+    const newRefundableAmount = Math.max(0, price - newTotalRefunded);
+    this.transactions.set(id, {
+      ...transaction,
+      totalRefunded: newTotalRefunded.toFixed(2),
+      refundableAmount: newRefundableAmount.toFixed(2),
+      status: newTotalRefunded <= 0 ? "completed" : "partially_refunded",
+    });
   }
 
   async updateTransactionStatus(id: number, status: string, windcaveTransactionId?: string): Promise<Transaction | undefined> {
@@ -2436,6 +2478,43 @@ export class DatabaseStorage implements IStorage {
       .where(eq(transactions.id, id))
       .returning();
     return result[0];
+  }
+
+  async reserveRefundAmount(id: number, refundAmount: number): Promise<Transaction | null | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const amt = refundAmount.toFixed(2);
+    // Single atomic UPDATE: increment totalRefunded, recompute refundableAmount and
+    // status, guarded by (a) refundable status and (b) the CURRENT remaining balance
+    // (price - already-refunded) being >= the requested amount. Concurrent/double
+    // refunds serialize on the row; the second sees a reduced balance and its WHERE
+    // fails, so 0 rows return -> caller treats it as a rejected reservation.
+    const result = await this.db
+      .update(transactions)
+      .set({
+        totalRefunded: sql`(COALESCE(${transactions.totalRefunded}, '0')::numeric + ${amt}::numeric)`,
+        refundableAmount: sql`GREATEST(0, ${transactions.price}::numeric - (COALESCE(${transactions.totalRefunded}, '0')::numeric + ${amt}::numeric))`,
+        status: sql`CASE WHEN ${transactions.price}::numeric - (COALESCE(${transactions.totalRefunded}, '0')::numeric + ${amt}::numeric) <= 0 THEN 'refunded' ELSE 'partially_refunded' END`,
+      })
+      .where(and(
+        eq(transactions.id, id),
+        inArray(transactions.status, ['completed', 'partially_refunded']),
+        sql`(${transactions.price}::numeric - COALESCE(${transactions.totalRefunded}, '0')::numeric) >= ${amt}::numeric`,
+      ))
+      .returning();
+    return result[0] ?? null;
+  }
+
+  async releaseRefundAmount(id: number, refundAmount: number): Promise<void> {
+    if (!this.db) throw new Error('Database not available');
+    const amt = refundAmount.toFixed(2);
+    await this.db
+      .update(transactions)
+      .set({
+        totalRefunded: sql`GREATEST(0, COALESCE(${transactions.totalRefunded}, '0')::numeric - ${amt}::numeric)`,
+        refundableAmount: sql`LEAST(${transactions.price}::numeric, ${transactions.price}::numeric - GREATEST(0, COALESCE(${transactions.totalRefunded}, '0')::numeric - ${amt}::numeric))`,
+        status: sql`CASE WHEN GREATEST(0, COALESCE(${transactions.totalRefunded}, '0')::numeric - ${amt}::numeric) <= 0 THEN 'completed' ELSE 'partially_refunded' END`,
+      })
+      .where(eq(transactions.id, id));
   }
 
   // API Key operations - placeholder implementations

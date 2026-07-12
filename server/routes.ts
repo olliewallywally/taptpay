@@ -4625,18 +4625,20 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       // Check refund amount is valid
       const requestedAmount = parseFloat(refundAmount);
-      const transactionAmount = parseFloat(transaction.price);
-      const alreadyRefunded = parseFloat(transaction.totalRefunded || "0");
-      const refundableAmount = parseFloat(transaction.refundableAmount || transaction.price);
-
-      if (requestedAmount > refundableAmount) {
-        return res.status(400).json({ 
-          message: `Refund amount cannot exceed refundable amount of $${refundableAmount.toFixed(2)}` 
-        });
+      if (isNaN(requestedAmount) || requestedAmount <= 0) {
+        return res.status(400).json({ message: "Refund amount must be greater than zero" });
       }
 
-      if (requestedAmount <= 0) {
-        return res.status(400).json({ message: "Refund amount must be greater than zero" });
+      // Atomically reserve this refund against the remaining refundable balance
+      // BEFORE moving any money. Serializes concurrent / double-submitted refunds at
+      // the DB so they can never over-refund (the old check-then-act read the balance,
+      // then called Windcave, with no lock in between). null = reservation rejected.
+      const reserved = await storage.reserveRefundAmount(transactionId, requestedAmount);
+      if (!reserved) {
+        const remaining = parseFloat(transaction.refundableAmount || transaction.price);
+        return res.status(409).json({
+          message: `Refund could not be applied — it exceeds the remaining refundable amount of $${remaining.toFixed(2)}, or another refund is already in progress.`,
+        });
       }
 
       // Create refund record
@@ -4664,9 +4666,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         );
 
         if (!refundResult.success) {
+          // Money did not move — release the reservation so the balance is restored
+          // and the merchant can retry.
+          await storage.releaseRefundAmount(transactionId, requestedAmount);
           await storage.updateRefundStatus(refund.id, "failed");
-          return res.status(502).json({ 
-            message: refundResult.error || "Windcave refund failed. Please try again." 
+          return res.status(502).json({
+            message: refundResult.error || "Windcave refund failed. Please try again."
           });
         }
 
@@ -4676,11 +4681,10 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         windcaveRefundId = `REFUND_SIM_${Date.now()}`;
       }
 
-      // Mark refund record as completed
+      // Mark refund record as completed. Transaction totals were already updated
+      // atomically by reserveRefundAmount above.
       const completedRefund = await storage.updateRefundStatus(refund.id, "completed", windcaveRefundId);
-
-      // Update transaction totals and status (refunded / partially_refunded)
-      const updatedTransaction = await storage.updateTransactionAfterRefund(transactionId, requestedAmount);
+      const updatedTransaction = reserved;
 
       // Broadcast real-time update
       broadcastToStone(merchantId, transaction.taptStoneId, { 
