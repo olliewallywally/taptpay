@@ -28,6 +28,9 @@ import { sendGstInvoices, extractEmails } from "./gst-invoice";
 // stoneId can be null for merchant-level connections
 const sseConnections = new Map<number, Map<number | null, Set<any>>>();
 
+// Guards against overlapping cron runs (see POST /api/internal/cron).
+let cronRunning = false;
+
 // ── Merchant response sanitizers ──────────────────────────────────────────
 // getMerchant() returns the full row (SELECT *), which includes server-only
 // secrets and financial PII. These must never reach a client. No client page
@@ -7123,6 +7126,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     if (providedBuf.length !== secretBuf.length || !crypto.timingSafeEqual(providedBuf, secretBuf)) {
       return res.status(401).json({ message: "Unauthorized" });
     }
+    // Serialize cron runs. Overlapping invocations (scheduler double-fire, or a run
+    // that exceeds the schedule interval) would otherwise double-generate invoices
+    // and double-dispatch tenant emails, since generate/dispatch are fetch-then-write
+    // and advance nextRunDate non-atomically.
+    if (cronRunning) return res.status(409).json({ message: "A cron run is already in progress" });
+    cronRunning = true;
     try {
       const { runGeneratePass, runDispatchPass, runOverduePass, runReminderPass } = await import("./property-cron");
       const { runTradesGeneratePass } = await import("./trades-cron");
@@ -7142,6 +7151,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       console.log(`[CRON] generate=${JSON.stringify(generate)} tradesGenerate=${JSON.stringify(tradesGenerate)} dispatch=${JSON.stringify(dispatch)} overdue=${JSON.stringify(overdue)} reminders=${JSON.stringify(reminders)}`);
       res.json({ ok: true, ranAt: now.toISOString(), generate, tradesGenerate, dispatch, tradesDispatch, overdue, tradesOverdue, reminders, tradesReminders });
     } catch (err) { console.error("[CRON]", err); res.status(500).json({ message: "Cron run failed" }); }
+    finally { cronRunning = false; }
   });
 
   const httpServer = createServer(app);
