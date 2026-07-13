@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import helmet from "helmet";
 import compression from "compression";
-import { spawnSync } from "child_process";
+import { spawn, spawnSync } from "child_process";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { seedDatabase } from "./seed";
@@ -218,6 +218,50 @@ app.use((req, res, next) => {
       }
     } catch (error) {
       log(`⚠️ Failed to ensure info_pack_leads table: ${error}`);
+    }
+  }
+
+  // Ensure uploaded_files table exists (additive migration, safe to re-run).
+  // Merchant logos and invoice documents are stored here instead of the local
+  // filesystem, which is wiped on every autoscale deploy/restart.
+  if (isDatabaseConnected()) {
+    try {
+      const pgDb = getDb();
+      if (pgDb) {
+        await pgDb.execute(sql`
+          CREATE TABLE IF NOT EXISTS uploaded_files (
+            id serial PRIMARY KEY,
+            path text NOT NULL UNIQUE,
+            mime_type text NOT NULL,
+            data bytea NOT NULL,
+            created_at timestamp DEFAULT now() NOT NULL
+          )
+        `);
+        log("✅ uploaded_files table ready");
+      }
+    } catch (error) {
+      log(`⚠️ Failed to ensure uploaded_files table: ${error}`);
+    }
+  }
+
+  // Dev-only automatic DB backups: snapshot both databases (workspace helium +
+  // production Neon) on every boot and then daily, via pg_dump into db-backups/.
+  // Runs in the workspace only — the deployed container has no pg_dump and its
+  // filesystem is ephemeral, so backups there would be pointless.
+  if (process.env.NODE_ENV !== 'production') {
+    const backupScript = path.resolve(process.cwd(), 'scripts', 'db-backup.sh');
+    if (fs.existsSync(backupScript)) {
+      const runBackup = () => {
+        try {
+          const child = spawn('bash', [backupScript], { stdio: 'ignore', detached: true });
+          child.unref();
+        } catch (err) {
+          log(`⚠️ DB backup failed to start: ${err}`);
+        }
+      };
+      runBackup();
+      setInterval(runBackup, 24 * 60 * 60 * 1000).unref();
+      log("✅ DB backups: snapshot on boot + daily (db-backups/)");
     }
   }
 

@@ -1,4 +1,4 @@
-import { pgTable, text, serial, decimal, timestamp, boolean, integer, jsonb, uuid, uniqueIndex, index } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, decimal, timestamp, boolean, integer, jsonb, uuid, uniqueIndex, index, customType } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -1205,3 +1205,25 @@ export type InsertClientProfile = typeof clientProfiles.$inferInsert;
 export type Quote = typeof quotes.$inferSelect;
 export type JobInvoice = typeof jobInvoices.$inferSelect;
 export type JobSchedule = typeof jobSchedules.$inferSelect;
+
+// ── Uploaded files (DB-backed) ───────────────────────────────────────────────
+// Merchant logos and invoice documents used to live on the local filesystem
+// under uploads/. On autoscale deployments the filesystem is ephemeral, so every
+// deploy/restart wiped customer uploads. Files are now stored in Postgres and
+// served from the DB; `path` mirrors the public URL under /uploads/ (e.g.
+// "logos/merchant-5.png") so previously-issued URLs keep resolving.
+const bytea = customType<{ data: Buffer }>({
+  dataType() {
+    return "bytea";
+  },
+});
+
+export const uploadedFiles = pgTable("uploaded_files", {
+  id: serial("id").primaryKey(),
+  path: text("path").notNull().unique(),
+  mimeType: text("mime_type").notNull(),
+  data: bytea("data").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type UploadedFile = typeof uploadedFiles.$inferSelect;

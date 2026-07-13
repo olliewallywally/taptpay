@@ -2,6 +2,9 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { db } from "./db";
+import { uploadedFiles } from "@shared/schema";
+import { eq } from "drizzle-orm";
 import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
 import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, simulateCreateSession, simulateQuerySession, simulateRentSession, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, simulateAttendedTapToPay } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, createUser, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
@@ -205,27 +208,12 @@ const createCryptoTransactionSchema = z.object({
   cryptocurrency: z.enum(["BTC", "ETH", "USDC", "USDT", "LTC", "BCH"]),
 });
 
-// Multer configuration for logo uploads
-const uploadsDir = path.join(process.cwd(), 'uploads', 'logos');
-
-// Ensure uploads directory exists
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-const logoStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (req, file, cb) => {
-    const merchantId = req.params.id;
-    const ext = path.extname(file.originalname);
-    cb(null, `merchant-${merchantId}${ext}`);
-  }
-});
-
+// Multer configuration for logo uploads.
+// Files are held in memory and persisted to the uploaded_files table — never to
+// the local filesystem, which is ephemeral on autoscale deployments (a deploy or
+// restart would silently delete every customer upload).
 const logoUpload = multer({
-  storage: logoStorage,
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 20 * 1024 * 1024, // 20MB max
   },
@@ -239,34 +227,31 @@ const logoUpload = multer({
 });
 
 // Multer configuration for one-off charge invoice documents (PDF / image).
-// Stored under uploads/invoices and served back via the static /uploads mount;
+// Stored in the uploaded_files table and served back via the /uploads route;
 // the saved URL is attached to the invoice and surfaced on the checkout page.
-const invoiceDocsDir = path.join(process.cwd(), 'uploads', 'invoices');
-if (!fs.existsSync(invoiceDocsDir)) {
-  fs.mkdirSync(invoiceDocsDir, { recursive: true });
-}
-
 const INVOICE_DOC_MIME = new Set([
   'application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'image/heic',
 ]);
 
-const invoiceDocStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, invoiceDocsDir),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    const unique = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}`;
-    cb(null, `invoice-${unique}${ext}`);
-  },
-});
-
 const invoiceDocUpload = multer({
-  storage: invoiceDocStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 }, // 20MB max
   fileFilter: (_req, file, cb) => {
     if (INVOICE_DOC_MIME.has(file.mimetype)) cb(null, true);
     else cb(new Error('Only PDF or image files are allowed'));
   },
 });
+
+// Upsert a file into the uploaded_files table under its public /uploads path
+// (e.g. "logos/merchant-5.png"). Re-uploading to the same path overwrites.
+async function saveUploadedFile(relPath: string, mimeType: string, data: Buffer): Promise<void> {
+  await db.insert(uploadedFiles)
+    .values({ path: relPath, mimeType, data })
+    .onConflictDoUpdate({
+      target: uploadedFiles.path,
+      set: { mimeType, data, createdAt: new Date() },
+    });
+}
 
 // Utility to remove undefined keys
 function removeUndefined<T extends Record<string, any>>(obj: T): Partial<T> {
@@ -2902,33 +2887,25 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       // Verify PNG magic bytes (89 50 4E 47 0D 0A 1A 0A) regardless of client-supplied MIME type
       const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-      const fileHeader = Buffer.alloc(8);
-      const fd = fs.openSync(req.file.path, 'r');
-      fs.readSync(fd, fileHeader, 0, 8, 0);
-      fs.closeSync(fd);
-      if (!fileHeader.equals(PNG_MAGIC)) {
-        fs.unlinkSync(req.file.path);
+      if (req.file.buffer.length < 8 || !req.file.buffer.subarray(0, 8).equals(PNG_MAGIC)) {
         return res.status(400).json({ message: "Invalid file: only PNG images are accepted" });
       }
 
-      // Generate URL path for the logo
-      const logoUrl = `/uploads/logos/${req.file.filename}`;
-      
-      // Update merchant with new logo URL
+      const filename = `merchant-${merchantId}${path.extname(req.file.originalname) || '.png'}`;
+      const logoUrl = `/uploads/logos/${filename}`;
+
+      // Persist the file first so the merchant row never points at a missing file
+      await saveUploadedFile(`logos/${filename}`, 'image/png', req.file.buffer);
+
       const updatedMerchant = await storage.updateMerchantLogoUrl(merchantId, logoUrl);
       if (!updatedMerchant) {
-        // Clean up uploaded file if merchant not found
-        fs.unlinkSync(req.file.path);
+        await db.delete(uploadedFiles).where(eq(uploadedFiles.path, `logos/${filename}`));
         return res.status(404).json({ message: "Merchant not found" });
       }
 
       res.json({ logoUrl, message: "Logo uploaded successfully" });
     } catch (error) {
       console.error("Logo upload error:", error);
-      // Clean up uploaded file on error
-      if (req.file) {
-        fs.unlinkSync(req.file.path);
-      }
       res.status(500).json({ message: "Failed to upload logo" });
     }
   });
@@ -5635,8 +5612,32 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Serve static uploads
-  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+  // Serve uploads from the uploaded_files table (durable across deploys), with
+  // a local-disk fallback for any legacy file that predates DB-backed storage.
+  app.get('/uploads/:folder/:name', async (req, res) => {
+    try {
+      const { folder, name } = req.params;
+      // Route params never contain '/', but keep an explicit guard against
+      // traversal for the disk fallback below.
+      if (folder.includes('..') || name.includes('..')) return res.status(400).end();
+      const relPath = `${folder}/${name}`;
+
+      const [file] = await db.select().from(uploadedFiles).where(eq(uploadedFiles.path, relPath));
+      if (file) {
+        res.setHeader('Content-Type', file.mimeType);
+        res.setHeader('Cache-Control', 'public, max-age=300');
+        return res.send(file.data);
+      }
+
+      const diskPath = path.join(process.cwd(), 'uploads', folder, name);
+      if (fs.existsSync(diskPath)) return res.sendFile(diskPath);
+
+      res.status(404).json({ message: 'File not found' });
+    } catch (err) {
+      console.error('[UPLOADS_SERVE]', err);
+      res.status(500).json({ message: 'Failed to serve file' });
+    }
+  });
 
   // ── Customer HPP redirect ────────────────────────────────────────────────────
   // When a customer opens a payment link (/pay/:merchantId or the stone variant),
@@ -6052,14 +6053,15 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.post("/api/property/invoices/document", authenticateToken, invoiceDocUpload.single('document'), async (req: AuthenticatedRequest, res) => {
     try {
       if (!req.user?.merchantId) {
-        if (req.file) fs.unlinkSync(req.file.path);
         return res.status(401).json({ message: "Authentication required" });
       }
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-      const documentUrl = `/uploads/invoices/${req.file.filename}`;
+      const ext = path.extname(req.file.originalname).toLowerCase();
+      const filename = `invoice-${Date.now()}-${crypto.randomBytes(8).toString('hex')}${ext}`;
+      await saveUploadedFile(`invoices/${filename}`, req.file.mimetype, req.file.buffer);
+      const documentUrl = `/uploads/invoices/${filename}`;
       res.json({ documentUrl, documentName: req.file.originalname });
     } catch (err) {
-      if (req.file) { try { fs.unlinkSync(req.file.path); } catch {} }
       console.error("[PROP_INVOICE_DOC_UPLOAD]", err);
       res.status(500).json({ message: "Failed to upload document" });
     }
