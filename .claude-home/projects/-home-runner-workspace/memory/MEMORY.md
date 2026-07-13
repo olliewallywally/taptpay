@@ -5,11 +5,12 @@
 - [Split-bill cross-vertical](split-bill-cross-vertical.md) — shipped to PR 2026-06-27; merchant-gated split to trades + neutral wording; webview verify still owed
 - [Bug audit 2026-07-07](audit-2026-07-07-bugfixes.md) — fixed IDORs, debug backdoors, Windcave double-charge, jest config; remaining flaws + plan
 - [Security audit 2026-07-12](audit-2026-07-12-security.md) — fixed C1 merchant-secret leak (crit), C2 onboarding IDOR, C3 SSE cross-tenant leak (dual-payload), C4 refund race, C5 cron race — all committed + verified live
-- [Report gen integration](report-gen-integration.md) — Task #59 COMPLETE: 11 reports live in 5 pages, PDF engine lazy-chunked, all PDFs/CSVs verified headlessly; uncommitted
+- [Report gen integration](report-gen-integration.md) — Task #59 COMPLETE: 11 reports live in 5 pages, PDF engine lazy-chunked, all PDFs/CSVs verified headlessly; committed (verified 2026-07-13)
 - [App perf & loading](app-perf-loading.md) — slow-load root cause: 3.5MB eager catch-all vendor chunk; fix plan + progress
 - [Checkout redesign handoff](checkout-redesign-handoff.md) — all stages built; real-mode E2E done 2026-07-11, 2 quote bugs fixed, live app de-mocked to production-only (landing phone demo kept)
 - [Dev server single instance](dev-server-single-instance.md) — only ONE dev server on :5000; workflow does NOT auto-restart (supervisor loop added); two servers → HMR token clash overlay
-- [Server crash hardening](server-crash-hardening.md) — root cause of "keeps crashing/timing out": unhandledRejection → process.exit + no workflow restart; both fixed 2026-07-11, uncommitted
-- [Quick invoice & PageTransition fix](quickinv-pagetransition-fix.md) — quick-invoice + directory redesign verified E2E; PageTransition double-mounted every page (fixed via Switch location pin), uncommitted
+- [Server crash hardening](server-crash-hardening.md) — root cause of "keeps crashing/timing out": unhandledRejection → process.exit + no workflow restart; both fixed 2026-07-11, committed
+- [Quick invoice & PageTransition fix](quickinv-pagetransition-fix.md) — quick-invoice + directory redesign verified E2E; PageTransition double-mounted every page (fixed via Switch location pin), committed
+- [Data persistence topology](data-persistence-topology.md) — prod=Neon (durable), dev=helium (Replit-forked ~06-30, divergent); uploads moved to Postgres + auto pg_dump backups (2026-07-13)
 - [Playwright nix chromium](playwright-nix-chromium.md) — bundled chromium broken (libnspr4); use nix-store executablePath + minted JWT for merchant 22
 - [UI consistency plan 2026-07-12](ui-consistency-plan-2026-07-12.md) — 5-item plan (charts, widths, navy bleed, stock page, analytics drag), order 5→2→3→4→1, commit+memory per step
