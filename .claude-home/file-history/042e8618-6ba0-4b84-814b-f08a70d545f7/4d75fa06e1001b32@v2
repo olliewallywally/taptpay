@@ -272,10 +272,7 @@
       "Bash(awk 'NR>=1740 && /async updateTransactionAfterRefund/{f=1} f{print NR\": \"$0} f&&/^  }/{c++; if\\(c>=1\\) exit}' server/storage.ts)",
       "Bash(grep -nA3 \"unhandledRejection|uncaughtException\" server/port-manager.ts)",
       "Bash(grep -rnA2 \"unhandledRejection\\\\|uncaughtException\" server/)",
-      "Bash(grep *)",
-      "Bash(git ls-remote *)",
-      "Bash(gh repo *)",
-      "Bash(git *)"
+      "Bash(grep *)"
     ]
   }
 }

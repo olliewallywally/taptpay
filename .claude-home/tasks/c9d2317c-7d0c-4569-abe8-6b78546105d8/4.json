@@ -1,0 +1,9 @@
+{
+  "id": "4",
+  "subject": "Rebuild stock-management page to 430 mobile column",
+  "description": "stock-management.tsx uses Tailwind max-w-3xl; convert to white gutter + centered 430 column",
+  "activeForm": "Rebuilding stock page layout",
+  "status": "in_progress",
+  "blocks": [],
+  "blockedBy": []
+}

@@ -1,0 +1,44 @@
+import { chromium } from '/home/runner/workspace/node_modules/playwright-core/index.mjs';
+
+const BASE = process.env.BASE || 'http://localhost:5000';
+const routes = ['/', '/login', '/dashboard', '/property', '/trades'];
+
+const browser = await chromium.launch({
+  executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
+  args: ['--no-sandbox', '--disable-dev-shm-usage'],
+});
+const ctx = await browser.newContext();
+const page = await ctx.newPage();
+
+const issues = [];
+page.on('console', (m) => {
+  if (m.type() === 'error' || m.type() === 'warning') {
+    issues.push(`[console.${m.type()}] ${m.text().slice(0, 300)}`);
+  }
+});
+page.on('pageerror', (e) => issues.push(`[pageerror] ${String(e).slice(0, 400)}`));
+page.on('requestfailed', (r) =>
+  issues.push(`[reqfail] ${r.method()} ${r.url().slice(0, 150)} :: ${r.failure()?.errorText}`)
+);
+page.on('response', (r) => {
+  if (r.status() >= 500) issues.push(`[http ${r.status()}] ${r.url().slice(0, 150)}`);
+});
+
+for (const route of routes) {
+  issues.length = 0;
+  const t0 = Date.now();
+  try {
+    await page.goto(BASE + route, { waitUntil: 'load', timeout: 30000 });
+    await page.waitForTimeout(3500); // let lazy chunks/queries settle
+    const ms = Date.now() - t0;
+    const rootHtmlLen = await page.evaluate(() => document.getElementById('root')?.innerHTML.length ?? -1);
+    const overlay = await page.evaluate(() => !!document.querySelector('vite-error-overlay, [plugin-runtime-error-modal], iframe#runtime-error-iframe'));
+    console.log(`\n=== ${route} — loaded in ${ms}ms, rootHTML=${rootHtmlLen} chars, errorOverlay=${overlay}`);
+  } catch (e) {
+    console.log(`\n=== ${route} — FAILED to load: ${String(e).slice(0, 200)}`);
+  }
+  for (const i of issues) console.log('   ' + i);
+  if (!issues.length) console.log('   (no console errors / failed requests)');
+}
+
+await browser.close();

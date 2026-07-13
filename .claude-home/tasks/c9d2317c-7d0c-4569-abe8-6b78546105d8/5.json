@@ -1,0 +1,9 @@
+{
+  "id": "5",
+  "subject": "Port property pointer-drag sheet to trades-analytics and transactions",
+  "description": "Replace touch-only two-position snap with property-analytics' pointer-event free-park drag in trades-analytics.tsx and transactions.tsx",
+  "activeForm": "Porting analytics sheet drag",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

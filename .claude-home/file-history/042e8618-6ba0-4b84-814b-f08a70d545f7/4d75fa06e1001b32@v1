@@ -267,15 +267,8 @@
       "Bash(sed -i 's/maxWidth: 390/maxWidth: 430/g' client/src/pages/trades/client-profile.tsx)",
       "Bash(sed -i \"s/width: '100%', maxWidth: 390,/width: '100%', maxWidth: 430,/\" client/src/pages/property/tenant-directory.tsx)",
       "Bash(sed -i 's/maxWidth: 390,/maxWidth: 430,/' client/src/pages/trades/client-directory.tsx)",
-      "Bash(tee /tmp/claude-1000/-home-runner-workspace/042e8618-6ba0-4b84-814b-f08a70d545f7/scratchpad/tsc.log)",
-      "Bash(grep -nE \"sseConnections|broadcastToMerchant|function broadcast|\\\\.write\\\\\\(\\\\`data\" server/routes.ts)",
-      "Bash(awk 'NR>=1740 && /async updateTransactionAfterRefund/{f=1} f{print NR\": \"$0} f&&/^  }/{c++; if\\(c>=1\\) exit}' server/storage.ts)",
-      "Bash(grep -nA3 \"unhandledRejection|uncaughtException\" server/port-manager.ts)",
-      "Bash(grep -rnA2 \"unhandledRejection\\\\|uncaughtException\" server/)",
-      "Bash(grep *)",
-      "Bash(git ls-remote *)",
-      "Bash(gh repo *)",
-      "Bash(git *)"
+      "Bash(tee /tmp/claude-1000/-home-runner-workspace/042e8618-6ba0-4b84-814b-f08a70d545f7/scratchpad/tsc.log)"
     ]
-  }
+  },
+  "model": "claude-opus-4-8"
 }

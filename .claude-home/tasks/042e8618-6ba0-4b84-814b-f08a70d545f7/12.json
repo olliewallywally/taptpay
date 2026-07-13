@@ -1,0 +1,9 @@
+{
+  "id": "12",
+  "subject": "Fix confirmed sweep findings + report",
+  "description": "Fix clear/safe findings from sweeps A-C (commit per batch, verify), rank the rest, deliver report + memory update.",
+  "activeForm": "Fixing sweep findings and reporting",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

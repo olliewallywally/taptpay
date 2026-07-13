@@ -1,0 +1,9 @@
+{
+  "id": "1",
+  "subject": "Remove ghost bars and fix empty-bar shape in 3 dashboard charts",
+  "description": "dashboard.tsx, property-dashboard.tsx, trades-dashboard.tsx: delete dashed ghost <rect> blocks + unused plumbing (GHOST_CAP/billed); zero-value bars → small subtle centered dot instead of 6px full-width pill",
+  "activeForm": "Cleaning up dashboard charts",
+  "status": "completed",
+  "blocks": [],
+  "blockedBy": []
+}

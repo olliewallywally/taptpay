@@ -1,0 +1,9 @@
+{
+  "id": "2",
+  "subject": "Normalize page widths to 430 (tenant/client profile, recurring)",
+  "description": "tenant-profile.tsx (390 ×3), client-profile.tsx (390 ×2), recurring-schedules.tsx (620) → standard 430 column; verify hero morph alignment",
+  "activeForm": "Normalizing page widths",
+  "status": "completed",
+  "blocks": [],
+  "blockedBy": []
+}
