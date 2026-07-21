@@ -19,15 +19,17 @@ import {
   Upload, CheckCircle, XCircle, LogOut, AlertCircle, Bell, BellOff, ChevronDown, Printer, ArrowRight, CreditCard, Building2, Wrench, BookOpen, RotateCcw
 } from "lucide-react";
 
-function SettingsSection({ title, isOpen, onToggle, children, delay = 0 }: {
+function SettingsSection({ title, isOpen, onToggle, children, delay = 0, anchor }: {
   title: string;
   isOpen: boolean;
   onToggle: () => void;
   children: React.ReactNode;
   delay?: number;
+  anchor?: string;
 }) {
   return (
     <div
+      data-tutorial-id={anchor}
       className="pt-bounce bg-white mb-4 overflow-hidden transition-shadow"
       style={{ '--pt-d': `${delay}ms`, borderRadius: 22, boxShadow: isOpen ? '0 10px 30px rgba(4,13,109,0.10)' : '0 4px 14px rgba(4,13,109,0.08)' } as any}
     >
@@ -785,7 +787,7 @@ export default function Settings() {
         </button>
 
         {/* Business Details Section */}
-        <SettingsSection title="Business Details" delay={140} isOpen={openSections.has('business')} onToggle={() => toggle('business')}>
+        <SettingsSection anchor="set-business" title="Business Details" delay={140} isOpen={openSections.has('business')} onToggle={() => toggle('business')}>
           <div className="space-y-4 mt-1">
             <div>
               <Label htmlFor="businessName" className="!text-[#040D6D] font-semibold text-base mb-2 block">Company Name</Label>
@@ -913,7 +915,7 @@ export default function Settings() {
         </SettingsSection>
 
         {/* Dashboard Preferences Section */}
-        <SettingsSection title="Dashboard Preferences" delay={185} isOpen={openSections.has('preferences')} onToggle={() => toggle('preferences')}>
+        <SettingsSection anchor="set-goal" title="Dashboard Preferences" delay={185} isOpen={openSections.has('preferences')} onToggle={() => toggle('preferences')}>
           <div className="space-y-4 mt-1">
             <div>
               <Label htmlFor="dailyGoal" className="text-gray-700 text-sm mb-1.5 block">

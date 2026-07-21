@@ -791,7 +791,7 @@ export function QuoteScreen({ onCancel, onExit }: { onCancel: () => void; onExit
               <button onClick={() => setLines(cur => [...cur, { id: Date.now(), description: '', qty: '1', unitPrice: '' }])} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 0, color: BLUE, fontWeight: 700, fontSize: 13.5, cursor: 'pointer', fontFamily: 'Outfit, system-ui', padding: '4px 0 18px' }}><Ic.Plus sz={16} sw={2.4} /> add line</button>
 
               {/* Deposit */}
-              <button onClick={() => setDepositEnabled(v => !v)} aria-pressed={depositEnabled}
+              <button data-tutorial-id="tq-deposit" onClick={() => setDepositEnabled(v => !v)} aria-pressed={depositEnabled}
                 style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '13px 16px', borderRadius: 16, border: `1px solid ${depositEnabled ? 'rgba(88,171,255,0.4)' : 'rgba(88,171,255,0.15)'}`, background: depositEnabled ? 'rgba(88,171,255,0.1)' : 'rgba(255,255,255,0.04)', cursor: 'pointer', fontFamily: 'Outfit, system-ui' }}>
                 <span style={{ flex: 1, textAlign: 'left', fontWeight: 600, fontSize: 13.5, color: BLUE }}>require deposit</span>
                 <span style={{ width: 42, height: 25, borderRadius: 999, background: depositEnabled ? BLUE : 'rgba(88,171,255,0.25)', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
@@ -810,7 +810,7 @@ export function QuoteScreen({ onCancel, onExit }: { onCancel: () => void; onExit
               <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="quote notes" maxLength={1000} style={{ ...Q_FIELD, minHeight: 78, resize: 'vertical' }} />
 
               {/* Totals */}
-              <div style={{ marginTop: 20, background: 'rgba(88,171,255,0.08)', border: '1px solid rgba(88,171,255,0.2)', borderRadius: 16, padding: '14px 16px' }}>
+              <div data-tutorial-id="tq-totals" style={{ marginTop: 20, background: 'rgba(88,171,255,0.08)', border: '1px solid rgba(88,171,255,0.2)', borderRadius: 16, padding: '14px 16px' }}>
                 {gstReg && <div style={{ ...Q_TOTROW, color: 'rgba(88,171,255,0.7)', fontSize: 13 }}><span>{gstMode === 'exclusive' ? 'subtotal' : 'subtotal (excl. GST)'}</span><span>{fmt(totals.net)}</span></div>}
                 {gstReg && <div style={{ ...Q_TOTROW, color: 'rgba(88,171,255,0.7)', fontSize: 13 }}><span>{gstMode === 'exclusive' ? 'GST (15%)' : 'GST (15%) incl.'}</span><span>{fmt(totals.gst)}</span></div>}
                 {depositEnabled && <div style={{ ...Q_TOTROW, fontSize: 13 }}><span style={{ color: 'rgba(88,171,255,0.7)' }}>deposit on acceptance</span><strong style={{ color: BLUE }}>{fmt(totals.deposit)}</strong></div>}
@@ -822,7 +822,7 @@ export function QuoteScreen({ onCancel, onExit }: { onCancel: () => void; onExit
 
             {/* CTA */}
             <div style={{ flexShrink: 0, padding: '12px 0 20px', display: 'flex', justifyContent: 'center' }}>
-              <button className="tp-cta-wire" onClick={() => ready && createQuote.mutate()} disabled={!ready || createQuote.isPending} style={{ minWidth: 220, opacity: !ready ? 0.5 : 1, ...(createQuote.isPending ? { background: BLUE, color: NAVY } : {}) }}>
+              <button data-tutorial-id="tq-create" className="tp-cta-wire" onClick={() => ready && createQuote.mutate()} disabled={!ready || createQuote.isPending} style={{ minWidth: 220, opacity: !ready ? 0.5 : 1, ...(createQuote.isPending ? { background: BLUE, color: NAVY } : {}) }}>
                 {createQuote.isPending ? 'creating…' : 'create quote'}
               </button>
             </div>

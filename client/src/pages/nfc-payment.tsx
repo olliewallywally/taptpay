@@ -273,7 +273,7 @@ export default function NFCPayment() {
         {/* Clean Payment Form */}
         <div className="space-y-6">
           {/* Amount Input */}
-          <div className="backdrop-blur-xl bg-white/[0.03] border border-white/10 rounded-2xl p-6">
+          <div data-tutorial-id="nfc-amount" className="backdrop-blur-xl bg-white/[0.03] border border-white/10 rounded-2xl p-6">
             <label className="block text-white/70 text-sm font-light mb-3">Amount</label>
             <div className="relative">
               <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/60 text-2xl font-light">$</span>
@@ -289,7 +289,7 @@ export default function NFCPayment() {
           </div>
 
           {/* Item Name Input */}
-          <div className="backdrop-blur-xl bg-white/[0.03] border border-white/10 rounded-2xl p-6">
+          <div data-tutorial-id="nfc-item" className="backdrop-blur-xl bg-white/[0.03] border border-white/10 rounded-2xl p-6">
             <label className="block text-white/70 text-sm font-light mb-3">Item</label>
             <input
               type="text"
@@ -312,7 +312,8 @@ export default function NFCPayment() {
 
           {/* Create Payment Button */}
           {paymentStatus === "idle" && (
-            <button 
+            <button
+              data-tutorial-id="nfc-create"
               onClick={createNFCPayment}
               disabled={!nfcCapabilities?.nfcSupported || !amount || !itemName}
               style={{

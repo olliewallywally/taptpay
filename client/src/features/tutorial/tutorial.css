@@ -24,9 +24,10 @@
 
 .tutorial-highlight {
   position: fixed;
-  border: 2px solid #58abff;
   border-radius: 18px;
-  box-shadow: 0 0 0 4px rgba(88, 171, 255, 0.24), 0 12px 40px rgba(4, 13, 109, 0.3);
+  /* Clean spotlight: the dim/blur around the target does the isolating.
+     No coloured stroke or ring — just a soft depth shadow for separation. */
+  box-shadow: 0 12px 40px rgba(4, 13, 109, 0.3);
   pointer-events: none;
 }
 
@@ -36,8 +37,8 @@
   max-width: 132px;
   border-radius: 999px;
   padding: 6px 11px;
-  background: #58abff;
-  color: #040d6d;
+  background: #040d6d;
+  color: #ffffff;
   box-shadow: 0 5px 16px rgba(4, 13, 109, 0.24);
   font-size: 11px;
   font-weight: 800;

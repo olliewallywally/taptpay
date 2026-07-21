@@ -228,7 +228,7 @@ export default function TenantProfile() {
             <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 6-6 6 6 6"/></svg>
           </button>
           <div style={{ fontWeight: 600, fontSize: 11, color: C.navy, letterSpacing: '0.16em', textTransform: 'uppercase' }}>tenant profile</div>
-          <button onClick={startEdit} disabled={!tenant} style={{ width: 34, height: 34, borderRadius: 999, background: C.gray, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: tenant ? 'pointer' : 'default', opacity: tenant ? 1 : 0.35 }}>
+          <button onClick={startEdit} disabled={!tenant} aria-label="Edit tenant" data-tutorial-id="tenant-edit" style={{ width: 34, height: 34, borderRadius: 999, background: C.gray, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: tenant ? 'pointer' : 'default', opacity: tenant ? 1 : 0.35 }}>
             <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={C.navy} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
           </button>
         </div>

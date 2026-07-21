@@ -101,7 +101,7 @@ export default function PaymentStack() {
           </Link>
           <div className="flex items-center gap-2">
             <Layers size={20} className="text-white/60" />
-            <h1 className="text-lg font-semibold text-white">Payment Stack</h1>
+            <h1 data-tutorial-id="ps-header" className="text-lg font-semibold text-white">Payment Stack</h1>
           </div>
           {activeStack.length > 0 && (
             <span className="ml-1 px-2 py-0.5 rounded-full text-xs font-bold text-black"
@@ -129,7 +129,7 @@ export default function PaymentStack() {
             <p className="text-white/40 text-base font-medium">No active payments</p>
             <p className="text-white/20 text-sm mt-1">New transactions will appear here</p>
             <Link href="/terminal">
-              <button className="mt-6 px-6 py-3 rounded-2xl text-sm font-semibold text-black flex items-center gap-2"
+              <button data-tutorial-id="ps-new" className="mt-6 px-6 py-3 rounded-2xl text-sm font-semibold text-black flex items-center gap-2"
                 style={{ backgroundColor: BRAND }}>
                 <Plus size={16} />
                 New Transaction
@@ -236,7 +236,7 @@ export default function PaymentStack() {
 
         {activeStack.length > 0 && (
           <Link href="/terminal">
-            <button className="w-full py-4 rounded-2xl text-sm font-semibold text-black flex items-center justify-center gap-2 mt-2 transition-all hover:scale-[1.01]"
+            <button data-tutorial-id="ps-new" className="w-full py-4 rounded-2xl text-sm font-semibold text-black flex items-center justify-center gap-2 mt-2 transition-all hover:scale-[1.01]"
               style={{ backgroundColor: BRAND, boxShadow: `0 4px 20px ${BRAND}33` }}>
               <Plus size={16} />
               New Transaction

@@ -579,7 +579,7 @@ export default function BoardBuilder() {
 
         {/* LEFT: Live Preview */}
         <div className="w-full lg:flex-1 bg-white rounded-2xl border border-gray-200 shadow-sm flex flex-col items-center p-4 lg:p-6 gap-5 min-w-0">
-          <div className="w-full text-center">
+          <div data-tutorial-id="bb-preview" className="w-full text-center">
             <p className="text-sm text-gray-500 mb-3 font-medium">
               Live Preview — {dim.label} ({dim.mmW}×{dim.mmH}mm)
             </p>
@@ -614,7 +614,7 @@ export default function BoardBuilder() {
           </div>
 
           {/* Submit section */}
-          <div className="w-full max-w-md bg-gray-50 rounded-2xl border border-gray-200 p-4 lg:p-5">
+          <div data-tutorial-id="bb-submit" className="w-full max-w-md bg-gray-50 rounded-2xl border border-gray-200 p-4 lg:p-5">
             <h3 className="font-semibold text-gray-900 mb-1">Ready to print?</h3>
             <p className="text-sm text-gray-500 mb-4">We'll email your board design as a PDF ready for printing.</p>
             <div className="space-y-3">
@@ -642,7 +642,7 @@ export default function BoardBuilder() {
         <div className="w-full lg:w-[360px] xl:w-[400px] bg-white rounded-2xl border border-gray-200 shadow-sm overflow-y-auto flex-shrink-0 max-h-[calc(100vh-90px)] lg:sticky lg:top-[73px]">
           <div className="p-4 space-y-1">
 
-            <ControlSection icon={<QrCode size={16} />} title="Payment QR Code" isOpen={openSection === "stone"} onToggle={() => toggle("stone")}>
+            <ControlSection anchor="bb-qr" icon={<QrCode size={16} />} title="Payment QR Code" isOpen={openSection === "stone"} onToggle={() => toggle("stone")}>
               <div className="space-y-2">
                 <Label className="text-xs text-gray-500">Select which Tapt Stone or payment link to show</Label>
                 <Select value={selectedStoneId} onValueChange={setSelectedStoneId}>
@@ -691,7 +691,7 @@ export default function BoardBuilder() {
               </div>
             </ControlSection>
 
-            <ControlSection icon={<Palette size={16} />} title="Colour" isOpen={openSection === "colour"} onToggle={() => toggle("colour")}>
+            <ControlSection anchor="bb-colour" icon={<Palette size={16} />} title="Colour" isOpen={openSection === "colour"} onToggle={() => toggle("colour")}>
               <div className="space-y-4">
 
                 {/* Accent colour */}
@@ -838,7 +838,7 @@ export default function BoardBuilder() {
               </div>
             </ControlSection>
 
-            <ControlSection icon={<Type size={16} />} title="Text" isOpen={openSection === "text"} onToggle={() => toggle("text")}>
+            <ControlSection anchor="bb-text" icon={<Type size={16} />} title="Text" isOpen={openSection === "text"} onToggle={() => toggle("text")}>
               <div className="space-y-3">
                 <div>
                   <Label className="text-xs text-gray-500 mb-1 block">Business Name</Label>
@@ -921,16 +921,17 @@ export default function BoardBuilder() {
 }
 
 function ControlSection({
-  icon, title, isOpen, onToggle, children,
+  icon, title, isOpen, onToggle, children, anchor,
 }: {
   icon: React.ReactNode;
   title: string;
   isOpen: boolean;
   onToggle: () => void;
   children: React.ReactNode;
+  anchor?: string;
 }) {
   return (
-    <div className="border border-gray-100 rounded-xl overflow-hidden">
+    <div data-tutorial-id={anchor} className="border border-gray-100 rounded-xl overflow-hidden">
       <button
         onClick={onToggle}
         className="w-full flex items-center justify-between px-4 py-3 text-left bg-white hover:bg-gray-50 transition-colors"
