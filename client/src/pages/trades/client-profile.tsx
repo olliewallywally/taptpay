@@ -539,7 +539,7 @@ export default function ClientProfile({ clientId: clientIdProp, embedded = false
           </div>
         </div>
 
-        <div className="pt-bounce" style={{ "--pt-d": "170ms", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "24px 20px 4px" } as CSSProperties}>
+        <div data-tutorial-id="client-activity" className="pt-bounce" style={{ "--pt-d": "170ms", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "24px 20px 4px" } as CSSProperties}>
           <div style={{ fontWeight: 700, fontSize: 12, color: C.ink, letterSpacing: 0, textTransform: "uppercase" }}>activity timeline</div>
           <div style={{ fontWeight: 700, fontSize: 11, color: C.mute }}>{events.length}</div>
         </div>

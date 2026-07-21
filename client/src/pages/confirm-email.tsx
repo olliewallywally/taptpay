@@ -26,7 +26,7 @@ export default function ConfirmEmail() {
         if (res.ok) {
           setState("success");
           setTimeout(() => {
-            setLocation(`/business-details?id=${data.merchantId}`);
+            setLocation("/login");
           }, 2000);
         } else {
           setState("error");
@@ -71,7 +71,7 @@ export default function ConfirmEmail() {
             </div>
             <h1 className="text-white text-xl font-semibold mb-2">Email confirmed!</h1>
             <p className="text-white/60 text-sm leading-relaxed mb-6">
-              Taking you to the next step…
+              Your application has been submitted. Taking you to sign in…
             </p>
             <div className="flex justify-center">
               <div className="w-5 h-5 border-2 border-[#00f1d7] border-t-transparent rounded-full animate-spin" />

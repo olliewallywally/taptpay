@@ -59,7 +59,7 @@ app.use(compression({ threshold: 1024 }));
 
 // Skip JSON parsing for webhook routes to preserve raw body for signature verification
 app.use((req, res, next) => {
-  if (req.path === '/api/crypto-transactions/webhook/coinbase' || req.path === '/api/windcave/notification') {
+  if (req.path === '/api/windcave/notification') {
     next();
   } else {
     express.json()(req, res, next);
@@ -177,6 +177,30 @@ app.use((req, res, next) => {
       }
     } catch (err) {
       log(`⚠️  Schema push threw an error (non-fatal): ${err}`);
+    }
+  }
+
+  // Consolidated signup KYC fields. This is an additive, idempotent migration
+  // and intentionally lives outside drizzle-kit push so production deploys do
+  // not require RUN_SCHEMA_PUSH for these non-destructive columns.
+  if (isDatabaseConnected()) {
+    try {
+      const pgDb = getDb();
+      if (pgDb) {
+        await pgDb.execute(sql`
+          ALTER TABLE merchants
+            ADD COLUMN IF NOT EXISTS business_description text,
+            ADD COLUMN IF NOT EXISTS website_url text,
+            ADD COLUMN IF NOT EXISTS estimated_annual_turnover text
+        `);
+        log("✅ Merchant signup KYC columns ready");
+      }
+    } catch (error) {
+      if (isProduction) {
+        console.error("FATAL: Failed to prepare merchant signup KYC columns:", error);
+        process.exit(1);
+      }
+      log(`⚠️ Failed to prepare merchant signup KYC columns: ${error}`);
     }
   }
 

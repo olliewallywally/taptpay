@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { storage } from "./storage";
+import { billingCardIsReady } from "./billing-card";
 
 function nextRun(from: Date, frequency: string, anchorDom?: number): Date {
   const date = new Date(from);
@@ -26,6 +27,11 @@ export async function runTradesGeneratePass(now: Date = new Date()): Promise<{ g
 
   for (const schedule of schedules) {
     try {
+      const merchant = await storage.getMerchant(schedule.merchantId);
+      if (!billingCardIsReady(merchant)) {
+        result.skipped++;
+        continue;
+      }
       const dueAt = new Date(schedule.nextRunDate);
       if (schedule.endDate && dueAt > new Date(schedule.endDate)) {
         await storage.terminateJobSchedule(schedule.id);

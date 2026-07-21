@@ -14,8 +14,9 @@ import { isNativeApp, isNativeIOS } from "@/lib/native";
 import { TRADES_THEME } from "@/lib/trades-theme";
 import { Switch } from "@/components/ui/switch";
 import { WireframeLiquidButton } from "@/components/wireframe-liquid-button";
+import { useTutorial } from "@/features/tutorial/tutorial";
 import { 
-  Upload, CheckCircle, XCircle, LogOut, AlertCircle, Bell, BellOff, ChevronDown, Printer, ArrowRight, CreditCard, Building2, Wrench
+  Upload, CheckCircle, XCircle, LogOut, AlertCircle, Bell, BellOff, ChevronDown, Printer, ArrowRight, CreditCard, Building2, Wrench, BookOpen, RotateCcw
 } from "lucide-react";
 
 function SettingsSection({ title, isOpen, onToggle, children, delay = 0 }: {
@@ -85,6 +86,13 @@ export default function Settings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const merchantId = getCurrentMerchantId();
+  const {
+    restartTutorials,
+    visitedPages: tutorialVisitedPages,
+    pageCount: tutorialPageCount,
+    isRestarting: tutorialRestarting,
+    canRestart: tutorialReady,
+  } = useTutorial();
 
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
   const toggle = (id: string) => setOpenSections(prev => {
@@ -92,6 +100,12 @@ export default function Settings() {
     if (next.has(id)) next.delete(id); else next.add(id);
     return next;
   });
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("section") === "billing") {
+      setOpenSections(previous => new Set(previous).add("billing"));
+    }
+  }, []);
 
   const [businessDetails, setBusinessDetails] = useState<MerchantDetails>({
     businessName: '',
@@ -387,6 +401,21 @@ export default function Settings() {
     },
   });
 
+  const { data: billingCardStatus } = useQuery<{
+    ready: boolean;
+    card: { last4: string; brand: string; expiry: string } | null;
+  }>({
+    queryKey: ["/api/billing/card"],
+  });
+
+  useEffect(() => {
+    if (!isLoading && new URLSearchParams(window.location.search).get("section") === "billing") {
+      requestAnimationFrame(() => {
+        document.querySelector('[data-settings-section="billing"]')?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+  }, [isLoading]);
+
   const updateMerchantMutation = useMutation({
     mutationFn: async (details: MerchantDetails & { windcaveApiKey?: string }) => {
       const token = localStorage.getItem("authToken");
@@ -582,6 +611,27 @@ export default function Settings() {
     setLocation('/login');
   };
 
+  const handleRestartTutorials = async () => {
+    const confirmed = window.confirm(
+      "Restart all page tutorials? Settings will begin now, and every other tutorial will appear as you visit that page.",
+    );
+    if (!confirmed) return;
+    try {
+      await restartTutorials();
+      setOpenSections(previous => new Set(previous).add("tutorial"));
+      toast({
+        title: "Tutorials restarted",
+        description: "Open each page normally to see its tutorial again.",
+      });
+    } catch (error) {
+      toast({
+        title: "Could not restart tutorials",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleBillingFrequencyChange = (frequency: string) => {
     setBillingFrequency(frequency);
     updateBillingFrequencyMutation.mutate(frequency);
@@ -632,7 +682,10 @@ export default function Settings() {
         const err = await resp.json().catch(() => ({}));
         throw new Error((err as { message?: string }).message || 'Failed to save card');
       }
-      queryClient.invalidateQueries({ queryKey: ['/api/merchants', merchantId] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['/api/billing/card'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] }),
+      ]);
       setShowCardForm(false);
       setCardNumber('');
       setCardExpiry('');
@@ -655,7 +708,10 @@ export default function Settings() {
         headers: { 'Authorization': `Bearer ${authToken}` },
       });
       if (!resp.ok) throw new Error('Failed to remove card');
-      queryClient.invalidateQueries({ queryKey: ['/api/merchants', merchantId] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['/api/billing/card'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] }),
+      ]);
       toast({ title: "Card removed" });
     } catch {
       toast({ title: "Failed to remove card", variant: "destructive" });
@@ -913,6 +969,7 @@ export default function Settings() {
             </div>
           </div>
         ) : (
+        <div data-settings-section="billing">
         <SettingsSection title="Subscription & Billing" delay={230} isOpen={openSections.has('billing')} onToggle={() => toggle('billing')}>
           <div className="space-y-5 mt-1">
             {/* Current Tier */}
@@ -988,20 +1045,27 @@ export default function Settings() {
               <Label className="text-gray-700 text-sm mb-2 block">Payment Card</Label>
               <div className="p-3 mb-3 bg-amber-50 border border-amber-200 rounded-lg">
                 <p className="text-xs text-amber-800 font-medium">
-                  Payment processing coming soon via Windcave. Saving your card details now will allow automatic billing once the integration goes live.
+                  A valid credit or debit card is required before you can send any payment request. Only masked card details are retained.
                 </p>
               </div>
-              {merchant?.billingCardLast4 && !showCardForm ? (
+              {billingCardStatus?.card && !billingCardStatus.ready && (
+                <div className="p-3 mb-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-xs text-red-700 font-medium">
+                    This card is expired or no longer valid for payment requests. Please replace it.
+                  </p>
+                </div>
+              )}
+              {billingCardStatus?.card && !showCardForm ? (
                 <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-7 bg-white border border-gray-300 rounded flex items-center justify-center">
-                      <span className="text-[9px] font-bold text-gray-600">{merchant.billingCardBrand?.toUpperCase()}</span>
+                      <span className="text-[9px] font-bold text-gray-600">{billingCardStatus.card.brand.toUpperCase()}</span>
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-800">
-                        {merchant.billingCardBrand} ending in {merchant.billingCardLast4}
+                        {billingCardStatus.card.brand} ending in {billingCardStatus.card.last4}
                       </p>
-                      <p className="text-xs text-gray-500">Expires {merchant.billingCardExpiry}</p>
+                      <p className="text-xs text-gray-500">Expires {billingCardStatus.card.expiry}</p>
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -1024,7 +1088,7 @@ export default function Settings() {
                     </Button>
                   </div>
                 </div>
-              ) : showCardForm || !merchant?.billingCardLast4 ? (
+              ) : showCardForm || !billingCardStatus?.card ? (
                 <div className="space-y-3">
                   <div>
                     <Label className="text-xs text-gray-600 mb-1 block">Card Number</Label>
@@ -1150,6 +1214,7 @@ export default function Settings() {
             )}
           </div>
         </SettingsSection>
+        </div>
         )}
 
         {/* Account Section */}
@@ -1208,6 +1273,45 @@ export default function Settings() {
             )}
           </div>
         </SettingsSection>
+
+        <div data-tutorial-id="settings-tutorial-help">
+          <SettingsSection title="Tutorial & Help" delay={350} isOpen={openSections.has('tutorial')} onToggle={() => toggle('tutorial')}>
+            <div className="mt-1">
+              <div className="flex items-start gap-3">
+                <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0" style={{ background: 'rgba(88,171,255,0.16)' }}>
+                  <BookOpen size={21} style={{ color: '#040D6D' }} />
+                </div>
+                <div>
+                  <p className="font-semibold text-[#040D6D]">Page-by-page walkthroughs</p>
+                  <p className="text-sm text-gray-500 mt-1 leading-relaxed">
+                    Tutorials appear only when you open each page. They never move you between pages or change your data.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 p-4 rounded-2xl" style={{ background: 'rgba(4,13,109,0.05)' }}>
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <span className="text-sm font-medium text-[#040D6D]">Tutorial progress</span>
+                  <span className="text-xs font-semibold text-[#58ABFF]">
+                    {tutorialVisitedPages} of {tutorialPageCount || 20} pages introduced
+                  </span>
+                </div>
+                <Progress value={tutorialPageCount ? (tutorialVisitedPages / tutorialPageCount) * 100 : 0} className="h-2" />
+              </div>
+
+              <Button
+                type="button"
+                onClick={handleRestartTutorials}
+                disabled={!tutorialReady || tutorialRestarting}
+                className="w-full mt-4 bg-[#58ABFF] hover:bg-[#73B9FF] text-[#040D6D] py-6 rounded-2xl font-semibold flex items-center justify-center gap-2"
+                data-testid="button-restart-tutorials"
+              >
+                <RotateCcw size={18} className={tutorialRestarting ? "animate-spin" : ""} />
+                {tutorialRestarting ? "Restarting..." : tutorialVisitedPages ? "Restart Tutorials" : "Start Tutorials"}
+              </Button>
+            </div>
+          </SettingsSection>
+        </div>
 
         {/* Customer Payment Page Button */}
         <div className="pt-bounce mb-5" style={{ '--pt-d': '365ms' } as any}>

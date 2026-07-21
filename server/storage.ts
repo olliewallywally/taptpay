@@ -1,4 +1,4 @@
-import { merchants, transactions, merchantSettlements, platformFees, refunds, splitPayments, taptStones, stockItems, cryptoTransactions, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, tenantProfiles, activeSchedules, invoicesRentRequests, transactionEvents, clientProfiles, quotes, jobInvoices, jobSchedules, jobEvents, type Merchant, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type CryptoTransaction, type InsertCryptoTransaction, type MerchantSubscription, type SubscriptionBillingHistory } from "@shared/schema";
+import { merchants, merchantTutorialProgress, transactions, merchantSettlements, platformFees, refunds, splitPayments, taptStones, stockItems, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, tenantProfiles, activeSchedules, invoicesRentRequests, transactionEvents, clientProfiles, quotes, jobInvoices, jobSchedules, jobEvents, type Merchant, type MerchantTutorialProgress, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type MerchantSubscription, type SubscriptionBillingHistory } from "@shared/schema";
 import { getDb, isDatabaseConnected } from "./database";
 import { eq, ne, desc, and, inArray, gte, lte, or, ilike, sql } from "drizzle-orm";
 
@@ -24,9 +24,11 @@ export interface IStorage {
   updateMerchantDetails(id: number, details: { businessName: string; contactEmail: string; contactPhone: string; businessAddress: string }): Promise<Merchant | undefined>;
   updateMerchantBankAccount(id: number, bankDetails: { bankName: string; bankAccountNumber: string; bankBranch: string; accountHolderName: string }): Promise<Merchant | undefined>;
   updateMerchantTheme(id: number, themeId: string): Promise<Merchant | undefined>;
-  updateMerchantCryptoSettings(id: number, settings: any): Promise<Merchant | undefined>;
   updateMerchantLogoUrl(id: number, logoUrl: string | null): Promise<Merchant | undefined>;
   updateMerchantBillingCard(id: number, card: { last4: string; brand: string; expiry: string } | null): Promise<Merchant | undefined>;
+  getMerchantTutorialProgress(merchantId: number, generation: number): Promise<MerchantTutorialProgress[]>;
+  upsertMerchantTutorialProgress(merchantId: number, generation: number, pageKey: string, status: string, lastStep: number): Promise<MerchantTutorialProgress>;
+  restartMerchantTutorial(merchantId: number): Promise<Merchant | undefined>;
   getAllMerchants(): Promise<Merchant[]>;
   deleteMerchant(id: number): Promise<boolean>;
   
@@ -86,13 +88,6 @@ export interface IStorage {
   getStockItemsByMerchant(merchantId: number): Promise<StockItem[]>;
   updateStockItem(id: number, data: Partial<InsertStockItem>): Promise<StockItem | undefined>;
   deleteStockItem(id: number): Promise<boolean>;
-  
-  // Crypto Transaction operations
-  createCryptoTransaction(data: InsertCryptoTransaction): Promise<CryptoTransaction>;
-  getCryptoTransaction(id: number): Promise<CryptoTransaction | undefined>;
-  getCryptoTransactionByTransactionId(transactionId: number): Promise<CryptoTransaction | undefined>;
-  getCryptoTransactionByChargeCode(chargeCode: string): Promise<CryptoTransaction | undefined>;
-  updateCryptoTransactionStatus(id: number, status: string, confirmations?: number): Promise<CryptoTransaction | undefined>;
   
   // Analytics operations
   getMerchantAnalytics(merchantId: number): Promise<{
@@ -271,9 +266,14 @@ const MEM_MERCHANT_DEFAULTS = {
   onboardingCompleted: false,
   gstRegistered: false,
   tradeGstMode: "inclusive",
+  tutorialGeneration: 1,
+  tutorialAutoEnabled: true,
   billingCardLast4: null,
   billingCardBrand: null,
   billingCardExpiry: null,
+  businessDescription: null,
+  websiteUrl: null,
+  estimatedAnnualTurnover: null,
   rentReminderEnabled: true,
   rentReminderDelayDays: 3,
   rentReminderIntervalDays: 3,
@@ -289,17 +289,16 @@ export class MemStorage implements IStorage {
   private splitPayments: Map<number, any>;
   private taptStones: Map<number, TaptStone>;
   private stockItems: Map<number, StockItem>;
-  private cryptoTransactions: Map<number, CryptoTransaction>;
   private currentMerchantId: number;
   private currentTransactionId: number;
   private currentPlatformFeeId: number;
-  private currentCryptoTransactionId: number;
   private currentRefundId: number;
   private currentSplitPaymentId: number;
   private currentTaptStoneId: number;
   private currentStockItemId: number;
   private activeTransactionCache: Map<string, Transaction | null>;
   private pushSubs: any[];
+  private tutorialProgress: Map<string, MerchantTutorialProgress>;
 
   constructor() {
     this.merchants = new Map();
@@ -309,8 +308,8 @@ export class MemStorage implements IStorage {
     this.splitPayments = new Map();
     this.taptStones = new Map();
     this.stockItems = new Map();
-    this.cryptoTransactions = new Map();
     this.pushSubs = [];
+    this.tutorialProgress = new Map();
     this.currentMerchantId = 1;
     this.currentTransactionId = 1;
     this.currentPlatformFeeId = 1;
@@ -318,7 +317,6 @@ export class MemStorage implements IStorage {
     this.currentSplitPaymentId = 1;
     this.currentTaptStoneId = 1;
     this.currentStockItemId = 1;
-    this.currentCryptoTransactionId = 1;
     this.activeTransactionCache = new Map();
   }
 
@@ -385,12 +383,6 @@ export class MemStorage implements IStorage {
       nzbn: null,
       customLogoUrl: null,
       windcaveApiKey: null,
-      coinbaseCommerceApiKey: null,
-      coinbaseWebhookSecret: null,
-      cryptoEnabled: false,
-      enabledCryptocurrencies: null,
-      autoConvertToFiat: false,
-      minConfirmations: 1,
       dailyGoal: "500.00",
       resetToken: null,
       resetTokenExpiry: null,
@@ -432,12 +424,6 @@ export class MemStorage implements IStorage {
       nzbn: merchantData.nzbn || null,
       customLogoUrl: merchantData.customLogoUrl || null,
       windcaveApiKey: merchantData.windcaveApiKey || null,
-      coinbaseCommerceApiKey: merchantData.coinbaseCommerceApiKey || null,
-      coinbaseWebhookSecret: merchantData.coinbaseWebhookSecret || null,
-      cryptoEnabled: merchantData.cryptoEnabled || false,
-      enabledCryptocurrencies: merchantData.enabledCryptocurrencies || null,
-      autoConvertToFiat: merchantData.autoConvertToFiat || false,
-      minConfirmations: merchantData.minConfirmations || 1,
       dailyGoal: merchantData.dailyGoal || "500.00",
       resetToken: null,
       resetTokenExpiry: null,
@@ -479,12 +465,6 @@ export class MemStorage implements IStorage {
       nzbn: null,
       customLogoUrl: null,
       windcaveApiKey: null,
-      coinbaseCommerceApiKey: null,
-      coinbaseWebhookSecret: null,
-      cryptoEnabled: false,
-      enabledCryptocurrencies: null,
-      autoConvertToFiat: false,
-      minConfirmations: 1,
       dailyGoal: "500.00",
       resetToken: null,
       resetTokenExpiry: null,
@@ -994,6 +974,41 @@ export class MemStorage implements IStorage {
     return updatedMerchant;
   }
 
+  async getMerchantTutorialProgress(merchantId: number, generation: number): Promise<MerchantTutorialProgress[]> {
+    return Array.from(this.tutorialProgress.values()).filter(
+      row => row.merchantId === merchantId && row.generation === generation,
+    );
+  }
+
+  async upsertMerchantTutorialProgress(merchantId: number, generation: number, pageKey: string, status: string, lastStep: number): Promise<MerchantTutorialProgress> {
+    const key = `${merchantId}:${generation}:${pageKey}`;
+    const previous = this.tutorialProgress.get(key);
+    const now = new Date();
+    const row: MerchantTutorialProgress = {
+      id: previous?.id ?? `tutorial-${key}`,
+      merchantId,
+      generation,
+      pageKey,
+      status,
+      lastStep,
+      startedAt: previous?.startedAt ?? now,
+      completedAt: status === "completed" ? now : previous?.completedAt ?? null,
+      dismissedAt: status === "dismissed" ? now : previous?.dismissedAt ?? null,
+      updatedAt: now,
+    };
+    this.tutorialProgress.set(key, row);
+    return row;
+  }
+
+  async restartMerchantTutorial(merchantId: number): Promise<Merchant | undefined> {
+    const merchant = this.merchants.get(merchantId);
+    if (!merchant) return undefined;
+    return this.updateMerchant(merchantId, {
+      tutorialGeneration: merchant.tutorialGeneration + 1,
+      tutorialAutoEnabled: true,
+    });
+  }
+
   async updateMerchantLogoUrl(id: number, logoUrl: string | null): Promise<Merchant | undefined> {
     const merchant = this.merchants.get(id);
     if (!merchant) return undefined;
@@ -1058,18 +1073,6 @@ export class MemStorage implements IStorage {
     const updatedMerchant = {
       ...merchant,
       themeId,
-    };
-    this.merchants.set(id, updatedMerchant);
-    return updatedMerchant;
-  }
-
-  async updateMerchantCryptoSettings(id: number, settings: any): Promise<Merchant | undefined> {
-    const merchant = this.merchants.get(id);
-    if (!merchant) return undefined;
-    
-    const updatedMerchant = {
-      ...merchant,
-      ...settings,
     };
     this.merchants.set(id, updatedMerchant);
     return updatedMerchant;
@@ -1596,61 +1599,6 @@ export class MemStorage implements IStorage {
     return false;
   }
 
-  async createCryptoTransaction(data: InsertCryptoTransaction): Promise<CryptoTransaction> {
-    const id = this.currentCryptoTransactionId++;
-    const cryptoTransaction: CryptoTransaction = {
-      ...data,
-      merchantId: data.merchantId ?? null,
-      transactionId: data.transactionId ?? null,
-      status: data.status ?? "pending",
-      expiresAt: data.expiresAt ?? null,
-      coinbaseChargeId: data.coinbaseChargeId ?? null,
-      coinbaseChargeCode: data.coinbaseChargeCode ?? null,
-      hostedUrl: data.hostedUrl ?? null,
-      requiredConfirmations: data.requiredConfirmations ?? 1,
-      id,
-      confirmations: 0,
-      createdAt: new Date(),
-      completedAt: null,
-      blockchainTxHash: null,
-      networkFeeAmount: null,
-      networkFeeFiat: null,
-    };
-    this.cryptoTransactions.set(id, cryptoTransaction);
-    return cryptoTransaction;
-  }
-
-  async getCryptoTransaction(id: number): Promise<CryptoTransaction | undefined> {
-    return this.cryptoTransactions.get(id);
-  }
-
-  async getCryptoTransactionByTransactionId(transactionId: number): Promise<CryptoTransaction | undefined> {
-    return Array.from(this.cryptoTransactions.values()).find(
-      (ct) => ct.transactionId === transactionId
-    );
-  }
-
-  async getCryptoTransactionByChargeCode(chargeCode: string): Promise<CryptoTransaction | undefined> {
-    return Array.from(this.cryptoTransactions.values()).find(
-      (ct) => ct.coinbaseChargeCode === chargeCode
-    );
-  }
-
-  async updateCryptoTransactionStatus(id: number, status: string, confirmations?: number): Promise<CryptoTransaction | undefined> {
-    const cryptoTx = this.cryptoTransactions.get(id);
-    if (cryptoTx) {
-      const updated = {
-        ...cryptoTx,
-        status,
-        confirmations: confirmations ?? cryptoTx.confirmations,
-        completedAt: status === 'confirmed' || status === 'completed' ? new Date() : cryptoTx.completedAt,
-      };
-      this.cryptoTransactions.set(id, updated);
-      return updated;
-    }
-    return undefined;
-  }
-
   // Subscription stub methods (not used in production)
   async getOrCreateSubscription(merchantId: number): Promise<any> {
     throw new Error('Subscriptions not supported in memory storage');
@@ -1816,6 +1764,60 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async getMerchantTutorialProgress(merchantId: number, generation: number): Promise<MerchantTutorialProgress[]> {
+    if (!this.db) throw new Error('Database not available');
+    return this.db
+      .select()
+      .from(merchantTutorialProgress)
+      .where(and(
+        eq(merchantTutorialProgress.merchantId, merchantId),
+        eq(merchantTutorialProgress.generation, generation),
+      ));
+  }
+
+  async upsertMerchantTutorialProgress(merchantId: number, generation: number, pageKey: string, status: string, lastStep: number): Promise<MerchantTutorialProgress> {
+    if (!this.db) throw new Error('Database not available');
+    const now = new Date();
+    const rows = await this.db
+      .insert(merchantTutorialProgress)
+      .values({
+        merchantId,
+        generation,
+        pageKey,
+        status,
+        lastStep,
+        completedAt: status === 'completed' ? now : null,
+        dismissedAt: status === 'dismissed' ? now : null,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: [merchantTutorialProgress.merchantId, merchantTutorialProgress.generation, merchantTutorialProgress.pageKey],
+        set: {
+          status,
+          lastStep,
+          completedAt: status === 'completed' ? now : null,
+          dismissedAt: status === 'dismissed' ? now : null,
+          updatedAt: now,
+        },
+      })
+      .returning();
+    return rows[0];
+  }
+
+  async restartMerchantTutorial(merchantId: number): Promise<Merchant | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const rows = await this.db
+      .update(merchants)
+      .set({
+        tutorialGeneration: sql`${merchants.tutorialGeneration} + 1`,
+        tutorialAutoEnabled: true,
+        updatedAt: new Date(),
+      })
+      .where(eq(merchants.id, merchantId))
+      .returning();
+    return rows[0];
+  }
+
   async updateMerchantLogoUrl(id: number, logoUrl: string | null): Promise<Merchant | undefined> {
     if (!this.db) throw new Error('Database not available');
     const result = await this.db
@@ -1866,16 +1868,6 @@ export class DatabaseStorage implements IStorage {
     const result = await this.db
       .update(merchants)
       .set({ themeId })
-      .where(eq(merchants.id, id))
-      .returning();
-    return result[0];
-  }
-
-  async updateMerchantCryptoSettings(id: number, settings: any): Promise<Merchant | undefined> {
-    if (!this.db) throw new Error('Database not available');
-    const result = await this.db
-      .update(merchants)
-      .set(settings)
       .where(eq(merchants.id, id))
       .returning();
     return result[0];
@@ -2926,48 +2918,6 @@ export class DatabaseStorage implements IStorage {
       .where(eq(stockItems.id, id))
       .returning();
     return result.length > 0;
-  }
-
-  // Crypto Transaction methods for DatabaseStorage
-  async createCryptoTransaction(data: InsertCryptoTransaction): Promise<CryptoTransaction> {
-    if (!this.db) throw new Error('Database not available');
-    const result = await this.db.insert(cryptoTransactions).values(data).returning();
-    return result[0];
-  }
-
-  async getCryptoTransaction(id: number): Promise<CryptoTransaction | undefined> {
-    if (!this.db) throw new Error('Database not available');
-    const result = await this.db.select().from(cryptoTransactions).where(eq(cryptoTransactions.id, id)).limit(1);
-    return result[0];
-  }
-
-  async getCryptoTransactionByTransactionId(transactionId: number): Promise<CryptoTransaction | undefined> {
-    if (!this.db) throw new Error('Database not available');
-    const result = await this.db.select().from(cryptoTransactions).where(eq(cryptoTransactions.transactionId, transactionId)).limit(1);
-    return result[0];
-  }
-
-  async getCryptoTransactionByChargeCode(chargeCode: string): Promise<CryptoTransaction | undefined> {
-    if (!this.db) throw new Error('Database not available');
-    const result = await this.db.select().from(cryptoTransactions).where(eq(cryptoTransactions.coinbaseChargeCode, chargeCode)).limit(1);
-    return result[0];
-  }
-
-  async updateCryptoTransactionStatus(id: number, status: string, confirmations?: number): Promise<CryptoTransaction | undefined> {
-    if (!this.db) throw new Error('Database not available');
-    const updateData: any = { status };
-    if (confirmations !== undefined) {
-      updateData.confirmations = confirmations;
-    }
-    if (status === 'confirmed' || status === 'completed') {
-      updateData.completedAt = new Date();
-    }
-    const result = await this.db
-      .update(cryptoTransactions)
-      .set(updateData)
-      .where(eq(cryptoTransactions.id, id))
-      .returning();
-    return result[0];
   }
 
   // Subscription methods for DatabaseStorage

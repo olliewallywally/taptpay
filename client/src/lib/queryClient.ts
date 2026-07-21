@@ -1,7 +1,18 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+export const BILLING_CARD_REQUIRED_EVENT = "taptpay:billing-card-required";
+
+export function notifyIfBillingCardRequired(res: Response): boolean {
+  if (res.status !== 402) return false;
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(BILLING_CARD_REQUIRED_EVENT));
+  }
+  return true;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
+    notifyIfBillingCardRequired(res);
     const text = (await res.text()) || res.statusText;
     throw new Error(`${res.status}: ${text}`);
   }

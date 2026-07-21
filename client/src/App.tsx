@@ -9,6 +9,8 @@ import { NotificationProvider } from "@/components/notification-system";
 
 import { PageTransition } from "@/components/page-transition";
 import { BottomNavigation } from "@/components/bottom-navigation";
+import { TutorialPageBoundary, TutorialProvider } from "@/features/tutorial/tutorial";
+import type { TutorialPageKey } from "@shared/tutorial";
 
 import { LandingPage } from "@/pages/landing-page";
 import Login from "@/pages/login";
@@ -173,7 +175,11 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   return <AuthContext.Provider value={{ auth, isChecking }}>{children}</AuthContext.Provider>;
 }
 
-function ProtectedRoute({ children, skipOnboardingCheck = false }: { children: React.ReactNode; skipOnboardingCheck?: boolean }) {
+function ProtectedRoute({ children, skipOnboardingCheck = false, tutorialPage }: {
+  children: React.ReactNode;
+  skipOnboardingCheck?: boolean;
+  tutorialPage?: TutorialPageKey;
+}) {
   const [, setLocation] = useLocation();
   const { auth, isChecking } = useContext(AuthContext);
 
@@ -198,7 +204,9 @@ function ProtectedRoute({ children, skipOnboardingCheck = false }: { children: R
   if (!auth?.isAuthenticated) return null;
   if (!skipOnboardingCheck && auth.merchantId && auth.role !== 'admin' && auth.onboardingCompleted === false) return null;
 
-  return <>{children}</>;
+  return tutorialPage
+    ? <TutorialPageBoundary pageKey={tutorialPage}>{children}</TutorialPageBoundary>
+    : <>{children}</>;
 }
 
 function AdminProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -293,70 +301,70 @@ function Router() {
           <Route path="/forgot-password" component={ForgotPassword} />
           <Route path="/reset-password" component={ResetPassword} />
           <Route path="/terminal">
-            <ProtectedRoute><MerchantTerminalMobile /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="retail-terminal"><MerchantTerminalMobile /></ProtectedRoute>
           </Route>
           <Route path="/stack">
-            <ProtectedRoute><PaymentStack /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="retail-payment-stack"><PaymentStack /></ProtectedRoute>
           </Route>
           <Route path="/dashboard">
-            <ProtectedRoute><Dashboard /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="retail-dashboard"><Dashboard /></ProtectedRoute>
           </Route>
           <Route path="/settings">
-            <ProtectedRoute><Settings /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="settings"><Settings /></ProtectedRoute>
           </Route>
           <Route path="/transactions">
-            <ProtectedRoute><Transactions /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="retail-transactions"><Transactions /></ProtectedRoute>
           </Route>
           <Route path="/stock">
-            <ProtectedRoute><StockManagement /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="retail-stock"><StockManagement /></ProtectedRoute>
           </Route>
           <Route path="/nfc">
-            <ProtectedRoute><NFCPayment /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="retail-nfc"><NFCPayment /></ProtectedRoute>
           </Route>
           <Route path="/board-builder">
-            <ProtectedRoute><BoardBuilder /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="payment-board-builder"><BoardBuilder /></ProtectedRoute>
           </Route>
           <Route path="/smart-terminal" component={SmartTerminal} />
           {/* ── Property management section ── */}
           <Route path="/property">
-            <ProtectedRoute><PropertyDashboard /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="property-dashboard"><PropertyDashboard /></ProtectedRoute>
           </Route>
           <Route path="/property/tenants">
-            <ProtectedRoute><TenantDirectory /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="property-tenants"><TenantDirectory /></ProtectedRoute>
           </Route>
           <Route path="/property/tenants/:id">
-            <ProtectedRoute><TenantProfile /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="property-tenant-profile"><TenantProfile /></ProtectedRoute>
           </Route>
           <Route path="/property/analytics">
-            <ProtectedRoute><PropertyAnalytics /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="property-analytics"><PropertyAnalytics /></ProtectedRoute>
           </Route>
           <Route path="/property/terminal">
-            <ProtectedRoute><PropertyTerminal /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="property-terminal"><PropertyTerminal /></ProtectedRoute>
           </Route>
           {/* ── Trades section ── */}
           <Route path="/trades">
-            <ProtectedRoute><TradesDashboard /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="trades-dashboard"><TradesDashboard /></ProtectedRoute>
           </Route>
           <Route path="/trades/clients">
-            <ProtectedRoute><TradesClientDirectory /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="trades-clients"><TradesClientDirectory /></ProtectedRoute>
           </Route>
           <Route path="/trades/clients/:id">
-            <ProtectedRoute><TradesClientProfile /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="trades-client-profile"><TradesClientProfile /></ProtectedRoute>
           </Route>
           <Route path="/trades/analytics">
-            <ProtectedRoute><TradesAnalytics /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="trades-analytics"><TradesAnalytics /></ProtectedRoute>
           </Route>
           <Route path="/trades/terminal">
-            <ProtectedRoute><TradesTerminal /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="trades-terminal"><TradesTerminal /></ProtectedRoute>
           </Route>
           <Route path="/trades/quote">
-            <ProtectedRoute><TradesQuoteBuilder /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="trades-quote"><TradesQuoteBuilder /></ProtectedRoute>
           </Route>
           {/* Customer-facing quote acceptance → deposit/full payment, all on the
               branded Checkout card (quoteMode drives the animated 3-step flow). */}
           <Route path="/trades/quote/:token">{() => <Checkout quoteMode />}</Route>
           <Route path="/trades/recurring">
-            <ProtectedRoute><TradesRecurring /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="trades-recurring"><TradesRecurring /></ProtectedRoute>
           </Route>
           {/* Public rent/charge checkout — no auth required. Uses the shared
               branded Checkout page (same UI as retail) via the invoice token. */}
@@ -390,11 +398,12 @@ function AppRoutes() {
   // landing page shouldn't download the entire app in the background.
   const { auth } = useContext(AuthContext);
   useRoutePreload(auth?.isAuthenticated === true);
+  const tutorialEnabled = auth?.isAuthenticated === true && auth.role !== "admin" && !!auth.merchantId && auth.onboardingCompleted === true;
   return (
-    <>
+    <TutorialProvider enabled={tutorialEnabled}>
       <Router />
       <BottomNavigation />
-    </>
+    </TutorialProvider>
   );
 }
 

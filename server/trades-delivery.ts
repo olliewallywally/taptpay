@@ -4,6 +4,7 @@ import { isWhatsAppConfigured, sendWhatsApp } from './whatsapp-service';
 import { isSmsConfigured, sendSms } from './sms-service';
 import { GST_RATE } from '@shared/schema';
 import { generateQuotePdf } from './trades-quote-pdf';
+import { billingCardIsReady } from './billing-card';
 
 type DeliveryResult = {
   sent: boolean;
@@ -123,6 +124,7 @@ export async function sendTradeQuote(
     storage.getMerchant(quote.merchantId),
   ]);
   if (!client || !merchant) return { sent: false, reason: 'missing_data' };
+  if (!billingCardIsReady(merchant)) return { sent: false, reason: 'billing_card_required' };
   const ref = String(quote.token || quote.id).slice(0, 8).toUpperCase();
   const pdf = generateQuotePdf(quote, client, merchant, baseUrl);
   const result = await deliver(

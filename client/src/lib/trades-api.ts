@@ -1,6 +1,7 @@
 // Shared fetch helpers for the trades pages — mirrors property-api.ts.
 // tradesHeaders() attaches the bearer token. tradesFetch() additionally catches
 // a 401 (session expired mid-use) and bounces to /login with a returnTo.
+import { notifyIfBillingCardRequired } from "./queryClient";
 export function tradesHeaders(): HeadersInit {
   const token = localStorage.getItem('authToken');
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -10,6 +11,7 @@ let redirecting = false;
 
 export async function tradesFetch(url: string, init: RequestInit = {}): Promise<Response> {
   const res = await fetch(url, { ...init, headers: { ...(init.headers || {}), ...tradesHeaders() } });
+  notifyIfBillingCardRequired(res);
   if (res.status === 401) {
     if (!redirecting) {
       redirecting = true;

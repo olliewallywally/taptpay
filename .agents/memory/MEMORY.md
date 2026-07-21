@@ -3,3 +3,5 @@
 - [Hero section landing page design](hero-section-landing-page.md) — navy bg, sky blue logo centred, "multi-stack digital payment solution" tagline
 - [New landing page UI](new-landing-page-ui.md) — full set of 13 landing page section designs: hero, feature panels, app screenshots, pricing, ecommerce plugin, mobile view
 - [Schema push gating & drift](schema-push-and-drift.md) — auto schema push is opt-in via an env var, and `db:push` can hang on unrelated table prompts; use direct `CREATE INDEX` SQL for additive-only changes.
+
+- [Merchant onboarding, billing gate, crypto removal, and tutorials](merchant-onboarding-billing-tutorial-2026-07-20.md) — uncommitted 2026-07-20 implementation, migration, validation, and safe GitHub staging handoff

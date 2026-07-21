@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, createContext, useContext, useCallback, us
 import { AnimatePresence, motion, useMotionValue, useTransform } from "framer-motion";
 import { X, WifiOff, AlertTriangle, CheckCircle, Info, Smartphone } from "lucide-react";
 import { sseClient } from "@/lib/sse-client";
+import { BILLING_CARD_REQUIRED_EVENT } from "@/lib/queryClient";
 
 interface Notification {
   id: string;
@@ -72,6 +73,24 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const contextValue = useMemo(() => ({
     notifications, addNotification, removeNotification, clearAll,
   }), [notifications, addNotification, removeNotification, clearAll]);
+
+  useEffect(() => {
+    const handleCardRequired = () => {
+      addNotification({
+        type: "warning",
+        title: "Credit or debit card required",
+        message: "Please enter a valid credit or debit card in Settings before sending payments.",
+        duration: 0,
+        actions: [{
+          label: "Open Settings",
+          variant: "primary",
+          onClick: () => { window.location.href = "/settings?section=billing"; },
+        }],
+      });
+    };
+    window.addEventListener(BILLING_CARD_REQUIRED_EVENT, handleCardRequired);
+    return () => window.removeEventListener(BILLING_CARD_REQUIRED_EVENT, handleCardRequired);
+  }, [addNotification]);
 
   return (
     <NotificationContext.Provider value={contextValue}>

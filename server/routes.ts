@@ -5,7 +5,8 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { uploadedFiles } from "@shared/schema";
 import { eq } from "drizzle-orm";
-import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateBankAccountSchema, updateThemeSchema, updateDailyGoalSchema, updateCryptoSettingsSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
+import { TUTORIAL_PAGE_KEYS, isTutorialPageKey } from "@shared/tutorial";
+import { insertTransactionSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateThemeSchema, updateDailyGoalSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createTaptStoneSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
 import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, simulateCreateSession, simulateQuerySession, simulateRentSession, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, simulateAttendedTapToPay } from "./windcave";
 import { authenticateUser, generateToken, authenticateToken, createUser, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
@@ -26,6 +27,7 @@ import { sendPushToMerchant } from "./push";
 import { resendInvoiceEmail } from "./property-cron";
 import { resendTradeInvoice, sendTradePaymentInvoice, sendTradeQuote } from "./trades-delivery";
 import { sendGstInvoices, extractEmails } from "./gst-invoice";
+import { BILLING_CARD_REQUIRED, billingCardIsReady, isCardExpiryValid, isLuhnValid } from "./billing-card";
 
 // Store SSE connections for real-time updates (merchantId -> stoneId -> Set of connections)
 // stoneId can be null for merchant-level connections
@@ -42,7 +44,7 @@ let cronRunning = false;
 // is non-breaking.
 const MERCHANT_SECRET_FIELDS = [
   "passwordHash", "resetToken", "resetTokenExpiry", "verificationToken", "googleId",
-  "windcaveApiKey", "coinbaseCommerceApiKey", "coinbaseWebhookSecret",
+  "windcaveApiKey",
 ] as const;
 const MERCHANT_FINANCIAL_FIELDS = [
   "bankAccountNumber", "bankName", "bankBranch", "accountHolderName",
@@ -64,6 +66,13 @@ function publicMerchant<T extends Record<string, any>>(m: T): T {
   const out: Record<string, any> = stripMerchantSecrets(m);
   for (const f of MERCHANT_FINANCIAL_FIELDS) delete out[f];
   return out as T;
+}
+
+async function requireBillingCard(merchantId: number, res: any): Promise<boolean> {
+  const merchant = await storage.getMerchant(merchantId);
+  if (billingCardIsReady(merchant)) return true;
+  res.status(402).json(BILLING_CARD_REQUIRED);
+  return false;
 }
 
 // Server-side cache of Windcave AJAX submit URLs per transaction.
@@ -151,8 +160,6 @@ const SSE_TXN_SENSITIVE = [
   "windcaveTransactionId", "windcaveSessionId", "windcaveXId", "windcaveSessionState",
   "nfcSessionId", "deviceId",
 ];
-const SSE_CRYPTO_SENSITIVE = ["walletAddress"];
-
 function stripFields<T extends Record<string, any>>(obj: T, fields: string[]): T {
   if (!obj || typeof obj !== "object") return obj;
   const out: Record<string, any> = { ...obj };
@@ -164,7 +171,6 @@ function publicSseData(data: any): any {
   if (!data || typeof data !== "object") return data;
   const out: Record<string, any> = { ...data };
   if (out.transaction) out.transaction = stripFields(out.transaction, SSE_TXN_SENSITIVE);
-  if (out.cryptoTransaction) out.cryptoTransaction = stripFields(out.cryptoTransaction, SSE_CRYPTO_SENSITIVE);
   if (out.refund) delete out.refund; // refund internals are merchant-only
   return out;
 }
@@ -199,13 +205,6 @@ function broadcastToStone(merchantId: number, stoneId: number | null | undefined
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
-});
-
-const createCryptoTransactionSchema = z.object({
-  merchantId: z.number(),
-  itemName: z.string().min(1),
-  fiatAmount: z.string().regex(/^\d+(\.\d{1,2})?$/),
-  cryptocurrency: z.enum(["BTC", "ETH", "USDC", "USDT", "LTC", "BCH"]),
 });
 
 // Multer configuration for logo uploads.
@@ -728,12 +727,14 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     let merchantStatus: string | null = null;
     let gstRegistered = false;
     let tradeGstMode = "inclusive";
+    let billingCardReady = false;
     if (merchantId) {
       const merchant = await storage.getMerchant(merchantId);
       onboardingCompleted = merchant?.onboardingCompleted ?? false;
       merchantStatus = merchant?.status ?? null;
       gstRegistered = merchant?.gstRegistered ?? false;
       tradeGstMode = merchant?.tradeGstMode === "exclusive" ? "exclusive" : "inclusive";
+      billingCardReady = billingCardIsReady(merchant);
     }
     res.json({
       user: {
@@ -745,8 +746,102 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         merchantStatus,
         gstRegistered,
         tradeGstMode,
+        billingCardReady,
       },
     });
+  });
+
+  const tutorialProgressSchema = z.object({
+    generation: z.number().int().positive(),
+    status: z.enum(["started", "completed", "dismissed"]),
+    lastStep: z.number().int().min(0).max(100).default(0),
+  }).strict();
+
+  app.get("/api/tutorial/state", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId || req.user?.role === "admin") {
+        return res.status(403).json({ message: "Merchant access required" });
+      }
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) return res.status(404).json({ message: "Merchant not found" });
+
+      const progressRows = await storage.getMerchantTutorialProgress(merchantId, merchant.tutorialGeneration);
+      const progress = Object.fromEntries(progressRows.map(row => [row.pageKey, {
+        status: row.status,
+        lastStep: row.lastStep,
+        startedAt: row.startedAt,
+        completedAt: row.completedAt,
+        dismissedAt: row.dismissedAt,
+      }]));
+
+      res.json({
+        generation: merchant.tutorialGeneration,
+        autoEnabled: merchant.tutorialAutoEnabled,
+        pageCount: TUTORIAL_PAGE_KEYS.length,
+        progress,
+      });
+    } catch (error) {
+      console.error("Tutorial state error:", error);
+      res.status(500).json({ message: "Failed to load tutorial progress" });
+    }
+  });
+
+  app.patch("/api/tutorial/pages/:pageKey", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId || req.user?.role === "admin") {
+        return res.status(403).json({ message: "Merchant access required" });
+      }
+      if (!isTutorialPageKey(req.params.pageKey)) {
+        return res.status(400).json({ message: "Unknown tutorial page" });
+      }
+      const parsed = tutorialProgressSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid tutorial progress", errors: parsed.error.errors });
+      }
+
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) return res.status(404).json({ message: "Merchant not found" });
+      if (parsed.data.generation !== merchant.tutorialGeneration) {
+        return res.status(409).json({
+          message: "Tutorials were restarted in another session",
+          generation: merchant.tutorialGeneration,
+        });
+      }
+
+      const row = await storage.upsertMerchantTutorialProgress(
+        merchantId,
+        merchant.tutorialGeneration,
+        req.params.pageKey,
+        parsed.data.status,
+        parsed.data.lastStep,
+      );
+      res.json({ pageKey: row.pageKey, status: row.status, lastStep: row.lastStep });
+    } catch (error) {
+      console.error("Tutorial progress error:", error);
+      res.status(500).json({ message: "Failed to save tutorial progress" });
+    }
+  });
+
+  app.post("/api/tutorial/restart", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId || req.user?.role === "admin") {
+        return res.status(403).json({ message: "Merchant access required" });
+      }
+      const merchant = await storage.restartMerchantTutorial(merchantId);
+      if (!merchant) return res.status(404).json({ message: "Merchant not found" });
+      res.json({
+        generation: merchant.tutorialGeneration,
+        autoEnabled: true,
+        pageCount: TUTORIAL_PAGE_KEYS.length,
+        progress: {},
+      });
+    } catch (error) {
+      console.error("Tutorial restart error:", error);
+      res.status(500).json({ message: "Failed to restart tutorials" });
+    }
   });
 
   // Merchant KYC onboarding submission
@@ -768,10 +863,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         director,
         nzbn,
         gstNumber,
-        bankName,
-        bankAccountNumber,
-        bankBranch,
-        accountHolderName,
         websiteUrl,
         estimatedAnnualTurnover,
         businessDescription,
@@ -782,10 +873,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         director: director || null,
         nzbn: nzbn || null,
         gstNumber: gstNumber || null,
-        bankName: bankName || null,
-        bankAccountNumber: bankAccountNumber || null,
-        bankBranch: bankBranch || null,
-        accountHolderName: accountHolderName || null,
         onboardingCompleted: true,
       });
 
@@ -821,14 +908,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
             <tr><td><strong>GST Number</strong></td><td>${escHtml(gstNumber)}</td></tr>
           </table>
 
-          <h3>Bank Account Details (for settlements)</h3>
-          <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse; width:100%; font-family:sans-serif;">
-            <tr><td><strong>Bank</strong></td><td>${escHtml(bankName)}</td></tr>
-            <tr><td><strong>Account Holder</strong></td><td>${escHtml(accountHolderName)}</td></tr>
-            <tr><td><strong>Account Number</strong></td><td>${escHtml(bankAccountNumber)}</td></tr>
-            <tr><td><strong>Branch</strong></td><td>${escHtml(bankBranch)}</td></tr>
-          </table>
-
           <p style="margin-top:20px; color:#666;">Submitted via TaptPay merchant onboarding form.</p>
         `;
 
@@ -837,7 +916,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           from: 'noreply@taptpay.co.nz',
           subject: `New Merchant KYC Submission — ${(merchant.businessName || '').replace(/[\r\n]/g, '')}`,
           html: emailHtml,
-          text: `New merchant KYC submission from ${merchant.businessName} (${merchant.email}). Director: ${director || 'N/A'}. NZBN: ${nzbn || 'N/A'}. GST: ${gstNumber || 'N/A'}. Bank: ${bankName || 'N/A'} / ${bankAccountNumber || 'N/A'}.`,
+          text: `New merchant KYC submission from ${merchant.businessName} (${merchant.email}). Director: ${director || 'N/A'}. NZBN: ${nzbn || 'N/A'}. GST: ${gstNumber || 'N/A'}.`,
         });
       }
 
@@ -1074,6 +1153,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!checkMerchantOwnership(req, validation.data.merchantId)) {
         return res.status(403).json({ message: "Access denied" });
       }
+      if (!(await requireBillingCard(validation.data.merchantId, res))) return;
 
       const transaction = await storage.createTransaction(validation.data);
       
@@ -1112,6 +1192,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!checkMerchantOwnership(req, parseInt(merchantId))) {
         return res.status(403).json({ message: "Access denied" });
       }
+      if (!(await requireBillingCard(parseInt(merchantId), res))) return;
 
       const priceNum = parseFloat(price);
       if (isNaN(priceNum) || priceNum <= 0) {
@@ -1167,6 +1248,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!checkMerchantOwnership(req, mid)) {
         return res.status(403).json({ message: "Access denied" });
       }
+      if (!(await requireBillingCard(mid, res))) return;
 
       const requestedAmount = parseFloat(amount);
       if (isNaN(requestedAmount) || requestedAmount <= 0) {
@@ -1435,6 +1517,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!checkMerchantOwnership(req, merchantId)) {
         return res.status(403).json({ message: "Access denied" });
       }
+      if (!(await requireBillingCard(merchantId, res))) return;
       const { amount, itemName, deviceId, nfcCapabilities } = req.body;
 
       // Validate required fields
@@ -2222,291 +2305,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   // ======================
-  // CRYPTO TRANSACTION ROUTES
-  // ======================
-
-  // Create crypto transaction
-  app.post("/api/crypto-transactions", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    try {
-      const validation = createCryptoTransactionSchema.safeParse(req.body);
-      if (!validation.success) {
-        return res.status(400).json({ message: "Invalid request data", errors: validation.error.errors });
-      }
-      
-      const { merchantId, itemName, fiatAmount, cryptocurrency } = validation.data;
-      
-      // Verify the user owns this merchant
-      if (!req.user || req.user.merchantId !== merchantId) {
-        return res.status(403).json({ message: "Unauthorized to create transactions for this merchant" });
-      }
-      
-      // Get merchant to check crypto settings
-      const merchant = await storage.getMerchant(merchantId);
-      if (!merchant) {
-        return res.status(404).json({ message: "Merchant not found" });
-      }
-      
-      if (!merchant.cryptoEnabled) {
-        return res.status(400).json({ message: "Crypto payments not enabled for this merchant" });
-      }
-      
-      // Create regular transaction first
-      const transaction = await storage.createTransaction({
-        merchantId,
-        itemName,
-        price: fiatAmount,
-        status: "pending",
-        paymentMethod: "crypto",
-        splitEnabled: false,
-      });
-      
-      // Mock exchange rate (in production, fetch from CoinGecko or similar)
-      const mockExchangeRates: { [key: string]: number } = {
-        "BTC": 0.000015, // 1 NZD = 0.000015 BTC
-        "ETH": 0.00025,  // 1 NZD = 0.00025 ETH
-        "USDC": 0.60,    // 1 NZD = 0.60 USDC
-        "USDT": 0.60,
-        "LTC": 0.005,
-        "BCH": 0.002
-      };
-      
-      const exchangeRate = mockExchangeRates[cryptocurrency] || 0.000015;
-      const cryptoAmount = (parseFloat(fiatAmount) * exchangeRate).toFixed(8);
-      
-      // Generate mock wallet address (in production, use Coinbase Commerce API)
-      const mockWalletAddress = `${cryptocurrency}_${crypto.randomBytes(20).toString('hex')}`;
-      
-      // Create crypto transaction record
-      const cryptoTransaction = await storage.createCryptoTransaction({
-        transactionId: transaction.id,
-        merchantId,
-        cryptocurrency,
-        walletAddress: mockWalletAddress,
-        cryptoAmount,
-        fiatAmount,
-        exchangeRate: exchangeRate.toString(),
-        coinbaseChargeId: `charge_${crypto.randomBytes(16).toString('hex')}`,
-        coinbaseChargeCode: crypto.randomBytes(4).toString('hex').toUpperCase(),
-        hostedUrl: `${req.protocol}://${req.get('host')}/crypto-pay/${transaction.id}`,
-        requiredConfirmations: merchant.minConfirmations || 1,
-        status: "pending",
-        expiresAt: new Date(Date.now() + 60 * 60 * 1000) // 1 hour expiry
-      });
-      
-      // Notify SSE clients
-      const connections = sseConnections.get(merchantId);
-      if (connections) {
-        connections.forEach((connSet) => {
-          connSet.forEach(conn => {
-            sseWrite(conn, { type: 'crypto_transaction_created', transaction, cryptoTransaction });
-          });
-        });
-      }
-      
-      res.json({ transaction, cryptoTransaction });
-    } catch (error) {
-      console.error("Error creating crypto transaction:", error);
-      res.status(500).json({ message: "Failed to create crypto transaction" });
-    }
-  });
-
-  // Get crypto transaction
-  app.get("/api/crypto-transactions/:id", async (req, res) => {
-    try {
-      const cryptoTransactionId = parseInt(req.params.id);
-      const cryptoTransaction = await storage.getCryptoTransaction(cryptoTransactionId);
-      
-      if (!cryptoTransaction) {
-        return res.status(404).json({ message: "Crypto transaction not found" });
-      }
-      
-      res.json(cryptoTransaction);
-    } catch (error) {
-      console.error("Error fetching crypto transaction:", error);
-      res.status(500).json({ message: "Failed to fetch crypto transaction" });
-    }
-  });
-
-  // Get crypto transaction by regular transaction ID
-  app.get("/api/transactions/:id/crypto", async (req, res) => {
-    try {
-      const transactionId = parseInt(req.params.id);
-      const cryptoTransaction = await storage.getCryptoTransactionByTransactionId(transactionId);
-      
-      if (!cryptoTransaction) {
-        return res.status(404).json({ message: "Crypto transaction not found" });
-      }
-      
-      res.json(cryptoTransaction);
-    } catch (error) {
-      console.error("Error fetching crypto transaction:", error);
-      res.status(500).json({ message: "Failed to fetch crypto transaction" });
-    }
-  });
-
-  // Mock crypto payment confirmation (simulates blockchain confirmation).
-  // SECURITY: This endpoint marks a transaction paid WITHOUT verifying any real
-  // payment, so it must never be reachable in production — real confirmations arrive
-  // via the signature-verified Coinbase webhook below. Disabled outside development.
-  app.post("/api/crypto-transactions/:id/confirm", async (req, res) => {
-    if (process.env.NODE_ENV === 'production') {
-      return res.status(404).json({ message: "Not found" });
-    }
-    try {
-      const cryptoTransactionId = parseInt(req.params.id);
-      const cryptoTransaction = await storage.getCryptoTransaction(cryptoTransactionId);
-      
-      if (!cryptoTransaction) {
-        return res.status(404).json({ message: "Crypto transaction not found" });
-      }
-      
-      // Update crypto transaction status
-      const updatedCryptoTx = await storage.updateCryptoTransactionStatus(
-        cryptoTransactionId,
-        "confirmed",
-        1 // confirmations
-      );
-      
-      // Update main transaction status
-      await storage.updateTransactionStatus(cryptoTransaction.transactionId!, "completed");
-      
-      // Calculate platform fee (0.5% of transaction amount)
-      const platformFeeAmount = parseFloat(cryptoTransaction.fiatAmount) * 0.005;
-      
-      // Create platform fee record
-      await storage.createPlatformFee({
-        transactionId: cryptoTransaction.transactionId,
-        merchantId: cryptoTransaction.merchantId,
-        feeAmount: platformFeeAmount.toFixed(2),
-        transactionAmount: cryptoTransaction.fiatAmount,
-        status: "pending"
-      });
-      
-      // Track transaction for subscription billing
-      if (cryptoTransaction.merchantId) {
-        await storage.incrementTransactionCount(cryptoTransaction.merchantId);
-      }
-      
-      // TODO: Auto-charge merchant's payment method for platform fee via Windcave
-      
-      // Notify SSE clients
-      const connections = sseConnections.get(cryptoTransaction.merchantId!);
-      if (connections) {
-        connections.forEach((connSet) => {
-          connSet.forEach(conn => {
-            sseWrite(conn, { type: 'crypto_payment_confirmed', cryptoTransaction: updatedCryptoTx });
-          });
-        });
-      }
-      
-      res.json(updatedCryptoTx);
-    } catch (error) {
-      console.error("Error confirming crypto payment:", error);
-      res.status(500).json({ message: "Failed to confirm crypto payment" });
-    }
-  });
-
-  // Coinbase Commerce webhook with signature verification
-  app.post("/api/crypto-transactions/webhook/coinbase", express.raw({ type: 'application/json' }), async (req, res) => {
-    try {
-      const signature = req.headers['x-cc-webhook-signature'] as string;
-      const rawBody = req.body.toString();
-      
-      if (!signature) {
-        return res.status(401).json({ message: "Missing webhook signature" });
-      }
-      
-      // Parse the event
-      const event = JSON.parse(rawBody);
-      const { event: eventData } = event;
-      
-      if (!eventData || !eventData.data || !eventData.data.code) {
-        return res.status(400).json({ message: "Invalid webhook payload" });
-      }
-      
-      // Find crypto transaction by Coinbase charge code
-      const chargeCode = eventData.data.code;
-      const cryptoTx = await storage.getCryptoTransactionByChargeCode(chargeCode);
-      
-      if (!cryptoTx) {
-        return res.status(404).json({ message: "Crypto transaction not found" });
-      }
-      
-      // Get merchant to verify webhook secret
-      const merchant = await storage.getMerchant(cryptoTx.merchantId!);
-      if (!merchant || !merchant.coinbaseWebhookSecret) {
-        return res.status(500).json({ message: "Merchant webhook secret not configured" });
-      }
-      
-      // Verify webhook signature using HMAC-SHA256
-      const expectedSignature = crypto
-        .createHmac('sha256', merchant.coinbaseWebhookSecret)
-        .update(rawBody)
-        .digest('hex');
-      
-      if (signature !== expectedSignature) {
-        console.error("Webhook signature verification failed");
-        return res.status(401).json({ message: "Invalid webhook signature" });
-      }
-      
-      // Process webhook event based on type
-      const eventType = eventData.type;
-      console.log(`Processing Coinbase webhook: ${eventType} for charge ${chargeCode}`);
-      
-      if (eventType === 'charge:confirmed') {
-        // Payment confirmed - update status
-        await storage.updateCryptoTransactionStatus(cryptoTx.id, 'confirmed', eventData.data.confirmations || 1);
-        await storage.updateTransactionStatus(cryptoTx.transactionId!, 'completed');
-        
-        // Calculate and create platform fee (0.5%)
-        const platformFeeAmount = parseFloat(cryptoTx.fiatAmount) * 0.005;
-        await storage.createPlatformFee({
-          transactionId: cryptoTx.transactionId,
-          merchantId: cryptoTx.merchantId,
-          feeAmount: platformFeeAmount.toFixed(2),
-          transactionAmount: cryptoTx.fiatAmount,
-          status: 'pending'
-        });
-        
-        // Track transaction for subscription billing
-        if (cryptoTx.merchantId) {
-          await storage.incrementTransactionCount(cryptoTx.merchantId);
-        }
-        
-        // Broadcast SSE update
-        const connections = sseConnections.get(cryptoTx.merchantId!);
-        if (connections) {
-          const transaction = await storage.getTransaction(cryptoTx.transactionId!);
-          connections.forEach((connSet) => {
-            connSet.forEach(client => {
-              sseWrite(client, { type: 'transaction_update', transaction, cryptoTransaction: cryptoTx });
-            });
-          });
-        }
-      } else if (eventType === 'charge:failed' || eventType === 'charge:expired') {
-        // Payment failed or expired
-        await storage.updateCryptoTransactionStatus(cryptoTx.id, eventType === 'charge:expired' ? 'expired' : 'failed', 0);
-        await storage.updateTransactionStatus(cryptoTx.transactionId!, 'failed');
-        
-        // Broadcast SSE update
-        const connections = sseConnections.get(cryptoTx.merchantId!);
-        if (connections) {
-          const transaction = await storage.getTransaction(cryptoTx.transactionId!);
-          connections.forEach((connSet) => {
-            connSet.forEach(client => {
-              sseWrite(client, { type: 'transaction_update', transaction, cryptoTransaction: cryptoTx });
-            });
-          });
-        }
-      }
-      
-      res.json({ received: true, processed: true });
-    } catch (error) {
-      console.error("Error processing Coinbase webhook:", error);
-      res.status(500).json({ message: "Webhook processing failed" });
-    }
-  });
-
   // Admin manual merchant verification (mark as verified directly)
   app.post("/api/admin/merchants/:id/verify", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {
@@ -2733,26 +2531,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   app.put("/api/merchants/:id/bank-account", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    try {
-      const merchantId = parseInt(req.params.id);
-      if (!checkMerchantOwnership(req, merchantId)) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-      const validation = updateBankAccountSchema.safeParse(req.body);
-      
-      if (!validation.success) {
-        return res.status(400).json({ message: "Invalid bank account details", errors: validation.error.errors });
-      }
-
-      const updatedMerchant = await storage.updateMerchantBankAccount(merchantId, validation.data);
-      if (!updatedMerchant) {
-        return res.status(404).json({ message: "Merchant not found" });
-      }
-
-      res.json(updatedMerchant);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to update bank account details" });
-    }
+    res.status(410).json({ message: "Merchant bank account details are no longer collected" });
   });
 
   app.put("/api/merchants/:id/theme", authenticateToken, async (req: AuthenticatedRequest, res) => {
@@ -2940,40 +2719,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     } catch (error) {
       console.error("Logo deletion error:", error);
       res.status(500).json({ message: "Failed to delete logo" });
-    }
-  });
-
-  // Update merchant crypto settings
-  app.put("/api/merchants/:id/crypto-settings", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    try {
-      const merchantId = parseInt(req.params.id);
-      
-      // Verify user owns this merchant
-      if (!req.user || req.user.merchantId !== merchantId) {
-        return res.status(403).json({ message: "Unauthorized" });
-      }
-
-      const validation = updateCryptoSettingsSchema.safeParse(req.body);
-      if (!validation.success) {
-        return res.status(400).json({ message: "Invalid crypto settings", errors: validation.error.errors });
-      }
-
-      const updatedMerchant = await storage.updateMerchantCryptoSettings(merchantId, validation.data);
-      if (!updatedMerchant) {
-        return res.status(404).json({ message: "Merchant not found" });
-      }
-
-      // Don't return sensitive data
-      const safeData = {
-        ...updatedMerchant,
-        coinbaseCommerceApiKey: updatedMerchant.coinbaseCommerceApiKey ? '••••••••' : null,
-        coinbaseWebhookSecret: updatedMerchant.coinbaseWebhookSecret ? '••••••••' : null,
-      };
-
-      res.json(safeData);
-    } catch (error) {
-      console.error("Error updating crypto settings:", error);
-      res.status(500).json({ message: "Failed to update crypto settings" });
     }
   });
 
@@ -3735,15 +3480,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         });
       }
 
-      if (updates.bankName || updates.bankAccountNumber || updates.bankBranch || updates.accountHolderName) {
-        await storage.updateMerchantBankAccount(merchantId, {
-          bankName: updates.bankName,
-          bankAccountNumber: updates.bankAccountNumber,
-          bankBranch: updates.bankBranch,
-          accountHolderName: updates.accountHolderName,
-        });
-      }
-
       if (updates.currentProviderRate) {
         await storage.updateMerchantRates(merchantId, updates.currentProviderRate);
       }
@@ -4060,16 +3796,83 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const merchant = await storage.getMerchantByToken(token);
       if (!merchant) return res.status(400).json({ message: "Invalid or expired verification token" });
 
-      // Mark email verified and promote status to 'verified' so merchant can log in
+      // New stepper signups arrive with the full KYC application already stored.
+      // Legacy pending accounts may not have these fields, so only mark onboarding
+      // complete (and send the application notification) for the consolidated flow.
+      const hasCompleteApplication = Boolean(
+        merchant.businessName &&
+        merchant.businessAddress &&
+        merchant.director &&
+        merchant.businessDescription &&
+        merchant.estimatedAnnualTurnover
+      );
+
+      // Mark email verified and promote status to 'verified' so merchant can log in.
       await storage.updateMerchant(merchant.id, {
         emailVerified: true,
         verificationToken: null,
         status: 'verified',
+        onboardingCompleted: hasCompleteApplication,
       });
 
       // Sync auth store so the merchant can log in immediately
       const { syncVerifiedMerchants } = await import('./auth');
       await syncVerifiedMerchants();
+
+      if (hasCompleteApplication) {
+        const businessType = String(merchant.businessType || "Not provided")
+          .split("-")
+          .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+          .join(" ");
+        const notificationSent = await sendEmail({
+          to: "oliver@taptpay.co.nz",
+          from: process.env.RESEND_FROM_EMAIL || "noreply@taptpay.co.nz",
+          subject: `Verified TaptPay signup — ${(merchant.businessName || merchant.name || "").replace(/[\r\n]/g, "")}`,
+          html: `
+            <div style="font-family:Arial,sans-serif;max-width:680px;margin:0 auto;color:#06102f">
+              <div style="background:#060d2f;color:#fff;padding:28px 32px;border-radius:18px 18px 0 0">
+                <p style="margin:0;color:#6eaeff;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase">Email verified</p>
+                <h2 style="margin:8px 0 0;font-size:26px">${escHtml(merchant.businessName)}</h2>
+              </div>
+              <div style="border:1px solid #dfe4ec;border-top:0;padding:28px 32px;border-radius:0 0 18px 18px">
+                <h3>Primary contact</h3>
+                <table style="width:100%;border-collapse:collapse">
+                  <tr><td style="padding:7px 0;color:#667085;width:38%">Full name</td><td style="padding:7px 0;font-weight:600">${escHtml(merchant.name)}</td></tr>
+                  <tr><td style="padding:7px 0;color:#667085">Email</td><td style="padding:7px 0">${escHtml(merchant.email)}</td></tr>
+                  <tr><td style="padding:7px 0;color:#667085">Phone</td><td style="padding:7px 0">${escHtml(merchant.phone)}</td></tr>
+                </table>
+                <h3 style="margin-top:24px">Business details</h3>
+                <table style="width:100%;border-collapse:collapse">
+                  <tr><td style="padding:7px 0;color:#667085;width:38%">Legal name</td><td style="padding:7px 0;font-weight:600">${escHtml(merchant.businessName)}</td></tr>
+                  <tr><td style="padding:7px 0;color:#667085">Type</td><td style="padding:7px 0">${escHtml(businessType)}</td></tr>
+                  <tr><td style="padding:7px 0;color:#667085">Address</td><td style="padding:7px 0">${escHtml(merchant.businessAddress || merchant.address)}</td></tr>
+                  <tr><td style="padding:7px 0;color:#667085">NZBN</td><td style="padding:7px 0">${escHtml(merchant.nzbn || "Not provided")}</td></tr>
+                  <tr><td style="padding:7px 0;color:#667085">GST number</td><td style="padding:7px 0">${escHtml(merchant.gstNumber || "Not provided")}</td></tr>
+                  <tr><td style="padding:7px 0;color:#667085">Description</td><td style="padding:7px 0">${escHtml(merchant.businessDescription)}</td></tr>
+                  <tr><td style="padding:7px 0;color:#667085">Website</td><td style="padding:7px 0">${escHtml(merchant.websiteUrl || "Not provided")}</td></tr>
+                  <tr><td style="padding:7px 0;color:#667085">Annual card turnover</td><td style="padding:7px 0">${escHtml(merchant.estimatedAnnualTurnover)}</td></tr>
+                </table>
+                <h3 style="margin-top:24px">KYC</h3>
+                <table style="width:100%;border-collapse:collapse">
+                  <tr><td style="padding:7px 0;color:#667085;width:38%">Director / owner</td><td style="padding:7px 0">${escHtml(merchant.director)}</td></tr>
+                </table>
+              </div>
+            </div>
+          `,
+          text: [
+            `Verified TaptPay signup: ${merchant.businessName}`,
+            `Contact: ${merchant.name} | ${merchant.email} | ${merchant.phone}`,
+            `Business: ${businessType} | ${merchant.businessAddress || merchant.address}`,
+            `NZBN: ${merchant.nzbn || "Not provided"} | GST: ${merchant.gstNumber || "Not provided"}`,
+            `Description: ${merchant.businessDescription}`,
+            `Website: ${merchant.websiteUrl || "Not provided"} | Turnover: ${merchant.estimatedAnnualTurnover}`,
+            `Director: ${merchant.director}`,
+          ].join("\n"),
+        });
+        if (!notificationSent) {
+          console.error(`[SIGNUP_NOTIFY] Failed to send verified application for merchant ${merchant.id} to oliver@taptpay.co.nz`);
+        }
+      }
 
       res.json({ message: "Email verified", merchantId: merchant.id });
     } catch (error) {
@@ -4171,7 +3974,22 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         });
       }
 
-      const { name, email, password, confirmPassword } = validation.data;
+      const {
+        name,
+        email,
+        phone,
+        businessName,
+        businessType,
+        businessAddress,
+        nzbn,
+        gstNumber,
+        director,
+        businessDescription,
+        websiteUrl,
+        estimatedAnnualTurnover,
+        password,
+        confirmPassword,
+      } = validation.data;
 
       // Check if email already exists
       const existingMerchant = await storage.getMerchantByEmail(email);
@@ -4185,14 +4003,15 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // Generate verification token
       const verificationToken = crypto.randomBytes(32).toString('hex');
 
-      // Create merchant with pending status — business details filled in next step
+      // Create a pending merchant with the complete stepper application. Access
+      // remains blocked until the email confirmation link is used.
       const merchant = await storage.createMerchantWithSignup({
         name,
-        businessName: name,
-        businessType: 'general',
+        businessName,
+        businessType,
         email,
-        phone: '',
-        address: '',
+        phone,
+        address: businessAddress,
         password,
         confirmPassword,
         verificationToken,
@@ -4200,6 +4019,18 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       if (merchant) {
         await storage.updateMerchantPasswordHash(merchant.id, passwordHash);
+        await storage.updateMerchant(merchant.id, {
+          contactEmail: email,
+          contactPhone: phone,
+          businessAddress,
+          nzbn: nzbn || null,
+          gstNumber: gstNumber || null,
+          director,
+          businessDescription,
+          websiteUrl: websiteUrl || null,
+          estimatedAnnualTurnover,
+          onboardingCompleted: false,
+        });
       }
 
       // Send verification email
@@ -4210,29 +4041,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const emailSent = await sendMerchantVerificationEmail(email, verificationToken, name, baseUrl);
       if (!emailSent) {
         console.warn('Failed to send verification email, but merchant account was created');
-      }
-
-      // Notify the TaptPay admin of the new signup immediately (lead capture) so a
-      // merchant who abandons before completing KYC is still surfaced. Non-fatal.
-      const signupNotifyEmail = process.env.ADMIN_EMAIL || process.env.ADMIN_NOTIFY_EMAIL;
-      if (signupNotifyEmail) {
-        try {
-          await sendEmail({
-            to: signupNotifyEmail,
-            from: process.env.RESEND_FROM_EMAIL || 'noreply@taptpay.co.nz',
-            subject: `New TaptPay signup — ${(name || '').replace(/[\r\n]/g, '')}`,
-            html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
-              <h2 style="color:#0055ff;margin-top:0">New signup started</h2>
-              <p>A new merchant created an account and was sent a verification email.</p>
-              <table style="width:100%;border-collapse:collapse">
-                <tr><td style="padding:8px 0;color:#666;width:40%">Name</td><td style="padding:8px 0;font-weight:600">${escHtml(name)}</td></tr>
-                <tr><td style="padding:8px 0;color:#666">Email</td><td style="padding:8px 0">${escHtml(email)}</td></tr>
-              </table>
-              <p style="margin-top:24px;color:#999;font-size:12px">They'll appear again with full details once they complete KYC onboarding.</p>
-            </div>`,
-            text: `New TaptPay signup: ${name} <${email}>. Verification email sent; awaiting email confirmation and KYC.`,
-          });
-        } catch (e) { console.error('[SIGNUP_NOTIFY]', e); }
       }
 
       res.json({
@@ -5090,6 +4898,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!req.apiKey.permissions.includes('create_transactions')) {
         return res.status(403).json({ error: 'Insufficient permissions' });
       }
+      if (!(await requireBillingCard(req.apiKey.merchantId, res))) return;
 
       // Create transaction
       const transaction = await storage.createTransaction({
@@ -5522,7 +5331,23 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Save billing card (masked stub — Windcave billing API integration ready)
+  app.get("/api/billing/card", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    const merchantId = req.user?.merchantId;
+    if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+    const merchant = await storage.getMerchant(merchantId);
+    if (!merchant) return res.status(404).json({ message: "Merchant not found" });
+    const ready = billingCardIsReady(merchant);
+    res.json({
+      ready,
+      card: merchant.billingCardLast4 ? {
+        last4: merchant.billingCardLast4,
+        brand: merchant.billingCardBrand,
+        expiry: merchant.billingCardExpiry,
+      } : null,
+    });
+  });
+
+  // Save only masked card metadata. Full card number and CVC are never persisted.
   app.post("/api/billing/card", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
@@ -5537,8 +5362,12 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!/^\d{13,19}$/.test(raw)) {
         return res.status(400).json({ message: "Invalid card number" });
       }
-      if (!/^\d{2}\/\d{2}$/.test(String(expiry).trim())) {
-        return res.status(400).json({ message: "Expiry must be in MM/YY format" });
+      if (!isLuhnValid(raw)) {
+        return res.status(400).json({ message: "Please enter a valid card number" });
+      }
+      const cleanExpiry = String(expiry).trim();
+      if (!isCardExpiryValid(cleanExpiry)) {
+        return res.status(400).json({ message: "Please enter a valid, unexpired date in MM/YY format" });
       }
       if (!/^\d{3,4}$/.test(String(cvc))) {
         return res.status(400).json({ message: "Invalid CVC" });
@@ -5546,23 +5375,24 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // CVC validated above but intentionally NOT stored — Windcave will tokenise when live.
 
       const last4 = raw.slice(-4);
-      const firstDigit = raw[0];
-      let brand = "Card";
-      if (firstDigit === "4") brand = "Visa";
-      else if (firstDigit === "5" || firstDigit === "2") brand = "Mastercard";
-      else if (firstDigit === "3") brand = "Amex";
+      let brand: "Visa" | "Mastercard" | "Amex" | null = null;
+      if (/^4/.test(raw)) brand = "Visa";
+      else if (/^(5[1-5]|2[2-7])/.test(raw)) brand = "Mastercard";
+      else if (/^3[47]/.test(raw)) brand = "Amex";
+      if (!brand) return res.status(400).json({ message: "Please use a supported credit or debit card" });
 
       // TODO: When Windcave billing API is available, tokenise the card here and store the token.
       // For now store masked placeholder only — no real card data is persisted.
       const merchant = await storage.updateMerchantBillingCard(merchantId, {
         last4,
         brand,
-        expiry: String(expiry).trim(),
+        expiry: cleanExpiry,
       });
 
       res.json({
         success: true,
-        card: { last4, brand, expiry: String(expiry).trim() },
+        ready: true,
+        card: { last4, brand, expiry: cleanExpiry },
         merchant,
       });
     } catch (error) {
@@ -5976,6 +5806,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const tenant = await storage.getTenantProfile(req.params.tenantId);
       if (!tenant) return res.status(404).json({ message: "Tenant not found" });
       if (!checkMerchantOwnership(req, tenant.merchantId)) return res.status(403).json({ message: "Access denied" });
+      if (!(await requireBillingCard(merchantId, res))) return;
       const data = createActiveScheduleSchema.parse({ ...req.body, tenantProfileId: req.params.tenantId });
       const schedule = await storage.createActiveSchedule({ ...data, merchantId, nextRunDate: data.startDate });
       await storage.logTransactionEvent({ merchantId, tenantProfileId: req.params.tenantId, scheduleId: schedule.id, eventType: "Schedule_Created", payload: { amountCents: schedule.amountCents, frequency: schedule.frequency } });
@@ -6074,6 +5905,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const tenant = await storage.getTenantProfile(req.body.tenantProfileId);
       if (!tenant) return res.status(404).json({ message: "Tenant not found" });
       if (!checkMerchantOwnership(req, tenant.merchantId)) return res.status(403).json({ message: "Access denied" });
+      if (!(await requireBillingCard(merchantId, res))) return;
       const data = createAdHocInvoiceSchema.parse(req.body);
       const baseUrl = getBaseUrl(req);
       const isCharge = data.kind === "charge";
@@ -6113,6 +5945,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const invoice = await storage.getInvoiceRentRequest(req.params.id);
       if (!invoice) return res.status(404).json({ message: "Invoice not found" });
       if (!checkMerchantOwnership(req, invoice.merchantId)) return res.status(403).json({ message: "Access denied" });
+      if (!(await requireBillingCard(merchantId, res))) return;
       if (["paid", "paid_external", "voided"].includes(invoice.status)) return res.status(400).json({ message: "Invoice is not payable" });
       const delivery = await resendInvoiceEmail(req.params.id, getBaseUrl(req));
       if (!delivery.ok) return res.status(502).json({ message: "Could not resend", reason: delivery.reason });
@@ -6771,6 +6604,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!(await requireBillingCard(merchantId, res))) return;
       const parsed = createQuoteSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
       if (parsed.data.depositEnabled && (!parsed.data.depositType || !parsed.data.depositValue || parsed.data.depositValue <= 0))
@@ -6879,6 +6713,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
       const quote = await storage.getQuote(req.params.id);
       if (!quote || quote.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      if (!(await requireBillingCard(merchantId, res))) return;
       if (["accepted", "declined", "expired"].includes(quote.status)) return res.status(409).json({ message: "Quote can no longer be resent" });
       const delivery = await sendTradeQuote(quote.id, getBaseUrl(req));
       if (!delivery.sent) return res.status(502).json({ message: "Could not resend quote", reason: delivery.reason });
@@ -6950,6 +6785,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         await storage.createJobEvent({ merchantId: quote.merchantId, clientProfileId: quote.clientProfileId, quoteId: quote.id, eventType: "quote_declined" });
         return res.json({ quote: declined, depositInvoice: null });
       }
+      if (!(await requireBillingCard(quote.merchantId, res))) return;
       const accepted = await storage.updateQuote(quote.id, { status: "accepted", acceptedAt: new Date() });
       await storage.createJobEvent({ merchantId: quote.merchantId, clientProfileId: quote.clientProfileId, quoteId: quote.id, eventType: "quote_accepted" });
       // Deposit enabled → auto-issue the deposit invoice so the checkout shows it immediately.
@@ -6989,6 +6825,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!(await requireBillingCard(merchantId, res))) return;
       const parsed = createJobInvoiceSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
       let client: any;
@@ -7039,6 +6876,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
       const invoice = await storage.getJobInvoice(req.params.id);
       if (!invoice || invoice.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      if (!(await requireBillingCard(merchantId, res))) return;
       const delivery = await resendTradeInvoice(invoice.id, getBaseUrl(req));
       if (!delivery.sent) return res.status(502).json({ message: "Could not resend invoice", reason: delivery.reason });
       res.json(delivery.invoice);
@@ -7053,6 +6891,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       // Issue the remaining balance for a deposit-paid job.
       const dep = await storage.getJobInvoice(req.params.id);
       if (!dep || dep.merchantId !== merchantId) return res.status(404).json({ message: "Not found" });
+      if (!(await requireBillingCard(merchantId, res))) return;
       if (dep.kind !== "deposit") return res.status(400).json({ message: "Balance can only be sent for a deposit invoice" });
       if (!["paid", "paid_external", "deposit_paid"].includes(dep.status))
         return res.status(409).json({ message: "Deposit must be paid before sending the balance" });
@@ -7136,6 +6975,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!(await requireBillingCard(merchantId, res))) return;
       const parsed = createJobScheduleSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
       if (parsed.data.endDate && parsed.data.endDate < parsed.data.startDate)

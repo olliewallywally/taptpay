@@ -16,7 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { updateMerchantDetailsSchema, updateBankAccountSchema } from "@shared/schema";
+import { updateMerchantDetailsSchema } from "@shared/schema";
 import { 
   ArrowLeft, 
   Building2, 
@@ -43,10 +43,6 @@ interface MerchantDetails {
   contactPhone: string;
   businessAddress: string;
   currentProviderRate: string;
-  bankName: string;
-  bankAccountNumber: string;
-  bankBranch: string;
-  accountHolderName: string;
   qrCodeUrl: string;
   paymentUrl: string;
   status: 'active' | 'inactive';
@@ -78,7 +74,6 @@ export default function AdminMerchantDetail() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isEditingDetails, setIsEditingDetails] = useState(false);
-  const [isEditingBank, setIsEditingBank] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const isMobile = useIsMobile();
 
@@ -90,16 +85,6 @@ export default function AdminMerchantDetail() {
       contactEmail: "",
       contactPhone: "",
       businessAddress: "",
-    },
-  });
-
-  const bankForm = useForm({
-    resolver: zodResolver(updateBankAccountSchema),
-    defaultValues: {
-      bankName: "",
-      bankAccountNumber: "",
-      bankBranch: "",
-      accountHolderName: "",
     },
   });
 
@@ -129,37 +114,6 @@ export default function AdminMerchantDetail() {
       toast({
         title: "Error",
         description: error.message || "Failed to update merchant details",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Update bank account mutation
-  const updateBankMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const response = await fetch(`/api/merchants/${merchantId}/bank-account`, {
-        method: 'PUT',
-        body: JSON.stringify(data),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('adminAuthToken')}`
-        },
-      });
-      if (!response.ok) throw new Error('Failed to update bank account');
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/merchants', merchantId] });
-      setIsEditingBank(false);
-      toast({
-        title: "Success",
-        description: "Bank account updated successfully",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update bank account",
         variant: "destructive",
       });
     },
@@ -254,23 +208,12 @@ export default function AdminMerchantDetail() {
         contactPhone: merchant.contactPhone || "",
         businessAddress: merchant.businessAddress || "",
       });
-      
-      bankForm.reset({
-        bankName: merchant.bankName || "",
-        bankAccountNumber: merchant.bankAccountNumber || "",
-        bankBranch: merchant.bankBranch || "",
-        accountHolderName: merchant.accountHolderName || "",
-      });
     }
-  }, [merchant, detailsForm, bankForm]);
+  }, [merchant, detailsForm]);
 
   // Form submission handlers
   const onDetailsSubmit = (data: any) => {
     updateDetailsMutation.mutate(data);
-  };
-
-  const onBankSubmit = (data: any) => {
-    updateBankMutation.mutate(data);
   };
 
   const handleDelete = () => {

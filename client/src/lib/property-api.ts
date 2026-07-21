@@ -3,6 +3,7 @@
 // propHeaders() attaches the bearer token. propFetch() additionally catches a
 // 401 (session expired mid-use) and bounces to /login with a returnTo, so the
 // user is sent to re-authenticate instead of staring at a silently-empty screen.
+import { notifyIfBillingCardRequired } from "./queryClient";
 
 export function propHeaders(): HeadersInit {
   const token = localStorage.getItem('authToken');
@@ -13,6 +14,7 @@ let redirecting = false;
 
 export async function propFetch(url: string, init: RequestInit = {}): Promise<Response> {
   const res = await fetch(url, { ...init, headers: { ...(init.headers || {}), ...propHeaders() } });
+  notifyIfBillingCardRequired(res);
   if (res.status === 401) {
     // Guard so several concurrent queries 401-ing at once don't stack redirects.
     if (!redirecting) {

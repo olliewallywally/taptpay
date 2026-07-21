@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -11,7 +10,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Building2, User, Landmark, FileText, Globe } from "lucide-react";
+import { CheckCircle, Building2, User, FileText, Globe } from "lucide-react";
 
 const INPUT_CLASS =
   "mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
@@ -21,7 +20,6 @@ const TEXTAREA_CLASS =
 
 export default function MerchantOnboarding() {
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
   const { data: authData } = useQuery<{
@@ -43,10 +41,6 @@ export default function MerchantOnboarding() {
     director: string;
     nzbn: string;
     gstNumber: string;
-    bankName: string;
-    bankAccountNumber: string;
-    bankBranch: string;
-    accountHolderName: string;
   }>({
     queryKey: [`/api/merchants/${merchantId}`],
     enabled: !!merchantId,
@@ -56,10 +50,6 @@ export default function MerchantOnboarding() {
     director: "",
     nzbn: "",
     gstNumber: "",
-    bankName: "",
-    bankAccountNumber: "",
-    bankBranch: "",
-    accountHolderName: "",
     websiteUrl: "",
     estimatedAnnualTurnover: "",
     businessDescription: "",
@@ -90,14 +80,6 @@ export default function MerchantOnboarding() {
     e.preventDefault();
     if (!form.director.trim()) {
       toast({ title: "Required", description: "Please enter the director's full legal name.", variant: "destructive" });
-      return;
-    }
-    if (!form.bankAccountNumber.trim()) {
-      toast({ title: "Required", description: "Please enter your bank account number.", variant: "destructive" });
-      return;
-    }
-    if (!form.accountHolderName.trim()) {
-      toast({ title: "Required", description: "Please enter the account holder name.", variant: "destructive" });
       return;
     }
     submitMutation.mutate();
@@ -263,72 +245,6 @@ export default function MerchantOnboarding() {
             </div>
           </div>
 
-          {/* Bank account */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <SectionHeader icon={Landmark} title="Bank Account for Settlements" />
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Bank Name</label>
-                  <select
-                    value={form.bankName}
-                    onChange={(e) => set("bankName", e.target.value)}
-                    className={INPUT_CLASS}
-                  >
-                    <option value="">Select bank</option>
-                    <option value="ANZ">ANZ</option>
-                    <option value="ASB">ASB</option>
-                    <option value="BNZ">BNZ</option>
-                    <option value="Kiwibank">Kiwibank</option>
-                    <option value="Westpac">Westpac</option>
-                    <option value="Cooperative Bank">Cooperative Bank</option>
-                    <option value="TSB">TSB</option>
-                    <option value="Rabobank">Rabobank</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700">
-                    Account Holder Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Name on the account"
-                    value={form.accountHolderName}
-                    onChange={(e) => set("accountHolderName", e.target.value)}
-                    className={INPUT_CLASS}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-700">
-                    Account Number <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="00-0000-0000000-00"
-                    value={form.bankAccountNumber}
-                    onChange={(e) => set("bankAccountNumber", e.target.value)}
-                    className={INPUT_CLASS}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Branch / Reference</label>
-                  <input
-                    type="text"
-                    placeholder="Optional"
-                    value={form.bankBranch}
-                    onChange={(e) => set("bankBranch", e.target.value)}
-                    className={INPUT_CLASS}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
           {/* Legal notice */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
             <div className="flex items-start gap-2">
@@ -371,7 +287,11 @@ export default function MerchantOnboarding() {
           </div>
           <Button
             className="w-full mt-2 bg-blue-600 hover:bg-blue-700"
-            onClick={() => setLocation("/dashboard")}
+            onClick={() => {
+              // AuthProvider caches /api/auth/me for the app lifetime. Reload so
+              // it sees onboardingCompleted=true and can start Dashboard's tour.
+              window.location.href = "/dashboard";
+            }}
           >
             Go to Dashboard
           </Button>

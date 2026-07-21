@@ -290,7 +290,7 @@ export default function TenantProfile() {
       </div>
 
       {/* Activity Timeline — header bounces in after hero settles */}
-      <div className="pt-bounce" style={{ '--pt-d': '170ms', display: 'flex', alignItems: 'center', padding: '24px 20px 4px' } as any}>
+      <div data-tutorial-id="tenant-activity" className="pt-bounce" style={{ '--pt-d': '170ms', display: 'flex', alignItems: 'center', padding: '24px 20px 4px' } as any}>
         <div style={{ fontWeight: 600, fontSize: 12, color: C.navy, letterSpacing: '0.12em', textTransform: 'uppercase' }}>activity timeline</div>
       </div>
 

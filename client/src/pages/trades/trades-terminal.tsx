@@ -6,6 +6,7 @@ import { formatNzd, tradesFeeCents } from "@/lib/trades-money";
 import { computeQuoteTotals } from "@shared/trades-gst";
 import { TRADES_THEME } from "@/lib/trades-theme";
 import ClientProfile from "./client-profile";
+import { notifyIfBillingCardRequired } from "@/lib/queryClient";
 
 /* ═══ TOKENS (trades palette via TRADES_THEME — see trades-theme.ts) ═══ */
 const NAVY  = TRADES_THEME.INK;    // charcoal base (was property NAVY)
@@ -707,7 +708,10 @@ export function QuoteScreen({ onCancel, onExit }: { onCancel: () => void; onExit
         notes: notes.trim() || undefined,
       };
       const response = await fetch('/api/trades/quotes', { method: 'POST', headers: { 'Content-Type': 'application/json', ...tradesHeaders() }, body: JSON.stringify(body) });
-      if (!response.ok) throw new Error(await response.json().then((d: any) => d.message).catch(() => 'Could not create quote'));
+      if (!response.ok) {
+        notifyIfBillingCardRequired(response);
+        throw new Error(await response.json().then((d: any) => d.message).catch(() => 'Could not create quote'));
+      }
       return response.json();
     },
     onSuccess: quote => { queryClient.invalidateQueries({ queryKey: ['/api/trades/quotes'] }); setCreated(quote); },
@@ -925,6 +929,7 @@ export default function TradesTerminal() {
         }),
       });
       if (!r.ok) {
+        notifyIfBillingCardRequired(r);
         const msg = await r.json().then((d: any) => d.message).catch(() => 'Failed to send invoice');
         throw new Error(msg);
       }

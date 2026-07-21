@@ -121,3 +121,7 @@ The application adopts a monorepo structure, separating client, server, and shar
 -   Payment Request API implementation for cross-browser compatibility
 -   Built-in "tap to phone" NFC payment API with support for Apple Pay, Google Pay, Samsung Pay, and contactless cards
 -   Feature detection and graceful fallback for unsupported devices
+
+## Current Implementation Handoff — 2026-07-20
+
+Before committing or pushing the current merchant onboarding, billing-card prerequisite, crypto-payment removal, or tutorial work, read docs/HANDOFF-2026-07-20-onboarding-billing-tutorial.md and .agents/memory/merchant-onboarding-billing-tutorial-2026-07-20.md. The work is implemented but deliberately uncommitted. Do not stage .claude-home/** or .claude/settings.local.json, and review the client/public/app generated-asset rollover as one unit.

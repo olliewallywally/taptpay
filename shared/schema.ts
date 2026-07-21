@@ -37,6 +37,9 @@ export const merchants = pgTable("merchants", {
   contactEmail: text("contact_email"),
   contactPhone: text("contact_phone"),
   businessAddress: text("business_address"),
+  businessDescription: text("business_description"),
+  websiteUrl: text("website_url"),
+  estimatedAnnualTurnover: text("estimated_annual_turnover"),
   
   // Bank account details
   bankName: text("bank_name"),
@@ -57,14 +60,6 @@ export const merchants = pgTable("merchants", {
   // Theme customization
   themeId: text("theme_id").default("classic"),
   
-  // Crypto payment settings
-  coinbaseCommerceApiKey: text("coinbase_commerce_api_key"),
-  coinbaseWebhookSecret: text("coinbase_webhook_secret"),
-  cryptoEnabled: boolean("crypto_enabled").default(false),
-  enabledCryptocurrencies: text("enabled_cryptocurrencies").array(),
-  autoConvertToFiat: boolean("auto_convert_to_fiat").default(false),
-  minConfirmations: integer("min_confirmations").default(1),
-  
   // Email verification
   emailVerified: boolean("email_verified").default(false),
 
@@ -79,6 +74,12 @@ export const merchants = pgTable("merchants", {
 
   // Dashboard preferences
   dailyGoal: decimal("daily_goal", { precision: 10, scale: 2 }).default("500.00"), // Daily revenue goal in dollars
+
+  // Page-by-page merchant tutorial. A generation is incremented whenever the
+  // merchant restarts the walkthroughs so stale browser tabs cannot overwrite
+  // the new run.
+  tutorialGeneration: integer("tutorial_generation").notNull().default(1),
+  tutorialAutoEnabled: boolean("tutorial_auto_enabled").notNull().default(true),
   
   // Billing card (stored masked — Windcave will handle live processing when ready)
   billingCardLast4: text("billing_card_last4"),
@@ -101,6 +102,22 @@ export const merchants = pgTable("merchants", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+export const merchantTutorialProgress = pgTable("merchant_tutorial_progress", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  merchantId: integer("merchant_id").references(() => merchants.id, { onDelete: "cascade" }).notNull(),
+  generation: integer("generation").notNull(),
+  pageKey: text("page_key").notNull(),
+  status: text("status").notNull(), // started, completed, dismissed
+  lastStep: integer("last_step").notNull().default(0),
+  startedAt: timestamp("started_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+  dismissedAt: timestamp("dismissed_at"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+  merchantGenerationPageUnique: uniqueIndex("merchant_tutorial_progress_run_page_idx").on(t.merchantId, t.generation, t.pageKey),
+  merchantGenerationIdx: index("merchant_tutorial_progress_merchant_generation_idx").on(t.merchantId, t.generation),
+}));
 
 export const transactions = pgTable("transactions", {
   id: serial("id").primaryKey(),
@@ -146,40 +163,6 @@ export const transactions = pgTable("transactions", {
   merchantIdIdx: index("transactions_merchant_id_idx").on(t.merchantId),
   taptStoneIdIdx: index("transactions_tapt_stone_id_idx").on(t.taptStoneId),
 }));
-
-// Crypto transactions table for cryptocurrency payments
-export const cryptoTransactions = pgTable("crypto_transactions", {
-  id: serial("id").primaryKey(),
-  transactionId: integer("transaction_id").references(() => transactions.id),
-  merchantId: integer("merchant_id").references(() => merchants.id),
-  
-  // Crypto payment details
-  cryptocurrency: text("cryptocurrency").notNull(), // BTC, ETH, USDC, etc.
-  walletAddress: text("wallet_address").notNull(), // Generated unique address for this payment
-  cryptoAmount: text("crypto_amount").notNull(), // Amount in crypto (stored as string for precision)
-  fiatAmount: decimal("fiat_amount", { precision: 10, scale: 2 }).notNull(), // Original amount in fiat
-  exchangeRate: decimal("exchange_rate", { precision: 18, scale: 8 }).notNull(), // Crypto to fiat rate at time of payment
-  
-  // Coinbase Commerce details
-  coinbaseChargeId: text("coinbase_charge_id").unique(), // Coinbase Commerce charge ID
-  coinbaseChargeCode: text("coinbase_charge_code"), // Short code for the charge
-  hostedUrl: text("hosted_url"), // Coinbase hosted payment page URL
-  
-  // Blockchain tracking
-  blockchainTxHash: text("blockchain_tx_hash"), // Transaction hash on blockchain
-  confirmations: integer("confirmations").default(0), // Number of blockchain confirmations
-  requiredConfirmations: integer("required_confirmations").default(1), // Required confirmations for completion
-  
-  // Network fees
-  networkFeeAmount: text("network_fee_amount"), // Gas/network fees (in crypto)
-  networkFeeFiat: decimal("network_fee_fiat", { precision: 10, scale: 2 }), // Network fees in fiat
-  
-  // Status and timing
-  status: text("status").notNull().default("pending"), // pending, confirming, confirmed, completed, failed, expired
-  expiresAt: timestamp("expires_at"), // When the payment request expires
-  completedAt: timestamp("completed_at"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
 
 // Split payments table to track individual payments for split bills
 export const splitPayments = pgTable("split_payments", {
@@ -268,7 +251,7 @@ export const createSplitPaymentSchema = z.object({
     const num = parseFloat(val);
     return !isNaN(num) && num > 0;
   }, "Amount must be a positive number"),
-  paymentMethod: z.enum(["qr_code", "nfc_tap", "card_reader", "manual", "cash", "tap_to_pay", "crypto", "api"]).default("qr_code"),
+  paymentMethod: z.enum(["qr_code", "nfc_tap", "card_reader", "manual", "cash", "tap_to_pay", "api"]).default("qr_code"),
 });
 
 // Bill split creation schema
@@ -296,6 +279,16 @@ export const createRefundSchema = z.object({
 export const publicSignupSchema = z.object({
   name: z.string().min(1, "Full name is required").max(100),
   email: z.string().email("Valid email is required"),
+  phone: z.string().min(1, "Phone number is required").max(20),
+  businessName: z.string().min(1, "Business name is required").max(100),
+  businessType: z.enum(["sole-trader", "limited-company", "partnership", "trust", "charity", "other"]),
+  businessAddress: z.string().min(1, "Business address is required").max(200),
+  nzbn: z.string().max(20).default(""),
+  gstNumber: z.string().max(20).default(""),
+  director: z.string().min(1, "Director / owner name is required").max(100),
+  businessDescription: z.string().min(1, "Business description is required").max(500),
+  websiteUrl: z.union([z.string().url("Enter a valid website URL"), z.literal("")]).default(""),
+  estimatedAnnualTurnover: z.enum(["Under $50k", "$50k–$150k", "$150k–$500k", "$500k–$1m", "Over $1m"]),
   password: z.string()
     .min(8, "Password must be at least 8 characters")
     .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
@@ -365,27 +358,12 @@ export const updateMerchantDetailsSchema = z.object({
   businessAddress: z.string().min(1, "Business address is required").max(200),
 });
 
-export const updateBankAccountSchema = z.object({
-  bankName: z.string().min(1, "Bank name is required").max(50),
-  bankAccountNumber: z.string().regex(/^\d{2}-\d{4}-\d{7}-\d{2,3}$/, "Must be valid NZ account format (12-3456-1234567-12)"),
-  bankBranch: z.string().min(1, "Bank branch is required").max(50),
-  accountHolderName: z.string().min(1, "Account holder name is required").max(100),
-});
-
 export const updateThemeSchema = z.object({
   themeId: z.string().min(1, "Theme selection is required"),
 });
 
 export const updateDailyGoalSchema = z.object({
   dailyGoal: z.string().regex(/^\d+(\.\d{1,2})?$/, "Daily goal must be a valid amount"),
-});
-
-export const updateCryptoSettingsSchema = z.object({
-  coinbaseCommerceApiKey: z.string().optional(),
-  coinbaseWebhookSecret: z.string().optional(),
-  cryptoEnabled: z.boolean(),
-  enabledCryptocurrencies: z.array(z.string()).optional(),
-  minConfirmations: z.number().min(1).max(6).default(1),
 });
 
 export const changePasswordSchema = z.object({
@@ -408,7 +386,7 @@ export const insertTransactionSchema = createInsertSchema(transactions).omit({
   merchantId: z.number(),
   price: z.string().regex(/^\d+(\.\d{2})?$/, "Price must be a valid decimal"),
   status: z.enum(["pending", "processing", "completed", "failed"]).default("pending"),
-  paymentMethod: z.enum(["qr_code", "nfc_tap", "card_reader", "manual", "cash", "tap_to_pay", "crypto", "api"]).default("qr_code"),
+  paymentMethod: z.enum(["qr_code", "nfc_tap", "card_reader", "manual", "cash", "tap_to_pay", "api"]).default("qr_code"),
   selectedStoneId: z.number().optional(),
   splitEnabled: z.boolean().optional().default(false),
 });
@@ -680,28 +658,6 @@ export const insertUserSchema = createInsertSchema(users).omit({
   resetTokenExpiry: true,
 });
 
-// Crypto transaction schemas
-export const insertCryptoTransactionSchema = createInsertSchema(cryptoTransactions).omit({
-  id: true,
-  createdAt: true,
-  completedAt: true,
-});
-
-export const createCryptoTransactionSchema = z.object({
-  itemName: z.string().min(1, "Item name is required"),
-  fiatAmount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid amount format"),
-  cryptocurrency: z.enum(["BTC", "ETH", "USDC", "USDT", "LTC", "BCH"]).default("BTC"),
-});
-
-// Merchant settings schemas
-export const updateMerchantCryptoSettingsSchema = z.object({
-  coinbaseCommerceApiKey: z.string().min(1, "API key is required"),
-  cryptoEnabled: z.boolean().default(true),
-  enabledCryptocurrencies: z.array(z.string()).min(1, "Select at least one cryptocurrency"),
-  autoConvertToFiat: z.boolean().default(false),
-  minConfirmations: z.number().min(1).max(6).default(1),
-});
-
 // Subscription schemas
 export const insertMerchantSubscriptionSchema = createInsertSchema(merchantSubscriptions).omit({
   id: true,
@@ -726,6 +682,7 @@ export const insertBillingHistorySchema = createInsertSchema(subscriptionBilling
 
 // Type exports - consolidated to avoid duplicates
 export type Merchant = typeof merchants.$inferSelect;
+export type MerchantTutorialProgress = typeof merchantTutorialProgress.$inferSelect;
 export type InsertMerchant = z.infer<typeof createMerchantSchema>;
 export type CreateMerchant = z.infer<typeof createMerchantSchema>;
 export type VerifyMerchant = z.infer<typeof verifyMerchantSchema>;
@@ -751,11 +708,6 @@ export type CreateTaptStone = z.infer<typeof createTaptStoneSchema>;
 export type StockItem = typeof stockItems.$inferSelect;
 export type InsertStockItem = z.infer<typeof insertStockItemSchema>;
 export type CreateStockItem = z.infer<typeof createStockItemSchema>;
-
-// Crypto Transaction types
-export type CryptoTransaction = typeof cryptoTransactions.$inferSelect;
-export type InsertCryptoTransaction = z.infer<typeof insertCryptoTransactionSchema>;
-export type CreateCryptoTransaction = z.infer<typeof createCryptoTransactionSchema>;
 
 // Subscription types
 export type MerchantSubscription = typeof merchantSubscriptions.$inferSelect;

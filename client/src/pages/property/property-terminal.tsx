@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { propFetch } from "@/lib/property-api";
 import { usePropertyTenants, usePropertyInvoices } from "@/lib/property-data";
 import { WireframeLiquidButton } from "@/components/wireframe-liquid-button";
+import { notifyIfBillingCardRequired } from "@/lib/queryClient";
 
 /* ═══ TOKENS ═══ */
 const NAVY = '#040D6D';
@@ -1205,7 +1206,11 @@ export default function PropertyTerminal() {
         method: 'POST', headers: { 'Content-Type': 'application/json', ...propHeaders() },
         body: JSON.stringify({ tenantProfileId: tenantId, amountCents, deliveryChannel: channel, dueAt: due.toISOString(), splitEnabled: !!split }),
       });
-      if (!r.ok) throw new Error('Failed to send');
+      if (!r.ok) {
+        notifyIfBillingCardRequired(r);
+        const message = await r.json().then((data: any) => data.message).catch(() => 'Failed to send');
+        throw new Error(message);
+      }
       const invoice = await r.json();
       // 2. If recurring, set up the automation starting one interval from now
       if (freq && freq !== 'once') {
@@ -1214,7 +1219,10 @@ export default function PropertyTerminal() {
           method: 'POST', headers: { 'Content-Type': 'application/json', ...propHeaders() },
           body: JSON.stringify({ amountCents, frequency: freq, deliveryChannel: channel, startDate: startDate.toISOString() }),
         });
-        if (!sr.ok) throw new Error('Sent, but failed to set up automation');
+        if (!sr.ok) {
+          notifyIfBillingCardRequired(sr);
+          throw new Error('Sent, but failed to set up automation');
+        }
       }
       return invoice;
     },
@@ -1243,6 +1251,7 @@ export default function PropertyTerminal() {
         }),
       });
       if (!r.ok) {
+        notifyIfBillingCardRequired(r);
         const msg = await r.json().then((d: any) => d.message).catch(() => 'Failed to send bill');
         throw new Error(msg);
       }
