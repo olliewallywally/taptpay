@@ -1,0 +1,1 @@
+function t(){var a;return((a=window.Capacitor)==null?void 0:a.isNativePlatform())===!0}function i(){var a;return t()&&((a=window.Capacitor)==null?void 0:a.getPlatform())==="ios"}function o(){var a;return i()&&typeof((a=window.TaptPay)==null?void 0:a.startTapToPay)=="function"}export{t as a,o as c,i};
