@@ -125,8 +125,8 @@ export const TUTORIAL_REGISTRY: Record<TutorialPageKey, TutorialPageDefinition> 
   "trades-dashboard": {
     label: "Trades dashboard",
     steps: [
-      { target: ".td-card", fallbackTarget: "main", tag: "Jobs overview", title: "See revenue and active work", body: "The dashboard combines collection performance, clients and outstanding job activity." },
-      { target: ".td-tap", fallbackTarget: "button", tag: "Shortcuts", title: "Jump into the next job", body: "Use the action cards to create invoices, quotes and client work more quickly." },
+      { target: '[data-tutorial-id="trades-home-health"]', fallbackTarget: ".td-card", tag: "Jobs overview", title: "See revenue and active work", body: "The dashboard combines collection performance, clients and outstanding job activity." },
+      { target: '[data-tutorial-id="trades-home-actions"]', fallbackTarget: ".td-tap", tag: "Shortcuts", title: "Jump into the next job", body: "Use the action cards to create invoices, quotes and client work more quickly." },
     ],
   },
   "trades-clients": {
