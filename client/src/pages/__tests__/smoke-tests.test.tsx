@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Router } from 'wouter';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { NotificationProvider } from '@/components/notification-system';
+import { TutorialProvider } from '@/features/tutorial/tutorial';
 
 // Type definitions for Jest globals
 declare const jest: any;
@@ -98,11 +99,13 @@ const TestWrapper = ({ children }: { children: React.ReactNode }) => {
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
-        <NotificationProvider>
-          <TooltipProvider>
-            {children}
-          </TooltipProvider>
-        </NotificationProvider>
+        <TutorialProvider enabled={false}>
+          <NotificationProvider>
+            <TooltipProvider>
+              {children}
+            </TooltipProvider>
+          </NotificationProvider>
+        </TutorialProvider>
       </Router>
     </QueryClientProvider>
   );

@@ -10,6 +10,7 @@ import { NotificationProvider } from "@/components/notification-system";
 import { PageTransition } from "@/components/page-transition";
 import { BottomNavigation } from "@/components/bottom-navigation";
 import { TutorialPageBoundary, TutorialProvider } from "@/features/tutorial/tutorial";
+import { useDeviceClass, type DeviceClass } from "@/hooks/use-device-class";
 import type { TutorialPageKey } from "@shared/tutorial";
 
 import { LandingPage } from "@/pages/landing-page";
@@ -57,13 +58,32 @@ const TradesTerminal        = lazy(() => import("@/pages/trades/trades-terminal"
 const TradesQuoteBuilder    = lazy(() => import("@/pages/trades/quote-builder"));
 const TradesRecurring       = lazy(() => import("@/pages/trades/recurring-schedules"));
 
+// Tablet/desktop pages live in their own lazy chunks. Keep these as direct
+// imports (rather than an eager barrel) so phones never download the second UI.
+const DesktopRetailHome       = lazy(() => import("@/desktop/pages/retail-home"));
+const DesktopRetailStock      = lazy(() => import("@/desktop/pages/retail-stock"));
+const DesktopRetailTerminal   = lazy(() => import("@/desktop/pages/retail-terminal"));
+const DesktopRetailAnalytics  = lazy(() => import("@/desktop/pages/retail-analytics"));
+const DesktopRetailSettings   = lazy(() => import("@/desktop/pages/retail-settings"));
+const DesktopPropertyHome      = lazy(() => import("@/desktop/pages/property-home"));
+const DesktopPropertyClients   = lazy(() => import("@/desktop/pages/property-clients"));
+const DesktopPropertyTerminal  = lazy(() => import("@/desktop/pages/property-terminal"));
+const DesktopPropertyAnalytics = lazy(() => import("@/desktop/pages/property-analytics"));
+const DesktopPropertySettings  = lazy(() => import("@/desktop/pages/property-settings"));
+const DesktopTradesHome         = lazy(() => import("@/desktop/pages/trades-home"));
+const DesktopTradesClients      = lazy(() => import("@/desktop/pages/trades-clients"));
+const DesktopTradesTerminal     = lazy(() => import("@/desktop/pages/trades-terminal"));
+const DesktopTradesAnalytics    = lazy(() => import("@/desktop/pages/trades-analytics"));
+const DesktopTradesSettings     = lazy(() => import("@/desktop/pages/trades-settings"));
+const DesktopLegacyPage         = lazy(() => import("@/desktop/DesktopLegacyPage"));
+
 /* Route chunks a signed-in merchant navigates between. Warmed one at a time
    during browser idle after first paint, so by the time they tap the dock the
    chunk is already cached and Suspense never shows the full-screen loader —
    the framer-motion page transition runs back-to-back instead. Vite dedupes
    these import() calls with the lazy() ones above (same module = same chunk).
    Ordered by likelihood of being the next tap. */
-const PRELOAD_ROUTES: Array<() => Promise<unknown>> = [
+const MOBILE_PRELOAD_ROUTES: Array<() => Promise<unknown>> = [
   () => import("@/pages/dashboard"),
   () => import("@/pages/merchant-terminal-mobile-v2"),
   () => import("@/pages/transactions"),
@@ -85,11 +105,31 @@ const PRELOAD_ROUTES: Array<() => Promise<unknown>> = [
   () => import("@/pages/nfc-payment"),
 ];
 
+const DESKTOP_PRELOAD_ROUTES: Array<() => Promise<unknown>> = [
+  () => import("@/desktop/pages/retail-home"),
+  () => import("@/desktop/pages/retail-stock"),
+  () => import("@/desktop/pages/retail-terminal"),
+  () => import("@/desktop/pages/retail-analytics"),
+  () => import("@/desktop/pages/retail-settings"),
+  () => import("@/desktop/pages/property-home"),
+  () => import("@/desktop/pages/property-clients"),
+  () => import("@/desktop/pages/property-terminal"),
+  () => import("@/desktop/pages/property-analytics"),
+  () => import("@/desktop/pages/property-settings"),
+  () => import("@/desktop/pages/trades-home"),
+  () => import("@/desktop/pages/trades-clients"),
+  () => import("@/desktop/pages/trades-terminal"),
+  () => import("@/desktop/pages/trades-analytics"),
+  () => import("@/desktop/pages/trades-settings"),
+  () => import("@/desktop/DesktopLegacyPage"),
+];
+
 /* Sequential (not Promise.all) so warming never competes with the page's own
    data fetches for bandwidth; each chunk waits for the next idle slice. */
-function useRoutePreload(enabled: boolean) {
+function useRoutePreload(enabled: boolean, deviceClass: DeviceClass) {
   useEffect(() => {
     if (!enabled) return;
+    const routes = deviceClass === "mobile" ? MOBILE_PRELOAD_ROUTES : DESKTOP_PRELOAD_ROUTES;
     let stopped = false;
     let i = 0;
     const idle = (cb: () => void) =>
@@ -97,15 +137,15 @@ function useRoutePreload(enabled: boolean) {
         ? (window as any).requestIdleCallback(cb, { timeout: 2000 })
         : setTimeout(cb, 250);
     const next = () => {
-      if (stopped || i >= PRELOAD_ROUTES.length) return;
-      PRELOAD_ROUTES[i++]()
+      if (stopped || i >= routes.length) return;
+      routes[i++]()
         .catch(() => {}) // offline / chunk 404 — the lazy() route will surface it if actually visited
         .finally(() => idle(next));
     };
     // Head start for first paint + the auth check before saturating the pipe.
     const t = setTimeout(() => idle(next), 1000);
     return () => { stopped = true; clearTimeout(t); };
-  }, [enabled]);
+  }, [deviceClass, enabled]);
 }
 
 function PageLoader() {
@@ -269,8 +309,26 @@ function isPwaStandalone() {
   );
 }
 
-function Router() {
+type MerchantMode = "retail" | "property" | "trades";
+
+const RETAIL_MODE_PATHS = new Set(["/dashboard", "/stock", "/terminal", "/transactions"]);
+
+function merchantModeForLocation(location: string): MerchantMode {
+  if (location.startsWith("/property")) return "property";
+  if (location.startsWith("/trades")) return "trades";
+  if (RETAIL_MODE_PATHS.has(location)) return "retail";
+  try {
+    const stored = localStorage.getItem("taptMode");
+    if (stored === "property" || stored === "trades" || stored === "retail") return stored;
+  } catch {
+    // Storage can be unavailable in privacy-restricted browser contexts.
+  }
+  return "retail";
+}
+
+function Router({ deviceClass }: { deviceClass: DeviceClass }) {
   const [location] = useLocation();
+  const merchantMode = merchantModeForLocation(location);
 
   if (location === "/") {
     return (
@@ -301,70 +359,113 @@ function Router() {
           <Route path="/forgot-password" component={ForgotPassword} />
           <Route path="/reset-password" component={ResetPassword} />
           <Route path="/terminal">
-            <ProtectedRoute tutorialPage="retail-terminal"><MerchantTerminalMobile /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="retail-terminal">
+              {deviceClass === "mobile" ? <MerchantTerminalMobile /> : <DesktopRetailTerminal deviceClass={deviceClass} />}
+            </ProtectedRoute>
           </Route>
           <Route path="/stack">
-            <ProtectedRoute tutorialPage="retail-payment-stack"><PaymentStack /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="retail-payment-stack">
+              {deviceClass === "mobile" ? <PaymentStack /> : <DesktopRetailTerminal deviceClass={deviceClass} />}
+            </ProtectedRoute>
           </Route>
           <Route path="/dashboard">
-            <ProtectedRoute tutorialPage="retail-dashboard"><Dashboard /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="retail-dashboard">
+              {deviceClass === "mobile" ? <Dashboard /> : <DesktopRetailHome deviceClass={deviceClass} />}
+            </ProtectedRoute>
           </Route>
           <Route path="/settings">
-            <ProtectedRoute tutorialPage="settings"><Settings /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="settings">
+              {deviceClass === "mobile" ? <Settings />
+                : merchantMode === "property" ? <DesktopPropertySettings deviceClass={deviceClass} />
+                : merchantMode === "trades" ? <DesktopTradesSettings deviceClass={deviceClass} />
+                : <DesktopRetailSettings deviceClass={deviceClass} />}
+            </ProtectedRoute>
           </Route>
           <Route path="/transactions">
-            <ProtectedRoute tutorialPage="retail-transactions"><Transactions /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="retail-transactions">
+              {deviceClass === "mobile" ? <Transactions /> : <DesktopRetailAnalytics deviceClass={deviceClass} />}
+            </ProtectedRoute>
           </Route>
           <Route path="/stock">
-            <ProtectedRoute tutorialPage="retail-stock"><StockManagement /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="retail-stock">
+              {deviceClass === "mobile" ? <StockManagement /> : <DesktopRetailStock deviceClass={deviceClass} />}
+            </ProtectedRoute>
           </Route>
           <Route path="/nfc">
-            <ProtectedRoute tutorialPage="retail-nfc"><NFCPayment /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="retail-nfc">
+              {deviceClass === "mobile" ? <NFCPayment /> : <DesktopLegacyPage deviceClass={deviceClass} vertical="retail" page="terminal"><NFCPayment /></DesktopLegacyPage>}
+            </ProtectedRoute>
           </Route>
           <Route path="/board-builder">
-            <ProtectedRoute tutorialPage="payment-board-builder"><BoardBuilder /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="payment-board-builder">
+              {deviceClass === "mobile" ? <BoardBuilder /> : <DesktopLegacyPage deviceClass={deviceClass} vertical="retail" page="settings"><BoardBuilder /></DesktopLegacyPage>}
+            </ProtectedRoute>
           </Route>
           <Route path="/smart-terminal" component={SmartTerminal} />
           {/* ── Property management section ── */}
           <Route path="/property">
-            <ProtectedRoute tutorialPage="property-dashboard"><PropertyDashboard /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="property-dashboard">
+              {deviceClass === "mobile" ? <PropertyDashboard /> : <DesktopPropertyHome deviceClass={deviceClass} />}
+            </ProtectedRoute>
           </Route>
           <Route path="/property/tenants">
-            <ProtectedRoute tutorialPage="property-tenants"><TenantDirectory /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="property-tenants">
+              {deviceClass === "mobile" ? <TenantDirectory /> : <DesktopPropertyClients deviceClass={deviceClass} />}
+            </ProtectedRoute>
           </Route>
           <Route path="/property/tenants/:id">
-            <ProtectedRoute tutorialPage="property-tenant-profile"><TenantProfile /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="property-tenant-profile">
+              {deviceClass === "mobile" ? <TenantProfile /> : <DesktopLegacyPage deviceClass={deviceClass} vertical="property" page="directory"><TenantProfile /></DesktopLegacyPage>}
+            </ProtectedRoute>
           </Route>
           <Route path="/property/analytics">
-            <ProtectedRoute tutorialPage="property-analytics"><PropertyAnalytics /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="property-analytics">
+              {deviceClass === "mobile" ? <PropertyAnalytics /> : <DesktopPropertyAnalytics deviceClass={deviceClass} />}
+            </ProtectedRoute>
           </Route>
           <Route path="/property/terminal">
-            <ProtectedRoute tutorialPage="property-terminal"><PropertyTerminal /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="property-terminal">
+              {deviceClass === "mobile" ? <PropertyTerminal /> : <DesktopPropertyTerminal deviceClass={deviceClass} />}
+            </ProtectedRoute>
           </Route>
           {/* ── Trades section ── */}
           <Route path="/trades">
-            <ProtectedRoute tutorialPage="trades-dashboard"><TradesDashboard /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="trades-dashboard">
+              {deviceClass === "mobile" ? <TradesDashboard /> : <DesktopTradesHome deviceClass={deviceClass} />}
+            </ProtectedRoute>
           </Route>
           <Route path="/trades/clients">
-            <ProtectedRoute tutorialPage="trades-clients"><TradesClientDirectory /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="trades-clients">
+              {deviceClass === "mobile" ? <TradesClientDirectory /> : <DesktopTradesClients deviceClass={deviceClass} />}
+            </ProtectedRoute>
           </Route>
           <Route path="/trades/clients/:id">
-            <ProtectedRoute tutorialPage="trades-client-profile"><TradesClientProfile /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="trades-client-profile">
+              {deviceClass === "mobile" ? <TradesClientProfile /> : <DesktopLegacyPage deviceClass={deviceClass} vertical="trades" page="directory"><TradesClientProfile /></DesktopLegacyPage>}
+            </ProtectedRoute>
           </Route>
           <Route path="/trades/analytics">
-            <ProtectedRoute tutorialPage="trades-analytics"><TradesAnalytics /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="trades-analytics">
+              {deviceClass === "mobile" ? <TradesAnalytics /> : <DesktopTradesAnalytics deviceClass={deviceClass} />}
+            </ProtectedRoute>
           </Route>
           <Route path="/trades/terminal">
-            <ProtectedRoute tutorialPage="trades-terminal"><TradesTerminal /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="trades-terminal">
+              {deviceClass === "mobile" ? <TradesTerminal /> : <DesktopTradesTerminal deviceClass={deviceClass} />}
+            </ProtectedRoute>
           </Route>
           <Route path="/trades/quote">
-            <ProtectedRoute tutorialPage="trades-quote"><TradesQuoteBuilder /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="trades-quote">
+              {deviceClass === "mobile" ? <TradesQuoteBuilder /> : <DesktopLegacyPage deviceClass={deviceClass} vertical="trades" page="terminal"><TradesQuoteBuilder /></DesktopLegacyPage>}
+            </ProtectedRoute>
           </Route>
           {/* Customer-facing quote acceptance → deposit/full payment, all on the
               branded Checkout card (quoteMode drives the animated 3-step flow). */}
           <Route path="/trades/quote/:token">{() => <Checkout quoteMode />}</Route>
           <Route path="/trades/recurring">
-            <ProtectedRoute tutorialPage="trades-recurring"><TradesRecurring /></ProtectedRoute>
+            <ProtectedRoute tutorialPage="trades-recurring">
+              {deviceClass === "mobile" ? <TradesRecurring /> : <DesktopLegacyPage deviceClass={deviceClass} vertical="trades" page="home"><TradesRecurring /></DesktopLegacyPage>}
+            </ProtectedRoute>
           </Route>
           {/* Public rent/charge checkout — no auth required. Uses the shared
               branded Checkout page (same UI as retail) via the invoice token. */}
@@ -397,12 +498,13 @@ function AppRoutes() {
   // Only warm app chunks for signed-in merchants — marketing visitors on the
   // landing page shouldn't download the entire app in the background.
   const { auth } = useContext(AuthContext);
-  useRoutePreload(auth?.isAuthenticated === true);
+  const deviceClass = useDeviceClass();
+  useRoutePreload(auth?.isAuthenticated === true, deviceClass);
   const tutorialEnabled = auth?.isAuthenticated === true && auth.role !== "admin" && !!auth.merchantId && auth.onboardingCompleted === true;
   return (
     <TutorialProvider enabled={tutorialEnabled}>
-      <Router />
-      <BottomNavigation />
+      <Router deviceClass={deviceClass} />
+      {deviceClass === "mobile" && <BottomNavigation />}
     </TutorialProvider>
   );
 }
