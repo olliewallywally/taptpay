@@ -11,6 +11,7 @@ import {
   type Timeframe,
 } from "@/lib/property-dashboard-data";
 import { dollarsToCents, fmtNZD } from "@/lib/report-utils";
+import { readDesktopPrefs } from "../data/desktop-prefs";
 import { ReportModal } from "@/components/reports/ReportModal";
 import { RETAIL_REPORT_OPTIONS } from "@/lib/report-pdf/reports/retail-options";
 import {
@@ -119,7 +120,10 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
   const [report, setReport] = useState<RetailReportId | null>(null);
   const [pendReport, setPendReport] = useState<RetailReportId>("sellers");
   const [sheetMode, setSheetMode] = useState<SheetMode>("history");
-  const [sheetOpen, setSheetOpen] = useState(false);
+  /* "Payment history opens" preference, set in Settings → Dashboard Preferences. */
+  const [sheetOpen, setSheetOpen] = useState(
+    () => readDesktopPrefs(merchantId).historyStart === "expanded",
+  );
   const [dragging, setDragging] = useState(false);
   const [dragY, setDragY] = useState(CLOSED);
   const [fPeriod, setFPeriod] = useState<PeriodChip>("This week");

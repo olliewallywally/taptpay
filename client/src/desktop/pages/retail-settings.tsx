@@ -1,10 +1,7 @@
-import {
-  DesktopPageScaffold,
-  type DesktopRoutePageProps,
-} from "../DesktopPageScaffold";
+import { DesktopSettingsPage } from "../DesktopSettingsPage";
+import type { DesktopRoutePageProps } from "../DesktopPageScaffold";
 
+/* Design screen 4e — the shared settings page in its retail flavour. */
 export default function DesktopRetailSettings(props: DesktopRoutePageProps) {
-  return (
-    <DesktopPageScaffold {...props} vertical="retail" page="settings" />
-  );
+  return <DesktopSettingsPage {...props} vertical="retail" />;
 }
