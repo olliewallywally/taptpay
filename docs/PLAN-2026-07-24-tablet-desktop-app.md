@@ -1,7 +1,10 @@
 # Plan — Tablet/Desktop merchant app (3 verticals × 5 pages)
 
 Date: 2026-07-24
-Status: PLAN ONLY — nothing implemented yet.
+Status: **IN PROGRESS on `feat/tablet-desktop-app`** — this file is still the
+authoritative spec, but it is no longer a description of the current state.
+**For what is actually built, the conventions in use, and what to do next, read
+`docs/HANDOFF-2026-07-28-tablet-desktop-app.md` first.**
 Audience: any AI/dev picking this up cold. Read this whole file before writing code.
 Also read first: `CLAUDE.md`, `docs/HANDOFF-2026-07-20-onboarding-billing-tutorial.md`, `replit.md`.
 
