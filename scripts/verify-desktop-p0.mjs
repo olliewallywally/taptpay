@@ -290,35 +290,22 @@ async function verifyDesktop(browser) {
     assert.equal(metrics.overflow, "hidden", "desktop frame must clip its canvas");
     assert.equal(await hasBottomNavigation(page), false, "desktop must not render BottomNavigation");
 
-    const canvas = page.getByTestId("desktop-scaled-canvas");
-    await canvas.evaluate((element) => {
-      const probe = document.createElement("button");
-      probe.type = "button";
-      probe.setAttribute("aria-label", "new sale");
-      probe.setAttribute("data-p0-tutorial-probe", "true");
-      Object.assign(probe.style, {
-        position: "absolute",
-        left: "320px",
-        top: "240px",
-        width: "160px",
-        height: "80px",
-        zIndex: "50",
-      });
-      element.appendChild(probe);
-    });
-
+    // The retail home quick action is the real anchor for the first tutorial
+    // step (`[aria-label="new sale"]` in tutorial-registry.ts), so the spotlight
+    // is measured against production markup inside the scaled canvas.
     tutorialGate.resolve();
     await page.locator(".tutorial-highlight").waitFor({ state: "visible" });
 
     const geometry = await page.evaluate(() => {
-      const target = document.querySelector('[data-p0-tutorial-probe="true"]');
+      const target = document.querySelector('[aria-label="new sale"]');
       const highlight = document.querySelector(".tutorial-highlight");
       const canvasElement = document.querySelector(
         '[data-testid="desktop-scaled-canvas"]',
       );
-      if (!(target instanceof HTMLElement)) throw new Error("Tutorial probe missing");
+      if (!(target instanceof HTMLElement)) throw new Error("Tutorial target missing");
       if (!(highlight instanceof HTMLElement)) throw new Error("Tutorial highlight missing");
       if (!(canvasElement instanceof HTMLElement)) throw new Error("Scaled canvas missing");
+      if (!canvasElement.contains(target)) throw new Error("Tutorial target is outside the scaled canvas");
 
       const targetRect = target.getBoundingClientRect();
       const highlightRect = highlight.getBoundingClientRect();
@@ -331,6 +318,8 @@ async function verifyDesktop(browser) {
           bottom: targetRect.bottom,
           width: targetRect.width,
           height: targetRect.height,
+          layoutWidth: target.offsetWidth,
+          layoutHeight: target.offsetHeight,
         },
         highlight: {
           left: highlightRect.left,
@@ -344,8 +333,17 @@ async function verifyDesktop(browser) {
     });
 
     assert.ok(geometry.scale > 0 && geometry.scale < 1, "desktop canvas must be scaled below 1");
-    assertClose(geometry.target.width, 160 * geometry.scale, "post-transform probe width");
-    assertClose(geometry.target.height, 80 * geometry.scale, "post-transform probe height");
+    assert.ok(geometry.target.layoutWidth > 0, "tutorial target must have layout size");
+    assertClose(
+      geometry.target.width,
+      geometry.target.layoutWidth * geometry.scale,
+      "post-transform target width",
+    );
+    assertClose(
+      geometry.target.height,
+      geometry.target.layoutHeight * geometry.scale,
+      "post-transform target height",
+    );
     assertClose(geometry.highlight.left, geometry.target.left - 9, "spotlight left padding");
     assertClose(geometry.highlight.top, geometry.target.top - 9, "spotlight top padding");
     assertClose(geometry.highlight.right, geometry.target.right + 9, "spotlight right padding");
