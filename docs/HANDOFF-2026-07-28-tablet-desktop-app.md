@@ -1,7 +1,7 @@
 # Handoff — Tablet/Desktop merchant app (branch `feat/tablet-desktop-app`)
 
 Date: 2026-07-28
-Status: **in progress** — retail vertical complete (5/5 screens), property started (1/5).
+Status: **in progress** — retail complete (5/5), property 4/5 (only 2d analytics left).
 Read `docs/PLAN-2026-07-24-tablet-desktop-app.md` first: it is still the authoritative
 spec for scope, device gating, routes and per-screen requirements. This file records
 what has actually been built, the conventions to follow, the traps that have already
@@ -20,9 +20,16 @@ cost time, and what to do next.
 | 4d retail analytics | `/transactions` | `desktop/pages/retail-analytics.tsx` + `desktop/data/retail-reports.ts` | `91865d6` |
 | 4e settings (all verticals) | `/settings` | `desktop/DesktopSettingsPage.tsx` + `desktop/pages/retail-settings.tsx` | `a81c04a` |
 | 2a property home | `/property` | `desktop/pages/property-home.tsx` | `dc8f2b9` |
+| 2b property clients | `/property/tenants` | `desktop/pages/property-clients.tsx` | `10405a0` |
+| 2c property terminal | `/property/terminal` | `desktop/pages/property-terminal.tsx` | `3e3b6c6` |
+| 2e property settings | `/settings` | `desktop/pages/property-settings.tsx` (wrapper) | `79b5dcc` |
 
-Still to build: **2b** clients, **2c** terminal, **2d** analytics, **2e** settings
-(two-line wrapper), then all of P3 trades, P5 tutorial adaptation, P6 polish.
+Still to build: **2d** property analytics, then all of P3 trades, P5 tutorial
+adaptation, P6 polish.
+
+Deliberately left out of finished screens, each worth its own pass rather than a
+cramped port: co-tenants on the add-tenant form (2b), and attach-invoice upload
+plus the split toggle on a bill (2c).
 
 `client/src/desktop/pages/*.tsx` not listed above are still P0 stubs that render an
 empty `DesktopPageScaffold` — that is what an unbuilt screen looks like.
@@ -183,19 +190,19 @@ file `tablet-desktop-open-deviations.md`; the current contents:
 
 ## 7. Next actions, in order
 
-1. **2b clients** — `/property/tenants`, design lines 1947–2000, ref
-   `pages/property/tenant-directory.tsx`. Tenant count hero, search, full list,
-   `+` opens the create-tenant form as a desktop modal (same `createTenantProfileSchema`,
-   same POST). Row → `/property/tenants/:id`, which has **no desktop design**: render
-   the existing mobile `tenant-profile.tsx` in an interim centred column via
-   `DesktopLegacyPage`, and say so in the PR.
-2. **2c terminal** — design lines 2001–2216, ref `pages/property/property-terminal.tsx`
-   (1,833 lines; request/expense compose, frequency, SMS). The riskiest property page.
-3. **2d analytics** — design lines 2217–2493. Mirror 4d's structure; property reports
-   must map onto reports that actually exist (`PropertyReportsButton`), omitting any
-   design tile with no backing rather than mocking it.
-4. **2e settings** — wrap `DesktopSettingsPage` with `vertical="property"`.
-5. Then P3 trades (3a–3e, same pattern), P5 tutorial adaptation (plan §7a), P6 polish.
+1. **2d property analytics** — design lines 2217–2493, ref
+   `pages/property/property-analytics.tsx` + `components/reports/PropertyReportsButton.tsx`.
+   Mirror 4d's structure exactly: `retail-analytics.tsx` is the reference for the
+   curve, the draggable sheet (including the scale divisor) and the tiles→filters→
+   report flow, and `desktop/data/retail-reports.ts` is the shape a
+   `property-reports.ts` should copy. Property reports must map onto reports that
+   actually exist; omit any design tile with no backing rather than mocking it, and
+   list the omissions in the commit.
+2. Then P3 trades (3a–3e, same pattern — trades state atoms are `tr*`; the trades
+   data layer mirrors property's), P5 tutorial adaptation (plan §7a), P6 polish.
+
+When trades home (3a) lands, decide the shared-home-components extraction: it will
+be the third copy of the chart/health-strip/list/actions furniture.
 
 ## 8. Repo hygiene
 
