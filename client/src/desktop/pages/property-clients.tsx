@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { useLocation } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { usePropertyInvoices, usePropertyTenants, PROPERTY_KEYS } from "@/lib/property-data";
 import { propHeaders } from "@/lib/property-api";
@@ -8,6 +7,7 @@ import {
   DesktopPageScaffold,
   type DesktopRoutePageProps,
 } from "../DesktopPageScaffold";
+import { DesktopDirectoryProfile } from "../DesktopDirectoryProfile";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -47,8 +47,8 @@ const EMPTY_FORM = {
 };
 
 export default function DesktopPropertyClients(props: DesktopRoutePageProps) {
-  const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const [selectedTenantId, setSelectedTenantId] = useState<string | null>(() => typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("client"));
   const [search, setSearch] = useState("");
   const [propFilter, setPropFilter] = useState<string | null>(null);
   const [scopeOpen, setScopeOpen] = useState(false);
@@ -116,6 +116,13 @@ export default function DesktopPropertyClients(props: DesktopRoutePageProps) {
       fullNameOf(t).toLowerCase().includes(term) ||
       String(t.propertyAddress ?? "").toLowerCase().includes(term),
   );
+  const selectedTenant = tenants.find((tenant: any) => tenant.id === selectedTenantId) ?? null;
+  const selectTenant = (id: string) => {
+    setSelectedTenantId(id);
+    const url = new URL(window.location.href);
+    url.searchParams.set("client", id);
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+  };
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof EMPTY_FORM) => {
@@ -255,7 +262,8 @@ export default function DesktopPropertyClients(props: DesktopRoutePageProps) {
                   key={t.id}
                   type="button"
                   className="pc-row"
-                  onClick={() => setLocation(`/property/tenants/${t.id}`)}
+                  aria-current={t.id === selectedTenantId ? "true" : undefined}
+                  onClick={() => selectTenant(t.id)}
                 >
                   <span className="pc-avatar">{initialsOf(t)}</span>
                   <span className="pc-row-mid">
@@ -275,6 +283,7 @@ export default function DesktopPropertyClients(props: DesktopRoutePageProps) {
             })
           )}
         </div>
+        {selectedTenant && <DesktopDirectoryProfile vertical="property" profile={selectedTenant} />}
       </div>
 
       {/* ── add tenant ── */}
@@ -391,16 +400,17 @@ const PC_CSS = `
 .pc-add { width:38px; height:38px; border-radius:50%; background:${ACTIVE}; display:flex; align-items:center; justify-content:center; cursor:pointer; flex:0 0 auto; box-shadow:0 2px 10px rgba(102,169,255,0.35); transition:opacity .15s ease, transform .15s ease; }
 .pc-add:hover { opacity:0.92; transform:scale(1.05); }
 
-.pc-list { margin-top:16px; display:flex; flex-direction:column; gap:5px; width:760px; max-height:520px; overflow-y:auto; scrollbar-width:none; animation:popIn .55s cubic-bezier(.34,1.42,.5,1) 200ms both; }
+.pc-list { margin-top:16px; display:flex; flex-direction:column; gap:5px; width:400px; max-height:520px; overflow-y:auto; scrollbar-width:none; animation:popIn .55s cubic-bezier(.34,1.42,.5,1) 200ms both; }
 .pc-list::-webkit-scrollbar { display:none; }
 .pc-row { display:flex; align-items:center; gap:16px; padding:2px 8px 2px 0; border-radius:10px; background:transparent; cursor:pointer; text-align:left; transition:background .15s ease; }
 .pc-row:hover { background:rgba(94,158,255,0.06); }
+.pc-row[aria-current="true"] { background:rgba(94,158,255,0.12); }
 .pc-avatar { width:40px; height:40px; border-radius:50%; border:1.5px solid rgba(94,158,255,0.8); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:11px; color:#fff; flex:0 0 auto; box-sizing:border-box; }
-.pc-row-mid { display:flex; flex-direction:column; gap:2px; flex:0 0 250px; min-width:0; }
+.pc-row-mid { display:flex; flex-direction:column; gap:2px; flex:1; min-width:0; }
 .pc-row-name { font-weight:300; font-size:13.5px; color:${TEXT_SOFT}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .pc-row-status { display:flex; align-items:center; gap:5px; font-weight:500; font-size:11px; color:rgba(244,246,255,0.5); }
 .pc-row-dot { width:5px; height:5px; border-radius:50%; opacity:0.7; flex:0 0 auto; }
-.pc-row-address { flex:1; min-width:0; font-weight:500; font-size:12px; color:rgba(244,246,255,0.45); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pc-row-address { display:none; }
 .pc-row-amt { font-weight:800; font-size:15px; color:#fff; flex:0 0 auto; font-variant-numeric:tabular-nums; }
 .pc-empty { padding:26px 0; font-weight:300; font-size:13px; color:rgba(191,209,255,0.5); }
 

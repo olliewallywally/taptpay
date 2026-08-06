@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { useLocation } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { tradesFetch } from "@/lib/trades-api";
 import { fmtNZD } from "@/lib/report-utils";
@@ -16,6 +15,7 @@ import {
   DesktopPageScaffold,
   type DesktopRoutePageProps,
 } from "../DesktopPageScaffold";
+import { DesktopDirectoryProfile } from "../DesktopDirectoryProfile";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -58,8 +58,8 @@ const EMPTY_FORM = {
 };
 
 export default function DesktopTradesClients(props: DesktopRoutePageProps) {
-  const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(() => typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("client"));
   const [search, setSearch] = useState("");
   const [siteFilter, setSiteFilter] = useState<string | null>(null);
   const [scopeOpen, setScopeOpen] = useState(false);
@@ -143,6 +143,13 @@ export default function DesktopTradesClients(props: DesktopRoutePageProps) {
 
   const isLoading = clientsQuery.isLoading || invoicesQuery.isLoading;
   const loadError = clientsQuery.error || invoicesQuery.error;
+  const selectedClient = clients.find((client) => client.id === selectedClientId) ?? null;
+  const selectClient = (id: string) => {
+    setSelectedClientId(id);
+    const url = new URL(window.location.href);
+    url.searchParams.set("client", id);
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+  };
 
   return (
     <DesktopPageScaffold {...props} vertical="trades" page="directory" showScope={false}>
@@ -233,9 +240,10 @@ export default function DesktopTradesClients(props: DesktopRoutePageProps) {
                 : "no clients yet — add your first with +"}
             </div>
           ) : (
-            rows.map((row) => <ClientRow key={row.id} row={row} onOpen={setLocation} />)
+            rows.map((row) => <ClientRow key={row.id} row={row} selected={row.id === selectedClientId} onOpen={selectClient} />)
           )}
         </div>
+        {selectedClient && <DesktopDirectoryProfile vertical="trades" profile={selectedClient} />}
       </div>
 
       {/* ── add client ── */}
@@ -339,9 +347,11 @@ export default function DesktopTradesClients(props: DesktopRoutePageProps) {
 export function ClientRow({
   row,
   onOpen,
+  selected = false,
 }: {
   row: TradesClientRow;
-  onOpen: (path: string) => void;
+  onOpen: (id: string) => void;
+  selected?: boolean;
 }) {
   const idPrefix = `tc-client-${row.id}`;
   const nameId = `${idPrefix}-name`;
@@ -362,7 +372,8 @@ export function ClientRow({
       className="tc-row"
       aria-labelledby={nameId}
       aria-describedby={descriptionIds}
-      onClick={() => onOpen(`/trades/clients/${row.id}`)}
+      aria-current={selected ? "true" : undefined}
+      onClick={() => onOpen(row.id)}
     >
       <span className="tc-avatar" aria-hidden="true">{row.initials}</span>
       <span className="tc-row-mid">
@@ -409,6 +420,7 @@ const TC_CSS = `
 .tc-list::-webkit-scrollbar { display:none; }
 .tc-row { display:flex; align-items:center; gap:16px; width:100%; min-width:0; box-sizing:border-box; padding:5px 0; border-radius:10px; background:transparent; cursor:pointer; text-align:left; transition:background .15s ease; }
 .tc-row:hover { background:rgba(94,158,255,0.06); }
+.tc-row[aria-current="true"] { background:rgba(94,158,255,0.12); }
 .tc-row:focus-visible { outline:2px solid ${ACCENT_SOFT}; outline-offset:2px; background:rgba(94,158,255,0.1); }
 .tc-avatar { width:40px; height:40px; border-radius:50%; border:1.5px solid rgba(94,158,255,0.8); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:11px; color:#fff; flex:0 0 auto; box-sizing:border-box; }
 .tc-row-mid { display:flex; flex-direction:column; gap:2px; flex:1; min-width:0; white-space:normal; overflow-wrap:anywhere; }

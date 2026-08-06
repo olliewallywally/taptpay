@@ -23,6 +23,7 @@ jest.mock("@/lib/property-data", () => ({
 
 jest.mock("@/lib/property-api", () => ({
   propHeaders: () => ({}),
+  propFetch: jest.fn().mockResolvedValue({ ok: true, json: async () => [] }),
 }));
 
 const usePropertyTenantsMock = propertyData.usePropertyTenants as jest.Mock;
@@ -113,6 +114,18 @@ describe("desktop client-directory boundary behavior", () => {
     expect(screen.queryByText("Beta South")).not.toBeInTheDocument();
   });
 
+  it("selects a property tenant in place and exposes the shared profile panel", async () => {
+    const user = userEvent.setup();
+    renderPropertyClients();
+
+    const row = screen.getByRole("button", { name: /Alpha North/i });
+    await user.click(row);
+
+    expect(row).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("complementary", { name: "Alpha North tenant profile" })).toBeInTheDocument();
+    expect(screen.getByText("1 Active Road", { selector: ".ddp-field span" })).toBeInTheDocument();
+  });
+
   it("uses the full visible trades name and visible row details as its accessibility contract", async () => {
     const firstName = "A".repeat(80);
     const lastName = "B".repeat(80);
@@ -144,11 +157,11 @@ describe("desktop client-directory boundary behavior", () => {
     button.focus();
     expect(button).toHaveFocus();
     await user.keyboard("{Enter}");
-    expect(onOpen).toHaveBeenCalledWith("/trades/clients/long-client");
+    expect(onOpen).toHaveBeenCalledWith("long-client");
 
     onOpen.mockClear();
     button.focus();
     await user.keyboard(" ");
-    expect(onOpen).toHaveBeenCalledWith("/trades/clients/long-client");
+    expect(onOpen).toHaveBeenCalledWith("long-client");
   });
 });
