@@ -330,9 +330,11 @@ export default function DesktopTradesClients(props: DesktopRoutePageProps) {
   );
 }
 
-/* The design prints name and site as one line ("mike thompson | 12 harbour
-   view rd"), so the row keeps that shape and ellipsises when a real address is
-   longer than the design's 400px column. */
+/* The design prints name and site as one line ("mike thompson | 12 harbour view
+   rd") inside a 400px column, which ellipsises on real data — and the hover
+   title that recovered it does nothing on tablet, where there is no hover. The
+   column width is the design's and stays; the label splits onto its own line so
+   both read in full. */
 function ClientRow({
   row,
   onOpen,
@@ -340,18 +342,17 @@ function ClientRow({
   row: TradesClientRow;
   onOpen: (path: string) => void;
 }) {
-  const label = row.siteAddress ? `${row.name} | ${row.siteAddress}` : row.name;
   return (
     <button
       type="button"
       className="tc-row"
-      title={label}
       aria-label={`view ${row.name}`}
       onClick={() => onOpen(`/trades/clients/${row.id}`)}
     >
       <span className="tc-avatar">{row.initials}</span>
       <span className="tc-row-mid">
-        <span className="tc-row-name">{label}</span>
+        <span className="tc-row-name">{row.name}</span>
+        {row.siteAddress && <span className="tc-row-site">{row.siteAddress}</span>}
         <span className="tc-row-status">
           <span className="tc-row-dot" style={{ background: STATUS_DOT[row.status] }} />
           <span>{row.status}</span>
@@ -387,11 +388,12 @@ const TC_CSS = `
 
 .tc-list { margin-top:16px; display:flex; flex-direction:column; gap:5px; width:400px; max-height:490px; overflow-y:auto; scrollbar-width:none; animation:popIn .55s cubic-bezier(.34,1.42,.5,1) 200ms both; }
 .tc-list::-webkit-scrollbar { display:none; }
-.tc-row { display:flex; align-items:center; gap:16px; padding:2px 0; border-radius:10px; background:transparent; cursor:pointer; text-align:left; transition:background .15s ease; }
+.tc-row { display:flex; align-items:center; gap:16px; padding:5px 0; border-radius:10px; background:transparent; cursor:pointer; text-align:left; transition:background .15s ease; }
 .tc-row:hover { background:rgba(94,158,255,0.06); }
 .tc-avatar { width:40px; height:40px; border-radius:50%; border:1.5px solid rgba(94,158,255,0.8); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:11px; color:#fff; flex:0 0 auto; box-sizing:border-box; }
 .tc-row-mid { display:flex; flex-direction:column; gap:2px; flex:1; min-width:0; }
 .tc-row-name { font-weight:300; font-size:13.5px; color:${TEXT_SOFT}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tc-row-site { font-weight:300; font-size:11.5px; color:rgba(244,246,255,0.62); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .tc-row-status { display:flex; align-items:center; gap:5px; font-weight:500; font-size:11px; color:rgba(244,246,255,0.5); }
 .tc-row-dot { width:5px; height:5px; border-radius:50%; opacity:0.7; flex:0 0 auto; }
 .tc-row-amt { font-weight:800; font-size:15px; color:#fff; flex:0 0 auto; font-variant-numeric:tabular-nums; }
