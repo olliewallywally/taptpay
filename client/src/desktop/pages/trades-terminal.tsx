@@ -757,7 +757,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
                 </>)}
               </div>
 
-              <div className="tt-inv-form">
+              <div className={`tt-inv-form${quickMode ? " tt-inv-form-quick" : ""}`}>
                 <div className="tt-field">
                   <span className="tt-field-label">JOB NOTE</span>
                   <input
@@ -1221,6 +1221,11 @@ const TT_CSS = `
    the 813px canvas — the design PNG shows the same clipped button. Raised to
    476 so the primary action is reachable; every internal offset is unchanged. */
 .tt-inv-form { position:absolute; left:668px; top:476px; width:430px; display:flex; flex-direction:column; gap:14px; animation:tileIn .35s cubic-bezier(.22,.9,.3,1) both; }
+/* Quick entry has fewer controls: lift its working fields, then reserve the
+   recovered space before the fee so that line stays level with the rail foot. */
+.tt-inv-form-quick { top:436px; }
+.tt-inv-form-quick .tt-fee { margin-top:40px; }
+.tt-inv-form-quick .tt-send { margin-top:16px; }
 .tt-field { display:flex; flex-direction:column; gap:8px; }
 .tt-quick-recipient { margin-top:14px; display:grid; grid-template-columns:1fr auto; gap:8px; }
 .tt-quick-recipient > input { grid-column:1 / -1; height:34px; padding:0 12px; border-radius:10px; border:1px solid rgba(94,158,255,.42); background:rgba(255,255,255,.05); color:; outline:none; }
