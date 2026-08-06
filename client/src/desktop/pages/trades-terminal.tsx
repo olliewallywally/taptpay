@@ -757,7 +757,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
                 </>)}
               </div>
 
-              <div className={`tt-inv-form${quickMode ? " tt-inv-form-quick" : ""}`}>
+              <div className="tt-inv-form">
                 <div className="tt-field">
                   <span className="tt-field-label">JOB NOTE</span>
                   <input
@@ -1220,12 +1220,7 @@ const TT_CSS = `
 /* The design pins this block at top:512, which pushes its send button 30px past
    the 813px canvas — the design PNG shows the same clipped button. Raised to
    476 so the primary action is reachable; every internal offset is unchanged. */
-.tt-inv-form { position:absolute; left:668px; top:476px; width:430px; display:flex; flex-direction:column; gap:14px; animation:tileIn .35s cubic-bezier(.22,.9,.3,1) both; }
-/* Quick entry has fewer controls: lift its working fields, then reserve the
-   recovered space before the fee so that line stays level with the rail foot. */
-.tt-inv-form-quick { top:436px; }
-.tt-inv-form-quick .tt-fee { margin-top:40px; }
-.tt-inv-form-quick .tt-send { margin-top:16px; }
+.tt-inv-form { position:absolute; left:668px; top:436px; width:430px; display:flex; flex-direction:column; gap:14px; animation:tileIn .35s cubic-bezier(.22,.9,.3,1) both; }
 .tt-field { display:flex; flex-direction:column; gap:8px; }
 .tt-quick-recipient { margin-top:14px; display:grid; grid-template-columns:1fr auto; gap:8px; }
 .tt-quick-recipient > input { grid-column:1 / -1; height:34px; padding:0 12px; border-radius:10px; border:1px solid rgba(94,158,255,.42); background:rgba(255,255,255,.05); color:; outline:none; }
@@ -1244,7 +1239,7 @@ const TT_CSS = `
 .tt-type-chip:disabled { opacity:0.4; cursor:not-allowed; }
 .tt-fee { font-weight:500; font-size:11px; color:rgba(244,246,255,0.4); }
 .tt-hint { font-weight:500; font-size:11px; color:rgba(240,163,78,0.9); }
-.tt-send { margin:44px auto 0; width:200px; height:46px; border-radius:9999px; border:1.5px solid rgba(94,158,255,0.7); background:transparent; font-weight:300; font-size:13.5px; color:${TEXT_SOFT}; cursor:pointer; transition:background .15s ease; }
+.tt-send { margin:16px auto 0; width:200px; height:46px; border-radius:9999px; border:1.5px solid rgba(94,158,255,0.7); background:transparent; font-weight:300; font-size:13.5px; color:${TEXT_SOFT}; cursor:pointer; transition:background .15s ease; }
 .tt-send:hover:not(:disabled) { background:rgba(94,158,255,0.08); }
 .tt-send:disabled { opacity:0.45; cursor:default; }
 
