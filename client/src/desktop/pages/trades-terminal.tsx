@@ -103,8 +103,9 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const quickEntry = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("quick") === "1";
+  const quoteEntry = typeof window !== "undefined" && window.location.pathname === "/trades/quote";
 
-  const [mode, setMode] = useState<Mode>(quickEntry ? "invoice" : "keypad");
+  const [mode, setMode] = useState<Mode>(quoteEntry ? "quote" : quickEntry ? "invoice" : "keypad");
   const [railMoving, setRailMoving] = useState(false);
   const [siteFilter, setSiteFilter] = useState<string | null>(null);
   const [scopeOpen, setScopeOpen] = useState(false);

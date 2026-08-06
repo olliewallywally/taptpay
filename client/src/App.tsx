@@ -459,7 +459,7 @@ function Router({ deviceClass }: { deviceClass: DeviceClass }) {
           </Route>
           <Route path="/trades/quote">
             <ProtectedRoute tutorialPage="trades-quote">
-              {deviceClass === "mobile" ? <TradesQuoteBuilder /> : <DesktopLegacyPage deviceClass={deviceClass} vertical="trades" page="terminal"><TradesQuoteBuilder /></DesktopLegacyPage>}
+              {deviceClass === "mobile" ? <TradesQuoteBuilder /> : <DesktopTradesTerminal deviceClass={deviceClass} />}
             </ProtectedRoute>
           </Route>
           {/* Customer-facing quote acceptance → deposit/full payment, all on the
