@@ -55,7 +55,7 @@ const GREEN = "#35D07F";
 const RED = "#F0656C";
 const AMBER = "#F0A34E";
 
-type Mode = "client" | "quote" | "keypad" | "invoice" | "paid";
+type Mode = "client" | "quote" | "keypad" | "invoice" | "paid" | "recurring";
 type InvoiceType = "full" | "deposit" | "balance";
 
 const STACK_FILTERS = ["all", "overdue", "sent", "awaiting deposit", "paid"] as const;
@@ -104,8 +104,9 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
   const { toast } = useToast();
   const quickEntry = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("quick") === "1";
   const quoteEntry = typeof window !== "undefined" && window.location.pathname === "/trades/quote";
+  const recurringEntry = typeof window !== "undefined" && window.location.pathname === "/trades/recurring";
 
-  const [mode, setMode] = useState<Mode>(quoteEntry ? "quote" : quickEntry ? "invoice" : "keypad");
+  const [mode, setMode] = useState<Mode>(recurringEntry ? "recurring" : quoteEntry ? "quote" : quickEntry ? "invoice" : "keypad");
   const [railMoving, setRailMoving] = useState(false);
   const [siteFilter, setSiteFilter] = useState<string | null>(null);
   const [scopeOpen, setScopeOpen] = useState(false);
@@ -127,6 +128,8 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
   const [lines, setLines] = useState<QuoteLineDraft[]>([{ ...EMPTY_LINE }]);
   const [depositChip, setDepositChip] = useState<DepositChip>("none");
   const [quoteFlash, setQuoteFlash] = useState(false);
+  const [recurring, setRecurring] = useState({ clientProfileId: "", amount: "", frequency: "monthly", deliveryChannel: "email", startDate: new Date().toISOString().slice(0, 10) });
+  const [recurringError, setRecurringError] = useState("");
 
   useEffect(() => {
     if (!quickEntry) return;
@@ -138,6 +141,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
   const clientsQuery = useTradesClientsQuery();
   const invoicesQuery = useTradesInvoicesQuery();
   const quotesQuery = useTradesQuotesQuery();
+  const schedulesQuery = useQuery<any[]>({ queryKey: ["/api/trades/schedules"], queryFn: () => tradesFetch("/api/trades/schedules").then((r) => r.ok ? r.json() : []) });
 
   const merchantQuery = useQuery<any>({
     queryKey: ["/api/merchants", merchantId, "profile"],
@@ -469,6 +473,22 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
       }),
   });
 
+  const createRecurring = useMutation({
+    mutationFn: async () => {
+      const amountCents = Math.round(Number(recurring.amount) * 100);
+      if (!recurring.clientProfileId || amountCents <= 0) throw new Error("Choose a client and enter an amount");
+      const response = await tradesFetch("/api/trades/schedules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...recurring, amountCents, startDate: new Date(`${recurring.startDate}T09:00:00Z`).toISOString(), amount: undefined }),
+      });
+      if (!response.ok) throw new Error(await response.json().then((d) => d.message).catch(() => "Could not create recurring invoice"));
+      return response.json();
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/trades/schedules"] }); setRecurringError(""); },
+    onError: (error) => setRecurringError(error instanceof Error ? error.message : "Could not create recurring invoice"),
+  });
+
   const markReceived = useMutation({
     mutationFn: async (invoiceId: string) => {
       const res = await tradesFetch(`/api/trades/invoices/${invoiceId}/mark-paid-external`, {
@@ -702,7 +722,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
         <div className="tt-rail-slot">
           <div className="tt-rail" data-tutorial-id="trades-terminal-tools">
             <svg className="tt-goo-filter" aria-hidden="true"><defs><filter id="tt-rail-goo"><feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur" /><feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -9" /><feBlend in="SourceGraphic" /></filter></defs></svg>
-            <div className={`tt-rail-blob${railMoving ? " tt-rail-blob-moving" : ""}`} style={{ "--tt-rail-index": railModes.indexOf(mode) } as React.CSSProperties} />
+            <div className={`tt-rail-blob${railMoving ? " tt-rail-blob-moving" : ""}`} style={{ "--tt-rail-index": mode === "recurring" ? 3 : railModes.indexOf(mode) } as React.CSSProperties} />
             {railBtn("client", (<><circle cx="12" cy="8" r="3.4" /><path d="M5.5 19.5c1-3.2 3.4-4.8 6.5-4.8s5.5 1.6 6.5 4.8" /></>), "choose client")}
             {railBtn("quote", (<><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></>), "quote builder")}
             {railBtn("keypad", (<path d="M12 5v14M5 12h14" />), "keypad")}
@@ -1037,6 +1057,26 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
             </div>
           )}
 
+          {mode === "recurring" && (
+            <div className="tt-mode tt-recurring">
+              <div className="tt-mode-title">Recurring invoices</div>
+              <div className="tt-rec-grid">
+                <select aria-label="recurring client" value={recurring.clientProfileId} onChange={(e) => setRecurring({ ...recurring, clientProfileId: e.target.value })}>
+                  <option value="">choose client</option>
+                  {clients.filter((c) => !["archived", "prospect"].includes(c.status)).map((c) => <option key={c.id} value={c.id}>{clientName(c)} — {c.siteAddress}</option>)}
+                </select>
+                <input aria-label="recurring amount" inputMode="decimal" placeholder="amount" value={recurring.amount} onChange={(e) => setRecurring({ ...recurring, amount: e.target.value.replace(/[^\d.]/g, "") })} />
+                <select aria-label="recurring frequency" value={recurring.frequency} onChange={(e) => setRecurring({ ...recurring, frequency: e.target.value })}><option value="weekly">weekly</option><option value="fortnightly">fortnightly</option><option value="monthly">monthly</option></select>
+                <input aria-label="recurring start date" type="date" value={recurring.startDate} onChange={(e) => setRecurring({ ...recurring, startDate: e.target.value })} />
+                <select aria-label="recurring delivery channel" value={recurring.deliveryChannel} onChange={(e) => setRecurring({ ...recurring, deliveryChannel: e.target.value })}><option value="email">email</option><option value="sms">sms</option><option value="whatsapp">whatsapp</option></select>
+              </div>
+              {recurringError && <div className="tt-rec-error">{recurringError}</div>}
+              <button type="button" className="tt-rec-create" disabled={createRecurring.isPending} onClick={() => createRecurring.mutate()}>{createRecurring.isPending ? "saving…" : "create recurring invoice"}</button>
+              <div className="tt-rec-title">active schedules</div>
+              <div className="tt-rec-list">{(schedulesQuery.data ?? []).length === 0 ? <div className="tt-empty">no recurring invoices</div> : (schedulesQuery.data ?? []).map((schedule) => <div className="tt-rec-row" key={schedule.id}><span><strong>{clientName(clientById.get(schedule.clientProfileId)) || "client"}</strong><small>{schedule.frequency} · {schedule.deliveryChannel}</small></span><strong>{formatNzd(schedule.amountCents)}</strong></div>)}</div>
+            </div>
+          )}
+
           {mode === "paid" && (
             <div className="tt-mode tt-paid">
               <div className="tt-mode-title tt-paid-title">Mark as received externally</div>
@@ -1258,6 +1298,8 @@ const TT_CSS = `
 .tt-kp-key:hover { opacity:0.88; }
 
 /* mark received */
+.tt-recurring { padding-top:58px; width:445px; }.tt-rec-grid { margin-top:18px; display:grid; grid-template-columns:1fr 1fr; gap:10px; }.tt-rec-grid select,.tt-rec-grid input { min-width:0; height:44px; border-radius:11px; border:1px solid rgba(94,158,255,.35); background:rgba(94,158,255,.08); color:#fff; padding:0 12px; font:inherit; }.tt-rec-grid select:first-child { grid-column:1/-1; }.tt-rec-grid option { color:#000F3F; }.tt-rec-create { margin-top:14px; height:44px; width:100%; border-radius:999px; background:${ACTIVE}; color:${NAVY}; font-weight:800; cursor:pointer; }.tt-rec-create:disabled { opacity:.5; }.tt-rec-error { margin-top:10px; color:#FFB3B8; font-size:12px; }.tt-rec-title { margin-top:28px; color:${ACCENT_SOFT}; font-size:11px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; }.tt-rec-list { margin-top:8px; max-height:230px; overflow:auto; }.tt-rec-row { display:flex; justify-content:space-between; align-items:center; padding:11px 2px; border-bottom:1px solid rgba(94,158,255,.14); }.tt-rec-row span { display:flex; flex-direction:column; gap:2px; }.tt-rec-row strong { font-size:13px; }.tt-rec-row small { color:rgba(244,246,255,.5); font-size:10.5px; }
+
 .tt-paid-title { margin-top:100px; }
 .tt-paid-sub { margin-top:4px; font-weight:500; font-size:12px; color:rgba(244,246,255,0.45); }
 .tt-paid-rows { margin-top:22px; display:flex; flex-direction:column; width:440px; max-height:420px; overflow-y:auto; scrollbar-width:none; }

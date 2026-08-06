@@ -467,7 +467,7 @@ function Router({ deviceClass }: { deviceClass: DeviceClass }) {
           <Route path="/trades/quote/:token">{() => <Checkout sourceKind="quote-token" />}</Route>
           <Route path="/trades/recurring">
             <ProtectedRoute tutorialPage="trades-recurring">
-              {deviceClass === "mobile" ? <TradesRecurring /> : <DesktopLegacyPage deviceClass={deviceClass} vertical="trades" page="home"><TradesRecurring /></DesktopLegacyPage>}
+              {deviceClass === "mobile" ? <TradesRecurring /> : <DesktopTradesTerminal deviceClass={deviceClass} />}
             </ProtectedRoute>
           </Route>
           {/* Public rent/charge checkout — no auth required. Uses the shared
