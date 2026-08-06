@@ -90,15 +90,20 @@ export default function DesktopPropertyClients(props: DesktopRoutePageProps) {
     [tenants],
   );
 
+  /* The count sits under the scope pill, so it answers "how many here": it
+     follows the property scope but not the search box, which is a find-tool
+     rather than a filter. Same rule as the trades directory (3b). */
+  const scopedTenants = activeTenants.filter(
+    (t: any) => !propFilter || t.propertyAddress === propFilter,
+  );
+
   const term = search.trim().toLowerCase();
-  const rows = activeTenants
-    .filter((t: any) => !propFilter || t.propertyAddress === propFilter)
-    .filter(
-      (t: any) =>
-        !term ||
-        fullNameOf(t).toLowerCase().includes(term) ||
-        String(t.propertyAddress ?? "").toLowerCase().includes(term),
-    );
+  const rows = scopedTenants.filter(
+    (t: any) =>
+      !term ||
+      fullNameOf(t).toLowerCase().includes(term) ||
+      String(t.propertyAddress ?? "").toLowerCase().includes(term),
+  );
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof EMPTY_FORM) => {
@@ -135,7 +140,7 @@ export default function DesktopPropertyClients(props: DesktopRoutePageProps) {
   const set = (k: keyof typeof EMPTY_FORM) => (v: string) =>
     setForm((f) => ({ ...f, [k]: v } as typeof EMPTY_FORM));
 
-  const countLabel = `active tenant${activeTenants.length === 1 ? "" : "s"}`;
+  const countLabel = `active tenant${scopedTenants.length === 1 ? "" : "s"}`;
 
   return (
     <DesktopPageScaffold {...props} vertical="property" page="directory" showScope={false}>
@@ -188,7 +193,7 @@ export default function DesktopPropertyClients(props: DesktopRoutePageProps) {
 
         <div className="pc-hero">
           <span className="pc-hero-count">
-            {tenantsQuery.isLoading ? "—" : activeTenants.length}
+            {tenantsQuery.isLoading ? "—" : scopedTenants.length}
           </span>
           <span className="pc-hero-label">{countLabel}</span>
         </div>
