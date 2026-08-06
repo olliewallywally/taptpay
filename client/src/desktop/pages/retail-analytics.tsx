@@ -60,8 +60,8 @@ const DONUT_COLORS = ["#5E9EFF", "#93BAFF", "#DCE7FF", "rgba(94,158,255,0.35)", 
 
 /* Sheet geometry, straight from the prototype. */
 const SHEET_H = 664;
-const PEEK = 152;
-const CLOSED = SHEET_H - PEEK;
+/* Rest the sheet 20px below Retail's plotted SVG (frame y ≈ 424). */
+const CLOSED = 275;
 
 const RANGES: { k: Timeframe; label: string }[] = [
   { k: "day", label: "Day" },
