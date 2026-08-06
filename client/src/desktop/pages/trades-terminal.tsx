@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { tradesFetch } from "@/lib/trades-api";
@@ -102,6 +102,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
   const merchantId = getCurrentMerchantId();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const quickEntry = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("quick") === "1";
 
   const [mode, setMode] = useState<Mode>("invoice");
   const [siteFilter, setSiteFilter] = useState<string | null>(null);
@@ -117,10 +118,20 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
   const [note, setNote] = useState("");
   const [invType, setInvType] = useState<InvoiceType>("full");
   const [sentFlash, setSentFlash] = useState(false);
+  const [quickMode, setQuickMode] = useState(quickEntry);
+  const [recipient, setRecipient] = useState({ name: "", email: "", phone: "", channel: "email" as "email" | "sms" });
+  const [sentInvoice, setSentInvoice] = useState<any>(null);
 
   const [lines, setLines] = useState<QuoteLineDraft[]>([{ ...EMPTY_LINE }]);
   const [depositChip, setDepositChip] = useState<DepositChip>("none");
   const [quoteFlash, setQuoteFlash] = useState(false);
+
+  useEffect(() => {
+    if (!quickEntry) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("quick");
+    window.history.replaceState(null, "", ``);
+  }, []);
 
   const clientsQuery = useTradesClientsQuery();
   const invoicesQuery = useTradesInvoicesQuery();
@@ -317,10 +328,11 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
 
   const sendInvoice = useMutation({
     mutationFn: async () => {
-      if (!selectedClient) throw new Error("Choose a client first");
+      if (!selectedClient && !quickMode) throw new Error("Choose a client first");
 
       /* A balance is issued by the server from the paid deposit; everything else
          is a new invoice for the typed amount. */
+      if (quickMode && invType !== "full") throw new Error("Quick invoices must be full invoices");
       if (invType === "balance") {
         if (!balanceDeposit) throw new Error("No paid deposit to bill the balance for");
         const res = await tradesFetch(
@@ -342,9 +354,16 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          clientProfileId: selectedClient.id,
+          ...(quickMode
+            ? { recipient: {
+                name: recipient.name.trim(),
+                email: recipient.email.trim() || undefined,
+                phone: recipient.phone.trim() || undefined,
+                channel: recipient.channel,
+              } }
+            : { clientProfileId: selectedClient!.id }),
           amountCents,
-          deliveryChannel: selectedClient.preferredChannel || "email",
+          deliveryChannel: quickMode ? recipient.channel : selectedClient!.preferredChannel || "email",
           dueAt: due.toISOString(),
           kind: invType,
           quoteId: invType === "deposit" ? depositQuote?.id : undefined,
@@ -354,13 +373,16 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
       if (!res.ok) throw await failure(res, "Could not send the invoice");
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       invalidateTrades();
+      setSentInvoice(data);
       setSentFlash(true);
       setTimeout(() => setSentFlash(false), 1800);
-      setAmountCents(0);
-      setNote("");
-      setInvType("full");
+      if (!quickMode) {
+        setAmountCents(0);
+        setNote("");
+        setInvType("full");
+      }
     },
     onError: (error: unknown) =>
       toast({
@@ -368,6 +390,24 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
         description: error instanceof Error ? error.message : "Could not send the invoice",
         variant: "destructive",
       }),
+  });
+
+  const promoteClient = useMutation({
+    mutationFn: async () => {
+      if (!sentInvoice?.clientProfileId) throw new Error("No client to save");
+      const res = await tradesFetch(`/api/trades/clients//promote`, { method: "POST" });
+      if (!res.ok) throw await failure(res, "Could not save the client");
+      return res.json();
+    },
+    onSuccess: () => {
+      invalidateTrades();
+      toast({ title: "Client saved" });
+    },
+    onError: (error: unknown) => toast({
+      title: "Client not saved",
+      description: error instanceof Error ? error.message : "Could not save the client",
+      variant: "destructive",
+    }),
   });
 
   const createQuote = useMutation({
@@ -501,11 +541,14 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
   };
 
   const isLoading = clientsQuery.isLoading || invoicesQuery.isLoading || quotesQuery.isLoading;
+  const quickRecipientValid = recipient.name.trim().length > 0 &&
+    (recipient.channel === "email" ? recipient.email.trim().length > 0 : recipient.phone.trim().length > 0);
   const canSend =
-    !!selectedClient &&
+    (!!selectedClient || (quickMode && quickRecipientValid)) &&
     typeAvailable[invType] &&
     (invType === "balance" ? balanceCents > 0 : amountCents > 0) &&
-    !sendInvoice.isPending;
+    !sendInvoice.isPending &&
+    !(quickMode && !!sentInvoice);
 
   return (
     <DesktopPageScaffold {...props} vertical="trades" page="terminal" showScope={false}>
@@ -669,12 +712,19 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
                     edit&gt;
                   </button>
                 </div>
-                <div className="tt-inv-client">
-                  {selectedClient ? clientName(selectedClient) : "no client chosen"}
-                </div>
-                <div className="tt-inv-site">
-                  {selectedClient ? selectedClient.siteAddress : "pick one from the client rail"}
-                </div>
+                {quickMode ? (
+                  <div className="tt-quick-recipient">
+                    <input aria-label="customer name" placeholder="customer name" value={recipient.name} onChange={(e) => setRecipient((r) => ({ ...r, name: e.target.value }))} />
+                    <div className="tt-quick-channel">
+                      <button type="button" aria-pressed={recipient.channel === "email"} onClick={() => setRecipient((r) => ({ ...r, channel: "email" }))}>email</button>
+                      <button type="button" aria-pressed={recipient.channel === "sms"} onClick={() => setRecipient((r) => ({ ...r, channel: "sms" }))}>sms</button>
+                    </div>
+                    <input aria-label={recipient.channel === "email" ? "customer email" : "customer phone"} placeholder={recipient.channel === "email" ? "customer email" : "customer phone"} value={recipient.channel === "email" ? recipient.email : recipient.phone} onChange={(e) => setRecipient((r) => ({ ...r, [r.channel === "email" ? "email" : "phone"]: e.target.value }))} />
+                  </div>
+                ) : (<>
+                  <div className="tt-inv-client">{selectedClient ? clientName(selectedClient) : "no client chosen"}</div>
+                  <div className="tt-inv-site">{selectedClient ? selectedClient.siteAddress : "pick one from the client rail"}</div>
+                </>)}
               </div>
 
               <div className="tt-inv-form">
@@ -693,15 +743,15 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 4H4v12h4v4l5-4h7z" /></svg>
                   <span className="tt-via-text">
                     <span className="tt-via-label">
-                      sending via {selectedClient?.preferredChannel ?? "email"}
+                      sending via {quickMode ? recipient.channel : selectedClient?.preferredChannel ?? "email"}
                     </span>
                     <span className="tt-via-value">
-                      {contactFor(selectedClient) || "no contact on file"}
+                      {quickMode ? (recipient.channel === "email" ? recipient.email : recipient.phone) || "enter customer details" : contactFor(selectedClient) || "no contact on file"}
                     </span>
                   </span>
                 </div>
 
-                <div className="tt-type-chips">
+                {!quickMode && <div className="tt-type-chips">
                   {INVOICE_TYPES.map((t) => {
                     const on = invType === t;
                     const enabled = typeAvailable[t];
@@ -725,7 +775,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
                       </button>
                     );
                   })}
-                </div>
+                </div>}
 
                 {!typeAvailable[invType] ? (
                   <span className="tt-hint">{typeHint[invType]}</span>
@@ -746,8 +796,16 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
                   disabled={!canSend}
                   onClick={() => sendInvoice.mutate()}
                 >
-                  {sendInvoice.isPending ? "sending…" : sentFlash ? "invoice sent ✓" : "send invoice"}
+                  {sendInvoice.isPending ? "sending…" : sentFlash ? "invoice sent ✓" : quickMode ? "send quick invoice" : "send invoice"}
                 </button>
+                {quickMode && sentInvoice?.clientProfileId && (
+                  <div className="tt-quick-success" role="status">
+                    <span>invoice sent ✓</span>
+                    <button type="button" disabled={promoteClient.isPending || promoteClient.isSuccess} onClick={() => promoteClient.mutate()}>
+                      {promoteClient.isPending ? "saving…" : promoteClient.isSuccess ? "client saved ✓" : "add client"}
+                    </button>
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -1112,6 +1170,13 @@ const TT_CSS = `
    476 so the primary action is reachable; every internal offset is unchanged. */
 .tt-inv-form { position:absolute; left:668px; top:476px; width:430px; display:flex; flex-direction:column; gap:14px; animation:tileIn .35s cubic-bezier(.22,.9,.3,1) both; }
 .tt-field { display:flex; flex-direction:column; gap:8px; }
+.tt-quick-recipient { margin-top:14px; display:grid; grid-template-columns:1fr auto; gap:8px; }
+.tt-quick-recipient > input { grid-column:1 / -1; height:34px; padding:0 12px; border-radius:10px; border:1px solid rgba(94,158,255,.42); background:rgba(255,255,255,.05); color:; outline:none; }
+.tt-quick-channel { display:flex; gap:6px; grid-column:1 / -1; }
+.tt-quick-channel button { border:1px solid rgba(94,158,255,.5); border-radius:999px; background:transparent; color:; padding:5px 13px; }
+.tt-quick-channel button[aria-pressed="true"] { background:; color:; }
+.tt-quick-success { margin:14px auto 0; display:flex; align-items:center; justify-content:center; gap:14px; color:; font-size:13px; }
+.tt-quick-success button { border:1px solid rgba(94,158,255,.6); border-radius:999px; background:transparent; color:; padding:7px 15px; }
 .tt-note { height:50px; box-sizing:border-box; border-radius:9999px; border:none; outline:none; background:#fff; padding:0 22px; color:#12162E; font-family:'Outfit',sans-serif; font-weight:600; font-size:13.5px; }
 .tt-via { display:flex; align-items:center; gap:14px; height:54px; padding:0 20px; box-sizing:border-box; border-radius:12px; border:1.5px solid rgba(94,158,255,0.55); }
 .tt-via-text { display:flex; flex-direction:column; gap:1px; min-width:0; }
