@@ -104,7 +104,8 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
   const { toast } = useToast();
   const quickEntry = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("quick") === "1";
 
-  const [mode, setMode] = useState<Mode>("invoice");
+  const [mode, setMode] = useState<Mode>(quickEntry ? "invoice" : "keypad");
+  const [railMoving, setRailMoving] = useState(false);
   const [siteFilter, setSiteFilter] = useState<string | null>(null);
   const [scopeOpen, setScopeOpen] = useState(false);
   const [jobsOpen, setJobsOpen] = useState(true);
@@ -130,7 +131,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
     if (!quickEntry) return;
     const url = new URL(window.location.href);
     url.searchParams.delete("quick");
-    window.history.replaceState(null, "", ``);
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
   }, []);
 
   const clientsQuery = useTradesClientsQuery();
@@ -513,24 +514,30 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
     setMode("invoice");
   };
 
-  const railBtn = (m: Mode, big: boolean, path: JSX.Element, label: string) => {
+  useEffect(() => {
+    setRailMoving(true);
+    const timer = window.setTimeout(() => setRailMoving(false), 240);
+    return () => window.clearTimeout(timer);
+  }, [mode]);
+
+  const railModes: Mode[] = ["client", "quote", "keypad", "invoice", "paid"];
+  const railBtn = (m: Mode, path: JSX.Element, label: string) => {
     const on = mode === m;
     return (
       <button
         type="button"
-        className={big ? "tt-rail-btn tt-rail-big" : "tt-rail-btn"}
+        className="tt-rail-btn"
         aria-label={label}
         aria-pressed={on}
-        style={big ? undefined : { background: on ? ACTIVE : "transparent" }}
-        onClick={() => (big ? openKeypad() : setMode(m))}
+        onClick={() => (m === "keypad" ? openKeypad() : setMode(m))}
       >
         <svg
-          width={big ? 24 : 19}
-          height={big ? 24 : 19}
+          width={19}
+          height={19}
           viewBox="0 0 24 24"
           fill="none"
-          stroke={big ? NAVY : on ? NAVY : ACCENT_SOFT}
-          strokeWidth={big ? 2.4 : 1.8}
+          stroke={on ? NAVY : ACCENT_SOFT}
+          strokeWidth={1.8}
           strokeLinecap="round"
           strokeLinejoin="round"
         >
@@ -693,11 +700,13 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
         {/* ── CENTRE RAIL ── */}
         <div className="tt-rail-slot">
           <div className="tt-rail" data-tutorial-id="trades-terminal-tools">
-            {railBtn("client", false, (<><circle cx="12" cy="8" r="3.4" /><path d="M5.5 19.5c1-3.2 3.4-4.8 6.5-4.8s5.5 1.6 6.5 4.8" /></>), "choose client")}
-            {railBtn("quote", false, (<><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></>), "quote builder")}
-            {railBtn("keypad", true, (<path d="M12 5v14M5 12h14" />), "keypad")}
-            {railBtn("invoice", false, (<><path d="M22 2 11 13" /><path d="M22 2 15 22l-4-9-9-4z" /></>), "compose invoice")}
-            {railBtn("paid", false, (<><rect x="4" y="4" width="16" height="16" rx="3" /><path d="m9 12 2.2 2.2L15.5 10" /></>), "mark received")}
+            <svg className="tt-goo-filter" aria-hidden="true"><defs><filter id="tt-rail-goo"><feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur" /><feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -9" /><feBlend in="SourceGraphic" /></filter></defs></svg>
+            <div className={`tt-rail-blob${railMoving ? " tt-rail-blob-moving" : ""}`} style={{ "--tt-rail-index": railModes.indexOf(mode) } as React.CSSProperties} />
+            {railBtn("client", (<><circle cx="12" cy="8" r="3.4" /><path d="M5.5 19.5c1-3.2 3.4-4.8 6.5-4.8s5.5 1.6 6.5 4.8" /></>), "choose client")}
+            {railBtn("quote", (<><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></>), "quote builder")}
+            {railBtn("keypad", (<path d="M12 5v14M5 12h14" />), "keypad")}
+            {railBtn("invoice", (<><path d="M22 2 11 13" /><path d="M22 2 15 22l-4-9-9-4z" /></>), "compose invoice")}
+            {railBtn("paid", (<><rect x="4" y="4" width="16" height="16" rx="3" /><path d="m9 12 2.2 2.2L15.5 10" /></>), "mark received")}
           </div>
         </div>
 
@@ -1145,10 +1154,12 @@ const TT_CSS = `
 /* ── centre rail (design pins it at x=539, y=199) ── */
 .tt-rail-slot { flex:0 0 76px; margin:175px 40px 0 44px; }
 .tt-rail { position:absolute; left:539px; top:199px; width:86px; box-sizing:border-box; border:1.5px solid rgba(94,158,255,0.7); border-radius:32px; padding:30px 0; display:flex; flex-direction:column; align-items:center; gap:40px; }
-.tt-rail-btn { width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:background .18s ease; }
+.tt-goo-filter { position:absolute; width:0; height:0; }
+.tt-rail-blob { --tt-rail-index:2; position:absolute; z-index:0; left:15px; top:26px; width:54px; height:54px; border-radius:50%; background:${ACTIVE}; box-shadow:0 8px 20px rgba(102,169,255,0.35); filter:url(#tt-rail-goo); transform:translateY(calc(var(--tt-rail-index) * 86px)) scaleY(1); transform-origin:center; transition:transform 460ms cubic-bezier(.65,.02,.28,1); pointer-events:none; }
+.tt-rail-blob-moving { transform:translateY(calc(var(--tt-rail-index) * 86px)) scaleY(1.48); }
+.tt-rail-btn { position:relative; z-index:1; width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:background .18s ease; }
 .tt-rail-btn:hover { background:rgba(94,158,255,0.14); }
-.tt-rail-big { width:54px; height:54px; background:${ACTIVE}; box-shadow:0 8px 20px rgba(102,169,255,0.35); }
-.tt-rail-big:hover { background:${ACTIVE}; opacity:0.9; }
+@media (prefers-reduced-motion: reduce) { .tt-rail-blob { transition:none; } .tt-rail-blob-moving { transform:translateY(calc(var(--tt-rail-index) * 86px)); } }
 
 /* ── right panel ── */
 .tt-panel { flex:1; min-width:0; padding-left:36px; box-sizing:border-box; }
