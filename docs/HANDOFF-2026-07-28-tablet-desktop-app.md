@@ -1,9 +1,16 @@
 # Handoff — Tablet/Desktop merchant app (branch `feat/tablet-desktop-app`)
 
 Date: 2026-07-28, updated 2026-08-06
-Status: **all 15 screens built** — retail 5/5, property 5/5, trades 5/5. What is
-left is P5 (tutorial adaptation, plan §7a) and P6 (polish), plus the deviation
-list in §6, which Oliver asked to see as one list now the screens are done.
+Status: **all 15 screens built** — retail 5/5, property 5/5, trades 5/5. The §6
+deviation list has now been **raised with Oliver and ruled on** — see §6 for what
+he decided and what shipped. What is left is the accepted-change queue in §9,
+then P5 (tutorial adaptation, plan §7a) and P6 (polish).
+
+> **If you are picking this up cold and about to work on the terminal's "no
+> payment board" option, read `docs/PLAN-2026-08-06-payment-links-no-board.md`
+> first.** It is approved and not started. The obvious implementation ships a
+> money bug (a customer can pay a sale rung up on a different board) — that plan
+> documents the proof and the approved design.
 Read `docs/PLAN-2026-07-24-tablet-desktop-app.md` first: it is still the authoritative
 spec for scope, device gating, routes and per-screen requirements. This file records
 what has actually been built, the conventions to follow, the traps that have already
@@ -189,12 +196,47 @@ sensible moment. Treat it as a decision, not an oversight.
 
 ---
 
-## 6. Open deviations — DO NOT silently resolve these
+## 6. Deviations — RAISED AND RULED ON (2026-08-06)
 
-Oliver's instruction: these are collected and raised **as one list when the whole
-integration is finished**, so he can accept or overrule each. Keep adding to it; do
-not re-litigate them screen by screen. The living copy is in the assistant memory
-file `tablet-desktop-open-deviations.md`; the current contents:
+The full list was put to Oliver on 2026-08-06 and he ruled on every item. **Do not
+re-raise these.** Rulings below; the accepted-change queue is §9.
+
+**Shipped as fixes** (committed 2026-08-06):
+
+| Item | Ruling | Commit |
+|---|---|---|
+| 4d/3d peak dot floating in the fill | fix it | `4ade651` |
+| 2b vs 3b hero count contradiction | make 2b match 3b | `5cadc4d` |
+| 4c keypad `.`/`<` keys | centre both as glyphs, not characters | `6067bd4` |
+| 3d "outstanding invoices" | keep live, but label it all-time | `cfe5fe5` |
+| 4e payout account | **remove entirely** — bank details are Windcave's | `6ec20f7` |
+| 3b name/site ellipsising | split onto separate lines, keep the 400px column | `e3a6daa` |
+
+**Kept as shipped** (Oliver accepted the deviation): 4c boards picker, 4c split
+chips (same function as mobile), 4d report tiles white, 3c compose block at
+`top:476`, 3c deposit/balance chips disabled with a reason, 3c jobs list one row
+per client, 3b status dots coloured by state, 3d/2d shipping 4 reports not 10,
+home-screen components **not** extracted (accepted duplication), Dashboard
+Preferences `homeBigBox`/`chartStyle` stay out.
+
+**Changed scope — became real work:**
+
+- **4d Fees report: remove it**, replace with a report we can guarantee is
+  correct. Oliver approved *Revenue by Board* (backed by `transactions.taptStoneId`
+  + the stones table; nothing invented). The prototype's "vs eftpos" comparison
+  stays dropped.
+- **4c "no payment board"** — approved as a **per-payment token link**, not the
+  shared merchant URL. This is its own plan:
+  `docs/PLAN-2026-08-06-payment-links-no-board.md`. Read it before starting.
+- **4e notification toggles: build the missing two.** Oliver was shown the cost
+  (preferences column + migration, filtering across all 13 `sendPushToMerchant`
+  call sites, a new daily-payout job, a new failed-payment send site) and asked
+  for them anyway. Keep it in its own commits at the end of the queue so the
+  desktop UI work can merge independently if needed.
+- **4d second filter row** (product not category) stays as-is for now — a
+  `category` column on stock items is a genuine feature, explicitly deferred.
+
+The historical list, for context on *why* each deviation existed:
 
 - 4c keypad `.` key shows its character (prototype renders it blank).
 - 4c "boards" reveals a board picker the design doesn't have (API needs a stone id).
@@ -236,16 +278,47 @@ file `tablet-desktop-open-deviations.md`; the current contents:
 
 ## 7. Next actions, in order
 
-1. **Raise §6 with Oliver.** All fifteen screens are built, which is the point he
-   asked to be shown the whole deviation list so he can accept or overrule each.
-   Do that before P6 polish — several items are his call, not a cleanup.
-2. **P5 tutorial adaptation** (plan §7a). The registry already carries desktop
-   entries for the trades pages (`ta-*` on analytics, `trades-home-*` on home), so
-   the work is auditing each of the fifteen screens for anchors, adding
-   `desktopTarget`/`desktopBody` overrides where the desktop layout needs different
-   wording, and confirming the mobile tutorial is byte-identical afterwards.
-3. **P6 polish**, including the owed items listed in §6 (mobile push hook, the
-   `ReportModal` portal, and the home-component extraction if he wants it).
+§6 has been raised and ruled on. The remaining queue is §9. After it: **P5
+tutorial adaptation** (plan §7a) — the registry already carries desktop entries
+for the trades pages (`ta-*` on analytics, `trades-home-*` on home), so the work
+is auditing each of the fifteen screens for anchors, adding
+`desktopTarget`/`desktopBody` overrides where the desktop layout needs different
+wording, and confirming the mobile tutorial is byte-identical afterwards. Then
+**P6 polish**.
+
+---
+
+## 9. Accepted-change queue (as at 2026-08-06)
+
+Six fixes are committed (§6). What remains, in the order agreed:
+
+1. **b4 — Revenue by Board report.** Remove the Fees report from
+   `desktop/data/retail-reports.ts` (leaving 9) and add *Revenue by Board*:
+   revenue / count / average per board off `transactions.taptStoneId` joined to
+   the stones table, with an "unassigned" bucket. Entirely real columns.
+2. **b2 — no-board payment links + board creation.** See
+   `docs/PLAN-2026-08-06-payment-links-no-board.md`. Approved, not started.
+   **Read that plan before writing any code** — the naive version ships a money bug.
+3. **D2 — `ReportModal` into the desktop frame.** It portals to `document.body`
+   (`components/reports/ReportModal.tsx:98,259`), so Export covers the browser
+   window instead of the simulated 13″ frame. Portal to `.tapt-desktop-frame`
+   when present. **Trap:** the frame is inside a `transform: scale(...)` canvas,
+   so the modal's `position:fixed; inset:0` must become absolute or it will be
+   scale-relative.
+4. **D1 — mobile push onto the shared hook.** `hooks/use-push-notifications.ts` is
+   used only by `desktop/DesktopSettingsPage.tsx`; `pages/settings.tsx:144-350`
+   still carries its own inline copy including the native-iOS branch. Own commit,
+   needs real-device testing.
+5. **b7 — the two missing notification toggles.** The big one, deliberately last.
+   `push_subscriptions` (`shared/schema.ts:573`) has no preference column, and
+   `sendPushToMerchant` is called from 13 sites with the type passed at the call
+   site, never compared against anything stored. Of the design's three toggles
+   only "payment received" maps to something real: there is **no daily-payout job
+   at all**, and `sendPushToMerchant` is never called with a `failed` status.
+   Needs: preferences column + migration `0012`, filtering inside
+   `sendPushToMerchant`, a daily-payout job, and a failed-payment send site.
+
+Then P5, then P6.
 
 ## 8. Repo hygiene
 
