@@ -17,6 +17,10 @@ import {
   sumCents,
   timeframeWindow,
 } from "@/lib/report-utils";
+import {
+  tradesInvoiceRemainingCents,
+  tradesOutstandingCents,
+} from "@/lib/trades-money";
 import type { TradesClient, TradesInvoice, TradesQuote } from "./trades-data";
 
 /* ── inputs and metadata ───────────────────────────────────────────── */
@@ -153,6 +157,8 @@ const isPaid = (invoice: TradesInvoice) => PAID.has(invoice.status);
 const isVoided = (invoice: TradesInvoice) => invoice.status === "voided";
 const isOpen = (invoice: TradesInvoice) => !CLOSED.has(invoice.status);
 const centsOf = (invoice: TradesInvoice) => invoice.amountCents ?? 0;
+const remainingCentsOf = (invoice: TradesInvoice) =>
+  tradesInvoiceRemainingCents(invoice);
 
 function dateValue(value: string | Date | null | undefined): number | null {
   if (value == null) return null;
@@ -405,14 +411,16 @@ function buildAgedReceivables(ctx: TradesReportContext): TradesReportResult {
   const clients = clientMap(data.clients);
 
   /* A snapshot, never period-filtered: what is owed right now. agedBuckets does
-     the ageing off dueAt, so this pre-filter only drops settled and cancelled
-     rows — a balance_due invoice whose due date is still ahead has no age yet
-     and so belongs in no bucket. */
-  const outstanding = data.invoices.filter(isOpen);
+     the ageing off dueAt, so this pre-filter drops settled/cancelled rows and
+     status-lagged splits with no balance. A balance_due invoice whose due date
+     is still ahead has no age yet and so belongs in no bucket. */
+  const outstanding = data.invoices.filter(
+    (invoice) => isOpen(invoice) && remainingCentsOf(invoice) > 0,
+  );
   const { buckets, grandTotalCents } = agedBuckets(
     outstanding,
     (invoice) => invoice.dueAt,
-    centsOf,
+    remainingCentsOf,
     now,
   );
 
@@ -428,7 +436,9 @@ function buildAgedReceivables(ctx: TradesReportContext): TradesReportResult {
     return empty("Aged Receivables", "bars", "BY INVOICE", "nothing overdue");
   }
 
-  const shownCents = sumCents(rows, (row) => centsOf(row.invoice));
+  const shownCents = sumCents(rows, (row) =>
+    remainingCentsOf(row.invoice),
+  );
   const oldest = rows.reduce<number | null>((earliest, row) => {
     const due = dateValue(row.invoice.dueAt);
     return due !== null && (earliest === null || due < earliest) ? due : earliest;
@@ -451,7 +461,7 @@ function buildAgedReceivables(ctx: TradesReportContext): TradesReportResult {
       .map(({ invoice, bucket }) => ({
         name: clientName(clients.get(invoice.clientProfileId)),
         sub: `${siteOf(invoice, clients)} · ${kindLabel(invoice).toLowerCase()}`,
-        val: fmtNZD(centsOf(invoice)),
+        val: fmtNZD(remainingCentsOf(invoice)),
         sub2: `${bucket} · due ${fmtDate(invoice.dueAt)}`,
       })),
   };
@@ -477,13 +487,16 @@ function buildClientStatement(ctx: TradesReportContext): TradesReportResult {
   const statements = [...byClient.entries()]
     .map(([clientId, invoices]) => {
       const billedCents = sumCents(invoices, centsOf);
-      const outstandingCents = sumCents(invoices.filter(isOpen), centsOf);
+      const outstandingCents = tradesOutstandingCents(invoices);
       return {
         client: clients.get(clientId),
         invoices,
         billedCents,
         outstandingCents,
-        overdue: invoices.some((invoice) => isOverdue(invoice, now)),
+        overdue: invoices.some(
+          (invoice) =>
+            remainingCentsOf(invoice) > 0 && isOverdue(invoice, now),
+        ),
       };
     })
     .filter((row) =>

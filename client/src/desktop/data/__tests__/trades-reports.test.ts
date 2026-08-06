@@ -312,6 +312,45 @@ describe("aged receivables", () => {
     );
     expect(thisWeek.heroV).toBe(thisYear.heroV);
   });
+
+  it("ages only the exact remainder of a partially paid split invoice", () => {
+    const result = buildTradesReport(
+      "aged-receivables",
+      ctx({
+        invoices: [
+          invoice("split-overdue", MIKE.id, 10_001, {
+            dueAt: iso(3),
+            splitEnabled: true,
+            splitCount: 3,
+            splitPaidCount: 1,
+          }),
+        ],
+      }),
+    );
+
+    expect(result.heroV).toBe("$66.68");
+    expect(result.h2V).toBe("$66.68");
+    expect(result.rows[0].val).toBe("$66.68");
+  });
+
+  it("omits an open row whose split paid count already reaches the total", () => {
+    const result = buildTradesReport(
+      "aged-receivables",
+      ctx({
+        invoices: [
+          invoice("split-complete", MIKE.id, 10_001, {
+            dueAt: iso(3),
+            splitEnabled: true,
+            splitCount: 3,
+            splitPaidCount: 3,
+          }),
+        ],
+      }),
+    );
+
+    expect(result.heroV).toBe("—");
+    expect(result.rows).toHaveLength(0);
+  });
 });
 
 describe("client statement", () => {
@@ -342,5 +381,26 @@ describe("client statement", () => {
     );
     expect(result.rows).toHaveLength(1);
     expect(result.rows[0].name).toBe("Sarah Chen");
+  });
+
+  it("keeps gross billed value but reports only a split invoice's remainder", () => {
+    const result = buildTradesReport(
+      "client-statement",
+      ctx({
+        invoices: [
+          invoice("split", MIKE.id, 10_001, {
+            dueAt: iso(2),
+            splitEnabled: true,
+            splitCount: 3,
+            splitPaidCount: 1,
+          }),
+        ],
+      }),
+    );
+
+    expect(result.heroV).toBe("$100.01");
+    expect(result.h2V).toBe("$66.68");
+    expect(result.rows[0].val).toBe("$100.01");
+    expect(result.rows[0].sub2).toBe("$66.68 outstanding · overdue");
   });
 });

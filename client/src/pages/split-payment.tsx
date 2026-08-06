@@ -17,11 +17,23 @@ import {
   chipStyle,
 } from "@/lib/checkout-theme";
 import { TaptWordmark } from "@/components/checkout/tapt-wordmark";
+import { useTokenPagePrivacy } from "@/hooks/use-token-page-privacy";
+import {
+  checkoutResolveEndpoint,
+  currentTokenPaymentAmount,
+  tokenPaymentPath,
+  tokenSplitEndpoint,
+  type CheckoutRouteKind,
+} from "@/lib/payment-addressing";
 
-export default function SplitPayment() {
-  const { transactionId } = useParams<{ transactionId: string }>();
+export default function SplitPayment({ sourceKind = "retail-legacy" }: {
+  sourceKind?: Extract<CheckoutRouteKind, "retail-legacy" | "retail-token">;
+}) {
+  const { transactionId, token = "" } = useParams<{ transactionId?: string; token?: string }>();
   const [, setLocation] = useLocation();
-  const txnId = parseInt(transactionId);
+  const isTokenSource = sourceKind === "retail-token";
+  const txnId = transactionId ? parseInt(transactionId) : 0;
+  useTokenPagePrivacy(isTokenSource);
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentTransaction, setCurrentTransaction] = useState<any>(null);
@@ -33,15 +45,25 @@ export default function SplitPayment() {
   const [editValue, setEditValue] = useState("");
   const [confirmedCustom, setConfirmedCustom] = useState<string | null>(null); // null = use equal split
 
-  const { data: transaction, isLoading } = useQuery({
-    queryKey: ["/api/transactions", txnId],
+  const { data: transaction, isLoading, refetch: refetchTransaction } = useQuery({
+    queryKey: isTokenSource ? ["token-payment", token] : ["/api/transactions", txnId],
     queryFn: async () => {
-      const response = await fetch(`/api/transactions/${txnId}`);
+      const endpoint = isTokenSource
+        ? checkoutResolveEndpoint({ kind: "retail-token", token })
+        : checkoutResolveEndpoint({ kind: "retail-legacy", transactionId: txnId });
+      const response = await fetch(endpoint, isTokenSource
+        ? { headers: { "Cache-Control": "no-cache" } }
+        : undefined);
+      const body = await response.json().catch(() => ({}));
+      if (isTokenSource && response.status === 410 && body?.payment) {
+        return { ...body.payment, closed: true };
+      }
       if (!response.ok) throw new Error("Transaction not found");
-      return response.json();
+      return body;
     },
-    enabled: !!txnId,
+    enabled: isTokenSource ? !!token : !!txnId,
     refetchInterval: 3000,
+    staleTime: 0,
   });
 
   const { data: merchant } = useQuery({
@@ -51,7 +73,7 @@ export default function SplitPayment() {
       if (!response.ok) throw new Error("Merchant not found");
       return response.json();
     },
-    enabled: !!transaction?.merchantId,
+    enabled: !isTokenSource && !!transaction?.merchantId,
   });
 
   useEffect(() => {
@@ -59,8 +81,8 @@ export default function SplitPayment() {
   }, [transaction]);
 
   useEffect(() => {
-    if (!transaction?.merchantId) return;
-    sseClient.connect(transaction.merchantId, transaction.taptStoneId);
+    if (isTokenSource || !transaction?.merchantId) return;
+    sseClient.connectCustomer(transaction.merchantId, transaction.taptStoneId);
     const handleUpdate = (message: any) => {
       if (message.transaction?.id === txnId) {
         setCurrentTransaction(message.transaction);
@@ -72,18 +94,22 @@ export default function SplitPayment() {
       sseClient.unsubscribe("transaction_updated", handleUpdate);
       sseClient.disconnect();
     };
-  }, [transaction?.merchantId, txnId]);
+  }, [isTokenSource, transaction?.merchantId, transaction?.taptStoneId, txnId]);
 
   const txn = currentTransaction || transaction;
   const totalAmount = txn ? parseFloat(txn.price) : 0;
   const isSplitSetup = txn?.isSplit === true;
   const completedSplits = txn?.completedSplits || 0;
   const totalSplits = txn?.totalSplits || splitCount;
-  const allDone = txn?.status === "completed";
+  const allDone = ["completed", "partially_refunded", "refunded"].includes(txn?.status);
+  const tokenInProgress = isTokenSource && txn?.status === "processing";
+  const tokenClosed = isTokenSource && (txn?.closed || ["failed", "cancelled"].includes(txn?.status));
   const nextPersonIndex = completedSplits + 1;
 
   // Equal share based on split count
-  const equalShare = (totalAmount / (isSplitSetup ? totalSplits : splitCount)).toFixed(2);
+  const equalShare = isTokenSource
+    ? (Math.floor(Math.round(totalAmount * 100) / (isSplitSetup ? totalSplits : splitCount)) / 100).toFixed(2)
+    : (totalAmount / (isSplitSetup ? totalSplits : splitCount)).toFixed(2);
 
   // Subsequent payers: remaining amount and their share
   const totalPaid = isSplitSetup && txn?.splitAmount
@@ -91,7 +117,9 @@ export default function SplitPayment() {
     : 0;
   const remaining = totalAmount - totalPaid;
   const subsequentShare = isSplitSetup
-    ? (parseFloat(txn?.splitAmount || "0") || parseFloat(equalShare)).toFixed(2)
+    ? (isTokenSource
+        ? currentTokenPaymentAmount(txn)
+        : (parseFloat(txn?.splitAmount || "0") || parseFloat(equalShare)).toFixed(2))
     : equalShare;
 
   // What's shown as the large static amount
@@ -116,22 +144,33 @@ export default function SplitPayment() {
 
   const handlePay = async () => {
     if (!txn) return;
+    if (isTokenSource && txn.status !== "pending") return;
     setSplitError(null);
     setIsProcessing(true);
     try {
       let payAmt: number;
       if (!isSplitSetup) {
-        const response = await apiRequest("POST", `/api/transactions/${txnId}/split`, {
+        const response = await apiRequest("POST", isTokenSource
+          ? tokenSplitEndpoint(token)
+          : `/api/transactions/${txnId}/split`, {
           totalSplits: splitCount,
         });
         const data = await response.json();
-        if (data.transaction) {
+        if (!isTokenSource && data.transaction) {
           setCurrentTransaction(data.transaction);
           queryClient.setQueryData(["/api/transactions", txnId], data.transaction);
+        } else if (isTokenSource) {
+          await refetchTransaction();
         }
         payAmt = parseFloat(displayAmount);
       } else {
         payAmt = parseFloat(subDisplay);
+      }
+
+      if (isTokenSource) {
+        const base = tokenPaymentPath(token, "checkout");
+        setLocation(base);
+        return;
       }
 
       const payRes = await fetch(`/api/transactions/${txnId}/pay`, {
@@ -155,7 +194,9 @@ export default function SplitPayment() {
     }
   };
 
-  const customLogoUrl: string | null = merchant?.customLogoUrl ?? null;
+  const customLogoUrl: string | null = isTokenSource
+    ? txn?.merchant?.customLogoUrl ?? null
+    : merchant?.customLogoUrl ?? null;
 
   if (isLoading) {
     return (
@@ -195,8 +236,18 @@ export default function SplitPayment() {
         <div style={{ ...cardStyle, minHeight: 560, justifyContent: "flex-start" }}>
           <TaptWordmark customLogoUrl={customLogoUrl} />
 
+          {/* ── Closed token link ── */}
+          {tokenClosed && (
+            <>
+              <div style={{ flex: 1 }} />
+              <p style={{ color: CT.SKY, fontSize: 20, fontWeight: 700 }}>Payment closed</p>
+              <p style={{ color: CT.SKY_DIM, fontSize: 13, marginTop: 8 }}>This payment can no longer be completed.</p>
+              <div style={{ flex: 1 }} />
+            </>
+          )}
+
           {/* ── All paid ── */}
-          {allDone && (
+          {allDone && !tokenClosed && (
             <>
               <div style={{ flex: 1 }} />
               <div style={{ textAlign: "center" }}>
@@ -207,22 +258,26 @@ export default function SplitPayment() {
                 <p style={{ color: CT.SKY_DIM, fontSize: 13 }}>total paid</p>
               </div>
               <div style={{ flex: 1 }} />
-              <button style={{ ...outlineBtnStyle, marginTop: 8 }} onClick={() => setLocation("/")}>done</button>
+              <button style={{ ...outlineBtnStyle, marginTop: 8 }} onClick={() => setLocation(
+                "/",
+              )}>done</button>
             </>
           )}
 
           {/* ── Redirecting ── */}
-          {!allDone && isProcessing && (
+          {!allDone && !tokenClosed && (isProcessing || tokenInProgress) && (
             <>
               <div style={{ flex: 1 }} />
               <Loader2 size={32} color={CT.SKY} style={{ animation: "spin 1s linear infinite" }} />
-              <p style={{ color: CT.SKY, fontSize: 15, fontWeight: 600, marginTop: 14 }}>Taking you to payment…</p>
+              <p style={{ color: CT.SKY, fontSize: 15, fontWeight: 600, marginTop: 14 }}>
+                {tokenInProgress ? "Payment in progress…" : "Taking you to payment…"}
+              </p>
               <div style={{ flex: 1 }} />
             </>
           )}
 
           {/* ── First person ── */}
-          {!allDone && !isProcessing && !isSplitSetup && (
+          {!allDone && !tokenClosed && !isProcessing && !tokenInProgress && !isSplitSetup && (
             <>
               <div style={{ flex: 1, minHeight: 12 }} />
               <div style={{ ...chipStyle, marginBottom: 14 }}>Person 1 of {splitCount}</div>
@@ -257,12 +312,14 @@ export default function SplitPayment() {
                       ? <>your amount: <span style={{ color: CT.SKY, fontWeight: 700 }}>${confirmedCustom}</span></>
                       : <>each pays <span style={{ color: CT.SKY, fontWeight: 700 }}>${equalShare}</span></>}
                   </p>
-                  <button
-                    onClick={() => { setEditValue(confirmedCustom ?? totalAmount.toFixed(2)); setEditMode(true); }}
-                    style={footerLinkStyle}
-                  >
-                    {confirmedCustom ? "change amount" : "enter different amount"}
-                  </button>
+                  {!isTokenSource && (
+                    <button
+                      onClick={() => { setEditValue(confirmedCustom ?? totalAmount.toFixed(2)); setEditMode(true); }}
+                      style={footerLinkStyle}
+                    >
+                      {confirmedCustom ? "change amount" : "enter different amount"}
+                    </button>
+                  )}
                 </>
               )}
 
@@ -302,6 +359,10 @@ export default function SplitPayment() {
               {!editMode && (
                 <button
                   onClick={async () => {
+                    if (isTokenSource) {
+                      setLocation(tokenPaymentPath(token, "checkout"));
+                      return;
+                    }
                     try {
                       const payRes = await fetch(`/api/transactions/${txnId}/pay`, {
                         method: "POST",
@@ -324,7 +385,7 @@ export default function SplitPayment() {
           )}
 
           {/* ── Subsequent payers ── */}
-          {!allDone && !isProcessing && isSplitSetup && (
+          {!allDone && !tokenClosed && !isProcessing && !tokenInProgress && isSplitSetup && (
             <>
               <div style={{ flex: 1, minHeight: 12 }} />
               <div style={{ ...chipStyle, marginBottom: 14 }}>Person {nextPersonIndex} of {totalSplits}</div>
@@ -333,12 +394,14 @@ export default function SplitPayment() {
               {!subEditMode && (
                 <>
                   <p style={{ ...amountStyle, fontSize: 56 }}>${subDisplay}</p>
-                  <button
-                    onClick={() => { setSubEditValue(subConfirmed ?? remaining.toFixed(2)); setSubEditMode(true); }}
-                    style={footerLinkStyle}
-                  >
-                    {subConfirmed ? "change amount" : "enter different amount"}
-                  </button>
+                  {!isTokenSource && (
+                    <button
+                      onClick={() => { setSubEditValue(subConfirmed ?? remaining.toFixed(2)); setSubEditMode(true); }}
+                      style={footerLinkStyle}
+                    >
+                      {subConfirmed ? "change amount" : "enter different amount"}
+                    </button>
+                  )}
                 </>
               )}
 

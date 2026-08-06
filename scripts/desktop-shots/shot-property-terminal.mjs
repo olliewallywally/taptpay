@@ -67,6 +67,8 @@ async function installMocks(page) {
   await page.route(`**/api/merchants/${MERCHANT_ID}/**`, (r) => json(r, []));
   await page.route(`**/api/merchants/${MERCHANT_ID}`, (r) =>
     json(r, { id: MERCHANT_ID, businessName: "Wallace Property", status: "active" }));
+  await page.route(`**/api/merchants/${MERCHANT_ID}/profile`, (r) =>
+    json(r, { id: MERCHANT_ID, businessName: "Wallace Property", status: "active" }));
 }
 
 async function shoot(browser, label, ctxOpts) {
@@ -125,7 +127,10 @@ async function main() {
   const b = await shoot(browser, "tablet", { viewport: { width: 1194, height: 834 }, hasTouch: true });
   await browser.close();
   const errors = [...a, ...b];
-  console.log(errors.length ? `PAGE ERRORS:\n${errors.join("\n")}` : "no page errors");
+  if (errors.length) {
+    throw new Error(`PAGE ERRORS:\n${errors.join("\n")}`);
+  }
+  console.log("no page errors");
   console.log(`shots → ${OUT}`);
 }
 

@@ -71,9 +71,9 @@ export default function AdminMerchantDetail() {
 
   // Fetch merchant details
   const { data: merchant, isLoading: merchantLoading } = useQuery<MerchantDetails>({
-    queryKey: ['/api/merchants', merchantId],
+    queryKey: ['/api/admin/merchants', merchantId],
     queryFn: async () => {
-      const response = await fetch(`/api/merchants/${merchantId}`, {
+      const response = await fetch(`/api/admin/merchants/${merchantId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('adminAuthToken')}`
         }
@@ -118,7 +118,7 @@ export default function AdminMerchantDetail() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/merchants', merchantId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/merchants', merchantId] });
       setIsEditing(false);
       setEditedMerchant({});
       toast({

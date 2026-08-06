@@ -402,7 +402,7 @@ export default function DesktopPropertyHome(props: DesktopRoutePageProps) {
       {/* ── RIGHT COLUMN ── */}
       <div className="ph-right">
         {/* portfolio health */}
-        <div className="ph-health">
+        <div className="ph-health" data-tutorial-id="property-home-health">
           {healthBox && m.detail[healthBox] ? (
             <div className="ph-hdet">
               <div className="ph-hdet-head">
@@ -456,7 +456,7 @@ export default function DesktopPropertyHome(props: DesktopRoutePageProps) {
         </div>
 
         {/* notifications */}
-        <div className="ph-notif" style={{ height: notifOpen ? 194 : 108 }}>
+        <div className="ph-notif" data-tutorial-id="property-home-notifications" style={{ height: notifOpen ? 194 : 108 }}>
           <span className="ph-notif-glow" />
           <button
             type="button"
@@ -554,17 +554,17 @@ export default function DesktopPropertyHome(props: DesktopRoutePageProps) {
 
         {/* quick actions */}
         <div className="ph-actions">
-          <button type="button" className="ph-action ph-action-primary" aria-label="set up rent payment" onClick={go("/property/terminal")}>
+          <button type="button" className="ph-action ph-action-primary" data-tutorial-id="property-home-rent" aria-label="set up rent payment" onClick={go("/property/terminal")}>
             <span className="ph-action-glow" />
             <svg className="ph-action-ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={NAVY} strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
             <span className="ph-action-label" style={{ color: NAVY }}>set up<br />rent payment</span>
           </button>
-          <button type="button" className="ph-action" aria-label="send reminder" onClick={go("/property/terminal?mode=reminder")}>
+          <button type="button" className="ph-action" data-tutorial-id="property-home-reminder" aria-label="send reminder" onClick={go("/property/terminal?mode=reminder")}>
             <span className="ph-action-glow" />
             <svg className="ph-action-ico" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#CFE0FF" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="13" r="7" /><path d="M12 10v3l2 2" /><path d="M5 4 3 6M19 4l2 2" /></svg>
             <span className="ph-action-label">send<br />reminder</span>
           </button>
-          <button type="button" className="ph-action" aria-label="send expense" onClick={go("/property/terminal?mode=expense")}>
+          <button type="button" className="ph-action" data-tutorial-id="property-home-expense" aria-label="send expense" onClick={go("/property/terminal?mode=expense")}>
             <span className="ph-action-glow" />
             <svg className="ph-action-ico" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#CFE0FF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" /><path d="M9.5 8h5M9.5 12h5" /></svg>
             <span className="ph-action-label">send<br />expense</span>

@@ -4,6 +4,7 @@ import { mkdir } from "node:fs/promises";
 import {
   BASE_URL,
   CLIENTS,
+  INVOICES,
   SITE,
   assertAbsent,
   assertVisible,
@@ -13,6 +14,27 @@ import {
 } from "./trades-fixtures.mjs";
 
 const OUT = "/tmp/taptpay-desktop-3b";
+const LONG_CLIENT_ID = "00000000-0000-4000-8000-0000000000aa";
+const LONG_FIRST_NAME = "A".repeat(80);
+const LONG_LAST_NAME = "B".repeat(80);
+const LONG_NAME = `${LONG_FIRST_NAME} ${LONG_LAST_NAME}`;
+const LONG_SITE = `9 ${"Z".repeat(198)}`;
+
+const LONG_CLIENT = {
+  ...CLIENTS[0],
+  id: LONG_CLIENT_ID,
+  firstName: LONG_FIRST_NAME,
+  lastName: LONG_LAST_NAME,
+  siteAddress: LONG_SITE,
+};
+
+const SCROLL_CLIENTS = Array.from({ length: 8 }, (_, index) => ({
+  ...CLIENTS[0],
+  id: `00000000-0000-4000-8000-${String(index + 20).padStart(12, "0")}`,
+  firstName: `Scroll${index + 1}`,
+  lastName: "Client",
+  siteAddress: `${index + 20} Scroll Test Road, Auckland`,
+}));
 
 async function shoot(browser, label, contextOptions) {
   const { context, page, errors } = await newTradesPage(browser, label, contextOptions);
@@ -20,7 +42,16 @@ async function shoot(browser, label, contextOptions) {
   /* Registered after the shared mocks, so this wins for /api/trades/clients.
      A POST appends to the served list, which is what the page's cache
      invalidation then refetches. */
-  const clients = [...CLIENTS];
+  const clients = [...CLIENTS, LONG_CLIENT, ...SCROLL_CLIENTS];
+  const invoices = [
+    ...INVOICES,
+    {
+      ...INVOICES[0],
+      id: "long-client-paid",
+      clientProfileId: LONG_CLIENT_ID,
+      amountCents: 123456,
+    },
+  ];
   await page.route("**/api/trades/clients", async (route) => {
     if (route.request().method() !== "POST") return json(route, clients);
     const body = JSON.parse(route.request().postData() ?? "{}");
@@ -34,6 +65,7 @@ async function shoot(browser, label, contextOptions) {
     clients.push(created);
     return json(route, created, 201);
   });
+  await page.route("**/api/trades/invoices", (route) => json(route, invoices));
 
   try {
     await page.goto(`${BASE_URL}/trades/clients`, { waitUntil: "networkidle" });
@@ -45,12 +77,91 @@ async function shoot(browser, label, contextOptions) {
       await page.screenshot({ path: `${OUT}/${label}-${name}.png` });
     };
 
-    const row = (name) => page.getByRole("button", { name: `view ${name}`, exact: true });
+    const row = (name) => page.getByRole("button", { name, exact: true });
 
     await assertVisible(row("Mike Thompson"), "active client row");
     await assertAbsent(row("Alice Archived"), "archived client in the directory");
     await assertAbsent(row("Priya Prospect"), "hidden prospect in the directory");
     await screenshot("1-directory");
+
+    /* Boundary fixture: the API permits 80+80-character names and long site
+       addresses. The row must wrap in its fixed 400px column, retain all
+       visible details in the accessibility tree, and keep the list scrollable. */
+    const longRow = row(LONG_NAME);
+    await longRow.scrollIntoViewIfNeeded();
+    await longRow.focus();
+    const contract = await longRow.evaluate((element) => {
+      const list = element.closest(".tc-list");
+      const name = element.querySelector(".tc-row-name");
+      const site = element.querySelector(".tc-row-site");
+      const avatar = element.querySelector(".tc-avatar");
+      const dot = element.querySelector(".tc-row-dot");
+      const labelledBy = element.getAttribute("aria-labelledby");
+      const describedBy = element.getAttribute("aria-describedby") ?? "";
+      const label = labelledBy ? document.getElementById(labelledBy)?.textContent?.trim() : null;
+      const description = describedBy
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((id) => document.getElementById(id)?.textContent?.trim() ?? "")
+        .join(" ");
+      const rowRect = element.getBoundingClientRect();
+      const listRect = list?.getBoundingClientRect();
+      return {
+        active: document.activeElement === element,
+        ariaLabel: element.getAttribute("aria-label"),
+        label,
+        description,
+        avatarHidden: avatar?.getAttribute("aria-hidden"),
+        dotHidden: dot?.getAttribute("aria-hidden"),
+        nameWhiteSpace: name ? getComputedStyle(name).whiteSpace : null,
+        nameOverflowWrap: name ? getComputedStyle(name).overflowWrap : null,
+        siteWhiteSpace: site ? getComputedStyle(site).whiteSpace : null,
+        siteOverflowWrap: site ? getComputedStyle(site).overflowWrap : null,
+        rowScrollWidth: element.scrollWidth,
+        rowClientWidth: element.clientWidth,
+        rowLeft: rowRect.left,
+        rowRight: rowRect.right,
+        listLeft: listRect?.left ?? null,
+        listRight: listRect?.right ?? null,
+        listRowCount: list?.querySelectorAll(".tc-row").length ?? 0,
+        listScrollHeight: list?.scrollHeight ?? 0,
+        listClientHeight: list?.clientHeight ?? 0,
+      };
+    });
+
+    if (!contract.active) throw new Error("Expected the long client row to receive focus");
+    if (contract.ariaLabel !== null) throw new Error("Trades row still overrides its visible accessible name");
+    if (contract.label !== LONG_NAME) throw new Error("Trades row accessible name lost the full visible name");
+    if (contract.description !== `${LONG_SITE} paid $1,234.56`) {
+      throw new Error("Trades row description did not include the full visible site, status and amount");
+    }
+    if (contract.avatarHidden !== "true" || contract.dotHidden !== "true") {
+      throw new Error("Decorative trades row initials/status dot reached the accessibility tree");
+    }
+    if (
+      contract.nameWhiteSpace !== "normal" ||
+      contract.nameOverflowWrap !== "anywhere" ||
+      contract.siteWhiteSpace !== "normal" ||
+      contract.siteOverflowWrap !== "anywhere"
+    ) {
+      throw new Error("Long trades client text is not configured to wrap anywhere");
+    }
+    if (contract.rowScrollWidth > contract.rowClientWidth + 1) {
+      throw new Error("Long trades client content clips horizontally inside its row");
+    }
+    if (
+      contract.listLeft === null ||
+      contract.listRight === null ||
+      contract.rowLeft < contract.listLeft - 1 ||
+      contract.rowRight > contract.listRight + 1
+    ) {
+      throw new Error("Long trades client row escaped the fixed directory column");
+    }
+    if (contract.listRowCount < 10 || contract.listScrollHeight <= contract.listClientHeight) {
+      throw new Error("Expected 10+ trades rows to remain vertically scrollable");
+    }
+    await screenshot("1b-long-content");
+    await page.locator(".tc-list").evaluate((element) => { element.scrollTop = 0; });
 
     /* Search matches the site as well as the name. */
     const search = page.getByRole("textbox", {

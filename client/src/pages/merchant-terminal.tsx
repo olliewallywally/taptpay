@@ -145,9 +145,11 @@ export default function MerchantTerminal() {
 
   // Get merchant data
   const { data: merchant } = useQuery({
-    queryKey: ["/api/merchants", merchantId],
+    queryKey: ["/api/merchants", merchantId, "profile"],
     queryFn: async () => {
-      const response = await fetch(`/api/merchants/${merchantId}`);
+      const response = await fetch(`/api/merchants/${merchantId}/profile`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+      });
       if (!response.ok) throw new Error("Failed to fetch merchant");
       return response.json();
     },
@@ -396,7 +398,9 @@ export default function MerchantTerminal() {
 
   // Set up SSE connection
   useEffect(() => {
-    sseClient.connect(merchantId);
+    const token = localStorage.getItem("authToken");
+    if (!token) return;
+    sseClient.connectMerchant(merchantId, token);
     
     sseClient.subscribe("transaction_updated", (message) => {
       // Route through the query cache only — the [activeTransaction] effect

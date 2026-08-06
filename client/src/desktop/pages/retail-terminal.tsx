@@ -7,6 +7,14 @@ import {
   DesktopPageScaffold,
   type DesktopRoutePageProps,
 } from "../DesktopPageScaffold";
+import {
+  DESKTOP_KEYPAD_KEYS,
+  DesktopKeypadButton,
+  desktopKeypadCents,
+  desktopKeypadReducer,
+  formatDesktopKeypadMoney,
+  type DesktopKeypadKey,
+} from "../desktop-keypad";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -24,6 +32,31 @@ const AMBER = "#F0A34E";
 const VIOLET = "#9DBCFF";
 
 type Mode = "send" | "keypad" | "stock" | "split" | "share";
+
+type SaleDestination =
+  | { kind: "no-board" }
+  | { kind: "board"; boardId: number };
+
+interface CreateSaleInput {
+  item: string;
+  price: string;
+  splitEnabled: boolean;
+  destination: SaleDestination;
+}
+
+interface CreatedSaleResponse {
+  id?: number;
+  paymentUrl?: string | null;
+  qrCodeUrl?: string | null;
+}
+
+interface CurrentSale {
+  item: string;
+  amount: number;
+  paymentUrl: string;
+  qrCodeUrl: string;
+  destination: SaleDestination;
+}
 
 interface Tx {
   id: number;
@@ -51,20 +84,31 @@ interface Stone {
   qrCodeUrl?: string | null;
 }
 
+const BOARD_LIMIT_MESSAGE = "Maximum 10 tapt stones allowed per merchant";
+
+function apiErrorDetails(error: unknown): { status: number | null; message: string } {
+  const raw = error instanceof Error ? error.message : String(error ?? "");
+  const statusMatch = raw.match(/^(\d{3}):\s*/);
+  const status = statusMatch ? Number(statusMatch[1]) : null;
+  const withoutStatus = statusMatch ? raw.slice(statusMatch[0].length) : raw;
+  const jsonStart = withoutStatus.indexOf("{");
+  if (jsonStart >= 0) {
+    try {
+      const parsed = JSON.parse(withoutStatus.slice(jsonStart));
+      if (typeof parsed?.message === "string" && parsed.message.trim()) {
+        return { status, message: parsed.message.trim() };
+      }
+    } catch {
+      /* Fall through to the server text below. */
+    }
+  }
+  return { status, message: withoutStatus.trim() };
+}
+
 const num = (p: unknown) => parseFloat(String(p ?? "0") || "0") || 0;
 const money2 = (n: number) =>
   "$" + n.toLocaleString("en-NZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const moneyWhole = (n: number) => "$" + Math.round(n).toLocaleString("en-NZ");
-
-/* Keypad entry is a raw string ("15.5") formatted exactly as the prototype does. */
-function kpMoney(v: string): string {
-  if (!v) return "$0.00";
-  const [rawD, rawC] = v.split(".");
-  const d = (rawD || "0").replace(/^0+(?=\d)/, "");
-  const dn = Number(d).toLocaleString("en-NZ");
-  if (v.includes(".")) return "$" + dn + "." + ((rawC || "") + "00").slice(0, 2);
-  return "$" + dn + ".00";
-}
 
 function initials(name: string): string {
   const parts = String(name ?? "")
@@ -104,7 +148,6 @@ const FILTER_BUCKET: Record<StackFilter, Bucket | null> = {
   failed: "failed",
 };
 
-const KP_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "<"] as const;
 const QUICK_AMTS = ["5", "10", "15", "20"] as const;
 const SPLIT_WAYS = [2, 3, 4, 6] as const;
 
@@ -117,13 +160,14 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
   const [amount, setAmount] = useState(0);
   const [kpVal, setKpVal] = useState("");
   const [itemName, setItemName] = useState("");
-  const [via, setVia] = useState<"paywave" | "boards">("paywave");
-  const [stoneId, setStoneId] = useState<number | null>(null);
+  const [destination, setDestination] = useState<SaleDestination>({ kind: "no-board" });
+  const [currentSale, setCurrentSale] = useState<CurrentSale | null>(null);
+  const [saleError, setSaleError] = useState<string | null>(null);
+  const [boardError, setBoardError] = useState<string | null>(null);
   const [splitOn, setSplitOn] = useState(false);
   const [splitN, setSplitN] = useState<number>(2);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<StackFilter>("all");
-  const [sendFlash, setSendFlash] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
@@ -135,8 +179,8 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
   };
 
   const merchantQuery = useQuery<any>({
-    queryKey: ["/api/merchants", merchantId],
-    queryFn: () => authFetch(`/api/merchants/${merchantId}`),
+    queryKey: ["/api/merchants", merchantId, "profile"],
+    queryFn: () => authFetch(`/api/merchants/${merchantId}/profile`),
     enabled: !!merchantId,
   });
 
@@ -164,41 +208,98 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
   const stones = stonesQuery.data ?? [];
   const merchant = merchantQuery.data;
 
-  /* Payment links come from the server (merchant + per-board), same as mobile. */
-  const merchantLink: string =
-    merchant?.paymentUrl ||
-    (typeof window !== "undefined" && merchantId ? `${window.location.origin}/pay/${merchantId}` : "");
-
-  const createMutation = useMutation({
-    mutationFn: async (body: {
-      itemName: string;
-      price: string;
-      splitEnabled: boolean;
-      selectedStoneId?: number;
-    }) => {
+  const createMutation = useMutation<CreatedSaleResponse, Error, CreateSaleInput>({
+    mutationFn: async (sale) => {
       const res = await apiRequest("POST", "/api/transactions", {
         merchantId,
-        itemName: body.itemName,
-        price: body.price,
+        itemName: sale.item,
+        price: sale.price,
         status: "pending",
-        splitEnabled: body.splitEnabled,
-        ...(body.selectedStoneId ? { selectedStoneId: body.selectedStoneId } : {}),
+        splitEnabled: sale.splitEnabled,
+        ...(sale.destination.kind === "no-board"
+          ? { linkMode: "per_payment" }
+          : { selectedStoneId: sale.destination.boardId, linkMode: "legacy" }),
       });
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
-      setSendFlash(true);
-      setTimeout(() => setSendFlash(false), 1600);
+    onMutate: () => {
+      /* The raw credential is intentionally returned once. Never leave the
+         previous one visible while another request is pending or fails. */
+      setCurrentSale(null);
+      setSaleError(null);
+      setCopiedKey(null);
+    },
+    onSuccess: (created, sale) => {
+      void queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "transactions"] });
+      void queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "active-transaction"] });
+
+      const paymentUrl = typeof created?.paymentUrl === "string" ? created.paymentUrl.trim() : "";
+      const qrCodeUrl = typeof created?.qrCodeUrl === "string" ? created.qrCodeUrl.trim() : "";
+      if (!paymentUrl || !qrCodeUrl) {
+        const message = "The sale was created, but its private share link was not returned. Start a new sale to try again.";
+        setSaleError(message);
+        setMode("share");
+        toast({ title: "Payment link unavailable", description: message, variant: "destructive" });
+      } else {
+        setCurrentSale({
+          item: sale.item,
+          amount: num(sale.price),
+          paymentUrl,
+          qrCodeUrl,
+          destination: sale.destination,
+        });
+        setMode("share");
+      }
       setItemName("");
       setAmount(0);
       setSplitOn(false);
-      setMode("send");
     },
-    onError: () => {
+    onError: (error) => {
       /* 402 BILLING_CARD_REQUIRED surfaces its own persistent warning via apiRequest. */
-      toast({ title: "Couldn't start the sale", description: "Please try again", variant: "destructive" });
+      const detail = apiErrorDetails(error);
+      const message = detail.message || "Please try again";
+      setSaleError(message);
+      toast({ title: "Couldn't start the sale", description: message, variant: "destructive" });
+    },
+  });
+
+  const createBoardMutation = useMutation<Stone, Error>({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/merchants/${merchantId}/tapt-stones`, {});
+      return res.json();
+    },
+    onMutate: () => setBoardError(null),
+    onSuccess: (created) => {
+      if (typeof created?.id !== "number") {
+        const message = "New board created, but its details could not be loaded";
+        setBoardError(message);
+        void stonesQuery.refetch();
+        return;
+      }
+      queryClient.setQueryData<Stone[]>(
+        ["/api/merchants", merchantId, "tapt-stones"],
+        (current = []) =>
+          [...current.filter((stone) => stone.id !== created.id), created].sort(
+            (a, b) => a.stoneNumber - b.stoneNumber,
+          ),
+      );
+      setDestination({ kind: "board", boardId: created.id });
+      setBoardError(null);
+      void queryClient.invalidateQueries({
+        queryKey: ["/api/merchants", merchantId, "tapt-stones"],
+      });
+      toast({ title: "New board created", description: `${created.name} selected` });
+    },
+    onError: (error) => {
+      const detail = apiErrorDetails(error);
+      const message = detail.message || "Failed to create a new board";
+      setBoardError(message);
+      if (detail.status === 409) void stonesQuery.refetch();
+      toast({
+        title: message === BOARD_LIMIT_MESSAGE ? "Board limit reached" : "Couldn't create board",
+        description: message,
+        variant: "destructive",
+      });
     },
   });
 
@@ -252,8 +353,17 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
   }, [transactions, search, filter]);
 
   const splitEach = splitN > 0 ? amount / splitN : amount;
-  const boardsReady = via === "boards" && stones.length > 0;
-  const activeStone = boardsReady ? (stones.find((s) => s.id === stoneId) ?? stones[0]) : undefined;
+  const selectedBoard =
+    destination.kind === "board"
+      ? stones.find((stone) => stone.id === destination.boardId)
+      : undefined;
+  const currentSaleBoardId =
+    currentSale?.destination.kind === "board" ? currentSale.destination.boardId : null;
+  const currentSaleBoard =
+    currentSaleBoardId == null
+      ? undefined
+      : stones.find((stone) => stone.id === currentSaleBoardId);
+  const atBoardLimit = stones.length >= 10;
 
   /* ── actions ── */
   const send = (withSplit: boolean) => {
@@ -265,29 +375,36 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
       toast({ title: "Item name is required", variant: "destructive" });
       return;
     }
+    if (destination.kind === "board" && !selectedBoard) {
+      const message = "That board is no longer available. Choose another destination.";
+      setSaleError(message);
+      toast({ title: "Choose a destination", description: message, variant: "destructive" });
+      return;
+    }
     createMutation.mutate({
-      itemName: itemName.trim(),
+      item: itemName.trim(),
       price: amount.toFixed(2),
       splitEnabled: withSplit,
-      selectedStoneId: activeStone?.id,
+      destination,
     });
   };
 
-  const pressKey = (k: string) => {
-    setKpVal((v) => {
-      if (k === "<") return v.slice(0, -1);
-      if (k === ".") return v.includes(".") ? v : v ? v + "." : "0.";
-      if (v.replace(".", "").length >= 7) return v;
-      return v + k;
-    });
+  const clearCurrentSale = () => {
+    setCurrentSale(null);
+    setSaleError(null);
+    setCopiedKey(null);
   };
+
+  const pressKey = (key: DesktopKeypadKey) =>
+    setKpVal((value) => desktopKeypadReducer(value, key));
 
   const openKeypad = () => {
+    clearCurrentSale();
     setKpVal("");
     setMode("keypad");
   };
   const commitKeypad = () => {
-    setAmount(num(kpVal));
+    setAmount(desktopKeypadCents(kpVal) / 100);
     setKpVal("");
     setMode("send");
   };
@@ -297,14 +414,16 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
   };
 
   const pickStock = (item: StockItem) => {
+    clearCurrentSale();
     setItemName(item.name);
     setAmount(num(item.cost));
     setMode("send");
   };
 
-  const pickVia = (v: "paywave" | "boards") => {
-    setVia(v);
-    if (v === "boards" && stoneId === null && stones.length > 0) setStoneId(stones[0].id);
+  const openComposeMode = (nextMode: Exclude<Mode, "share">) => {
+    clearCurrentSale();
+    if (nextMode === "keypad") openKeypad();
+    else setMode(nextMode);
   };
 
   const copyLink = async (url: string, key: string) => {
@@ -330,14 +449,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
     }
   };
 
-  const openQr = () => {
-    const qr = activeStone?.qrCodeUrl || merchant?.qrCodeUrl;
-    if (!qr) {
-      toast({ title: "No QR code yet", description: "Your payment QR is generated with your first board" });
-      return;
-    }
-    window.open(qr, "_blank");
-  };
+  const openQr = (qrCodeUrl: string) => window.open(qrCodeUrl, "_blank");
 
   /* rail button helper */
   const railBtn = (m: Mode, big: boolean, path: JSX.Element, label: string) => {
@@ -349,7 +461,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
         aria-label={label}
         aria-pressed={on}
         style={big ? undefined : { background: on ? ACTIVE : "transparent" }}
-        onClick={() => (big ? openKeypad() : setMode(m))}
+        onClick={() => (m === "share" ? setMode("share") : openComposeMode(m))}
       >
         <svg
           width={big ? 24 : 19}
@@ -374,11 +486,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
     fontWeight: on ? 700 : 600,
   });
 
-  const sendLabel = sendFlash
-    ? "payment sent ✓"
-    : createMutation.isPending
-      ? "sending…"
-      : "send payment";
+  const sendLabel = createMutation.isPending ? "creating private link…" : "send payment";
 
   return (
     <DesktopPageScaffold {...props} vertical="retail" page="terminal" showScope={false}>
@@ -406,7 +514,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
           <span className="rt-hero rt-hero-dim">{txQuery.isLoading ? "—" : txnsToday}</span>
           <span className="rt-hero-sub rt-hero-sub-dim">transactions today</span>
 
-          <div className="rt-stack">
+          <div className="rt-stack" data-tutorial-id="retail-terminal-live-payments">
             <div className="rt-stack-head">
               <span className="rt-stack-title">
                 <span>active stack</span>
@@ -441,7 +549,10 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
                   const live = r.meta.bucket === "awaiting";
                   const open = expandedId === r.id;
                   const stone = stones.find((s) => s.id === r.taptStoneId);
-                  const rowLink = stone?.paymentUrl || merchantLink;
+                  /* Per-payment no-board credentials are intentionally not
+                     recoverable from transaction history. Only board rows have
+                     a durable link that can safely be shown again. */
+                  const rowLink = stone?.paymentUrl?.trim() || "";
                   return (
                     <div key={r.id} className="rt-row-wrap">
                       <div
@@ -474,9 +585,13 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
                       </div>
                       {live && open && (
                         <div className="rt-row-actions">
-                          <button type="button" className="rt-row-act" onClick={() => copyLink(rowLink, `tx-${r.id}`)}>
-                            {copiedKey === `tx-${r.id}` ? "copied ✓" : "copy link"}
-                          </button>
+                          {rowLink ? (
+                            <button type="button" className="rt-row-act" onClick={() => copyLink(rowLink, `tx-${r.id}`)}>
+                              {copiedKey === `tx-${r.id}` ? "copied ✓" : "copy board link"}
+                            </button>
+                          ) : (
+                            <span className="rt-row-link-note">private link available only when the sale starts</span>
+                          )}
                           <button
                             type="button"
                             className="rt-row-act rt-row-act-danger"
@@ -497,7 +612,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
 
         {/* ── CENTER RAIL ── */}
         <div className="rt-rail-slot">
-          <div className="rt-rail">
+          <div className="rt-rail" data-tutorial-id="retail-terminal-tools">
             {railBtn("stock", false, (<><rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="7" rx="1.5" /><rect x="4" y="13" width="7" height="7" rx="1.5" /><rect x="13" y="13" width="7" height="7" rx="1.5" /></>), "stock tiles")}
             {railBtn("split", false, (<><path d="M12 3v7" /><path d="M12 10l-6 8" /><path d="M12 10l6 8" /></>), "split bill")}
             {railBtn("keypad", true, (<path d="M12 5v14M5 12h14" />), "keypad")}
@@ -511,36 +626,69 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
           {mode === "send" && (
             <>
               <div className="rt-mode rt-send-top">
-                <div className="rt-amt-row">
+                <div className="rt-amt-row" data-tutorial-id="retail-terminal-amount">
                   <span className="rt-amt">{money2(amount)}</span>
                   <button type="button" className="rt-edit" onClick={openKeypad}>edit&gt;</button>
                 </div>
-                <div className="rt-via">
-                  {(["paywave", "boards"] as const).map((v) => (
-                    <button key={v} type="button" className="rt-via-chip" style={chipStyle(v === via, 1.5)} onClick={() => pickVia(v)}>
-                      {v}
+                <div className="rt-destination-label" id="rt-destination-label">PAYMENT DESTINATION</div>
+                <div className="rt-destinations" data-tutorial-id="retail-terminal-destination" role="radiogroup" aria-labelledby="rt-destination-label">
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={destination.kind === "no-board"}
+                    className="rt-via-chip"
+                    style={chipStyle(destination.kind === "no-board", 1.5)}
+                    onClick={() => setDestination({ kind: "no-board" })}
+                  >
+                    no board
+                  </button>
+                  {stones.map((stone) => (
+                    <button
+                      key={stone.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={destination.kind === "board" && destination.boardId === stone.id}
+                      aria-label={`${stone.name || `board ${stone.stoneNumber}`}, board ${stone.stoneNumber}`}
+                      className="rt-board-chip"
+                      style={chipStyle(destination.kind === "board" && destination.boardId === stone.id, 1)}
+                      onClick={() => setDestination({ kind: "board", boardId: stone.id })}
+                    >
+                      {stone.name || `board ${stone.stoneNumber}`}
                     </button>
                   ))}
                 </div>
-                {via === "boards" && (
-                  stones.length === 0 ? (
-                    <div className="rt-board-hint">no boards yet — add one from the terminal on your phone</div>
-                  ) : (
-                    <div className="rt-boards">
-                      {stones.map((s) => (
-                        <button
-                          key={s.id}
-                          type="button"
-                          className="rt-board-chip"
-                          style={chipStyle(s.id === activeStone?.id, 1)}
-                          onClick={() => setStoneId(s.id)}
-                        >
-                          {s.name || `board ${s.stoneNumber}`}
-                        </button>
-                      ))}
-                    </div>
-                  )
-                )}
+                <div className="rt-board-tools">
+                  <button
+                    type="button"
+                    className="rt-new-board"
+                    aria-label="create new board"
+                    aria-busy={createBoardMutation.isPending}
+                    aria-describedby={
+                      stonesQuery.isLoading || stonesQuery.isError || boardError || atBoardLimit
+                        ? "rt-board-status"
+                        : undefined
+                    }
+                    disabled={createBoardMutation.isPending || atBoardLimit}
+                    onClick={() => createBoardMutation.mutate()}
+                  >
+                    {createBoardMutation.isPending ? "creating board…" : "+ New board"}
+                  </button>
+                  {(stonesQuery.isLoading || stonesQuery.isError || boardError || atBoardLimit) && (
+                    <span
+                      id="rt-board-status"
+                      className={stonesQuery.isError || boardError ? "rt-inline-error" : "rt-board-hint"}
+                      role={stonesQuery.isError || boardError ? "alert" : "status"}
+                      aria-live="polite"
+                    >
+                      {boardError ||
+                        (stonesQuery.isError
+                          ? "Boards couldn't be loaded. No board remains available."
+                          : atBoardLimit
+                            ? BOARD_LIMIT_MESSAGE
+                            : "loading boards…")}
+                    </span>
+                  )}
+                </div>
                 <div className="rt-item-name">{itemName || "new sale"}</div>
                 <div className="rt-item-hint">tap send to share payment</div>
               </div>
@@ -577,13 +725,25 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
                 <button
                   type="button"
                   className="rt-send-btn"
+                  data-tutorial-id="retail-terminal-send"
                   aria-label="send payment"
+                  aria-busy={createMutation.isPending}
+                  aria-describedby={createMutation.isPending || saleError ? "rt-sale-status" : undefined}
                   disabled={createMutation.isPending}
-                  style={sendFlash ? { borderColor: GREEN, color: GREEN } : undefined}
                   onClick={() => send(splitOn)}
                 >
                   {sendLabel}
                 </button>
+                {(createMutation.isPending || saleError) && (
+                  <span
+                    id="rt-sale-status"
+                    className={saleError ? "rt-inline-error" : "rt-inline-status"}
+                    role={saleError ? "alert" : "status"}
+                    aria-live="polite"
+                  >
+                    {saleError || "Creating a private payment link…"}
+                  </span>
+                )}
               </div>
             </>
           )}
@@ -598,7 +758,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5L19 8" /></svg>
                 </button>
               </div>
-              <div className="rt-kp-amt">{kpMoney(kpVal)}</div>
+              <div className="rt-kp-amt">{formatDesktopKeypadMoney(kpVal)}</div>
               <div className="rt-kp-quick">
                 {QUICK_AMTS.map((q) => (
                   <button key={q} type="button" className="rt-kp-quick-btn" onClick={() => setKpVal(q)}>${q}</button>
@@ -606,47 +766,21 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
               </div>
               <div className="rt-kp-hint">quick amounts or type it — ✓ starts the sale</div>
               <div className="rt-kp-grid">
-                {KP_KEYS.map((k) => {
+                {DESKTOP_KEYPAD_KEYS.map((k) => {
                   const fill = k !== "." && k !== "<";
                   return (
-                    <button
+                    <DesktopKeypadButton
                       key={k}
-                      type="button"
+                      keyValue={k}
                       className="rt-kp-key"
-                      aria-label={k === "<" ? "backspace" : k === "." ? "decimal point" : k}
                       style={{
                         background: fill ? ACTIVE : "transparent",
                         border: fill ? "none" : `1.5px solid ${ACCENT}`,
                         color: fill ? "#FFFFFF" : VIOLET,
                         boxShadow: fill ? "0 14px 22px rgba(0,6,25,0.45)" : "none",
                       }}
-                      onClick={() => pressKey(k)}
-                    >
-                      {/* The two non-digit keys are drawn as glyphs rather than
-                          characters: a "." sits on the text baseline and reads as
-                          bottom-aligned in an 80px circle, and "<" is a less-than
-                          sign, not a backspace. Both are optically centred. */}
-                      {k === "." ? (
-                        <span className="rt-kp-dot" />
-                      ) : k === "<" ? (
-                        <svg width="34" height="24" viewBox="0 0 34 24" fill="none" aria-hidden="true">
-                          <path
-                            d="M11 3h18a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H11L2 12l9-9Z"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinejoin="round"
-                          />
-                          <path
-                            d="m16 9 8 6m0-6-8 6"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                          />
-                        </svg>
-                      ) : (
-                        k
-                      )}
-                    </button>
+                      onPress={pressKey}
+                    />
                   );
                 })}
               </div>
@@ -699,12 +833,23 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
                   type="button"
                   className="rt-send-btn rt-send-btn-split"
                   aria-label="send split payment"
+                  aria-busy={createMutation.isPending}
+                  aria-describedby={createMutation.isPending || saleError ? "rt-sale-status" : undefined}
                   disabled={createMutation.isPending}
-                  style={sendFlash ? { borderColor: GREEN, color: GREEN } : undefined}
                   onClick={() => send(true)}
                 >
                   {sendLabel}
                 </button>
+                {(createMutation.isPending || saleError) && (
+                  <span
+                    id="rt-sale-status"
+                    className={saleError ? "rt-inline-error" : "rt-inline-status"}
+                    role={saleError ? "alert" : "status"}
+                    aria-live="polite"
+                  >
+                    {saleError || "Creating a private split-payment link…"}
+                  </span>
+                )}
               </div>
             </div>
           )}
@@ -712,51 +857,57 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
           {mode === "share" && (
             <div className="rt-mode rt-share">
               <div className="rt-share-head">Share payment link</div>
-              <div className="rt-share-sub">
-                {(itemName || "current sale") + " · " + money2(amount) + " — anyone with the link can pay"}
-              </div>
-              <div className="rt-share-body">
-                <div className="rt-share-link">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" /><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" /></svg>
-                  <span className="rt-share-url">{merchantLink.replace(/^https?:\/\//, "") || "—"}</span>
-                  <button type="button" className="rt-share-copy" onClick={() => copyLink(merchantLink, "merchant")}>
-                    {copiedKey === "merchant" ? "copied ✓" : "copy link"}
-                  </button>
-                </div>
-                <div className="rt-share-actions">
-                  <button type="button" className="rt-share-act" onClick={() => shareVia("email", merchantLink)}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 7l10 7 10-7" /><rect x="2" y="5" width="20" height="14" rx="2" /></svg>
-                    <span>email</span>
-                  </button>
-                  <button type="button" className="rt-share-act" onClick={() => shareVia("sms", merchantLink)}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 4H4v12h4v4l5-4h7z" /></svg>
-                    <span>sms</span>
-                  </button>
-                  <button type="button" className="rt-share-act" onClick={openQr}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="6" height="6" /><rect x="14" y="4" width="6" height="6" /><rect x="4" y="14" width="6" height="6" /><path d="M14 14h3v3h-3zM20 14v6h-6" /></svg>
-                    <span>QR code</span>
-                  </button>
-                </div>
-                <div className="rt-share-label">BOARD-SPECIFIC LINKS</div>
-                {stones.length === 0 ? (
-                  <div className="rt-empty rt-share-empty">no boards yet</div>
-                ) : (
-                  stones.map((s) => (
-                    <div key={s.id} className="rt-board-row">
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="3" width="14" height="18" rx="2" /><path d="M9 7h6" /></svg>
-                      <span className="rt-board-name">{s.name || `board ${s.stoneNumber}`}</span>
-                      <span className="rt-board-sub">QR + NFC · board {s.stoneNumber}</span>
-                      <button
-                        type="button"
-                        className="rt-share-copy"
-                        onClick={() => copyLink(s.paymentUrl || merchantLink, `stone-${s.id}`)}
-                      >
-                        {copiedKey === `stone-${s.id}` ? "copied ✓" : "copy"}
+              {currentSale ? (
+                <>
+                  <div className="rt-share-sub">
+                    {currentSale.item + " · " + money2(currentSale.amount) + " — anyone with this private link can pay"}
+                  </div>
+                  <div className="rt-share-body" aria-live="polite">
+                    <div className="rt-share-link">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" /><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" /></svg>
+                      <span className="rt-share-url" title={currentSale.paymentUrl}>
+                        {currentSale.paymentUrl.replace(/^https?:\/\//, "")}
+                      </span>
+                      <button type="button" className="rt-share-copy" onClick={() => copyLink(currentSale.paymentUrl, "current-sale")}>
+                        {copiedKey === "current-sale" ? "copied ✓" : "copy link"}
                       </button>
                     </div>
-                  ))
-                )}
-              </div>
+                    <div className="rt-share-actions">
+                      <button type="button" className="rt-share-act" onClick={() => shareVia("email", currentSale.paymentUrl)}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 7l10 7 10-7" /><rect x="2" y="5" width="20" height="14" rx="2" /></svg>
+                        <span>email</span>
+                      </button>
+                      <button type="button" className="rt-share-act" onClick={() => shareVia("sms", currentSale.paymentUrl)}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 4H4v12h4v4l5-4h7z" /></svg>
+                        <span>sms</span>
+                      </button>
+                      <button type="button" className="rt-share-act" onClick={() => openQr(currentSale.qrCodeUrl)}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="6" height="6" /><rect x="14" y="4" width="6" height="6" /><rect x="4" y="14" width="6" height="6" /><path d="M14 14h3v3h-3zM20 14v6h-6" /></svg>
+                        <span>QR code</span>
+                      </button>
+                    </div>
+                    <div className="rt-current-destination">
+                      {currentSale.destination.kind === "no-board"
+                        ? "private no-board link"
+                        : `board ${currentSaleBoard?.stoneNumber ?? currentSaleBoardId} link`}
+                    </div>
+                    <button type="button" className="rt-new-sale" onClick={() => openComposeMode("send")}>
+                      start new sale
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="rt-share-empty-state" aria-live="polite">
+                  {saleError ? (
+                    <p className="rt-inline-error" role="alert">{saleError}</p>
+                  ) : (
+                    <p role="status">No current sale link. Start a sale to generate a private payment link.</p>
+                  )}
+                  <button type="button" className="rt-new-sale" onClick={() => openComposeMode("send")}>
+                    start new sale
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -803,6 +954,7 @@ const RT_CSS = `
 .rt-row-act:disabled { opacity:0.5; cursor:default; }
 .rt-row-act-danger { border-color:rgba(240,101,108,0.5); color:${RED}; }
 .rt-row-act-danger:hover:not(:disabled) { background:rgba(240,101,108,0.1); }
+.rt-row-link-note { align-self:center; max-width:215px; font-weight:500; font-size:10.5px; color:rgba(244,246,255,0.48); }
 .rt-empty { padding:20px 0; font-weight:300; font-size:12.5px; color:rgba(191,209,255,0.5); }
 
 /* ── centre rail (design places it absolutely at x=550) ── */
@@ -823,11 +975,15 @@ const RT_CSS = `
 .rt-amt-row { display:flex; align-items:baseline; gap:12px; }
 .rt-amt { font-family:'Outfit',sans-serif; font-weight:700; font-size:66px; line-height:0.95; color:${KP_INK}; font-variant-numeric:tabular-nums; }
 .rt-edit { font-weight:300; font-size:12px; color:${ACCENT_SOFT}; cursor:pointer; background:transparent; }
-.rt-via { margin-top:18px; display:flex; gap:10px; }
+.rt-destination-label { margin-top:18px; font-weight:700; font-size:9px; letter-spacing:0.16em; color:rgba(244,246,255,0.45); }
+.rt-destinations { margin-top:8px; display:flex; flex-wrap:wrap; gap:8px; }
 .rt-via-chip { padding:9px 22px; border-radius:9999px; font-size:12.5px; cursor:pointer; transition:background .15s ease, color .15s ease; text-transform:lowercase; }
-.rt-boards { margin-top:10px; display:flex; flex-wrap:wrap; gap:8px; }
 .rt-board-chip { padding:6px 14px; border-radius:9999px; font-size:11px; cursor:pointer; transition:background .15s ease, color .15s ease; text-transform:lowercase; }
-.rt-board-hint { margin-top:10px; font-weight:500; font-size:11px; color:rgba(244,246,255,0.4); }
+.rt-board-tools { margin-top:9px; display:flex; align-items:center; gap:10px; min-height:24px; }
+.rt-new-board { padding:5px 11px; border-radius:9999px; border:1px solid rgba(94,158,255,0.5); background:transparent; font-weight:700; font-size:10.5px; color:${ACCENT_SOFT}; cursor:pointer; }
+.rt-new-board:disabled { opacity:0.52; cursor:default; }
+.rt-board-hint, .rt-inline-status { font-weight:500; font-size:10.5px; color:rgba(244,246,255,0.48); }
+.rt-inline-error { font-weight:600; font-size:10.5px; color:${RED}; }
 .rt-item-name { margin-top:16px; font-weight:300; font-size:16px; color:${TEXT_SOFT}; text-transform:lowercase; }
 .rt-item-hint { margin-top:4px; font-weight:500; font-size:13px; color:rgba(244,246,255,0.5); }
 .rt-field { display:flex; flex-direction:column; gap:8px; }
@@ -857,7 +1013,6 @@ const RT_CSS = `
 .rt-kp-grid { margin:36px auto 0; display:grid; grid-template-columns:repeat(3,80px); gap:36px 56px; justify-content:center; }
 .rt-kp-key { width:80px; height:80px; border-radius:50%; font-size:34px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; font-family:'Outfit',sans-serif; box-sizing:border-box; transition:opacity .12s ease; }
 .rt-kp-key:hover { opacity:0.88; }
-.rt-kp-dot { width:9px; height:9px; border-radius:50%; background:currentColor; }
 
 /* stock tiles */
 .rt-stock { margin-top:40px; }
@@ -890,9 +1045,8 @@ const RT_CSS = `
 .rt-share-actions { display:flex; gap:10px; }
 .rt-share-act { flex:1; display:inline-flex; align-items:center; justify-content:center; gap:8px; height:44px; border-radius:9999px; border:1.5px solid rgba(94,158,255,0.55); background:transparent; font-weight:600; font-size:12.5px; color:${ACCENT_SOFT}; cursor:pointer; transition:background .15s ease; }
 .rt-share-act:hover { background:rgba(94,158,255,0.08); }
-.rt-share-label { margin-top:14px; font-weight:700; font-size:10px; letter-spacing:0.18em; color:rgba(244,246,255,0.45); }
-.rt-board-row { display:flex; align-items:center; gap:12px; height:50px; padding:0 20px; box-sizing:border-box; border-radius:12px; background:rgba(94,158,255,0.08); }
-.rt-board-name { flex:1; min-width:0; font-weight:600; font-size:12.5px; color:${TEXT_SOFT}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.rt-board-sub { font-weight:500; font-size:11px; color:rgba(244,246,255,0.45); white-space:nowrap; }
-.rt-share-empty { padding:6px 0; }
+.rt-current-destination { font-weight:600; font-size:11px; color:rgba(244,246,255,0.48); text-transform:lowercase; }
+.rt-new-sale { align-self:flex-start; padding:8px 17px; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); background:transparent; font-weight:700; font-size:11.5px; color:${ACCENT_SOFT}; cursor:pointer; }
+.rt-share-empty-state { margin-top:28px; display:flex; flex-direction:column; align-items:flex-start; gap:18px; max-width:440px; padding:22px; border-radius:14px; border:1px solid rgba(94,158,255,0.35); font-weight:500; font-size:12.5px; color:rgba(244,246,255,0.62); }
+.rt-share-empty-state p { margin:0; }
 `;

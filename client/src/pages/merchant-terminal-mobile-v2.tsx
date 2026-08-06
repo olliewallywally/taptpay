@@ -74,9 +74,11 @@ export default function MerchantTerminalMobile() {
   const merchantId = getCurrentMerchantId();
 
   const { data: merchant } = useQuery({
-    queryKey: ["/api/merchants", merchantId],
+    queryKey: ["/api/merchants", merchantId, "profile"],
     queryFn: async () => {
-      const r = await fetch(`/api/merchants/${merchantId}`);
+      const r = await fetch(`/api/merchants/${merchantId}/profile`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+      });
       if (!r.ok) throw new Error("Failed to fetch merchant");
       return r.json();
     },
@@ -131,7 +133,9 @@ export default function MerchantTerminalMobile() {
 
   useEffect(() => {
     if (!merchantId) return;
-    sseClient.connect(merchantId);
+    const token = localStorage.getItem("authToken");
+    if (!token) return;
+    sseClient.connectMerchant(merchantId, token);
     sseClient.subscribe("transaction_updated", (message) => {
       const tx = message.transaction ?? null;
       queryClient.setQueryData(["/api/merchants", merchantId, "active-transaction"], tx);

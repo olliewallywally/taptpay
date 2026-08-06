@@ -1,5 +1,6 @@
 // Windcave RESTful API Integration
 import crypto from "crypto";
+import { redactSensitive } from "./request-log";
 
 const WINDCAVE_ENDPOINT = process.env.WINDCAVE_ENDPOINT || "https://uat.windcave.com/api/v1";
 const SESSION_URL = `${WINDCAVE_ENDPOINT}/sessions`;
@@ -12,10 +13,19 @@ export function getWindcaveEnv(): "uat" | "sec" {
   return endpoint.includes("sec.windcave.com") ? "sec" : "uat";
 }
 
+const PROCESSOR_AUDIT_VALUE_KEY = /(?:session|x[-_]?id|transactionId|txId|refundTxId|merchantReference|url|href|body)/i;
+
+export function sanitizeWindcaveAuditDetails(details: Record<string, any>) {
+  return Object.fromEntries(
+    Object.entries(details).map(([key, value]) => [
+      key,
+      PROCESSOR_AUDIT_VALUE_KEY.test(key) ? "[REDACTED]" : redactSensitive(value, key),
+    ]),
+  );
+}
+
 function logAudit(action: string, details: Record<string, any>) {
-  const sanitized = { ...details };
-  if (sanitized.apiKey) sanitized.apiKey = "***";
-  if (sanitized.authorization) sanitized.authorization = "***";
+  const sanitized = sanitizeWindcaveAuditDetails(details);
   console.log(`[WINDCAVE] [${new Date().toISOString()}] ${action}:`, JSON.stringify(sanitized));
 }
 

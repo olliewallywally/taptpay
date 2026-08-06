@@ -1,5 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { tradesFetch } from "@/lib/trades-api";
+import {
+  tradesInvoiceRemainingCents,
+  tradesOutstandingCents,
+} from "@/lib/trades-money";
 
 /* The list endpoints return raw Drizzle rows as JSON. Timestamps therefore
    arrive in the browser as ISO strings (or null for nullable columns). */
@@ -489,11 +493,15 @@ export function buildTradesHealth(
   healthById: TradesHealthById;
   healthRowsById: TradesHealthRowsById;
 } {
-  const overdue = invoices.filter((invoice) =>
-    isTradesInvoiceOverdue(invoice, now),
+  const overdue = invoices.filter(
+    (invoice) =>
+      tradesInvoiceRemainingCents(invoice) > 0 &&
+      isTradesInvoiceOverdue(invoice, now),
   );
-  const awaitingDeposit = invoices.filter((invoice) =>
-    isTradesAwaitingDeposit(invoice, now),
+  const awaitingDeposit = invoices.filter(
+    (invoice) =>
+      tradesInvoiceRemainingCents(invoice) > 0 &&
+      isTradesAwaitingDeposit(invoice, now),
   );
   const awaitingReply = quotes.filter((quote) =>
     isTradesQuoteAwaitingReply(quote, now),
@@ -504,7 +512,7 @@ export function buildTradesHealth(
     id: invoice.id,
     clientProfileId: invoice.clientProfileId,
     sourceType: "invoice",
-    amountCents: invoice.amountCents,
+    amountCents: tradesInvoiceRemainingCents(invoice),
     status: invoice.status,
     dueAt: invoice.dueAt,
     validUntil: null,
@@ -529,13 +537,13 @@ export function buildTradesHealth(
       id: "overdue",
       label: "overdue invoices",
       count: overdue.length,
-      amountCents: sumInvoiceCents(overdue),
+      amountCents: tradesOutstandingCents(overdue),
     },
     {
       id: "awaiting-deposit",
       label: "awaiting deposit",
       count: awaitingDeposit.length,
-      amountCents: sumInvoiceCents(awaitingDeposit),
+      amountCents: tradesOutstandingCents(awaitingDeposit),
     },
     {
       id: "awaiting-reply",
@@ -652,7 +660,11 @@ export function buildTradesClientRows(
       invoiceId: invoice?.id ?? null,
       invoiceStatus: invoice?.status ?? null,
       status: clientRowStatus(invoice, now),
-      amountCents: invoice?.amountCents ?? null,
+      amountCents: invoice
+        ? isTradesInvoiceOpen(invoice)
+          ? tradesInvoiceRemainingCents(invoice)
+          : invoice.amountCents
+        : null,
       dueAt: invoice?.dueAt ?? null,
     };
   });

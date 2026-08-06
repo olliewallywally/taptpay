@@ -421,6 +421,30 @@ describe("Trades desktop home data", () => {
     });
   });
 
+  test("home health, detail rows and client rows show the remaining split balance", () => {
+    const model = buildTradesHomeModel({
+      clients: [client("active")],
+      invoices: [
+        invoice("part-paid", "active", 10_001, {
+          dueAt: "2026-07-20T12:00:00.000Z",
+          splitEnabled: true,
+          splitCount: 3,
+          splitPaidCount: 1,
+        }),
+      ],
+      quotes: [],
+      timeframe: "week",
+      now: NOW,
+    });
+
+    expect(model.healthById.overdue).toMatchObject({
+      count: 1,
+      amountCents: 6_668,
+    });
+    expect(model.healthRowsById.overdue[0].amountCents).toBe(6_668);
+    expect(model.clientRows[0].amountCents).toBe(6_668);
+  });
+
   test("client rows prefer risk states over newer paid invoices", () => {
     const clients = [client("active")];
     const rows = buildTradesClientRows(

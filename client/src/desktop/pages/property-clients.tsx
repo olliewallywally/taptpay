@@ -84,17 +84,29 @@ export default function DesktopPropertyClients(props: DesktopRoutePageProps) {
     return map;
   }, [tenants, invoices]);
 
-  const activeTenants = tenants.filter((t: any) => t.status !== "archived");
-  const addresses = useMemo(
-    () => Array.from(new Set(tenants.map((t: any) => t.propertyAddress).filter(Boolean))) as string[],
+  const activeTenants = useMemo(
+    () => tenants.filter((t: any) => t.status !== "archived"),
     [tenants],
   );
+  const addresses = useMemo(
+    () =>
+      Array.from(
+        new Set(activeTenants.map((t: any) => t.propertyAddress).filter(Boolean)),
+      ) as string[],
+    [activeTenants],
+  );
+  /* A property can disappear from the active choices after a refetch (for
+     example, when its final tenant is archived). Treat that stale selection as
+     all properties immediately instead of leaving the directory at an
+     impossible zero-row scope. */
+  const propertyScope =
+    propFilter && addresses.includes(propFilter) ? propFilter : null;
 
   /* The count sits under the scope pill, so it answers "how many here": it
      follows the property scope but not the search box, which is a find-tool
      rather than a filter. Same rule as the trades directory (3b). */
   const scopedTenants = activeTenants.filter(
-    (t: any) => !propFilter || t.propertyAddress === propFilter,
+    (t: any) => !propertyScope || t.propertyAddress === propertyScope,
   );
 
   const term = search.trim().toLowerCase();
@@ -141,6 +153,9 @@ export default function DesktopPropertyClients(props: DesktopRoutePageProps) {
     setForm((f) => ({ ...f, [k]: v } as typeof EMPTY_FORM));
 
   const countLabel = `active tenant${scopedTenants.length === 1 ? "" : "s"}`;
+  const countAnnouncement = tenantsQuery.isLoading
+    ? "loading active tenants"
+    : `${scopedTenants.length} ${countLabel}`;
 
   return (
     <DesktopPageScaffold {...props} vertical="property" page="directory" showScope={false}>
@@ -152,10 +167,10 @@ export default function DesktopPropertyClients(props: DesktopRoutePageProps) {
             className="pc-scope"
             aria-haspopup="listbox"
             aria-expanded={scopeOpen}
-            aria-label={`${propFilter ?? "all properties"} scope`}
+            aria-label={`${propertyScope ?? "all properties"} scope`}
             onClick={() => setScopeOpen((o) => !o)}
           >
-            <span>{propFilter ?? "all properties"}</span>
+            <span>{propertyScope ?? "all properties"}</span>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
           </button>
           {scopeOpen && (
@@ -164,7 +179,7 @@ export default function DesktopPropertyClients(props: DesktopRoutePageProps) {
                 type="button"
                 className="pc-scope-opt"
                 role="option"
-                aria-selected={propFilter === null}
+                aria-selected={propertyScope === null}
                 onClick={() => {
                   setPropFilter(null);
                   setScopeOpen(false);
@@ -178,7 +193,7 @@ export default function DesktopPropertyClients(props: DesktopRoutePageProps) {
                   type="button"
                   className="pc-scope-opt"
                   role="option"
-                  aria-selected={propFilter === a}
+                  aria-selected={propertyScope === a}
                   onClick={() => {
                     setPropFilter(a);
                     setScopeOpen(false);
@@ -191,14 +206,20 @@ export default function DesktopPropertyClients(props: DesktopRoutePageProps) {
           )}
         </div>
 
-        <div className="pc-hero">
+        <div
+          className="pc-hero"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          aria-label={countAnnouncement}
+        >
           <span className="pc-hero-count">
             {tenantsQuery.isLoading ? "—" : scopedTenants.length}
           </span>
           <span className="pc-hero-label">{countLabel}</span>
         </div>
 
-        <div className="pc-search-row">
+        <div className="pc-search-row" data-tutorial-id="property-directory-search">
           <div className="pc-search">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={ACCENT} strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="6.5" /><path d="m20 20-3.8-3.8" /></svg>
             <input
@@ -208,7 +229,7 @@ export default function DesktopPropertyClients(props: DesktopRoutePageProps) {
               aria-label="search tenants"
             />
           </div>
-          <button type="button" className="pc-add" aria-label="add tenant" onClick={() => setAddOpen(true)}>
+          <button type="button" className="pc-add" data-tutorial-id="property-directory-add" aria-label="add tenant" onClick={() => setAddOpen(true)}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={NAVY} strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
           </button>
         </div>
@@ -218,7 +239,7 @@ export default function DesktopPropertyClients(props: DesktopRoutePageProps) {
             <div className="pc-empty">loading tenants…</div>
           ) : rows.length === 0 ? (
             <div className="pc-empty">
-              {term || propFilter ? "no matching tenants" : "no tenants yet — add your first with +"}
+              {term || propertyScope ? "no matching tenants" : "no tenants yet — add your first with +"}
             </div>
           ) : (
             rows.map((t: any) => {

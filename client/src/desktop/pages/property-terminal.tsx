@@ -9,6 +9,14 @@ import {
   DesktopPageScaffold,
   type DesktopRoutePageProps,
 } from "../DesktopPageScaffold";
+import {
+  DESKTOP_KEYPAD_KEYS,
+  DesktopKeypadButton,
+  desktopKeypadCents,
+  desktopKeypadReducer,
+  formatDesktopKeypadMoney,
+  type DesktopKeypadKey,
+} from "../desktop-keypad";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -47,8 +55,6 @@ const FREQ_LABEL: Record<Frequency, string> = {
 const STACK_FILTERS = ["all", "overdue", "sent", "paid", "failed"] as const;
 type StackFilter = (typeof STACK_FILTERS)[number];
 
-const KP_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "<"] as const;
-
 function addInterval(from: Date, frequency: string): Date {
   const d = new Date(from);
   if (frequency === "weekly") d.setDate(d.getDate() + 7);
@@ -61,15 +67,6 @@ const initialsOf = (t: any) =>
   `${t?.firstName?.[0] ?? ""}${t?.lastName?.[0] ?? ""}`.toUpperCase() || "?";
 const fullNameOf = (t: any) => `${t?.firstName ?? ""} ${t?.lastName ?? ""}`.trim() || "tenant";
 const whole = (cents: number) => "$" + Math.round(cents / 100).toLocaleString("en-NZ");
-
-function kpMoney(v: string): string {
-  if (!v) return "$0.00";
-  const [rawD, rawC] = v.split(".");
-  const d = (rawD || "0").replace(/^0+(?=\d)/, "");
-  const dn = Number(d).toLocaleString("en-NZ");
-  if (v.includes(".")) return "$" + dn + "." + ((rawC || "") + "00").slice(0, 2);
-  return "$" + dn + ".00";
-}
 
 /* The design's list buckets, mapped onto real invoice statuses. */
 function bucketOf(status: string): Exclude<StackFilter, "all"> {
@@ -330,14 +327,8 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
     sendBill.mutate();
   };
 
-  const pressKey = (k: string) => {
-    setKpVal((v) => {
-      if (k === "<") return v.slice(0, -1);
-      if (k === ".") return v.includes(".") ? v : v ? v + "." : "0.";
-      if (v.replace(".", "").length >= 7) return v;
-      return v + k;
-    });
-  };
+  const pressKey = (key: DesktopKeypadKey) =>
+    setKpVal((value) => desktopKeypadReducer(value, key));
 
   const openKeypad = () => {
     setKpVal("");
@@ -462,7 +453,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
 
         {/* ── CENTER RAIL ── */}
         <div className="pt-rail-slot">
-          <div className="pt-rail">
+          <div className="pt-rail" data-tutorial-id="property-terminal-tools">
             {railBtn("tenant", false, (<><circle cx="12" cy="8" r="3.4" /><path d="M5.5 19.5c1-3.2 3.4-4.8 6.5-4.8s5.5 1.6 6.5 4.8" /></>), "select tenant")}
             {railBtn("request", false, (<><path d="M22 2 11 13" /><path d="M22 2 15 22l-4-9-9-4z" /></>), "rent request")}
             {railBtn("keypad", true, (<path d="M12 5v14M5 12h14" />), "keypad")}
@@ -475,7 +466,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
         <div className="pt-panel">
           {mode === "request" && (
             <>
-              <div className="pt-mode pt-req-top">
+              <div className="pt-mode pt-req-top" data-tutorial-id="property-terminal-request">
                 <div className="pt-amt-row">
                   <span className="pt-amt">{fmtNZD(amountCents)}</span>
                   <span className="pt-freq-label">{FREQ_LABEL[frequency]}</span>
@@ -513,6 +504,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                 <button
                   type="button"
                   className="pt-send-btn"
+                  data-tutorial-id="property-terminal-send"
                   aria-label="send rent request"
                   disabled={sendRequest.isPending}
                   style={reqFlash ? { borderColor: GREEN, color: GREEN } : undefined}
@@ -597,7 +589,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                   className="pt-kp-circle"
                   aria-label="confirm amount"
                   onClick={() => {
-                    setAmountCents(Math.round((parseFloat(kpVal) || 0) * 100));
+                    setAmountCents(desktopKeypadCents(kpVal));
                     setKpVal("");
                     setMode("request");
                   }}
@@ -605,29 +597,26 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5L19 8" /></svg>
                 </button>
               </div>
-              <div className="pt-kp-amt">{kpMoney(kpVal)}</div>
+              <div className="pt-kp-amt">{formatDesktopKeypadMoney(kpVal)}</div>
               <div className="pt-kp-who">
                 {tenant ? `${fullNameOf(tenant)} — ${tenant.propertyAddress}` : "no tenant selected"}
               </div>
               <div className="pt-kp-grid">
-                {KP_KEYS.map((k) => {
+                {DESKTOP_KEYPAD_KEYS.map((k) => {
                   const fill = k !== "." && k !== "<";
                   return (
-                    <button
+                    <DesktopKeypadButton
                       key={k}
-                      type="button"
+                      keyValue={k}
                       className="pt-kp-key"
-                      aria-label={k === "<" ? "backspace" : k === "." ? "decimal point" : k}
                       style={{
                         background: fill ? ACTIVE : "transparent",
                         border: fill ? "none" : `1.5px solid ${ACCENT}`,
                         color: fill ? "#FFFFFF" : VIOLET,
                         boxShadow: fill ? "0 14px 22px rgba(0,6,25,0.45)" : "none",
                       }}
-                      onClick={() => pressKey(k)}
-                    >
-                      {k}
-                    </button>
+                      onPress={pressKey}
+                    />
                   );
                 })}
               </div>

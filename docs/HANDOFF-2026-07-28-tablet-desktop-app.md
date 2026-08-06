@@ -8,9 +8,10 @@ then P5 (tutorial adaptation, plan §7a) and P6 (polish).
 
 > **If you are picking this up cold and about to work on the terminal's "no
 > payment board" option, read `docs/PLAN-2026-08-06-payment-links-no-board.md`
-> first.** It is approved and not started. The obvious implementation ships a
-> money bug (a customer can pay a sale rung up on a different board) — that plan
-> documents the proof and the approved design.
+> first.** The token direction is approved and implementation has not started,
+> but the plan was independently reviewed and corrected on 2026-08-06. Its Phase
+> 0 is mandatory: production board selection, SSE isolation, response DTOs, and
+> storage scoping must be repaired before token work.
 Read `docs/PLAN-2026-07-24-tablet-desktop-app.md` first: it is still the authoritative
 spec for scope, device gating, routes and per-screen requirements. This file records
 what has actually been built, the conventions to follow, the traps that have already
@@ -118,7 +119,9 @@ Those scripts encode the things that are easy to get wrong:
   **Tablet** = `{ viewport: { width: 1194, height: 834 }, hasTouch: true }` → full
   bleed. Without `hasTouch` the pointer is fine and you get the desktop path, so you
   are not actually testing the tablet.
-- Assert `no page errors` — the scripts fail loudly on `pageerror`/console errors.
+- Assert `no page errors`. Several scripts currently collect/print errors but still
+  exit zero; the corrected payment plan Phase 1/6 requires hard failure before those
+  scripts count as a gate.
 
 The dev server must already be running on **:5000, single instance only** (memory
 `dev-server-single-instance`); the workflow does not auto-restart.
@@ -130,8 +133,9 @@ The dev server must already be running on **:5000, single instance only** (memor
 **Verify field names in `shared/schema.ts` before writing any aggregation.**
 
 - Retail transactions: `price` (decimal string), `taptStoneId`, `splitEnabled`,
-  `totalRefunded`, `refundableAmount`, `paymentMethod`. The insert schema also
-  accepts `selectedStoneId`, which `storage.createTransaction` maps to `taptStoneId`.
+  `totalRefunded`, `refundableAmount`, `paymentMethod`. Clients currently send the
+  request-only `selectedStoneId`; MemStorage maps it, but production DatabaseStorage
+  does not until the corrected plan's Phase 0 canonical input is implemented.
 - **There is no merchant-level split flag.** `splitEnabled` is a column on
   *transactions*. Gating split UI on `merchant.splitEnabled` hides it forever.
 - Rent invoices (`invoices_rent_requests`): **`amountCents` (integer cents)** and
@@ -212,6 +216,15 @@ re-raise these.** Rulings below; the accepted-change queue is §9.
 | 4e payout account | **remove entirely** — bank details are Windcave's | `6ec20f7` |
 | 3b name/site ellipsising | split onto separate lines, keep the 400px column | `e3a6daa` |
 
+**Post-fix review (2026-08-06):** all six UI commits implement their ruled normal
+case, but boundary/data/accessibility follow-ups remain: endpoint chart peaks clip,
+archived-only properties remain selectable, property/trades keypads are inconsistent,
+part-paid split invoices overstate outstanding totals, Business Details saves leak a
+raw merchant row, and long trades client text is still inaccessible. Commit
+`2f8a7bd` fixes the normal REST query but not SSE isolation or Postgres board
+persistence. The authoritative findings and implementation gates are now §2–§5 of
+`docs/PLAN-2026-08-06-payment-links-no-board.md`.
+
 **Kept as shipped** (Oliver accepted the deviation): 4c boards picker, 4c split
 chips (same function as mobile), 4d report tiles white, 3c compose block at
 `top:476`, 3c deposit/balance chips disabled with a reason, 3c jobs list one row
@@ -288,28 +301,45 @@ wording, and confirming the mobile tutorial is byte-identical afterwards. Then
 
 ---
 
-## 9. Accepted-change queue (as at 2026-08-06)
+## 9. Accepted-change queue (reviewed 2026-08-06)
 
-Six fixes are committed (§6). What remains, in the order agreed:
+Six normal-case fixes are committed (§6). The review found safety/correctness work
+that must precede the feature queue:
 
-1. **b4 — Revenue by Board report.** Remove the Fees report from
+1. **Payment/addressing safety gate.** Complete Phase 0 of
+   `docs/PLAN-2026-08-06-payment-links-no-board.md`: allowlisted merchant and
+   transaction responses, canonical Postgres board persistence + ownership checks,
+   transactionally serialized first-free board allocation, explicit active scopes,
+   header-authenticated SSE audiences, redacted logging, and removal of the stale
+   MemStorage cache. Run the read-only historical board/null audit; never guess a
+   backfill.
+2. **Post-fix boundary pass.** Complete Phase 1 of that plan: endpoint chart peaks,
+   active property choices/live count, consistent desktop keypad glyphs,
+   split-aware trades outstanding totals, readable/accessibly named client rows,
+   and settings response-contract coverage.
+3. **b4 — Revenue by Board report.** Only start after board persistence is fixed.
+   Remove the Fees report from
    `desktop/data/retail-reports.ts` (leaving 9) and add *Revenue by Board*:
    revenue / count / average per board off `transactions.taptStoneId` joined to
-   the stones table, with an "unassigned" bucket. Entirely real columns.
-2. **b2 — no-board payment links + board creation.** See
-   `docs/PLAN-2026-08-06-payment-links-no-board.md`. Approved, not started.
-   **Read that plan before writing any code** — the naive version ships a money bug.
-3. **D2 — `ReportModal` into the desktop frame.** It portals to `document.body`
+   the stones table, with an explicit "Unassigned" bucket. Historical null-board
+   data is known to include rows whose board intent was lost; do not present that
+   bucket as proven no-board revenue.
+4. **b2 — no-board payment links + board creation.** Complete Phases 2–6 of the
+   corrected plan. The token must remain the credential through checkout and
+   receipt; tokenized rows must be unreachable through numeric public routes.
+   Durable payment-attempt/idempotency rows and transactional split setup are
+   required before any per-payment link is enabled.
+5. **D2 — `ReportModal` into the desktop frame.** It portals to `document.body`
    (`components/reports/ReportModal.tsx:98,259`), so Export covers the browser
    window instead of the simulated 13″ frame. Portal to `.tapt-desktop-frame`
    when present. **Trap:** the frame is inside a `transform: scale(...)` canvas,
    so the modal's `position:fixed; inset:0` must become absolute or it will be
    scale-relative.
-4. **D1 — mobile push onto the shared hook.** `hooks/use-push-notifications.ts` is
+6. **D1 — mobile push onto the shared hook.** `hooks/use-push-notifications.ts` is
    used only by `desktop/DesktopSettingsPage.tsx`; `pages/settings.tsx:144-350`
    still carries its own inline copy including the native-iOS branch. Own commit,
    needs real-device testing.
-5. **b7 — the two missing notification toggles.** The big one, deliberately last.
+7. **b7 — the two missing notification toggles.** The big one, deliberately last.
    `push_subscriptions` (`shared/schema.ts:573`) has no preference column, and
    `sendPushToMerchant` is called from 13 sites with the type passed at the call
    site, never compared against anything stored. Of the design's three toggles

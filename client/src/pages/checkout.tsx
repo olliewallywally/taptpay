@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type CSSProperties, Component, type ReactNode } from "react";
+import { useState, useEffect, useMemo, useRef, type CSSProperties, Component, type ReactNode } from "react";
 import { useParams, useLocation, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -19,6 +19,27 @@ import {
   footerLinkStyle,
 } from "@/lib/checkout-theme";
 import { TaptWordmark } from "@/components/checkout/tapt-wordmark";
+import { useTokenPagePrivacy } from "@/hooks/use-token-page-privacy";
+import {
+  checkoutCompletionEndpoint,
+  checkoutResolveEndpoint,
+  checkoutSessionEndpoint,
+  checkoutSourceForRoute,
+  bindPaymentIdempotencyKey,
+  clearPaymentIdempotencyKey,
+  currentTokenPaymentAmount,
+  currentTokenShareIndex,
+  getOrCreatePaymentIdempotencyKey,
+  paymentIdempotencyKey,
+  redactCustomerPaymentAddress,
+  rememberPaymentReturnState,
+  tokenCompletionRequest,
+  tokenPaymentPath,
+  tokenSessionRequest,
+  type CheckoutRouteKind,
+  type CheckoutSource,
+  type PaymentCheckoutSource,
+} from "@/lib/payment-addressing";
 // Window augmentations are declared centrally in client/src/global.d.ts.
 
 // ── Error boundary — catches any render crash and shows a safe fallback ──
@@ -78,8 +99,8 @@ function loadScript(src: string): Promise<void> {
 // still referenced in some SDK redirect fallbacks).  Also catches any subdomain.
 const WINDCAVE_HPP_RE = /^https?:\/\/(?:[a-z0-9-]+\.)*(?:windcave|paymentexpress)\.com/i;
 
-function CheckoutInner({ quoteMode = false }: { quoteMode?: boolean }) {
-  // This page serves three payment sources behind one branded UI:
+function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
+  // This page serves four explicitly-addressed payment sources behind one UI:
   //   • Retail transactions at /checkout/:transactionId
   //   • Property rent/charge invoices at /r/:token
   //   • Trades quotes at /trades/quote/:token (quoteMode) — the customer accepts
@@ -87,27 +108,43 @@ function CheckoutInner({ quoteMode = false }: { quoteMode?: boolean }) {
   //     page behaves exactly like an /r/:token invoice. Until acceptance there
   //     is no invoice token, so `token` is undefined and the invoice/wallet
   //     machinery stays dormant — the animated quote steps render instead.
-  const { transactionId, token: routeToken } = useParams<{ transactionId?: string; token?: string }>();
+  const routeParams = useParams<{ transactionId?: string; token?: string }>();
+  const routeSource = useMemo(
+    () => checkoutSourceForRoute(sourceKind, routeParams),
+    [routeParams.token, routeParams.transactionId, sourceKind],
+  );
+  const quoteMode = routeSource?.kind === "quote-token";
   // In quote mode the route param is the QUOTE token, not an invoice token.
-  const quoteToken = quoteMode ? routeToken : undefined;
+  const quoteToken = routeSource?.kind === "quote-token" ? routeSource.token : undefined;
   const [acceptedInvoiceToken, setAcceptedInvoiceToken] = useState<string | null>(null);
   // Effective invoice token: the accepted deposit/full invoice in quote mode,
   // otherwise the /r/:token route param. Keeps every downstream endpoint,
   // guard and effect below identical across all three sources.
-  const token = quoteMode ? (acceptedInvoiceToken ?? undefined) : routeToken;
-  const isInvoice = !!token;
+  const activeSource: CheckoutSource | null = quoteMode && acceptedInvoiceToken
+    ? { kind: "invoice-token", token: acceptedInvoiceToken }
+    : routeSource;
+  const paymentSource: PaymentCheckoutSource | null = activeSource?.kind === "quote-token"
+    ? null
+    : activeSource;
+  const token = activeSource?.kind === "invoice-token" ? activeSource.token : undefined;
+  const retailToken = activeSource?.kind === "retail-token" ? activeSource.token : undefined;
+  const isInvoice = activeSource?.kind === "invoice-token";
+  const isRetailToken = activeSource?.kind === "retail-token";
   const [, setLocation] = useLocation();
   const search = useSearch();
-  const txId = transactionId ? parseInt(transactionId) : null;
+  const txId = activeSource?.kind === "retail-legacy" ? activeSource.transactionId : null;
   const urlParams = new URLSearchParams(search);
   const overrideAmount = urlParams.get("amount");
+  useTokenPagePrivacy(isRetailToken);
 
-  // Source-specific endpoints — keyed by token for invoices, numeric id for txns.
-  const sessionEndpoint = isInvoice ? `/api/checkout/${token}/session` : `/api/transactions/${txId}/pay`;
-  const hfCompleteEndpoint = isInvoice ? `/api/checkout/${token}/hosted-fields-complete` : `/api/transactions/${txId}/hosted-fields-complete`;
-  const gpayCompleteEndpoint = isInvoice ? `/api/checkout/${token}/googlepay-complete` : `/api/transactions/${txId}/googlepay-complete`;
+  // Source-specific endpoints. A retail token is never exchanged for an ID.
+  const sessionEndpoint = paymentSource ? checkoutSessionEndpoint(paymentSource) : "";
+  const hfCompleteEndpoint = paymentSource ? checkoutCompletionEndpoint(paymentSource, "hosted-fields") : "";
+  const gpayCompleteEndpoint = paymentSource ? checkoutCompletionEndpoint(paymentSource, "googlepay") : "";
   // Stable identifier for effect deps / guards across both sources.
-  const payId: string | number | null = isInvoice ? (token ?? null) : txId;
+  const payId: string | number | null = paymentSource?.kind === "retail-legacy"
+    ? paymentSource.transactionId
+    : paymentSource?.token ?? null;
 
   // Invoice split state (no-op for retail transactions).
   const [splitChoosing, setSplitChoosing] = useState(false);
@@ -159,7 +196,29 @@ function CheckoutInner({ quoteMode = false }: { quoteMode?: boolean }) {
       if (!res.ok) throw new Error("Not found");
       return res.json();
     },
-    enabled: !isInvoice && !!txId,
+    enabled: activeSource?.kind === "retail-legacy" && !!txId,
+  });
+
+  const {
+    data: tokenPayment,
+    isLoading: tokenPaymentLoading,
+    error: tokenPaymentError,
+    refetch: refetchTokenPayment,
+  } = useQuery<any>({
+    queryKey: ["token-payment", retailToken],
+    queryFn: async () => {
+      const res = await fetch(checkoutResolveEndpoint({ kind: "retail-token", token: retailToken! }), {
+        headers: { "Cache-Control": "no-cache" },
+      });
+      const body = await res.json().catch(() => ({}));
+      if (res.status === 410 && body?.payment) return { ...body.payment, closed: true };
+      if (!res.ok) throw new Error(res.status === 404 ? "not-found" : "error");
+      return body;
+    },
+    enabled: isRetailToken && !!retailToken,
+    retry: false,
+    staleTime: 0,
+    refetchInterval: 2500,
   });
 
   // Invoice resolve — amount, merchant, label, and split state for /r/:token.
@@ -266,13 +325,65 @@ function CheckoutInner({ quoteMode = false }: { quoteMode?: boolean }) {
             isSplit: false,
           }
         : null)
-    : rawTransaction;
+    : isRetailToken
+      ? (tokenPayment
+          ? {
+              price: currentTokenPaymentAmount(tokenPayment),
+              itemName: tokenPayment.itemName,
+              status: tokenPayment.status,
+              paymentMethod: tokenPayment.paymentMethod,
+              taptStoneId: null,
+              splitEnabled: tokenPayment.splitEnabled,
+              isSplit: tokenPayment.isSplit,
+              totalSplits: tokenPayment.totalSplits,
+              completedSplits: tokenPayment.completedSplits,
+              splitAmount: tokenPayment.splitAmount,
+              createdAt: tokenPayment.createdAt,
+            }
+          : null)
+      : rawTransaction;
 
-  const txLoading = isInvoice ? invoiceLoading : rawTxLoading;
+  const txLoading = isInvoice ? invoiceLoading : isRetailToken ? tokenPaymentLoading : rawTxLoading;
+  const tokenShareIndex = isRetailToken ? currentTokenShareIndex(tokenPayment ?? {}) : 0;
+
+  const getTokenIdempotencyKey = (shareIndex = tokenShareIndex) => {
+    if (!isRetailToken || !activeSource) return null;
+    return getOrCreatePaymentIdempotencyKey(activeSource, shareIndex);
+  };
+
+  const hydrateSession = (data: any) => {
+    if (!isRetailToken || !retailToken || !activeSource) return data;
+    const shareIndex = Number.isInteger(data?.shareIndex) ? data.shareIndex : tokenShareIndex;
+    const idempotencyKey = getTokenIdempotencyKey(tokenShareIndex);
+    bindPaymentIdempotencyKey(activeSource, tokenShareIndex, shareIndex, idempotencyKey!);
+    if (data?.returnState) rememberPaymentReturnState(data.returnState, retailToken);
+    return { ...data, shareIndex, __clientIdempotencyKey: idempotencyKey };
+  };
+
+  const completionBody = (session: any, extra: Record<string, any>) => {
+    if (!isRetailToken) return { sessionId: session.sessionId, ...extra };
+    const shareIndex = Number.isInteger(session?.shareIndex) ? session.shareIndex : tokenShareIndex;
+    return tokenCompletionRequest({
+      sessionId: session.sessionId,
+      idempotencyKey: session.__clientIdempotencyKey ?? getTokenIdempotencyKey(shareIndex)!,
+      shareIndex,
+    }, extra);
+  };
+
+  const reconcileTokenAttempt = (result: any, session: any) => {
+    if (!isRetailToken || !activeSource) return;
+    if (!["approved", "declined", "cancelled"].includes(result?.outcome)) return;
+    const shareIndex = Number.isInteger(session?.shareIndex) ? session.shareIndex : tokenShareIndex;
+    clearPaymentIdempotencyKey(activeSource, shareIndex);
+    refetchTokenPayment();
+  };
 
   // Body for the create-session call, per source.
   const buildSessionBody = (): Record<string, any> => {
     if (isInvoice) return payerEmail ? { payerEmail } : {};
+    if (isRetailToken) {
+      return tokenSessionRequest(getTokenIdempotencyKey()!);
+    }
     const body: Record<string, any> = { merchantId: transaction.merchantId };
     if (transaction.taptStoneId) body.stoneId = transaction.taptStoneId;
     if (overrideAmount) body.amount = overrideAmount;
@@ -283,6 +394,15 @@ function CheckoutInner({ quoteMode = false }: { quoteMode?: boolean }) {
   // success screen and refresh split progress (each payer pays on their own link).
   const navigateAfterSuccess = (result: any) => {
     if (isInvoice) { refetchInvoice(); return; }
+    if (isRetailToken && retailToken) {
+      if (navigateTimerRef.current) clearTimeout(navigateTimerRef.current);
+      const receiptShare = Number.isInteger(result?.receiptShare) ? result.receiptShare : null;
+      navigateTimerRef.current = setTimeout(() => setLocation(
+        tokenPaymentPath(retailToken, "receipt", receiptShare),
+        { replace: true },
+      ), 1200);
+      return;
+    }
     if (navigateTimerRef.current) clearTimeout(navigateTimerRef.current);
     navigateTimerRef.current = setTimeout(() => setLocation(result.redirectPath || `/receipt/${txId}`), 1200);
   };
@@ -292,15 +412,30 @@ function CheckoutInner({ quoteMode = false }: { quoteMode?: boolean }) {
     queryFn: async () => (await fetch("/api/windcave/env")).json(),
   });
 
-  const { data: merchant } = useQuery({
+  const { data: legacyMerchant } = useQuery({
     queryKey: ["/api/merchants", transaction?.merchantId],
     queryFn: async () => {
       const res = await fetch(`/api/merchants/${transaction.merchantId}`);
       if (!res.ok) throw new Error("Not found");
       return res.json();
     },
-    enabled: !!transaction?.merchantId,
+    enabled: !isRetailToken && activeSource?.kind !== "quote-token" && !!transaction?.merchantId,
   });
+  const merchant = isRetailToken ? tokenPayment?.merchant : legacyMerchant;
+
+  useEffect(() => {
+    if (!isRetailToken || !retailToken || !tokenPayment) return;
+    if (!["completed", "partially_refunded", "refunded"].includes(tokenPayment.status)) return;
+    if (tokenPayment.isSplit) return;
+    setLocation(tokenPaymentPath(retailToken, "receipt"), { replace: true });
+  }, [isRetailToken, retailToken, setLocation, tokenPayment?.isSplit, tokenPayment?.status]);
+
+  const tokenHasLocalAttempt = isRetailToken && activeSource
+    ? !!paymentIdempotencyKey(activeSource, tokenShareIndex)
+    : false;
+  const tokenCanCreateSession = !isRetailToken || tokenPayment?.status === "pending" || (
+    tokenPayment?.status === "processing" && tokenHasLocalAttempt
+  );
 
   const env: "uat" | "sec" = envData?.env || "uat";
   const applePayMerchantId: string = envData?.applePayMerchantId || "";
@@ -355,7 +490,7 @@ function CheckoutInner({ quoteMode = false }: { quoteMode?: boolean }) {
   // preSessionRef, and create a race where the user taps between the clear and
   // the new async completing. Using stable primitives stops that churn.
   useEffect(() => {
-    if (!applePayAvailable || !transaction?.id || !envData?.env || !payId) return;
+    if (!applePayAvailable || !transaction || !envData?.env || !payId || !tokenCanCreateSession) return;
     let cancelled = false;
 
     // Clear the stale pre-session only when a payment was attempted — that is,
@@ -370,7 +505,7 @@ function CheckoutInner({ quoteMode = false }: { quoteMode?: boolean }) {
       try {
         const res = await apiRequest("POST", sessionEndpoint, buildSessionBody());
         if (!cancelled && res.ok) {
-          const data = await res.json();
+          const data = hydrateSession(await res.json());
           if (data.ajaxSubmitApplePayUrl) {
             preSessionRef.current = data;
           }
@@ -383,14 +518,14 @@ function CheckoutInner({ quoteMode = false }: { quoteMode?: boolean }) {
   // React Query refetches, so the effect only re-runs when something meaningful
   // changes (new transaction, different env, overrideAmount param, or a payment
   // was attempted and preSessionTrigger incremented).
-  }, [applePayAvailable, transaction?.id, envData?.env, payId, overrideAmount, preSessionTrigger]);
+  }, [applePayAvailable, payId, transaction?.status, envData?.env, overrideAmount, preSessionTrigger, tokenCanCreateSession, tokenShareIndex]);
 
   // Pre-create a Windcave session for Google Pay so it is ready the instant
   // the user approves — eliminates the createSession() network call that
   // previously happened after loadPaymentData() resolved, which added latency
   // at the most sensitive moment.  Same pattern as the Apple Pay pre-session.
   useEffect(() => {
-    if (!googlePayAvailable || !transaction?.id || !envData?.env || !payId) return;
+    if (!googlePayAvailable || !transaction || !envData?.env || !payId || !tokenCanCreateSession) return;
     let cancelled = false;
 
     if (googlePreSessionTrigger > 0) {
@@ -401,7 +536,7 @@ function CheckoutInner({ quoteMode = false }: { quoteMode?: boolean }) {
       try {
         const res = await apiRequest("POST", sessionEndpoint, buildSessionBody());
         if (!cancelled && res.ok) {
-          const data = await res.json();
+          const data = hydrateSession(await res.json());
           if (data?.sessionId) {
             googlePreSessionRef.current = data;
           }
@@ -410,7 +545,7 @@ function CheckoutInner({ quoteMode = false }: { quoteMode?: boolean }) {
     })();
 
     return () => { cancelled = true; };
-  }, [googlePayAvailable, transaction?.id, envData?.env, payId, overrideAmount, googlePreSessionTrigger]);
+  }, [googlePayAvailable, payId, transaction?.status, envData?.env, overrideAmount, googlePreSessionTrigger, tokenCanCreateSession, tokenShareIndex]);
 
   // Lazy-load Windcave Hosted Fields scripts only when the card tab is first
   // opened — loading them at page load causes the HF SDK to auto-initialise
@@ -473,7 +608,7 @@ function CheckoutInner({ quoteMode = false }: { quoteMode?: boolean }) {
         // in browser console captures and bug reports.
         console.warn(
           `[Checkout] Blocked Windcave HPP redirect (${via}):`,
-          urlStr.slice(0, 200)
+          redactCustomerPaymentAddress(urlStr).slice(0, 200)
         );
         return true;
       }
@@ -710,16 +845,16 @@ function CheckoutInner({ quoteMode = false }: { quoteMode?: boolean }) {
     if (payState !== "processing") return;
     function onBeforeUnload(e: BeforeUnloadEvent) {
       console.error("[Checkout] Navigation attempted during payment processing (beforeunload)", {
-        currentUrl: window.location.href,
-        referrer: document.referrer,
+        currentUrl: redactCustomerPaymentAddress(window.location.href),
+        referrer: redactCustomerPaymentAddress(document.referrer),
       });
       e.preventDefault();
       e.returnValue = "";
     }
     function onPageHide() {
       console.error("[Checkout] Page hidden during payment processing (pagehide)", {
-        currentUrl: window.location.href,
-        referrer: document.referrer,
+        currentUrl: redactCustomerPaymentAddress(window.location.href),
+        referrer: redactCustomerPaymentAddress(document.referrer),
       });
     }
     window.addEventListener("beforeunload", onBeforeUnload);
@@ -822,20 +957,37 @@ function CheckoutInner({ quoteMode = false }: { quoteMode?: boolean }) {
   }
 
   async function createSession() {
-    if (!payId || !transaction) return null;
+    if (!payId || !transaction || !tokenCanCreateSession) return null;
     try {
       const res = await apiRequest("POST", sessionEndpoint, buildSessionBody());
       if (!res.ok) return null;
-      const data = await res.json();
+      const data = hydrateSession(await res.json());
+      if (isRetailToken && ["approved", "declined", "cancelled"].includes(data?.attemptState)) {
+        const result = {
+          approved: data.attemptState === "approved",
+          outcome: data.attemptState,
+          receiptShare: data.shareIndex > 0 ? data.shareIndex : null,
+        };
+        reconcileTokenAttempt(result, data);
+        if (result.approved) {
+          setPayState("success");
+          navigateAfterSuccess(result);
+        } else {
+          setPayState("error");
+          setErrorMsg("The previous payment attempt did not complete. Please try again.");
+        }
+        return { ...data, __terminal: true };
+      }
       sessionRef.current = data;
       return data;
     } catch { return null; }
   }
 
-  async function finaliseCard(sessionId: string) {
+  async function finaliseCard(session: any) {
     try {
-      const res = await apiRequest("POST", hfCompleteEndpoint, { sessionId, paymentMethod: "card" });
+      const res = await apiRequest("POST", hfCompleteEndpoint, completionBody(session, { paymentMethod: "card" }));
       const result = await res.json();
+      reconcileTokenAttempt(result, session);
       if (result.approved) {
         setPayState("success");
         navigateAfterSuccess(result);
@@ -852,6 +1004,7 @@ function CheckoutInner({ quoteMode = false }: { quoteMode?: boolean }) {
   async function handleCardPay() {
     setPayState("processing");
     const session = await createSession();
+    if (session?.__terminal) return;
     if (!session?.sessionId) {
       setPayState("error");
       setErrorMsg("Unable to start payment. Please try again.");
@@ -874,7 +1027,7 @@ function CheckoutInner({ quoteMode = false }: { quoteMode?: boolean }) {
           1200,
           async (status: string) => {
             if (status === "done") {
-              await finaliseCard(session.sessionId);
+              await finaliseCard(session);
             } else {
               // Any non-"done" terminal status (abandoned / timed-out 3DS, etc.).
               // Surface a retryable error instead of leaving the spinner hanging
@@ -941,11 +1094,11 @@ function CheckoutInner({ quoteMode = false }: { quoteMode?: boolean }) {
       async (state: string, _url: string, notify: (ok: boolean) => void) => {
         if (state === "done") {
           try {
-            const res = await apiRequest("POST", hfCompleteEndpoint, {
-              sessionId: preSession.sessionId,
+            const res = await apiRequest("POST", hfCompleteEndpoint, completionBody(preSession, {
               paymentMethod: "apple_pay",
-            });
+            }));
             const result = await res.json();
+            reconcileTokenAttempt(result, preSession);
             notify(result.approved === true);
             if (result.approved) {
               setPayState("success");
@@ -1027,16 +1180,18 @@ function CheckoutInner({ quoteMode = false }: { quoteMode?: boolean }) {
       // Fall back to creating a new session if the pre-session wasn't ready.
       const session = googlePreSessionRef.current || await createSession();
       googlePreSessionRef.current = null; // consume the session
+      if (session?.__terminal) return;
       if (!session) { setPayState("error"); setErrorMsg("Unable to start payment."); return; }
       // Trigger a new pre-session for retry after failed/cancelled payment
-      setGooglePreSessionTrigger(t => t + 1);
+      if (!isRetailToken) setGooglePreSessionTrigger(t => t + 1);
       // NOTE: ajaxSubmitGooglePayUrl is intentionally NOT sent — the backend looks it
       // up from its server-side cache to prevent SSRF attacks.
-      const res = await apiRequest("POST", gpayCompleteEndpoint, {
-        sessionId: session.sessionId,
+      const res = await apiRequest("POST", gpayCompleteEndpoint, completionBody(session, {
         googlePayToken,
-      });
+      }));
       const result = await res.json();
+      reconcileTokenAttempt(result, session);
+      if (isRetailToken) setGooglePreSessionTrigger(t => t + 1);
       if (result.approved) {
         setPayState("success");
         navigateAfterSuccess(result);
@@ -1056,10 +1211,9 @@ function CheckoutInner({ quoteMode = false }: { quoteMode?: boolean }) {
     setErrorMsg("");
     sessionRef.current = null;
     setPayState("idle");
-    // Mint fresh wallet pre-sessions so a retry after sitting on the error
-    // screen never reuses a stale/expired Windcave session. The card flow
-    // already creates a brand-new session on every handleCardPay, so retries
-    // are effectively unlimited — there is no attempt cap anywhere.
+    // A token retry re-resolves the same durable attempt with the same UUID.
+    // The UUID is cleared only after an explicit reconciled terminal outcome,
+    // never because a browser request timed out.
     setPreSessionTrigger(t => t + 1);
     setGooglePreSessionTrigger(t => t + 1);
   }
@@ -1088,6 +1242,10 @@ function CheckoutInner({ quoteMode = false }: { quoteMode?: boolean }) {
     // Invoices are opened directly from a payment link — there is no prior TaptPay
     // page to return to, so the Cancel affordance is hidden for them (see render).
     if (isInvoice) return;
+    if (isRetailToken && retailToken) {
+      setLocation(tokenPaymentPath(retailToken, transaction?.splitEnabled ? "split" : "entry"));
+      return;
+    }
     // If we came from a split flow (amount override or transaction is split-enabled),
     // go back to the split page so the customer can adjust — not to /pay which would loop
     if (transaction?.splitEnabled && txId) {
@@ -1272,6 +1430,48 @@ function CheckoutInner({ quoteMode = false }: { quoteMode?: boolean }) {
         <CheckCircle size={64} color={CT.SKY} style={{ margin: "0 auto 16px" }} />
         <p style={{ color: CT.SKY, fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Already paid</p>
         <p style={{ color: CT.SKY_DIM, fontSize: 14 }}>This has already been paid. Thank you!</p>
+      </div>
+    );
+  }
+
+  if (isRetailToken && tokenPaymentError) {
+    return renderTerminal(
+      <div style={{ textAlign: "center" }}>
+        <XCircle size={48} color={CT.RED} style={{ margin: "0 auto 16px" }} />
+        <p style={{ color: CT.SKY, fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Payment link not found</p>
+        <p style={{ color: CT.SKY_DIM, fontSize: 13 }}>This payment link doesn't exist or has expired.</p>
+      </div>
+    );
+  }
+
+  if (isRetailToken && (tokenPayment?.closed || ["failed", "cancelled"].includes(tokenPayment?.status))) {
+    return renderTerminal(
+      <div style={{ textAlign: "center" }}>
+        <XCircle size={48} color={CT.RED} style={{ margin: "0 auto 16px" }} />
+        <p style={{ color: CT.SKY, fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Payment link closed</p>
+        <p style={{ color: CT.SKY_DIM, fontSize: 13 }}>This payment can no longer be completed.</p>
+      </div>
+    );
+  }
+
+  if (isRetailToken && tokenPayment?.status === "processing" && !tokenHasLocalAttempt) {
+    return renderTerminal(
+      <div style={{ textAlign: "center" }}>
+        <Loader2 size={42} color={CT.SKY} style={{ margin: "0 auto 16px", animation: "spin 1s linear infinite" }} />
+        <p style={{ color: CT.SKY, fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Payment in progress</p>
+        <p style={{ color: CT.SKY_DIM, fontSize: 13 }}>We're waiting for the current payment attempt to finish.</p>
+      </div>
+    );
+  }
+
+  if (isRetailToken && ["completed", "partially_refunded", "refunded"].includes(tokenPayment?.status)) {
+    return renderTerminal(
+      <div style={{ textAlign: "center" }}>
+        <CheckCircle size={64} color={CT.SKY} style={{ margin: "0 auto 16px" }} />
+        <p style={{ color: CT.SKY, fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Payment confirmed</p>
+        <p style={{ color: CT.SKY_DIM, fontSize: 14 }}>
+          {tokenPayment?.isSplit ? "Open the original link to see the split status." : "Opening your receipt…"}
+        </p>
       </div>
     );
   }
@@ -1733,10 +1933,10 @@ const payBtnStyle: CSSProperties = {
   boxShadow: "0 6px 20px rgba(4,13,109,0.3)",
 };
 
-export default function Checkout({ quoteMode = false }: { quoteMode?: boolean }) {
+export default function Checkout({ sourceKind = "retail-legacy" }: { sourceKind?: CheckoutRouteKind }) {
   return (
     <CheckoutErrorBoundary>
-      <CheckoutInner quoteMode={quoteMode} />
+      <CheckoutInner sourceKind={sourceKind} />
     </CheckoutErrorBoundary>
   );
 }

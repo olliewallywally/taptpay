@@ -6,6 +6,13 @@ import { Separator } from "@/components/ui/separator";
 import { CheckCircle, Download, Share2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import taptLogo from "@assets/IMG_6592_1755070818452.png";
+import { useTokenPagePrivacy } from "@/hooks/use-token-page-privacy";
+import {
+  parsePositiveShare,
+  receiptDataEndpoint,
+  receiptPdfEndpoint,
+  type ReceiptSource,
+} from "@/lib/payment-addressing";
 
 function formatPaymentMethod(method?: string): string {
   switch (method) {
@@ -18,19 +25,29 @@ function formatPaymentMethod(method?: string): string {
   }
 }
 
-export default function Receipt() {
-  const { transactionId } = useParams<{ transactionId: string }>();
+export default function Receipt({ sourceKind = "retail-legacy" }: {
+  sourceKind?: ReceiptSource["kind"];
+}) {
+  const { transactionId, token = "" } = useParams<{ transactionId?: string; token?: string }>();
   const search = useSearch();
   const params = new URLSearchParams(search);
+  const isTokenSource = sourceKind === "retail-token";
   const splitIdParam = params.get("splitId");
   const splitId = splitIdParam ? parseInt(splitIdParam) : null;
+  const shareParam = params.get("share");
+  const share = parsePositiveShare(shareParam);
+  const invalidShare = shareParam != null && share == null;
+  useTokenPagePrivacy(isTokenSource);
 
   const [isActioning, setIsActioning] = useState(false);
   const { toast } = useToast();
 
   const id = transactionId ? parseInt(transactionId) : null;
+  const receiptSource: ReceiptSource | null = isTokenSource
+    ? (token && !invalidShare ? { kind: "retail-token", token, share } : null)
+    : (id ? { kind: "retail-legacy", transactionId: id, splitPaymentId: splitId } : null);
 
-  const { data: transaction, isLoading: transactionLoading } = useQuery({
+  const { data: legacyTransaction, isLoading: transactionLoading } = useQuery({
     queryKey: ["/api/transactions", id],
     queryFn: async () => {
       if (!id) return null;
@@ -38,21 +55,39 @@ export default function Receipt() {
       if (!response.ok) throw new Error("Failed to fetch transaction");
       return response.json();
     },
-    enabled: !!id,
+    enabled: !isTokenSource && !!id,
   });
 
-  const { data: merchant, isLoading: merchantLoading } = useQuery({
-    queryKey: ["/api/merchants", transaction?.merchantId],
+  const {
+    data: tokenReceipt,
+    isLoading: tokenReceiptLoading,
+    error: tokenReceiptError,
+  } = useQuery<any>({
+    queryKey: ["token-receipt", token, share],
     queryFn: async () => {
-      if (!transaction?.merchantId) return null;
-      const response = await fetch(`/api/merchants/${transaction.merchantId}`);
+      const response = await fetch(receiptDataEndpoint(receiptSource as Extract<ReceiptSource, { kind: "retail-token" }>), {
+        headers: { "Cache-Control": "no-cache" },
+      });
+      if (!response.ok) throw new Error("Receipt not found");
+      return response.json();
+    },
+    enabled: isTokenSource && !!receiptSource,
+    retry: false,
+    staleTime: 0,
+  });
+
+  const { data: legacyMerchant, isLoading: merchantLoading } = useQuery({
+    queryKey: ["/api/merchants", legacyTransaction?.merchantId],
+    queryFn: async () => {
+      if (!legacyTransaction?.merchantId) return null;
+      const response = await fetch(`/api/merchants/${legacyTransaction.merchantId}`);
       if (!response.ok) throw new Error("Failed to fetch merchant");
       return response.json();
     },
-    enabled: !!transaction?.merchantId,
+    enabled: !isTokenSource && !!legacyTransaction?.merchantId,
   });
 
-  const { data: splitPayment, isLoading: splitLoading } = useQuery({
+  const { data: legacySplitPayment, isLoading: splitLoading } = useQuery({
     queryKey: ["/api/split-payments", splitId],
     queryFn: async () => {
       if (!splitId) return null;
@@ -60,8 +95,12 @@ export default function Receipt() {
       if (!response.ok) throw new Error("Failed to fetch split payment");
       return response.json();
     },
-    enabled: !!splitId,
+    enabled: !isTokenSource && !!splitId,
   });
+
+  const transaction = isTokenSource ? tokenReceipt?.transaction : legacyTransaction;
+  const merchant = isTokenSource ? tokenReceipt?.merchant : legacyMerchant;
+  const splitPayment = isTokenSource ? tokenReceipt?.share : legacySplitPayment;
 
   const formatDate = (dateString: string) =>
     new Date(dateString).toLocaleString("en-NZ", {
@@ -73,8 +112,8 @@ export default function Receipt() {
     });
 
   const getPdfUrl = () => {
-    const base = `/api/transactions/${id}/receipt-pdf`;
-    return splitId ? `${base}?splitId=${splitId}` : base;
+    if (!receiptSource) return "";
+    return receiptPdfEndpoint(receiptSource);
   };
 
   const fetchPdfBlob = async (): Promise<Blob> => {
@@ -99,7 +138,8 @@ export default function Receipt() {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `receipt-${transaction.id}-${new Date().toISOString().split("T")[0]}.pdf`;
+      const reference = isTokenSource ? (share ? `share-${share}` : "payment") : transaction.id;
+      link.download = `receipt-${reference}-${new Date().toISOString().split("T")[0]}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -121,7 +161,8 @@ export default function Receipt() {
     setIsActioning(true);
     try {
       const blob = await fetchPdfBlob();
-      const file = new File([blob], `receipt-${transaction.id}.pdf`, { type: "application/pdf" });
+      const reference = isTokenSource ? (share ? `share-${share}` : "payment") : transaction.id;
+      const file = new File([blob], `receipt-${reference}.pdf`, { type: "application/pdf" });
       const merchantName = merchant.businessName || merchant.name || "the merchant";
       const shareAmt = `$${effectiveAmount.toFixed(2)}`;
 
@@ -141,7 +182,7 @@ export default function Receipt() {
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
-        link.download = `receipt-${transaction.id}.pdf`;
+        link.download = `receipt-${reference}.pdf`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -161,17 +202,19 @@ export default function Receipt() {
     }
   };
 
-  if (!id) {
+  if (!receiptSource) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl p-8 text-center">
-          <p className="text-gray-600">Invalid transaction ID</p>
+          <p className="text-gray-600">{isTokenSource ? "Invalid receipt link" : "Invalid transaction ID"}</p>
         </div>
       </div>
     );
   }
 
-  const isLoading = transactionLoading || merchantLoading || (!!splitId && splitLoading);
+  const isLoading = isTokenSource
+    ? tokenReceiptLoading
+    : transactionLoading || merchantLoading || (!!splitId && splitLoading);
 
   if (isLoading) {
     return (
@@ -189,7 +232,7 @@ export default function Receipt() {
     );
   }
 
-  if (!transaction) {
+  if (!transaction || tokenReceiptError) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl p-8 text-center">
@@ -199,10 +242,13 @@ export default function Receipt() {
     );
   }
 
-  const isSplitReceipt = !!splitId && !!splitPayment;
+  const isSplitReceipt = isTokenSource ? !!share && !!splitPayment : !!splitId && !!splitPayment;
   const effectiveAmount = isSplitReceipt
     ? parseFloat(splitPayment.amount)
     : parseFloat(transaction.price);
+  const receiptPaymentMethod = isSplitReceipt
+    ? splitPayment.paymentMethod ?? transaction.paymentMethod
+    : transaction.paymentMethod;
 
   const gstRate = 0.15;
   const gstAmount = (effectiveAmount * gstRate) / (1 + gstRate);
@@ -269,12 +315,14 @@ export default function Receipt() {
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-400">Payment method</span>
-              <span className="text-gray-700 font-medium">{formatPaymentMethod(transaction.paymentMethod)}</span>
+              <span className="text-gray-700 font-medium">{formatPaymentMethod(receiptPaymentMethod)}</span>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-400">Reference</span>
-              <span className="text-gray-500 font-mono text-xs">#{transaction.id}</span>
-            </div>
+            {!isTokenSource && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">Reference</span>
+                <span className="text-gray-500 font-mono text-xs">#{transaction.id}</span>
+              </div>
+            )}
           </div>
 
           <Separator className="my-3" />

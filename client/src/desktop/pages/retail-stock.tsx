@@ -261,7 +261,7 @@ export default function DesktopRetailStock(props: DesktopRoutePageProps) {
             <span className="rs-count-sub">products in inventory</span>
           </div>
 
-          <div className="rs-search">
+          <div className="rs-search" data-tutorial-id="retail-stock-directory">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={ACCENT} strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="6.5" /><path d="m20 20-3.8-3.8" /></svg>
             <input
               value={search}
@@ -309,7 +309,7 @@ export default function DesktopRetailStock(props: DesktopRoutePageProps) {
         {/* ── RIGHT: card grid ── */}
         <div className="rs-right">
           <div className="rs-grid">
-            <button type="button" className="rs-add" aria-label="add product" onClick={openAdd}>
+            <button type="button" className="rs-add" data-tutorial-id="retail-stock-add" aria-label="add product" onClick={openAdd}>
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
               <span>add product</span>
             </button>

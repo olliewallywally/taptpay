@@ -1,12 +1,259 @@
-import { merchants, merchantTutorialProgress, transactions, merchantSettlements, platformFees, refunds, splitPayments, taptStones, stockItems, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, tenantProfiles, activeSchedules, invoicesRentRequests, transactionEvents, clientProfiles, quotes, jobInvoices, jobSchedules, jobEvents, type Merchant, type MerchantTutorialProgress, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type MerchantSubscription, type SubscriptionBillingHistory } from "@shared/schema";
+import { merchants, merchantTutorialProgress, transactions, merchantSettlements, platformFees, refunds, splitPayments, paymentAttempts, PAYMENT_RETURN_STATE_MAX_AGE_MS, taptStones, stockItems, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, pushNotificationDeliveries, normalizePushNotificationPreferences, DEFAULT_PUSH_NOTIFICATION_PREFERENCES, tenantProfiles, activeSchedules, invoicesRentRequests, transactionEvents, clientProfiles, quotes, jobInvoices, jobSchedules, jobEvents, type Merchant, type MerchantTutorialProgress, type Transaction, type SplitPayment, type PaymentAttempt, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type MerchantSubscription, type SubscriptionBillingHistory, type PushSubscription, type PushNotificationPreferences, type PushNotificationEventType } from "@shared/schema";
 import { getDb, isDatabaseConnected } from "./database";
-import { eq, ne, desc, and, inArray, gte, lte, or, ilike, sql, isNull } from "drizzle-orm";
+import { eq, ne, desc, and, inArray, gte, lte, lt, or, ilike, sql, isNull, isNotNull } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+import type {
+  AttachPaymentAttemptSessionRecordInput,
+  AttachPaymentAttemptSessionResult,
+  ClaimPaymentAttemptFinalizationRecordInput,
+  ClaimPaymentAttemptFinalizationResult,
+  ClaimPaymentAttemptRecordInput,
+  ClaimPaymentAttemptResult,
+  FinalizePaymentAttemptRecordInput,
+  FinalizePaymentAttemptResult,
+  PaymentAttemptRepository,
+} from "./payment-attempt-service";
+
+export type ActiveTransactionScope =
+  | { kind: "merchant-any" }
+  | { kind: "legacy-no-board" }
+  | { kind: "board"; stoneId: number };
+
+export type PushSubscriptionInput = {
+  merchantId: number;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  userAgent?: string;
+};
+
+export type DailyPushPaymentSummary = {
+  merchantId: number;
+  amount: string;
+  paymentCount: number;
+};
+
+export type PushNotificationDeliveryStatus = "processed" | "skipped" | "failed";
+export const PUSH_NOTIFICATION_DELIVERY_LEASE_MS = 15 * 60 * 1000;
+
+/**
+ * Internal transaction input accepted by storage implementations. The external
+ * insert/request schemas omit the digest; only a server service can add it while
+ * canonicalizing a validated request.
+ */
+export type TransactionStorageInput = Omit<InsertTransaction, "selectedStoneId"> & {
+  taptStoneId?: Transaction["taptStoneId"];
+  paymentTokenHash?: Transaction["paymentTokenHash"];
+};
+
+export type TransactionServerOwnedFields = Readonly<{
+  paymentTokenHash?: Transaction["paymentTokenHash"];
+}>;
+
+type RuntimeTransactionFields = InsertTransaction & {
+  paymentTokenHash?: unknown;
+  rawToken?: unknown;
+  paymentToken?: unknown;
+  token?: unknown;
+};
+
+/**
+ * Canonicalize the current external transaction shape without ever forwarding
+ * its request-only `selectedStoneId` alias to the database driver.
+ */
+export function toTransactionStorageInput(
+  transaction: InsertTransaction,
+  serverOwned: TransactionServerOwnedFields = {},
+): TransactionStorageInput {
+  const {
+    selectedStoneId,
+    paymentTokenHash: _callerPaymentTokenHash,
+    rawToken: _rawToken,
+    paymentToken: _paymentToken,
+    token: _token,
+    ...canonical
+  } = transaction as RuntimeTransactionFields;
+  return {
+    ...canonical,
+    taptStoneId:
+      canonical.taptStoneId !== undefined
+        ? canonical.taptStoneId
+        : selectedStoneId ?? null,
+    ...(serverOwned.paymentTokenHash !== undefined
+      ? { paymentTokenHash: serverOwned.paymentTokenHash }
+      : {}),
+  };
+}
+
+/**
+ * Storage is allowed to receive a digest but never a bearer secret. Keep this
+ * runtime projection even though TypeScript already excludes raw-token fields.
+ */
+function sanitizeTransactionStorageInput(
+  input: TransactionStorageInput,
+): TransactionStorageInput {
+  const {
+    selectedStoneId,
+    rawToken: _rawToken,
+    paymentToken: _paymentToken,
+    token: _token,
+    ...canonical
+  } = input as TransactionStorageInput & {
+    selectedStoneId?: number | null;
+    rawToken?: unknown;
+    paymentToken?: unknown;
+    token?: unknown;
+  };
+  return {
+    ...canonical,
+    taptStoneId:
+      canonical.taptStoneId !== undefined
+        ? canonical.taptStoneId
+        : selectedStoneId ?? null,
+  };
+}
+
+export class TaptStoneCapacityError extends Error {
+  readonly code = "TAPT_STONE_LIMIT";
+
+  constructor() {
+    super("Maximum 10 tapt stones allowed per merchant");
+    this.name = "TaptStoneCapacityError";
+  }
+}
+
+export class TaptStoneConflictError extends Error {
+  readonly code = "TAPT_STONE_CONFLICT";
+
+  constructor() {
+    super("A tapt stone with that number already exists");
+    this.name = "TaptStoneConflictError";
+  }
+}
+
+export type BillSplitConflictReason =
+  | "invalid-count"
+  | "transaction-not-pending"
+  | "already-configured"
+  | "split-in-progress"
+  | "inconsistent-split-state";
+
+export class BillSplitConflictError extends Error {
+  readonly code = "BILL_SPLIT_CONFLICT";
+
+  constructor(readonly reason: BillSplitConflictReason) {
+    super(
+      reason === "invalid-count"
+        ? "Total splits must be an integer between 2 and 10"
+        : "The transaction split can no longer be configured",
+    );
+    this.name = "BillSplitConflictError";
+  }
+}
+
+function moneyStringToCents(value: string): number {
+  const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(value);
+  if (!match) throw new BillSplitConflictError("inconsistent-split-state");
+  return Number(match[1]) * 100 + Number((match[2] ?? "").padEnd(2, "0"));
+}
+
+function centsToMoneyString(cents: number): string {
+  return (cents / 100).toFixed(2);
+}
+
+function transactionSplitAmounts(price: string, totalSplits: number): string[] {
+  if (!Number.isInteger(totalSplits) || totalSplits < 2 || totalSplits > 10) {
+    throw new BillSplitConflictError("invalid-count");
+  }
+  const totalCents = moneyStringToCents(price);
+  if (totalCents < totalSplits) {
+    throw new BillSplitConflictError("invalid-count");
+  }
+  const baseCents = Math.floor(totalCents / totalSplits);
+  const finalCents = totalCents - baseCents * (totalSplits - 1);
+  return Array.from(
+    { length: totalSplits },
+    (_, index) => centsToMoneyString(index === totalSplits - 1 ? finalCents : baseCents),
+  );
+}
+
+const TAPT_STONE_LIMIT = 10;
+// Stable two-key advisory-lock namespace. The second key is the merchant ID.
+const TAPT_STONE_ALLOCATION_LOCK_NAMESPACE = 1_413_566_548; // ASCII "TAPT"
+
+function firstFreeTaptStoneNumber(stones: Iterable<Pick<TaptStone, "stoneNumber">>): number | undefined {
+  const usedNumbers = new Set(Array.from(stones, (stone) => stone.stoneNumber));
+  for (let stoneNumber = 1; stoneNumber <= TAPT_STONE_LIMIT; stoneNumber += 1) {
+    if (!usedNumbers.has(stoneNumber)) return stoneNumber;
+  }
+  return undefined;
+}
+
+function compareTransactionsNewest(a: Transaction, b: Transaction): number {
+  const createdDifference = (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0);
+  return createdDifference || b.id - a.id;
+}
+
+const LIVE_PAYMENT_ATTEMPT_STATES = new Set([
+  "claiming",
+  "ready",
+  "finalizing",
+]);
+const TERMINAL_PAYMENT_ATTEMPT_STATES = new Set([
+  "approved",
+  "declined",
+  "cancelled",
+]);
+
+function paymentAttemptIsLive(attempt: PaymentAttempt): boolean {
+  return LIVE_PAYMENT_ATTEMPT_STATES.has(attempt.state);
+}
+
+function paymentAttemptIsTerminal(attempt: PaymentAttempt): boolean {
+  return TERMINAL_PAYMENT_ATTEMPT_STATES.has(attempt.state);
+}
+
+function paymentAttemptLeaseExpired(attempt: PaymentAttempt, now: Date): boolean {
+  return paymentAttemptIsLive(attempt) && attempt.leaseExpiresAt.getTime() <= now.getTime();
+}
+
+async function withMemLock<T>(
+  locks: Map<string, Promise<void>>,
+  key: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const previous = locks.get(key) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const lockTail = previous.then(() => current);
+  locks.set(key, lockTail);
+  await previous;
+  try {
+    return await operation();
+  } finally {
+    release();
+    if (locks.get(key) === lockTail) locks.delete(key);
+  }
+}
+
+function isPostgresUniqueViolation(error: unknown): boolean {
+  const seen = new Set<object>();
+  let current = error;
+  while (current && typeof current === "object" && !seen.has(current)) {
+    if ((current as { code?: unknown }).code === "23505") return true;
+    seen.add(current);
+    current = (current as { cause?: unknown }).cause;
+  }
+  return false;
+}
 
 function isNeonEmptyResultError(error: unknown): boolean {
   return error instanceof TypeError && error.message === "Cannot read properties of null (reading 'map')";
 }
 
-export interface IStorage {
+export interface IStorage extends PaymentAttemptRepository {
   // Merchant operations
   getMerchant(id: number): Promise<Merchant | undefined>;
   getMerchantByName(name: string): Promise<Merchant | undefined>;
@@ -34,21 +281,16 @@ export interface IStorage {
   
   // Transaction operations
   getTransaction(id: number): Promise<Transaction | undefined>;
+  getTransactionByPaymentTokenHash(paymentTokenHash: string): Promise<Transaction | undefined>;
   /**
-   * Find the merchant's active transaction, optionally scoped to a board.
-   *
-   * `taptStoneId` is deliberately tri-state:
-   *   undefined → any board (merchant-side callers that mean "whatever is pending")
-   *   null      → **no-board sales only** — the public /pay/:merchantId link
-   *   number    → that board only
-   *
-   * The null case exists because filtering by merchant alone lets a customer on
-   * the merchant-level link be served, and pay, a sale rung up on a specific
-   * board. Do not collapse null back into undefined.
+   * Find the merchant's newest active transaction within an explicit audience
+   * scope. Public shared-link callers use `legacy-no-board`, which excludes
+   * per-payment credentials as well as board-bound rows; authenticated
+   * merchant callers that intentionally see every board use `merchant-any`.
    */
-  getActiveTransactionByMerchant(merchantId: number, taptStoneId?: number | null): Promise<Transaction | undefined>;
+  getActiveTransactionByMerchant(merchantId: number, scope: ActiveTransactionScope): Promise<Transaction | undefined>;
   getTransactionByNfcSession(nfcSessionId: string): Promise<Transaction | undefined>;
-  createTransaction(transaction: InsertTransaction): Promise<Transaction>;
+  createTransaction(transaction: TransactionStorageInput): Promise<Transaction>;
   updateTransactionStatus(id: number, status: string, windcaveTransactionId?: string): Promise<Transaction | undefined>;
   updateTransactionPaymentMethod(id: number, paymentMethod: string): Promise<Transaction | undefined>;
   updateTransactionSplitEnabled(id: number, splitEnabled: boolean): Promise<Transaction | undefined>;
@@ -87,6 +329,7 @@ export interface IStorage {
 
   // Tapt Stone operations
   createTaptStone(data: InsertTaptStone): Promise<TaptStone>;
+  createNextTaptStone(merchantId: number, name?: string): Promise<TaptStone>;
   getTaptStone(id: number): Promise<TaptStone | undefined>;
   getTaptStonesByMerchant(merchantId: number): Promise<TaptStone[]>;
   updateTaptStone(id: number, data: Partial<{ name: string }>): Promise<TaptStone | undefined>;
@@ -163,10 +406,29 @@ export interface IStorage {
   resetUnbilledTransactions(merchantId: number): Promise<void>;
   
   // Push subscription operations
-  createPushSubscription(data: { merchantId: number; endpoint: string; p256dh: string; auth: string; userAgent?: string }): Promise<any>;
-  getPushSubscriptionsByMerchant(merchantId: number): Promise<any[]>;
+  createPushSubscription(data: PushSubscriptionInput): Promise<PushSubscription | null>;
+  getPushSubscriptionsByMerchant(merchantId: number): Promise<PushSubscription[]>;
+  getPushNotificationPreferences(merchantId: number): Promise<PushNotificationPreferences>;
+  updatePushNotificationPreferences(
+    merchantId: number,
+    preferences: PushNotificationPreferences,
+  ): Promise<PushNotificationPreferences>;
   deactivatePushSubscription(id: number): Promise<void>;
   deactivatePushSubscriptionByEndpoint(endpoint: string): Promise<void>;
+  getDailyPushPaymentSummaries(start: Date, end: Date): Promise<DailyPushPaymentSummary[]>;
+  claimPushNotificationDelivery(
+    merchantId: number,
+    eventType: PushNotificationEventType,
+    eventKey: string,
+    now?: Date,
+  ): Promise<string | null>;
+  completePushNotificationDelivery(
+    merchantId: number,
+    eventType: PushNotificationEventType,
+    eventKey: string,
+    claimToken: string,
+    status: PushNotificationDeliveryStatus,
+  ): Promise<void>;
 
   // Info pack lead capture
   createInfoPackLead(data: { name: string; email: string }): Promise<any>;
@@ -298,7 +560,9 @@ export class MemStorage implements IStorage {
   private transactions: Map<number, Transaction>;
   private platformFees: Map<number, PlatformFee>;
   private refunds: Map<number, Refund>;
-  private splitPayments: Map<number, any>;
+  private splitPayments: Map<number, SplitPayment>;
+  private paymentAttempts: Map<string, PaymentAttempt>;
+  private merchantTransactionCounts: Map<number, number>;
   private taptStones: Map<number, TaptStone>;
   private stockItems: Map<number, StockItem>;
   private currentMerchantId: number;
@@ -308,8 +572,15 @@ export class MemStorage implements IStorage {
   private currentSplitPaymentId: number;
   private currentTaptStoneId: number;
   private currentStockItemId: number;
-  private activeTransactionCache: Map<string, Transaction | null>;
-  private pushSubs: any[];
+  private taptStoneCreationLocks: Map<number, Promise<void>>;
+  private paymentAttemptLocks: Map<string, Promise<void>>;
+  private billSplitLocks: Map<string, Promise<void>>;
+  private pushSubs: PushSubscription[];
+  private pushDeliveryClaims: Map<string, {
+    status: PushNotificationDeliveryStatus | "claimed";
+    claimToken: string;
+    claimedAt: Date;
+  }>;
   private tutorialProgress: Map<string, MerchantTutorialProgress>;
 
   constructor() {
@@ -318,9 +589,12 @@ export class MemStorage implements IStorage {
     this.platformFees = new Map();
     this.refunds = new Map();
     this.splitPayments = new Map();
+    this.paymentAttempts = new Map();
+    this.merchantTransactionCounts = new Map();
     this.taptStones = new Map();
     this.stockItems = new Map();
     this.pushSubs = [];
+    this.pushDeliveryClaims = new Map();
     this.tutorialProgress = new Map();
     this.currentMerchantId = 1;
     this.currentTransactionId = 1;
@@ -329,7 +603,9 @@ export class MemStorage implements IStorage {
     this.currentSplitPaymentId = 1;
     this.currentTaptStoneId = 1;
     this.currentStockItemId = 1;
-    this.activeTransactionCache = new Map();
+    this.taptStoneCreationLocks = new Map();
+    this.paymentAttemptLocks = new Map();
+    this.billSplitLocks = new Map();
   }
 
   async getMerchant(id: number): Promise<Merchant | undefined> {
@@ -524,58 +800,424 @@ export class MemStorage implements IStorage {
     return this.transactions.get(id);
   }
 
-  async getActiveTransactionByMerchant(merchantId: number, taptStoneId?: number | null): Promise<Transaction | undefined> {
-    // Tri-state — see the interface docstring. The three cases need three distinct
-    // cache keys: "any board" and "no board only" are different questions with
-    // different answers, so they must not share an entry.
-    const cacheKey =
-      taptStoneId === undefined
-        ? `${merchantId}`
-        : taptStoneId === null
-          ? `${merchantId}-noboard`
-          : `${merchantId}-${taptStoneId}`;
-    
-    // Check cache first for instant response
-    if (this.activeTransactionCache.has(cacheKey)) {
-      return this.activeTransactionCache.get(cacheKey) || undefined;
-    }
-    
-    // Return pending/processing first, then recently-completed (within 3 min) so the
-    // terminal can detect the status transition and show the success overlay.
+  async getTransactionByPaymentTokenHash(
+    paymentTokenHash: string,
+  ): Promise<Transaction | undefined> {
+    return Array.from(this.transactions.values())
+      .find((transaction) => transaction.paymentTokenHash === paymentTokenHash);
+  }
+
+  async getPaymentAttempt(id: string): Promise<PaymentAttempt | undefined> {
+    return this.paymentAttempts.get(id);
+  }
+
+  async getPaymentAttemptByProcessorSessionId(
+    processorSessionId: string,
+  ): Promise<PaymentAttempt | undefined> {
+    return Array.from(this.paymentAttempts.values()).find(
+      (attempt) => attempt.processorSessionId === processorSessionId,
+    );
+  }
+
+  async getPaymentAttemptByTransactionShareKey(
+    transactionId: number,
+    shareIndex: number,
+    idempotencyKey: string,
+  ): Promise<PaymentAttempt | undefined> {
+    return Array.from(this.paymentAttempts.values()).find(
+      (attempt) =>
+        attempt.transactionId === transactionId &&
+        attempt.shareIndex === shareIndex &&
+        attempt.idempotencyKey === idempotencyKey,
+    );
+  }
+
+  async claimPaymentAttemptRecord(
+    input: ClaimPaymentAttemptRecordInput,
+  ): Promise<ClaimPaymentAttemptResult> {
+    const lockKey = `share:${input.transactionId}:${input.shareIndex}`;
+    return withMemLock(this.paymentAttemptLocks, lockKey, async () => {
+      const transaction = this.transactions.get(input.transactionId);
+      if (!transaction) {
+        return { kind: "transaction-not-found" };
+      }
+      const attempts = Array.from(this.paymentAttempts.values())
+        .filter(
+          (attempt) =>
+            attempt.transactionId === input.transactionId &&
+            attempt.shareIndex === input.shareIndex,
+        )
+        .sort(
+          (a, b) =>
+            b.createdAt.getTime() - a.createdAt.getTime() ||
+            b.id.localeCompare(a.id),
+        );
+      const sameKey = attempts.find(
+        (attempt) => attempt.idempotencyKey === input.idempotencyKey,
+      );
+      let active = attempts.find(paymentAttemptIsLive);
+      let abandonedAttemptId: string | undefined;
+
+      if (active && paymentAttemptLeaseExpired(active, input.now)) {
+        // A processor-bound attempt must be reconciled before another key can
+        // claim this payment target. Abandoning it here could leave an HPP/card
+        // session chargeable while a replacement session is created.
+        if (active.processorSessionId) {
+          return { kind: "expired", attempt: active };
+        }
+        const abandoned: PaymentAttempt = {
+          ...active,
+          state: "abandoned",
+          updatedAt: input.now,
+        };
+        this.paymentAttempts.set(abandoned.id, abandoned);
+        abandonedAttemptId = abandoned.id;
+        if (sameKey?.id === abandoned.id) {
+          return { kind: "expired", attempt: abandoned };
+        }
+        active = undefined;
+      }
+
+      if (sameKey) {
+        const current = this.paymentAttempts.get(sameKey.id) ?? sameKey;
+        if (paymentAttemptIsLive(current)) {
+          return { kind: "reused", attempt: current };
+        }
+        if (paymentAttemptIsTerminal(current)) {
+          return { kind: "terminal", attempt: current };
+        }
+        return { kind: "expired", attempt: current };
+      }
+      if (active) return { kind: "conflict", attempt: active };
+
+      if (transaction.status !== "pending") {
+        return { kind: "target-conflict", reason: "transaction-not-payable" };
+      }
+      if (input.shareIndex === 0 && transaction.isSplit) {
+        return { kind: "target-conflict", reason: "split-target-required" };
+      }
+      if (input.shareIndex > 0 && !transaction.isSplit) {
+        return { kind: "target-conflict", reason: "unsplit-target-required" };
+      }
+      if (input.shareIndex > 0) {
+        const share = Array.from(this.splitPayments.values()).find(
+          (candidate) =>
+            candidate.transactionId === input.transactionId &&
+            candidate.splitIndex === input.shareIndex,
+        );
+        if (!share) return { kind: "target-conflict", reason: "share-not-found" };
+        if (share.status !== "pending") {
+          return { kind: "target-conflict", reason: "share-not-payable" };
+        }
+      }
+
+      const attempt: PaymentAttempt = {
+        id: randomUUID(),
+        transactionId: input.transactionId,
+        shareIndex: input.shareIndex,
+        idempotencyKey: input.idempotencyKey,
+        state: "claiming",
+        leaseExpiresAt: input.leaseExpiresAt,
+        processorSessionId: null,
+        processorXId: null,
+        returnStateHash: null,
+        returnStateExpiresAt: null,
+        outcome: null,
+        receiptShare: null,
+        createdAt: input.now,
+        updatedAt: input.now,
+      };
+      this.paymentAttempts.set(attempt.id, attempt);
+      return {
+        kind: "claimed",
+        attempt,
+        ...(abandonedAttemptId ? { abandonedAttemptId } : {}),
+      };
+    });
+  }
+
+  async attachPaymentAttemptSessionRecord(
+    input: AttachPaymentAttemptSessionRecordInput,
+  ): Promise<AttachPaymentAttemptSessionResult> {
+    return withMemLock(this.paymentAttemptLocks, `attempt:${input.attemptId}`, async () => {
+      const attempt = this.paymentAttempts.get(input.attemptId);
+      if (!attempt) return { kind: "not-found" };
+
+      if (paymentAttemptLeaseExpired(attempt, input.now)) {
+        const abandoned: PaymentAttempt = {
+          ...attempt,
+          state: "abandoned",
+          updatedAt: input.now,
+        };
+        this.paymentAttempts.set(abandoned.id, abandoned);
+        return { kind: "expired", attempt: abandoned };
+      }
+      if (attempt.state === "abandoned") {
+        return { kind: "expired", attempt };
+      }
+      if (paymentAttemptIsTerminal(attempt)) {
+        return { kind: "terminal", attempt };
+      }
+
+      const duplicateIdentity = Array.from(this.paymentAttempts.values()).find(
+        (candidate) =>
+          candidate.id !== attempt.id &&
+          (candidate.processorSessionId === input.processorSessionId ||
+            candidate.processorXId === input.processorXId ||
+            (input.returnStateHash !== null &&
+              candidate.returnStateHash === input.returnStateHash)),
+      );
+      if (duplicateIdentity) return { kind: "conflict", attempt };
+
+      const maximumReturnExpiry = new Date(
+        attempt.createdAt.getTime() + PAYMENT_RETURN_STATE_MAX_AGE_MS,
+      );
+      const returnStateExpiresAt =
+        input.returnStateExpiresAt &&
+        input.returnStateExpiresAt.getTime() > maximumReturnExpiry.getTime()
+          ? maximumReturnExpiry
+          : input.returnStateExpiresAt;
+      const matches =
+        attempt.processorSessionId === input.processorSessionId &&
+        attempt.processorXId === input.processorXId &&
+        attempt.returnStateHash === input.returnStateHash &&
+        (attempt.returnStateExpiresAt?.getTime() ?? null) ===
+          (returnStateExpiresAt?.getTime() ?? null);
+
+      if (attempt.state === "ready") {
+        return matches
+          ? { kind: "reused", attempt }
+          : { kind: "conflict", attempt };
+      }
+      if (attempt.state !== "claiming") {
+        return { kind: "conflict", attempt };
+      }
+
+      const attached: PaymentAttempt = {
+        ...attempt,
+        state: "ready",
+        processorSessionId: input.processorSessionId,
+        processorXId: input.processorXId,
+        returnStateHash: input.returnStateHash,
+        returnStateExpiresAt,
+        updatedAt: input.now,
+      };
+      this.paymentAttempts.set(attached.id, attached);
+      return { kind: "attached", attempt: attached };
+    });
+  }
+
+  async getPaymentAttemptByReturnStateHash(
+    returnStateHash: string,
+  ): Promise<PaymentAttempt | undefined> {
+    return Array.from(this.paymentAttempts.values())
+      .find((attempt) => attempt.returnStateHash === returnStateHash);
+  }
+
+  async claimPaymentAttemptFinalizationRecord(
+    input: ClaimPaymentAttemptFinalizationRecordInput,
+  ): Promise<ClaimPaymentAttemptFinalizationResult> {
+    return withMemLock(this.paymentAttemptLocks, `attempt:${input.attemptId}`, async () => {
+      const attempt = this.paymentAttempts.get(input.attemptId);
+      if (!attempt) return { kind: "not-found" };
+      if (attempt.processorSessionId !== input.processorSessionId) {
+        return { kind: "conflict", attempt };
+      }
+      if (attempt.state === "finalizing") return { kind: "reused", attempt };
+      if (paymentAttemptIsTerminal(attempt)) return { kind: "terminal", attempt };
+      if (attempt.state !== "ready") return { kind: "conflict", attempt };
+
+      const claimed: PaymentAttempt = {
+        ...attempt,
+        state: "finalizing",
+        updatedAt: input.now,
+      };
+      this.paymentAttempts.set(claimed.id, claimed);
+      return { kind: "claimed", attempt: claimed };
+    });
+  }
+
+  async finalizePaymentAttemptRecord(
+    input: FinalizePaymentAttemptRecordInput,
+  ): Promise<FinalizePaymentAttemptResult> {
+    const initialAttempt = this.paymentAttempts.get(input.attemptId);
+    if (!initialAttempt) return { kind: "not-found" };
+
+    return withMemLock(
+      this.paymentAttemptLocks,
+      `settle:${initialAttempt.transactionId}`,
+      async () => {
+        const attempt = this.paymentAttempts.get(input.attemptId);
+        if (!attempt) return { kind: "not-found" };
+        const transaction = this.transactions.get(attempt.transactionId);
+        if (!transaction) return { kind: "not-found" };
+
+        const splitPayment = attempt.shareIndex === 0
+          ? null
+          : Array.from(this.splitPayments.values()).find(
+              (split) =>
+                split.transactionId === attempt.transactionId &&
+                split.splitIndex === attempt.shareIndex,
+            ) ?? null;
+        const targetExists = attempt.shareIndex === 0
+          ? !transaction.isSplit
+          : transaction.isSplit && splitPayment !== null;
+        const receiptIsValid =
+          input.outcome === "approved"
+            ? attempt.shareIndex === 0
+              ? input.receiptShare === null
+              : input.receiptShare === attempt.shareIndex
+            : input.receiptShare === null;
+        if (
+          !targetExists ||
+          !receiptIsValid ||
+          attempt.processorSessionId !== input.processorSessionId ||
+          (input.outcome === "approved" && input.processorTransactionId === null)
+        ) {
+          return { kind: "conflict", attempt };
+        }
+
+        if (paymentAttemptIsTerminal(attempt)) {
+          return attempt.state === input.outcome &&
+            attempt.outcome === input.outcome &&
+            attempt.receiptShare === input.receiptShare
+            ? {
+                kind: "reused",
+                attempt,
+                transaction,
+                splitPayment,
+                platformFee: null,
+                counterIncremented: false,
+              }
+            : { kind: "conflict", attempt };
+        }
+        if (attempt.state !== "finalizing") {
+          return { kind: "conflict", attempt };
+        }
+        if (
+          !["pending", "processing"].includes(transaction.status) ||
+          (splitPayment && !["pending", "processing"].includes(splitPayment.status))
+        ) {
+          return { kind: "conflict", attempt };
+        }
+
+        const updatedSplit: SplitPayment | null = splitPayment
+          ? {
+              ...splitPayment,
+              status: input.outcome === "approved" ? "completed" : "pending",
+              windcaveTransactionId:
+                input.processorTransactionId ?? splitPayment.windcaveTransactionId,
+              paymentMethod: input.paymentMethod ?? splitPayment.paymentMethod,
+              paidAt: input.outcome === "approved" ? input.now : null,
+            }
+          : null;
+        const completedSplits = updatedSplit
+          ? Array.from(this.splitPayments.values()).filter(
+              (split) =>
+                split.transactionId === transaction.id &&
+                (split.id === updatedSplit.id
+                  ? updatedSplit.status === "completed"
+                  : split.status === "completed"),
+            ).length
+          : transaction.completedSplits ?? 0;
+        const allSplitsComplete = updatedSplit !== null &&
+          completedSplits >= (transaction.totalSplits ?? 1);
+        const transactionStatus = updatedSplit
+          ? input.outcome === "approved" && allSplitsComplete
+            ? "completed"
+            : "pending"
+          : input.outcome === "approved"
+            ? "completed"
+            : input.outcome === "cancelled" ? "cancelled" : "failed";
+        const updatedTransaction: Transaction = {
+          ...transaction,
+          status: transactionStatus,
+          completedSplits,
+          windcaveTransactionId:
+            input.processorTransactionId ?? transaction.windcaveTransactionId,
+          paymentMethod: input.paymentMethod ?? transaction.paymentMethod,
+          windcaveSessionId: input.processorSessionId,
+          windcaveSessionState:
+            updatedSplit && !allSplitsComplete ? "pending" : input.outcome,
+          windcaveXId: attempt.processorXId,
+        };
+        const finalized: PaymentAttempt = {
+          ...attempt,
+          state: input.outcome,
+          outcome: input.outcome,
+          receiptShare: input.receiptShare,
+          updatedAt: input.now,
+        };
+
+        let collectedFee: PlatformFee | null = null;
+        let counterIncremented = false;
+        if (input.outcome === "approved") {
+          collectedFee = {
+            id: this.currentPlatformFeeId,
+            transactionId: transaction.id,
+            merchantId: transaction.merchantId,
+            feeAmount:
+              updatedSplit?.platformFeeAmount ?? transaction.platformFeeAmount ?? "0.10",
+            transactionAmount: updatedSplit?.amount ?? transaction.price,
+            status: "collected",
+            collectedAt: input.now,
+            createdAt: input.now,
+          };
+          this.currentPlatformFeeId += 1;
+          if (transaction.merchantId !== null) {
+            this.merchantTransactionCounts.set(
+              transaction.merchantId,
+              (this.merchantTransactionCounts.get(transaction.merchantId) ?? 0) + 1,
+            );
+            counterIncremented = true;
+          }
+        }
+
+        if (updatedSplit) this.splitPayments.set(updatedSplit.id, updatedSplit);
+        this.transactions.set(updatedTransaction.id, updatedTransaction);
+        if (collectedFee) this.platformFees.set(collectedFee.id, collectedFee);
+        this.paymentAttempts.set(finalized.id, finalized);
+        return {
+          kind: "finalized",
+          attempt: finalized,
+          transaction: updatedTransaction,
+          splitPayment: updatedSplit,
+          platformFee: collectedFee,
+          counterIncremented,
+        };
+      },
+    );
+  }
+
+  async getActiveTransactionByMerchant(
+    merchantId: number,
+    scope: ActiveTransactionScope,
+  ): Promise<Transaction | undefined> {
+    // A map scan is cheap in the development/test backend and avoids a family of
+    // stale positive/negative cache entries after status, split, and cancel writes.
     const cutoff = new Date(Date.now() - 3 * 60 * 1000);
-    let activeTransaction: Transaction | undefined;
-    let recentlyCompleted: Transaction | undefined;
+    const scoped = Array.from(this.transactions.values())
+      .filter((transaction) => {
+        if (transaction.merchantId !== merchantId) return false;
+        switch (scope.kind) {
+          case "merchant-any":
+            return true;
+          case "legacy-no-board":
+            return transaction.taptStoneId == null && transaction.paymentTokenHash == null;
+          case "board":
+            return transaction.taptStoneId === scope.stoneId;
+        }
+      })
+      .sort(compareTransactionsNewest);
 
-    const transactionArray = Array.from(this.transactions.values());
-    for (let i = 0; i < transactionArray.length; i++) {
-      const transaction = transactionArray[i];
-      const matchesMerchant = transaction.merchantId === merchantId;
-      const matchesStone =
-        taptStoneId === undefined
-          ? true
-          : taptStoneId === null
-            ? transaction.taptStoneId == null
-            : transaction.taptStoneId === taptStoneId;
-      if (!matchesMerchant || !matchesStone) continue;
-
-      if (transaction.status === "pending" || transaction.status === "processing") {
-        activeTransaction = transaction;
-        break;
-      }
-      if (
+    return scoped.find(
+      (transaction) => transaction.status === "pending" || transaction.status === "processing",
+    ) ?? scoped.find(
+      (transaction) =>
         transaction.status === "completed" &&
-        transaction.createdAt &&
-        new Date(transaction.createdAt) >= cutoff &&
-        (!recentlyCompleted || new Date(transaction.createdAt) > new Date(recentlyCompleted.createdAt!))
-      ) {
-        recentlyCompleted = transaction;
-      }
-    }
-
-    const result = activeTransaction ?? recentlyCompleted;
-    // Cache for immediate future lookups
-    this.activeTransactionCache.set(cacheKey, result || null);
-    return result;
+        transaction.createdAt != null &&
+        transaction.createdAt >= cutoff,
+    );
   }
 
   async getTransactionByNfcSession(nfcSessionId: string): Promise<Transaction | undefined> {
@@ -583,7 +1225,8 @@ export class MemStorage implements IStorage {
       .find(t => t.nfcSessionId === nfcSessionId);
   }
 
-  async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
+  async createTransaction(input: TransactionStorageInput): Promise<Transaction> {
+    const insertTransaction = sanitizeTransactionStorageInput(input);
     const id = this.currentTransactionId++;
     const transactionAmount = parseFloat(insertTransaction.price);
     
@@ -594,7 +1237,7 @@ export class MemStorage implements IStorage {
     const transaction: Transaction = {
       ...insertTransaction,
       merchantId: insertTransaction.merchantId ?? null,
-      taptStoneId: (insertTransaction as any).taptStoneId ?? insertTransaction.selectedStoneId ?? null,
+      taptStoneId: insertTransaction.taptStoneId ?? null,
       isSplit: insertTransaction.isSplit ?? false,
       totalSplits: insertTransaction.totalSplits ?? 1,
       completedSplits: insertTransaction.completedSplits ?? 0,
@@ -616,14 +1259,9 @@ export class MemStorage implements IStorage {
       windcaveSessionId: null,
       windcaveSessionState: null,
       windcaveXId: null,
+      paymentTokenHash: insertTransaction.paymentTokenHash ?? null,
     };
     this.transactions.set(id, transaction);
-    
-    // Update cache if this is a pending transaction
-    if (transaction.status === "pending") {
-      this.activeTransactionCache.set(String(transaction.merchantId), transaction);
-    }
-    
     return transaction;
   }
 
@@ -795,15 +1433,6 @@ export class MemStorage implements IStorage {
       windcaveTransactionId: windcaveTransactionId || transaction.windcaveTransactionId,
     };
     this.transactions.set(id, updatedTransaction);
-    
-    // Update cache based on new status
-    if (status === "pending") {
-      this.activeTransactionCache.set(String(transaction.merchantId), updatedTransaction);
-    } else {
-      // Transaction is no longer pending, remove from cache
-      this.activeTransactionCache.delete(String(transaction.merchantId));
-    }
-    
     return updatedTransaction;
   }
 
@@ -820,9 +1449,6 @@ export class MemStorage implements IStorage {
     if (!transaction) return undefined;
     const updated = { ...transaction, splitEnabled };
     this.transactions.set(id, updated);
-    if (transaction.status === 'pending') {
-      this.activeTransactionCache.set(String(transaction.merchantId), updated);
-    }
     return updated;
   }
 
@@ -866,45 +1492,68 @@ export class MemStorage implements IStorage {
 
   // Bill splitting operations
   async createBillSplit(transactionId: number, totalSplits: number): Promise<Transaction | undefined> {
-    const transaction = this.transactions.get(transactionId);
-    if (!transaction) return undefined;
+    return withMemLock(this.billSplitLocks, String(transactionId), async () => {
+      const transaction = this.transactions.get(transactionId);
+      if (!transaction) return undefined;
 
-    const splitAmount = parseFloat(transaction.price) / totalSplits;
-    
-    const updatedTransaction = {
-      ...transaction,
-      isSplit: true,
-      totalSplits: totalSplits,
-      completedSplits: 0,
-      splitAmount: splitAmount.toFixed(2),
-    };
-    
-    this.transactions.set(transactionId, updatedTransaction);
+      const amounts = transactionSplitAmounts(transaction.price, totalSplits);
+      const existing = Array.from(this.splitPayments.values())
+        .filter((split) => split.transactionId === transactionId)
+        .sort((a, b) => a.splitIndex - b.splitIndex);
+      if (
+        (transaction.completedSplits ?? 0) > 0 ||
+        existing.some((split) => split.status !== "pending")
+      ) {
+        throw new BillSplitConflictError("split-in-progress");
+      }
+      if (transaction.status !== "pending") {
+        throw new BillSplitConflictError("transaction-not-pending");
+      }
+      if (transaction.isSplit) {
+        const isExactRetry =
+          transaction.totalSplits === totalSplits &&
+          existing.length === totalSplits &&
+          existing.every(
+            (split, index) =>
+              split.splitIndex === index + 1 &&
+              split.amount === amounts[index],
+          );
+        if (isExactRetry) return transaction;
+        throw new BillSplitConflictError("already-configured");
+      }
+      if (existing.length > 0) {
+        throw new BillSplitConflictError("inconsistent-split-state");
+      }
 
-    // Create split payment records
-    for (let i = 1; i <= totalSplits; i++) {
-      const splitPayment = {
-        id: this.currentSplitPaymentId++,
-        transactionId: transactionId,
+      const now = new Date();
+      const rows = amounts.map((amount, index) => ({
+        id: this.currentSplitPaymentId + index,
+        transactionId,
         merchantId: transaction.merchantId,
-        splitIndex: i,
-        amount: splitAmount.toFixed(2),
+        splitIndex: index + 1,
+        amount,
         status: "pending",
         windcaveTransactionId: null,
         paymentMethod: "qr_code",
         windcaveFeeAmount: "0.00",
         platformFeeAmount: "0.10",
-        merchantNet: splitAmount.toFixed(2),
+        merchantNet: amount,
         paidAt: null,
-        createdAt: new Date(),
+        createdAt: now,
+      }));
+      const updatedTransaction: Transaction = {
+        ...transaction,
+        isSplit: true,
+        totalSplits,
+        completedSplits: 0,
+        splitAmount: amounts[0],
       };
-      this.splitPayments.set(splitPayment.id, splitPayment);
-    }
 
-    // Update active transaction cache
-    this.activeTransactionCache.set(String(transaction.merchantId), updatedTransaction);
-
-    return updatedTransaction;
+      this.currentSplitPaymentId += rows.length;
+      this.transactions.set(transactionId, updatedTransaction);
+      for (const row of rows) this.splitPayments.set(row.id, row);
+      return updatedTransaction;
+    });
   }
 
   async createSplitPayment(data: any): Promise<any> {
@@ -955,13 +1604,6 @@ export class MemStorage implements IStorage {
         };
         
         this.transactions.set(splitPayment.transactionId, updatedTransaction);
-        
-        // Update cache
-        if (updatedTransaction.status === "completed") {
-          this.activeTransactionCache.delete(String(transaction.merchantId));
-        } else {
-          this.activeTransactionCache.set(String(transaction.merchantId), updatedTransaction);
-        }
       }
     }
 
@@ -1266,9 +1908,6 @@ export class MemStorage implements IStorage {
       this.transactions.delete(transaction.id);
     });
     
-    // Clear the active transaction cache for this merchant
-    this.activeTransactionCache.delete(String(merchantId));
-    
     console.log(`Cleared ${transactionsToDelete.length} transactions for merchant ${merchantId}`);
     return true;
   }
@@ -1324,7 +1963,6 @@ export class MemStorage implements IStorage {
     this.transactions.clear();
     this.currentMerchantId = 1;
     this.currentTransactionId = 1;
-    this.activeTransactionCache.clear();
     console.log("All merchants and transactions cleared from memory");
   }
 
@@ -1392,6 +2030,7 @@ export class MemStorage implements IStorage {
         windcaveSessionId: null,
         windcaveSessionState: null,
         windcaveXId: null,
+        paymentTokenHash: null,
         createdAt: createdDate,
       };
       this.transactions.set(id, newTransaction);
@@ -1456,22 +2095,55 @@ export class MemStorage implements IStorage {
     return [];
   }
 
-  async createPushSubscription(data: { merchantId: number; endpoint: string; p256dh: string; auth: string; userAgent?: string }): Promise<any> {
+  async createPushSubscription(data: PushSubscriptionInput): Promise<PushSubscription> {
+    const targetPreferences = await this.getPushNotificationPreferences(data.merchantId);
     const existing = this.pushSubs.find(s => s.endpoint === data.endpoint);
     if (existing) {
+      const preferences = existing.merchantId === data.merchantId
+        ? normalizePushNotificationPreferences(existing.preferences)
+        : targetPreferences;
       existing.isActive = true;
       existing.merchantId = data.merchantId;
       existing.p256dh = data.p256dh;
       existing.auth = data.auth;
+      existing.userAgent = data.userAgent ?? existing.userAgent;
+      existing.preferences = { ...preferences };
       return existing;
     }
-    const sub = { id: this.pushSubs.length + 1, ...data, isActive: true, createdAt: new Date() };
+    const sub: PushSubscription = {
+      id: this.pushSubs.length + 1,
+      ...data,
+      userAgent: data.userAgent ?? null,
+      isActive: true,
+      preferences: { ...targetPreferences },
+      createdAt: new Date(),
+    };
     this.pushSubs.push(sub);
     return sub;
   }
 
-  async getPushSubscriptionsByMerchant(merchantId: number): Promise<any[]> {
+  async getPushSubscriptionsByMerchant(merchantId: number): Promise<PushSubscription[]> {
     return this.pushSubs.filter(s => s.merchantId === merchantId && s.isActive);
+  }
+
+  async getPushNotificationPreferences(merchantId: number): Promise<PushNotificationPreferences> {
+    const latest = this.pushSubs
+      .filter((sub) => sub.merchantId === merchantId)
+      .sort((a, b) => b.id - a.id)[0];
+    return latest
+      ? normalizePushNotificationPreferences(latest.preferences)
+      : { ...DEFAULT_PUSH_NOTIFICATION_PREFERENCES };
+  }
+
+  async updatePushNotificationPreferences(
+    merchantId: number,
+    preferences: PushNotificationPreferences,
+  ): Promise<PushNotificationPreferences> {
+    const safePreferences = normalizePushNotificationPreferences(preferences);
+    for (const sub of this.pushSubs) {
+      if (sub.merchantId === merchantId) sub.preferences = { ...safePreferences };
+    }
+    return safePreferences;
   }
 
   async deactivatePushSubscription(id: number): Promise<void> {
@@ -1482,6 +2154,61 @@ export class MemStorage implements IStorage {
   async deactivatePushSubscriptionByEndpoint(endpoint: string): Promise<void> {
     const sub = this.pushSubs.find(s => s.endpoint === endpoint);
     if (sub) sub.isActive = false;
+  }
+
+  async getDailyPushPaymentSummaries(start: Date, end: Date): Promise<DailyPushPaymentSummary[]> {
+    const summaries = new Map<number, { amountCents: number; paymentCount: number }>();
+    for (const fee of this.platformFees.values()) {
+      if (
+        fee.status !== "collected"
+        || fee.merchantId == null
+        || !fee.collectedAt
+        || fee.collectedAt < start
+        || fee.collectedAt >= end
+      ) continue;
+      const current = summaries.get(fee.merchantId) ?? { amountCents: 0, paymentCount: 0 };
+      current.amountCents += Math.round(Number(fee.transactionAmount) * 100);
+      current.paymentCount += 1;
+      summaries.set(fee.merchantId, current);
+    }
+    return Array.from(summaries, ([merchantId, summary]) => ({
+      merchantId,
+      amount: (summary.amountCents / 100).toFixed(2),
+      paymentCount: summary.paymentCount,
+    }));
+  }
+
+  async claimPushNotificationDelivery(
+    merchantId: number,
+    eventType: PushNotificationEventType,
+    eventKey: string,
+    now = new Date(),
+  ): Promise<string | null> {
+    const key = `${merchantId}:${eventType}:${eventKey}`;
+    const existing = this.pushDeliveryClaims.get(key);
+    const staleBefore = now.getTime() - PUSH_NOTIFICATION_DELIVERY_LEASE_MS;
+    if (
+      existing
+      && existing.status !== "failed"
+      && !(existing.status === "claimed" && existing.claimedAt.getTime() <= staleBefore)
+    ) return null;
+    const claimToken = randomUUID();
+    this.pushDeliveryClaims.set(key, { status: "claimed", claimToken, claimedAt: now });
+    return claimToken;
+  }
+
+  async completePushNotificationDelivery(
+    merchantId: number,
+    eventType: PushNotificationEventType,
+    eventKey: string,
+    claimToken: string,
+    status: PushNotificationDeliveryStatus,
+  ): Promise<void> {
+    const key = `${merchantId}:${eventType}:${eventKey}`;
+    const existing = this.pushDeliveryClaims.get(key);
+    if (existing?.claimToken === claimToken) {
+      this.pushDeliveryClaims.set(key, { ...existing, status });
+    }
   }
 
   async createInfoPackLead(data: { name: string; email: string }): Promise<any> {
@@ -1502,6 +2229,29 @@ export class MemStorage implements IStorage {
   }
 
   // Tapt Stone operations
+  private async withTaptStoneCreationLock<T>(
+    merchantId: number,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    const previous = this.taptStoneCreationLocks.get(merchantId) ?? Promise.resolve();
+    let release!: () => void;
+    const current = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const lockTail = previous.then(() => current);
+    this.taptStoneCreationLocks.set(merchantId, lockTail);
+
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+      if (this.taptStoneCreationLocks.get(merchantId) === lockTail) {
+        this.taptStoneCreationLocks.delete(merchantId);
+      }
+    }
+  }
+
   async createTaptStone(data: InsertTaptStone): Promise<TaptStone> {
     const id = this.currentTaptStoneId++;
     const taptStone: TaptStone = {
@@ -1516,6 +2266,22 @@ export class MemStorage implements IStorage {
     };
     this.taptStones.set(id, taptStone);
     return taptStone;
+  }
+
+  async createNextTaptStone(merchantId: number, name?: string): Promise<TaptStone> {
+    return this.withTaptStoneCreationLock(merchantId, async () => {
+      const activeStones = Array.from(this.taptStones.values()).filter(
+        (stone) => stone.merchantId === merchantId && stone.isActive,
+      );
+      const stoneNumber = firstFreeTaptStoneNumber(activeStones);
+      if (stoneNumber === undefined) throw new TaptStoneCapacityError();
+
+      return this.createTaptStone({
+        merchantId,
+        stoneNumber,
+        name: name?.trim() || `Stone ${stoneNumber}`,
+      });
+    });
   }
 
   async getTaptStone(id: number): Promise<TaptStone | undefined> {
@@ -1641,7 +2407,10 @@ export class MemStorage implements IStorage {
   }
 
   async incrementTransactionCount(merchantId: number): Promise<void> {
-    // No-op in memory storage
+    this.merchantTransactionCounts.set(
+      merchantId,
+      (this.merchantTransactionCounts.get(merchantId) ?? 0) + 1,
+    );
   }
 
   async cancelSubscription(merchantId: number, reason: string): Promise<any> {
@@ -1995,19 +2764,576 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async getActiveTransactionByMerchant(merchantId: number, taptStoneId?: number | null): Promise<Transaction | undefined> {
+  async getTransactionByPaymentTokenHash(
+    paymentTokenHash: string,
+  ): Promise<Transaction | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.paymentTokenHash, paymentTokenHash))
+      .limit(1);
+    return result[0];
+  }
+
+  async getPaymentAttempt(id: string): Promise<PaymentAttempt | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const rows = await this.db
+      .select()
+      .from(paymentAttempts)
+      .where(eq(paymentAttempts.id, id))
+      .limit(1);
+    return rows[0];
+  }
+
+  async getPaymentAttemptByProcessorSessionId(
+    processorSessionId: string,
+  ): Promise<PaymentAttempt | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const rows = await this.db
+      .select()
+      .from(paymentAttempts)
+      .where(eq(paymentAttempts.processorSessionId, processorSessionId))
+      .limit(1);
+    return rows[0];
+  }
+
+  async getPaymentAttemptByTransactionShareKey(
+    transactionId: number,
+    shareIndex: number,
+    idempotencyKey: string,
+  ): Promise<PaymentAttempt | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const rows = await this.db
+      .select()
+      .from(paymentAttempts)
+      .where(and(
+        eq(paymentAttempts.transactionId, transactionId),
+        eq(paymentAttempts.shareIndex, shareIndex),
+        eq(paymentAttempts.idempotencyKey, idempotencyKey),
+      ))
+      .limit(1);
+    return rows[0];
+  }
+
+  async claimPaymentAttemptRecord(
+    input: ClaimPaymentAttemptRecordInput,
+  ): Promise<ClaimPaymentAttemptResult> {
+    const db = this.db;
+    if (!db) throw new Error('Database not available');
+
+    return db.transaction(async (tx) => {
+      const transactionRows = await tx
+        .select()
+        .from(transactions)
+        .where(eq(transactions.id, input.transactionId))
+        .for("update")
+        .limit(1);
+      const transaction = transactionRows[0];
+      if (!transaction) return { kind: "transaction-not-found" };
+      const attempts = await tx
+        .select()
+        .from(paymentAttempts)
+        .where(and(
+          eq(paymentAttempts.transactionId, input.transactionId),
+          eq(paymentAttempts.shareIndex, input.shareIndex),
+        ))
+        .orderBy(desc(paymentAttempts.createdAt), desc(paymentAttempts.id))
+        .for("update");
+      const sameKey = attempts.find(
+        (attempt) => attempt.idempotencyKey === input.idempotencyKey,
+      );
+      let active = attempts.find(paymentAttemptIsLive);
+      let abandonedAttemptId: string | undefined;
+
+      if (active && paymentAttemptLeaseExpired(active, input.now)) {
+        // Keep a processor-bound attempt live until the route queries and
+        // terminalizes that exact session. This transaction lock prevents a
+        // conflicting key from creating a second chargeable session meanwhile.
+        if (active.processorSessionId) {
+          return { kind: "expired", attempt: active };
+        }
+        const rows = await tx
+          .update(paymentAttempts)
+          .set({ state: "abandoned", updatedAt: input.now })
+          .where(eq(paymentAttempts.id, active.id))
+          .returning();
+        const abandoned = rows[0];
+        abandonedAttemptId = abandoned.id;
+        if (sameKey?.id === abandoned.id) {
+          return { kind: "expired", attempt: abandoned };
+        }
+        active = undefined;
+      }
+
+      if (sameKey) {
+        const current =
+          sameKey.id === abandonedAttemptId
+            ? { ...sameKey, state: "abandoned" as const, updatedAt: input.now }
+            : sameKey;
+        if (paymentAttemptIsLive(current)) {
+          return { kind: "reused", attempt: current };
+        }
+        if (paymentAttemptIsTerminal(current)) {
+          return { kind: "terminal", attempt: current };
+        }
+        return { kind: "expired", attempt: current };
+      }
+      if (active) return { kind: "conflict", attempt: active };
+
+      if (transaction.status !== "pending") {
+        return { kind: "target-conflict", reason: "transaction-not-payable" };
+      }
+      if (input.shareIndex === 0 && transaction.isSplit) {
+        return { kind: "target-conflict", reason: "split-target-required" };
+      }
+      if (input.shareIndex > 0 && !transaction.isSplit) {
+        return { kind: "target-conflict", reason: "unsplit-target-required" };
+      }
+      if (input.shareIndex > 0) {
+        const shareRows = await tx
+          .select()
+          .from(splitPayments)
+          .where(and(
+            eq(splitPayments.transactionId, input.transactionId),
+            eq(splitPayments.splitIndex, input.shareIndex),
+          ))
+          .for("update")
+          .limit(1);
+        const share = shareRows[0];
+        if (!share) return { kind: "target-conflict", reason: "share-not-found" };
+        if (share.status !== "pending") {
+          return { kind: "target-conflict", reason: "share-not-payable" };
+        }
+      }
+
+      const rows = await tx
+        .insert(paymentAttempts)
+        .values({
+          transactionId: input.transactionId,
+          shareIndex: input.shareIndex,
+          idempotencyKey: input.idempotencyKey,
+          state: "claiming",
+          leaseExpiresAt: input.leaseExpiresAt,
+          createdAt: input.now,
+          updatedAt: input.now,
+        })
+        .returning();
+      return {
+        kind: "claimed",
+        attempt: rows[0],
+        ...(abandonedAttemptId ? { abandonedAttemptId } : {}),
+      };
+    });
+  }
+
+  async attachPaymentAttemptSessionRecord(
+    input: AttachPaymentAttemptSessionRecordInput,
+  ): Promise<AttachPaymentAttemptSessionResult> {
+    const db = this.db;
+    if (!db) throw new Error('Database not available');
+
+    return db.transaction(async (tx) => {
+      const attempts = await tx
+        .select()
+        .from(paymentAttempts)
+        .where(eq(paymentAttempts.id, input.attemptId))
+        .for("update")
+        .limit(1);
+      const attempt = attempts[0];
+      if (!attempt) return { kind: "not-found" };
+
+      if (paymentAttemptLeaseExpired(attempt, input.now)) {
+        const rows = await tx
+          .update(paymentAttempts)
+          .set({ state: "abandoned", updatedAt: input.now })
+          .where(eq(paymentAttempts.id, attempt.id))
+          .returning();
+        return { kind: "expired", attempt: rows[0] };
+      }
+      if (attempt.state === "abandoned") {
+        return { kind: "expired", attempt };
+      }
+      if (paymentAttemptIsTerminal(attempt)) {
+        return { kind: "terminal", attempt };
+      }
+
+      const duplicateIdentityCondition = input.returnStateHash === null
+        ? or(
+            eq(paymentAttempts.processorSessionId, input.processorSessionId),
+            eq(paymentAttempts.processorXId, input.processorXId),
+          )
+        : or(
+            eq(paymentAttempts.processorSessionId, input.processorSessionId),
+            eq(paymentAttempts.processorXId, input.processorXId),
+            eq(paymentAttempts.returnStateHash, input.returnStateHash),
+          );
+      const duplicateIdentities = await tx
+        .select({ id: paymentAttempts.id })
+        .from(paymentAttempts)
+        .where(and(
+          ne(paymentAttempts.id, attempt.id),
+          duplicateIdentityCondition,
+        ))
+        .limit(1);
+      if (duplicateIdentities[0]) return { kind: "conflict", attempt };
+
+      const maximumReturnExpiry = new Date(
+        attempt.createdAt.getTime() + PAYMENT_RETURN_STATE_MAX_AGE_MS,
+      );
+      const returnStateExpiresAt =
+        input.returnStateExpiresAt &&
+        input.returnStateExpiresAt.getTime() > maximumReturnExpiry.getTime()
+          ? maximumReturnExpiry
+          : input.returnStateExpiresAt;
+      const matches =
+        attempt.processorSessionId === input.processorSessionId &&
+        attempt.processorXId === input.processorXId &&
+        attempt.returnStateHash === input.returnStateHash &&
+        (attempt.returnStateExpiresAt?.getTime() ?? null) ===
+          (returnStateExpiresAt?.getTime() ?? null);
+
+      if (attempt.state === "ready") {
+        return matches
+          ? { kind: "reused", attempt }
+          : { kind: "conflict", attempt };
+      }
+      if (attempt.state !== "claiming") {
+        return { kind: "conflict", attempt };
+      }
+
+      const rows = await tx
+        .update(paymentAttempts)
+        .set({
+          state: "ready",
+          processorSessionId: input.processorSessionId,
+          processorXId: input.processorXId,
+          returnStateHash: input.returnStateHash,
+          returnStateExpiresAt,
+          updatedAt: input.now,
+        })
+        .where(eq(paymentAttempts.id, attempt.id))
+        .returning();
+      return { kind: "attached", attempt: rows[0] };
+    });
+  }
+
+  async getPaymentAttemptByReturnStateHash(
+    returnStateHash: string,
+  ): Promise<PaymentAttempt | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const rows = await this.db
+      .select()
+      .from(paymentAttempts)
+      .where(eq(paymentAttempts.returnStateHash, returnStateHash))
+      .limit(1);
+    return rows[0];
+  }
+
+  async claimPaymentAttemptFinalizationRecord(
+    input: ClaimPaymentAttemptFinalizationRecordInput,
+  ): Promise<ClaimPaymentAttemptFinalizationResult> {
+    const db = this.db;
+    if (!db) throw new Error('Database not available');
+
+    return db.transaction(async (tx) => {
+      const rows = await tx
+        .select()
+        .from(paymentAttempts)
+        .where(eq(paymentAttempts.id, input.attemptId))
+        .for("update")
+        .limit(1);
+      const attempt = rows[0];
+      if (!attempt) return { kind: "not-found" };
+      if (attempt.processorSessionId !== input.processorSessionId) {
+        return { kind: "conflict", attempt };
+      }
+      if (attempt.state === "finalizing") return { kind: "reused", attempt };
+      if (paymentAttemptIsTerminal(attempt)) return { kind: "terminal", attempt };
+      if (attempt.state !== "ready") return { kind: "conflict", attempt };
+
+      const updated = await tx
+        .update(paymentAttempts)
+        .set({ state: "finalizing", updatedAt: input.now })
+        .where(eq(paymentAttempts.id, attempt.id))
+        .returning();
+      return { kind: "claimed", attempt: updated[0] };
+    });
+  }
+
+  async finalizePaymentAttemptRecord(
+    input: FinalizePaymentAttemptRecordInput,
+  ): Promise<FinalizePaymentAttemptResult> {
+    const db = this.db;
+    if (!db) throw new Error('Database not available');
+
+    return db.transaction(async (tx) => {
+      // Resolve the immutable parent first, then lock in the same order used by
+      // claim/split configuration: transaction -> attempt -> split rows. This
+      // prevents a claim (transaction -> attempt) and completion from forming
+      // a row-lock cycle under concurrent processor callbacks.
+      const locatorRows = await tx
+        .select({ transactionId: paymentAttempts.transactionId })
+        .from(paymentAttempts)
+        .where(eq(paymentAttempts.id, input.attemptId))
+        .limit(1);
+      const locator = locatorRows[0];
+      if (!locator) return { kind: "not-found" };
+
+      const transactionRows = await tx
+        .select()
+        .from(transactions)
+        .where(eq(transactions.id, locator.transactionId))
+        .for("update")
+        .limit(1);
+      const transaction = transactionRows[0];
+      if (!transaction) return { kind: "not-found" };
+
+      const attemptRows = await tx
+        .select()
+        .from(paymentAttempts)
+        .where(eq(paymentAttempts.id, input.attemptId))
+        .for("update")
+        .limit(1);
+      const attempt = attemptRows[0];
+      if (!attempt) return { kind: "not-found" };
+      if (attempt.transactionId !== transaction.id) {
+        throw new Error("Payment attempt parent changed during finalization");
+      }
+
+      const transactionSplits = attempt.shareIndex === 0
+        ? []
+        : await tx
+            .select()
+            .from(splitPayments)
+            .where(eq(splitPayments.transactionId, attempt.transactionId))
+            .orderBy(splitPayments.splitIndex)
+            .for("update");
+      const splitPayment = attempt.shareIndex === 0
+        ? null
+        : transactionSplits.find(
+            (split) => split.splitIndex === attempt.shareIndex,
+          ) ?? null;
+      const targetExists = attempt.shareIndex === 0
+        ? !transaction.isSplit
+        : transaction.isSplit && splitPayment !== null;
+
+      const receiptIsValid =
+        input.outcome === "approved"
+          ? attempt.shareIndex === 0
+            ? input.receiptShare === null
+            : input.receiptShare === attempt.shareIndex
+          : input.receiptShare === null;
+      if (
+        !targetExists ||
+        !receiptIsValid ||
+        attempt.processorSessionId !== input.processorSessionId ||
+        (input.outcome === "approved" && input.processorTransactionId === null)
+      ) {
+        return { kind: "conflict", attempt };
+      }
+
+      if (paymentAttemptIsTerminal(attempt)) {
+        return attempt.state === input.outcome &&
+          attempt.outcome === input.outcome &&
+          attempt.receiptShare === input.receiptShare
+          ? {
+              kind: "reused",
+              attempt,
+              transaction,
+              splitPayment,
+              platformFee: null,
+              counterIncremented: false,
+            }
+          : { kind: "conflict", attempt };
+      }
+      if (attempt.state !== "finalizing") {
+        return { kind: "conflict", attempt };
+      }
+      if (
+        !["pending", "processing"].includes(transaction.status) ||
+        (splitPayment && !["pending", "processing"].includes(splitPayment.status))
+      ) {
+        return { kind: "conflict", attempt };
+      }
+
+      let updatedSplit: SplitPayment | null = null;
+      if (splitPayment) {
+        const splitRows = await tx
+          .update(splitPayments)
+          .set({
+            status: input.outcome === "approved" ? "completed" : "pending",
+            windcaveTransactionId:
+              input.processorTransactionId ?? splitPayment.windcaveTransactionId,
+            paymentMethod: input.paymentMethod ?? splitPayment.paymentMethod,
+            paidAt: input.outcome === "approved" ? input.now : null,
+          })
+          .where(eq(splitPayments.id, splitPayment.id))
+          .returning();
+        updatedSplit = splitRows[0];
+      }
+
+      const completedSplits = updatedSplit
+        ? transactionSplits.filter(
+            (split) =>
+              split.id === updatedSplit!.id
+                ? updatedSplit!.status === "completed"
+                : split.status === "completed",
+          ).length
+        : transaction.completedSplits ?? 0;
+      const allSplitsComplete = updatedSplit !== null &&
+        completedSplits >= (transaction.totalSplits ?? 1);
+      const transactionStatus = updatedSplit
+        ? input.outcome === "approved" && allSplitsComplete
+          ? "completed"
+          : "pending"
+        : input.outcome === "approved"
+          ? "completed"
+          : input.outcome === "cancelled" ? "cancelled" : "failed";
+      const updatedTransactionRows = await tx
+        .update(transactions)
+        .set({
+          status: transactionStatus,
+          completedSplits,
+          windcaveTransactionId:
+            input.processorTransactionId ?? transaction.windcaveTransactionId,
+          paymentMethod: input.paymentMethod ?? transaction.paymentMethod,
+          windcaveSessionId: input.processorSessionId,
+          windcaveSessionState:
+            updatedSplit && !allSplitsComplete ? "pending" : input.outcome,
+          windcaveXId: attempt.processorXId,
+        })
+        .where(eq(transactions.id, transaction.id))
+        .returning();
+      const updatedTransaction = updatedTransactionRows[0];
+
+      let collectedFee: PlatformFee | null = null;
+      let counterIncremented = false;
+      if (input.outcome === "approved") {
+        const feeRows = await tx
+          .insert(platformFees)
+          .values({
+            transactionId: transaction.id,
+            merchantId: transaction.merchantId,
+            feeAmount:
+              updatedSplit?.platformFeeAmount ?? transaction.platformFeeAmount ?? "0.10",
+            transactionAmount: updatedSplit?.amount ?? transaction.price,
+            status: "collected",
+            collectedAt: input.now,
+          })
+          .returning();
+        collectedFee = feeRows[0];
+
+        if (transaction.merchantId !== null) {
+          let subscriptionRows = await tx
+            .select()
+            .from(merchantSubscriptions)
+            .where(eq(merchantSubscriptions.merchantId, transaction.merchantId))
+            .for("update")
+            .limit(1);
+          if (!subscriptionRows[0]) {
+            const nextBillingDate = new Date(input.now);
+            nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
+            await tx
+              .insert(merchantSubscriptions)
+              .values({
+                merchantId: transaction.merchantId,
+                tier: "free",
+                status: "active",
+                currentMonthTransactions: 0,
+                totalLifetimeTransactions: 0,
+                monthStartDate: input.now,
+                billingFrequency: "monthly",
+                nextBillingDate,
+                unbilledTransactionCount: 0,
+                unbilledAmount: "0.00",
+              })
+              .onConflictDoNothing({ target: merchantSubscriptions.merchantId });
+            subscriptionRows = await tx
+              .select()
+              .from(merchantSubscriptions)
+              .where(eq(merchantSubscriptions.merchantId, transaction.merchantId))
+              .for("update")
+              .limit(1);
+          }
+          const subscription = subscriptionRows[0];
+          if (!subscription) {
+            throw new Error("Failed to create merchant subscription counter");
+          }
+          const monthStart = subscription.monthStartDate ?? input.now;
+          const monthsElapsed =
+            (input.now.getFullYear() - monthStart.getFullYear()) * 12 +
+            (input.now.getMonth() - monthStart.getMonth());
+          const currentMonthTransactions = monthsElapsed >= 1
+            ? 0
+            : subscription.currentMonthTransactions ?? 0;
+          const shouldCharge =
+            subscription.tier !== "free" || currentMonthTransactions >= 100;
+          await tx
+            .update(merchantSubscriptions)
+            .set({
+              currentMonthTransactions: currentMonthTransactions + 1,
+              totalLifetimeTransactions:
+                (subscription.totalLifetimeTransactions ?? 0) + 1,
+              monthStartDate:
+                monthsElapsed >= 1 ? input.now : subscription.monthStartDate,
+              unbilledTransactionCount: shouldCharge
+                ? (subscription.unbilledTransactionCount ?? 0) + 1
+                : subscription.unbilledTransactionCount,
+              unbilledAmount: shouldCharge
+                ? (Number(subscription.unbilledAmount ?? "0") + 0.1).toFixed(2)
+                : subscription.unbilledAmount,
+              updatedAt: input.now,
+            })
+            .where(eq(merchantSubscriptions.id, subscription.id));
+          counterIncremented = true;
+        }
+      }
+
+      const finalizedAttemptRows = await tx
+        .update(paymentAttempts)
+        .set({
+          state: input.outcome,
+          outcome: input.outcome,
+          receiptShare: input.receiptShare,
+          updatedAt: input.now,
+        })
+        .where(and(
+          eq(paymentAttempts.id, attempt.id),
+          eq(paymentAttempts.state, "finalizing"),
+          eq(paymentAttempts.processorSessionId, input.processorSessionId),
+        ))
+        .returning();
+      const finalizedAttempt = finalizedAttemptRows[0];
+      if (!finalizedAttempt) {
+        throw new Error("Payment attempt finalization compare-and-set failed");
+      }
+      return {
+        kind: "finalized",
+        attempt: finalizedAttempt,
+        transaction: updatedTransaction,
+        splitPayment: updatedSplit,
+        platformFee: collectedFee,
+        counterIncremented,
+      };
+    });
+  }
+
+  async getActiveTransactionByMerchant(
+    merchantId: number,
+    scope: ActiveTransactionScope,
+  ): Promise<Transaction | undefined> {
     if (!this.db) throw new Error('Database not available');
 
-    /* Tri-state board scoping — see the interface docstring. `null` means
-       "no-board sales only" and must produce IS NULL, not an absent filter:
-       filtering by merchant alone is what let the merchant-level pay link serve
-       a sale rung up on a specific board. */
     const stoneCondition =
-      taptStoneId === undefined
-        ? null
-        : taptStoneId === null
-          ? isNull(transactions.taptStoneId)
-          : eq(transactions.taptStoneId, taptStoneId);
+      scope.kind === "merchant-any"
+        ? undefined
+        : scope.kind === "legacy-no-board"
+          ? and(
+              isNull(transactions.taptStoneId),
+              isNull(transactions.paymentTokenHash),
+            )
+          : eq(transactions.taptStoneId, scope.stoneId);
 
     // 1. Prefer pending/processing (in-flight) transactions
     const activeConditions = [
@@ -2021,7 +3347,7 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(transactions)
       .where(and(...activeConditions))
-      .orderBy(desc(transactions.createdAt))
+      .orderBy(sql`${transactions.createdAt} desc nulls last`, desc(transactions.id))
       .limit(1);
     if (activeResult[0]) return activeResult[0];
 
@@ -2040,13 +3366,14 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(transactions)
       .where(and(...completedConditions))
-      .orderBy(desc(transactions.createdAt))
+      .orderBy(sql`${transactions.createdAt} desc nulls last`, desc(transactions.id))
       .limit(1);
     return completedResult[0];
   }
 
-  async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
+  async createTransaction(input: TransactionStorageInput): Promise<Transaction> {
     if (!this.db) throw new Error('Database not available');
+    const insertTransaction = sanitizeTransactionStorageInput(input);
     const transactionAmount = parseFloat(insertTransaction.price);
 
     // Use caller-provided fees if present (e.g. cash sales have 0 Windcave fee),
@@ -2605,17 +3932,36 @@ export class DatabaseStorage implements IStorage {
     return [];
   }
 
-  async createPushSubscription(data: { merchantId: number; endpoint: string; p256dh: string; auth: string; userAgent?: string }): Promise<any> {
+  async createPushSubscription(data: PushSubscriptionInput): Promise<PushSubscription | null> {
     try {
+      const [targetPreferenceRow] = await this.db!
+        .select({ preferences: pushSubscriptions.preferences })
+        .from(pushSubscriptions)
+        .where(eq(pushSubscriptions.merchantId, data.merchantId))
+        .orderBy(desc(pushSubscriptions.id))
+        .limit(1);
+      const targetPreferences = normalizePushNotificationPreferences(
+        targetPreferenceRow?.preferences,
+      );
       const existing = await this.db!
         .select()
         .from(pushSubscriptions)
         .where(eq(pushSubscriptions.endpoint, data.endpoint));
       
       if (existing.length > 0) {
+        const preferences = existing[0].merchantId === data.merchantId
+          ? normalizePushNotificationPreferences(existing[0].preferences)
+          : targetPreferences;
         const [updated] = await this.db!
           .update(pushSubscriptions)
-          .set({ merchantId: data.merchantId, p256dh: data.p256dh, auth: data.auth, isActive: true })
+          .set({
+            merchantId: data.merchantId,
+            p256dh: data.p256dh,
+            auth: data.auth,
+            userAgent: data.userAgent ?? existing[0].userAgent,
+            preferences,
+            isActive: true,
+          })
           .where(eq(pushSubscriptions.endpoint, data.endpoint))
           .returning();
         return updated;
@@ -2629,6 +3975,7 @@ export class DatabaseStorage implements IStorage {
           p256dh: data.p256dh,
           auth: data.auth,
           userAgent: data.userAgent || null,
+          preferences: targetPreferences,
           isActive: true,
         })
         .returning();
@@ -2639,7 +3986,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getPushSubscriptionsByMerchant(merchantId: number): Promise<any[]> {
+  async getPushSubscriptionsByMerchant(merchantId: number): Promise<PushSubscription[]> {
     try {
       return await this.db!
         .select()
@@ -2649,6 +3996,33 @@ export class DatabaseStorage implements IStorage {
       console.error("Database error in getPushSubscriptionsByMerchant:", error);
       return [];
     }
+  }
+
+  async getPushNotificationPreferences(merchantId: number): Promise<PushNotificationPreferences> {
+    try {
+      const [row] = await this.db!
+        .select({ preferences: pushSubscriptions.preferences })
+        .from(pushSubscriptions)
+        .where(eq(pushSubscriptions.merchantId, merchantId))
+        .orderBy(desc(pushSubscriptions.id))
+        .limit(1);
+      return normalizePushNotificationPreferences(row?.preferences);
+    } catch (error) {
+      console.error("Database error in getPushNotificationPreferences:", error);
+      return { ...DEFAULT_PUSH_NOTIFICATION_PREFERENCES };
+    }
+  }
+
+  async updatePushNotificationPreferences(
+    merchantId: number,
+    preferences: PushNotificationPreferences,
+  ): Promise<PushNotificationPreferences> {
+    const safePreferences = normalizePushNotificationPreferences(preferences);
+    await this.db!
+      .update(pushSubscriptions)
+      .set({ preferences: safePreferences })
+      .where(eq(pushSubscriptions.merchantId, merchantId));
+    return safePreferences;
   }
 
   async deactivatePushSubscription(id: number): Promise<void> {
@@ -2673,6 +4047,77 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  async getDailyPushPaymentSummaries(start: Date, end: Date): Promise<DailyPushPaymentSummary[]> {
+    const rows = await this.db!
+      .select({
+        merchantId: platformFees.merchantId,
+        amount: sql<string>`coalesce(sum(${platformFees.transactionAmount}::numeric), 0)::text`,
+        paymentCount: sql<number>`count(*)::int`,
+      })
+      .from(platformFees)
+      .where(and(
+        eq(platformFees.status, "collected"),
+        isNotNull(platformFees.merchantId),
+        isNotNull(platformFees.collectedAt),
+        gte(platformFees.collectedAt, start),
+        lt(platformFees.collectedAt, end),
+      ))
+      .groupBy(platformFees.merchantId);
+    return rows.map((row) => ({
+      merchantId: row.merchantId!,
+      amount: Number(row.amount).toFixed(2),
+      paymentCount: Number(row.paymentCount),
+    }));
+  }
+
+  async claimPushNotificationDelivery(
+    merchantId: number,
+    eventType: PushNotificationEventType,
+    eventKey: string,
+    now = new Date(),
+  ): Promise<string | null> {
+    const staleBefore = new Date(now.getTime() - PUSH_NOTIFICATION_DELIVERY_LEASE_MS);
+    const claimToken = randomUUID();
+    const inserted = await this.db!
+      .insert(pushNotificationDeliveries)
+      .values({ merchantId, eventType, eventKey, status: "claimed", claimToken, claimedAt: now })
+      .onConflictDoUpdate({
+        target: [
+          pushNotificationDeliveries.merchantId,
+          pushNotificationDeliveries.eventType,
+          pushNotificationDeliveries.eventKey,
+        ],
+        set: { status: "claimed", claimToken, claimedAt: now, completedAt: null },
+        setWhere: or(
+          eq(pushNotificationDeliveries.status, "failed"),
+          and(
+            eq(pushNotificationDeliveries.status, "claimed"),
+            lte(pushNotificationDeliveries.claimedAt, staleBefore),
+          ),
+        ),
+      })
+      .returning({ claimToken: pushNotificationDeliveries.claimToken });
+    return inserted[0]?.claimToken ?? null;
+  }
+
+  async completePushNotificationDelivery(
+    merchantId: number,
+    eventType: PushNotificationEventType,
+    eventKey: string,
+    claimToken: string,
+    status: PushNotificationDeliveryStatus,
+  ): Promise<void> {
+    await this.db!
+      .update(pushNotificationDeliveries)
+      .set({ status, completedAt: new Date() })
+      .where(and(
+        eq(pushNotificationDeliveries.merchantId, merchantId),
+        eq(pushNotificationDeliveries.eventType, eventType),
+        eq(pushNotificationDeliveries.eventKey, eventKey),
+        eq(pushNotificationDeliveries.claimToken, claimToken),
+      ));
+  }
+
   async createInfoPackLead(data: { name: string; email: string }): Promise<any> {
     const { infoPackLeads } = await import("@shared/schema");
     const [lead] = await this.db!
@@ -2684,52 +4129,93 @@ export class DatabaseStorage implements IStorage {
 
   // Bill splitting operations
   async createBillSplit(transactionId: number, totalSplits: number): Promise<Transaction | undefined> {
+    const db = this.db;
+    if (!db) throw new Error('Database not available');
+
     try {
-      // Get the transaction first
-      const [transaction] = await this.db!
-        .select()
-        .from(transactions)
-        .where(eq(transactions.id, transactionId));
-      
-      if (!transaction) return undefined;
+      return await db.transaction(async (tx) => {
+        const transactionRows = await tx
+          .select()
+          .from(transactions)
+          .where(eq(transactions.id, transactionId))
+          .for("update")
+          .limit(1);
+        const transaction = transactionRows[0];
+        if (!transaction) return undefined;
 
-      const splitAmount = parseFloat(transaction.price) / totalSplits;
-      
-      // Update the transaction with split information
-      const [updatedTransaction] = await this.db!
-        .update(transactions)
-        .set({
-          isSplit: true,
-          totalSplits: totalSplits,
-          completedSplits: 0,
-          splitAmount: splitAmount.toFixed(2),
-        })
-        .where(eq(transactions.id, transactionId))
-        .returning();
+        const amounts = transactionSplitAmounts(transaction.price, totalSplits);
+        const existing = await tx
+          .select()
+          .from(splitPayments)
+          .where(eq(splitPayments.transactionId, transactionId))
+          .orderBy(splitPayments.splitIndex)
+          .for("update");
+        if (
+          (transaction.completedSplits ?? 0) > 0 ||
+          existing.some((split) => split.status !== "pending")
+        ) {
+          throw new BillSplitConflictError("split-in-progress");
+        }
+        if (transaction.status !== "pending") {
+          throw new BillSplitConflictError("transaction-not-pending");
+        }
+        if (transaction.isSplit) {
+          const isExactRetry =
+            transaction.totalSplits === totalSplits &&
+            existing.length === totalSplits &&
+            existing.every(
+              (split, index) =>
+                split.splitIndex === index + 1 &&
+                split.amount === amounts[index],
+            );
+          if (isExactRetry) return transaction;
+          throw new BillSplitConflictError("already-configured");
+        }
+        if (existing.length > 0) {
+          throw new BillSplitConflictError("inconsistent-split-state");
+        }
 
-      // Create split payment records
-      for (let i = 1; i <= totalSplits; i++) {
-        await this.db!
+        const updated = await tx
+          .update(transactions)
+          .set({
+            isSplit: true,
+            totalSplits,
+            completedSplits: 0,
+            splitAmount: amounts[0],
+          })
+          .where(and(
+            eq(transactions.id, transactionId),
+            eq(transactions.status, "pending"),
+            or(eq(transactions.isSplit, false), isNull(transactions.isSplit)),
+          ))
+          .returning();
+        if (!updated[0]) {
+          throw new BillSplitConflictError("already-configured");
+        }
+
+        await tx
           .insert(splitPayments)
-          .values({
-            transactionId: transactionId,
+          .values(amounts.map((amount, index) => ({
+            transactionId,
             merchantId: transaction.merchantId,
-            splitIndex: i,
-            amount: splitAmount.toFixed(2),
+            splitIndex: index + 1,
+            amount,
             status: "pending",
             windcaveTransactionId: null,
             paymentMethod: "qr_code",
             windcaveFeeAmount: "0.00",
             platformFeeAmount: "0.10",
-            merchantNet: splitAmount.toFixed(2),
+            merchantNet: amount,
             paidAt: null,
-          });
-      }
-
-      return updatedTransaction;
+          })));
+        return updated[0];
+      });
     } catch (error) {
-      console.error("Database error in createBillSplit:", error);
-      return undefined;
+      if (error instanceof BillSplitConflictError) throw error;
+      if (isPostgresUniqueViolation(error)) {
+        throw new BillSplitConflictError("already-configured");
+      }
+      throw error;
     }
   }
 
@@ -2844,6 +4330,47 @@ export class DatabaseStorage implements IStorage {
     if (!this.db) throw new Error('Database not available');
     const result = await this.db.insert(taptStones).values(data).returning();
     return result[0];
+  }
+
+  async createNextTaptStone(merchantId: number, name?: string): Promise<TaptStone> {
+    const db = this.db;
+    if (!db) throw new Error('Database not available');
+
+    try {
+      return await db.transaction(async (tx) => {
+        // Serialize allocators for this merchant before reading active numbers.
+        // The transaction-scoped lock is released automatically on commit/rollback.
+        await tx.execute(sql`
+          select pg_advisory_xact_lock(
+            ${TAPT_STONE_ALLOCATION_LOCK_NAMESPACE}::integer,
+            ${merchantId}::integer
+          )
+        `);
+
+        const activeStones = await tx
+          .select({ stoneNumber: taptStones.stoneNumber })
+          .from(taptStones)
+          .where(and(
+            eq(taptStones.merchantId, merchantId),
+            eq(taptStones.isActive, true),
+          ));
+        const stoneNumber = firstFreeTaptStoneNumber(activeStones);
+        if (stoneNumber === undefined) throw new TaptStoneCapacityError();
+
+        const rows = await tx
+          .insert(taptStones)
+          .values({
+            merchantId,
+            stoneNumber,
+            name: name?.trim() || `Stone ${stoneNumber}`,
+          })
+          .returning();
+        return rows[0];
+      });
+    } catch (error) {
+      if (isPostgresUniqueViolation(error)) throw new TaptStoneConflictError();
+      throw error;
+    }
   }
 
   async getTaptStone(id: number): Promise<TaptStone | undefined> {

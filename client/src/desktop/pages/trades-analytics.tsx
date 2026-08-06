@@ -1,15 +1,27 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { useMerchantProfile } from "@/lib/merchant";
 import { fmtNZD } from "@/lib/report-utils";
+import { tradesOutstandingCents } from "@/lib/trades-money";
 import { ReportModal } from "@/components/reports/ReportModal";
 import { TRADES_REPORT_OPTIONS } from "@/lib/report-pdf/reports/trades-options";
 import type { TradesReportData } from "@/lib/report-pdf/reports/trades";
 import { readDesktopPrefs } from "../data/desktop-prefs";
 import {
+  ANALYTICS_POINT_INSET,
+  analyticsBucketLabel,
+  buildAnalyticsAreaChart,
+  clampAnalyticsChipCenter,
+} from "../data/analytics-chart";
+import {
   TRADES_HOME_RANGES,
   buildTradesRevenueBuckets,
-  isTradesInvoiceOpen,
   scopeTradesData,
   tradesPaidRevenueCents,
   tradesPeriodWindow,
@@ -95,38 +107,18 @@ const isPaidInvoice = (invoice: TradesInvoice) =>
 const clientName = (client: TradesClient | undefined) =>
   [client?.firstName, client?.lastName].filter(Boolean).join(" ").trim();
 
-/* Geometry of .ta-chart-svg. preserveAspectRatio="none" stretches the 1076x240
-   viewBox onto these dimensions, then the svg is pulled up/left inside .ta-chart.
-   These drive both the css and the peak-marker placement so the marker can be
-   mapped through the same stretch rather than pinned at a fixed height. */
+/* The SVG still overscans the design canvas, but real bucket centres are mapped
+   onto the visible inset plot domain by buildAnalyticsAreaChart. */
 const SVG_LEFT = -86;
 const SVG_TOP = -47;
 const SVG_W = 1214;
 const SVG_H = 221;
-
-/** Catmull-Rom → cubic bezier: the prototype's curve, same geometry. */
-function curve(vals: number[]) {
-  const W = 1076;
-  const H = 240;
-  const TOP = 16;
-  const BOT = 24;
-  const pts = vals.length < 2 ? [vals[0] ?? 0, vals[0] ?? 0] : vals;
-  const m = pts.length;
-  const P = pts.map((v, i) => [i * (W / (m - 1)), H - BOT - v * (H - TOP - BOT)] as const);
-  let d = `M${P[0][0].toFixed(1)},${P[0][1].toFixed(1)}`;
-  for (let i = 1; i < m; i++) {
-    const p0 = P[i - 1];
-    const p1 = P[i];
-    const pm = P[i - 2] ?? p0;
-    const pn = P[i + 1] ?? p1;
-    const c1x = p0[0] + (p1[0] - pm[0]) / 6;
-    const c1y = p0[1] + (p1[1] - pm[1]) / 6;
-    const c2x = p1[0] - (pn[0] - p0[0]) / 6;
-    const c2y = p1[1] - (pn[1] - p0[1]) / 6;
-    d += ` C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p1[0].toFixed(1)},${p1[1].toFixed(1)}`;
-  }
-  return { d, P, W, H };
-}
+const CHART_PLACEMENT = {
+  left: SVG_LEFT,
+  top: SVG_TOP,
+  width: SVG_W,
+  height: SVG_H,
+} as const;
 
 export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
   const merchantId = getCurrentMerchantId();
@@ -152,8 +144,11 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
     TRADES_REPORT_BY_ID["invoice-summary"].extra[0],
   );
   const [exportOpen, setExportOpen] = useState(false);
+  const [chipLeft, setChipLeft] = useState(ANALYTICS_POINT_INSET);
 
   const drag = useRef({ startY: 0, startT: CLOSED, moved: false, scale: 1 });
+  const chartRef = useRef<HTMLDivElement>(null);
+  const chipRef = useRef<HTMLDivElement>(null);
 
   const clients = useMemo(() => clientsQuery.data ?? [], [clientsQuery.data]);
   const invoices = useMemo(() => invoicesQuery.data ?? [], [invoicesQuery.data]);
@@ -184,31 +179,56 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
     const growth =
       previous > 0 ? Math.round(((total - previous) / previous) * 100) : null;
     /* Outstanding is a live figure, not a period one: everything still open. */
-    const outstanding = scoped.invoices
-      .filter(isTradesInvoiceOpen)
-      .reduce((sum, invoice) => sum + invoice.amountCents, 0);
+    const outstanding = tradesOutstandingCents(scoped.invoices);
     const buckets = buildTradesRevenueBuckets(scoped.invoices, tf);
-    const max = Math.max(...buckets.map((bucket) => bucket.valueCents), 1);
-    let peak = 0;
-    buckets.forEach((bucket, index) => {
-      if (bucket.valueCents > buckets[peak].valueCents) peak = index;
-    });
-    const { d, P, W, H } = curve(buckets.map((bucket) => bucket.valueCents / max));
-    const peakPoint = P[Math.min(peak, P.length - 1)];
-    /* Map the peak through the svg's own stretch + offset so the marker lands on
-       the line at whatever height the peak actually is. */
+    const chart = buildAnalyticsAreaChart(
+      buckets.map((bucket) => bucket.valueCents),
+      CHART_PLACEMENT,
+    );
+    const peakBucket = buckets[chart.peakIndex];
     return {
       total,
       growth,
       outstanding,
       buckets,
-      lineD: d,
-      areaD: d + " L" + W + ",240 L0,240 Z",
-      dotLeft: (SVG_LEFT + (peakPoint[0] / W) * SVG_W).toFixed(1) + "px",
-      dotTop: (SVG_TOP + (peakPoint[1] / H) * SVG_H).toFixed(1) + "px",
-      peakValue: buckets[peak]?.valueCents ?? 0,
+      lineD: chart.lineD,
+      areaD: chart.areaD,
+      markerLeft: chart.marker.x,
+      markerTop: chart.marker.y,
+      peakIndex: chart.peakIndex,
+      peakLabel: analyticsBucketLabel(
+        tf,
+        chart.peakIndex,
+        peakBucket?.label ?? "unknown",
+      ),
+      peakValue: peakBucket?.valueCents ?? 0,
     };
   }, [scoped.invoices, tf]);
+
+  const measureChip = useCallback(() => {
+    const chart = chartRef.current;
+    const chip = chipRef.current;
+    if (!chart || !chip) return;
+    setChipLeft(
+      clampAnalyticsChipCenter(
+        overview.markerLeft,
+        chart.clientWidth,
+        chip.offsetWidth,
+      ),
+    );
+  }, [overview.markerLeft]);
+
+  useLayoutEffect(() => {
+    if (report || overview.peakValue <= 0) return;
+    measureChip();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measureChip);
+    if (chartRef.current) observer.observe(chartRef.current);
+    if (chipRef.current) observer.observe(chipRef.current);
+    return () => observer.disconnect();
+  }, [measureChip, overview.peakValue, report]);
+
+  const selectedPeriod = RANGES.find((range) => range.k === tf)?.label ?? tf;
 
   /* Payment history follows the selected scope and period, grouped by day. */
   const historyGroups = useMemo(() => {
@@ -440,8 +460,8 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
               </div>
             </div>
 
-            <div className="ta-chart">
-              <svg className="ta-chart-svg" viewBox="0 0 1076 240" preserveAspectRatio="none" aria-label="collected revenue chart">
+            <div className="ta-chart" ref={chartRef}>
+              <svg className="ta-chart-svg" viewBox="0 0 1076 240" preserveAspectRatio="none" aria-hidden="true">
                 <defs>
                   <linearGradient id="traderevfill" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0" stopColor={ACCENT} stopOpacity="0.34" />
@@ -453,15 +473,34 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
               </svg>
               {overview.peakValue > 0 && (
                 <>
-                  <div className="ta-chip" style={{ left: overview.dotLeft }}>
+                  <div
+                    ref={chipRef}
+                    aria-hidden="true"
+                    className="ta-chip"
+                    style={{ left: `${chipLeft}px` }}
+                  >
                     {moneyWhole(overview.peakValue)}
                   </div>
                   <div
+                    aria-hidden="true"
                     className="ta-dot"
-                    style={{ left: overview.dotLeft, top: overview.dotTop }}
+                    data-peak-index={overview.peakIndex}
+                    style={{
+                      left: `${overview.markerLeft}px`,
+                      top: `${overview.markerTop}px`,
+                    }}
                   />
                 </>
               )}
+              <p
+                className="ta-chart-summary"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+              >
+                {selectedPeriod} selected. Peak bucket {overview.peakLabel}:{" "}
+                {money(overview.peakValue)}.
+              </p>
             </div>
           </>
         )}
@@ -546,6 +585,7 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
         {/* ── SHEET ── */}
         <div
           className="ta-sheet"
+          data-tutorial-id="ta-history"
           style={{
             transform: `translateY(${sheetY}px)`,
             transition: dragging ? "none" : "transform .5s cubic-bezier(.22,.9,.3,1)",
@@ -572,7 +612,7 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
           </div>
 
           <div className="ta-sheet-head">
-            <span className="ta-sheet-title" data-tutorial-id="ta-history">{sheetTitle}</span>
+            <span className="ta-sheet-title">{sheetTitle}</span>
             <div className="ta-sheet-actions">
               {sheetMode === "history" && (
                 <>
@@ -762,6 +802,7 @@ const TA_CSS = `
 .ta-chart-svg { display:block; position:absolute; left:${SVG_LEFT}px; top:${SVG_TOP}px; width:${SVG_W}px; height:${SVG_H}px; }
 .ta-dot { position:absolute; width:14px; height:14px; border-radius:50%; background:#FFFFFF; box-shadow:0 0 0 4px rgba(255,255,255,0.18); transform:translate(-50%,-50%); transition:left .3s ease, top .3s ease; }
 .ta-chip { position:absolute; top:174px; transform:translateX(-50%); padding:7px 14px; border-radius:10px; background:#66A9FF; font-weight:700; font-size:13.5px; color:#000F3F; white-space:nowrap; transition:left .3s ease; }
+.ta-chart-summary { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 
 /* ── generated report ── */
 .ta-report { animation:reportIn .55s cubic-bezier(.22,.9,.3,1) both; display:flex; flex-direction:column; height:408px; }

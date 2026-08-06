@@ -96,6 +96,16 @@ async function installMocks(page) {
       paymentUrl: `${BASE_URL}/pay/${MERCHANT_ID}`,
       qrCodeUrl: `${BASE_URL}/api/merchants/${MERCHANT_ID}/qr`,
     }));
+  await page.route(`**/api/merchants/${MERCHANT_ID}/profile`, (r) =>
+    json(r, {
+      id: MERCHANT_ID,
+      businessName: "Ollie's Coffee",
+      status: "active",
+      gstRegistered: true,
+      gstNumber: "123-456-789",
+      paymentUrl: `${BASE_URL}/pay/${MERCHANT_ID}`,
+      qrCodeUrl: `${BASE_URL}/api/merchants/${MERCHANT_ID}/qr`,
+    }));
 }
 
 async function shoot(browser, label, ctxOpts) {
@@ -165,7 +175,10 @@ async function main() {
   const b = await shoot(browser, "tablet", { viewport: { width: 1194, height: 834 }, hasTouch: true });
   await browser.close();
   const errors = [...a, ...b];
-  console.log(errors.length ? `PAGE ERRORS:\n${errors.join("\n")}` : "no page errors");
+  if (errors.length) {
+    throw new Error(`PAGE ERRORS:\n${errors.join("\n")}`);
+  }
+  console.log("no page errors");
   console.log(`${TRANSACTIONS.length} mocked transactions · shots → ${OUT}`);
 }
 

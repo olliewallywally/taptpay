@@ -360,6 +360,16 @@ async function installMocks(page) {
       paymentUrl: `${BASE_URL}/pay/${MERCHANT_ID}`,
     }),
   );
+  await page.route(`**/api/merchants/${MERCHANT_ID}/profile`, (route) =>
+    json(route, {
+      id: MERCHANT_ID,
+      businessName: "Wallace Property",
+      status: "active",
+      gstRegistered: true,
+      gstNumber: "123-456-789",
+      paymentUrl: `${BASE_URL}/pay/${MERCHANT_ID}`,
+    }),
+  );
 }
 
 async function shoot(browser, label, contextOptions) {

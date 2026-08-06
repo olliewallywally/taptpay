@@ -35,6 +35,9 @@ async function shoot(browser, label, contextOptions) {
     json(route, { webPush: { available: true }, nativePush: { available: false } }),
   );
   await page.route("**/api/push/status", (route) => json(route, { subscribed: false }));
+  await page.route("**/api/push/preferences", (route) => json(route, {
+    preferences: { paymentReceived: true, dailyPayoutSummary: true, failedPaymentAlerts: false },
+  }));
 
   try {
     await page.goto(`${BASE_URL}/settings`, { waitUntil: "networkidle" });

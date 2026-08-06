@@ -366,10 +366,10 @@ export default function StockManagement() {
   }
 
   const { data: merchant } = useQuery({
-    queryKey: ["/api/merchants", merchantId],
+    queryKey: ["/api/merchants", merchantId, "profile"],
     queryFn: async () => {
       const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}`, {
+      const response = await fetch(`/api/merchants/${merchantId}/profile`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) throw new Error("Failed to fetch merchant");

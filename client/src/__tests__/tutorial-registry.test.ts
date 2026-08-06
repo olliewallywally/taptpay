@@ -1,12 +1,36 @@
 import { readdirSync, readFileSync } from "fs";
 import { join } from "path";
-import { TUTORIAL_PAGE_KEYS, isTutorialPageKey } from "../../../shared/tutorial";
-import { TUTORIAL_REGISTRY } from "../features/tutorial/tutorial-registry";
+import {
+  TUTORIAL_PAGE_KEYS,
+  isTutorialPageKey,
+  type TutorialPageKey,
+} from "../../../shared/tutorial";
+import {
+  TUTORIAL_REGISTRY,
+  tutorialStepsForDevice,
+} from "../features/tutorial/tutorial-registry";
 
 // Bare element selectors are forbidden as PRIMARY targets: they spotlight
 // "the first heading" or "the first button" instead of a real feature, which
 // is exactly the mis-targeting this registry exists to avoid.
 const GENERIC_TARGET = /^(h[1-6]|button|main|div|section|a|p|span|input|textarea|select|ul|ol|li|img|svg|nav|header|footer|form|label)$/;
+const DESKTOP_TARGET = /^\[data-tutorial-id="([^"]+)"\]$/;
+
+const DESKTOP_TUTORIAL_SOURCES: Partial<Record<TutorialPageKey, string>> = {
+  "retail-dashboard": "desktop/pages/retail-home.tsx",
+  "retail-terminal": "desktop/pages/retail-terminal.tsx",
+  "retail-payment-stack": "desktop/pages/retail-terminal.tsx",
+  "retail-transactions": "desktop/pages/retail-analytics.tsx",
+  "retail-stock": "desktop/pages/retail-stock.tsx",
+  "property-dashboard": "desktop/pages/property-home.tsx",
+  "property-tenants": "desktop/pages/property-clients.tsx",
+  "property-terminal": "desktop/pages/property-terminal.tsx",
+  "property-analytics": "desktop/pages/property-analytics.tsx",
+  "trades-dashboard": "desktop/pages/trades-home.tsx",
+  "trades-clients": "desktop/pages/trades-clients.tsx",
+  "trades-terminal": "desktop/pages/trades-terminal.tsx",
+  "trades-analytics": "desktop/pages/trades-analytics.tsx",
+};
 
 function collectSource(): string {
   const root = join(__dirname, "..");
@@ -67,7 +91,12 @@ describe("merchant tutorial registry", () => {
     const missing: string[] = [];
     for (const pageKey of TUTORIAL_PAGE_KEYS) {
       for (const step of TUTORIAL_REGISTRY[pageKey].steps) {
-        for (const selector of [step.target, step.fallbackTarget].filter(Boolean) as string[]) {
+        for (const selector of [
+          step.target,
+          step.fallbackTarget,
+          step.desktopTarget,
+          step.desktopFallbackTarget,
+        ].filter(Boolean) as string[]) {
           const match = selector.match(/\[data-tutorial-id="([^"]+)"\]/);
           if (!match) continue;
           const id = match[1];
@@ -82,9 +111,77 @@ describe("merchant tutorial registry", () => {
     expect(missing).toEqual([]);
   });
 
+  it("targets a real stable anchor on every bespoke desktop screen", () => {
+    for (const [pageKey, relativeSource] of Object.entries(DESKTOP_TUTORIAL_SOURCES) as Array<[TutorialPageKey, string]>) {
+      const source = readFileSync(join(__dirname, "..", relativeSource), "utf8");
+      for (const step of TUTORIAL_REGISTRY[pageKey].steps) {
+        expect(step.desktopTarget).toBeDefined();
+        const match = step.desktopTarget!.match(DESKTOP_TARGET);
+        expect(match).not.toBeNull();
+        expect(source).toContain(`data-tutorial-id="${match![1]}"`);
+
+        if (step.desktopFallbackTarget) {
+          const fallback = step.desktopFallbackTarget.match(DESKTOP_TARGET);
+          expect(fallback).not.toBeNull();
+          expect(source).toContain(`data-tutorial-id="${fallback![1]}"`);
+        }
+      }
+    }
+  });
+
   it("contains the shared Settings restart page", () => {
     expect(TUTORIAL_REGISTRY.settings.steps.some(step =>
       step.target.includes("settings-tutorial-help"),
     )).toBe(true);
+  });
+
+  it("merges the payment stack and desktop-only dashboard widgets without adding mobile steps", () => {
+    const retailTerminalMobile = tutorialStepsForDevice("retail-terminal", "mobile");
+    const retailTerminalDesktop = tutorialStepsForDevice("retail-terminal", "desktop");
+    expect(retailTerminalDesktop.map((step) => step.target)).toContain(
+      '[data-tutorial-id="retail-terminal-live-payments"]',
+    );
+    expect(retailTerminalMobile.some((step) => step.desktopOnly)).toBe(false);
+    expect(tutorialStepsForDevice("retail-payment-stack", "desktop").map((step) => step.target)).toEqual([
+      '[data-tutorial-id="retail-terminal-live-payments"]',
+      '[data-tutorial-id="retail-terminal-amount"]',
+    ]);
+
+    for (const pageKey of ["retail-dashboard", "property-dashboard", "trades-dashboard"] as const) {
+      const desktopOnly = TUTORIAL_REGISTRY[pageKey].steps.filter((step) => step.desktopOnly);
+      const mobile = tutorialStepsForDevice(pageKey, "mobile");
+      const desktop = tutorialStepsForDevice(pageKey, "desktop");
+      expect(desktopOnly.length).toBeGreaterThan(0);
+      desktopOnly.forEach((step) => {
+        expect(mobile).not.toContain(step);
+        expect(desktop.some((candidate) => candidate.title === step.title)).toBe(true);
+      });
+    }
+  });
+
+  it("keeps every mobile step object and order unchanged while resolving desktop copies", () => {
+    for (const pageKey of TUTORIAL_PAGE_KEYS) {
+      const original = TUTORIAL_REGISTRY[pageKey].steps;
+      const expectedMobile = original.filter((step) => !step.desktopOnly);
+      const mobile = tutorialStepsForDevice(pageKey, "mobile");
+
+      expect(mobile).toHaveLength(expectedMobile.length);
+      expectedMobile.forEach((step, index) => {
+        expect(mobile[index]).toBe(step);
+      });
+
+      for (const deviceClass of ["tablet", "desktop"] as const) {
+        const resolved = tutorialStepsForDevice(pageKey, deviceClass);
+        expect(resolved).toHaveLength(original.length);
+        resolved.forEach((step, index) => {
+          expect(step).not.toBe(original[index]);
+          expect(step.target).toBe(original[index].desktopTarget ?? original[index].target);
+          expect(step.fallbackTarget).toBe(
+            original[index].desktopFallbackTarget ?? original[index].fallbackTarget,
+          );
+          expect(step.body).toBe(original[index].desktopBody ?? original[index].body);
+        });
+      }
+    }
   });
 });

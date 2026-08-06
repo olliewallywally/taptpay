@@ -108,10 +108,10 @@ function useRetailHomeModel(tf: Timeframe, selBar: number) {
   const merchantId = getCurrentMerchantId();
 
   const merchantQuery = useQuery<any>({
-    queryKey: ["/api/merchants", merchantId],
+    queryKey: ["/api/merchants", merchantId, "profile"],
     queryFn: async () => {
       const token = localStorage.getItem("authToken");
-      const res = await fetch(`/api/merchants/${merchantId}`, {
+      const res = await fetch(`/api/merchants/${merchantId}/profile`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error("Failed to fetch merchant");
@@ -478,7 +478,7 @@ export default function DesktopRetailHome(props: DesktopRoutePageProps) {
       {/* ── RIGHT COLUMN ── */}
       <div className="rh-right">
         {/* store health */}
-        <div className="rh-health">
+        <div className="rh-health" data-tutorial-id="retail-home-health">
           {healthBox && m.detail[healthBox] ? (
             <div className="rh-hdet">
               <div className="rh-hdet-head">
@@ -532,7 +532,7 @@ export default function DesktopRetailHome(props: DesktopRoutePageProps) {
         </div>
 
         {/* notifications */}
-        <div className="rh-notif" style={{ height: notifOpen ? 194 : 108 }}>
+        <div className="rh-notif" data-tutorial-id="retail-home-notifications" style={{ height: notifOpen ? 194 : 108 }}>
           <span className="rh-notif-glow" />
           {/* collapsed preview */}
           <button
@@ -626,17 +626,17 @@ export default function DesktopRetailHome(props: DesktopRoutePageProps) {
 
         {/* quick actions */}
         <div className="rh-actions">
-          <button type="button" className="rh-action rh-action-primary" aria-label="new sale" onClick={go("/terminal")}>
+          <button type="button" className="rh-action rh-action-primary" data-tutorial-id="retail-home-new-sale" aria-label="new sale" onClick={go("/terminal")}>
             <span className="rh-action-glow" />
             <svg className="rh-action-ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={NAVY} strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
             <span className="rh-action-label" style={{ color: NAVY }}>new<br />sale</span>
           </button>
-          <button type="button" className="rh-action" aria-label="manage stock" onClick={go("/stock")}>
+          <button type="button" className="rh-action" data-tutorial-id="retail-home-stock" aria-label="manage stock" onClick={go("/stock")}>
             <span className="rh-action-glow" />
             <svg className="rh-action-ico" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#CFE0FF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8l-9-5-9 5v8l9 5 9-5V8z" /><path d="M3 8l9 5 9-5" /><path d="M12 13v8" /></svg>
             <span className="rh-action-label">manage<br />stock</span>
           </button>
-          <button type="button" className="rh-action" aria-label="view sales" onClick={go("/transactions")}>
+          <button type="button" className="rh-action" data-tutorial-id="retail-home-sales" aria-label="view sales" onClick={go("/transactions")}>
             <span className="rh-action-glow" />
             <svg className="rh-action-ico" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#CFE0FF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16" /><path d="M7 16v-5" /><path d="M12 16V8" /><path d="M17 16v-3" /></svg>
             <span className="rh-action-label">view<br />sales</span>

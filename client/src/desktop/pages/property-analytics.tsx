@@ -548,6 +548,7 @@ export default function DesktopPropertyAnalytics(props: DesktopRoutePageProps) {
         {/* ── SHEET ── */}
         <div
           className="pa-sheet"
+          data-tutorial-id="pa-history"
           style={{
             transform: `translateY(${sheetY}px)`,
             transition: dragging ? "none" : "transform .5s cubic-bezier(.22,.9,.3,1)",
@@ -574,7 +575,7 @@ export default function DesktopPropertyAnalytics(props: DesktopRoutePageProps) {
           </div>
 
           <div className="pa-sheet-head">
-            <span className="pa-sheet-title" data-tutorial-id="pa-history">{sheetTitle}</span>
+            <span className="pa-sheet-title">{sheetTitle}</span>
             <div className="pa-sheet-actions">
               {sheetMode === "history" && (
                 <>

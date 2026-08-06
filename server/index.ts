@@ -14,6 +14,7 @@ import {
   setupGracefulShutdown, 
   getPortConflictHelp 
 } from "./port-manager";
+import { createRequestLogger } from "./request-log";
 
 const app = express();
 
@@ -57,6 +58,24 @@ app.use(helmet({
 // very small payloads (< 1 KB) where compression overhead outweighs savings.
 app.use(compression({ threshold: 1024 }));
 
+// Bearer-addressed payment pages must not leak their URL through browser
+// referrers or shared caches. This runs before Vite/static fallback, so the HTML
+// document receives the policy before any checkout script is loaded.
+app.use((req, res, next) => {
+  if (
+    /^\/(?:pay|split|checkout|receipt)\/t\//.test(req.path) ||
+    /^\/pay\/return\//.test(req.path) ||
+    /^\/api\/pay\/(?:t|return)\//.test(req.path)
+  ) {
+    res.set({
+      "Cache-Control": "private, no-store",
+      Pragma: "no-cache",
+      "Referrer-Policy": "no-referrer",
+    });
+  }
+  next();
+});
+
 // Skip JSON parsing for webhook routes to preserve raw body for signature verification
 app.use((req, res, next) => {
   if (req.path === '/api/windcave/notification') {
@@ -68,35 +87,7 @@ app.use((req, res, next) => {
 
 app.use(express.urlencoded({ extended: false }));
 
-app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
-
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
-      log(logLine);
-    }
-  });
-
-  next();
-});
+app.use(createRequestLogger(log));
 
 (async () => {
   // ── JWT_SECRET validation ────────────────────────────────────────────────

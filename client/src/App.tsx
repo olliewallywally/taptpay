@@ -12,6 +12,7 @@ import { BottomNavigation } from "@/components/bottom-navigation";
 import { TutorialPageBoundary, TutorialProvider } from "@/features/tutorial/tutorial";
 import { useDeviceClass, type DeviceClass } from "@/hooks/use-device-class";
 import type { TutorialPageKey } from "@shared/tutorial";
+import { redactCustomerPaymentAddress } from "@/lib/payment-addressing";
 
 import { LandingPage } from "@/pages/landing-page";
 import Login from "@/pages/login";
@@ -24,6 +25,7 @@ const PaymentStack           = lazy(() => import("@/pages/payment-stack"));
 const MerchantTerminal      = lazy(() => import("@/pages/merchant-terminal"));
 const DemoTerminal          = lazy(() => import("@/pages/demo-terminal"));
 const CustomerPayment       = lazy(() => import("@/pages/customer-payment"));
+const TokenPaymentEntry      = lazy(() => import("@/pages/token-payment"));
 const Receipt               = lazy(() => import("@/pages/receipt"));
 const Dashboard             = lazy(() => import("@/pages/dashboard"));
 const Settings              = lazy(() => import("@/pages/settings"));
@@ -42,6 +44,7 @@ const ConfirmEmail          = lazy(() => import("@/pages/confirm-email"));
 const MerchantOnboarding    = lazy(() => import("@/pages/merchant-onboarding"));
 const SplitPayment          = lazy(() => import("@/pages/split-payment"));
 const PaymentResult         = lazy(() => import("@/pages/payment-result"));
+const PaymentReturn         = lazy(() => import("@/pages/payment-return"));
 const Checkout              = lazy(() => import("@/pages/checkout"));
 const BoardBuilder          = lazy(() => import("@/pages/board-builder"));
 const SmartTerminal         = lazy(() => import("@/components/SmartTransitions"));
@@ -294,7 +297,7 @@ function GA4PageTracker() {
   useEffect(() => {
     if (typeof window !== 'undefined' && (window as any).gtag) {
       (window as any).gtag('event', 'page_view', {
-        page_path: location,
+        page_path: redactCustomerPaymentAddress(location),
         page_title: document.title,
       });
     }
@@ -461,7 +464,7 @@ function Router({ deviceClass }: { deviceClass: DeviceClass }) {
           </Route>
           {/* Customer-facing quote acceptance → deposit/full payment, all on the
               branded Checkout card (quoteMode drives the animated 3-step flow). */}
-          <Route path="/trades/quote/:token">{() => <Checkout quoteMode />}</Route>
+          <Route path="/trades/quote/:token">{() => <Checkout sourceKind="quote-token" />}</Route>
           <Route path="/trades/recurring">
             <ProtectedRoute tutorialPage="trades-recurring">
               {deviceClass === "mobile" ? <TradesRecurring /> : <DesktopLegacyPage deviceClass={deviceClass} vertical="trades" page="home"><TradesRecurring /></DesktopLegacyPage>}
@@ -469,7 +472,7 @@ function Router({ deviceClass }: { deviceClass: DeviceClass }) {
           </Route>
           {/* Public rent/charge checkout — no auth required. Uses the shared
               branded Checkout page (same UI as retail) via the invoice token. */}
-          <Route path="/r/:token">{() => <Checkout />}</Route>
+          <Route path="/r/:token">{() => <Checkout sourceKind="invoice-token" />}</Route>
           <Route path="/onboarding">
             <ProtectedRoute skipOnboardingCheck={true}><MerchantOnboarding /></ProtectedRoute>
           </Route>
@@ -479,12 +482,19 @@ function Router({ deviceClass }: { deviceClass: DeviceClass }) {
           <Route path="/app-login" component={AppLogin} />
           <Route path="/terms" component={LegalPage} />
           <Route path="/privacy" component={LegalPage} />
+          {/* Bearer-token routes must precede every generic/numeric payment
+              route so the credential stays in the address through receipt. */}
+          <Route path="/pay/return/:state" component={PaymentReturn} />
+          <Route path="/pay/t/:token" component={TokenPaymentEntry} />
+          <Route path="/split/t/:token">{() => <SplitPayment sourceKind="retail-token" />}</Route>
+          <Route path="/checkout/t/:token">{() => <Checkout sourceKind="retail-token" />}</Route>
+          <Route path="/receipt/t/:token">{() => <Receipt sourceKind="retail-token" />}</Route>
           <Route path="/pay/:merchantId" component={CustomerPayment} />
           <Route path="/pay/:merchantId/stone/:stoneId" component={CustomerPayment} />
-          <Route path="/checkout/:transactionId">{() => <Checkout />}</Route>
-          <Route path="/split/:transactionId" component={SplitPayment} />
+          <Route path="/checkout/:transactionId">{() => <Checkout sourceKind="retail-legacy" />}</Route>
+          <Route path="/split/:transactionId">{() => <SplitPayment sourceKind="retail-legacy" />}</Route>
           <Route path="/payment/result/:transactionId" component={PaymentResult} />
-          <Route path="/receipt/:transactionId" component={Receipt} />
+          <Route path="/receipt/:transactionId">{() => <Receipt sourceKind="retail-legacy" />}</Route>
           <Route component={NotFound} />
         </Switch>
       </Suspense>

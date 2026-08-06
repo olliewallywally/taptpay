@@ -158,6 +158,13 @@ async function installMocks(page, { tutorialGate = null, tutorialEnabled = false
       status: "active",
     }),
   );
+  await page.route(`**/api/merchants/${MERCHANT_ID}/profile`, (route) =>
+    fulfillJson(route, {
+      id: MERCHANT_ID,
+      businessName: "P0 Browser Merchant",
+      status: "active",
+    }),
+  );
 }
 
 async function createScenario(browser, contextOptions, mockOptions) {

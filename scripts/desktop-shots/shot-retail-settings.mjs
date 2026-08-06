@@ -54,10 +54,14 @@ async function installMocks(page, { withCard = true } = {}) {
     json(r, withCard ? { ready: true, card: { brand: "visa", last4: "4021", expiry: "08/29" } } : { ready: false, card: null }));
   await page.route("**/api/push/capabilities", (r) => json(r, { webPush: { available: true }, nativePush: { available: false } }));
   await page.route("**/api/push/status", (r) => json(r, { subscribed: false }));
+  await page.route("**/api/push/preferences", (r) => json(r, {
+    preferences: { paymentReceived: true, dailyPayoutSummary: true, failedPaymentAlerts: false },
+  }));
   await page.route(`**/api/merchants/${MERCHANT_ID}/transactions`, (r) => json(r, []));
   await page.route(`**/api/merchants/${MERCHANT_ID}/stock-items`, (r) => json(r, []));
   await page.route(`**/api/merchants/${MERCHANT_ID}/tapt-stones`, (r) => json(r, []));
   await page.route(`**/api/merchants/${MERCHANT_ID}`, (r) => json(r, MERCHANT));
+  await page.route(`**/api/merchants/${MERCHANT_ID}/profile`, (r) => json(r, MERCHANT));
 }
 
 async function shoot(browser, label, ctxOpts, opts = {}) {
@@ -107,7 +111,8 @@ async function main() {
   const b = await shoot(browser, "tablet", { viewport: { width: 1194, height: 834 }, hasTouch: true }, { withCard: false });
   await browser.close();
   const errors = [...a, ...b];
-  console.log(errors.length ? `PAGE ERRORS:\n${errors.join("\n")}` : "no page errors");
+  if (errors.length) throw new Error(`PAGE ERRORS:\n${errors.join("\n")}`);
+  console.log("no page errors");
   console.log(`shots → ${OUT}`);
 }
 

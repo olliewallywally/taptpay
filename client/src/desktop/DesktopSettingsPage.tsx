@@ -8,7 +8,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { usePushNotifications } from "@/hooks/use-push-notifications";
+import {
+  usePushNotifications,
+  type PushNotificationPreferenceKey,
+} from "@/hooks/use-push-notifications";
 import { readDesktopPrefs, writeDesktopPrefs, type HistoryStart } from "./data/desktop-prefs";
 import { saveDesktopMode, type DesktopVertical } from "./desktop-theme";
 import {
@@ -33,6 +36,28 @@ const SECTIONS: { k: SectionKey; title: string }[] = [
   { k: "billing", title: "Subscription & Billing" },
   { k: "account", title: "Account" },
   { k: "notifs", title: "Transaction Notifications" },
+];
+
+const NOTIFICATION_OPTIONS: Array<{
+  key: PushNotificationPreferenceKey;
+  label: string;
+  description: string;
+}> = [
+  {
+    key: "paymentReceived",
+    label: "Payment received",
+    description: "Alert when a customer payment succeeds",
+  },
+  {
+    key: "dailyPayoutSummary",
+    label: "Daily payout summary",
+    description: "A morning summary of payments received yesterday",
+  },
+  {
+    key: "failedPaymentAlerts",
+    label: "Failed payment alerts",
+    description: "Alert when a payment is declined or cancelled",
+  },
 ];
 
 const MODES: { k: DesktopVertical; label: string; sub: string; path: string; icon: JSX.Element }[] = [
@@ -114,8 +139,8 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
   };
 
   const merchantQuery = useQuery<any>({
-    queryKey: ["/api/merchants", merchantId],
-    queryFn: () => authFetch(`/api/merchants/${merchantId}`),
+    queryKey: ["/api/merchants", merchantId, "profile"],
+    queryFn: () => authFetch(`/api/merchants/${merchantId}/profile`),
     enabled: !!merchantId,
   });
 
@@ -170,7 +195,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "profile"] });
       setDetailsDirty(false);
       toast({ title: "Business details saved successfully" });
     },
@@ -189,7 +214,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "profile"] });
       toast({ title: "Daily goal saved" });
     },
     onError: () => toast({ title: "Failed to save daily goal", variant: "destructive" }),
@@ -685,28 +710,32 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
                         Push notifications are not yet configured. Please contact support to enable this feature.
                       </div>
                     ) : (
-                      <div className="ds-row ds-row-last">
-                        <span className="ds-row-text">
-                          <span className="ds-row-label">Payment alerts</span>
-                          <span className="ds-row-sub">
-                            {push.enabled
-                              ? "You'll receive alerts when payments are received, failed, or refunded"
-                              : "Enable to get real-time alerts for transaction updates"}
-                          </span>
-                        </span>
-                        <button
-                          type="button"
-                          className="ds-switch"
-                          role="switch"
-                          aria-checked={push.enabled}
-                          aria-label="payment alerts"
-                          disabled={push.loading}
-                          style={{ background: push.enabled ? OPEN_INK : "rgba(255,255,255,0.4)" }}
-                          onClick={() => push.toggle(!push.enabled)}
-                        >
-                          <span className="ds-knob" style={{ transform: push.enabled ? "translateX(19px)" : "translateX(0)" }} />
-                        </button>
-                      </div>
+                      NOTIFICATION_OPTIONS.map((option, index) => {
+                        const checked = push.enabled && push.preferences[option.key];
+                        return (
+                          <div
+                            key={option.key}
+                            className={`ds-row${index === NOTIFICATION_OPTIONS.length - 1 ? " ds-row-last" : ""}`}
+                          >
+                            <span className="ds-row-text">
+                              <span className="ds-row-label">{option.label}</span>
+                              <span className="ds-row-sub">{option.description}</span>
+                            </span>
+                            <button
+                              type="button"
+                              className="ds-switch"
+                              role="switch"
+                              aria-checked={checked}
+                              aria-label={option.label.toLowerCase()}
+                              disabled={push.loading || push.preferencesLoading}
+                              style={{ background: checked ? OPEN_INK : "rgba(255,255,255,0.4)" }}
+                              onClick={() => push.setPreference(option.key, !checked)}
+                            >
+                              <span className="ds-knob" style={{ transform: checked ? "translateX(19px)" : "translateX(0)" }} />
+                            </button>
+                          </div>
+                        );
+                      })
                     )}
                   </div>
                 )}

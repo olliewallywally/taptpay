@@ -1,4 +1,10 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
@@ -12,6 +18,12 @@ import {
 } from "@/lib/property-dashboard-data";
 import { dollarsToCents, fmtNZD } from "@/lib/report-utils";
 import { readDesktopPrefs } from "../data/desktop-prefs";
+import {
+  ANALYTICS_POINT_INSET,
+  analyticsBucketLabel,
+  buildAnalyticsAreaChart,
+  clampAnalyticsChipCenter,
+} from "../data/analytics-chart";
 import { ReportModal } from "@/components/reports/ReportModal";
 import { RETAIL_REPORT_OPTIONS } from "@/lib/report-pdf/reports/retail-options";
 import {
@@ -22,6 +34,7 @@ import {
   buildRetailReport,
   itemChips,
   type PeriodChip,
+  type RetailBoard,
   type RetailReportId,
   type RetailTx,
 } from "../data/retail-reports";
@@ -87,39 +100,18 @@ const STATUS_LABEL: Record<string, string> = {
   processing: "Processing",
 };
 
-/* Geometry of .ra-chart-svg. The svg is drawn with preserveAspectRatio="none",
-   so it stretches its 1076x240 viewBox onto these dimensions and is then pulled
-   up/left inside .ra-chart. These constants drive both the css below and the
-   peak-marker placement, so the marker can be mapped through the same stretch
-   instead of being positioned in raw viewBox units. */
+/* The SVG still overscans the design canvas, but real bucket centres are mapped
+   onto the visible inset plot domain by buildAnalyticsAreaChart. */
 const SVG_LEFT = -51;
 const SVG_TOP = -131;
 const SVG_W = 1189;
 const SVG_H = 301;
-
-/** Catmull-Rom → cubic bezier: the prototype's `_curve`, same geometry. */
-function curve(vals: number[]) {
-  const W = 1076;
-  const H = 240;
-  const TOP = 16;
-  const BOT = 24;
-  const pts = vals.length < 2 ? [vals[0] ?? 0, vals[0] ?? 0] : vals;
-  const m = pts.length;
-  const P = pts.map((v, i) => [i * (W / (m - 1)), H - BOT - v * (H - TOP - BOT)] as const);
-  let d = `M${P[0][0].toFixed(1)},${P[0][1].toFixed(1)}`;
-  for (let i = 1; i < m; i++) {
-    const p0 = P[i - 1];
-    const p1 = P[i];
-    const pm = P[i - 2] ?? p0;
-    const pn = P[i + 1] ?? p1;
-    const c1x = p0[0] + (p1[0] - pm[0]) / 6;
-    const c1y = p0[1] + (p1[1] - pm[1]) / 6;
-    const c2x = p1[0] - (pn[0] - p0[0]) / 6;
-    const c2y = p1[1] - (pn[1] - p0[1]) / 6;
-    d += ` C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p1[0].toFixed(1)},${p1[1].toFixed(1)}`;
-  }
-  return { d, P, W, H };
-}
+const CHART_PLACEMENT = {
+  left: SVG_LEFT,
+  top: SVG_TOP,
+  width: SVG_W,
+  height: SVG_H,
+} as const;
 
 export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
   const merchantId = getCurrentMerchantId();
@@ -145,8 +137,11 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
   const [refundReason, setRefundReason] = useState("");
   const [exportOpen, setExportOpen] = useState(false);
   const [busyTx, setBusyTx] = useState<number | null>(null);
+  const [chipLeft, setChipLeft] = useState(ANALYTICS_POINT_INSET);
 
   const drag = useRef({ startY: 0, startT: CLOSED, moved: false, scale: 1 });
+  const chartRef = useRef<HTMLDivElement>(null);
+  const chipRef = useRef<HTMLDivElement>(null);
 
   const authFetch = async (path: string) => {
     const token = localStorage.getItem("authToken");
@@ -156,8 +151,8 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
   };
 
   const merchantQuery = useQuery<any>({
-    queryKey: ["/api/merchants", merchantId],
-    queryFn: () => authFetch(`/api/merchants/${merchantId}`),
+    queryKey: ["/api/merchants", merchantId, "profile"],
+    queryFn: () => authFetch(`/api/merchants/${merchantId}/profile`),
     enabled: !!merchantId,
   });
 
@@ -174,8 +169,15 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
     enabled: !!merchantId,
   });
 
+  const boardsQuery = useQuery<RetailBoard[]>({
+    queryKey: ["/api/merchants", merchantId, "tapt-stones"],
+    queryFn: () => authFetch(`/api/merchants/${merchantId}/tapt-stones`),
+    enabled: !!merchantId,
+  });
+
   const transactions = txQuery.data ?? [];
   const stockItems = stockQuery.data ?? [];
+  const boards = boardsQuery.data ?? [];
   const merchant = merchantQuery.data;
 
   /* ── overview model: the same invoice-shaped adapter 4a uses ── */
@@ -197,27 +199,53 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
     ).length;
 
     const buckets = buildBuckets(sales, tf);
-    const max = Math.max(...buckets.map((b) => b.valueCents), 1);
-    let peak = 0;
-    buckets.forEach((b, i) => {
-      if (b.valueCents > buckets[peak].valueCents) peak = i;
-    });
-    const { d, P, W, H } = curve(buckets.map((b) => b.valueCents / max));
-    const peakPoint = P[Math.min(peak, P.length - 1)];
-    /* Map the peak through the svg's own stretch + offset so the marker lands on
-       the line. The prototype positions it in raw viewBox units against a
-       stretched canvas, which leaves it floating in the fill. */
+    const chart = buildAnalyticsAreaChart(
+      buckets.map((bucket) => bucket.valueCents),
+      CHART_PLACEMENT,
+    );
+    const peakBucket = buckets[chart.peakIndex];
     return {
       total,
       growth,
       count,
-      lineD: d,
-      areaD: `${d} L${W},240 L0,240 Z`,
-      dotLeft: `${(SVG_LEFT + (peakPoint[0] / W) * SVG_W).toFixed(1)}px`,
-      dotTop: `${(SVG_TOP + (peakPoint[1] / H) * SVG_H).toFixed(1)}px`,
-      peakValue: buckets[peak]?.valueCents ?? 0,
+      lineD: chart.lineD,
+      areaD: chart.areaD,
+      markerLeft: chart.marker.x,
+      markerTop: chart.marker.y,
+      peakIndex: chart.peakIndex,
+      peakLabel: analyticsBucketLabel(
+        tf,
+        chart.peakIndex,
+        peakBucket?.label ?? "unknown",
+      ),
+      peakValue: peakBucket?.valueCents ?? 0,
     };
   }, [transactions, tf]);
+
+  const measureChip = useCallback(() => {
+    const chart = chartRef.current;
+    const chip = chipRef.current;
+    if (!chart || !chip) return;
+    setChipLeft(
+      clampAnalyticsChipCenter(
+        overview.markerLeft,
+        chart.clientWidth,
+        chip.offsetWidth,
+      ),
+    );
+  }, [overview.markerLeft]);
+
+  useLayoutEffect(() => {
+    if (report || overview.peakValue <= 0) return;
+    measureChip();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measureChip);
+    if (chartRef.current) observer.observe(chartRef.current);
+    if (chipRef.current) observer.observe(chipRef.current);
+    return () => observer.disconnect();
+  }, [measureChip, overview.peakValue, report]);
+
+  const selectedPeriod = RANGES.find((range) => range.k === tf)?.label ?? tf;
 
   /* ── payment history, grouped like the design ── */
   const historyGroups = useMemo(() => {
@@ -250,13 +278,14 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
         ? buildRetailReport(report, {
             transactions,
             stockItems,
+            boards,
             period: fPeriod,
             item: fItem,
             extra: fExtra,
             gstRegistered: merchant?.gstRegistered,
           })
         : null,
-    [report, transactions, stockItems, fPeriod, fItem, fExtra, merchant],
+    [report, transactions, stockItems, boards, fPeriod, fItem, fExtra, merchant],
   );
 
   /* ── mutations ── */
@@ -447,7 +476,7 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
                 <span className="ra-hero-sub ra-hero-sub-dim">transactions</span>
               </div>
 
-              <div className="ra-segs" role="tablist" aria-label="revenue range">
+              <div className="ra-segs" role="tablist" aria-label="revenue range" data-tutorial-id="retail-analytics-period">
                 {RANGES.map((r) => {
                   const on = r.k === tf;
                   return (
@@ -471,7 +500,7 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
               </div>
             </div>
 
-            <div className="ra-chart">
+            <div className="ra-chart" ref={chartRef}>
               <svg className="ra-chart-svg" viewBox="0 0 1076 240" preserveAspectRatio="none" aria-hidden="true">
                 <defs>
                   <linearGradient id="rtrevfill" x1="0" y1="0" x2="0" y2="1">
@@ -484,12 +513,34 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
               </svg>
               {overview.peakValue > 0 && (
                 <>
-                  <div className="ra-dot" style={{ left: overview.dotLeft, top: overview.dotTop }} />
-                  <div className="ra-chip" style={{ left: overview.dotLeft }}>
+                  <div
+                    aria-hidden="true"
+                    className="ra-dot"
+                    data-peak-index={overview.peakIndex}
+                    style={{
+                      left: `${overview.markerLeft}px`,
+                      top: `${overview.markerTop}px`,
+                    }}
+                  />
+                  <div
+                    ref={chipRef}
+                    aria-hidden="true"
+                    className="ra-chip"
+                    style={{ left: `${chipLeft}px` }}
+                  >
                     {moneyWhole(overview.peakValue)}
                   </div>
                 </>
               )}
+              <p
+                className="ra-chart-summary"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+              >
+                {selectedPeriod} selected. Peak bucket {overview.peakLabel}:{" "}
+                {money(overview.peakValue)}.
+              </p>
             </div>
           </>
         )}
@@ -574,6 +625,7 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
         {/* ── SHEET ── */}
         <div
           className="ra-sheet"
+          data-tutorial-id="retail-analytics-history"
           style={{
             transform: `translateY(${sheetY}px)`,
             transition: dragging ? "none" : "transform .5s cubic-bezier(.22,.9,.3,1)",
@@ -608,7 +660,7 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={DEEP_BLUE} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="7" rx="1.5" /><rect x="4" y="13" width="7" height="7" rx="1.5" /><rect x="13" y="13" width="7" height="7" rx="1.5" /></svg>
                     <span>Reports</span>
                   </button>
-                  <button type="button" className="ra-btn-white" onClick={() => setExportOpen(true)}>
+                  <button type="button" className="ra-btn-white" data-tutorial-id="retail-analytics-export" onClick={() => setExportOpen(true)}>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={INK} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4v10M8 10l4 4 4-4" /><path d="M5 19h14" /></svg>
                     <span>Export</span>
                   </button>
@@ -854,6 +906,7 @@ const RA_CSS = `
 .ra-chart-svg { display:block; position:absolute; left:${SVG_LEFT}px; top:${SVG_TOP}px; width:${SVG_W}px; height:${SVG_H}px; }
 .ra-dot { position:absolute; width:14px; height:14px; border-radius:50%; background:#fff; box-shadow:0 0 0 4px rgba(255,255,255,0.18); transform:translate(-50%,-50%); transition:left .3s ease, top .3s ease; }
 .ra-chip { position:absolute; top:170px; transform:translateX(-50%); padding:7px 14px; border-radius:10px; background:${ACTIVE}; font-weight:700; font-size:13.5px; color:${NAVY}; white-space:nowrap; transition:left .3s ease; }
+.ra-chart-summary { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 
 /* ── generated report ── */
 .ra-report { animation:reportIn .55s cubic-bezier(.22,.9,.3,1) both; display:flex; flex-direction:column; height:408px; }

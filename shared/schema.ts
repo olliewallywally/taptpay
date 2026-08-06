@@ -1,4 +1,4 @@
-import { pgTable, text, serial, decimal, timestamp, boolean, integer, jsonb, uuid, uniqueIndex, index, customType } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, decimal, timestamp, boolean, integer, jsonb, uuid, uniqueIndex, index, customType, check } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -155,6 +155,10 @@ export const transactions = pgTable("transactions", {
   windcaveSessionState: text("windcave_session_state"), // pending, processing, approved, declined
   windcaveXId: text("windcave_x_id"), // Idempotency key for session creation
 
+  // SHA-256 digest of the per-payment bearer credential. The raw credential is
+  // returned once by the create service and is never stored on a transaction.
+  paymentTokenHash: text("payment_token_hash"),
+
   // Split bill toggle (set by merchant at transaction creation time)
   splitEnabled: boolean("split_enabled").default(false),
   
@@ -162,12 +166,19 @@ export const transactions = pgTable("transactions", {
 }, (t) => ({
   merchantIdIdx: index("transactions_merchant_id_idx").on(t.merchantId),
   taptStoneIdIdx: index("transactions_tapt_stone_id_idx").on(t.taptStoneId),
+  paymentTokenHashUnique: uniqueIndex("transactions_payment_token_hash_uq")
+    .on(t.paymentTokenHash)
+    .where(sql`${t.paymentTokenHash} is not null`),
+  paymentTokenHashShape: check(
+    "transactions_payment_token_hash_shape_check",
+    sql`${t.paymentTokenHash} is null or ${t.paymentTokenHash} ~ '^[0-9a-f]{64}$'`,
+  ),
 }));
 
 // Split payments table to track individual payments for split bills
 export const splitPayments = pgTable("split_payments", {
   id: serial("id").primaryKey(),
-  transactionId: integer("transaction_id").references(() => transactions.id),
+  transactionId: integer("transaction_id").references(() => transactions.id).notNull(),
   merchantId: integer("merchant_id").references(() => merchants.id),
   splitIndex: integer("split_index").notNull(), // Which split this is (1, 2, 3, etc.)
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(), // Amount for this split
@@ -185,6 +196,92 @@ export const splitPayments = pgTable("split_payments", {
 }, (t) => ({
   transactionIdIdx: index("split_payments_transaction_id_idx").on(t.transactionId),
   merchantIdIdx: index("split_payments_merchant_id_idx").on(t.merchantId),
+  transactionSplitUnique: uniqueIndex("split_payments_transaction_split_uq")
+    .on(t.transactionId, t.splitIndex),
+}));
+
+export const paymentAttemptStates = [
+  "claiming",
+  "ready",
+  "finalizing",
+  "approved",
+  "declined",
+  "cancelled",
+  "abandoned",
+] as const;
+
+export type PaymentAttemptState = (typeof paymentAttemptStates)[number];
+
+export const paymentAttemptOutcomes = ["approved", "declined", "cancelled"] as const;
+
+export type PaymentAttemptOutcome = (typeof paymentAttemptOutcomes)[number];
+
+// Phase 3 claim/return services must use these exact bounds; the database checks
+// below are the final guard against accidentally creating longer-lived secrets.
+export const PAYMENT_ATTEMPT_MAX_LEASE_MS = 5 * 60 * 1000;
+export const PAYMENT_RETURN_STATE_MAX_AGE_MS = 30 * 60 * 1000;
+
+// Durable claim/session record for one transaction-local share. A share index of
+// zero addresses an unsplit transaction; configured split shares start at one.
+export const paymentAttempts = pgTable("payment_attempts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  transactionId: integer("transaction_id")
+    .references(() => transactions.id, { onDelete: "cascade" })
+    .notNull(),
+  shareIndex: integer("share_index").notNull().default(0),
+  idempotencyKey: uuid("idempotency_key").notNull(),
+  state: text("state").$type<PaymentAttemptState>().notNull().default("claiming"),
+  leaseExpiresAt: timestamp("lease_expires_at").notNull(),
+  processorSessionId: text("processor_session_id"),
+  processorXId: text("processor_x_id"),
+  returnStateHash: text("return_state_hash"),
+  returnStateExpiresAt: timestamp("return_state_expires_at"),
+  outcome: text("outcome").$type<PaymentAttemptOutcome>(),
+  receiptShare: integer("receipt_share"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  transactionIdx: index("payment_attempts_transaction_idx").on(t.transactionId),
+  transactionShareKeyUnique: uniqueIndex("payment_attempts_transaction_share_key_uq")
+    .on(t.transactionId, t.shareIndex, t.idempotencyKey),
+  liveTransactionShareUnique: uniqueIndex("payment_attempts_live_transaction_share_uq")
+    .on(t.transactionId, t.shareIndex)
+    .where(sql`${t.state} in ('claiming', 'ready', 'finalizing')`),
+  returnStateHashUnique: uniqueIndex("payment_attempts_return_state_hash_uq")
+    .on(t.returnStateHash)
+    .where(sql`${t.returnStateHash} is not null`),
+  shareIndexCheck: check(
+    "payment_attempts_share_index_check",
+    sql`${t.shareIndex} >= 0`,
+  ),
+  stateCheck: check(
+    "payment_attempts_state_check",
+    sql`${t.state} in ('claiming', 'ready', 'finalizing', 'approved', 'declined', 'cancelled', 'abandoned')`,
+  ),
+  finiteLeaseCheck: check(
+    "payment_attempts_lease_expiry_check",
+    sql`${t.leaseExpiresAt} > ${t.createdAt} and ${t.leaseExpiresAt} <= ${t.createdAt} + interval '5 minutes'`,
+  ),
+  returnStatePairCheck: check(
+    "payment_attempts_return_state_pair_check",
+    sql`(${t.returnStateHash} is null) = (${t.returnStateExpiresAt} is null)`,
+  ),
+  returnStateHashShapeCheck: check(
+    "payment_attempts_return_state_hash_shape_check",
+    sql`${t.returnStateHash} is null or ${t.returnStateHash} ~ '^[0-9a-f]{64}$'`,
+  ),
+  returnStateExpiryCheck: check(
+    "payment_attempts_return_state_expiry_check",
+    sql`${t.returnStateExpiresAt} is null or (${t.returnStateExpiresAt} > ${t.createdAt} and ${t.returnStateExpiresAt} <= ${t.createdAt} + interval '30 minutes')`,
+  ),
+  outcomeCheck: check(
+    "payment_attempts_outcome_check",
+    sql`${t.outcome} is null or (${t.outcome} in ('approved', 'declined', 'cancelled') and ${t.state} = ${t.outcome})`,
+  ),
+  receiptShareCheck: check(
+    "payment_attempts_receipt_share_check",
+    sql`${t.receiptShare} is null or (${t.shareIndex} >= 1 and ${t.receiptShare} = ${t.shareIndex})`,
+  ),
 }));
 
 // Refunds table to track all refund activities
@@ -382,6 +479,7 @@ export const insertTransactionSchema = createInsertSchema(transactions).omit({
   windcaveSessionId: true,
   windcaveSessionState: true,
   windcaveXId: true,
+  paymentTokenHash: true,
 }).extend({
   merchantId: z.number(),
   price: z.string().regex(/^\d+(\.\d{2})?$/, "Price must be a valid decimal"),
@@ -390,6 +488,24 @@ export const insertTransactionSchema = createInsertSchema(transactions).omit({
   selectedStoneId: z.number().optional(),
   splitEnabled: z.boolean().optional().default(false),
 });
+
+// External merchant-terminal request contract. Keep this separate from the
+// table-derived insert schema so callers can never set database/payment fields.
+// Existing phone clients redundantly send status:"pending"; accept and discard
+// only that literal during the compatibility cutover.
+export const retailTransactionCreateRequestSchema = z.object({
+  merchantId: z.number().int().positive(),
+  itemName: z.string().trim().min(1).max(200),
+  price: z.string()
+    .regex(/^\d+(\.\d{1,2})?$/, "Price must be a valid decimal")
+    .refine((value) => Number(value) > 0, "Price must be greater than zero"),
+  splitEnabled: z.boolean().optional().default(false),
+  selectedStoneId: z.number().int().positive().nullable().optional(),
+  linkMode: z.enum(["legacy", "per_payment"]).optional().default("legacy"),
+  status: z.literal("pending").optional(),
+}).strict();
+
+export type RetailTransactionCreateRequest = z.infer<typeof retailTransactionCreateRequestSchema>;
 
 // Password reset schemas
 export const forgotPasswordSchema = z.object({
@@ -422,7 +538,11 @@ export const taptStones = pgTable("tapt_stones", {
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => ({
+  activeMerchantNumberUnique: uniqueIndex("tapt_stones_active_merchant_number_uq")
+    .on(t.merchantId, t.stoneNumber)
+    .where(sql`${t.isActive} is true`),
+}));
 
 // Stock Items table - merchant inventory management
 export const stockItems = pgTable("stock_items", {
@@ -569,6 +689,39 @@ export const createInfoPackLeadSchema = z.object({
 export type InfoPackLead = typeof infoPackLeads.$inferSelect;
 export type InsertInfoPackLead = z.infer<typeof insertInfoPackLeadSchema>;
 
+export const DEFAULT_PUSH_NOTIFICATION_PREFERENCES = Object.freeze({
+  paymentReceived: true,
+  dailyPayoutSummary: true,
+  failedPaymentAlerts: false,
+});
+
+export const pushNotificationPreferencesSchema = z.object({
+  paymentReceived: z.boolean(),
+  dailyPayoutSummary: z.boolean(),
+  failedPaymentAlerts: z.boolean(),
+}).strict();
+
+export type PushNotificationPreferences = z.infer<typeof pushNotificationPreferencesSchema>;
+
+export function normalizePushNotificationPreferences(
+  value: unknown,
+): PushNotificationPreferences {
+  const parsed = pushNotificationPreferencesSchema.safeParse(value);
+  return parsed.success
+    ? parsed.data
+    : { ...DEFAULT_PUSH_NOTIFICATION_PREFERENCES };
+}
+
+export const PUSH_NOTIFICATION_EVENT_TYPES = [
+  "transaction_created",
+  "payment_received",
+  "payment_failed",
+  "refund_processed",
+  "daily_payout_summary",
+] as const;
+
+export type PushNotificationEventType = typeof PUSH_NOTIFICATION_EVENT_TYPES[number];
+
 // Push notification subscriptions table
 export const pushSubscriptions = pgTable("push_subscriptions", {
   id: serial("id").primaryKey(),
@@ -578,13 +731,46 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
   auth: text("auth").notNull(),
   userAgent: text("user_agent"),
   isActive: boolean("is_active").default(true),
+  preferences: jsonb("preferences")
+    .$type<PushNotificationPreferences>()
+    .notNull()
+    .default(DEFAULT_PUSH_NOTIFICATION_PREFERENCES),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions).omit({
   id: true,
+  preferences: true,
   createdAt: true,
 });
+
+// Persistent claim records make scheduled push producers safe under cron
+// retries and overlapping processes. No notification payload or endpoint secret
+// is stored here.
+export const pushNotificationDeliveries = pgTable("push_notification_deliveries", {
+  id: serial("id").primaryKey(),
+  merchantId: integer("merchant_id")
+    .references(() => merchants.id, { onDelete: "cascade" })
+    .notNull(),
+  eventType: text("event_type").$type<PushNotificationEventType>().notNull(),
+  eventKey: text("event_key").notNull(),
+  status: text("status").notNull().default("claimed"),
+  claimToken: uuid("claim_token").notNull().defaultRandom(),
+  claimedAt: timestamp("claimed_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  completedAt: timestamp("completed_at"),
+}, (t) => ({
+  merchantEventKeyUnique: uniqueIndex("push_notification_deliveries_merchant_event_key_uq")
+    .on(t.merchantId, t.eventType, t.eventKey),
+  eventTypeCheck: check(
+    "push_notification_deliveries_event_type_check",
+    sql`${t.eventType} in ('transaction_created', 'payment_received', 'payment_failed', 'refund_processed', 'daily_payout_summary')`,
+  ),
+  statusCheck: check(
+    "push_notification_deliveries_status_check",
+    sql`${t.status} in ('claimed', 'processed', 'skipped', 'failed')`,
+  ),
+}));
 
 // API Key schemas
 export const createApiKeySchema = z.object({
@@ -688,6 +874,9 @@ export type CreateMerchant = z.infer<typeof createMerchantSchema>;
 export type VerifyMerchant = z.infer<typeof verifyMerchantSchema>;
 export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
+export type SplitPayment = typeof splitPayments.$inferSelect;
+export type PaymentAttempt = typeof paymentAttempts.$inferSelect;
+export type InsertPaymentAttempt = typeof paymentAttempts.$inferInsert;
 export type PlatformFee = typeof platformFees.$inferSelect;
 export type InsertPlatformFee = z.infer<typeof insertPlatformFeeSchema>;
 export type MerchantSettlement = typeof merchantSettlements.$inferSelect;
@@ -722,6 +911,7 @@ export type InsertBillingHistory = z.infer<typeof insertBillingHistorySchema>;
 // Push Subscription types
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 export type InsertPushSubscription = z.infer<typeof insertPushSubscriptionSchema>;
+export type PushNotificationDelivery = typeof pushNotificationDeliveries.$inferSelect;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PROPERTY MANAGEMENT VERTICAL

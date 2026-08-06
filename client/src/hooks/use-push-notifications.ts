@@ -6,6 +6,35 @@ import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { isNativeIOS } from "@/lib/native";
 
+export type PushNotificationPreferences = {
+  paymentReceived: boolean;
+  dailyPayoutSummary: boolean;
+  failedPaymentAlerts: boolean;
+};
+
+export type PushNotificationPreferenceKey = keyof PushNotificationPreferences;
+
+const DEFAULT_PREFERENCES: PushNotificationPreferences = {
+  paymentReceived: true,
+  dailyPayoutSummary: true,
+  failedPaymentAlerts: false,
+};
+
+function normalizePreferences(value: unknown): PushNotificationPreferences {
+  if (!value || typeof value !== "object") return { ...DEFAULT_PREFERENCES };
+  const candidate = value as Record<string, unknown>;
+  if (
+    typeof candidate.paymentReceived !== "boolean"
+    || typeof candidate.dailyPayoutSummary !== "boolean"
+    || typeof candidate.failedPaymentAlerts !== "boolean"
+  ) return { ...DEFAULT_PREFERENCES };
+  return {
+    paymentReceived: candidate.paymentReceived,
+    dailyPayoutSummary: candidate.dailyPayoutSummary,
+    failedPaymentAlerts: candidate.failedPaymentAlerts,
+  };
+}
+
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -30,7 +59,10 @@ export interface PushNotifications {
   available: boolean;
   enabled: boolean;
   loading: boolean;
+  preferences: PushNotificationPreferences;
+  preferencesLoading: boolean;
   toggle: (enable: boolean) => Promise<void>;
+  setPreference: (key: PushNotificationPreferenceKey, value: boolean) => Promise<void>;
 }
 
 export function usePushNotifications(): PushNotifications {
@@ -39,6 +71,8 @@ export function usePushNotifications(): PushNotifications {
   const [available, setAvailable] = useState(false);
   const [enabled, setEnabled] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [preferences, setPreferences] = useState<PushNotificationPreferences>(DEFAULT_PREFERENCES);
+  const [preferencesLoading, setPreferencesLoading] = useState(true);
 
   const checkNativeStatus = useCallback(async () => {
     try {
@@ -102,8 +136,27 @@ export function usePushNotifications(): PushNotifications {
     };
   }, [checkNativeStatus, checkWebStatus]);
 
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/push/preferences", { headers: authHeaders() })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Push preferences unavailable");
+        return response.json();
+      })
+      .then((body) => {
+        if (!cancelled) setPreferences(normalizePreferences(body?.preferences));
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setPreferencesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const toggleWeb = useCallback(
-    async (enable: boolean) => {
+    async (enable: boolean): Promise<boolean> => {
       if (enable) {
         const permission = await Notification.requestPermission();
         if (permission !== "granted") {
@@ -112,7 +165,7 @@ export function usePushNotifications(): PushNotifications {
             description: "Please enable notifications in your browser settings",
             variant: "destructive",
           });
-          return;
+          return false;
         }
         const registration = await navigator.serviceWorker.ready;
         const keyRes = await fetch("/api/push/vapid-key");
@@ -138,7 +191,7 @@ export function usePushNotifications(): PushNotifications {
         }
         setEnabled(true);
         toast({ title: "Notifications enabled", description: "You'll receive alerts for transaction updates" });
-        return;
+        return true;
       }
 
       const registration = await navigator.serviceWorker.ready;
@@ -154,12 +207,13 @@ export function usePushNotifications(): PushNotifications {
       }
       setEnabled(false);
       toast({ title: "Notifications disabled" });
+      return false;
     },
     [toast],
   );
 
   const toggleNative = useCallback(
-    async (enable: boolean) => {
+    async (enable: boolean): Promise<boolean> => {
       const { PushNotifications: Native } = await import("@capacitor/push-notifications");
       if (!enable) {
         const res = await fetch("/api/push/native-unsubscribe", {
@@ -169,7 +223,7 @@ export function usePushNotifications(): PushNotifications {
         if (!res.ok) throw new Error("Server failed to remove notification subscription");
         setEnabled(false);
         toast({ title: "Notifications disabled" });
-        return;
+        return false;
       }
 
       const perm = await Native.requestPermissions();
@@ -179,9 +233,9 @@ export function usePushNotifications(): PushNotifications {
           description: "Please enable in iOS Settings > TaptPay",
           variant: "destructive",
         });
-        return;
+        return false;
       }
-      await new Promise<void>((resolve, reject) => {
+      return new Promise<boolean>((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error("Registration timed out")), 15000);
         const cleanup = () => {
           clearTimeout(timer);
@@ -199,7 +253,7 @@ export function usePushNotifications(): PushNotifications {
             if (!res.ok) throw new Error("Server rejected device token");
             setEnabled(true);
             toast({ title: "Notifications enabled", description: "You'll receive alerts for transaction updates" });
-            resolve();
+            resolve(true);
           } catch (e) {
             reject(e);
           }
@@ -229,7 +283,43 @@ export function usePushNotifications(): PushNotifications {
     [toggleNative, toggleWeb, toast],
   );
 
-  return { supported, available, enabled, loading, toggle };
+  const setPreference = useCallback(
+    async (key: PushNotificationPreferenceKey, value: boolean) => {
+      setLoading(true);
+      try {
+        if (value && !enabled) {
+          const registered = await (isNativeIOS() ? toggleNative(true) : toggleWeb(true));
+          if (!registered) return;
+        }
+        const next = { ...preferences, [key]: value };
+        const response = await fetch("/api/push/preferences", {
+          method: "PUT",
+          headers: authHeaders(true),
+          body: JSON.stringify(next),
+        });
+        if (!response.ok) throw new Error("Server rejected notification preferences");
+        const body = await response.json();
+        setPreferences(normalizePreferences(body?.preferences));
+      } catch (error) {
+        console.error("Push notification preference error:", error);
+        toast({ title: "Failed to update notification settings", variant: "destructive" });
+      } finally {
+        setLoading(false);
+      }
+    },
+    [enabled, preferences, toggleNative, toggleWeb, toast],
+  );
+
+  return {
+    supported,
+    available,
+    enabled,
+    loading,
+    preferences,
+    preferencesLoading,
+    toggle,
+    setPreference,
+  };
 }
 
 export default usePushNotifications;

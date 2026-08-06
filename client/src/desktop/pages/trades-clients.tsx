@@ -200,7 +200,7 @@ export default function DesktopTradesClients(props: DesktopRoutePageProps) {
           </span>
         </div>
 
-        <div className="tc-search-row">
+        <div className="tc-search-row" data-tutorial-id="trades-directory-search">
           <div className="tc-search">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={ACCENT} strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="6.5" /><path d="m20 20-3.8-3.8" /></svg>
             <input
@@ -213,6 +213,7 @@ export default function DesktopTradesClients(props: DesktopRoutePageProps) {
           <button
             type="button"
             className="tc-add"
+            data-tutorial-id="trades-directory-add"
             aria-label="add client"
             onClick={() => setAddOpen(true)}
           >
@@ -335,30 +336,48 @@ export default function DesktopTradesClients(props: DesktopRoutePageProps) {
    title that recovered it does nothing on tablet, where there is no hover. The
    column width is the design's and stays; the label splits onto its own line so
    both read in full. */
-function ClientRow({
+export function ClientRow({
   row,
   onOpen,
 }: {
   row: TradesClientRow;
   onOpen: (path: string) => void;
 }) {
+  const idPrefix = `tc-client-${row.id}`;
+  const nameId = `${idPrefix}-name`;
+  const siteId = `${idPrefix}-site`;
+  const statusId = `${idPrefix}-status`;
+  const amountId = `${idPrefix}-amount`;
+  const descriptionIds = [
+    row.siteAddress ? siteId : null,
+    statusId,
+    amountId,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <button
       type="button"
       className="tc-row"
-      aria-label={`view ${row.name}`}
+      aria-labelledby={nameId}
+      aria-describedby={descriptionIds}
       onClick={() => onOpen(`/trades/clients/${row.id}`)}
     >
-      <span className="tc-avatar">{row.initials}</span>
+      <span className="tc-avatar" aria-hidden="true">{row.initials}</span>
       <span className="tc-row-mid">
-        <span className="tc-row-name">{row.name}</span>
-        {row.siteAddress && <span className="tc-row-site">{row.siteAddress}</span>}
-        <span className="tc-row-status">
-          <span className="tc-row-dot" style={{ background: STATUS_DOT[row.status] }} />
+        <span id={nameId} className="tc-row-name">{row.name}</span>
+        {row.siteAddress && <span id={siteId} className="tc-row-site">{row.siteAddress}</span>}
+        <span id={statusId} className="tc-row-status">
+          <span
+            className="tc-row-dot"
+            style={{ background: STATUS_DOT[row.status] }}
+            aria-hidden="true"
+          />
           <span>{row.status}</span>
         </span>
       </span>
-      <span className="tc-row-amt">
+      <span id={amountId} className="tc-row-amt">
         {row.amountCents === null ? "—" : fmtNZD(row.amountCents)}
       </span>
     </button>
@@ -372,7 +391,7 @@ const TC_CSS = `
 .tc-scope { display:inline-flex; align-items:center; gap:9px; padding:10px 20px; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); background:transparent; font-weight:400; font-size:13.5px; color:${ACCENT_SOFT}; cursor:pointer; transition:background .18s ease; text-transform:lowercase; }
 .tc-scope:hover { background:rgba(94,158,255,0.08); }
 .tc-scope-menu { position:absolute; top:calc(100% + 6px); left:0; min-width:220px; max-height:260px; overflow-y:auto; padding:6px; border-radius:14px; background:#0B1436; border:1px solid rgba(94,158,255,0.3); box-shadow:0 18px 40px rgba(0,4,24,0.5); display:flex; flex-direction:column; gap:2px; }
-.tc-scope-opt { padding:9px 12px; border-radius:9px; background:transparent; font-weight:500; font-size:12.5px; color:${TEXT_SOFT}; text-align:left; cursor:pointer; transition:background .15s ease; text-transform:lowercase; }
+.tc-scope-opt { padding:9px 12px; border-radius:9px; background:transparent; font-weight:500; font-size:12.5px; color:${TEXT_SOFT}; text-align:left; cursor:pointer; transition:background .15s ease; text-transform:lowercase; white-space:normal; overflow-wrap:anywhere; }
 .tc-scope-opt:hover { background:rgba(94,158,255,0.14); }
 .tc-scope-opt[aria-selected="true"] { background:rgba(94,158,255,0.22); }
 
@@ -388,12 +407,13 @@ const TC_CSS = `
 
 .tc-list { margin-top:16px; display:flex; flex-direction:column; gap:5px; width:400px; max-height:490px; overflow-y:auto; scrollbar-width:none; animation:popIn .55s cubic-bezier(.34,1.42,.5,1) 200ms both; }
 .tc-list::-webkit-scrollbar { display:none; }
-.tc-row { display:flex; align-items:center; gap:16px; padding:5px 0; border-radius:10px; background:transparent; cursor:pointer; text-align:left; transition:background .15s ease; }
+.tc-row { display:flex; align-items:center; gap:16px; width:100%; min-width:0; box-sizing:border-box; padding:5px 0; border-radius:10px; background:transparent; cursor:pointer; text-align:left; transition:background .15s ease; }
 .tc-row:hover { background:rgba(94,158,255,0.06); }
+.tc-row:focus-visible { outline:2px solid ${ACCENT_SOFT}; outline-offset:2px; background:rgba(94,158,255,0.1); }
 .tc-avatar { width:40px; height:40px; border-radius:50%; border:1.5px solid rgba(94,158,255,0.8); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:11px; color:#fff; flex:0 0 auto; box-sizing:border-box; }
-.tc-row-mid { display:flex; flex-direction:column; gap:2px; flex:1; min-width:0; }
-.tc-row-name { font-weight:300; font-size:13.5px; color:${TEXT_SOFT}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.tc-row-site { font-weight:300; font-size:11.5px; color:rgba(244,246,255,0.62); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tc-row-mid { display:flex; flex-direction:column; gap:2px; flex:1; min-width:0; white-space:normal; overflow-wrap:anywhere; }
+.tc-row-name { font-weight:300; font-size:13.5px; color:${TEXT_SOFT}; white-space:normal; overflow-wrap:anywhere; }
+.tc-row-site { font-weight:300; font-size:11.5px; color:rgba(244,246,255,0.62); white-space:normal; overflow-wrap:anywhere; }
 .tc-row-status { display:flex; align-items:center; gap:5px; font-weight:500; font-size:11px; color:rgba(244,246,255,0.5); }
 .tc-row-dot { width:5px; height:5px; border-radius:50%; opacity:0.7; flex:0 0 auto; }
 .tc-row-amt { font-weight:800; font-size:15px; color:#fff; flex:0 0 auto; font-variant-numeric:tabular-nums; }

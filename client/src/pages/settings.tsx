@@ -10,7 +10,8 @@ import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
-import { isNativeApp, isNativeIOS } from "@/lib/native";
+import { isNativeApp } from "@/lib/native";
+import { usePushNotifications } from "@/hooks/use-push-notifications";
 import { TRADES_THEME } from "@/lib/trades-theme";
 import { Switch } from "@/components/ui/switch";
 import { WireframeLiquidButton } from "@/components/wireframe-liquid-button";
@@ -138,11 +139,13 @@ export default function Settings() {
   const [cardSaving, setCardSaving] = useState(false);
   const [cardRemoving, setCardRemoving] = useState(false);
 
-  // Push notification state
-  const [pushEnabled, setPushEnabled] = useState(false);
-  const [pushLoading, setPushLoading] = useState(false);
-  const [pushSupported, setPushSupported] = useState(false);
-  const [vapidAvailable, setVapidAvailable] = useState(false);
+  const {
+    enabled: pushEnabled,
+    loading: pushLoading,
+    supported: pushSupported,
+    available: vapidAvailable,
+    toggle: togglePushNotifications,
+  } = usePushNotifications();
 
   const [gstRegistered, setGstRegistered] = useState(false);
   const [tradeGstMode, setTradeGstMode] = useState<"inclusive" | "exclusive">("inclusive");
@@ -165,221 +168,16 @@ export default function Settings() {
     });
   };
 
-  useEffect(() => {
-    if (isNativeIOS()) {
-      setPushSupported(true);
-      fetch('/api/push/capabilities')
-        .then(r => r.json())
-        .then(caps => {
-          setVapidAvailable(!!caps?.nativePush?.available);
-          checkNativePushStatus();
-        })
-        .catch(() => {
-          setVapidAvailable(false);
-        });
-    } else {
-      const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
-      setPushSupported(supported);
-      if (supported) {
-        fetch('/api/push/capabilities')
-          .then(r => r.json())
-          .then(caps => {
-            const webReady = !!caps?.webPush?.available;
-            setVapidAvailable(webReady);
-            if (webReady) checkPushStatus();
-          })
-          .catch(() => setVapidAvailable(false));
-      }
-    }
-  }, []);
-
-  async function checkNativePushStatus() {
-    try {
-      const { PushNotifications } = await import('@capacitor/push-notifications');
-      const { receive } = await PushNotifications.checkPermissions();
-      if (receive !== 'granted') {
-        setPushEnabled(false);
-        return;
-      }
-      const token = localStorage.getItem("authToken");
-      if (token) {
-        const statusResp = await fetch('/api/push/status', {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-        if (statusResp.ok) {
-          const status = await statusResp.json();
-          setPushEnabled(!!status.nativeSubscribed);
-          return;
-        }
-      }
-      setPushEnabled(true);
-    } catch {
-      setPushSupported(false);
-    }
-  }
-
-  async function checkPushStatus() {
-    try {
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
-      setPushEnabled(!!subscription);
-    } catch {
-      setPushEnabled(false);
-    }
-  }
-
-  async function togglePushNotifications(enable: boolean) {
-    if (isNativeIOS()) {
-      return toggleNativePushNotifications(enable);
-    }
-    return toggleWebPushNotifications(enable);
-  }
-
-  async function toggleNativePushNotifications(enable: boolean) {
-    setPushLoading(true);
-    try {
-      const { PushNotifications } = await import('@capacitor/push-notifications');
-      if (enable) {
-        const permStatus = await PushNotifications.requestPermissions();
-        if (permStatus.receive !== 'granted') {
-          toast({ title: "Notification permission denied", description: "Please enable in iOS Settings > TaptPay", variant: "destructive" });
-          setPushLoading(false);
-          return;
-        }
-        await new Promise<void>((resolve, reject) => {
-          const timer = setTimeout(() => reject(new Error('Registration timed out')), 15000);
-          const regHandle = PushNotifications.addListener('registration', async (token) => {
-            clearTimeout(timer);
-            regHandle.then(h => h.remove());
-            errHandle.then(h => h.remove());
-            try {
-              const authToken = localStorage.getItem("authToken");
-              const resp = await fetch('/api/push/native-subscribe', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-                body: JSON.stringify({ deviceToken: token.value }),
-              });
-              if (resp.ok) {
-                setPushEnabled(true);
-                toast({ title: "Notifications enabled", description: "You'll receive alerts for transaction updates" });
-                resolve();
-              } else {
-                reject(new Error("Server rejected device token"));
-              }
-            } catch (e) { reject(e); }
-          });
-          const errHandle = PushNotifications.addListener('registrationError', async (err) => {
-            clearTimeout(timer);
-            regHandle.then(h => h.remove());
-            errHandle.then(h => h.remove());
-            reject(new Error(err.error));
-          });
-          PushNotifications.register();
-        });
-      } else {
-        const authToken = localStorage.getItem("authToken");
-        const unsubResp = await fetch('/api/push/native-unsubscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-        });
-        if (!unsubResp.ok) {
-          throw new Error("Server failed to remove notification subscription");
-        }
-        setPushEnabled(false);
-        toast({ title: "Notifications disabled" });
-      }
-    } catch (error) {
-      console.error("Native push toggle error:", error);
-      toast({ title: "Failed to update notification settings", variant: "destructive" });
-    }
-    setPushLoading(false);
-  }
-
-  async function toggleWebPushNotifications(enable: boolean) {
-    setPushLoading(true);
-    try {
-      if (enable) {
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') {
-          toast({ title: "Notification permission denied", description: "Please enable notifications in your browser settings", variant: "destructive" });
-          setPushLoading(false);
-          return;
-        }
-
-        const registration = await navigator.serviceWorker.ready;
-        const vapidResponse = await fetch('/api/push/vapid-key');
-        if (!vapidResponse.ok) {
-          setVapidAvailable(false);
-          throw new Error("VAPID key unavailable — push notifications not configured on server");
-        }
-        const { publicKey } = await vapidResponse.json();
-        if (!publicKey) throw new Error("Invalid VAPID public key received from server");
-
-        const subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(publicKey),
-        });
-
-        const token = localStorage.getItem("authToken");
-        const response = await fetch('/api/push/subscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ subscription: subscription.toJSON() }),
-        });
-
-        if (!response.ok) {
-          await subscription.unsubscribe();
-          throw new Error("Server rejected subscription");
-        }
-
-        setPushEnabled(true);
-        toast({ title: "Notifications enabled", description: "You'll receive alerts for transaction updates" });
-      } else {
-        const registration = await navigator.serviceWorker.ready;
-        const subscription = await registration.pushManager.getSubscription();
-        if (subscription) {
-          const endpoint = subscription.endpoint;
-          await subscription.unsubscribe();
-
-          const token = localStorage.getItem("authToken");
-          await fetch('/api/push/unsubscribe', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ endpoint }),
-          });
-        }
-
-        setPushEnabled(false);
-        toast({ title: "Notifications disabled" });
-      }
-    } catch (error) {
-      console.error("Push notification toggle error:", error);
-      toast({ title: "Failed to update notification settings", variant: "destructive" });
-    }
-    setPushLoading(false);
-  }
-
-  function urlBase64ToUint8Array(base64String: string): Uint8Array {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-    for (let i = 0; i < rawData.length; ++i) {
-      outputArray[i] = rawData.charCodeAt(i);
-    }
-    return outputArray;
-  }
-
   if (!merchantId) {
     setLocation('/login');
     return null;
   }
 
   const { data: merchant, isLoading } = useQuery({
-    queryKey: ["/api/merchants", merchantId],
+    queryKey: ["/api/merchants", merchantId, "profile"],
     queryFn: async () => {
       const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}`, {
+      const response = await fetch(`/api/merchants/${merchantId}/profile`, {
         headers: { "Authorization": `Bearer ${token}` },
       });
       if (!response.ok) throw new Error("Failed to fetch merchant");
@@ -393,8 +191,8 @@ export default function Settings() {
         email: data.email || '',
         gstNumber: data.gstNumber || '',
       });
-      setWindcaveApi(data.windcaveApiKey || '');
-      setApiActive(!!data.windcaveApiKey);
+      setWindcaveApi('');
+      setApiActive(!!data.windcaveApiConfigured);
       setDailyGoal(data.dailyGoal || '500.00');
       if (data.customLogoUrl) {
         setLogoPreview(data.customLogoUrl);
@@ -433,7 +231,7 @@ export default function Settings() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "profile"] });
       toast({ title: "Business details saved successfully" });
     },
     onError: () => {
@@ -456,7 +254,7 @@ export default function Settings() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "profile"] });
       toast({ title: "Daily goal updated successfully" });
     },
     onError: () => {
@@ -481,7 +279,7 @@ export default function Settings() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "profile"] });
       setLogoFile(null);
       setLogoPreview(null);
       toast({ title: "Logo uploaded successfully" });
@@ -504,7 +302,7 @@ export default function Settings() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "profile"] });
       setLogoPreview(null);
       toast({ title: "Logo deleted successfully" });
     },

@@ -49,6 +49,8 @@ jest.mock('@/lib/auth', () => ({
 jest.mock('@/lib/sse-client', () => ({
   sseClient: {
     connect: jest.fn(),
+    connectCustomer: jest.fn(),
+    connectMerchant: jest.fn(),
     disconnect: jest.fn(),
     subscribe: jest.fn(),
     unsubscribe: jest.fn(),

@@ -25,6 +25,23 @@ const OUT = "/tmp/taptpay-desktop-3c";
 
 const TOM = "00000000-0000-4000-8000-00000000000a";
 
+const PARTIAL_SPLIT = {
+  ...INVOICES.find((invoice) => invoice.status === "dispatched"),
+  id: "partial-split-tom",
+  clientProfileId: TOM,
+  amountCents: 10001,
+  splitEnabled: true,
+  splitCount: 3,
+  splitPaidCount: 1,
+};
+
+const FULLY_PAID_SPLIT = {
+  ...PARTIAL_SPLIT,
+  id: "fully-paid-split-tom",
+  amountCents: 9999,
+  splitPaidCount: 3,
+};
+
 /* Lisa's quote Q.sent totals $860; a paid $172 deposit leaves a $688 balance. */
 const PAID_DEPOSIT = {
   ...INVOICES[0],
@@ -54,7 +71,7 @@ async function shoot(browser, label, contextOptions) {
 
   const posted = [];
   const clients = [...CLIENTS, TOM_WALKER];
-  const invoices = [...INVOICES, PAID_DEPOSIT];
+  const invoices = [...INVOICES, PAID_DEPOSIT, PARTIAL_SPLIT, FULLY_PAID_SPLIT];
   const quotes = [...QUOTES];
 
   await page.route("**/api/trades/clients", (route) => json(route, clients));
@@ -83,6 +100,15 @@ async function shoot(browser, label, contextOptions) {
     return json(route, { ...INVOICES[0], status: "paid_external" });
   });
   await page.route(`**/api/merchants/${MERCHANT_ID}`, (route) =>
+    json(route, {
+      id: MERCHANT_ID,
+      businessName: "Wallace Electrical",
+      status: "active",
+      gstRegistered: true,
+      tradeGstMode: "inclusive",
+    }),
+  );
+  await page.route(`**/api/merchants/${MERCHANT_ID}/profile`, (route) =>
     json(route, {
       id: MERCHANT_ID,
       businessName: "Wallace Electrical",
@@ -185,6 +211,14 @@ async function shoot(browser, label, contextOptions) {
     /* mark received */
     await rail("mark received").click();
     await assertVisible(page.getByText("Mark as received externally"), "mark-received panel");
+    const markReceivedPanel = page.locator(".tt-paid");
+    await assertVisible(
+      markReceivedPanel.getByText("$66.68", { exact: true }),
+      "partial split remaining balance",
+    );
+    if (await markReceivedPanel.getByText("$99.99", { exact: true }).count()) {
+      throw new Error("Fully paid split invoice must not appear as outstanding");
+    }
     await screenshot("10-mark-received");
     await page.getByRole("button", { name: /^mark .* received$/ }).first().click();
     await page.waitForTimeout(400);

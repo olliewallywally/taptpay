@@ -3,10 +3,8 @@
    items. Pure functions: no React, no network, no mock rows. The prototype's
    hard-coded figures are placeholders; every number here comes from the data.
 
-   Two honest departures from the prototype: stock items have no category
-   column, so the second filter row selects a product instead of a category;
-   and the Fees report drops the prototype's "vs eftpos" comparison, which has
-   no data behind it. */
+   One honest departure from the prototype: stock items have no category
+   column, so the second filter row selects a product instead of a category. */
 import {
   dollarsToCents,
   fmtNZD,
@@ -20,6 +18,7 @@ import {
 
 export interface RetailTx {
   id: number;
+  taptStoneId?: number | null;
   itemName?: string;
   price?: string;
   status: string;
@@ -35,6 +34,13 @@ export interface RetailStockItem {
   id: number;
   name: string;
   cost: string | number;
+}
+
+/** The owner boards endpoint supplies the live side of the transaction join. */
+export interface RetailBoard {
+  id: number;
+  name: string;
+  stoneNumber: number;
 }
 
 export const PERIOD_CHIPS = ["Today", "This week", "This month", "This year"] as const;
@@ -55,7 +61,7 @@ export type RetailReportId =
   | "methods"
   | "avgsale"
   | "gst"
-  | "fees"
+  | "boards"
   | "splits"
   | "failed"
   | "days"
@@ -114,12 +120,12 @@ export const RETAIL_DESKTOP_REPORTS: RetailReportMeta[] = [
     extra: ["GST collected", "Gross sales"],
   },
   {
-    id: "fees",
-    title: "TaptPay Fees",
-    desc: "10¢ flat per payment",
-    icon: "M12 3v18 M17 8a5 5 0 0 0-10 0c0 5 10 3 10 8a5 5 0 0 1-10 0",
-    extraLabel: "GROUP BY",
-    extra: ["Monthly", "Weekly"],
+    id: "boards",
+    title: "Revenue by Board",
+    desc: "revenue, count & average by board",
+    icon: "M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z M14 14h2v2h-2z M18 14h2v6h-6v-2h4z",
+    extraLabel: "RANK BY",
+    extra: ["Revenue", "Payment count", "Average sale"],
   },
   {
     id: "splits",
@@ -192,6 +198,7 @@ export interface ReportResult {
 export interface ReportContext {
   transactions: RetailTx[];
   stockItems: RetailStockItem[];
+  boards: RetailBoard[];
   period: PeriodChip;
   item: string;
   extra: string;
@@ -395,14 +402,15 @@ export function buildRetailReport(id: RetailReportId, ctx: ReportContext): Repor
         .sort((a, b) => b.n - a.n);
       if (list.length === 0) return { ...base, chart: "donut", ...EMPTY, detailTitle: "BY METHOD" };
       const total = list.reduce((s, e) => s + e.n, 0);
+      const revenue = list.reduce((sum, entry) => sum + entry.revenue, 0);
       return {
         ...base,
         chart: "donut",
         detailTitle: "BY METHOD",
         heroV: String(total),
         heroL: total === 1 ? "payment this period" : "payments this period",
-        h2V: fmtNZD(total * 10),
-        h2L: "total fees · 10¢ each",
+        h2V: fmtNZD(revenue),
+        h2L: "revenue this period",
         segs: toSegs(list.slice(0, 4).map((e) => ({ label: e.label, value: e.n }))),
         bars: [],
         rows: list.map((e) => ({
@@ -499,47 +507,77 @@ export function buildRetailReport(id: RetailReportId, ctx: ReportContext): Repor
       };
     }
 
-    /* ── taptpay fees ── */
-    case "fees": {
-      if (paid.length === 0) return { ...base, ...EMPTY, detailTitle: "BY PERIOD" };
-      const weekly = ctx.extra === "Weekly";
-      const keyOf = (d: Date) => {
-        if (!weekly) return `${d.getFullYear()}-${String(d.getMonth()).padStart(2, "0")}`;
-        const monday = new Date(d);
-        monday.setDate(d.getDate() - mondayIndex(d));
-        monday.setHours(0, 0, 0, 0);
-        return monday.toISOString().slice(0, 10);
-      };
-      const labelOf = (d: Date) =>
-        weekly ? `week of ${d.getDate()} ${MONTHS[d.getMonth()]}` : `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+    /* ── revenue by board ── */
+    case "boards": {
+      if (paid.length === 0) return { ...base, ...EMPTY, detailTitle: "BY BOARD" };
 
-      const buckets = new Map<string, { label: string; short: string; n: number }>();
-      for (const t of paid) {
-        const d = when(t);
-        const k = keyOf(d);
-        const e = buckets.get(k) ?? {
-          label: labelOf(d),
-          short: weekly ? String(d.getDate()) : MONTHS[d.getMonth()][0],
-          n: 0,
+      /* Board ID, rather than name or board number, is the durable join key. A
+         rename therefore updates the label without moving historical revenue.
+         The owner boards endpoint exposes active rows; null or unmatched IDs
+         (including archived boards no longer returned by that endpoint) remain
+         one explicit, honest Unassigned bucket. */
+      const boardsById = new Map(ctx.boards.map((board) => [board.id, board]));
+      type BoardBucket = {
+        board: RetailBoard | null;
+        name: string;
+        count: number;
+        revenue: number;
+      };
+      const buckets = new Map<string, BoardBucket>();
+      for (const transaction of paid) {
+        const board =
+          typeof transaction.taptStoneId === "number"
+            ? boardsById.get(transaction.taptStoneId) ?? null
+            : null;
+        const key = board ? `board:${board.id}` : "unassigned";
+        const bucket = buckets.get(key) ?? {
+          board,
+          name: board?.name.trim() || (board ? `Board ${board.stoneNumber}` : "Unassigned"),
+          count: 0,
+          revenue: 0,
         };
-        e.n += 1;
-        buckets.set(k, e);
+        bucket.count += 1;
+        bucket.revenue += cents(transaction);
+        buckets.set(key, bucket);
       }
-      const list = [...buckets.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([, e]) => e);
+
+      const average = (bucket: BoardBucket) => Math.round(bucket.revenue / bucket.count);
+      const metric = (bucket: BoardBucket) => {
+        if (ctx.extra === "Payment count") return bucket.count;
+        if (ctx.extra === "Average sale") return average(bucket);
+        return bucket.revenue;
+      };
+      const list = [...buckets.values()].sort((a, b) => {
+        const ranked = metric(b) - metric(a);
+        if (ranked !== 0) return ranked;
+        if (a.board == null && b.board != null) return 1;
+        if (a.board != null && b.board == null) return -1;
+        return a.name.localeCompare(b.name) || (a.board?.id ?? 0) - (b.board?.id ?? 0);
+      });
+      const totalRevenue = paid.reduce((sum, transaction) => sum + cents(transaction), 0);
+      const totalAverage = Math.round(totalRevenue / paid.length);
+
       return {
         ...base,
-        detailTitle: weekly ? "BY WEEK" : "BY MONTH",
-        heroV: fmtNZD(paid.length * 10),
-        heroL: "fees this period · 10¢ each",
+        detailTitle: "BY BOARD",
+        heroV: fmtNZD(totalRevenue),
+        heroL: "revenue in this period",
         h2V: String(paid.length),
-        h2L: paid.length === 1 ? "payment" : "payments",
+        h2L: `${paid.length === 1 ? "payment" : "payments"} · ${fmtNZD(totalAverage)} average`,
         segs: [],
-        bars: toBars(list.slice(-6).map((e) => ({ v: e.n, label: e.short }))),
-        rows: [...list].reverse().map((e) => ({
-          name: e.label,
-          sub: `${e.n} ${e.n === 1 ? "payment" : "payments"}`,
-          val: fmtNZD(e.n * 10),
-          sub2: "10¢ each",
+        bars: toBars(
+          list.slice(0, 6).map((bucket) => ({
+            v: metric(bucket),
+            label: bucket.board ? `B${bucket.board.stoneNumber}` : "U",
+          })),
+        ),
+        rows: list.map((bucket) => ({
+          name: bucket.name,
+          sub: bucket.board
+            ? `board ${bucket.board.stoneNumber}`
+            : "historical board assignment unknown",
+          val: fmtNZD(bucket.revenue),
+          sub2: `${bucket.count} ${bucket.count === 1 ? "payment" : "payments"} · ${fmtNZD(average(bucket))} average`,
         })),
       };
     }

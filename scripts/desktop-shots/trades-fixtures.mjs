@@ -378,6 +378,7 @@ export async function installTradesMocks(page) {
   await page.route("**/api/trades/quotes", (route) => json(route, QUOTES));
   await page.route(`**/api/merchants/${MERCHANT_ID}/**`, (route) => json(route, []));
   await page.route(`**/api/merchants/${MERCHANT_ID}`, (route) => json(route, MERCHANT));
+  await page.route(`**/api/merchants/${MERCHANT_ID}/profile`, (route) => json(route, MERCHANT));
 }
 
 export async function assertVisible(locator, description) {
