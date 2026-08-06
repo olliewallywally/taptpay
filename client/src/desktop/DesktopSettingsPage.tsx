@@ -458,10 +458,6 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
                           aria-label="gst number"
                         />
                       </label>
-                      <div className="ds-field ds-field-static">
-                        <span className="ds-field-label">PAYOUT ACCOUNT</span>
-                        <span className="ds-field-value">{merchant?.bankAccountNumber || "not set"}</span>
-                      </div>
                       <label className="ds-field">
                         <span className="ds-field-label">RECEIPT EMAIL</span>
                         <input
@@ -483,7 +479,6 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
                       >
                         {saveDetails.isPending ? "Saving…" : "Save changes"}
                       </button>
-                      <span className="ds-note">payout account is changed by support, never in the app</span>
                     </div>
                   </div>
                 )}
@@ -772,8 +767,6 @@ const DS_CSS = `
 .ds-field-label { font-weight:700; font-size:10px; letter-spacing:0.14em; color:rgba(4,16,58,0.6); }
 .ds-field input { border:none; outline:none; background:transparent; padding:0; font-family:'Outfit',sans-serif; font-weight:600; font-size:13.5px; color:${OPEN_INK}; }
 .ds-field input::placeholder { color:rgba(4,16,58,0.4); }
-.ds-field-value { font-weight:600; font-size:13.5px; color:${OPEN_INK}; }
-.ds-field-static { background:rgba(255,255,255,0.12); }
 
 .ds-actions { margin-top:14px; display:flex; align-items:center; gap:14px; }
 .ds-primary { height:42px; padding:0 22px; border-radius:9999px; background:${OPEN_INK}; color:#fff; font-weight:700; font-size:13px; cursor:pointer; transition:opacity .15s ease; }
