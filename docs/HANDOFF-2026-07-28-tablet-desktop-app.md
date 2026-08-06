@@ -1,7 +1,9 @@
 # Handoff — Tablet/Desktop merchant app (branch `feat/tablet-desktop-app`)
 
-Date: 2026-07-28
-Status: **in progress** — retail complete (5/5), property 4/5 (only 2d analytics left).
+Date: 2026-07-28, updated 2026-08-06
+Status: **all 15 screens built** — retail 5/5, property 5/5, trades 5/5. What is
+left is P5 (tutorial adaptation, plan §7a) and P6 (polish), plus the deviation
+list in §6, which Oliver asked to see as one list now the screens are done.
 Read `docs/PLAN-2026-07-24-tablet-desktop-app.md` first: it is still the authoritative
 spec for scope, device gating, routes and per-screen requirements. This file records
 what has actually been built, the conventions to follow, the traps that have already
@@ -22,17 +24,20 @@ cost time, and what to do next.
 | 2a property home | `/property` | `desktop/pages/property-home.tsx` | `dc8f2b9` |
 | 2b property clients | `/property/tenants` | `desktop/pages/property-clients.tsx` | `10405a0` |
 | 2c property terminal | `/property/terminal` | `desktop/pages/property-terminal.tsx` | `3e3b6c6` |
+| 2d property analytics | `/property/analytics` | `desktop/pages/property-analytics.tsx` + `desktop/data/property-reports.ts` | `912c1e7` |
 | 2e property settings | `/settings` | `desktop/pages/property-settings.tsx` (wrapper) | `79b5dcc` |
+| 3a trades home | `/trades` | `desktop/pages/trades-home.tsx` + `desktop/data/trades-data.ts` | `934442b` |
+| 3b trades clients | `/trades/clients` | `desktop/pages/trades-clients.tsx` | `2f0101a` |
+| 3c trades terminal | `/trades/terminal` | `desktop/pages/trades-terminal.tsx` | `ba37025` |
+| 3d trades analytics | `/trades/analytics` | `desktop/pages/trades-analytics.tsx` + `desktop/data/trades-reports.ts` | `404fbaa` |
+| 3e trades settings | `/settings` | `desktop/pages/trades-settings.tsx` (wrapper) | `812e21d` |
 
-Still to build: **2d** property analytics, then all of P3 trades, P5 tutorial
-adaptation, P6 polish.
+Still to do: **P5** tutorial adaptation (plan §7a) and **P6** polish. No screen is
+a stub any more — every `client/src/desktop/pages/*.tsx` renders a real screen.
 
 Deliberately left out of finished screens, each worth its own pass rather than a
-cramped port: co-tenants on the add-tenant form (2b), and attach-invoice upload
-plus the split toggle on a bill (2c).
-
-`client/src/desktop/pages/*.tsx` not listed above are still P0 stubs that render an
-empty `DesktopPageScaffold` — that is what an unbuilt screen looks like.
+cramped port: co-tenants on the add-tenant form (2b), attach-invoice upload plus
+the split toggle on a bill (2c), and the split toggle on a job invoice (3c).
 
 ---
 
@@ -86,7 +91,14 @@ swap the route and fixtures:
 
 ```bash
 node scripts/desktop-shots/shot-property-home.mjs   # → /tmp/taptpay-desktop-2a/*.png
+node scripts/desktop-shots/shot-trades-terminal.mjs # → /tmp/taptpay-desktop-3c/*.png
 ```
+
+The five trades scripts share `scripts/desktop-shots/trades-fixtures.mjs` — clients,
+quotes, invoices, the API mocks, a frozen clock, and `newTradesPage`/`runTradesShots`.
+Use it for further trades work rather than re-inventing fixtures; a screen needing an
+extra row registers its own `page.route` afterwards, because Playwright matches the
+most recently registered route first.
 
 Those scripts encode the things that are easy to get wrong:
 
@@ -123,6 +135,14 @@ The dev server must already be running on **:5000, single instance only** (memor
   and per-board `stone.paymentUrl`. Do not hand-build `${origin}/pay/:id` (that is
   only payment-stack's fallback).
 
+**Trades invoices are not free-form.** `createJobInvoiceSchema` refuses a `deposit`
+that is not linked to a quote, and a `balance` is issued by the server from an
+already-paid deposit (`POST /api/trades/invoices/:id/send-balance`, amount computed
+from the quote total) rather than composed on the client. 3c's three type chips are
+therefore three different operations, two of them conditionally disabled. Quote GST
+comes from `@shared/trades-gst`'s `computeQuoteTotals` with the merchant's
+`gstRegistered`/`tradeGstMode`; the fee is `tradesFeeCents` in `lib/trades-money.ts`.
+
 **Property data must go through `client/src/lib/property-data.ts`** hooks
 (`usePropertyTenants` / `usePropertyInvoices` / `usePropertySchedules`). That file
 says MUST, and it is how mutations invalidate every consumer at once.
@@ -144,9 +164,16 @@ placeholder. If a figure has no data behind it, leave it out and say so — see 
 
 - `desktop/DesktopSettingsPage.tsx` — the **shared** settings screen. 2e and 3e are
   two-line wrappers: `<DesktopSettingsPage {...props} vertical="property" />`.
-- `desktop/data/retail-reports.ts` — pure report engine (10 retail reports). The
-  trades/property equivalents should follow the same shape: a metadata array + one
-  `build*Report(id, ctx)` switch returning `{heroV, h2V, chart, segs|bars, rows}`.
+- `desktop/data/retail-reports.ts` — pure report engine (10 retail reports).
+  `property-reports.ts` (4) and `trades-reports.ts` (4) follow the same shape: a
+  metadata array + one `build*Report(id, ctx)` switch returning
+  `{heroV, h2V, chart, segs|bars, rows}`. Property and trades expose only the
+  reports that have a real PDF implementation — design tiles with no backing data
+  were dropped, not mocked.
+- `desktop/data/trades-data.ts` — the trades cache and domain layer (query hooks on
+  the mobile keys, `scopeTradesData`, `buildTradesClientRows`, `buildTradesHealth`,
+  period/bucket helpers). Every trades screen reads through it, which is why a
+  client's status is identical on home, directory and terminal.
 - `desktop/data/desktop-prefs.ts` — per-merchant localStorage preferences.
 - `hooks/use-push-notifications.ts` — web + native-iOS push subscribe/unsubscribe.
 - `lib/report-utils.ts` — money, NZ GST, timeframe windows. Use these, don't re-derive.
@@ -184,25 +211,41 @@ file `tablet-desktop-open-deviations.md`; the current contents:
 - Push logic is duplicated: mobile `settings.tsx` still has its own inline copy.
 - `ReportModal` portals to `document.body`, so Export covers the browser window
   rather than rendering inside the 13″ frame.
-- Home-screen components not extracted (above).
+- Home-screen components not extracted (above) — trades home (3a) made it the third
+  copy, so this is now accepted duplication unless Oliver wants the refactor.
+- 3b status dots are coloured by state; the prototype paints every dot the same
+  accent blue, which carries no information on real rows. 2b already did this.
+- 3b hero count follows the site scope; 2b's equivalent count does not follow its
+  property scope. One of the two should change.
+- 3b rows keep the design's 400px column and its combined "name | site" label, so a
+  long client-plus-address string ellipsises (full text on hover).
+- 3c deposit/balance chips are disabled with a reason when the selected client has
+  no quote / no paid deposit, because the server cannot accept them (see §4).
+- 3c compose block raised from the design's `top:512` to `476`: at 512 its send
+  button falls 30px past the 813px canvas. The design PNG shows the same clipped
+  button, so this is a fix to the design, not a port error.
+- 3c "jobs" list shows one row per client (worst-case live invoice), which is what
+  the prototype's own list does, rather than one row per invoice.
+- 3d exposes 4 reports, not the design blurb's 10 — those are the four that have a
+  real trades PDF. Same call as 2d.
+- 3d "outstanding invoices" is a live figure (every open invoice), not a
+  period-windowed one; the period segments only reframe revenue and the chart.
+- 3d peak dot inherits 4d's floating-dot geometry (above).
 
 ---
 
 ## 7. Next actions, in order
 
-1. **2d property analytics** — design lines 2217–2493, ref
-   `pages/property/property-analytics.tsx` + `components/reports/PropertyReportsButton.tsx`.
-   Mirror 4d's structure exactly: `retail-analytics.tsx` is the reference for the
-   curve, the draggable sheet (including the scale divisor) and the tiles→filters→
-   report flow, and `desktop/data/retail-reports.ts` is the shape a
-   `property-reports.ts` should copy. Property reports must map onto reports that
-   actually exist; omit any design tile with no backing rather than mocking it, and
-   list the omissions in the commit.
-2. Then P3 trades (3a–3e, same pattern — trades state atoms are `tr*`; the trades
-   data layer mirrors property's), P5 tutorial adaptation (plan §7a), P6 polish.
-
-When trades home (3a) lands, decide the shared-home-components extraction: it will
-be the third copy of the chart/health-strip/list/actions furniture.
+1. **Raise §6 with Oliver.** All fifteen screens are built, which is the point he
+   asked to be shown the whole deviation list so he can accept or overrule each.
+   Do that before P6 polish — several items are his call, not a cleanup.
+2. **P5 tutorial adaptation** (plan §7a). The registry already carries desktop
+   entries for the trades pages (`ta-*` on analytics, `trades-home-*` on home), so
+   the work is auditing each of the fifteen screens for anchors, adding
+   `desktopTarget`/`desktopBody` overrides where the desktop layout needs different
+   wording, and confirming the mobile tutorial is byte-identical afterwards.
+3. **P6 polish**, including the owed items listed in §6 (mobile push hook, the
+   `ReportModal` portal, and the home-component extraction if he wants it).
 
 ## 8. Repo hygiene
 
