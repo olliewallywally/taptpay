@@ -1,6 +1,6 @@
 import { merchants, merchantTutorialProgress, transactions, merchantSettlements, platformFees, refunds, splitPayments, taptStones, stockItems, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, tenantProfiles, activeSchedules, invoicesRentRequests, transactionEvents, clientProfiles, quotes, jobInvoices, jobSchedules, jobEvents, type Merchant, type MerchantTutorialProgress, type Transaction, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type MerchantSubscription, type SubscriptionBillingHistory } from "@shared/schema";
 import { getDb, isDatabaseConnected } from "./database";
-import { eq, ne, desc, and, inArray, gte, lte, or, ilike, sql } from "drizzle-orm";
+import { eq, ne, desc, and, inArray, gte, lte, or, ilike, sql, isNull } from "drizzle-orm";
 
 function isNeonEmptyResultError(error: unknown): boolean {
   return error instanceof TypeError && error.message === "Cannot read properties of null (reading 'map')";
@@ -34,7 +34,19 @@ export interface IStorage {
   
   // Transaction operations
   getTransaction(id: number): Promise<Transaction | undefined>;
-  getActiveTransactionByMerchant(merchantId: number, taptStoneId?: number): Promise<Transaction | undefined>;
+  /**
+   * Find the merchant's active transaction, optionally scoped to a board.
+   *
+   * `taptStoneId` is deliberately tri-state:
+   *   undefined → any board (merchant-side callers that mean "whatever is pending")
+   *   null      → **no-board sales only** — the public /pay/:merchantId link
+   *   number    → that board only
+   *
+   * The null case exists because filtering by merchant alone lets a customer on
+   * the merchant-level link be served, and pay, a sale rung up on a specific
+   * board. Do not collapse null back into undefined.
+   */
+  getActiveTransactionByMerchant(merchantId: number, taptStoneId?: number | null): Promise<Transaction | undefined>;
   getTransactionByNfcSession(nfcSessionId: string): Promise<Transaction | undefined>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   updateTransactionStatus(id: number, status: string, windcaveTransactionId?: string): Promise<Transaction | undefined>;
@@ -512,9 +524,16 @@ export class MemStorage implements IStorage {
     return this.transactions.get(id);
   }
 
-  async getActiveTransactionByMerchant(merchantId: number, taptStoneId?: number): Promise<Transaction | undefined> {
-    // Create cache key including stone ID if provided
-    const cacheKey = taptStoneId ? `${merchantId}-${taptStoneId}` : `${merchantId}`;
+  async getActiveTransactionByMerchant(merchantId: number, taptStoneId?: number | null): Promise<Transaction | undefined> {
+    // Tri-state — see the interface docstring. The three cases need three distinct
+    // cache keys: "any board" and "no board only" are different questions with
+    // different answers, so they must not share an entry.
+    const cacheKey =
+      taptStoneId === undefined
+        ? `${merchantId}`
+        : taptStoneId === null
+          ? `${merchantId}-noboard`
+          : `${merchantId}-${taptStoneId}`;
     
     // Check cache first for instant response
     if (this.activeTransactionCache.has(cacheKey)) {
@@ -531,7 +550,12 @@ export class MemStorage implements IStorage {
     for (let i = 0; i < transactionArray.length; i++) {
       const transaction = transactionArray[i];
       const matchesMerchant = transaction.merchantId === merchantId;
-      const matchesStone = taptStoneId === undefined || transaction.taptStoneId === taptStoneId;
+      const matchesStone =
+        taptStoneId === undefined
+          ? true
+          : taptStoneId === null
+            ? transaction.taptStoneId == null
+            : transaction.taptStoneId === taptStoneId;
       if (!matchesMerchant || !matchesStone) continue;
 
       if (transaction.status === "pending" || transaction.status === "processing") {
@@ -1971,16 +1995,27 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async getActiveTransactionByMerchant(merchantId: number, taptStoneId?: number): Promise<Transaction | undefined> {
+  async getActiveTransactionByMerchant(merchantId: number, taptStoneId?: number | null): Promise<Transaction | undefined> {
     if (!this.db) throw new Error('Database not available');
+
+    /* Tri-state board scoping — see the interface docstring. `null` means
+       "no-board sales only" and must produce IS NULL, not an absent filter:
+       filtering by merchant alone is what let the merchant-level pay link serve
+       a sale rung up on a specific board. */
+    const stoneCondition =
+      taptStoneId === undefined
+        ? null
+        : taptStoneId === null
+          ? isNull(transactions.taptStoneId)
+          : eq(transactions.taptStoneId, taptStoneId);
 
     // 1. Prefer pending/processing (in-flight) transactions
     const activeConditions = [
       eq(transactions.merchantId, merchantId),
       inArray(transactions.status, ['pending', 'processing']),
     ];
-    if (taptStoneId !== undefined) {
-      activeConditions.push(eq(transactions.taptStoneId, taptStoneId));
+    if (stoneCondition) {
+      activeConditions.push(stoneCondition);
     }
     const activeResult = await this.db
       .select()
@@ -1998,8 +2033,8 @@ export class DatabaseStorage implements IStorage {
       eq(transactions.status, 'completed'),
       gte(transactions.createdAt, cutoff),
     ];
-    if (taptStoneId !== undefined) {
-      completedConditions.push(eq(transactions.taptStoneId, taptStoneId));
+    if (stoneCondition) {
+      completedConditions.push(stoneCondition);
     }
     const completedResult = await this.db
       .select()

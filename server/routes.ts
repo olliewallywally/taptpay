@@ -1108,8 +1108,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         }
       }
       
-      const transaction = await storage.getActiveTransactionByMerchant(merchantId, stoneId);
-      
+      // No stoneId on a public pay link means the *no-board* link, not "any board":
+      // pass null so it scopes to stoneless sales. Filtering by merchant alone
+      // would serve this customer a sale rung up on a specific board.
+      const transaction = await storage.getActiveTransactionByMerchant(merchantId, stoneId ?? null);
+
       if (!transaction) {
         return res.json(null);
       }
@@ -1267,6 +1270,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           return res.status(409).json({ message: "Transaction is no longer pending" });
         }
       } else {
+        // Deliberately unscoped (undefined = any board): this is the authenticated
+        // merchant finalising whatever they have pending, not a customer following
+        // a link, so board scoping would break a board-attached sale.
         pendingTransaction = await storage.getActiveTransactionByMerchant(mid);
       }
 
@@ -5484,7 +5490,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   ) {
     if (isNaN(merchantId)) return next();
     try {
-      const transaction = await storage.getActiveTransactionByMerchant(merchantId, stoneId ?? undefined);
+      // stoneId is already null for the merchant-level link — pass it straight
+      // through so that link scopes to no-board sales. This path 302s the customer
+      // to the Windcave HPP, so a mis-scoped read here is a real payment against
+      // the wrong sale, with no intermediate page to catch it.
+      const transaction = await storage.getActiveTransactionByMerchant(merchantId, stoneId);
       if (!transaction || transaction.status !== "pending") return next();
 
       // Split-enabled transactions → send customer to split selection page first
