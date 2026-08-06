@@ -4,6 +4,8 @@ import { useNotifications } from "@/components/notification-system";
 import {
   TRADES_HOME_RANGES,
   buildTradesHomeModel,
+  scopeTradesData,
+  tradesPeriodWindow,
   useTradesHomeQueries,
   type TradesHealthId,
   type TradesClientRow,
@@ -128,6 +130,15 @@ export default function DesktopTradesHome(props: DesktopRoutePageProps) {
       }),
     [clients, invoices, quotes, tf, selBar, siteFilter, modelNow],
   );
+  const quoted = useMemo(() => {
+    const scoped = scopeTradesData(clients, invoices, quotes, siteFilter);
+    const { start, end } = tradesPeriodWindow(tf, modelNow);
+    const rows = scoped.quotes.filter((quote) => {
+      const created = quote.createdAt ? new Date(quote.createdAt).getTime() : NaN;
+      return Number.isFinite(created) && created >= start.getTime() && created < end.getTime();
+    });
+    return { count: rows.length, cents: rows.reduce((sum, quote) => sum + quote.totalCents, 0) };
+  }, [clients, invoices, quotes, siteFilter, tf, modelNow]);
   const { notifications } = useNotifications();
 
   const isLoading =
@@ -296,6 +307,7 @@ export default function DesktopTradesHome(props: DesktopRoutePageProps) {
                 )}
               </div>
               <span className="th-hero-sub">revenue collected</span>
+              <span className="th-hero-sub2">{isLoading ? "—" : fmtDollars(quoted.cents) + " quoted · " + quoted.count + " job" + (quoted.count === 1 ? "" : "s")}</span>
             </>
           )}
         </div>
@@ -581,7 +593,8 @@ const TH_CSS = `
 .th-hero-row { display:flex; align-items:flex-start; gap:16px; }
 .th-amount { font-family:'Outfit',sans-serif; font-weight:700; font-size:84px; line-height:0.92; letter-spacing:-0.015em; color:${ACCENT}; font-variant-numeric:tabular-nums; }
 .th-pct { margin-top:8px; padding:7px 14px; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); font-weight:700; font-size:13.5px; color:${ACCENT_SOFT}; white-space:nowrap; }
-.th-hero-sub { display:block; margin-top:8px; font-weight:300; font-size:16px; color:${NAV_DIM}; }
+.th-hero-sub { display:block; margin-top:8px; font-weight:300; font-size:16px; color:; }
+.th-hero-sub2 { display:block; margin-top:4px; font-weight:300; font-size:13px; color:rgba(74,134,240,.78); }
 .th-error { display:flex; align-items:center; justify-content:space-between; gap:12px; height:78px; padding:0 18px; border-radius:14px; background:rgba(240,101,108,0.14); border:1px solid rgba(240,101,108,0.32); }
 .th-error span { color:#FFB3B8; font-size:13.5px; }
 .th-error button { background:${ACCENT}; color:${NAVY}; border-radius:10px; padding:8px 14px; font-size:12px; font-weight:700; cursor:pointer; }
