@@ -87,6 +87,16 @@ const STATUS_LABEL: Record<string, string> = {
   processing: "Processing",
 };
 
+/* Geometry of .ra-chart-svg. The svg is drawn with preserveAspectRatio="none",
+   so it stretches its 1076x240 viewBox onto these dimensions and is then pulled
+   up/left inside .ra-chart. These constants drive both the css below and the
+   peak-marker placement, so the marker can be mapped through the same stretch
+   instead of being positioned in raw viewBox units. */
+const SVG_LEFT = -51;
+const SVG_TOP = -131;
+const SVG_W = 1189;
+const SVG_H = 301;
+
 /** Catmull-Rom → cubic bezier: the prototype's `_curve`, same geometry. */
 function curve(vals: number[]) {
   const W = 1076;
@@ -192,16 +202,19 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
     buckets.forEach((b, i) => {
       if (b.valueCents > buckets[peak].valueCents) peak = i;
     });
-    const { d, P, W } = curve(buckets.map((b) => b.valueCents / max));
+    const { d, P, W, H } = curve(buckets.map((b) => b.valueCents / max));
     const peakPoint = P[Math.min(peak, P.length - 1)];
+    /* Map the peak through the svg's own stretch + offset so the marker lands on
+       the line. The prototype positions it in raw viewBox units against a
+       stretched canvas, which leaves it floating in the fill. */
     return {
       total,
       growth,
       count,
       lineD: d,
       areaD: `${d} L${W},240 L0,240 Z`,
-      dotLeft: `${((peakPoint[0] / W) * 100).toFixed(2)}%`,
-      dotTop: `${peakPoint[1].toFixed(0)}px`,
+      dotLeft: `${(SVG_LEFT + (peakPoint[0] / W) * SVG_W).toFixed(1)}px`,
+      dotTop: `${(SVG_TOP + (peakPoint[1] / H) * SVG_H).toFixed(1)}px`,
       peakValue: buckets[peak]?.valueCents ?? 0,
     };
   }, [transactions, tf]);
@@ -838,7 +851,7 @@ const RA_CSS = `
 .ra-seg { padding:10px 0; width:92px; border-radius:9999px; font-size:13.5px; cursor:pointer; transition:background .18s ease, color .18s ease; }
 
 .ra-chart { position:relative; margin-top:44px; height:266px; }
-.ra-chart-svg { display:block; position:absolute; left:-51px; top:-131px; width:1189px; height:301px; }
+.ra-chart-svg { display:block; position:absolute; left:${SVG_LEFT}px; top:${SVG_TOP}px; width:${SVG_W}px; height:${SVG_H}px; }
 .ra-dot { position:absolute; width:14px; height:14px; border-radius:50%; background:#fff; box-shadow:0 0 0 4px rgba(255,255,255,0.18); transform:translate(-50%,-50%); transition:left .3s ease, top .3s ease; }
 .ra-chip { position:absolute; top:170px; transform:translateX(-50%); padding:7px 14px; border-radius:10px; background:${ACTIVE}; font-weight:700; font-size:13.5px; color:${NAVY}; white-space:nowrap; transition:left .3s ease; }
 

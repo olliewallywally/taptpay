@@ -95,6 +95,15 @@ const isPaidInvoice = (invoice: TradesInvoice) =>
 const clientName = (client: TradesClient | undefined) =>
   [client?.firstName, client?.lastName].filter(Boolean).join(" ").trim();
 
+/* Geometry of .ta-chart-svg. preserveAspectRatio="none" stretches the 1076x240
+   viewBox onto these dimensions, then the svg is pulled up/left inside .ta-chart.
+   These drive both the css and the peak-marker placement so the marker can be
+   mapped through the same stretch rather than pinned at a fixed height. */
+const SVG_LEFT = -86;
+const SVG_TOP = -47;
+const SVG_W = 1214;
+const SVG_H = 221;
+
 /** Catmull-Rom → cubic bezier: the prototype's curve, same geometry. */
 function curve(vals: number[]) {
   const W = 1076;
@@ -184,8 +193,10 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
     buckets.forEach((bucket, index) => {
       if (bucket.valueCents > buckets[peak].valueCents) peak = index;
     });
-    const { d, P, W } = curve(buckets.map((bucket) => bucket.valueCents / max));
+    const { d, P, W, H } = curve(buckets.map((bucket) => bucket.valueCents / max));
     const peakPoint = P[Math.min(peak, P.length - 1)];
+    /* Map the peak through the svg's own stretch + offset so the marker lands on
+       the line at whatever height the peak actually is. */
     return {
       total,
       growth,
@@ -193,8 +204,8 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
       buckets,
       lineD: d,
       areaD: d + " L" + W + ",240 L0,240 Z",
-      dotLeft: (-86 + (peakPoint[0] / W) * 1214).toFixed(1) + "px",
-      floatingDotLeft: (52 - 86 + (peakPoint[0] / W) * 1214).toFixed(1) + "px",
+      dotLeft: (SVG_LEFT + (peakPoint[0] / W) * SVG_W).toFixed(1) + "px",
+      dotTop: (SVG_TOP + (peakPoint[1] / H) * SVG_H).toFixed(1) + "px",
       peakValue: buckets[peak]?.valueCents ?? 0,
     };
   }, [scoped.invoices, tf]);
@@ -438,17 +449,17 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
                 <path d={overview.lineD} fill="none" stroke="#8CBBFF" strokeWidth="3" strokeLinecap="round" />
               </svg>
               {overview.peakValue > 0 && (
-                <div className="ta-chip" style={{ left: overview.dotLeft }}>
-                  {moneyWhole(overview.peakValue)}
-                </div>
+                <>
+                  <div className="ta-chip" style={{ left: overview.dotLeft }}>
+                    {moneyWhole(overview.peakValue)}
+                  </div>
+                  <div
+                    className="ta-dot"
+                    style={{ left: overview.dotLeft, top: overview.dotTop }}
+                  />
+                </>
               )}
             </div>
-            {overview.peakValue > 0 && (
-              <div
-                className="ta-dot"
-                style={{ left: overview.floatingDotLeft }}
-              />
-            )}
           </>
         )}
 
@@ -745,8 +756,8 @@ const TA_CSS = `
 .ta-seg { padding:8px 0; width:70px; border-radius:9999px; font-size:12px; cursor:pointer; transition:background .18s ease, color .18s ease; }
 
 .ta-chart { position:relative; margin-top:44px; height:266px; }
-.ta-chart-svg { display:block; position:absolute; left:-86px; top:-47px; width:1214px; height:221px; }
-.ta-dot { position:absolute; top:185px; width:14px; height:14px; border-radius:50%; background:#FFFFFF; box-shadow:0 0 0 4px rgba(255,255,255,0.18); transform:translate(-50%,-50%); transition:left .3s ease; }
+.ta-chart-svg { display:block; position:absolute; left:${SVG_LEFT}px; top:${SVG_TOP}px; width:${SVG_W}px; height:${SVG_H}px; }
+.ta-dot { position:absolute; width:14px; height:14px; border-radius:50%; background:#FFFFFF; box-shadow:0 0 0 4px rgba(255,255,255,0.18); transform:translate(-50%,-50%); transition:left .3s ease, top .3s ease; }
 .ta-chip { position:absolute; top:174px; transform:translateX(-50%); padding:7px 14px; border-radius:10px; background:#66A9FF; font-weight:700; font-size:13.5px; color:#000F3F; white-space:nowrap; transition:left .3s ease; }
 
 /* ── generated report ── */
