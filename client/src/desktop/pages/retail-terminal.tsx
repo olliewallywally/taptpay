@@ -622,7 +622,30 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
                       }}
                       onClick={() => pressKey(k)}
                     >
-                      {k}
+                      {/* The two non-digit keys are drawn as glyphs rather than
+                          characters: a "." sits on the text baseline and reads as
+                          bottom-aligned in an 80px circle, and "<" is a less-than
+                          sign, not a backspace. Both are optically centred. */}
+                      {k === "." ? (
+                        <span className="rt-kp-dot" />
+                      ) : k === "<" ? (
+                        <svg width="34" height="24" viewBox="0 0 34 24" fill="none" aria-hidden="true">
+                          <path
+                            d="M11 3h18a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H11L2 12l9-9Z"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinejoin="round"
+                          />
+                          <path
+                            d="m16 9 8 6m0-6-8 6"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      ) : (
+                        k
+                      )}
                     </button>
                   );
                 })}
@@ -834,6 +857,7 @@ const RT_CSS = `
 .rt-kp-grid { margin:36px auto 0; display:grid; grid-template-columns:repeat(3,80px); gap:36px 56px; justify-content:center; }
 .rt-kp-key { width:80px; height:80px; border-radius:50%; font-size:34px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; font-family:'Outfit',sans-serif; box-sizing:border-box; transition:opacity .12s ease; }
 .rt-kp-key:hover { opacity:0.88; }
+.rt-kp-dot { width:9px; height:9px; border-radius:50%; background:currentColor; }
 
 /* stock tiles */
 .rt-stock { margin-top:40px; }
