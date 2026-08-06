@@ -433,7 +433,10 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
                 <span className="ta-hero-out">
                   {invoicesQuery.isLoading ? "—" : money(overview.outstanding)}
                 </span>
-                <span className="ta-hero-sub ta-hero-sub-dim">outstanding invoices</span>
+                {/* Every open invoice, not the selected period's — money you are
+                    owed doesn't stop being owed because the user picked "week".
+                    Labelled so the one figure that ignores the period says so. */}
+                <span className="ta-hero-sub ta-hero-sub-dim">outstanding invoices · all time</span>
               </div>
             </div>
 
