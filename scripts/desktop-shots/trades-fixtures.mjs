@@ -376,6 +376,7 @@ export async function installTradesMocks(page) {
   await page.route("**/api/trades/clients", (route) => json(route, CLIENTS));
   await page.route("**/api/trades/invoices", (route) => json(route, INVOICES));
   await page.route("**/api/trades/quotes", (route) => json(route, QUOTES));
+  await page.route("**/api/trades/schedules", (route) => json(route, []));
   await page.route(`**/api/merchants/${MERCHANT_ID}/**`, (route) => json(route, []));
   await page.route(`**/api/merchants/${MERCHANT_ID}`, (route) => json(route, MERCHANT));
   await page.route(`**/api/merchants/${MERCHANT_ID}/profile`, (route) => json(route, MERCHANT));

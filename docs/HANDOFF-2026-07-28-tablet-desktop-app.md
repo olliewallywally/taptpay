@@ -1,17 +1,18 @@
 # Handoff — Tablet/Desktop merchant app (branch `feat/tablet-desktop-app`)
 
-Date: 2026-07-28, updated 2026-08-06
-Status: **all 15 screens built** — retail 5/5, property 5/5, trades 5/5. The §6
-deviation list has now been **raised with Oliver and ruled on** — see §6 for what
-he decided and what shipped. What is left is the accepted-change queue in §9,
-then P5 (tutorial adaptation, plan §7a) and P6 (polish).
+Date: 2026-07-28, updated 2026-08-07
+Status: **implementation and headless acceptance complete** — all 15 screens, the
+§9 accepted-change queue, P5 tutorial adaptation, the Trades refinements, and P6
+browser/automated QA are committed or ready in the final QA commit. See
+`docs/VERIFY-2026-08-07-tablet-desktop-final-qa.md` for the recorded checks and the
+two remaining external manual gates (real-device push and a staging Windcave flow).
 
 > **If you are picking this up cold and about to work on the terminal's "no
 > payment board" option, read `docs/PLAN-2026-08-06-payment-links-no-board.md`
-> first.** The token direction is approved and implementation has not started,
-> but the plan was independently reviewed and corrected on 2026-08-06. Its Phase
-> 0 is mandatory: production board selection, SSE isolation, response DTOs, and
-> storage scoping must be repaired before token work.
+> first.** The corrected token flow and Phase 0 safety foundation are implemented
+> and verified against an isolated PostgreSQL 16 database. Production rollout is
+> still gated by the migration/deployment sequence and the external smoke checks
+> recorded in the final QA report.
 Read `docs/PLAN-2026-07-24-tablet-desktop-app.md` first: it is still the authoritative
 spec for scope, device gating, routes and per-screen requirements. This file records
 what has actually been built, the conventions to follow, the traps that have already
@@ -40,8 +41,9 @@ cost time, and what to do next.
 | 3d trades analytics | `/trades/analytics` | `desktop/pages/trades-analytics.tsx` + `desktop/data/trades-reports.ts` | `404fbaa` |
 | 3e trades settings | `/settings` | `desktop/pages/trades-settings.tsx` (wrapper) | `812e21d` |
 
-Still to do: **P5** tutorial adaptation (plan §7a) and **P6** polish. No screen is
-a stub any more — every `client/src/desktop/pages/*.tsx` renders a real screen.
+P5 and P6 are complete in code and headless/browser verification. No screen is a
+stub — every `client/src/desktop/pages/*.tsx` renders a real screen. The remaining
+work is review, the external manual gates, and controlled deployment.
 
 Deliberately left out of finished screens, each worth its own pass rather than a
 cramped port: co-tenants on the add-tenant form (2b), attach-invoice upload plus
@@ -291,20 +293,22 @@ The historical list, for context on *why* each deviation existed:
 
 ## 7. Next actions, in order
 
-§6 has been raised and ruled on. The remaining queue is §9. After it: **P5
-tutorial adaptation** (plan §7a) — the registry already carries desktop entries
-for the trades pages (`ta-*` on analytics, `trades-home-*` on home), so the work
-is auditing each of the fifteen screens for anchors, adding
-`desktopTarget`/`desktopBody` overrides where the desktop layout needs different
-wording, and confirming the mobile tutorial is byte-identical afterwards. Then
-**P6 polish**.
+1. Review the draft PR and its final QA record.
+2. On a real iOS/Web Push device, verify permission, subscription, preference
+   filtering, failed-payment delivery, and the daily-payout summary.
+3. Follow the controlled payment deployment sequence: apply migrations through
+   the approved process, smoke a staging Windcave token/board/split flow, then
+   monitor token and SSE errors. Do not infer a board for historical null rows.
+4. Merge only after those external gates are signed off. The phone merchant app,
+   onboarding/auth flows, and public customer routes remain regression boundaries.
 
 ---
 
-## 9. Accepted-change queue (reviewed 2026-08-06)
+## 9. Accepted-change queue — implemented (reviewed 2026-08-06)
 
-Six normal-case fixes are committed (§6). The review found safety/correctness work
-that must precede the feature queue:
+All seven items below are implemented. The isolated-Postgres, automated, visual,
+mobile-regression, and read-only audit results are recorded in the final QA report.
+The descriptions are retained as historical implementation context:
 
 1. **Payment/addressing safety gate.** Complete Phase 0 of
    `docs/PLAN-2026-08-06-payment-links-no-board.md`: allowlisted merchant and
@@ -348,7 +352,8 @@ that must precede the feature queue:
    Needs: preferences column + migration `0012`, filtering inside
    `sendPushToMerchant`, a daily-payout job, and a failed-payment send site.
 
-Then P5, then P6.
+P5 and P6 followed the queue and are complete in the verified branch state. See
+the final QA report before deployment.
 
 ## 8. Repo hygiene
 

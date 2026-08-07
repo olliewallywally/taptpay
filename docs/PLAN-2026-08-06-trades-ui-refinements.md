@@ -2,9 +2,11 @@
 
 Date: 2026-08-06
 Branch: `feat/tablet-desktop-app`
-Status: **planned, NOT started — implementation-ready after Codex review**
+Status: **implemented and browser-verified on desktop and touch-tablet**
 Source: Oliver, 2026-08-06, plus his clarification of §2 the same day. His wording
 is quoted verbatim per item so intent is not lost in paraphrase.
+Verification: `docs/VERIFY-2026-08-07-tablet-desktop-final-qa.md`; implementation
+commits run from `41267fb` through `d611405`.
 
 > **Baseline requirement.** Build this only after the payment-safety, no-board link, and notification-preference work on this branch is committed and verified. The mobile Trades terminal is the canonical logic source for §0.
 

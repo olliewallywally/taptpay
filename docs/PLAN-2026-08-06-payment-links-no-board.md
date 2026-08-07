@@ -2,21 +2,24 @@
 
 Date: 2026-08-06
 Branch: `feat/tablet-desktop-app`
-Status: **reviewed and corrected; implementation not started**
+Status: **implemented and verified in code; controlled production rollout pending**
 Supersedes: the earlier version of this file saved in commit `52012f1`
+Verification: `docs/VERIFY-2026-08-07-tablet-desktop-final-qa.md` records the
+isolated-Postgres, audit, automated, browser, and mobile-regression results.
 
 This is the implementation plan for Oliver's approved retail-terminal change:
 
 > A merchant can select an existing payment board, create another board, or choose
 > no board and receive a new payment link for that individual sale.
 
-The token direction is sound, but the previous plan was not safe to implement as
-written. It discarded the token before checkout, allowed the client to choose a
-future token, and would have exposed that credential through current REST/SSE row
-spreads. It also treated commit `2f8a7bd` as a complete cross-board fix when the
-SSE path and the production database insert path are still wrong.
+The review recorded below found that the previous plan was not safe to implement:
+it discarded the token before checkout, let the client choose a future token, and
+would have exposed credentials through REST/SSE row spreads. The implementation
+on this branch closes those findings, including the production storage and SSE
+paths that commit `2f8a7bd` did not cover.
 
-Do not begin token work until Phase 0 is green.
+Phase 0 is green in isolated PostgreSQL verification. Production remains subject
+to the controlled migration, staging smoke, monitoring, and rollback sequence.
 
 ---
 
