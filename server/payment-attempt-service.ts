@@ -83,7 +83,6 @@ export interface FinalizePaymentAttemptRecordInput {
 export interface FinalizedPaymentAttemptEffects {
   transaction: Transaction;
   splitPayment: SplitPayment | null;
-  platformFee: PlatformFee | null;
   counterIncremented: boolean;
 }
 

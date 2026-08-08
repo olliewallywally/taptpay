@@ -721,7 +721,6 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
                     <span className="rt-knob" style={{ transform: splitOn ? "translateX(19px)" : "translateX(0)" }} />
                   </button>
                 </div>
-                <span className="rt-fee">TaptPay fee: 10¢ per transaction</span>
                 <button
                   type="button"
                   className="rt-send-btn"

@@ -34,9 +34,12 @@ function TermsOfService() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-2">4. Fees</h2>
+            <h2 className="text-lg font-semibold mb-2">4. Subscription and fees</h2>
             <p className="text-muted-foreground">
-              Transaction fees apply to all payments processed through TaptPay. The specific fee structure, including per-transaction rates and any applicable monthly charges, is outlined in your individual merchant agreement. TaptPay reserves the right to modify fees with reasonable notice. Any outstanding fees will be deducted from your settlement amounts or charged to your nominated payment method.
+              TaptPay is provided on a monthly subscription. The plan you select at signup, and any plan you later change to, determines your monthly fee and the number of logins included on your account. Fees are billed monthly in advance to the payment method you nominate, starting from the date your subscription begins. TaptPay charges no per-transaction or percentage fee on payments you process; fees charged by your payment processor or acquiring bank are separate and governed by your agreement with them.
+            </p>
+            <p className="text-muted-foreground mt-3">
+              You may change plan at any time. An upgrade takes effect immediately; a downgrade takes effect at the end of your current billing period. You may cancel at any time, and your access continues until the end of the period you have already paid for; we do not refund part-periods. If a subscription payment fails we will retry it, notify you, and may suspend your account until payment succeeds. TaptPay may change subscription pricing with at least 30 days' notice, and any change takes effect from your next billing period.
             </p>
           </section>
 

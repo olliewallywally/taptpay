@@ -217,14 +217,10 @@ describe("PaymentAttemptService with MemStorage", () => {
         windcaveTransactionId: "processor-txn-approved",
         paymentMethod: "card",
       },
-      platformFee: {
-        transactionId: transaction.id,
-        feeAmount: "0.10",
-        status: "collected",
-      },
       counterIncremented: true,
     });
-    await expect(storage.getPlatformFeesByMerchant(1)).resolves.toHaveLength(1);
+    // No fee row is written: pricing is a monthly subscription, not per payment.
+    await expect(storage.getPlatformFeesByMerchant(1)).resolves.toHaveLength(0);
 
     const replay = await service.finalize({
       attemptId: claim.attempt.id,
@@ -235,10 +231,9 @@ describe("PaymentAttemptService with MemStorage", () => {
     });
     expect(replay).toMatchObject({
       kind: "reused",
-      platformFee: null,
       counterIncremented: false,
     });
-    await expect(storage.getPlatformFeesByMerchant(1)).resolves.toHaveLength(1);
+    await expect(storage.getPlatformFeesByMerchant(1)).resolves.toHaveLength(0);
     await expect(storage.getTransaction(transaction.id)).resolves.toMatchObject({
       windcaveTransactionId: "processor-txn-approved",
       paymentMethod: "card",
@@ -251,7 +246,7 @@ describe("PaymentAttemptService with MemStorage", () => {
   });
 
   test.each(["declined", "cancelled"] as const)(
-    "finalizes %s without a fabricated processor ID, fee, or counter",
+    "finalizes %s without a fabricated processor ID or counter",
     async (outcome) => {
       const transaction = await storage.createTransaction(transactionInput());
       const claim = await service.claim({
@@ -280,7 +275,6 @@ describe("PaymentAttemptService with MemStorage", () => {
           status: outcome === "cancelled" ? "cancelled" : "failed",
           windcaveTransactionId: null,
         },
-        platformFee: null,
         counterIncremented: false,
       });
       await expect(storage.getPlatformFeesByMerchant(1)).resolves.toHaveLength(0);
@@ -354,7 +348,6 @@ describe("PaymentAttemptService with MemStorage", () => {
       attempt: { state: "declined" },
       splitPayment: { splitIndex: 1, status: "pending" },
       transaction: { status: "pending", completedSplits: 0 },
-      platformFee: null,
       counterIncremented: false,
     });
 
@@ -459,6 +452,7 @@ describe("PaymentAttemptService with MemStorage", () => {
       status: "completed",
       completedSplits: 3,
     });
-    await expect(storage.getPlatformFeesByMerchant(1)).resolves.toHaveLength(3);
+    // Each share settles without writing a fee row — see the unsplit case above.
+    await expect(storage.getPlatformFeesByMerchant(1)).resolves.toHaveLength(0);
   });
 });

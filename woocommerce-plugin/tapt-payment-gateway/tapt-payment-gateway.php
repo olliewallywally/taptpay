@@ -2,8 +2,8 @@
 /**
  * Plugin Name: Tapt Payment Gateway
  * Plugin URI: https://tapt.co.nz
- * Description: Accept payments using Tapt's secure payment processing with NFC and QR code support. Perfect for businesses wanting modern payment solutions with low fixed fees.
- * Version: 1.0.0
+ * Description: Accept payments using Tapt's secure payment processing with NFC and QR code support, with no TaptPay per-transaction fee.
+ * Version: 1.1.0
  * Author: Tapt
  * Author URI: https://tapt.co.nz
  * License: GPL v2 or later
@@ -24,7 +24,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('TAPT_PAYMENT_GATEWAY_VERSION', '1.0.0');
+define('TAPT_PAYMENT_GATEWAY_VERSION', '1.1.0');
 define('TAPT_PAYMENT_GATEWAY_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('TAPT_PAYMENT_GATEWAY_PLUGIN_PATH', plugin_dir_path(__FILE__));
 
@@ -119,7 +119,7 @@ function tapt_payment_gateway_init() {
                     'title'       => __('Description', 'tapt-payment-gateway'),
                     'type'        => 'textarea',
                     'description' => __('Payment method description that the customer will see on your checkout.', 'tapt-payment-gateway'),
-                    'default'     => __('Pay securely using Tapt with NFC tap-to-pay or QR code scanning. Fixed $0.25 fee per transaction.', 'tapt-payment-gateway'),
+                    'default'     => __('Pay securely using Tapt with NFC tap-to-pay or QR code scanning.', 'tapt-payment-gateway'),
                     'desc_tip'    => true,
                 ),
                 'testmode' => array(
@@ -373,7 +373,7 @@ function tapt_payment_gateway_init() {
         public function admin_options() {
             echo '<div class="tapt-admin-header">';
             echo '<h3>' . __('Tapt Payment Gateway', 'tapt-payment-gateway') . '</h3>';
-            echo '<p>' . __('Modern payment processing with NFC tap-to-pay, QR codes, and transparent fixed-fee pricing.', 'tapt-payment-gateway') . '</p>';
+            echo '<p>' . __('Modern payment processing with NFC tap-to-pay, QR codes, and no TaptPay per-transaction fee.', 'tapt-payment-gateway') . '</p>';
             echo '</div>';
 
             // Show status indicators

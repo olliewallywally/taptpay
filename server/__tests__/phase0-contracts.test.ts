@@ -139,7 +139,7 @@ describe("Phase 0 request and response contracts", () => {
     expect(Object.keys(owner).sort()).toEqual([
       "address", "billingCardBrand", "billingCardExpiry", "billingCardLast4",
       "businessAddress", "businessDescription", "businessName", "businessType",
-      "contactEmail", "contactPhone", "createdAt", "currentProviderRate", "dailyGoal",
+      "contactEmail", "contactPhone", "createdAt", "dailyGoal",
       "director", "email", "emailVerified", "estimatedAnnualTurnover", "gstNumber",
       "gstRegistered", "id", "name", "nzbn", "onboardingCompleted", "paymentUrl",
       "phone", "qrCodeUrl", "rentReminderDelayDays", "rentReminderEnabled",
@@ -151,6 +151,8 @@ describe("Phase 0 request and response contracts", () => {
     for (const forbidden of [
       "passwordHash", "verificationToken", "resetToken", "windcaveApiKey",
       "bankAccountNumber", "bankName", "bankBranch", "accountHolderName", "ourRate",
+      // Retired with per-transaction pricing — these must not creep back in.
+      "currentProviderRate",
     ]) {
       expect(owner).not.toHaveProperty(forbidden);
       expect(admin).not.toHaveProperty(forbidden);
@@ -193,6 +195,8 @@ describe("Phase 0 request and response contracts", () => {
     }
     for (const forbidden of [
       "windcaveSessionId", "windcaveSessionState", "windcaveXId", "nfcSessionId", "deviceId",
+      // Fee fields left the owner projection with per-transaction pricing.
+      "platformFeeRate", "platformFeeAmount", "windcaveFeeRate", "windcaveFeeAmount",
     ]) {
       expect(ownerDto).not.toHaveProperty(forbidden);
     }
@@ -247,6 +251,7 @@ describe("Phase 0 SSE audience matrix", () => {
         const data = chunk.match(/^data: (.+)\n\n$/)?.[1];
         if (data) frames.push(JSON.parse(data));
       },
+      end: jest.fn(),
     };
   };
 
@@ -256,7 +261,7 @@ describe("Phase 0 SSE audience matrix", () => {
     const noBoardConn = connection();
     const boardThreeConn = connection();
     const boardFourConn = connection();
-    broker.subscribe(7, { kind: "merchant" }, merchantConn);
+    broker.subscribe(7, { kind: "merchant", userId: 5, principal: "user" }, merchantConn);
     broker.subscribe(7, { kind: "legacy-no-board" }, noBoardConn);
     broker.subscribe(7, { kind: "board", stoneId: 3 }, boardThreeConn);
     broker.subscribe(7, { kind: "board", stoneId: 4 }, boardFourConn);
@@ -297,6 +302,35 @@ describe("Phase 0 SSE audience matrix", () => {
     expect(merchantConn.frames).toHaveLength(3);
     expect(noBoardConn.frames).toHaveLength(1);
     expect(merchantConn.frames[2].transaction).not.toHaveProperty("paymentTokenHash");
+  });
+
+  test("disconnects only the revoked user's authenticated merchant streams", () => {
+    const broker = new SseBroker();
+    const revoked = connection();
+    const otherUser = connection();
+    const admin = connection();
+    const board = connection();
+    broker.subscribe(7, { kind: "merchant", userId: 5, principal: "user" }, revoked);
+    broker.subscribe(7, { kind: "merchant", userId: 9, principal: "user" }, otherUser);
+    broker.subscribe(7, { kind: "merchant", userId: 5, principal: "admin" }, admin);
+    broker.subscribe(7, { kind: "board", stoneId: 3 }, board);
+    for (const conn of [revoked, otherUser, admin, board]) conn.frames.length = 0;
+
+    expect(broker.disconnectUser(7, 5)).toBe(1);
+    expect(revoked.end).toHaveBeenCalledTimes(1);
+    expect(otherUser.end).not.toHaveBeenCalled();
+    expect(admin.end).not.toHaveBeenCalled();
+    expect(board.end).not.toHaveBeenCalled();
+    expect(broker.subscriberCount(7)).toBe(3);
+
+    broker.broadcast(7, 3, {
+      type: "transaction_updated",
+      transaction,
+    });
+    expect(revoked.frames).toHaveLength(0);
+    expect(otherUser.frames).toHaveLength(1);
+    expect(admin.frames).toHaveLength(1);
+    expect(board.frames).toHaveLength(1);
   });
 });
 

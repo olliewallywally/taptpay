@@ -70,8 +70,8 @@ export class SSEClient {
           cache: "no-store",
           signal,
         });
-        if (response.status === 401) {
-          console.error("Merchant SSE authentication expired");
+        if (response.status === 401 || response.status === 403) {
+          console.error("Merchant SSE authentication expired or was revoked");
           return;
         }
         if (!response.ok || !response.body) {

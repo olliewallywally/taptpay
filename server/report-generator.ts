@@ -5,11 +5,6 @@ export interface ReportData {
   totalTransactions: number;
   completedTransactions: number;
   totalRevenue: number;
-  currentProviderCost: number;
-  ourCost: number;
-  savings: number;
-  currentProviderRate: number;
-  ourRate: number;
   dateRange: { start: Date | null; end: Date | null };
   averageTransactionValue: number;
   transactionsByStatus: { [key: string]: number };
@@ -64,7 +59,11 @@ export async function generateBusinessReportPdf(
   
   // Key Metrics Cards
   let yPos = 50;
-  
+
+  const completionRate = analytics.totalTransactions > 0
+    ? ((analytics.completedTransactions / analytics.totalTransactions) * 100).toFixed(1)
+    : '0.0';
+
   // Create metric cards with proper spacing
   const cards = [
     { 
@@ -88,12 +87,12 @@ export async function generateBusinessReportPdf(
       color: [168, 85, 247],
       x: 114 
     },
-    { 
-      title: 'Savings', 
-      value: `$${analytics.savings.toFixed(2)}`, 
-      subtitle: 'vs current provider', 
+    {
+      title: 'Completed',
+      value: `${completionRate}%`,
+      subtitle: 'of all payments',
       color: [249, 115, 22],
-      x: 161 
+      x: 161
     }
   ];
 
@@ -124,44 +123,6 @@ export async function generateBusinessReportPdf(
   });
 
   yPos += 35;
-
-  // Cost Comparison Section
-  pdf.setFontSize(14);
-  pdf.setTextColor(22, 101, 52);
-  pdf.text('Cost Savings with Tapt', 20, yPos);
-  yPos += 12;
-
-  // Simple cost comparison chart
-  const costChartY = yPos;
-  const costChartHeight = 25;
-  
-  // Background
-  pdf.setFillColor(249, 250, 251);
-  pdf.rect(20, costChartY, 170, costChartHeight, 'F');
-  pdf.setDrawColor(229, 231, 235);
-  pdf.rect(20, costChartY, 170, costChartHeight, 'S');
-
-  // Cost comparison bars
-  const maxCost = Math.max(analytics.currentProviderCost, analytics.ourCost);
-  const barMaxWidth = 100;
-  
-  // Current provider bar
-  const providerBarWidth = maxCost > 0 ? (analytics.currentProviderCost / maxCost) * barMaxWidth : 0;
-  pdf.setFillColor(239, 68, 68);
-  pdf.rect(25, costChartY + 5, providerBarWidth, 5, 'F');
-  
-  // Tapt bar
-  const taptBarWidth = maxCost > 0 ? (analytics.ourCost / maxCost) * barMaxWidth : 0;
-  pdf.setFillColor(34, 197, 94);
-  pdf.rect(25, costChartY + 14, taptBarWidth, 5, 'F');
-
-  // Labels
-  pdf.setFontSize(9);
-  pdf.setTextColor(0, 0, 0);
-  pdf.text(`Current Provider: $${analytics.currentProviderCost.toFixed(2)}`, 135, costChartY + 9);
-  pdf.text(`Tapt Processing: $${analytics.ourCost.toFixed(2)}`, 135, costChartY + 18);
-
-  yPos += costChartHeight + 15;
 
   // Recent transactions table
   if (transactions.length > 0) {
@@ -251,9 +212,8 @@ export async function generateBusinessReportPdf(
   
   pdf.setFontSize(9);
   pdf.setTextColor(75, 85, 99);
-  const successRate = ((analytics.completedTransactions / analytics.totalTransactions) * 100).toFixed(1);
-  pdf.text(`• Transaction success rate: ${successRate}%`, 25, yPos + 15);
-  pdf.text(`• Monthly savings with Tapt: $${(analytics.savings * 12).toFixed(2)}`, 25, yPos + 20);
+  pdf.text(`• Transaction success rate: ${completionRate}%`, 25, yPos + 15);
+  pdf.text(`• Average sale: $${analytics.averageTransactionValue.toFixed(2)}`, 25, yPos + 20);
   
   yPos += 35;
   

@@ -35,7 +35,6 @@ interface MerchantDetails {
   contactEmail: string;
   contactPhone: string;
   businessAddress: string;
-  currentProviderRate: string;
   bankName: string;
   bankAccountNumber: string;
   bankBranch: string;
@@ -407,18 +406,6 @@ export default function AdminMerchantDetail() {
                   )}
                 </div>
 
-                <div>
-                  <Label htmlFor="currentProviderRate">Current Provider Rate (%)</Label>
-                  {isEditing ? (
-                    <Input
-                      id="currentProviderRate"
-                      value={editedMerchant.currentProviderRate || ''}
-                      onChange={(e) => handleInputChange('currentProviderRate', e.target.value)}
-                    />
-                  ) : (
-                    <p className="text-sm text-gray-900 mt-1">{merchant.currentProviderRate}%</p>
-                  )}
-                </div>
               </CardContent>
             </Card>
 

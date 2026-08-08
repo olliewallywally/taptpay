@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useLayoutEffect } from "react";
 
 /**
  * The server sets the same policy before token-route HTML is served. This
@@ -6,7 +6,7 @@ import { useEffect } from "react";
  * SDK or merchant asset is loaded.
  */
 export function useTokenPagePrivacy(enabled = true): void {
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!enabled) return;
     const existing = document.head.querySelector<HTMLMetaElement>('meta[name="referrer"]');
     const previous = existing?.content;

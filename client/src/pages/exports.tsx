@@ -268,10 +268,6 @@ export default function Exports() {
                 <p className="text-2xl font-bold text-green-600">${analytics.totalRevenue.toFixed(2)}</p>
                 <p className="text-sm text-gray-600">Revenue</p>
               </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-orange-600">${analytics.savings.toFixed(2)}</p>
-                <p className="text-sm text-gray-600">Savings with Tapt</p>
-              </div>
             </div>
           </CardContent>
         </Card>
@@ -337,7 +333,6 @@ export default function Exports() {
               <p><strong>Includes:</strong></p>
               <ul className="list-disc list-inside mt-2">
                 <li>Executive summary with key metrics</li>
-                <li>Cost comparison and savings</li>
                 <li>Transaction breakdown by status</li>
                 <li>Recent transaction details</li>
               </ul>

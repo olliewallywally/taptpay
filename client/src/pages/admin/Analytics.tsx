@@ -79,7 +79,8 @@ interface RevenuePoint { day: string; revenue: number; transactions: number }
 interface PaymentMethod { name: string; value: number; color: string }
 interface AnalyticsData {
   totalMerchants: number; activeMerchants: number; totalRevenue: number;
-  totalTransactions: number; completedTransactions: number; transactionFeeRevenue: number;
+  totalTransactions: number; completedTransactions: number;
+  monthlyRecurringRevenue: number; payingSubscriptions: number;
 }
 
 const deviceIcon = (name: string) => {
@@ -515,7 +516,7 @@ export function Analytics() {
               { icon: <Activity className="size-5 text-[#0055FF]" />, label: 'Transactions', value: fmt(platformStats?.totalTransactions || 0), sub: `${fmt(platformStats?.completedTransactions || 0)} completed`, grad: false },
               { icon: <Users className="size-5 text-[#00E5CC]" />, label: 'Active Merchants', value: fmt(platformStats?.activeMerchants || 0), sub: `of ${fmt(platformStats?.totalMerchants || 0)} total`, grad: false },
               { icon: <TrendingUp className="size-5 text-[#0055FF]" />, label: 'Avg Transaction', value: fmtNZD(avgTransaction), sub: 'Platform average', grad: false },
-              { icon: <DollarSign className="size-5 text-[#00E5CC]" />, label: 'Fee Revenue', value: fmtNZD(platformStats?.transactionFeeRevenue || 0), sub: `${fmt(platformStats?.completedTransactions || 0)} × $0.20`, grad: false },
+              { icon: <DollarSign className="size-5 text-[#00E5CC]" />, label: 'Recurring Revenue', value: fmtNZD(platformStats?.monthlyRecurringRevenue || 0), sub: `${fmt(platformStats?.payingSubscriptions || 0)} subscriptions / month`, grad: false },
             ].map((m, i) => (
               <div key={i} className="bg-[#24263a] rounded-xl p-4">
                 <div className="flex items-center gap-2.5 mb-2">

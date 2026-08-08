@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { tradesFetch, tradesHeaders } from "@/lib/trades-api";
-import { formatNzd, tradesFeeCents } from "@/lib/trades-money";
+import { formatNzd } from "@/lib/trades-money";
 import { computeQuoteTotals } from "@shared/trades-gst";
 import { TRADES_THEME } from "@/lib/trades-theme";
 import ClientProfile from "./client-profile";
@@ -371,7 +371,6 @@ function QuickInvoice({ go, selectedClient, quickMode, recipient, setRecipient, 
             {!isQuick && <div style={{ fontWeight: 400, fontSize: 14, color: 'rgba(4,13,109,0.5)', marginTop: 4 }}>{selectedClient.siteAddress}</div>}
             {isQuick && <div style={{ fontWeight: 400, fontSize: 14, color: 'rgba(4,13,109,0.5)', marginTop: 4 }}>quick invoice</div>}
           </div>
-          {amount > 0 && <div style={{ marginTop: 10, fontSize: 12, color: 'rgba(4,13,109,0.48)' }}>TaptPay fee (0.3%): {formatNzd(tradesFeeCents(amount))}</div>}
         </div>
         <div style={{ height: 52 }} />
       </div>
@@ -815,7 +814,6 @@ export function QuoteScreen({ onCancel, onExit }: { onCancel: () => void; onExit
                 {gstReg && <div style={{ ...Q_TOTROW, color: 'rgba(88,171,255,0.7)', fontSize: 13 }}><span>{gstMode === 'exclusive' ? 'GST (15%)' : 'GST (15%) incl.'}</span><span>{fmt(totals.gst)}</span></div>}
                 {depositEnabled && <div style={{ ...Q_TOTROW, fontSize: 13 }}><span style={{ color: 'rgba(88,171,255,0.7)' }}>deposit on acceptance</span><strong style={{ color: BLUE }}>{fmt(totals.deposit)}</strong></div>}
                 <div style={{ ...Q_TOTROW, borderTop: '1px solid rgba(88,171,255,0.2)', paddingTop: 11, marginTop: 6, fontSize: 17 }}><span style={{ color: '#fff', fontWeight: 700 }}>{gstMode === 'exclusive' && gstReg ? 'total (incl GST)' : 'total'}</span><strong style={{ color: '#fff' }}>{fmt(totals.total)}</strong></div>
-                <div style={{ ...Q_TOTROW, color: 'rgba(88,171,255,0.5)', fontSize: 11.5 }}><span>TaptPay fee (0.3%)</span><span>{fmt(tradesFeeCents(totals.total))}</span></div>
               </div>
               {error && <p role="alert" style={{ color: RED, fontWeight: 600, marginTop: 12 }}>{error}</p>}
             </div>

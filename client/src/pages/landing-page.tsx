@@ -2,6 +2,7 @@
 // styles use string values (fontWeight:"500", rows:"3", …) for 1:1 fidelity.
 import { useEffect } from 'react';
 import './landing.css';
+import { PLANS, formatPlanPrice } from "@shared/plans";
 
 export interface LandingPageProps {
   /** hero coin density (0.4–2) */
@@ -152,7 +153,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
             </a>
             {' '}
             <a href="#tp-pricing" className="tp-anchor" style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "8px", padding: "15px 10px", color: "rgba(244,241,232,0.62)", fontFamily: "'Outfit'", fontWeight: "500", fontSize: "15px", cursor: "pointer" }}>
-              {"pricing: 10¢ retail · 0.3% everything else "}
+              {`pricing: from ${formatPlanPrice(PLANS.solo.priceCents)} a month · no transaction fees `}
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M5 12h14M13 6l6 6-6 6" />
               </svg>
@@ -401,8 +402,8 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
             <div style={{ marginTop: "30px", display: "flex", gap: "clamp(18px,3vw,44px)", flexWrap: "wrap" }}>
               {' '}
               <div>
-                <div id="tp-ind-s1v" style={{ fontFamily: "'Outfit'", fontWeight: "700", fontSize: "clamp(26px,2.6vw,38px)", color: "#5E9DFF" }}>{"0.3%"}</div>
-                <div id="tp-ind-s1l" style={{ marginTop: "4px", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.5)" }}>{"platform fee"}</div>
+                <div id="tp-ind-s1v" style={{ fontFamily: "'Outfit'", fontWeight: "700", fontSize: "clamp(26px,2.6vw,38px)", color: "#5E9DFF" }}>{"$0"}</div>
+                <div id="tp-ind-s1l" style={{ marginTop: "4px", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.5)" }}>{"per transaction"}</div>
               </div>
               {' '}
               <div>
@@ -480,37 +481,37 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
           {' '}
           <div className="tp-rev" style={{ flex: "1 1 400px", minWidth: "300px", padding: "clamp(30px,3.4vw,48px)", borderRadius: "28px", background: "rgba(94,157,255,0.07)", border: "1px solid rgba(94,157,255,0.28)" }}>
             {' '}
-            <div style={{ fontFamily: "'Outfit'", fontWeight: "500", fontSize: "13px", letterSpacing: "0.26em", textTransform: "uppercase", color: "rgba(244,241,232,0.5)" }}>{"retail & hospitality"}</div>
+            <div style={{ fontFamily: "'Outfit'", fontWeight: "500", fontSize: "13px", letterSpacing: "0.26em", textTransform: "uppercase", color: "rgba(244,241,232,0.5)" }}>{"every transaction"}</div>
             {' '}
             <div style={{ marginTop: "18px", display: "flex", alignItems: "baseline", gap: "12px" }}>
               {' '}
-              <span style={{ fontFamily: "'Outfit'", fontWeight: "300", fontSize: "clamp(88px,9vw,150px)", lineHeight: "0.9", letterSpacing: "-0.04em", color: "#F4F1E8" }}>{"10¢"}</span>
+              <span style={{ fontFamily: "'Outfit'", fontWeight: "300", fontSize: "clamp(88px,9vw,150px)", lineHeight: "0.9", letterSpacing: "-0.04em", color: "#F4F1E8" }}>{"$0"}</span>
               {' '}
             </div>
             {' '}
-            <div style={{ marginTop: "14px", fontFamily: "'Outfit'", fontWeight: "500", fontSize: "clamp(16px,1.4vw,20px)", color: "#5E9DFF" }}>{"per transaction. flat. not a percentage."}</div>
+            <div style={{ marginTop: "14px", fontFamily: "'Outfit'", fontWeight: "500", fontSize: "clamp(16px,1.4vw,20px)", color: "#5E9DFF" }}>{"no transaction fee. not a cent. not a percentage."}</div>
             {' '}
-            <p style={{ margin: "18px 0 0", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "clamp(14px,1.15vw,16px)", lineHeight: "1.6", color: "rgba(244,241,232,0.6)" }}>{"a $500 saturday costs you 10¢ a tap — not $25 in percentages. keypad, stock, splits and analytics included."}</p>
+            <p style={{ margin: "18px 0 0", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "clamp(14px,1.15vw,16px)", lineHeight: "1.6", color: "rgba(244,241,232,0.6)" }}>{"taptpay adds nothing per sale — no flat fee and no percentage. keypad, stock, splits and analytics included."}</p>
             {' '}
           </div>
           {' '}
           <div className="tp-rev" style={{ flex: "1 1 400px", minWidth: "300px", padding: "clamp(30px,3.4vw,48px)", borderRadius: "28px", background: "rgba(94,157,255,0.07)", border: "1px solid rgba(94,157,255,0.28)" }}>
             {' '}
-            <div style={{ fontFamily: "'Outfit'", fontWeight: "500", fontSize: "13px", letterSpacing: "0.26em", textTransform: "uppercase", color: "rgba(244,241,232,0.5)" }}>{"property & trades"}</div>
+            <div style={{ fontFamily: "'Outfit'", fontWeight: "500", fontSize: "13px", letterSpacing: "0.26em", textTransform: "uppercase", color: "rgba(244,241,232,0.5)" }}>{"every vertical"}</div>
             {' '}
             <div style={{ marginTop: "18px", display: "flex", alignItems: "baseline", gap: "12px" }}>
               {' '}
               <span style={{ fontFamily: "'Outfit'", fontWeight: "300", fontSize: "clamp(88px,9vw,150px)", lineHeight: "0.9", letterSpacing: "-0.04em", color: "#F4F1E8" }}>
-                {"0.3"}
-                <span style={{ fontSize: "0.5em", color: "#5E9DFF" }}>{"%"}</span>
+                {"3"}
+                <span style={{ fontSize: "0.5em", color: "#5E9DFF" }}>{"-in-1"}</span>
               </span>
               {' '}
             </div>
             {' '}
-            <div style={{ marginTop: "14px", fontFamily: "'Outfit'", fontWeight: "500", fontSize: "clamp(16px,1.4vw,20px)", color: "#5E9DFF" }}>{"platform fee. that's the whole bill."}</div>
+            <div style={{ marginTop: "14px", fontFamily: "'Outfit'", fontWeight: "500", fontSize: "clamp(16px,1.4vw,20px)", color: "#5E9DFF" }}>{"retail, property and trades. one subscription."}</div>
             {' '}
             <p style={{ margin: "18px 0 0", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "clamp(14px,1.15vw,16px)", lineHeight: "1.6", color: "rgba(244,241,232,0.6)" }}>
-              {"collecting $2,400 rent costs $7.20 — while rent platforms and job apps charge subscriptions "}
+              {"collecting $2,400 rent costs nothing extra — while rent platforms and job apps charge subscriptions "}
               <span style={{ fontStyle: "italic" }}>{"plus"}</span>
               {" card fees for less."}
             </p>
@@ -523,49 +524,49 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
         {' '}
         <div className="tp-rev" style={{ marginTop: "54px", maxWidth: "1150px" }}>
           {' '}
-          <div style={{ fontFamily: "'Outfit'", fontWeight: "500", fontSize: "13px", letterSpacing: "0.26em", textTransform: "uppercase", color: "rgba(244,241,232,0.5)" }}>{"plus one simple subscription"}</div>
+          <div style={{ fontFamily: "'Outfit'", fontWeight: "500", fontSize: "13px", letterSpacing: "0.26em", textTransform: "uppercase", color: "rgba(244,241,232,0.5)" }}>{"one simple subscription"}</div>
           {' '}
           <div style={{ marginTop: "22px", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: "16px" }}>
             {' '}
             <div style={{ padding: "26px", borderRadius: "22px", background: "rgba(244,241,232,0.04)", border: "1px solid rgba(244,241,232,0.12)" }}>
               {' '}
-              <div style={{ fontFamily: "'Outfit'", fontWeight: "600", fontSize: "15px", color: "#F4F1E8" }}>{"solo"}</div>
+              <div style={{ fontFamily: "'Outfit'", fontWeight: "600", fontSize: "15px", color: "#F4F1E8" }}>{PLANS.solo.name.toLowerCase()}</div>
               {' '}
               <div style={{ marginTop: "14px", display: "flex", alignItems: "baseline", gap: "4px" }}>
-                <span style={{ fontFamily: "'Outfit'", fontWeight: "300", fontSize: "40px", letterSpacing: "-0.02em", color: "#F4F1E8" }}>{"$7.99"}</span>
+                <span style={{ fontFamily: "'Outfit'", fontWeight: "300", fontSize: "40px", letterSpacing: "-0.02em", color: "#F4F1E8" }}>{formatPlanPrice(PLANS.solo.priceCents)}</span>
                 <span style={{ fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.5)" }}>{"/mo"}</span>
               </div>
               {' '}
-              <div style={{ marginTop: "10px", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.55)" }}>{"1 login · the full stack"}</div>
+              <div style={{ marginTop: "10px", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.55)" }}>{PLANS.solo.blurb}</div>
               {' '}
             </div>
             {' '}
             <div style={{ padding: "26px", borderRadius: "22px", background: "rgba(94,157,255,0.08)", border: "1px solid rgba(94,157,255,0.35)" }}>
               {' '}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontFamily: "'Outfit'", fontWeight: "600", fontSize: "15px", color: "#F4F1E8" }}>{"team"}</span>
-                <span style={{ padding: "5px 12px", borderRadius: "9999px", background: "rgba(94,157,255,0.16)", fontFamily: "'Outfit'", fontWeight: "600", fontSize: "10px", letterSpacing: "0.12em", textTransform: "uppercase", color: "#5E9DFF" }}>{"most popular"}</span>
+                <span style={{ fontFamily: "'Outfit'", fontWeight: "600", fontSize: "15px", color: "#F4F1E8" }}>{PLANS.team.name.toLowerCase()}</span>
+                {PLANS.team.popular && <span style={{ padding: "5px 12px", borderRadius: "9999px", background: "rgba(94,157,255,0.16)", fontFamily: "'Outfit'", fontWeight: "600", fontSize: "10px", letterSpacing: "0.12em", textTransform: "uppercase", color: "#5E9DFF" }}>{"most popular"}</span>}
               </div>
               {' '}
               <div style={{ marginTop: "14px", display: "flex", alignItems: "baseline", gap: "4px" }}>
-                <span style={{ fontFamily: "'Outfit'", fontWeight: "300", fontSize: "40px", letterSpacing: "-0.02em", color: "#F4F1E8" }}>{"$8.99"}</span>
+                <span style={{ fontFamily: "'Outfit'", fontWeight: "300", fontSize: "40px", letterSpacing: "-0.02em", color: "#F4F1E8" }}>{formatPlanPrice(PLANS.team.priceCents)}</span>
                 <span style={{ fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.5)" }}>{"/mo"}</span>
               </div>
               {' '}
-              <div style={{ marginTop: "10px", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.55)" }}>{"5 logins · one dollar more"}</div>
+              <div style={{ marginTop: "10px", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.55)" }}>{PLANS.team.blurb}</div>
               {' '}
             </div>
             {' '}
             <div style={{ padding: "26px", borderRadius: "22px", background: "rgba(244,241,232,0.04)", border: "1px solid rgba(244,241,232,0.12)" }}>
               {' '}
-              <div style={{ fontFamily: "'Outfit'", fontWeight: "600", fontSize: "15px", color: "#F4F1E8" }}>{"crew"}</div>
+              <div style={{ fontFamily: "'Outfit'", fontWeight: "600", fontSize: "15px", color: "#F4F1E8" }}>{PLANS.crew.name.toLowerCase()}</div>
               {' '}
               <div style={{ marginTop: "14px", display: "flex", alignItems: "baseline", gap: "4px" }}>
-                <span style={{ fontFamily: "'Outfit'", fontWeight: "300", fontSize: "40px", letterSpacing: "-0.02em", color: "#F4F1E8" }}>{"$12.99"}</span>
+                <span style={{ fontFamily: "'Outfit'", fontWeight: "300", fontSize: "40px", letterSpacing: "-0.02em", color: "#F4F1E8" }}>{formatPlanPrice(PLANS.crew.priceCents)}</span>
                 <span style={{ fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.5)" }}>{"/mo"}</span>
               </div>
               {' '}
-              <div style={{ marginTop: "10px", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.55)" }}>{"10 logins · whole crew covered"}</div>
+              <div style={{ marginTop: "10px", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.55)" }}>{PLANS.crew.blurb}</div>
               {' '}
             </div>
             {' '}

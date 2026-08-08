@@ -5,7 +5,6 @@ import { tradesFetch } from "@/lib/trades-api";
 import { useToast } from "@/hooks/use-toast";
 import {
   formatNzd,
-  tradesFeeCents,
   tradesInvoiceRemainingCents,
   tradesOutstandingCents,
 } from "@/lib/trades-money";
@@ -813,11 +812,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
                   <span className="tt-hint">
                     the balance is calculated from the quote total — {formatNzd(balanceCents)}
                   </span>
-                ) : (
-                  <span className="tt-fee">
-                    TaptPay fee (0.3%): {formatNzd(tradesFeeCents(sendCents))}
-                  </span>
-                )}
+                ) : null}
 
                 <button
                   type="button"

@@ -231,8 +231,9 @@ export async function resendInvoiceEmail(invoiceId: string, baseUrl: string): Pr
   const invoice = await storage.getInvoiceRentRequest(invoiceId);
   if (!invoice) return { ok: false, reason: "not_found" };
   if (["paid", "paid_external", "voided"].includes(invoice.status)) return { ok: false, reason: "not_payable" };
-  const merchant = await storage.getMerchant(invoice.merchantId);
-  if (!billingCardIsReady(merchant)) return { ok: false, reason: "billing_card_required" };
+  if (!billingCardIsReady(await storage.getSubscription(invoice.merchantId))) {
+    return { ok: false, reason: "billing_card_required" };
+  }
 
   const delivery = await deliverInvoice(invoice, baseUrl, deliverOptsFor(invoice, invoice.status === "overdue"));
   if (!delivery.sent) return { ok: false, reason: delivery.reason || "send_failed" };
@@ -258,8 +259,7 @@ export async function runGeneratePass(now: Date = new Date()): Promise<{ generat
 
   for (const schedule of dueSchedules) {
     try {
-      const merchant = await storage.getMerchant(schedule.merchantId);
-      if (!billingCardIsReady(merchant)) {
+      if (!billingCardIsReady(await storage.getSubscription(schedule.merchantId))) {
         result.skipped++;
         continue;
       }
@@ -298,8 +298,7 @@ export async function runDispatchPass(baseUrl: string): Promise<{ dispatched: nu
 
   for (const invoice of invoices) {
     try {
-      const merchant = await storage.getMerchant(invoice.merchantId);
-      if (!billingCardIsReady(merchant)) {
+      if (!billingCardIsReady(await storage.getSubscription(invoice.merchantId))) {
         result.failed++;
         continue;
       }

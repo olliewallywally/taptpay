@@ -5,12 +5,13 @@ import {
 } from "./http-contracts";
 
 export type SseAudience =
-  | { kind: "merchant" }
+  | { kind: "merchant"; userId: number; principal: "user" | "admin" }
   | { kind: "legacy-no-board" }
   | { kind: "board"; stoneId: number };
 
 export interface SseWritable {
   write(chunk: string): unknown;
+  end?(): unknown;
 }
 
 type Subscriber = {
@@ -103,6 +104,37 @@ export class SseBroker {
         `data: ${JSON.stringify(projectEvent(data, subscriber.audience))}\n\n`,
       );
     }
+  }
+
+  /**
+   * Drop every live merchant stream owned by a revoked users-row principal.
+   * Public board/no-board streams and environment-backed admin streams are not
+   * tied to that login and must remain connected.
+   */
+  disconnectUser(merchantId: number, userId: number) {
+    const merchantSubscribers = this.subscribers.get(merchantId);
+    if (!merchantSubscribers) return 0;
+
+    let disconnected = 0;
+    for (const subscriber of Array.from(merchantSubscribers)) {
+      if (
+        subscriber.audience.kind !== "merchant" ||
+        subscriber.audience.principal !== "user" ||
+        subscriber.audience.userId !== userId
+      ) {
+        continue;
+      }
+      merchantSubscribers.delete(subscriber);
+      disconnected++;
+      try {
+        subscriber.connection.end?.();
+      } catch {
+        // A socket that already vanished is still successfully unsubscribed.
+      }
+    }
+
+    if (merchantSubscribers.size === 0) this.subscribers.delete(merchantId);
+    return disconnected;
   }
 
   subscriberCount(merchantId?: number) {
