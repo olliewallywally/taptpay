@@ -40,6 +40,26 @@ function assertClose(actual, expected, label, tolerance = PIXEL_TOLERANCE) {
   );
 }
 
+// Waits for every running CSS animation/transition to finish, so geometry is
+// asserted against settled layout rather than an in-flight transform. Infinite
+// animations (spinners) never finish, so they are excluded and the whole wait is
+// bounded.
+async function waitForAnimationsToSettle(page, timeout = 4000) {
+  await page.waitForFunction(
+    () =>
+      document
+        .getAnimations()
+        .filter((animation) => {
+          if (animation.playState !== "running") return false;
+          const iterations = animation.effect?.getComputedTiming?.().iterations;
+          return Number.isFinite(iterations);
+        })
+        .length === 0,
+    undefined,
+    { timeout },
+  );
+}
+
 function uniqueSourcePaths(requests) {
   return [
     ...new Set(
@@ -302,6 +322,10 @@ async function verifyDesktop(browser) {
     // is measured against production markup inside the scaled canvas.
     tutorialGate.resolve();
     await page.locator(".tutorial-highlight").waitFor({ state: "visible" });
+    // The entry cascade animates a transform on the quick actions' ancestor, so
+    // both the target rect and the spotlight that tracks it are in motion for
+    // ~900ms. Assert the settled geometry, not a frame part-way through it.
+    await waitForAnimationsToSettle(page);
 
     const geometry = await page.evaluate(() => {
       const target = document.querySelector('[aria-label="new sale"]');

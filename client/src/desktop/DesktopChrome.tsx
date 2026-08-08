@@ -58,13 +58,4 @@ export function DesktopChrome({
   );
 }
 
-/**
- * Page-slot Suspense fallback. Deliberately empty: a lazy chunk resolving must
- * never paint a spinner over chrome that is already on screen — the incoming
- * page's own cascade is the only motion the user should see.
- */
-export function DesktopPageFallback() {
-  return <div className="tapt-desktop-page-fallback" aria-hidden="true" />;
-}
-
 export default DesktopChrome;

@@ -11,8 +11,7 @@ import { PageTransition } from "@/components/page-transition";
 import { BottomNavigation } from "@/components/bottom-navigation";
 import { TutorialPageBoundary, TutorialProvider } from "@/features/tutorial/tutorial";
 import { useDeviceClass, type DeviceClass } from "@/hooks/use-device-class";
-import { DesktopChrome, DesktopPageFallback } from "@/desktop/DesktopChrome";
-import { desktopChromeForLocation } from "@/desktop/desktop-theme";
+import { desktopChromeForLocation } from "@/lib/desktop-chrome-route";
 import type { TutorialPageKey } from "@shared/tutorial";
 import { redactCustomerPaymentAddress } from "@/lib/payment-addressing";
 
@@ -66,6 +65,22 @@ const TradesRecurring       = lazy(() => import("@/pages/trades/recurring-schedu
 
 // Tablet/desktop pages live in their own lazy chunks. Keep these as direct
 // imports (rather than an eager barrel) so phones never download the second UI.
+// The chrome is lazy for the same reason: it is mounted once above the router,
+// but a static import would put the frame, shell, canvas and desktop.css in the
+// entry chunk that phones also load.
+const DesktopChrome           = lazy(() => import("@/desktop/DesktopChrome"));
+
+/**
+ * Suspense fallback for the desktop chrome and its page slot. Deliberately
+ * empty: a lazy chunk resolving must never paint a spinner over chrome that is
+ * already on screen — the incoming page's own cascade is the only motion the
+ * user should see. Defined here rather than imported, so that reaching for the
+ * fallback does not drag the desktop chunk into the entry bundle.
+ */
+function DesktopPageFallback() {
+  return <div className="tapt-desktop-page-fallback" aria-hidden="true" />;
+}
+
 const DesktopRetailHome       = lazy(() => import("@/desktop/pages/retail-home"));
 const DesktopRetailStock      = lazy(() => import("@/desktop/pages/retail-stock"));
 const DesktopRetailTerminal   = lazy(() => import("@/desktop/pages/retail-terminal"));
@@ -357,20 +372,25 @@ function Router({ deviceClass }: { deviceClass: DeviceClass }) {
       return (
         <>
           <GA4PageTracker />
-          <DesktopChrome deviceClass={deviceClass} route={chromeRoute}>
-            <Suspense fallback={<DesktopPageFallback />}>
-              {/* Keyed on the screen, not the raw location, so the cascade
-                  replays whenever the user lands on a different screen but a
-                  one-shot param (?quick=1) or an id segment does not throw away
-                  a screen the user is already on. */}
-              <RouteTable
-                key={`${chromeRoute.vertical}/${chromeRoute.page}`}
-                location={location}
-                deviceClass={deviceClass}
-                merchantMode={merchantMode}
-              />
-            </Suspense>
-          </DesktopChrome>
+          {/* Outer boundary covers only the chrome's own chunk on cold load;
+              once resolved it stays mounted, so navigation never suspends here
+              and the frame cannot blink between screens. */}
+          <Suspense fallback={<DesktopPageFallback />}>
+            <DesktopChrome deviceClass={deviceClass} route={chromeRoute}>
+              <Suspense fallback={<DesktopPageFallback />}>
+                {/* Keyed on the screen, not the raw location, so the cascade
+                    replays whenever the user lands on a different screen but a
+                    one-shot param (?quick=1) or an id segment does not throw away
+                    a screen the user is already on. */}
+                <RouteTable
+                  key={`${chromeRoute.vertical}/${chromeRoute.page}`}
+                  location={location}
+                  deviceClass={deviceClass}
+                  merchantMode={merchantMode}
+                />
+              </Suspense>
+            </DesktopChrome>
+          </Suspense>
         </>
       );
     }

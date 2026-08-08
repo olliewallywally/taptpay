@@ -300,12 +300,25 @@ function TutorialOverlay({ pageLabel, step, stepIndex, stepCount, onNext, onDism
     const settle = window.setTimeout(measure, reducedMotion ? 0 : 360);
     const observer = target ? new ResizeObserver(measure) : null;
     if (target && observer) observer.observe(target);
+    // The desktop entry cascade animates a transform on an ancestor block, which
+    // no ResizeObserver reports and which outlives the settle timer, so without
+    // this the spotlight freezes around a mid-bounce rect. Animation events are
+    // listened for in capture so an ancestor's completion still re-measures.
+    const onAnimationSettled = (event: Event) => {
+      const node = event.target;
+      if (!target || !(node instanceof Node)) return;
+      if (node === target || node.contains(target)) measure();
+    };
+    document.addEventListener("animationend", onAnimationSettled, true);
+    document.addEventListener("transitionend", onAnimationSettled, true);
     window.addEventListener("resize", measure);
     window.addEventListener("scroll", measure, true);
     return () => {
       cancelAnimationFrame(raf);
       window.clearTimeout(settle);
       observer?.disconnect();
+      document.removeEventListener("animationend", onAnimationSettled, true);
+      document.removeEventListener("transitionend", onAnimationSettled, true);
       window.removeEventListener("resize", measure);
       window.removeEventListener("scroll", measure, true);
     };
