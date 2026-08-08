@@ -1,8 +1,13 @@
 // @ts-nocheck — ported verbatim from the July 2026 prototype export; inline
 // styles use string values (fontWeight:"500", rows:"3", …) for 1:1 fidelity.
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import './landing.css';
 import { PLANS, formatPlanPrice } from "@shared/plans";
+import { LandingPhoneMount } from './landing-phone/LandingPhoneMount';
+// Pure data, no runtime: importing scenes/registry here would pull all eight
+// scenes and every primitive into the main landing chunk and break the "zero
+// phone bytes before the story approaches" budget (plan §6).
+import { INDUSTRY_SCENE, SCENE_STEPS, isIndustryKey, type IndustryKey } from './landing-phone/manifest';
 
 export interface LandingPageProps {
   /** hero coin density (0.4–2) */
@@ -20,6 +25,31 @@ export interface LandingPageProps {
  * Mount once as a full page (e.g. a wouter route).
  */
 export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', reducedMotion = false }: LandingPageProps) {
+  // The Industries tabs and the "try it live" button are plain DOM buttons owned
+  // by landingRuntime, which rewrites all the copy around them. React only needs
+  // to know which one is selected so the phone can show that vertical's
+  // workflow, so it listens to them rather than taking them over.
+  const [industry, setIndustry] = useState<IndustryKey>(defaultIndustry);
+  const [industryLive, setIndustryLive] = useState(false);
+
+  useEffect(() => {
+    const tabs = Array.from(document.querySelectorAll('[data-ind]'));
+    const pick = (e: Event) => {
+      const key = (e.currentTarget as HTMLElement).getAttribute('data-ind');
+      if (isIndustryKey(key)) setIndustry(key);
+    };
+    tabs.forEach((t) => t.addEventListener('click', pick));
+
+    const liveBtns = Array.from(document.querySelectorAll('.tp-phone-live'));
+    const toggleLive = () => setIndustryLive((v) => !v);
+    liveBtns.forEach((b) => b.addEventListener('click', toggleLive));
+
+    return () => {
+      tabs.forEach((t) => t.removeEventListener('click', pick));
+      liveBtns.forEach((b) => b.removeEventListener('click', toggleLive));
+    };
+  }, []);
+
   useEffect(() => {
     // The runtime pulls in three.js (~1.2 MB min), so it's loaded on demand:
     // the static markup paints immediately and the scroll/3D rig attaches a
@@ -232,7 +262,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
                           {' '}
                           <div className="tp-phone-scale" style={{ position: "absolute", left: "4.4%", right: "4.2%", top: "1.75%", bottom: "1.75%", borderRadius: "11%/5.2%", overflow: "hidden", background: "#fff" }}>
                             {' '}
-                            <iframe id="tp-cine-frame" className="tp-app-frame" data-late-src="app/embed.html?mode=property&route=/property" title="taptpay live app" style={{ width: "390px", height: "844px", border: "none", transformOrigin: "top left", pointerEvents: "none", display: "block", background: "#fff" }} />
+                            <LandingPhoneMount variant="cinematic" bare storySelector="#tp-story-wrap" className="tp-app-frame" style={{ pointerEvents: "none", display: "block" }} />
                             {' '}
                           </div>
                           {' '}
@@ -434,7 +464,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
                     {' '}
                     <div className="tp-phone-scale" style={{ position: "absolute", inset: "clamp(6px,0.9vh,9px)", borderRadius: "clamp(26px,3.4vh,38px)", overflow: "hidden", background: "#fff" }}>
                       {' '}
-                      <iframe id="tp-ind-frame" className="tp-app-frame" data-defer-src="app/embed.html?mode=property&route=/property" title="taptpay live app" style={{ width: "390px", height: "844px", border: "none", transformOrigin: "top left", pointerEvents: "none", display: "block", background: "#fff" }} />
+                      <LandingPhoneMount variant="industries" bare interactive={industryLive} scene={INDUSTRY_SCENE[industry]} steps={SCENE_STEPS[INDUSTRY_SCENE[industry]]} className="tp-app-frame" style={{ pointerEvents: industryLive ? "auto" : "none", display: "block" }} />
                       {' '}
                     </div>
                     {' '}

@@ -190,40 +190,24 @@ export class LandingRuntime {
         tag: 'property management', h: 'rent that collects itself.',
         sub: 'set the schedule once. taptpay invoices every cycle, chases every late payment, and marks every dollar the moment it lands.',
         stats: [['$0', 'per transaction'], ['2–10', 'way rent splits'], ['auto', 'reminders, never duplicated']],
-        feats: ['recurring rent schedules on autopilot', 'overdue reminders that never double-send', 'utility bills & expenses, sent as payment links', 'gst receipts emailed automatically'],
-        hash: '#/property'
+        feats: ['recurring rent schedules on autopilot', 'overdue reminders that never double-send', 'utility bills & expenses, sent as payment links', 'gst receipts emailed automatically']
       },
       trades: {
         tag: 'trades & services', h: 'quote → deposit → balance → done.',
         sub: 'the quote and the money are one object. the customer accepting the job is the deposit hitting your account.',
         stats: [['$0', 'per transaction'], ['on accept', 'deposit link presented'], ['auto', 'gst receipts emailed']],
-        feats: ['line-item quote builder with deposit toggles', 'quick invoice for callouts — keypad, client, send', 'incl gst / + gst, snapshotted per quote', 'client profiles with full event timelines'],
-        hash: '#/trades'
+        feats: ['line-item quote builder with deposit toggles', 'quick invoice for callouts — keypad, client, send', 'incl gst / + gst, snapshotted per quote', 'client profiles with full event timelines']
       },
       retail: {
         tag: 'retail & hospitality', h: 'a terminal in every pocket.',
         sub: 'cafés, markets, food trucks — keypad to charge, tap or scan to pay, split the table without maths at the counter.',
         stats: [['$0', 'per transaction, ever'], ['multi', 'stack — unlimited payments at once'], ['2–10', 'way bill splits']],
-        feats: ['charge in seconds from the keypad', 'payment boards — customers scan or tap the counter', 'per-person receipts on splits', 'live transaction history & analytics'],
-        hash: '#/terminal'
+        feats: ['charge in seconds from the keypad', 'payment boards — customers scan or tap the counter', 'per-person receipts on splits', 'live transaction history & analytics']
       }
     };
     this.renderIndustry(this.props.defaultIndustry ?? 'property', true);
     $$('.tp-tab').forEach((tab) => {
       tab.addEventListener('click', () => this.renderIndustry(tab.getAttribute('data-ind'), false));
-    });
-
-    // live demo chips
-    $$('.tp-live-chip').forEach((chip) => {
-      chip.addEventListener('click', () => {
-        const f = $('#tp-live-frame');
-        if (f && f.contentWindow) { try { f.contentWindow.location.hash = chip.getAttribute('data-hash'); } catch (e) {} }
-        $$('.tp-live-chip').forEach((c) => {
-          const on = c === chip;
-          c.style.background = on ? '#5E9DFF' : 'transparent';
-          c.style.color = on ? '#040D6D' : '#5E9DFF';
-        });
-      });
     });
 
     this.initContact();
@@ -242,17 +226,9 @@ export class LandingRuntime {
     this.initPhones();
     this.initCoins();
 
-    // stagger the app copies: primary phone right after first paint, secondary when near view
-    setTimeout(() => {
-      const f = document.querySelector('iframe[data-late-src]');
-      if (f && !f.getAttribute('src')) f.src = f.getAttribute('data-late-src');
-    }, 450);
-    document.querySelectorAll('iframe[data-defer-src]').forEach((f) => {
-      const io = new IntersectionObserver((es) => {
-        es.forEach((en) => { if (en.isIntersecting && !f.getAttribute('src')) { f.src = f.getAttribute('data-defer-src'); io.disconnect(); } });
-      }, { rootMargin: '1500px 0px 1500px 0px' });
-      io.observe(f);
-    });
+    // Both phone screens are React (landing-phone/LandingPhoneMount) and load
+    // themselves behind their own IntersectionObserver, so there is nothing to
+    // stagger here any more.
 
     // governor: sustained jank -> lower render resolution + blur, never touches layout/design
     let gT = performance.now(), gAcc = 0, gN = 0;
@@ -287,7 +263,6 @@ export class LandingRuntime {
     const world = $('#tp-cine-world');
     const rig = $('#tp-cine-rig');
     const turn = $('#tp-cine-turn');
-    const frame = $('#tp-cine-frame');
     const glow = $('#tp-cine-glow');
     const glare = $('#tp3-glare');
     const headA = $('#tp-s-head-a');
@@ -296,7 +271,7 @@ export class LandingRuntime {
     const dotsWrap = $('#tp-cine-dots');
     const cap = $('#tp-cine-cap');
     const ghost = Array.from(document.querySelectorAll('#tp-cine-world .tp-gword'));
-    if (!world || !rig || !turn || !frame) return;
+    if (!world || !rig || !turn) return;
 
     const EASE = 'cubic-bezier(.6,.04,.16,1)';
     const wallet = '<div style="margin-top:24px;display:flex;flex-wrap:wrap;align-items:center;gap:10px;">' +
@@ -307,14 +282,14 @@ export class LandingRuntime {
       '<span style="display:inline-flex;align-items:center;padding:10px 18px;border-radius:9999px;background:rgba(244,241,232,0.08);border:1px solid rgba(244,241,232,0.16);font-family:Outfit;font-weight:600;font-size:13px;color:#F4F1E8;">visa</span></div>';
 
     const B = [
-      { k: 'intro', hash: '#/property' },
-      { side: 'L', hash: '#/property/terminal', tag: 'property management', num: '01', mb: 'schedules send the rent requests, reminders chase the stragglers, every dollar reconciles itself.', h: 'rent that <span style="font-weight:500;color:#5E9DFF;">collects itself.</span>', b: 'automated rent &amp; bill collection — schedules send the requests, reminders chase the stragglers, and every dollar reconciles the moment it lands.', bl: ['track every payment link as it goes out', 'tenants pay instantly from their digital wallet', 'auto-generated gst receipts, emailed for you'] },
-      { side: 'L', hash: '#/property/terminal', drive: 'bill', tag: 'property management', num: '02', mb: 'pick the tenant, attach the invoice, send. it gets paid the same way rent does.', h: 'send &amp; track <span style="font-weight:500;color:#5E9DFF;">utility bills.</span>', b: 'water, late fees, cleaning, damages — pick the tenant, attach the invoice, send. it gets paid the same way rent does.', bl: ['one tap from the tenant&rsquo;s profile', 'attach the pdf invoice to the link', 'watch it move: sent → paid'] },
-      { side: 'R', hash: '#/trades', tag: 'trades & services', num: '03', mb: 'quote, invoice &amp; collect — the job and the money finally live in one place.', h: 'invoicing &amp; <span style="font-weight:500;color:#5E9DFF;">collecting payments.</span>', b: 'quote, invoice &amp; collect payment digitally — the job and the money finally live in one place.', bl: ['line-item quotes with gst done right', 'auto deposit request on acceptance', 'client profiles with full history'] },
-      { side: 'R', hash: '#/trades/quote', tag: 'trades & services', num: '04', mb: 'the moment they accept, the deposit request is already on their screen.', h: 'the quote pays <span style="font-weight:500;color:#5E9DFF;">its own deposit.</span>', b: 'build the quote on site and send it as a secure link — the moment they accept, the deposit request is already on their screen.', bl: ['accepted → deposit link, automatically', 'balance chases itself on completion', 'gst receipt lands in their inbox'] },
-      { side: 'L', hash: '#/terminal', tag: 'retail & hospitality', num: '05', mb: 'a full point of sale in your pocket. no transaction fees, just your subscription.', h: 'digital p.o.s &amp; <span style="font-weight:500;color:#5E9DFF;">eftpos system.</span>', b: 'throw out your old brick — a full point of sale that lives in your pocket, built for taking payments on the go.', bl: ['multi-stack — unlimited payments at once', 'no transaction fees — flat or percentage', 'live dashboard: everything you need, nothing you don&rsquo;t'] },
-      { side: 'L', hash: '#/terminal', drive: 'split', tag: 'retail & hospitality', num: '06', mb: 'each pays their share on their own card, with their own receipt.', h: 'they split the bill, <span style="font-weight:500;color:#5E9DFF;">not you.</span>', b: 'customers split the bill on their end without you lifting a finger — each pays their share on their own card, with their own receipt.', bl: ['2–10 way splits on any payment', 'track each share as it lands', 'auto gst receipt per person'] },
-      { side: 'R', hash: '#/pay/1', tag: 'the customer side', num: '07', mb: 'no app, no signup — the link opens straight to checkout. every wallet, secured by windcave.', h: 'a secure link. <span style="font-weight:500;color:#5E9DFF;">every wallet.</span>', b: 'no app, no signup — the secure payment link opens straight to checkout. digital wallets, afterpay or card, secured by windcave.', bl: [], wallets: true }
+      { k: 'intro' },
+      { side: 'L', tag: 'property management', num: '01', mb: 'schedules send the rent requests, reminders chase the stragglers, every dollar reconciles itself.', h: 'rent that <span style="font-weight:500;color:#5E9DFF;">collects itself.</span>', b: 'automated rent &amp; bill collection — schedules send the requests, reminders chase the stragglers, and every dollar reconciles the moment it lands.', bl: ['track every payment link as it goes out', 'tenants pay instantly from their digital wallet', 'auto-generated gst receipts, emailed for you'] },
+      { side: 'L', tag: 'property management', num: '02', mb: 'pick the tenant, attach the invoice, send. it gets paid the same way rent does.', h: 'send &amp; track <span style="font-weight:500;color:#5E9DFF;">utility bills.</span>', b: 'water, late fees, cleaning, damages — pick the tenant, attach the invoice, send. it gets paid the same way rent does.', bl: ['one tap from the tenant&rsquo;s profile', 'attach the pdf invoice to the link', 'watch it move: sent → paid'] },
+      { side: 'R', tag: 'trades & services', num: '03', mb: 'quote, invoice &amp; collect — the job and the money finally live in one place.', h: 'invoicing &amp; <span style="font-weight:500;color:#5E9DFF;">collecting payments.</span>', b: 'quote, invoice &amp; collect payment digitally — the job and the money finally live in one place.', bl: ['line-item quotes with gst done right', 'auto deposit request on acceptance', 'client profiles with full history'] },
+      { side: 'R', tag: 'trades & services', num: '04', mb: 'the moment they accept, the deposit request is already on their screen.', h: 'the quote pays <span style="font-weight:500;color:#5E9DFF;">its own deposit.</span>', b: 'build the quote on site and send it as a secure link — the moment they accept, the deposit request is already on their screen.', bl: ['accepted → deposit link, automatically', 'balance chases itself on completion', 'gst receipt lands in their inbox'] },
+      { side: 'L', tag: 'retail & hospitality', num: '05', mb: 'a full point of sale in your pocket. no transaction fees, just your subscription.', h: 'digital p.o.s &amp; <span style="font-weight:500;color:#5E9DFF;">eftpos system.</span>', b: 'throw out your old brick — a full point of sale that lives in your pocket, built for taking payments on the go.', bl: ['multi-stack — unlimited payments at once', 'no transaction fees — flat or percentage', 'live dashboard: everything you need, nothing you don&rsquo;t'] },
+      { side: 'L', tag: 'retail & hospitality', num: '06', mb: 'each pays their share on their own card, with their own receipt.', h: 'they split the bill, <span style="font-weight:500;color:#5E9DFF;">not you.</span>', b: 'customers split the bill on their end without you lifting a finger — each pays their share on their own card, with their own receipt.', bl: ['2–10 way splits on any payment', 'track each share as it lands', 'auto gst receipt per person'] },
+      { side: 'R', tag: 'the customer side', num: '07', mb: 'no app, no signup — the link opens straight to checkout. every wallet, secured by windcave.', h: 'a secure link. <span style="font-weight:500;color:#5E9DFF;">every wallet.</span>', b: 'no app, no signup — the secure payment link opens straight to checkout. digital wallets, afterpay or card, secured by windcave.', bl: [], wallets: true }
     ];
     const N = B.length;
     const STEP_Y = 880;
@@ -467,7 +442,6 @@ export class LandingRuntime {
     const turnTo = (deg, ms) => {
       if (this._p3) this._p3.setRot(deg, ms);
     };
-    const setHash = (h) => { try { if (frame.contentWindow && frame.contentWindow.location.hash !== h) frame.contentWindow.location.hash = h; } catch (e) {} };
     const sweep = () => {
       if (!glare) return;
       glare.style.animation = 'none';
@@ -475,27 +449,11 @@ export class LandingRuntime {
       glare.style.animation = 'tpGlare 1.5s cubic-bezier(.5,.06,.3,1) 1';
     };
 
-    // ---- drive the live app's own controls ----
-    const drive = (kind) => {
-      try {
-        const doc = frame.contentDocument;
-        if (!doc) return;
-        const btns = Array.from(doc.querySelectorAll('button'));
-        const find = (re) => btns.find((x) => re.test((x.getAttribute('aria-label') || '') + ' ' + (x.getAttribute('data-testid') || '') + ' ' + (x.textContent || '')));
-        let b = null;
-        if (kind === 'bill') b = find(/bill/i);
-        if (kind === 'split') b = find(/split/i);
-        if (b) b.click();
-      } catch (e) {}
-    };
-    const closeOverlay = () => {
-      try {
-        const doc = frame.contentDocument;
-        if (!doc) return;
-        const b = Array.from(doc.querySelectorAll('button')).find((x) => /close|back|cancel/i.test((x.getAttribute('aria-label') || '')));
-        if (b) b.click();
-      } catch (e) {}
-    };
+    // The screen itself is a React component (landing-phone/), driven by the
+    // same scroll progress as the camera. This used to be an iframe whose
+    // workflows were faked by setting its hash and, after a fixed 1750 ms,
+    // regex-matching its buttons and clicking the first hit — both of which
+    // this beat list no longer needs to know anything about.
 
     // ---- progress dots ----
     const dots = B.map(() => {
@@ -507,7 +465,7 @@ export class LandingRuntime {
 
     let cur = -1;
     let rot = 0;
-    let hideT = null, showT = null, midT = null, driveT = null, glareT = null;
+    let hideT = null, showT = null, glareT = null;
     let visCard = null;
 
     const popIn = (el) => { el.style.animation = 'tpPopIn .75s cubic-bezier(.34,1.45,.5,1) forwards'; };
@@ -517,7 +475,7 @@ export class LandingRuntime {
       const bt = B[i];
       const mob = isMobile();
       const g = G[i];
-      clearTimeout(hideT); clearTimeout(showT); clearTimeout(midT); clearTimeout(driveT); clearTimeout(glareT);
+      clearTimeout(hideT); clearTimeout(showT); clearTimeout(glareT);
 
       const rollDir = i === 0 ? 0 : (bt.side === 'L' ? -1 : 1);
       camGo(g.cx, g.cy, 0, i === 0 ? 950 : 1300, rollDir);
@@ -526,9 +484,6 @@ export class LandingRuntime {
       turnTo(rot, 1150);
       if (glow) glow.style.opacity = i === 0 ? '0.8' : '0.55';
 
-      midT = setTimeout(() => { setHash(bt.hash); }, 540);
-      if (bt.drive) driveT = setTimeout(() => drive(bt.drive), 1750);
-      else if (prev >= 0 && B[prev] && B[prev].drive) driveT = setTimeout(closeOverlay, 1500);
       glareT = setTimeout(sweep, 1080);
 
       if (headB) headB.style.opacity = i === 0 ? headB.style.opacity : '0';
@@ -622,220 +577,6 @@ export class LandingRuntime {
     };
   }
 
-  // ---------------- legacy cinema (inert, superseded) ----------------
-  _cinemaLegacy() {
-    return;
-    const $ = (s) => document.querySelector(s);
-    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-    const map = (p, a, b) => clamp((p - a) / (b - a), 0, 1);
-    const rig = $('#tp-cine-rig');
-    const turn = $('#tp-cine-turn');
-    const frame = $('#tp-cine-frame');
-    const glow = $('#tp-cine-glow');
-    const bg = $('#tp-cine-bg');
-    const headA = $('#tp-s-head-a');
-    const headB = $('#tp-s-head-b');
-    const ghost = Array.from(document.querySelectorAll('.tp-gword'));
-    const panelL = $('#tp-cine-left');
-    const panelR = $('#tp-cine-right');
-    const dotsWrap = $('#tp-cine-dots');
-    const cap = $('#tp-cine-cap');
-    if (!rig || !turn || !frame) return;
-
-    const EASE = 'cubic-bezier(.6,.04,.16,1)';
-    const wallet = '<div style="margin-top:24px;display:flex;flex-wrap:wrap;align-items:center;gap:10px;">' +
-      '<span style="display:inline-flex;align-items:center;padding:10px 18px;border-radius:9999px;background:#F4F1E8;"><img src="/assets/Google_Pay_Logo.svg_1773556576322-DufliZL0.png" alt="google pay" style="height:17px;width:auto;display:block;"></span>' +
-      '<span style="display:inline-flex;align-items:center;padding:10px 18px;border-radius:9999px;background:rgba(244,241,232,0.08);border:1px solid rgba(244,241,232,0.16);font-family:Outfit;font-weight:600;font-size:13px;color:#F4F1E8;"> pay</span>' +
-      '<span style="display:inline-flex;align-items:center;padding:10px 18px;border-radius:9999px;background:rgba(244,241,232,0.08);border:1px solid rgba(244,241,232,0.16);font-family:Outfit;font-weight:600;font-size:13px;color:#F4F1E8;">afterpay</span>' +
-      '<span style="display:inline-flex;align-items:center;padding:10px 18px;border-radius:9999px;background:rgba(244,241,232,0.08);border:1px solid rgba(244,241,232,0.16);font-family:Outfit;font-weight:600;font-size:13px;color:#F4F1E8;">mastercard</span>' +
-      '<span style="display:inline-flex;align-items:center;padding:10px 18px;border-radius:9999px;background:rgba(244,241,232,0.08);border:1px solid rgba(244,241,232,0.16);font-family:Outfit;font-weight:600;font-size:13px;color:#F4F1E8;">visa</span></div>';
-
-    const B = [
-      { k: 'intro', hash: '#/property' },
-      { side: 'L', hash: '#/property/terminal', tag: 'property management', num: '01', mb: 'schedules send the rent requests, reminders chase the stragglers, every dollar reconciles itself.', h: 'rent that <span style="font-weight:500;color:#5E9DFF;">collects itself.</span>', b: 'automated rent &amp; bill collection — schedules send the requests, reminders chase the stragglers, and every dollar reconciles the moment it lands.', bl: ['track every payment link as it goes out', 'tenants pay instantly from their digital wallet', 'auto-generated gst receipts, emailed for you'] },
-      { side: 'L', hash: '#/property/terminal', drive: 'bill', tag: 'property management', num: '02', mb: 'pick the tenant, attach the invoice, send. it gets paid the same way rent does.', h: 'send &amp; track <span style="font-weight:500;color:#5E9DFF;">utility bills.</span>', b: 'water, late fees, cleaning, damages — pick the tenant, attach the invoice, send. it gets paid the same way rent does.', bl: ['one tap from the tenant&rsquo;s profile', 'attach the pdf invoice to the link', 'watch it move: sent → paid'] },
-      { side: 'R', hash: '#/trades', tag: 'trades & services', num: '03', mb: 'quote, invoice &amp; collect — the job and the money finally live in one place.', h: 'invoicing &amp; <span style="font-weight:500;color:#5E9DFF;">collecting payments.</span>', b: 'quote, invoice &amp; collect payment digitally — the job and the money finally live in one place.', bl: ['line-item quotes with gst done right', 'auto deposit request on acceptance', 'client profiles with full history'] },
-      { side: 'R', hash: '#/trades/quote', tag: 'trades & services', num: '04', mb: 'the moment they accept, the deposit request is already on their screen.', h: 'the quote pays <span style="font-weight:500;color:#5E9DFF;">its own deposit.</span>', b: 'build the quote on site and send it as a secure link — the moment they accept, the deposit request is already on their screen.', bl: ['accepted → deposit link, automatically', 'balance chases itself on completion', 'gst receipt lands in their inbox'] },
-      { side: 'L', hash: '#/terminal', tag: 'retail & hospitality', num: '05', mb: 'a full point of sale in your pocket. no transaction fees, just your subscription.', h: 'digital p.o.s &amp; <span style="font-weight:500;color:#5E9DFF;">eftpos system.</span>', b: 'throw out your old brick — a full point of sale that lives in your pocket, built for taking payments on the go.', bl: ['multi-stack — unlimited payments at once', 'no transaction fees — flat or percentage', 'live dashboard: everything you need, nothing you don&rsquo;t'] },
-      { side: 'L', hash: '#/terminal', drive: 'split', tag: 'retail & hospitality', num: '06', mb: 'each pays their share on their own card, with their own receipt.', h: 'they split the bill, <span style="font-weight:500;color:#5E9DFF;">not you.</span>', b: 'customers split the bill on their end without you lifting a finger — each pays their share on their own card, with their own receipt.', bl: ['2–10 way splits on any payment', 'track each share as it lands', 'auto gst receipt per person'] },
-      { side: 'R', hash: '#/pay/1', tag: 'the customer side', num: '07', mb: 'no app, no signup — the link opens straight to checkout. every wallet, secured by windcave.', h: 'a secure link. <span style="font-weight:500;color:#5E9DFF;">every wallet.</span>', b: 'no app, no signup — the secure payment link opens straight to checkout. digital wallets, afterpay or card, secured by windcave.', bl: [], wallets: true }
-    ];
-    const N = B.length;
-
-    // progress dots
-    const dots = B.map(() => {
-      const d = document.createElement('span');
-      d.style.cssText = 'width:26px;height:4px;border-radius:2px;background:rgba(244,241,232,0.15);transition:background .3s ease;';
-      dotsWrap.appendChild(d);
-      return d;
-    });
-
-    const isMobile = () => window.innerWidth < 880;
-
-    const panelHTML = (bt) => {
-      let h = '<div style="padding:0;">';
-      h += '<div style="display:flex;align-items:center;gap:12px;"><span style="font-family:Outfit;font-weight:800;font-size:12px;letter-spacing:0.28em;color:rgba(94,157,255,0.75);">' + bt.num + '</span><span style="font-family:Outfit;font-weight:500;font-size:12px;letter-spacing:0.26em;text-transform:uppercase;color:rgba(244,241,232,0.45);">' + bt.tag + '</span></div>';
-      h += '<h3 style="margin:14px 0 0;font-family:Outfit;font-weight:300;font-size:clamp(28px,3.5vw,54px);line-height:1.05;letter-spacing:-0.02em;color:#F4F1E8;">' + bt.h + '</h3>';
-      h += '<p style="margin:18px 0 0;font-family:Outfit;font-weight:400;font-size:clamp(14px,1.3vw,18px);line-height:1.6;color:rgba(244,241,232,0.62);">' + bt.b + '</p>';
-      if (bt.bl && bt.bl.length) {
-        h += '<div style="margin-top:22px;display:flex;flex-direction:column;gap:11px;">';
-        bt.bl.forEach((li) => {
-          h += '<div style="display:flex;align-items:flex-start;gap:12px;"><span style="flex:0 0 auto;margin-top:2px;color:#5E9DFF;font-family:Outfit;font-weight:700;font-size:14px;">&gt;</span><span style="font-family:Outfit;font-weight:400;font-size:clamp(13px,1.15vw,16px);line-height:1.5;color:rgba(244,241,232,0.78);">' + li + '</span></div>';
-        });
-        h += '</div>';
-      }
-      if (bt.wallets) h += wallet;
-      h += '</div>';
-      return h;
-    };
-
-    // drives: reach into the live app and press its own controls
-    const drive = (kind) => {
-      try {
-        const doc = frame.contentDocument;
-        if (!doc) return;
-        const btns = Array.from(doc.querySelectorAll('button'));
-        const find = (re) => btns.find((x) => re.test((x.getAttribute('aria-label') || '') + ' ' + (x.getAttribute('data-testid') || '') + ' ' + (x.textContent || '')));
-        let b = null;
-        if (kind === 'bill') b = find(/bill/i);
-        if (kind === 'split') b = find(/split/i);
-        if (b) b.click();
-      } catch (e) {}
-    };
-    const closeOverlay = () => {
-      try {
-        const doc = frame.contentDocument;
-        if (!doc) return;
-        const b = Array.from(doc.querySelectorAll('button')).find((x) => /close|back|cancel/i.test((x.getAttribute('aria-label') || '')));
-        if (b) b.click();
-      } catch (e) {}
-    };
-
-    let cur = -1;
-    let rot = 0;
-    let hideT = null; let showT = null; let midT = null; let driveT = null;
-    let visPanel = null;
-
-    const setHash = (h) => { try { if (frame.contentWindow && frame.contentWindow.location.hash !== h) frame.contentWindow.location.hash = h; } catch (e) {} };
-
-    const rigTo = (x, y, sc, ms) => {
-      rig.style.transition = ms ? 'transform ' + ms + 'ms ' + EASE : 'none';
-      rig.style.transform = 'translate(-50%,-50%) translate3d(' + x + 'vw,' + y + 'vh,0) scale(' + sc + ')';
-    };
-    const turnTo = (deg, ms) => {
-      if (this._p3) this._p3.setRot(deg, ms);
-    };
-
-    const applyBeat = (i, prev) => {
-      const bt = B[i];
-      const mob = isMobile();
-      clearTimeout(hideT); clearTimeout(showT); clearTimeout(midT); clearTimeout(driveT);
-
-      // phone target
-      const px = i === 0 ? 0 : mob ? 0 : (bt.side === 'L' ? 24 : -24);
-      const py = i === 0 ? 0 : mob ? -14 : 0;
-      const ps = i === 0 ? 1 : mob ? 0.82 : 0.94;
-      rot += (i >= prev ? 360 : -360);
-      rigTo(px, py, ps, 1150);
-      turnTo(rot, 1150);
-      if (glow) glow.style.opacity = i === 0 ? '0.8' : '0.55';
-
-      // camera pan illusion on bg
-      if (bg) {
-        const bx = i === 0 ? 0 : (bt.side === 'L' ? -1 : 1) * (2 + i * 1.4);
-        bg.style.transform = 'translate3d(' + bx + 'vw,' + (-i * 3.2) + 'vh,0)';
-      }
-
-      // screen swap at spin midpoint + drive after settle
-      midT = setTimeout(() => { setHash(bt.hash); }, 520);
-      if (bt.drive) driveT = setTimeout(() => drive(bt.drive), 1750);
-      else if (prev >= 0 && B[prev] && B[prev].drive) driveT = setTimeout(closeOverlay, 1500);
-
-      // intro chrome
-      if (headB) { headB.style.opacity = i === 0 ? headB.style.opacity : '0'; }
-      if (headA) { headA.style.opacity = i === 0 ? headA.style.opacity : '0'; }
-      ghost.forEach((g) => { if (i !== 0) g.style.opacity = '0'; });
-      if (cap) cap.style.opacity = i === 0 ? '0' : '1';
-
-      // text panels
-      const show = i === 0 ? null : (mob ? panelL : (bt.side === 'L' ? panelL : panelR));
-      const hideNow = (el) => {
-        if (!el) return;
-        el.style.animation = 'tpPopOut .45s cubic-bezier(.5,.06,.4,1) forwards';
-        el.style.pointerEvents = 'none';
-      };
-      if (visPanel && visPanel !== show) hideNow(visPanel);
-      if (visPanel && visPanel === show) hideNow(visPanel);
-      if (show) {
-        showT = setTimeout(() => {
-          show.innerHTML = panelHTML(bt);
-          show.style.animation = 'tpPopIn .75s cubic-bezier(.34,1.45,.5,1) forwards';
-          show.style.pointerEvents = 'auto';
-        }, 500);
-        visPanel = show;
-      } else {
-        visPanel = null;
-      }
-
-      dots.forEach((d, di) => { d.style.background = di === i ? '#5E9DFF' : 'rgba(244,241,232,0.15)'; });
-    };
-    this._applyCineBeat = applyBeat;
-
-    // mobile panel placement
-    const layoutPanels = () => {
-      const mob = isMobile();
-      [panelL, panelR].forEach((p) => {
-        if (!p) return;
-        if (mob) {
-          p.style.top = 'auto'; p.style.bottom = '9vh'; p.style.left = '5vw'; p.style.right = '5vw';
-          p.style.width = 'auto'; p.style.transform = 'none'; p.style.maxHeight = '38vh'; p.style.overflow = 'hidden';
-        } else {
-          p.style.bottom = 'auto'; p.style.top = '50%'; p.style.transform = 'translateY(-50%)';
-          p.style.width = 'min(520px,38vw)'; p.style.maxHeight = 'none'; p.style.overflow = 'visible';
-          if (p === panelL) { p.style.left = 'clamp(20px,7vw,9vw)'; p.style.right = 'auto'; }
-          else { p.style.right = 'clamp(20px,7vw,9vw)'; p.style.left = 'auto'; }
-        }
-      });
-    };
-    layoutPanels();
-    window.addEventListener('resize', () => { layoutPanels(); if (cur > 0) applyBeat(cur, cur); });
-
-    const easeOut = (t) => 1 - Math.pow(1 - t, 3);
-
-    this._cine = (p, t) => {
-      const zone = clamp(Math.floor(p * N), 0, N - 1);
-      if (zone !== cur) {
-        const prev = cur;
-        cur = zone;
-        applyBeat(zone, prev < 0 ? 0 : prev);
-      }
-      // intro scrub within zone 0
-      if (zone === 0) {
-        const rp = easeOut(map(p, 0.004, 1 / N * 0.82));
-        rigTo(0, (1 - rp) * 64, 0.9 + rp * 0.1, 0);
-        turnTo(-520 + rp * 520, 0);
-        rot = 0;
-        if (glow) glow.style.opacity = String(rp * 0.85);
-        if (headA) {
-          const aOut = map(rp, 0.42, 0.62);
-          headA.style.opacity = String((1 - aOut));
-          headA.style.transform = 'translateY(' + (-aOut * 26) + 'px)';
-        }
-        if (headB) {
-          const bIn = map(rp, 0.6, 0.82);
-          headB.style.opacity = String(bIn);
-          headB.style.transform = 'translateY(' + ((1 - bIn) * 26) + 'px)';
-        }
-        ghost.forEach((g, gi) => {
-          const gIn = map(rp, 0.5 + gi * 0.07, 0.62 + gi * 0.07);
-          const gOut = map(p, 1 / N * 0.86, 1 / N * 0.99);
-          g.style.opacity = String(gIn * (1 - gOut) * (0.55 + 0.45 * Math.sin(t * 1.3 + gi * 2)));
-          g.style.transform = 'translateY(' + ((1 - gIn) * 40 - gOut * 60 - Math.sin(t * 0.9 + gi * 1.7) * 6) + 'px)';
-        });
-      }
-    };
-  }
-
   // ---------------- industries ----------------
   renderIndustry(key, instant) {
     const d = this.industryData[key] || this.industryData.property;
@@ -857,13 +598,9 @@ export class LandingRuntime {
           feats.appendChild(row);
         });
       }
-      const fr = $('#tp-ind-frame');
-      if (fr) {
-        fr._wantHash = d.hash;
-        const setHash = () => { try { if (fr.contentWindow && /embed\.html/.test(fr.contentWindow.location.href)) fr.contentWindow.location.hash = fr._wantHash; } catch (e) {} };
-        setHash();
-        if (!fr._hashHook) { fr._hashHook = true; fr.addEventListener('load', setHash); }
-      }
+      // The phone beside this copy is React and picks its own scene off the
+      // selected tab (landing-page.tsx reads [data-ind]); this method owns the
+      // copy only.
       document.querySelectorAll('.tp-tab').forEach((t) => {
         const on = t.getAttribute('data-ind') === key;
         t.style.background = on ? '#5E9DFF' : 'transparent';
@@ -929,14 +666,14 @@ export class LandingRuntime {
     fit();
     window.addEventListener('resize', fit);
     setTimeout(fit, 400); setTimeout(fit, 1500); setTimeout(fit, 4000);
+    // The screen's own pointer-events are React's (landing-page.tsx watches this
+    // same click), so this handler owns nothing but the button's own appearance.
+    // Two writers on one inline style is how they would drift apart.
     document.querySelectorAll('.tp-phone-live').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const scope = btn.parentElement;
-        const f = scope ? scope.querySelector('.tp-app-frame') : null;
-        if (!f) return;
-        const live = f.style.pointerEvents === 'auto';
-        f.style.pointerEvents = live ? 'none' : 'auto';
+        const live = btn.getAttribute('data-live') === '1';
+        btn.setAttribute('data-live', live ? '0' : '1');
         btn.textContent = live ? 'try it live' : 'exit live demo';
         btn.style.background = live ? 'transparent' : '#5E9DFF';
         btn.style.color = live ? '#5E9DFF' : '#040D6D';
@@ -1049,8 +786,6 @@ export class LandingRuntime {
     const reveal = () => {
       if (open) return; open = true;
       clearTimeout(animT);
-      const fr = $('#tp-ind-frame');
-      if (fr && !fr.getAttribute('src')) fr.src = fr.getAttribute('data-defer-src');
       tab.style.transform = 'translateX(110%)'; tab.style.opacity = '0'; tab.style.pointerEvents = 'none';
       copy.style.opacity = '0'; copy.style.transform = 'translateX(-28px)';
       animT = setTimeout(() => {

@@ -30,6 +30,15 @@ export type LandingPhoneDemoProps = {
   scale?: number;
   /** Reduced motion or Save-Data: show finished frames, skip the build-up. */
   still?: boolean;
+  /**
+   * Screen only — no rim, back face, glare or dynamic island.
+   *
+   * The landing page already draws a phone around this slot (the cinematic
+   * WebGL body, and the tilting `.tp-phone` in Industries), so drawing our own
+   * would nest a phone inside a phone. `bare` is what the landing page uses;
+   * the full chrome exists for standalone use, where the demo *is* the phone.
+   */
+  bare?: boolean;
   className?: string;
 };
 
@@ -53,10 +62,58 @@ function useSceneAnnouncement(state: LandingPhoneState): string {
   return message;
 }
 
-export function LandingPhoneDemo({ state, rotateY = 0, rotateX = 0, scale = 1, still = false, className }: LandingPhoneDemoProps) {
+const SR_ONLY = {
+  position: 'absolute', width: 1, height: 1, overflow: 'hidden',
+  clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap',
+} as const;
+
+export function LandingPhoneDemo({ state, rotateY = 0, rotateX = 0, scale = 1, still = false, bare = false, className }: LandingPhoneDemoProps) {
   const def = SCENES[state.scene];
   const Scene = def.Component;
   const announcement = useSceneAnnouncement(state);
+
+  // The scene always renders at its canonical 390 × 844 and is scaled as a
+  // whole, so no scene has to know what size it is being shown at.
+  const screen = (
+    <div
+      style={{
+        width: SCREEN_W,
+        height: SCREEN_H,
+        transform: scale === 1 ? undefined : `scale(${scale})`,
+        transformOrigin: 'top left',
+        position: 'relative',
+        overflow: 'hidden',
+        background: '#fff',
+      }}
+    >
+      <Scene step={state.step} still={still} />
+      {!bare && <div className="lp-island" aria-hidden />}
+    </div>
+  );
+
+  const live = (
+    <p aria-live="polite" style={SR_ONLY}>
+      {announcement}
+    </p>
+  );
+
+  if (bare) {
+    // No .lp-phone here: preserve-3d and a perspective transform belong to
+    // whoever owns the phone body, and this element is only its screen.
+    return (
+      <div
+        className={className}
+        data-demo-scene={state.scene}
+        data-demo-step={state.step}
+        role="img"
+        aria-label={def.label}
+        style={{ width: SCREEN_W * scale, height: SCREEN_H * scale, position: 'relative', overflow: 'hidden', background: '#fff' }}
+      >
+        {screen}
+        {live}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -72,28 +129,10 @@ export function LandingPhoneDemo({ state, rotateY = 0, rotateX = 0, scale = 1, s
       <div className="lp-rim" aria-hidden />
       <div className="lp-face lp-face-back" aria-hidden style={{ backgroundImage: "url('/assets/shell-back.webp')" }} />
       <div className="lp-face" role="img" aria-label={def.label}>
-        <div
-          style={{
-            width: SCREEN_W,
-            height: SCREEN_H,
-            transform: scale === 1 ? undefined : `scale(${scale})`,
-            transformOrigin: 'top left',
-            position: 'relative',
-            overflow: 'hidden',
-            background: '#fff',
-          }}
-        >
-          <Scene step={state.step} still={still} />
-          <div className="lp-island" aria-hidden />
-        </div>
+        {screen}
         <div className="lp-glare" aria-hidden />
       </div>
-      <p
-        aria-live="polite"
-        style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}
-      >
-        {announcement}
-      </p>
+      {live}
     </div>
   );
 }

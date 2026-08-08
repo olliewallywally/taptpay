@@ -16,7 +16,7 @@
  *   • no IntersectionObserver → load immediately
  *   • Save-Data → no prefetch, and finished frames when it does load
  */
-import { Component, Suspense, lazy, useCallback, useEffect, useState, type ReactNode } from 'react';
+import { Component, Suspense, lazy, useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { SCREEN_H, SCREEN_W } from './tokens';
 import type { LandingPhoneScene, LandingPhoneState } from './types';
 import { useApproaching, useStillPreference, useStoryProgress } from './useStoryProgress';
@@ -27,8 +27,12 @@ const PhoneStage = lazy(() => import('./LandingPhoneDemo'));
  * Inline-styled on purpose: the shell is the pre-chunk state, so it must not
  * depend on landing-phone.css. It is a few hundred bytes and carries the
  * phone's silhouette, not its content.
+ *
+ * `bare` drops the silhouette: inside the landing page's own phone chrome the
+ * shell is a screen, and a rounded, shadowed slab there would read as a second
+ * phone floating behind the glass for as long as the chunk takes to arrive.
  */
-function StaticShell({ scale = 1, rotateY = 0, label = 'taptpay app' }: { scale?: number; rotateY?: number; label?: string }) {
+function StaticShell({ scale = 1, rotateY = 0, bare = false, label = 'taptpay app' }: { scale?: number; rotateY?: number; bare?: boolean; label?: string }) {
   return (
     <div
       role="img"
@@ -37,10 +41,14 @@ function StaticShell({ scale = 1, rotateY = 0, label = 'taptpay app' }: { scale?
       style={{
         width: SCREEN_W * scale,
         height: SCREEN_H * scale,
-        borderRadius: 54 * scale,
         background: 'linear-gradient(158deg,#0a1656 0%,#040D6D 46%,#0b1a6e 100%)',
-        boxShadow: '0 40px 120px rgba(4,13,109,0.55), inset 0 0 0 2px rgba(185,203,232,0.35)',
-        transform: `perspective(2200px) rotateY(${rotateY}deg)`,
+        ...(bare
+          ? null
+          : {
+              borderRadius: 54 * scale,
+              boxShadow: '0 40px 120px rgba(4,13,109,0.55), inset 0 0 0 2px rgba(185,203,232,0.35)',
+              transform: `perspective(2200px) rotateY(${rotateY}deg)`,
+            }),
       }}
     />
   );
@@ -86,15 +94,24 @@ export type LandingPhoneMountProps = {
   /** Milestone count for the selected scene; supplied by the caller so the
    *  main chunk never imports the registry to find out. */
   steps?: number;
+  /** Render the screen only, for callers that draw their own phone body. */
+  bare?: boolean;
+  /**
+   * Cinematic only: selector for the tall element whose scroll travel is the
+   * story. Omit when the mount itself is what scrolls.
+   */
+  storySelector?: string;
   className?: string;
+  style?: CSSProperties;
 };
 
 export function LandingPhoneMount({
-  variant, scene, state, scale = 1, spin = [-18, 18], interactive = false, steps, className,
+  variant, scene, state, scale = 1, spin = [-18, 18], interactive = false, steps,
+  bare = false, storySelector, className, style,
 }: LandingPhoneMountProps) {
   const [ref, near] = useApproaching<HTMLDivElement>('600px');
   const { reducedMotion, saveData } = useStillPreference();
-  const progress = useStoryProgress(ref, near && variant === 'cinematic');
+  const progress = useStoryProgress(ref, near && variant === 'cinematic', storySelector);
 
   // Tap-through state for the Industries phone. Selecting a different tab
   // restarts that workflow from its own first milestone.
@@ -110,7 +127,7 @@ export function LandingPhoneMount({
   const load = saveData ? near && progress > 0 : near;
   const rotateY = variant === 'cinematic' ? spin[0] + (spin[1] - spin[0]) * progress : 0;
 
-  const shell = <StaticShell scale={scale} rotateY={rotateY} />;
+  const shell = <StaticShell scale={scale} rotateY={rotateY} bare={bare} />;
 
   // An Industries tab that is not being tapped through rests on its finished
   // frame, so the tab shows a completed workflow rather than an empty first step.
@@ -120,7 +137,20 @@ export function LandingPhoneMount({
     : undefined;
 
   return (
-    <div ref={ref} className={className} style={{ width: SCREEN_W * scale, height: SCREEN_H * scale, position: 'relative' }}>
+    <div
+      ref={ref}
+      className={className}
+      style={{
+        width: SCREEN_W * scale,
+        height: SCREEN_H * scale,
+        position: 'relative',
+        // The landing page scales this element to fit its phone chrome
+        // (landingRuntime initPhones), which only lands correctly from the
+        // top-left corner of the 390 × 844 screen.
+        transformOrigin: 'top left',
+        ...style,
+      }}
+    >
       {load ? (
         <PhoneBoundary fallback={shell}>
           <Suspense fallback={shell}>
@@ -130,6 +160,7 @@ export function LandingPhoneMount({
               rotateY={rotateY}
               scale={scale}
               still={still}
+              bare={bare}
             />
           </Suspense>
         </PhoneBoundary>
@@ -154,7 +185,9 @@ export function LandingPhoneMount({
             type="button"
             onClick={() => setStep(0)}
             style={{
-              position: 'absolute', bottom: -14, left: '50%', transform: 'translateX(-50%)',
+              // Bare mounts sit inside a clipping phone screen, so the control
+              // has to live above the bottom edge rather than under it.
+              position: 'absolute', bottom: bare ? 16 : -14, left: '50%', transform: 'translateX(-50%)',
               padding: '8px 18px', borderRadius: 999, border: '1px solid rgba(94,157,255,0.5)',
               background: 'rgba(4,13,109,0.9)', color: '#5E9DFF', cursor: 'pointer',
               font: "600 12px/1 'Outfit', system-ui", letterSpacing: '0.06em',

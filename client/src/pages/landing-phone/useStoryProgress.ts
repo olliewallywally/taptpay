@@ -41,25 +41,56 @@ export function useApproaching<T extends Element>(margin = '600px'): [React.RefO
 }
 
 /**
- * Progress of `ref` through the viewport, 0 → 1.
+ * Progress of an element through the viewport, 0 → 1.
  *
  * Rounded to a small grid before it reaches React: the scene controller only
  * cares about milestone boundaries, so there is no reason to re-render on
  * sub-pixel scroll deltas.
+ *
+ * `trackSelector` names the element that actually travels. It exists because
+ * the landing page pins the phone inside a `position: sticky` viewport: the
+ * phone itself never moves relative to the viewport, so measuring it yields a
+ * step function rather than a story. The tall scroll container around it
+ * (`#tp-story-wrap`) is what scrolls, and measuring it reproduces the runtime's
+ * own `(scrollY - storyTop) / storyLen` exactly.
  */
-export function useStoryProgress<T extends Element>(ref: React.RefObject<T>, active = true): number {
+export function useStoryProgress<T extends Element>(
+  ref: React.RefObject<T>,
+  active = true,
+  trackSelector?: string,
+): number {
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
-    const el = ref.current;
-    if (!el || !active) return;
+    const anchor = ref.current;
+    if (!anchor || !active) return;
+    // Prefer the ancestor: a landing page rendered twice would otherwise have
+    // both phones measuring the first match in the document.
+    const el = trackSelector
+      ? anchor.closest(trackSelector) ?? document.querySelector(trackSelector)
+      : anchor;
+    if (!el) return;
 
     let frame = 0;
-    let visible = true;
 
+    /*
+     * Deliberately not gated on "is the story visible".
+     *
+     * Gating there strands the phone. An IntersectionObserver only fires when
+     * the intersection ratio crosses a threshold, so scrolling from above the
+     * story to below it in one jump — a tall landing page, a hash link, an
+     * end key — goes 0 → 0 and fires nothing at all. Progress would then stay
+     * frozen wherever it was, leaving the phone on scene 1 while the page sits
+     * past scene 8.
+     *
+     * The reading itself is one clamped rect measurement, coalesced to one per
+     * frame. §6 rule 9 is still satisfied where it counts: outside the story
+     * the value pins to exactly 0 or 1, so `setProgress` no-ops and neither
+     * React nor any scene does work.
+     */
     const measure = () => {
       frame = 0;
-      if (!visible || document.hidden) return;
+      if (document.hidden) return;
       const rect = el.getBoundingClientRect();
       const travel = rect.height - window.innerHeight;
       const raw = travel > 0 ? -rect.top / travel : rect.top <= 0 ? 1 : 0;
@@ -72,16 +103,12 @@ export function useStoryProgress<T extends Element>(ref: React.RefObject<T>, act
       frame = requestAnimationFrame(measure);
     };
 
+    // Catches movement that fires no scroll event — a resize, a lazy image
+    // above the story, the sticky viewport settling after layout.
     const io =
       typeof IntersectionObserver === 'undefined'
         ? null
-        : new IntersectionObserver(
-            (entries) => {
-              visible = entries.some((e) => e.isIntersecting);
-              if (visible) schedule();
-            },
-            { rootMargin: '100px' },
-          );
+        : new IntersectionObserver(() => schedule(), { rootMargin: '100px' });
     io?.observe(el);
 
     window.addEventListener('scroll', schedule, { passive: true });
@@ -96,7 +123,7 @@ export function useStoryProgress<T extends Element>(ref: React.RefObject<T>, act
       window.removeEventListener('resize', schedule);
       document.removeEventListener('visibilitychange', schedule);
     };
-  }, [ref, active]);
+  }, [ref, active, trackSelector]);
 
   return progress;
 }
