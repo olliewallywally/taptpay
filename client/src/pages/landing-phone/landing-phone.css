@@ -1,0 +1,236 @@
+/*
+ * Landing phone demo styles.
+ *
+ * Declarations are copied by value from the production terminal CSS
+ * (property-terminal.tsx TP_TERM_CSS) so the demo matches the real app at
+ * 390 × 844. Class names are re-prefixed lp- rather than tp- because the
+ * landing page already owns a tp- namespace of its own; the values, not the
+ * names, are the fidelity contract.
+ *
+ * The font family is NOT imported here. landing.css already declares Outfit
+ * via local @font-face, and the production terminal's Google Fonts @import
+ * would be an external request the demo is not allowed to make.
+ */
+
+.lp-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: 'Outfit', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.lp-amount {
+  font-family: 'Outfit', system-ui;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+  font-variant-numeric: tabular-nums;
+}
+
+.lp-kp {
+  width: 76px;
+  height: 76px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Outfit', system-ui;
+  font-weight: 700;
+  font-size: 30px;
+  background: #58abff;
+  color: #fff;
+  border: none;
+}
+.lp-kp.outline {
+  background: transparent;
+  color: #58abff;
+  box-shadow: inset 0 0 0 2px #58abff;
+}
+/* Lit while the scripted press is on this key. */
+.lp-kp.hit {
+  transform: scale(0.92);
+  background: #1a5fcc;
+}
+
+.lp-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  padding: 6px 20px;
+  font-family: 'Outfit', system-ui;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 1;
+  border: none;
+}
+.lp-pill.solid {
+  background: #58abff;
+  color: #040d6d;
+}
+.lp-pill.outline {
+  background: transparent;
+  color: #58abff;
+  box-shadow: inset 0 0 0 1px #58abff;
+}
+
+.lp-subhead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 22px 0;
+}
+.lp-subhead-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: 2px solid #040d6d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #040d6d;
+  background: none;
+}
+
+.lp-stack-card {
+  border-radius: 14px;
+  background: #fff;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(4, 13, 109, 0.06);
+  border: 1px solid rgba(4, 13, 109, 0.04);
+}
+.lp-stack-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: #040d6d;
+  letter-spacing: -0.2px;
+}
+
+.lp-send {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 14px 4px 4px;
+  border-radius: 26px;
+  background: #040d6d;
+  border: none;
+  box-shadow: 0 4px 16px rgba(4, 13, 109, 0.25);
+  height: 37px;
+}
+.lp-send-circle {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #58abff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.lp-send-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #58abff;
+  letter-spacing: 0.3px;
+}
+
+.lp-fab {
+  width: 70px;
+  height: 70px;
+  border-radius: 999px;
+  background: #58abff;
+  color: #040d6d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 18px rgba(4, 13, 109, 0.25);
+  border: none;
+}
+
+/* ── step-driven motion ─────────────────────────────────────────────────────
+   Scenes never schedule anything. They render a frame for the current step and
+   these transitions carry the eye between frames, so a scene change can never
+   leave an animation running behind it. */
+.lp-t {
+  transition: opacity 0.32s ease, transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.lp-in {
+  opacity: 1;
+  transform: none;
+}
+.lp-out-up {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+.lp-out-down {
+  opacity: 0;
+  transform: translateY(14px);
+}
+.lp-grow {
+  transition: width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ── phone body (CSS 3D, replaces the WebGL slab) ──────────────────────────── */
+.lp-phone {
+  position: relative;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+.lp-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  border-radius: 54px;
+  overflow: hidden;
+}
+.lp-face-back {
+  transform: rotateY(180deg);
+  background-size: cover;
+  background-position: center;
+}
+.lp-rim {
+  position: absolute;
+  inset: -2px;
+  border-radius: 56px;
+  background: linear-gradient(145deg, #b9cbe8 0%, #6f86ad 42%, #dce6f7 68%, #56688c 100%);
+  transform: translateZ(-6px);
+}
+.lp-glare {
+  position: absolute;
+  inset: 0;
+  border-radius: 54px;
+  pointer-events: none;
+  background: linear-gradient(118deg, rgba(255, 255, 255, 0) 38%, rgba(255, 255, 255, 0.22) 50%, rgba(255, 255, 255, 0) 62%);
+}
+.lp-island {
+  position: absolute;
+  top: 11px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 118px;
+  height: 33px;
+  border-radius: 999px;
+  background: #05060f;
+  z-index: 40;
+}
+
+/* Enhanced 3D is additive: if transforms are unsupported the screen still
+   renders, flat, rather than showing a blank phone. */
+@supports not (transform-style: preserve-3d) {
+  .lp-phone {
+    transform: none !important;
+  }
+  .lp-face-back,
+  .lp-rim {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-t,
+  .lp-grow {
+    transition: none;
+  }
+}
