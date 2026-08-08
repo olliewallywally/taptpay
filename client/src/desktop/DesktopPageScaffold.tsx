@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { DeviceClass } from "@/hooks/use-device-class";
+import { useHasDesktopChrome } from "./DesktopChrome";
 import { DesktopFrame } from "./DesktopFrame";
 import { DesktopShell } from "./DesktopShell";
 import { ScaledCanvas } from "./ScaledCanvas";
@@ -30,6 +31,14 @@ export function DesktopPageScaffold({
   children,
   showScope,
 }: DesktopPageScaffoldProps) {
+  /* In the app the frame + header + nav are mounted once above the router (see
+     `DesktopChrome`), so re-rendering them here would reintroduce the per-hop
+     remount this scaffold used to cause. Rendered standalone — unit tests,
+     screenshot fixtures — there is no chrome above, so it still draws its own. */
+  if (useHasDesktopChrome()) {
+    return <>{children}</>;
+  }
+
   return (
     <DesktopFrame deviceClass={deviceClass}>
       <ScaledCanvas>

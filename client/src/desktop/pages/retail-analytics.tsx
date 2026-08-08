@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
 } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getCurrentMerchantId } from "@/lib/auth";
@@ -453,12 +454,13 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
         {/* ── OVERVIEW ── */}
         {!report && (
           <>
-            <button type="button" className="ra-scope" aria-label="my store scope" aria-haspopup="listbox">
+            {/* entry cascade step 0 */}
+            <button type="button" className="ra-scope dt-rise" style={{ "--dt-i": 0 } as CSSProperties} aria-label="my store scope" aria-haspopup="listbox">
               <span>my store</span>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
             </button>
 
-            <div className="ra-hero-row">
+            <div className="ra-hero-row dt-rise" style={{ "--dt-i": 1 } as CSSProperties}>
               <div className="ra-hero-col">
                 <div className="ra-hero-amt-row">
                   <span className="ra-hero">{txQuery.isLoading ? "—" : money(overview.total)}</span>
@@ -500,7 +502,7 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
               </div>
             </div>
 
-            <div className="ra-chart" ref={chartRef}>
+            <div className="ra-chart dt-rise" style={{ "--dt-i": 2 } as CSSProperties} ref={chartRef}>
               <svg className="ra-chart-svg" viewBox="0 0 1076 240" preserveAspectRatio="none" aria-hidden="true">
                 <defs>
                   <linearGradient id="rtrevfill" x1="0" y1="0" x2="0" y2="1">
@@ -631,8 +633,11 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
             transition: dragging ? "none" : "transform .5s cubic-bezier(.22,.9,.3,1)",
           }}
         >
+          {/* The sheet shell itself carries a live inline transform for the drag,
+              so the entry cascade runs on its contents instead. */}
           <div
-            className="ra-grab"
+            className="ra-grab dt-rise"
+            style={{ "--dt-i": 3 } as CSSProperties}
             role="button"
             tabIndex={0}
             aria-label={sheetOpen ? "collapse payment history" : "expand payment history"}
@@ -651,7 +656,7 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
             <span className="ra-grab-bar" />
           </div>
 
-          <div className="ra-sheet-head">
+          <div className="ra-sheet-head dt-rise" style={{ "--dt-i": 4 } as CSSProperties}>
             <span className="ra-sheet-title">{sheetTitle}</span>
             <div className="ra-sheet-actions">
               {sheetMode === "history" && (
@@ -681,7 +686,7 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
             </div>
           </div>
 
-          <div className="ra-sheet-body">
+          <div className="ra-sheet-body dt-rise" style={{ "--dt-i": 5 } as CSSProperties}>
             {sheetMode === "history" &&
               (txQuery.isLoading ? (
                 <div className="ra-sheet-empty">loading sales…</div>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { tradesFetch } from "@/lib/trades-api";
 import { fmtNZD } from "@/lib/report-utils";
@@ -155,7 +155,9 @@ export default function DesktopTradesClients(props: DesktopRoutePageProps) {
     <DesktopPageScaffold {...props} vertical="trades" page="directory" showScope={false}>
       <style>{TC_CSS}</style>
       <div className="tc-body">
-        <div className="tc-scope-wrap">
+        {/* Entry cascade: scope → hero → search → list. The profile panel is
+            opened by selecting a client, so it keeps its own animation. */}
+        <div className="tc-scope-wrap dt-rise" style={{ "--dt-i": 0 } as CSSProperties}>
           <button
             type="button"
             className="tc-scope"
@@ -200,14 +202,14 @@ export default function DesktopTradesClients(props: DesktopRoutePageProps) {
           )}
         </div>
 
-        <div className="tc-hero">
+        <div className="tc-hero dt-rise" style={{ "--dt-i": 1 } as CSSProperties}>
           <span className="tc-hero-count">{isLoading ? "—" : activeCount}</span>
           <span className="tc-hero-label">
             active client{activeCount === 1 ? "" : "s"}
           </span>
         </div>
 
-        <div className="tc-search-row" data-tutorial-id="trades-directory-search">
+        <div className="tc-search-row dt-rise" style={{ "--dt-i": 2 } as CSSProperties} data-tutorial-id="trades-directory-search">
           <div className="tc-search">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={ACCENT} strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="6.5" /><path d="m20 20-3.8-3.8" /></svg>
             <input
@@ -228,7 +230,7 @@ export default function DesktopTradesClients(props: DesktopRoutePageProps) {
           </button>
         </div>
 
-        <div className="tc-list">
+        <div className="tc-list dt-rise" style={{ "--dt-i": 3 } as CSSProperties}>
           {loadError ? (
             <div className="tc-empty">couldn’t load clients — try again shortly</div>
           ) : isLoading ? (
@@ -406,17 +408,17 @@ const TC_CSS = `
 .tc-scope-opt:hover { background:rgba(94,158,255,0.14); }
 .tc-scope-opt[aria-selected="true"] { background:rgba(94,158,255,0.22); }
 
-.tc-hero { margin-top:18px; display:flex; flex-direction:column; animation:popIn .55s cubic-bezier(.34,1.42,.5,1) 40ms both; }
+.tc-hero { margin-top:18px; display:flex; flex-direction:column; }
 .tc-hero-count { font-family:'Outfit',sans-serif; font-weight:700; font-size:96px; line-height:0.95; letter-spacing:-0.01em; color:${ACCENT}; font-variant-numeric:tabular-nums; }
 .tc-hero-label { margin-top:6px; font-weight:300; font-size:16px; color:${NAV_DIM}; }
 
-.tc-search-row { margin-top:56px; display:flex; align-items:center; gap:12px; animation:popIn .55s cubic-bezier(.34,1.42,.5,1) 120ms both; }
+.tc-search-row { margin-top:56px; display:flex; align-items:center; gap:12px; }
 .tc-search { display:flex; align-items:center; gap:10px; width:300px; height:38px; padding:0 16px; box-sizing:border-box; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); }
 .tc-search input { flex:1; min-width:0; border:none; background:transparent; outline:none; color:#fff; font-family:'Outfit',sans-serif; font-weight:500; font-size:12px; }
 .tc-add { width:38px; height:38px; border-radius:50%; background:${ACTIVE}; display:flex; align-items:center; justify-content:center; cursor:pointer; flex:0 0 auto; box-shadow:0 2px 10px rgba(102,169,255,0.35); transition:opacity .15s ease, transform .15s ease; }
 .tc-add:hover { opacity:0.92; transform:scale(1.05); }
 
-.tc-list { margin-top:16px; display:flex; flex-direction:column; gap:5px; width:400px; max-height:490px; overflow-y:auto; scrollbar-width:none; animation:popIn .55s cubic-bezier(.34,1.42,.5,1) 200ms both; }
+.tc-list { margin-top:16px; display:flex; flex-direction:column; gap:5px; width:400px; max-height:490px; overflow-y:auto; scrollbar-width:none; }
 .tc-list::-webkit-scrollbar { display:none; }
 .tc-row { display:flex; align-items:center; gap:16px; width:100%; min-width:0; box-sizing:border-box; padding:5px 0; border-radius:10px; background:transparent; cursor:pointer; text-align:left; transition:background .15s ease; }
 .tc-row:hover { background:rgba(94,158,255,0.06); }

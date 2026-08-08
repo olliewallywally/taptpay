@@ -1,4 +1,11 @@
-import { useEffect, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { useLocation } from "wouter";
 import {
   DESKTOP_NAV_ITEMS,
@@ -28,6 +35,39 @@ export function DesktopShell({
 }: DesktopShellProps) {
   const [, setLocation] = useLocation();
   const navItems = DESKTOP_NAV_ITEMS[vertical];
+  const navRef = useRef<HTMLElement>(null);
+  const [bubble, setBubble] = useState<{ x: number; width: number } | null>(
+    null,
+  );
+
+  /* Measure the active pill and drive the bubble to it. Layout-effect so the
+     bubble is already in place on first paint, and re-measured on resize because
+     the nav is inside a scaled canvas whose width follows the viewport. */
+  useLayoutEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+
+    const measure = () => {
+      const active = nav.querySelector<HTMLElement>(
+        `[data-nav-id="${page}"]`,
+      );
+      if (!active) return;
+      setBubble((current) =>
+        current &&
+        current.x === active.offsetLeft &&
+        current.width === active.offsetWidth
+          ? current
+          : { x: active.offsetLeft, width: active.offsetWidth },
+      );
+    };
+
+    measure();
+
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(nav);
+    return () => observer.disconnect();
+  }, [page, vertical, navItems]);
 
   useEffect(() => {
     saveDesktopMode(vertical);
@@ -53,7 +93,21 @@ export function DesktopShell({
         <nav
           className="tapt-desktop-nav"
           aria-label={`${vertical} app navigation`}
+          ref={navRef}
         >
+          <span
+            className="tapt-desktop-nav-bubble"
+            data-ready={bubble ? "true" : "false"}
+            style={
+              bubble
+                ? ({
+                    "--bubble-x": `${bubble.x}px`,
+                    "--bubble-w": `${bubble.width}px`,
+                  } as CSSProperties)
+                : undefined
+            }
+            aria-hidden="true"
+          />
           {navItems.map((item) => {
             const active = item.id === page;
             return (
@@ -61,11 +115,13 @@ export function DesktopShell({
                 key={item.id}
                 type="button"
                 className="tapt-desktop-nav-item"
+                data-nav-id={item.id}
+                data-label={item.label}
                 aria-current={active ? "page" : undefined}
                 aria-label={item.label.toLowerCase()}
                 onClick={() => navigate(item.path)}
               >
-                {item.label}
+                <span className="tapt-desktop-nav-label">{item.label}</span>
               </button>
             );
           })}

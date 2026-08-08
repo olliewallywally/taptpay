@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -250,7 +250,8 @@ export default function DesktopRetailStock(props: DesktopRoutePageProps) {
       <style>{RS_CSS}</style>
       <div className="rs-body">
         {/* ── LEFT ── */}
-        <div className="rs-left">
+        {/* entry cascade: scope → count → search → sorts → best seller */}
+        <div className="rs-left dt-cascade">
           <button type="button" className="rs-scope" aria-label="my store scope">
             <span>my store</span>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
@@ -307,7 +308,11 @@ export default function DesktopRetailStock(props: DesktopRoutePageProps) {
         </div>
 
         {/* ── RIGHT: card grid ── */}
-        <div className="rs-right">
+        {/* last step of the entry cascade, after the left column's five */}
+        <div
+          className="rs-right dt-rise"
+          style={{ "--dt-i": 5 } as CSSProperties}
+        >
           <div className="rs-grid">
             <button type="button" className="rs-add" data-tutorial-id="retail-stock-add" aria-label="add product" onClick={openAdd}>
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>

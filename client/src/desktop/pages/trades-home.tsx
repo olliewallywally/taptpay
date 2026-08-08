@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { useLocation } from "wouter";
 import { useNotifications } from "@/components/notification-system";
 import {
@@ -240,7 +240,9 @@ export default function DesktopTradesHome(props: DesktopRoutePageProps) {
       <style>{TH_CSS}</style>
 
       {/* ── LEFT COLUMN ── */}
-      <div className="th-left">
+      {/* Entry cascade: the left column runs steps 0–3, the right column picks
+          up at step 4 via `--dt-d` so the screen reads as one sequence. */}
+      <div className="th-left dt-cascade">
         <div className="th-scope-wrap">
           <button
             type="button"
@@ -399,7 +401,7 @@ export default function DesktopTradesHome(props: DesktopRoutePageProps) {
       </div>
 
       {/* ── RIGHT COLUMN ── */}
-      <div className="th-right">
+      <div className="th-right dt-cascade" style={{ "--dt-d": "208ms" } as CSSProperties}>
         {/* business health */}
         <div className="th-health" data-tutorial-id="trades-home-health">
           {healthBox && detail[healthBox] ? (
@@ -589,7 +591,7 @@ const TH_CSS = `
 .th-scope-opt:hover { background:rgba(94,158,255,0.14); }
 .th-scope-opt[aria-selected="true"] { background:rgba(94,158,255,0.22); }
 
-.th-hero { margin-top:22px; animation:popIn .55s cubic-bezier(.34,1.42,.5,1) 40ms both; }
+.th-hero { margin-top:22px; }
 .th-hero-row { display:flex; align-items:flex-start; gap:16px; }
 .th-amount { font-family:'Outfit',sans-serif; font-weight:700; font-size:84px; line-height:0.92; letter-spacing:-0.015em; color:${ACCENT}; font-variant-numeric:tabular-nums; }
 .th-pct { margin-top:8px; padding:7px 14px; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); font-weight:700; font-size:13.5px; color:${ACCENT_SOFT}; white-space:nowrap; }
@@ -599,7 +601,7 @@ const TH_CSS = `
 .th-error span { color:#FFB3B8; font-size:13.5px; }
 .th-error button { background:${ACCENT}; color:${NAVY}; border-radius:10px; padding:8px 14px; font-size:12px; font-weight:700; cursor:pointer; }
 
-.th-chart-wrap { margin-top:36px; animation:popIn .55s cubic-bezier(.34,1.42,.5,1) 100ms both; }
+.th-chart-wrap { margin-top:36px; }
 .th-bars { display:flex; align-items:flex-end; gap:16px; height:298px; }
 .th-bar-btn { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:12px; height:100%; cursor:pointer; background:transparent; }
 .th-bar { width:100%; max-width:36px; border-radius:10px; transition:height .3s ease, background .2s ease; }
@@ -608,7 +610,7 @@ const TH_CSS = `
 .th-segs { display:flex; align-items:center; padding:4px; border-radius:9999px; background:${CHIP}; }
 .th-seg { padding:9px 0; width:76px; border-radius:9999px; font-size:12px; cursor:pointer; transition:background .18s ease, color .18s ease; }
 
-.th-breakdown { margin-top:24px; height:138px; border-radius:12px; border:1.5px solid rgba(94,158,255,0.5); box-sizing:border-box; padding:18px 22px; display:flex; flex-direction:column; justify-content:space-between; animation:popIn .55s cubic-bezier(.34,1.42,.5,1) 160ms both; }
+.th-breakdown { margin-top:24px; height:138px; border-radius:12px; border:1.5px solid rgba(94,158,255,0.5); box-sizing:border-box; padding:18px 22px; display:flex; flex-direction:column; justify-content:space-between; }
 .th-bd-head { display:flex; align-items:center; justify-content:space-between; }
 .th-bd-title { font-weight:300; font-size:11px; letter-spacing:0.22em; color:${ACCENT_SOFT}; }
 .th-bd-hint { font-weight:300; font-size:11px; color:rgba(244,246,255,0.4); }
@@ -624,7 +626,7 @@ const TH_CSS = `
 .th-bd-track { display:block; height:5px; border-radius:3px; background:rgba(94,158,255,0.18); overflow:hidden; }
 .th-bd-fill { display:block; height:100%; border-radius:3px; background:${ACCENT}; transition:width .3s ease; }
 
-.th-health { flex:0 0 auto; height:182px; border-radius:16px; border:1.5px solid rgba(94,158,255,0.5); box-sizing:border-box; padding:18px 24px; display:flex; flex-direction:column; overflow:hidden; animation:popIn .55s cubic-bezier(.34,1.42,.5,1) 130ms both; }
+.th-health { flex:0 0 auto; height:182px; border-radius:16px; border:1.5px solid rgba(94,158,255,0.5); box-sizing:border-box; padding:18px 24px; display:flex; flex-direction:column; overflow:hidden; }
 .th-health-head { display:flex; align-items:center; justify-content:space-between; }
 .th-health-body { flex:1; display:flex; align-items:center; }
 .th-stat { flex:1; display:flex; flex-direction:column; align-items:flex-start; gap:4px; cursor:pointer; background:transparent; }
@@ -642,7 +644,7 @@ const TH_CSS = `
 .th-hdet-sub { font-weight:300; font-size:11.5px; color:rgba(244,246,255,0.5); white-space:nowrap; }
 .th-hdet-amt { font-family:'Outfit',sans-serif; font-weight:700; font-size:13.5px; }
 
-.th-notif { position:relative; flex:0 0 auto; margin-top:26px; border-radius:16px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); overflow:hidden; transition:height .42s cubic-bezier(.22,.9,.3,1); animation:popIn .55s cubic-bezier(.34,1.42,.5,1) 190ms both; }
+.th-notif { position:relative; flex:0 0 auto; margin-top:26px; border-radius:16px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); overflow:hidden; transition:height .42s cubic-bezier(.22,.9,.3,1); }
 .th-notif-glow { position:absolute; left:-20%; top:-70%; width:140%; height:240%; border-radius:50%; background:radial-gradient(closest-side,rgba(102,169,255,0.18),transparent 70%); animation:glowDrift 10s ease-in-out -5s infinite; pointer-events:none; }
 .th-notif-prev { position:absolute; inset:0; padding:14px 18px; display:flex; flex-direction:column; justify-content:space-between; cursor:pointer; transition:opacity .26s ease; text-align:left; background:transparent; }
 .th-slot { position:relative; width:100%; height:46px; display:block; }
@@ -662,13 +664,13 @@ const TH_CSS = `
 .th-notif-dot { width:6px; height:6px; border-radius:50%; flex:0 0 auto; }
 .th-notif-text { flex:1; font-weight:300; font-size:11.5px; color:#E8F0FF; min-width:0; }
 
-.th-search-row { flex:0 0 auto; margin-top:24px; display:flex; align-items:center; gap:14px; animation:popIn .55s cubic-bezier(.34,1.42,.5,1) 250ms both; }
+.th-search-row { flex:0 0 auto; margin-top:24px; display:flex; align-items:center; gap:14px; }
 .th-search { flex:1; display:flex; align-items:center; gap:10px; height:44px; padding:0 18px; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); box-sizing:border-box; }
 .th-search input { flex:1; min-width:0; border:none; background:transparent; outline:none; color:#fff; font-family:'Outfit',sans-serif; font-weight:500; font-size:13px; }
 .th-viewall { display:inline-flex; align-items:center; height:44px; padding:0 22px; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); background:transparent; font-weight:400; font-size:13px; color:${TEXT_SOFT}; cursor:pointer; transition:background .18s ease; box-sizing:border-box; }
 .th-viewall:hover { background:rgba(94,158,255,0.08); }
 
-.th-clients { margin-top:20px; display:flex; flex-direction:column; gap:18px; flex:0 1 auto; min-height:0; overflow:hidden; animation:popIn .55s cubic-bezier(.34,1.42,.5,1) 310ms both; }
+.th-clients { margin-top:20px; display:flex; flex-direction:column; gap:18px; flex:0 1 auto; min-height:0; overflow:hidden; }
 .th-client { display:flex; align-items:center; gap:14px; background:transparent; cursor:pointer; text-align:left; }
 .th-client:hover .th-client-name { color:#fff; }
 .th-client-avatar { width:44px; height:44px; border-radius:50%; border:1.5px solid rgba(94,158,255,0.8); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; color:#fff; flex:0 0 auto; box-sizing:border-box; }
@@ -680,7 +682,7 @@ const TH_CSS = `
 .th-client-label { font-weight:600; font-size:9px; color:rgba(244,246,255,0.5); }
 .th-client-due { font-weight:600; font-size:10px; color:rgba(244,246,255,0.5); }
 
-.th-actions { flex:0 0 auto; margin-top:26px; display:flex; gap:14px; animation:popIn .55s cubic-bezier(.34,1.42,.5,1) 370ms both; }
+.th-actions { flex:0 0 auto; margin-top:26px; display:flex; gap:14px; }
 .th-action { position:relative; flex:1; height:88px; border-radius:14px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); overflow:hidden; cursor:pointer; text-align:left; transition:background .18s ease; }
 .th-action:hover { background:rgba(255,255,255,0.1); }
 .th-action-primary { background:${ACTIVE}; border:none; box-shadow:inset 0 1px 0 rgba(255,255,255,0.3); }

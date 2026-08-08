@@ -168,7 +168,7 @@ export default function DesktopPropertyClients(props: DesktopRoutePageProps) {
     <DesktopPageScaffold {...props} vertical="property" page="directory" showScope={false}>
       <style>{PC_CSS}</style>
       <div className="pc-body">
-        <div className="pc-scope-wrap">
+        <div className="pc-scope-wrap dt-rise">
           <button
             type="button"
             className="pc-scope"
@@ -214,7 +214,7 @@ export default function DesktopPropertyClients(props: DesktopRoutePageProps) {
         </div>
 
         <div
-          className="pc-hero"
+          className="pc-hero dt-rise"
           role="status"
           aria-live="polite"
           aria-atomic="true"
@@ -226,7 +226,7 @@ export default function DesktopPropertyClients(props: DesktopRoutePageProps) {
           <span className="pc-hero-label">{countLabel}</span>
         </div>
 
-        <div className="pc-search-row" data-tutorial-id="property-directory-search">
+        <div className="pc-search-row dt-rise" data-tutorial-id="property-directory-search">
           <div className="pc-search">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={ACCENT} strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="6.5" /><path d="m20 20-3.8-3.8" /></svg>
             <input
@@ -241,7 +241,7 @@ export default function DesktopPropertyClients(props: DesktopRoutePageProps) {
           </button>
         </div>
 
-        <div className="pc-list">
+        <div className="pc-list dt-rise">
           {tenantsQuery.isLoading ? (
             <div className="pc-empty">loading tenants…</div>
           ) : rows.length === 0 ? (
@@ -382,7 +382,8 @@ export default function DesktopPropertyClients(props: DesktopRoutePageProps) {
 const PC_CSS = `
 .pc-body { position:relative; height:100%; box-sizing:border-box; padding:26px 52px 0; }
 
-.pc-scope-wrap { position:relative; display:inline-block; z-index:5; }
+/* Page-entry cascade: scope → count → search → list (steps 0–3). */
+.pc-scope-wrap { position:relative; display:inline-block; z-index:5; --dt-i:0; }
 .pc-scope { display:inline-flex; align-items:center; gap:9px; padding:10px 20px; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); background:transparent; font-weight:400; font-size:13.5px; color:${ACCENT_SOFT}; cursor:pointer; transition:background .18s ease; text-transform:lowercase; }
 .pc-scope:hover { background:rgba(94,158,255,0.08); }
 .pc-scope-menu { position:absolute; top:calc(100% + 6px); left:0; min-width:220px; max-height:260px; overflow-y:auto; padding:6px; border-radius:14px; background:#0B1436; border:1px solid rgba(94,158,255,0.3); box-shadow:0 18px 40px rgba(0,4,24,0.5); display:flex; flex-direction:column; gap:2px; }
@@ -390,17 +391,17 @@ const PC_CSS = `
 .pc-scope-opt:hover { background:rgba(94,158,255,0.14); }
 .pc-scope-opt[aria-selected="true"] { background:rgba(94,158,255,0.22); }
 
-.pc-hero { margin-top:18px; display:flex; flex-direction:column; animation:popIn .55s cubic-bezier(.34,1.42,.5,1) 40ms both; }
+.pc-hero { margin-top:18px; display:flex; flex-direction:column; --dt-i:1; }
 .pc-hero-count { font-family:'Outfit',sans-serif; font-weight:700; font-size:96px; line-height:0.95; letter-spacing:-0.01em; color:${ACCENT}; font-variant-numeric:tabular-nums; }
 .pc-hero-label { margin-top:6px; font-weight:300; font-size:16px; color:${NAV_DIM}; }
 
-.pc-search-row { margin-top:56px; display:flex; align-items:center; gap:12px; animation:popIn .55s cubic-bezier(.34,1.42,.5,1) 120ms both; }
+.pc-search-row { margin-top:56px; display:flex; align-items:center; gap:12px; --dt-i:2; }
 .pc-search { display:flex; align-items:center; gap:10px; width:300px; height:38px; padding:0 16px; box-sizing:border-box; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); }
 .pc-search input { flex:1; min-width:0; border:none; background:transparent; outline:none; color:#fff; font-family:'Outfit',sans-serif; font-weight:500; font-size:12px; }
 .pc-add { width:38px; height:38px; border-radius:50%; background:${ACTIVE}; display:flex; align-items:center; justify-content:center; cursor:pointer; flex:0 0 auto; box-shadow:0 2px 10px rgba(102,169,255,0.35); transition:opacity .15s ease, transform .15s ease; }
 .pc-add:hover { opacity:0.92; transform:scale(1.05); }
 
-.pc-list { margin-top:16px; display:flex; flex-direction:column; gap:5px; width:400px; max-height:520px; overflow-y:auto; scrollbar-width:none; animation:popIn .55s cubic-bezier(.34,1.42,.5,1) 200ms both; }
+.pc-list { margin-top:16px; display:flex; flex-direction:column; gap:5px; width:400px; max-height:520px; overflow-y:auto; scrollbar-width:none; --dt-i:3; }
 .pc-list::-webkit-scrollbar { display:none; }
 .pc-row { display:flex; align-items:center; gap:16px; padding:2px 8px 2px 0; border-radius:10px; background:transparent; cursor:pointer; text-align:left; transition:background .15s ease; }
 .pc-row:hover { background:rgba(94,158,255,0.06); }

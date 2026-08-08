@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
 } from "react";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { useMerchantProfile } from "@/lib/merchant";
@@ -380,7 +381,9 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
         {/* ── OVERVIEW ── */}
         {!report && (
           <>
-            <div className="ta-overview-head">
+            {/* Entry cascade: scope/range row → hero → chart, then the sheet's
+                own blocks pick up at steps 3–5. */}
+            <div className="ta-overview-head dt-rise" style={{ "--dt-i": 0 } as CSSProperties}>
               <div className="ta-scope-wrap">
                 <button
                   type="button"
@@ -438,7 +441,7 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
               </div>
             </div>
 
-            <div className="ta-hero-row" data-tutorial-id="ta-total">
+            <div className="ta-hero-row dt-rise" style={{ "--dt-i": 1 } as CSSProperties} data-tutorial-id="ta-total">
               <div className="ta-hero-col">
                 <div className="ta-hero-amt-row">
                   <span className="ta-hero">{invoicesQuery.isLoading ? "—" : money(overview.total)}</span>
@@ -460,7 +463,7 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
               </div>
             </div>
 
-            <div className="ta-chart" ref={chartRef}>
+            <div className="ta-chart dt-rise" style={{ "--dt-i": 2 } as CSSProperties} ref={chartRef}>
               <svg className="ta-chart-svg" viewBox="0 0 1076 240" preserveAspectRatio="none" aria-hidden="true">
                 <defs>
                   <linearGradient id="traderevfill" x1="0" y1="0" x2="0" y2="1">
@@ -591,8 +594,11 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
             transition: dragging ? "none" : "transform .5s cubic-bezier(.22,.9,.3,1)",
           }}
         >
+          {/* `.ta-sheet` itself carries the live drag transform, so the entry
+              cascade runs on its blocks rather than on the sheet. */}
           <div
-            className="ta-grab"
+            className="ta-grab dt-rise"
+            style={{ "--dt-i": 3 } as CSSProperties}
             role="button"
             tabIndex={0}
             aria-label={sheetOpen ? "collapse payment history" : "expand payment history"}
@@ -611,7 +617,7 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
             <span className="ta-grab-bar" />
           </div>
 
-          <div className="ta-sheet-head">
+          <div className="ta-sheet-head dt-rise" style={{ "--dt-i": 4 } as CSSProperties}>
             <span className="ta-sheet-title">{sheetTitle}</span>
             <div className="ta-sheet-actions">
               {sheetMode === "history" && (
@@ -641,7 +647,7 @@ export default function DesktopTradesAnalytics(props: DesktopRoutePageProps) {
             </div>
           </div>
 
-          <div className="ta-sheet-body">
+          <div className="ta-sheet-body dt-rise" style={{ "--dt-i": 5 } as CSSProperties}>
             {sheetMode === "history" &&
               (invoicesQuery.isLoading || clientsQuery.isLoading ? (
                 <div className="ta-sheet-empty">loading payments…</div>

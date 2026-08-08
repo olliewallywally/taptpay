@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { getCurrentMerchantId } from "@/lib/auth";
@@ -364,7 +364,8 @@ export default function DesktopRetailHome(props: DesktopRoutePageProps) {
       <style>{RH_CSS}</style>
 
       {/* ── LEFT COLUMN ── */}
-      <div className="rh-left">
+      {/* entry cascade: scope → hero → chart → breakdown */}
+      <div className="rh-left dt-cascade">
         <button type="button" className="rh-scope" aria-label="my store scope">
           <span>my store</span>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
@@ -476,7 +477,11 @@ export default function DesktopRetailHome(props: DesktopRoutePageProps) {
       </div>
 
       {/* ── RIGHT COLUMN ── */}
-      <div className="rh-right">
+      {/* entry cascade continues after the left column's four steps (4 × 52ms) */}
+      <div
+        className="rh-right dt-cascade"
+        style={{ "--dt-d": "208ms" } as CSSProperties}
+      >
         {/* store health */}
         <div className="rh-health" data-tutorial-id="retail-home-health">
           {healthBox && m.detail[healthBox] ? (

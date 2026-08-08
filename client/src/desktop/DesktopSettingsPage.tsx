@@ -534,7 +534,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
       <style>{DS_CSS}</style>
       <div className="ds-body">
         {/* ── LEFT ── */}
-        <div className="ds-left">
+        <div className="ds-left dt-cascade">
           <div className="ds-id-row">
             <span className="ds-avatar">{initialsOf(businessName)}</span>
             <span className="ds-status" style={{ color: isActive ? GREEN : "#F0A34E" }}>
@@ -585,7 +585,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
         </div>
 
         {/* ── RIGHT ── */}
-        <div className="ds-right">
+        <div className="ds-right dt-cascade">
           <button type="button" className="ds-board" onClick={() => setLocation("/board-builder")}>
             <span className="ds-board-ico">
               <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#CFE0FF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M7 8V3h10v5" /><rect x="4" y="8" width="16" height="9" rx="2" /><path d="M7 14h10v7H7z" /></svg>
@@ -1086,6 +1086,11 @@ const DS_CSS = `
 
 /* ── right column ── */
 .ds-right { flex:1; display:flex; flex-direction:column; gap:12px; min-width:0; overflow-y:auto; scrollbar-width:none; }
+/* Page-entry cascade only: the left identity column leads (steps 0–5, 0–260ms)
+   and the right stack of sections follows one beat behind, so the last section
+   starts at 5x52ms + 80ms = 340ms. --dt-d inherits to the .dt-cascade children;
+   --dt-i is assigned per child by desktop.css. */
+.ds-right.dt-cascade { --dt-d: 80ms; }
 .ds-right::-webkit-scrollbar { display:none; }
 .ds-board { display:flex; align-items:center; gap:18px; padding:20px 24px; border-radius:20px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); backdrop-filter:blur(16px); cursor:pointer; text-align:left; flex:0 0 auto; transition:background .15s ease; }
 .ds-board:hover { background:rgba(255,255,255,0.1); }

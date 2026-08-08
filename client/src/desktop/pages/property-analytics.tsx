@@ -365,7 +365,7 @@ export default function DesktopPropertyAnalytics(props: DesktopRoutePageProps) {
         {/* ── OVERVIEW ── */}
         {!report && (
           <>
-            <div className="pa-overview-head">
+            <div className="pa-overview-head dt-cascade">
               <div className="pa-scope-wrap">
                 <button
                   type="button"
@@ -424,7 +424,7 @@ export default function DesktopPropertyAnalytics(props: DesktopRoutePageProps) {
             </div>
 
             <div className="pa-hero-row" data-tutorial-id="pa-total">
-              <div className="pa-hero-col">
+              <div className="pa-hero-col dt-cascade">
                 <div className="pa-hero-amt-row">
                   <span className="pa-hero">{invoicesQuery.isLoading ? "—" : money(overview.total)}</span>
                   {overview.growth !== null && (
@@ -442,7 +442,7 @@ export default function DesktopPropertyAnalytics(props: DesktopRoutePageProps) {
               </div>
             </div>
 
-            <div className="pa-chart">
+            <div className="pa-chart dt-rise">
               <svg className="pa-chart-svg" viewBox="0 0 1076 240" preserveAspectRatio="none" aria-label="collected rent chart">
                 <defs>
                   <linearGradient id="proprevfill" x1="0" y1="0" x2="0" y2="1">
@@ -753,7 +753,9 @@ const PA_CSS = `
 .pa-scope-option { width:100%; padding:10px 12px; border-radius:10px; background:transparent; color:#9DBCFF; text-align:left; font-weight:600; font-size:12.5px; cursor:pointer; }
 .pa-scope-option:hover, .pa-scope-option[aria-selected=true] { background:rgba(94,158,255,0.16); color:#FFFFFF; }
 .pa-hero-row { position:relative; z-index:1; margin-top:22px; display:flex; align-items:flex-start; justify-content:space-between; }
-.pa-hero-col { display:flex; flex-direction:column; gap:6px; }
+/* The hero figures continue the head's cascade (scope 0, ranges 1), so the four
+   hero lines run steps 2–5 and the chart lands on 6. */
+.pa-hero-col { display:flex; flex-direction:column; gap:6px; --dt-d:104ms; }
 .pa-hero-amt-row { display:flex; align-items:flex-start; gap:18px; }
 .pa-hero { font-family:Outfit,sans-serif; font-weight:700; font-size:63px; line-height:0.92; letter-spacing:-0.015em; color:#5E9EFF; font-variant-numeric:tabular-nums; }
 .pa-hero-pill { margin-top:10px; padding:7px 14px; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); font-weight:700; font-size:14px; color:#7FB2FF; white-space:nowrap; }
@@ -763,7 +765,7 @@ const PA_CSS = `
 .pa-segs { display:flex; align-items:center; padding:4px; border-radius:9999px; background:#0F1747; }
 .pa-seg { padding:8px 0; width:70px; border-radius:9999px; font-size:12px; cursor:pointer; transition:background .18s ease, color .18s ease; }
 
-.pa-chart { position:relative; margin-top:44px; height:266px; }
+.pa-chart { position:relative; margin-top:44px; height:266px; --dt-i:6; }
 .pa-chart-svg { display:block; position:absolute; left:-86px; top:-47px; width:1214px; height:221px; }
 .pa-dot { position:absolute; top:185px; width:14px; height:14px; border-radius:50%; background:#FFFFFF; box-shadow:0 0 0 4px rgba(255,255,255,0.18); transform:translate(-50%,-50%); transition:left .3s ease; }
 .pa-chip { position:absolute; top:174px; transform:translateX(-50%); padding:7px 14px; border-radius:10px; background:#66A9FF; font-weight:700; font-size:13.5px; color:#000F3F; white-space:nowrap; transition:left .3s ease; }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
@@ -493,7 +493,8 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
       <style>{RT_CSS}</style>
       <div className="rt-body">
         {/* ── LEFT ── */}
-        <div className="rt-left">
+        {/* entry cascade: scope → revenue → label → count → label → stack */}
+        <div className="rt-left dt-cascade">
           <div>
             <button type="button" className="rt-scope" aria-label="my store scope" aria-haspopup="listbox">
               <span>my store</span>
@@ -612,7 +613,14 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
 
         {/* ── CENTER RAIL ── */}
         <div className="rt-rail-slot">
-          <div className="rt-rail" data-tutorial-id="retail-terminal-tools">
+          {/* the rail is the animated element, not `.rt-rail-slot` — the slot is
+              not a containing block, so transforming it would re-anchor the
+              absolutely-positioned rail mid-animation */}
+          <div
+            className="rt-rail dt-rise"
+            data-tutorial-id="retail-terminal-tools"
+            style={{ "--dt-i": 6 } as CSSProperties}
+          >
             {railBtn("stock", false, (<><rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="7" rx="1.5" /><rect x="4" y="13" width="7" height="7" rx="1.5" /><rect x="13" y="13" width="7" height="7" rx="1.5" /></>), "stock tiles")}
             {railBtn("split", false, (<><path d="M12 3v7" /><path d="M12 10l-6 8" /><path d="M12 10l6 8" /></>), "split bill")}
             {railBtn("keypad", true, (<path d="M12 5v14M5 12h14" />), "keypad")}
@@ -622,7 +630,8 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
         </div>
 
         {/* ── RIGHT PANEL ── */}
-        <div className="rt-panel">
+        {/* last entry step; `.rt-mode` keeps its own tileIn for mode switching */}
+        <div className="rt-panel dt-rise" style={{ "--dt-i": 7 } as CSSProperties}>
           {mode === "send" && (
             <>
               <div className="rt-mode rt-send-top">

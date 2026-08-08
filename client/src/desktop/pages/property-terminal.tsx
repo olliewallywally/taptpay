@@ -383,7 +383,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
       <style>{PT_CSS}</style>
       <div className="pt-body">
         {/* ── LEFT ── */}
-        <div className="pt-left">
+        <div className="pt-left dt-cascade">
           <div>
             <button type="button" className="pt-scope" aria-label="all properties scope" aria-haspopup="listbox">
               <span>all properties</span>
@@ -453,7 +453,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
 
         {/* ── CENTER RAIL ── */}
         <div className="pt-rail-slot">
-          <div className="pt-rail" data-tutorial-id="property-terminal-tools">
+          <div className="pt-rail dt-rise" data-tutorial-id="property-terminal-tools">
             {railBtn("tenant", false, (<><circle cx="12" cy="8" r="3.4" /><path d="M5.5 19.5c1-3.2 3.4-4.8 6.5-4.8s5.5 1.6 6.5 4.8" /></>), "select tenant")}
             {railBtn("request", false, (<><path d="M22 2 11 13" /><path d="M22 2 15 22l-4-9-9-4z" /></>), "rent request")}
             {railBtn("keypad", true, (<path d="M12 5v14M5 12h14" />), "keypad")}
@@ -463,7 +463,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
         </div>
 
         {/* ── RIGHT PANEL ── */}
-        <div className="pt-panel">
+        <div className="pt-panel dt-rise">
           {mode === "request" && (
             <>
               <div className="pt-mode pt-req-top" data-tutorial-id="property-terminal-request">
@@ -725,7 +725,9 @@ const PT_CSS = `
 .pt-body { position:relative; display:flex; height:100%; box-sizing:border-box; padding:26px 46px 0 52px; }
 
 /* ── left ── */
-.pt-left { flex:0 0 420px; display:flex; flex-direction:column; animation:popIn .55s cubic-bezier(.34,1.42,.5,1) 40ms both; }
+/* Page-entry cascade: the left column's six blocks run steps 0–5, then the
+   rail (6) and the right panel (7) complete the sweep left-to-right. */
+.pt-left { flex:0 0 420px; display:flex; flex-direction:column; }
 .pt-scope { display:inline-flex; align-items:center; gap:9px; padding:10px 20px; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); background:transparent; font-weight:400; font-size:13.5px; color:${ACCENT_SOFT}; cursor:pointer; transition:background .18s ease; }
 .pt-scope:hover { background:rgba(94,158,255,0.08); }
 .pt-hero-row { margin-top:22px; display:flex; align-items:flex-start; gap:14px; }
@@ -754,14 +756,14 @@ const PT_CSS = `
 
 /* ── rail (design pins it at x=550) ── */
 .pt-rail-slot { flex:0 0 76px; margin:175px 40px 0 44px; }
-.pt-rail { position:absolute; left:550px; width:80px; box-sizing:border-box; border:1.5px solid rgba(94,158,255,0.7); border-radius:32px; padding:30px 0; display:flex; flex-direction:column; align-items:center; gap:40px; }
+.pt-rail { position:absolute; left:550px; width:80px; box-sizing:border-box; border:1.5px solid rgba(94,158,255,0.7); border-radius:32px; padding:30px 0; display:flex; flex-direction:column; align-items:center; gap:40px; --dt-i:6; }
 .pt-rail-btn { width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:background .18s ease; }
 .pt-rail-btn:hover { background:rgba(94,158,255,0.14); }
 .pt-rail-big { width:54px; height:54px; background:${ACTIVE}; box-shadow:0 8px 20px rgba(102,169,255,0.35); }
 .pt-rail-big:hover { background:${ACTIVE}; opacity:0.9; }
 
 /* ── right panel ── */
-.pt-panel { flex:1; min-width:0; padding-left:36px; box-sizing:border-box; position:relative; }
+.pt-panel { flex:1; min-width:0; padding-left:36px; box-sizing:border-box; position:relative; --dt-i:7; }
 .pt-mode { animation:tileIn .35s cubic-bezier(.22,.9,.3,1) both; }
 .pt-mode-head { font-weight:300; font-size:15px; color:${KP_INK}; }
 .pt-mode-sub { margin-top:4px; font-weight:500; font-size:12px; color:rgba(244,246,255,0.45); max-width:430px; }

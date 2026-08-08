@@ -11,6 +11,8 @@ import { PageTransition } from "@/components/page-transition";
 import { BottomNavigation } from "@/components/bottom-navigation";
 import { TutorialPageBoundary, TutorialProvider } from "@/features/tutorial/tutorial";
 import { useDeviceClass, type DeviceClass } from "@/hooks/use-device-class";
+import { DesktopChrome, DesktopPageFallback } from "@/desktop/DesktopChrome";
+import { desktopChromeForLocation } from "@/desktop/desktop-theme";
 import type { TutorialPageKey } from "@shared/tutorial";
 import { redactCustomerPaymentAddress } from "@/lib/payment-addressing";
 
@@ -343,16 +345,69 @@ function Router({ deviceClass }: { deviceClass: DeviceClass }) {
     );
   }
 
+  /* Tablet/desktop app screens keep a persistent chrome and deliberately skip
+     PageTransition: that wrapper keys a motion.div on the location, so the frame
+     inside it was torn down and rebuilt on every hop, and its mode="wait" exit
+     spends 220ms on a blank screen before the destination even mounts. Here the
+     frame + header + nav stay mounted and only the page slot swaps — the
+     incoming page's own cascade is the transition. */
+  if (deviceClass !== "mobile") {
+    const chromeRoute = desktopChromeForLocation(location, merchantMode);
+    if (chromeRoute) {
+      return (
+        <>
+          <GA4PageTracker />
+          <DesktopChrome deviceClass={deviceClass} route={chromeRoute}>
+            <Suspense fallback={<DesktopPageFallback />}>
+              {/* Keyed on the screen, not the raw location, so the cascade
+                  replays whenever the user lands on a different screen but a
+                  one-shot param (?quick=1) or an id segment does not throw away
+                  a screen the user is already on. */}
+              <RouteTable
+                key={`${chromeRoute.vertical}/${chromeRoute.page}`}
+                location={location}
+                deviceClass={deviceClass}
+                merchantMode={merchantMode}
+              />
+            </Suspense>
+          </DesktopChrome>
+        </>
+      );
+    }
+  }
+
   return (
     <PageTransition>
       {/* Pin the Switch to the wrapper's location — matching from context would
           let the exiting page re-render as the destination during the exit
           animation (a double mount that eats one-shot params like ?quick=1). */}
       {(transitionLocation) => (
-      <>
-      <GA4PageTracker />
-      <Suspense fallback={<PageLoader />}>
-        <Switch location={transitionLocation}>
+        <>
+          <GA4PageTracker />
+          <Suspense fallback={<PageLoader />}>
+            <RouteTable
+              location={transitionLocation}
+              deviceClass={deviceClass}
+              merchantMode={merchantMode}
+            />
+          </Suspense>
+        </>
+      )}
+    </PageTransition>
+  );
+}
+
+function RouteTable({
+  location,
+  deviceClass,
+  merchantMode,
+}: {
+  location: string;
+  deviceClass: DeviceClass;
+  merchantMode: MerchantMode;
+}) {
+  return (
+        <Switch location={location}>
           <Route path="/"><LandingPage /></Route>
           <Route path="/info" component={InfoPage} />
           <Route path="/business-details" component={BusinessDetails} />
@@ -499,10 +554,6 @@ function Router({ deviceClass }: { deviceClass: DeviceClass }) {
           <Route path="/receipt/:transactionId">{() => <Receipt sourceKind="retail-legacy" />}</Route>
           <Route component={NotFound} />
         </Switch>
-      </Suspense>
-      </>
-      )}
-    </PageTransition>
   );
 }
 

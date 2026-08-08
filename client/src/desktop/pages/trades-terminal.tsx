@@ -582,7 +582,10 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
       <style>{TT_CSS}</style>
       <div className="tt-body">
         {/* ── LEFT COLUMN ── */}
-        <div className="tt-left">
+        {/* Entry cascade: the left column runs steps 0–5, the centre rail lands
+            at step 6. The right panel is driven by the rail's mode morph, so it
+            keeps its own tileIn rather than joining the page-entry sequence. */}
+        <div className="tt-left dt-cascade">
           <div className="tt-scope-wrap">
             <button
               type="button"
@@ -719,7 +722,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
 
         {/* ── CENTRE RAIL ── */}
         <div className="tt-rail-slot">
-          <div className="tt-rail" data-tutorial-id="trades-terminal-tools">
+          <div className="tt-rail dt-rise" style={{ "--dt-i": 6 } as React.CSSProperties} data-tutorial-id="trades-terminal-tools">
             <svg className="tt-goo-filter" aria-hidden="true"><defs><filter id="tt-rail-goo"><feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur" /><feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -9" /><feBlend in="SourceGraphic" /></filter></defs></svg>
             <div className={`tt-rail-blob${railMoving ? " tt-rail-blob-moving" : ""}`} style={{ "--tt-rail-index": mode === "recurring" ? 3 : railModes.indexOf(mode) } as React.CSSProperties} />
             {railBtn("client", (<><circle cx="12" cy="8" r="3.4" /><path d="M5.5 19.5c1-3.2 3.4-4.8 6.5-4.8s5.5 1.6 6.5 4.8" /></>), "choose client")}
@@ -1161,7 +1164,7 @@ const TT_CSS = `
 .tt-scope-opt:hover { background:rgba(94,158,255,0.14); }
 .tt-scope-opt[aria-selected="true"] { background:rgba(94,158,255,0.22); }
 
-.tt-hero-row { margin-top:22px; display:flex; align-items:flex-start; gap:14px; animation:popIn .55s cubic-bezier(.34,1.42,.5,1) 40ms both; }
+.tt-hero-row { margin-top:22px; display:flex; align-items:flex-start; gap:14px; }
 .tt-hero { font-family:'Outfit',sans-serif; font-weight:700; font-size:84px; line-height:0.92; letter-spacing:-0.015em; color:${ACCENT}; font-variant-numeric:tabular-nums; }
 .tt-growth { margin-top:6px; padding:6px 13px; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); font-weight:700; font-size:13px; color:${ACCENT_SOFT}; white-space:nowrap; }
 .tt-hero-label { margin-top:24px; font-weight:300; font-size:17px; color:${NAV_DIM}; }

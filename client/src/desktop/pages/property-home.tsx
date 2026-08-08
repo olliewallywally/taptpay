@@ -242,7 +242,7 @@ export default function DesktopPropertyHome(props: DesktopRoutePageProps) {
       <style>{PH_CSS}</style>
 
       {/* ── LEFT COLUMN ── */}
-      <div className="ph-left">
+      <div className="ph-left dt-cascade">
         <div className="ph-scope-wrap">
           <button
             type="button"
@@ -400,7 +400,7 @@ export default function DesktopPropertyHome(props: DesktopRoutePageProps) {
       </div>
 
       {/* ── RIGHT COLUMN ── */}
-      <div className="ph-right">
+      <div className="ph-right dt-cascade">
         {/* portfolio health */}
         <div className="ph-health" data-tutorial-id="property-home-health">
           {healthBox && m.detail[healthBox] ? (
@@ -577,7 +577,9 @@ export default function DesktopPropertyHome(props: DesktopRoutePageProps) {
 
 const PH_CSS = `
 .ph-left { position:absolute; left:52px; top:26px; width:440px; display:flex; flex-direction:column; }
-.ph-right { position:absolute; left:588px; top:53px; width:481px; height:688px; display:flex; flex-direction:column; }
+/* The right column continues the left column's cascade rather than restarting
+   it: four blocks on the left (steps 0–3), so the right picks up at step 4. */
+.ph-right { position:absolute; left:588px; top:53px; width:481px; height:688px; display:flex; flex-direction:column; --dt-d:208ms; }
 
 .ph-scope-wrap { position:relative; align-self:flex-start; z-index:5; }
 .ph-scope { display:inline-flex; align-items:center; gap:9px; padding:10px 20px; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); background:transparent; font-weight:400; font-size:13.5px; color:${ACCENT_SOFT}; cursor:pointer; transition:background .18s ease; text-transform:lowercase; }
@@ -587,7 +589,7 @@ const PH_CSS = `
 .ph-scope-opt:hover { background:rgba(94,158,255,0.14); }
 .ph-scope-opt[aria-selected="true"] { background:rgba(94,158,255,0.22); }
 
-.ph-hero { margin-top:22px; animation:popIn .55s cubic-bezier(.34,1.42,.5,1) 40ms both; }
+.ph-hero { margin-top:22px; }
 .ph-hero-row { display:flex; align-items:flex-start; gap:16px; }
 .ph-amount { font-family:'Outfit',sans-serif; font-weight:700; font-size:84px; line-height:0.92; letter-spacing:-0.015em; color:${ACCENT}; font-variant-numeric:tabular-nums; }
 .ph-pct { margin-top:8px; padding:7px 14px; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); font-weight:700; font-size:13.5px; color:${ACCENT_SOFT}; white-space:nowrap; }
@@ -596,7 +598,7 @@ const PH_CSS = `
 .ph-error span { color:#FFB3B8; font-size:13.5px; }
 .ph-error button { background:${ACCENT}; color:${NAVY}; border-radius:10px; padding:8px 14px; font-size:12px; font-weight:700; cursor:pointer; }
 
-.ph-chart-wrap { margin-top:36px; animation:popIn .55s cubic-bezier(.34,1.42,.5,1) 100ms both; }
+.ph-chart-wrap { margin-top:36px; }
 .ph-bars { display:flex; align-items:flex-end; gap:16px; height:298px; }
 .ph-bar-btn { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:12px; height:100%; cursor:pointer; background:transparent; }
 .ph-bar { width:100%; max-width:36px; border-radius:10px; transition:height .3s ease, background .2s ease; }
@@ -605,7 +607,7 @@ const PH_CSS = `
 .ph-segs { display:flex; align-items:center; padding:4px; border-radius:9999px; background:${CHIP}; }
 .ph-seg { padding:9px 0; width:76px; border-radius:9999px; font-size:12px; cursor:pointer; transition:background .18s ease, color .18s ease; }
 
-.ph-breakdown { margin-top:24px; height:138px; border-radius:12px; border:1.5px solid rgba(94,158,255,0.5); box-sizing:border-box; padding:18px 22px; display:flex; flex-direction:column; justify-content:space-between; animation:popIn .55s cubic-bezier(.34,1.42,.5,1) 160ms both; }
+.ph-breakdown { margin-top:24px; height:138px; border-radius:12px; border:1.5px solid rgba(94,158,255,0.5); box-sizing:border-box; padding:18px 22px; display:flex; flex-direction:column; justify-content:space-between; }
 .ph-bd-head { display:flex; align-items:center; justify-content:space-between; }
 .ph-bd-title { font-weight:300; font-size:11px; letter-spacing:0.22em; color:${ACCENT_SOFT}; }
 .ph-bd-hint { font-weight:300; font-size:11px; color:rgba(244,246,255,0.4); }
@@ -621,7 +623,7 @@ const PH_CSS = `
 .ph-bd-track { display:block; height:5px; border-radius:3px; background:rgba(94,158,255,0.18); overflow:hidden; }
 .ph-bd-fill { display:block; height:100%; border-radius:3px; background:${ACCENT}; transition:width .3s ease; }
 
-.ph-health { flex:0 0 auto; height:182px; border-radius:16px; border:1.5px solid rgba(94,158,255,0.5); box-sizing:border-box; padding:18px 24px; display:flex; flex-direction:column; overflow:hidden; animation:popIn .55s cubic-bezier(.34,1.42,.5,1) 130ms both; }
+.ph-health { flex:0 0 auto; height:182px; border-radius:16px; border:1.5px solid rgba(94,158,255,0.5); box-sizing:border-box; padding:18px 24px; display:flex; flex-direction:column; overflow:hidden; }
 .ph-health-head { display:flex; align-items:center; justify-content:space-between; }
 .ph-health-body { flex:1; display:flex; align-items:center; }
 .ph-stat { flex:1; display:flex; flex-direction:column; align-items:flex-start; gap:4px; cursor:pointer; background:transparent; }
@@ -639,7 +641,7 @@ const PH_CSS = `
 .ph-hdet-sub { font-weight:300; font-size:11.5px; color:rgba(244,246,255,0.5); white-space:nowrap; }
 .ph-hdet-amt { font-family:'Outfit',sans-serif; font-weight:700; font-size:13.5px; }
 
-.ph-notif { position:relative; flex:0 0 auto; margin-top:26px; border-radius:16px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); overflow:hidden; transition:height .42s cubic-bezier(.22,.9,.3,1); animation:popIn .55s cubic-bezier(.34,1.42,.5,1) 190ms both; }
+.ph-notif { position:relative; flex:0 0 auto; margin-top:26px; border-radius:16px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); overflow:hidden; transition:height .42s cubic-bezier(.22,.9,.3,1); }
 .ph-notif-glow { position:absolute; left:-20%; top:-70%; width:140%; height:240%; border-radius:50%; background:radial-gradient(closest-side,rgba(102,169,255,0.18),transparent 70%); animation:glowDrift 10s ease-in-out -5s infinite; pointer-events:none; }
 .ph-notif-prev { position:absolute; inset:0; padding:14px 18px; display:flex; flex-direction:column; justify-content:space-between; cursor:pointer; transition:opacity .26s ease; text-align:left; background:transparent; }
 .ph-slot { position:relative; height:46px; display:block; }
@@ -659,13 +661,13 @@ const PH_CSS = `
 .ph-notif-dot { width:6px; height:6px; border-radius:50%; flex:0 0 auto; }
 .ph-notif-text { flex:1; font-weight:300; font-size:11.5px; color:#E8F0FF; min-width:0; }
 
-.ph-search-row { flex:0 0 auto; margin-top:24px; display:flex; align-items:center; gap:14px; animation:popIn .55s cubic-bezier(.34,1.42,.5,1) 250ms both; }
+.ph-search-row { flex:0 0 auto; margin-top:24px; display:flex; align-items:center; gap:14px; }
 .ph-search { flex:1; display:flex; align-items:center; gap:10px; height:44px; padding:0 18px; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); box-sizing:border-box; }
 .ph-search input { flex:1; min-width:0; border:none; background:transparent; outline:none; color:#fff; font-family:'Outfit',sans-serif; font-weight:500; font-size:13px; }
 .ph-viewall { display:inline-flex; align-items:center; height:44px; padding:0 22px; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); background:transparent; font-weight:400; font-size:13px; color:${TEXT_SOFT}; cursor:pointer; transition:background .18s ease; box-sizing:border-box; }
 .ph-viewall:hover { background:rgba(94,158,255,0.08); }
 
-.ph-tenants { margin-top:20px; display:flex; flex-direction:column; gap:18px; flex:0 1 auto; min-height:0; overflow:hidden; animation:popIn .55s cubic-bezier(.34,1.42,.5,1) 310ms both; }
+.ph-tenants { margin-top:20px; display:flex; flex-direction:column; gap:18px; flex:0 1 auto; min-height:0; overflow:hidden; }
 .ph-tenant { display:flex; align-items:center; gap:14px; background:transparent; cursor:pointer; text-align:left; }
 .ph-tenant:hover .ph-tenant-name { color:#fff; }
 .ph-tenant-avatar { width:44px; height:44px; border-radius:50%; border:1.5px solid rgba(94,158,255,0.8); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; color:#fff; flex:0 0 auto; box-sizing:border-box; }
@@ -677,7 +679,7 @@ const PH_CSS = `
 .ph-tenant-label { font-weight:600; font-size:9px; color:rgba(244,246,255,0.5); }
 .ph-tenant-due { font-weight:600; font-size:10px; color:rgba(244,246,255,0.5); }
 
-.ph-actions { flex:0 0 auto; margin-top:26px; display:flex; gap:14px; animation:popIn .55s cubic-bezier(.34,1.42,.5,1) 370ms both; }
+.ph-actions { flex:0 0 auto; margin-top:26px; display:flex; gap:14px; }
 .ph-action { position:relative; flex:1; height:88px; border-radius:14px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); overflow:hidden; cursor:pointer; text-align:left; transition:background .18s ease; }
 .ph-action:hover { background:rgba(255,255,255,0.1); }
 .ph-action-primary { background:${ACTIVE}; border:none; box-shadow:inset 0 1px 0 rgba(255,255,255,0.3); }

@@ -96,6 +96,57 @@
   }
 }
 
+/* ── Cascading bounce pop-in ───────────────────────────────────────────────
+ *
+ * The desktop counterpart of the mobile `bouncePopIn` (index.css): a settle with
+ * three decaying overshoots rather than `popIn`'s single one. Because the chrome
+ * now persists across navigations, this cascade IS the page transition — every
+ * screen's blocks rise in sequence as the slot swaps.
+ *
+ * Usage: put `.dt-cascade` on a container to auto-index its direct children, or
+ * `.dt-rise` on any element and set `--dt-i` (step) / `--dt-d` (extra delay).
+ */
+@keyframes desktopBounceIn {
+  0% {
+    opacity: 0;
+    transform: translateY(26px) scale(0.88);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(-6px) scale(1.035);
+  }
+  74% {
+    transform: translateY(2.5px) scale(0.987);
+  }
+  88% {
+    transform: translateY(-1.2px) scale(1.005);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.dt-rise,
+.dt-cascade > * {
+  opacity: 0;
+  animation: desktopBounceIn 0.54s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: calc(var(--dt-i, 0) * 52ms + var(--dt-d, 0ms));
+}
+
+/* Auto-index for `.dt-cascade` containers. Ten steps covers the densest screen
+   (settings); anything beyond simply lands on the last step. */
+.dt-cascade > *:nth-child(1) { --dt-i: 0; }
+.dt-cascade > *:nth-child(2) { --dt-i: 1; }
+.dt-cascade > *:nth-child(3) { --dt-i: 2; }
+.dt-cascade > *:nth-child(4) { --dt-i: 3; }
+.dt-cascade > *:nth-child(5) { --dt-i: 4; }
+.dt-cascade > *:nth-child(6) { --dt-i: 5; }
+.dt-cascade > *:nth-child(7) { --dt-i: 6; }
+.dt-cascade > *:nth-child(8) { --dt-i: 7; }
+.dt-cascade > *:nth-child(9) { --dt-i: 8; }
+.dt-cascade > *:nth-child(n + 10) { --dt-i: 9; }
+
 @keyframes popIn {
   0% {
     opacity: 0;
@@ -279,6 +330,7 @@
 }
 
 .tapt-desktop-nav {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -288,22 +340,63 @@
   padding-right: 30px;
 }
 
-.tapt-desktop-nav-item {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  padding: 0;
+/* The one moving part of the header. Sits under the labels and slides between
+   them; the items themselves never change size, so nothing else can shift. */
+.tapt-desktop-nav-bubble {
+  position: absolute;
+  z-index: 0;
+  top: 50%;
+  left: 0;
+  height: 34px;
   border-radius: 9999px;
+  background: #66a9ff;
+  transform: translate(var(--bubble-x, 0px), -50%);
+  width: var(--bubble-w, 0px);
+  pointer-events: none;
+  transition:
+    transform 420ms cubic-bezier(0.34, 1.42, 0.5, 1),
+    width 420ms cubic-bezier(0.34, 1.42, 0.5, 1);
+}
+
+/* Before the first measurement the bubble must not slide in from the origin. */
+.tapt-desktop-nav-bubble[data-ready="false"] {
+  opacity: 0;
+  transition: none;
+}
+
+.tapt-desktop-nav-item {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  align-items: center;
+  justify-items: center;
+  flex: 0 0 auto;
+  /* Always carries the active padding so selecting a page cannot resize it. */
+  padding: 8px 22px;
+  border-radius: 9999px;
+  background: transparent;
   color: #4a86f0;
   font-size: 15px;
   font-weight: 400;
   line-height: normal;
   white-space: nowrap;
   cursor: pointer;
-  transition:
-    color 180ms ease,
-    background 180ms ease;
+  transition: color 220ms ease;
+}
+
+/* A hidden bold copy of the label shares the grid cell, so the cell is already
+   as wide as the active (700-weight) text. Without this the weight change alone
+   would widen the item and nudge its neighbours. */
+.tapt-desktop-nav-item > .tapt-desktop-nav-label,
+.tapt-desktop-nav-item::after {
+  grid-area: 1 / 1;
+}
+
+.tapt-desktop-nav-item::after {
+  content: attr(data-label);
+  font-weight: 700;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .tapt-desktop-nav-item:hover {
@@ -311,10 +404,12 @@
 }
 
 .tapt-desktop-nav-item[aria-current="page"] {
-  padding: 8px 22px;
-  background: #66a9ff;
   color: #000f3f;
   font-weight: 700;
+}
+
+.tapt-desktop-nav-item[aria-current="page"]:hover {
+  color: #000f3f;
 }
 
 .tapt-desktop-nav-item:focus-visible,
@@ -370,6 +465,13 @@
   height: 100%;
 }
 
+/* Lazy-chunk placeholder. Occupies the slot without painting anything, so a
+   cold chunk never flashes a spinner over chrome that is already on screen. */
+.tapt-desktop-page-fallback {
+  width: 100%;
+  height: 100%;
+}
+
 .tapt-desktop-legacy-wrap {
   display: flex;
   justify-content: center;
@@ -398,5 +500,14 @@
     animation-duration: 1ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 1ms !important;
+  }
+
+  /* The cascade hides its elements at opacity 0 and relies on the animation to
+     reveal them, so clamping the duration is not enough — drop the animation and
+     restore visibility outright. Matches `.pt-bounce` in index.css. */
+  .tapt-desktop-viewport .dt-rise,
+  .tapt-desktop-viewport .dt-cascade > * {
+    animation: none !important;
+    opacity: 1 !important;
   }
 }
