@@ -1,6 +1,6 @@
 export const BILLING_CARD_REQUIRED = {
   code: "BILLING_CARD_REQUIRED",
-  message: "Please enter a valid credit or debit card in Settings before sending payments.",
+  message: "Add a payment method in Settings to activate your subscription before sending payments.",
 } as const;
 
 export function isCardExpiryValid(expiry: unknown, now: Date = new Date()): boolean {
@@ -27,11 +27,36 @@ export function isLuhnValid(cardNumber: string): boolean {
   return sum % 10 === 0;
 }
 
-export function billingCardIsReady(merchant: any, now: Date = new Date()): boolean {
-  return Boolean(
-    merchant &&
-    /^\d{4}$/.test(String(merchant.billingCardLast4 || "")) &&
-    ["Visa", "Mastercard", "Amex"].includes(String(merchant.billingCardBrand || "")) &&
-    isCardExpiryValid(merchant.billingCardExpiry, now)
-  );
+/**
+ * Whether a merchant's subscription can bill, and therefore whether they may
+ * send payment requests.
+ *
+ * Reads the subscription row, which is where the Windcave card-on-file lives.
+ * A suspended subscription fails even with a valid card: billing has already
+ * exhausted its retries against it.
+ *
+ * The expiry check is deliberately lenient about *format* — Windcave supplies
+ * the masked expiry and an unparseable one should not lock a paying merchant
+ * out of their own terminal. A card Windcave has stored is a card Windcave will
+ * try to charge.
+ */
+export function billingCardIsReady(subscription: any, now: Date = new Date()): boolean {
+  if (!subscription) return false;
+  if (subscription.status !== "active" && subscription.status !== "past_due") return false;
+  // A card token alone is not activation: the first monthly charge must have
+  // succeeded and established a paid period.
+  if (!subscription.lastBillingDate) return false;
+  if (!subscription.windcaveCardId) return false;
+  if (
+    subscription.cancelAtPeriodEnd
+    && subscription.currentPeriodEnd
+    && new Date(subscription.currentPeriodEnd) <= now
+  ) {
+    return false;
+  }
+  const expiry = subscription.cardExpiry;
+  if (expiry && /^\d{2}\/\d{2}$/.test(String(expiry)) && !isCardExpiryValid(expiry, now)) {
+    return false;
+  }
+  return true;
 }

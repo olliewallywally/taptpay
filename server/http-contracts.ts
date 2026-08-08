@@ -2,7 +2,10 @@ import {
   normalizePushNotificationPreferences,
   type Merchant,
   type Transaction,
+  type User,
+  type SubscriptionBillingHistory,
 } from "@shared/schema";
+import { planForOrDefault } from "@shared/plans";
 
 type MerchantInput = Merchant & Record<string, unknown>;
 type TransactionInput = Transaction & Record<string, unknown>;
@@ -14,6 +17,73 @@ export function pushNotificationPreferencesDto(value: unknown) {
     paymentReceived: preferences.paymentReceived,
     dailyPayoutSummary: preferences.dailyPayoutSummary,
     failedPaymentAlerts: preferences.failedPaymentAlerts,
+  };
+}
+
+/**
+ * Owner view of a subscription. Allowlisted: the row carries the Windcave card
+ * token and the superseded Stripe columns, none of which may reach a browser.
+ */
+export function subscriptionDto(subscription: any, seatsInUse: number) {
+  const plan = planForOrDefault(subscription?.planId);
+  const pendingPlan = subscription?.pendingPlanId
+    ? planForOrDefault(subscription.pendingPlanId)
+    : null;
+  return {
+    planId: plan.id,
+    planName: plan.name,
+    priceCents: subscription?.priceCents ?? plan.priceCents,
+    seatLimit: subscription?.seatLimit ?? plan.seats,
+    seatsInUse,
+    status: subscription?.status ?? "active",
+    currentPeriodStart: subscription?.currentPeriodStart ?? null,
+    currentPeriodEnd: subscription?.currentPeriodEnd ?? null,
+    nextBillingDate: subscription?.nextBillingDate ?? null,
+    cancelAtPeriodEnd: subscription?.cancelAtPeriodEnd ?? false,
+    cancellationEffectiveDate: subscription?.cancellationEffectiveDate ?? null,
+    pendingPlanId: pendingPlan?.id ?? null,
+    pendingPlanName: pendingPlan?.name ?? null,
+    pendingPlanEffectiveAt: subscription?.pendingPlanEffectiveAt ?? null,
+    failedPaymentCount: subscription?.failedPaymentCount ?? 0,
+    // Masked card metadata only — never the Windcave card token.
+    card: subscription?.cardLast4
+      ? {
+          brand: subscription.cardBrand,
+          last4: subscription.cardLast4,
+          expiry: subscription.cardExpiry,
+        }
+      : null,
+    currentMonthTransactions: subscription?.currentMonthTransactions ?? 0,
+    totalLifetimeTransactions: subscription?.totalLifetimeTransactions ?? 0,
+  };
+}
+
+/** Browser billing history omits provider ids, idempotency keys and tenant ids. */
+export function billingHistoryDto(entry: SubscriptionBillingHistory) {
+  return {
+    id: entry.id,
+    billingType: entry.billingType,
+    amount: entry.amount,
+    status: entry.status,
+    description: entry.description,
+    failureReason: entry.failureReason,
+    billingPeriodStart: entry.billingPeriodStart,
+    billingPeriodEnd: entry.billingPeriodEnd,
+    paidAt: entry.paidAt,
+    createdAt: entry.createdAt,
+  };
+}
+
+/** Team seat view. Password hashes and invite tokens never leave the server. */
+export function teamMemberDto(user: User) {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    status: user.status,
+    lastLoginAt: user.lastLoginAt,
+    createdAt: user.createdAt,
   };
 }
 
@@ -44,7 +114,6 @@ export function ownerMerchantDto(merchant: MerchantInput) {
     status: merchant.status,
     qrCodeUrl: merchant.qrCodeUrl,
     paymentUrl: merchant.paymentUrl,
-    currentProviderRate: merchant.currentProviderRate,
     director: merchant.director,
     nzbn: merchant.nzbn,
     contactEmail: merchant.contactEmail,
@@ -98,7 +167,6 @@ export function adminMerchantDto(merchant: MerchantInput) {
     address: merchant.address,
     qrCodeUrl: merchant.qrCodeUrl,
     paymentUrl: merchant.paymentUrl,
-    currentProviderRate: merchant.currentProviderRate,
     director: merchant.director,
     contactEmail: merchant.contactEmail,
     contactPhone: merchant.contactPhone,
@@ -213,10 +281,8 @@ export function ownerTransactionDto(transaction: TransactionInput) {
   return {
     ...publicTransactionDto(transaction),
     windcaveTransactionId: transaction.windcaveTransactionId,
-    windcaveFeeRate: transaction.windcaveFeeRate,
-    windcaveFeeAmount: transaction.windcaveFeeAmount,
-    platformFeeRate: transaction.platformFeeRate,
-    platformFeeAmount: transaction.platformFeeAmount,
+    // No fee fields: TaptPay charges no per-transaction fee, and Windcave's own
+    // fees are settled on their side and were never tracked here.
     merchantNet: transaction.merchantNet,
     totalRefunded: transaction.totalRefunded,
     refundableAmount: transaction.refundableAmount,

@@ -35,6 +35,8 @@ const PRE_INDEX_MIGRATIONS = [
   "0010a_reconcile_retail_payment_baseline.sql",
 ];
 const FINAL_MIGRATION = "0011_payment_links_and_board_numbers.sql";
+const PUSH_NOTIFICATIONS_MIGRATION = "0012_push_notification_preferences.sql";
+const SUBSCRIPTION_MIGRATION = "0013_subscription_plans.sql";
 
 function stage(message) {
   console.log(`[postgres-verifier] ${message}`);
@@ -332,6 +334,343 @@ async function expectPostgresError(operation, code, constraint) {
   assert.fail(`expected PostgreSQL error ${code}`);
 }
 
+async function prepareSubscriptionMigrationFixtures(client) {
+  const suffix = randomBytes(8).toString("hex");
+  const merchantRows = await client.query(
+    `INSERT INTO merchants
+       (name, business_name, email, status, password_hash)
+     VALUES
+       ('Migration pending merchant', 'Migration pending merchant', $1, 'pending', $2),
+       ('Migration verified merchant', 'Migration verified merchant', $3, 'verified', $4),
+       ('Migration seeded merchant', 'Migration seeded merchant', $5, 'active', NULL)
+     RETURNING id, email, status`,
+    [
+      `migration-pending-${suffix}@example.test`,
+      "pending-merchant-password-hash",
+      `migration-verified-${suffix}@example.test`,
+      "verified-merchant-password-hash",
+      `migration-seeded-${suffix}@example.test`,
+    ],
+  );
+  const pending = merchantRows.rows.find((row) => row.status === "pending");
+  const verified = merchantRows.rows.find((row) => row.status === "verified");
+  const seeded = merchantRows.rows.find((row) => row.status === "active");
+  assert.ok(pending && verified && seeded);
+
+  const alternateEmail = `migration-member-${suffix}@example.test`;
+  await client.query(
+    `INSERT INTO users (email, password, merchant_id, role)
+     VALUES
+       ($1, 'stale-owner-password', $2, 'merchant'),
+       ($3, 'member-password', $2, 'merchant')`,
+    [verified.email.toUpperCase(), verified.id, alternateEmail],
+  );
+
+  await client.query(
+    `INSERT INTO merchant_subscriptions (merchant_id, status)
+     VALUES ($1, 'active'), ($2, 'active')`,
+    [pending.id, verified.id],
+  );
+
+  const historicalTransaction = await client.query(
+    `INSERT INTO transactions (merchant_id, item_name, price, status)
+     VALUES ($1, 'Historical fee-default transaction', '5.00', 'pending')
+     RETURNING id, platform_fee_rate`,
+    [verified.id],
+  );
+  assert.equal(historicalTransaction.rows[0].platform_fee_rate, "0.0050");
+
+  return {
+    pending,
+    verified,
+    seeded,
+    alternateEmail,
+    historicalTransactionId: historicalTransaction.rows[0].id,
+  };
+}
+
+async function verifySubscriptionMigration(
+  client,
+  schemaName,
+  fixture,
+) {
+  const subscriptions = await client.query(
+    `SELECT merchant_id, plan_id, seat_limit, price_cents, status,
+            current_period_start, current_period_end, next_billing_date,
+            last_billing_date, billing_claim_token, billing_claimed_at
+       FROM merchant_subscriptions
+      WHERE merchant_id = ANY($1::integer[])`,
+    [[fixture.pending.id, fixture.verified.id, fixture.seeded.id]],
+  );
+  const byMerchant = new Map(
+    subscriptions.rows.map((row) => [row.merchant_id, row]),
+  );
+  const pending = byMerchant.get(fixture.pending.id);
+  const verified = byMerchant.get(fixture.verified.id);
+  const seeded = byMerchant.get(fixture.seeded.id);
+  assert.ok(pending && verified && seeded);
+
+  assert.deepEqual(
+    [pending.plan_id, pending.seat_limit, pending.price_cents, pending.status],
+    ["solo", 1, 799, "pending"],
+  );
+  assert.equal(pending.current_period_start, null);
+  assert.equal(pending.current_period_end, null);
+  assert.equal(pending.next_billing_date, null);
+
+  assert.deepEqual(
+    [verified.plan_id, verified.seat_limit, verified.price_cents, verified.status],
+    ["solo", 1, 799, "active"],
+  );
+  assert.ok(verified.current_period_start instanceof Date);
+  assert.ok(verified.current_period_end instanceof Date);
+  assert.ok(verified.next_billing_date instanceof Date);
+  assert.ok(
+    verified.next_billing_date.getTime() <= Date.now() + 10_000,
+    "an uncharged legacy subscription was not made immediately due",
+  );
+
+  assert.deepEqual(
+    [seeded.plan_id, seeded.seat_limit, seeded.price_cents, seeded.status],
+    ["solo", 1, 799, "active"],
+  );
+  assert.equal(seeded.current_period_start, null);
+  assert.equal(seeded.current_period_end, null);
+  assert.equal(seeded.next_billing_date, null);
+
+  const verifiedUsers = await client.query(
+    `SELECT email, password, role, status
+       FROM users
+      WHERE merchant_id = $1
+      ORDER BY id`,
+    [fixture.verified.id],
+  );
+  assert.equal(
+    verifiedUsers.rows.filter((row) => row.role === "owner").length,
+    1,
+  );
+  const owner = verifiedUsers.rows.find((row) => row.role === "owner");
+  assert.equal(owner.email.toLowerCase(), fixture.verified.email.toLowerCase());
+  assert.equal(owner.password, "verified-merchant-password-hash");
+  assert.equal(owner.status, "active");
+  assert.equal(
+    verifiedUsers.rows.find((row) => row.email === fixture.alternateEmail)?.role,
+    "member",
+  );
+
+  const pendingOwners = await client.query(
+    `SELECT email, role, status
+       FROM users
+      WHERE merchant_id = $1 AND role = 'owner'`,
+    [fixture.pending.id],
+  );
+  assert.deepEqual(pendingOwners.rows, [
+    { email: fixture.pending.email, role: "owner", status: "active" },
+  ]);
+
+  const columnRows = await client.query(
+    `SELECT table_name, column_name, column_default, is_nullable
+       FROM information_schema.columns
+      WHERE table_schema = $1
+        AND (
+          (table_name = 'users' AND column_name IN (
+            'merchant_id', 'role', 'reset_token', 'reset_token_expiry'
+          ))
+          OR
+          (table_name = 'merchant_subscriptions' AND column_name IN (
+            'status', 'current_period_start', 'billing_claim_token',
+            'billing_claimed_at'
+          ))
+          OR
+          (table_name = 'subscription_billing_history' AND column_name IN (
+            'windcave_transaction_id', 'idempotency_key', 'attempt_number'
+          ))
+          OR
+          (table_name = 'transactions' AND column_name = 'platform_fee_rate')
+        )`,
+    [schemaName],
+  );
+  const columns = new Map(
+    columnRows.rows.map((row) => [
+      `${row.table_name}.${row.column_name}`,
+      row,
+    ]),
+  );
+  assert.equal(columns.get("users.merchant_id")?.is_nullable, "YES");
+  assert.equal(columns.get("users.merchant_id")?.column_default, null);
+  assert.match(columns.get("users.role")?.column_default ?? "", /member/);
+  assert.ok(columns.has("users.reset_token"));
+  assert.ok(columns.has("users.reset_token_expiry"));
+  assert.match(
+    columns.get("merchant_subscriptions.status")?.column_default ?? "",
+    /pending/,
+  );
+  assert.equal(
+    columns.get("merchant_subscriptions.current_period_start")?.column_default,
+    null,
+  );
+  assert.ok(columns.has("merchant_subscriptions.billing_claim_token"));
+  assert.ok(columns.has("merchant_subscriptions.billing_claimed_at"));
+  assert.ok(columns.has("subscription_billing_history.windcave_transaction_id"));
+  assert.ok(columns.has("subscription_billing_history.idempotency_key"));
+  assert.ok(columns.has("subscription_billing_history.attempt_number"));
+  assert.match(
+    columns.get("transactions.platform_fee_rate")?.column_default ?? "",
+    /0\.0000/,
+  );
+
+  const requiredIndexes = [
+    "subscription_billing_history_idempotency_key_uq",
+    "subscription_billing_history_merchant_created_idx",
+    "users_email_lower_uq",
+    "users_invite_token_hash_uq",
+    "users_reset_token_hash_uq",
+  ];
+  const indexes = await client.query(
+    `SELECT indexname
+       FROM pg_indexes
+      WHERE schemaname = $1
+        AND indexname = ANY($2::text[])
+      ORDER BY indexname`,
+    [schemaName, requiredIndexes],
+  );
+  assert.deepEqual(
+    indexes.rows.map((row) => row.indexname),
+    [...requiredIndexes].sort(),
+  );
+
+  const historicalRate = await client.query(
+    "SELECT platform_fee_rate FROM transactions WHERE id = $1",
+    [fixture.historicalTransactionId],
+  );
+  assert.equal(historicalRate.rows[0].platform_fee_rate, "0.0050");
+  const newTransaction = await client.query(
+    `INSERT INTO transactions (merchant_id, item_name, price, status)
+     VALUES ($1, 'Zero fee-default transaction', '6.00', 'pending')
+     RETURNING platform_fee_rate`,
+    [fixture.verified.id],
+  );
+  assert.equal(newTransaction.rows[0].platform_fee_rate, "0.0000");
+
+  await expectPostgresError(
+    () =>
+      client.query(
+        "UPDATE merchant_subscriptions SET plan_id = 'invalid' WHERE merchant_id = $1",
+        [fixture.seeded.id],
+      ),
+    "23514",
+    "merchant_subscriptions_plan_id_check",
+  );
+  await expectPostgresError(
+    () =>
+      client.query(
+        "UPDATE merchant_subscriptions SET status = 'invalid' WHERE merchant_id = $1",
+        [fixture.seeded.id],
+      ),
+    "23514",
+    "merchant_subscriptions_status_check",
+  );
+  await expectPostgresError(
+    () =>
+      client.query(
+        `INSERT INTO users (email, password, merchant_id, role, status)
+         VALUES ($1, 'duplicate-email', $2, 'member', 'active')`,
+        [fixture.pending.email.toUpperCase(), fixture.pending.id],
+      ),
+    "23505",
+    "users_email_lower_uq",
+  );
+
+  const resetTokenHash = randomBytes(32).toString("hex");
+  const verifiedOwner = verifiedUsers.rows.find((row) => row.role === "owner");
+  await client.query(
+    "UPDATE users SET reset_token = $1 WHERE lower(email) = lower($2)",
+    [resetTokenHash, verifiedOwner.email],
+  );
+  await expectPostgresError(
+    () =>
+      client.query(
+        "UPDATE users SET reset_token = $1 WHERE email = $2",
+        [resetTokenHash, fixture.alternateEmail],
+      ),
+    "23505",
+    "users_reset_token_hash_uq",
+  );
+  await client.query(
+    "UPDATE users SET reset_token = NULL WHERE lower(email) = lower($1)",
+    [verifiedOwner.email],
+  );
+
+  const billingKey = `migration-billing-${randomUUID()}`;
+  const billingRow = await client.query(
+    `INSERT INTO subscription_billing_history
+       (merchant_id, subscription_id, billing_type, amount,
+        windcave_transaction_id, idempotency_key, attempt_number, status)
+     VALUES (
+       $1,
+       (SELECT id FROM merchant_subscriptions WHERE merchant_id = $1),
+       'monthly_subscription', '7.99', 'migration-provider-transaction',
+       $2, 1, 'succeeded'
+     )
+     RETURNING id`,
+    [fixture.verified.id, billingKey],
+  );
+  assert.ok(billingRow.rows[0].id);
+  await expectPostgresError(
+    () =>
+      client.query(
+        `INSERT INTO subscription_billing_history
+           (merchant_id, subscription_id, billing_type, amount,
+            idempotency_key, attempt_number, status)
+         VALUES (
+           $1,
+           (SELECT id FROM merchant_subscriptions WHERE merchant_id = $1),
+           'monthly_subscription', '7.99', $2, 1, 'succeeded'
+         )`,
+        [fixture.verified.id, billingKey],
+      ),
+    "23505",
+    "subscription_billing_history_idempotency_key_uq",
+  );
+
+  stage(
+    "proved 0013 pending/legacy seed semantics, owner backfill, zero-fee defaults, and reconciliation indexes",
+  );
+  return { billingKey };
+}
+
+async function verifySubscriptionMigrationRerun(
+  client,
+  fixture,
+  billingKey,
+) {
+  const result = await client.query(
+    `SELECT plan_id, seat_limit, price_cents
+       FROM merchant_subscriptions
+      WHERE merchant_id = $1`,
+    [fixture.verified.id],
+  );
+  assert.deepEqual(result.rows, [
+    { plan_id: "team", seat_limit: 5, price_cents: 899 },
+  ]);
+
+  const ownerCount = await client.query(
+    `SELECT count(*)::integer AS rows
+       FROM users
+      WHERE merchant_id = $1 AND role = 'owner'`,
+    [fixture.verified.id],
+  );
+  assert.equal(ownerCount.rows[0].rows, 1);
+  const billingCount = await client.query(
+    `SELECT count(*)::integer AS rows
+       FROM subscription_billing_history
+      WHERE idempotency_key = $1`,
+    [billingKey],
+  );
+  assert.equal(billingCount.rows[0].rows, 1);
+  stage("proved 0013 rerun preserves live plan choices and unique billing history");
+}
+
 async function verifyPostIndexConstraints(client, schemaName) {
   const requiredIndexes = [
     "payment_attempts_live_transaction_share_uq",
@@ -580,6 +919,50 @@ async function main() {
         FINAL_MIGRATION,
       );
       await verifyPostIndexConstraints(migrationClient, schemaName);
+      await applyMigration(
+        migrationClient,
+        schemaName,
+        PUSH_NOTIFICATIONS_MIGRATION,
+      );
+      // 0012 declares itself idempotent; exercise the real rerun path instead of
+      // trusting IF NOT EXISTS coverage by inspection.
+      await applyMigration(
+        migrationClient,
+        schemaName,
+        PUSH_NOTIFICATIONS_MIGRATION,
+      );
+
+      const subscriptionFixture =
+        await prepareSubscriptionMigrationFixtures(migrationClient);
+      await applyMigration(
+        migrationClient,
+        schemaName,
+        SUBSCRIPTION_MIGRATION,
+      );
+      const { billingKey } = await verifySubscriptionMigration(
+        migrationClient,
+        schemaName,
+        subscriptionFixture,
+      );
+
+      // Prove a rerun cannot re-price a customer who changed plan after 0013.
+      await migrationClient.query(
+        `UPDATE merchant_subscriptions
+            SET plan_id = 'team', seat_limit = 5, price_cents = 899
+          WHERE merchant_id = $1`,
+        [subscriptionFixture.verified.id],
+      );
+      await applyMigration(
+        migrationClient,
+        schemaName,
+        SUBSCRIPTION_MIGRATION,
+      );
+      await verifySubscriptionMigrationRerun(
+        migrationClient,
+        subscriptionFixture,
+        billingKey,
+      );
+      await verifyObjectsStayInSchema(migrationClient, schemaName);
     } finally {
       migrationClient.release();
     }

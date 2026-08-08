@@ -1,7 +1,9 @@
-import { merchants, merchantTutorialProgress, transactions, merchantSettlements, platformFees, refunds, splitPayments, paymentAttempts, PAYMENT_RETURN_STATE_MAX_AGE_MS, taptStones, stockItems, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, pushNotificationDeliveries, normalizePushNotificationPreferences, DEFAULT_PUSH_NOTIFICATION_PREFERENCES, tenantProfiles, activeSchedules, invoicesRentRequests, transactionEvents, clientProfiles, quotes, jobInvoices, jobSchedules, jobEvents, type Merchant, type MerchantTutorialProgress, type Transaction, type SplitPayment, type PaymentAttempt, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type MerchantSubscription, type SubscriptionBillingHistory, type PushSubscription, type PushNotificationPreferences, type PushNotificationEventType } from "@shared/schema";
+import { users, type User, type UserStatus, merchants, merchantTutorialProgress, transactions, merchantSettlements, platformFees, refunds, splitPayments, paymentAttempts, PAYMENT_RETURN_STATE_MAX_AGE_MS, taptStones, stockItems, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, pushNotificationDeliveries, normalizePushNotificationPreferences, DEFAULT_PUSH_NOTIFICATION_PREFERENCES, tenantProfiles, activeSchedules, invoicesRentRequests, transactionEvents, clientProfiles, quotes, jobInvoices, jobSchedules, jobEvents, type Merchant, type MerchantTutorialProgress, type Transaction, type SplitPayment, type PaymentAttempt, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type MerchantSubscription, type SubscriptionBillingHistory, type PushSubscription, type PushNotificationPreferences, type PushNotificationEventType } from "@shared/schema";
+import { DEFAULT_PLAN_ID, isUpgrade, planFor, planForOrDefault, type PlanId } from "@shared/plans";
+import { decideBilling, failedPaymentUpdates, immediatePlanUpdates, MAX_PAYMENT_ATTEMPTS, nextBillingPeriodStart, nextPeriodUpdates, proratedUpgradeCents, queuedPlanUpdates, renewalPlan } from "./subscription-billing";
 import { getDb, isDatabaseConnected } from "./database";
-import { eq, ne, desc, and, inArray, gte, lte, lt, or, ilike, sql, isNull, isNotNull } from "drizzle-orm";
-import { randomUUID } from "node:crypto";
+import { eq, ne, desc, asc, and, inArray, notInArray, gte, lte, lt, or, ilike, sql, isNull, isNotNull } from "drizzle-orm";
+import { createHash, randomUUID } from "node:crypto";
 import type {
   AttachPaymentAttemptSessionRecordInput,
   AttachPaymentAttemptSessionResult,
@@ -35,6 +37,7 @@ export type DailyPushPaymentSummary = {
 
 export type PushNotificationDeliveryStatus = "processed" | "skipped" | "failed";
 export const PUSH_NOTIFICATION_DELIVERY_LEASE_MS = 15 * 60 * 1000;
+export const SUBSCRIPTION_BILLING_CLAIM_LEASE_MS = 15 * 60 * 1000;
 
 /**
  * Internal transaction input accepted by storage implementations. The external
@@ -111,6 +114,250 @@ function sanitizeTransactionStorageInput(
         ? canonical.taptStoneId
         : selectedStoneId ?? null,
   };
+}
+
+export interface SubscriptionCardInput {
+  windcaveCardId: string;
+  brand: string | null;
+  last4: string | null;
+  expiry: string | null;
+}
+
+export interface SubscriptionCardChargeRequest {
+  subscriptionId: number;
+  merchantId: number;
+  cardId: string;
+  amountCents: number;
+  idempotencyKey: string;
+  reference: string;
+}
+
+export type SubscriptionCardSessionState =
+  | "pending"
+  | "succeeded"
+  | "declined";
+
+function subscriptionCardSessionDigest(sessionId: string): string {
+  return createHash("sha256").update(sessionId, "utf8").digest("hex");
+}
+
+function terminalSubscriptionCardSessionRef(
+  state: Exclude<SubscriptionCardSessionState, "pending">,
+  sessionId: string,
+): string {
+  return `${state}:${subscriptionCardSessionDigest(sessionId)}`;
+}
+
+export function subscriptionCardSessionState(
+  subscription: Pick<MerchantSubscription, "windcaveBillingRef"> | null | undefined,
+  sessionId: string,
+): SubscriptionCardSessionState | null {
+  if (!subscription?.windcaveBillingRef || !sessionId) return null;
+  if (subscription.windcaveBillingRef === sessionId) return "pending";
+  const digest = subscriptionCardSessionDigest(sessionId);
+  if (subscription.windcaveBillingRef === `succeeded:${digest}`) return "succeeded";
+  if (subscription.windcaveBillingRef === `declined:${digest}`) return "declined";
+  return null;
+}
+
+export type SubscriptionCardChargeExecutor = (
+  request: SubscriptionCardChargeRequest,
+) => Promise<PlanUpgradeChargeResult>;
+
+export type SubscriptionCardSetupResult =
+  | {
+      ok: true;
+      subscription: MerchantSubscription;
+      charged: boolean;
+    }
+  | {
+      ok: false;
+      reason: "not-found" | "session-mismatch" | "billing-busy" | "invalid-state" | "charge-failed" | "declined";
+      message: string;
+    };
+
+export type CancelSubscriptionResult =
+  | { ok: true; subscription: MerchantSubscription }
+  | { ok: false; reason: "not-found" | "billing-busy" };
+
+export type PlanChangeResult =
+  | { ok: true; subscription: MerchantSubscription; applied: "immediate" | "queued" }
+  | { ok: false; reason: "not-found" }
+  | { ok: false; reason: "too-many-seats"; seatsInUse: number; seatLimit: number }
+  | {
+      ok: false;
+      reason: "payment-method-required" | "billing-busy" | "invalid-state" | "declined" | "charge-failed";
+      message: string;
+    };
+
+export interface PlanUpgradeChargeRequest {
+  subscriptionId: number;
+  merchantId: number;
+  targetPlanId: PlanId;
+  cardId: string;
+  amountCents: number;
+  idempotencyKey: string;
+  reference: string;
+}
+
+export type PlanUpgradeChargeResult =
+  | {
+      success: true;
+      approved: boolean;
+      windcaveTransactionId?: string;
+      declineReason?: string;
+    }
+  | { success: false; error: string };
+
+export type PlanUpgradeChargeExecutor = (
+  request: PlanUpgradeChargeRequest,
+) => Promise<PlanUpgradeChargeResult>;
+
+export type MerchantSignupStorageInput = CreateMerchant & {
+  verificationToken: string;
+  passwordHash?: string;
+  planId?: PlanId;
+  contactEmail?: string;
+  contactPhone?: string;
+  businessAddress?: string;
+  nzbn?: string | null;
+  gstNumber?: string | null;
+  director?: string | null;
+  businessDescription?: string | null;
+  websiteUrl?: string | null;
+  estimatedAnnualTurnover?: string | null;
+  onboardingCompleted?: boolean;
+};
+
+export interface InviteTeamMemberInput {
+  email: string;
+  name?: string | null;
+  /** SHA-256 of the raw invite token. The raw token is emailed, never stored. */
+  inviteTokenHash: string;
+  inviteExpiresAt: Date;
+}
+
+export type InviteTeamMemberResult =
+  | { ok: true; user: User }
+  | { ok: false; reason: "seat-limit"; seatsInUse: number; seatLimit: number }
+  | { ok: false; reason: "email-taken" };
+
+export type TeamMemberStatusResult =
+  | { ok: true; user: User }
+  | { ok: false; reason: "not-found" | "owner" | "invalid-state" }
+  | { ok: false; reason: "seat-limit"; seatsInUse: number; seatLimit: number };
+
+export type RotateTeamInviteResult =
+  | { ok: true; user: User }
+  | { ok: false; reason: "not-found" | "conflict" }
+  | { ok: false; reason: "seat-limit"; seatsInUse: number; seatLimit: number };
+
+export interface SubscriptionRevenue {
+  /** Committed monthly recurring revenue, in dollars. */
+  monthlyRecurringRevenue: number;
+  /** Subscriptions actually expected to pay next period. */
+  payingSubscriptions: number;
+  /** Every subscription row, including cancelled and suspended. */
+  totalSubscriptions: number;
+  byPlan: Record<string, { count: number; monthlyRevenue: number }>;
+  pastDue: number;
+  suspended: number;
+  cancelling: number;
+}
+
+/**
+ * MRR counts only subscriptions that will actually be charged next period:
+ * `active` and not cancelling. Past-due rows are excluded — they represent money
+ * we have failed to collect, and counting them would flatter the number.
+ */
+export function summariseSubscriptionRevenue(
+  rows: readonly {
+    planId?: string | null;
+    priceCents?: number | null;
+    status?: string | null;
+    cancelAtPeriodEnd?: boolean | null;
+    lastBillingDate?: string | null;
+  }[],
+): SubscriptionRevenue {
+  const byPlan: Record<string, { count: number; monthlyRevenue: number }> = {};
+  let monthlyCents = 0;
+  let payingSubscriptions = 0;
+  let pastDue = 0;
+  let suspended = 0;
+  let cancelling = 0;
+
+  for (const row of rows) {
+    if (row.status === "past_due") pastDue += 1;
+    if (row.status === "suspended") suspended += 1;
+    if (row.cancelAtPeriodEnd) cancelling += 1;
+
+    // Do not report onboarding rows as revenue before a charge has succeeded.
+    const counts = row.status === "active"
+      && !row.cancelAtPeriodEnd
+      && !!row.lastBillingDate;
+    if (!counts) continue;
+
+    const planId = row.planId ?? DEFAULT_PLAN_ID;
+    const cents = row.priceCents ?? planFor(DEFAULT_PLAN_ID).priceCents;
+    monthlyCents += cents;
+    payingSubscriptions += 1;
+    const bucket = byPlan[planId] ?? { count: 0, monthlyRevenue: 0 };
+    bucket.count += 1;
+    bucket.monthlyRevenue = Number((bucket.monthlyRevenue + cents / 100).toFixed(2));
+    byPlan[planId] = bucket;
+  }
+
+  return {
+    monthlyRecurringRevenue: Number((monthlyCents / 100).toFixed(2)),
+    payingSubscriptions,
+    totalSubscriptions: rows.length,
+    byPlan,
+    pastDue,
+    suspended,
+    cancelling,
+  };
+}
+
+/**
+ * Column values for a brand-new subscription. Every creation path goes through
+ * here so a merchant can never end up with a plan, seat limit and price that
+ * disagree with the catalogue.
+ */
+export function newSubscriptionValues(merchantId: number, now: Date = new Date()) {
+  const plan = planFor(DEFAULT_PLAN_ID);
+  return {
+    merchantId,
+    planId: plan.id,
+    seatLimit: plan.seats,
+    priceCents: plan.priceCents,
+    status: "pending",
+    currentPeriodStart: null,
+    currentPeriodEnd: null,
+    nextBillingDate: null,
+    lastBillingDate: null,
+    currentMonthTransactions: 0,
+    totalLifetimeTransactions: 0,
+    monthStartDate: now,
+  };
+}
+
+/**
+ * Adds one calendar month, clamping to the last day of the target month so a
+ * subscription started on the 31st does not skip a month. Billing dates must be
+ * derived with this, never with `setMonth` alone.
+ */
+export function addOneMonth(from: Date): Date {
+  const result = new Date(from);
+  const targetMonth = result.getUTCMonth() + 1;
+  result.setUTCDate(1);
+  result.setUTCMonth(targetMonth);
+  const lastDayOfTargetMonth = new Date(Date.UTC(
+    result.getUTCFullYear(),
+    result.getUTCMonth() + 1,
+    0,
+  )).getUTCDate();
+  result.setUTCDate(Math.min(from.getUTCDate(), lastDayOfTargetMonth));
+  return result;
 }
 
 export class TaptStoneCapacityError extends Error {
@@ -262,7 +509,7 @@ export interface IStorage extends PaymentAttemptRepository {
   getMerchantByResetToken(resetToken: string): Promise<Merchant | undefined>;
   createMerchant(merchant: InsertMerchant): Promise<Merchant>;
   createMerchantWithPassword(merchantData: any, passwordHash: string): Promise<Merchant>;
-  createMerchantWithSignup(data: CreateMerchant & { verificationToken: string }): Promise<Merchant>;
+  createMerchantWithSignup(data: MerchantSignupStorageInput): Promise<Merchant>;
   verifyMerchant(token: string, passwordHash: string): Promise<Merchant | undefined>;
   updateMerchantStatus(id: number, status: string): Promise<Merchant | undefined>;
   updateMerchantPasswordHash(id: number, passwordHash: string): Promise<Merchant | undefined>;
@@ -310,7 +557,8 @@ export interface IStorage extends PaymentAttemptRepository {
   getPlatformFee(id: number): Promise<PlatformFee | undefined>;
   getPlatformFeesByMerchant(merchantId: number): Promise<PlatformFee[]>;
   updatePlatformFeeStatus(id: number, status: string): Promise<PlatformFee | undefined>;
-  getTotalPlatformRevenue(): Promise<{ totalFees: number; totalTransactions: number }>;
+  // Platform revenue is subscription MRR — TaptPay takes no cut of merchant turnover.
+  getSubscriptionRevenue(): Promise<SubscriptionRevenue>;
   
   // Refund operations
   createRefund(data: InsertRefund): Promise<Refund>;
@@ -349,11 +597,6 @@ export interface IStorage extends PaymentAttemptRepository {
     totalTransactions: number;
     completedTransactions: number;
     totalRevenue: number;
-    currentProviderCost: number;
-    ourCost: number;
-    savings: number;
-    currentProviderRate: number;
-    ourRate: number;
     weeklyTransactions: number;
     weeklyRevenue: number;
     averageTransaction: number;
@@ -365,11 +608,6 @@ export interface IStorage extends PaymentAttemptRepository {
     totalTransactions: number;
     completedTransactions: number;
     totalRevenue: number;
-    currentProviderCost: number;
-    ourCost: number;
-    savings: number;
-    currentProviderRate: number;
-    ourRate: number;
     dateRange: { start: Date | null; end: Date | null };
     averageTransactionValue: number;
     transactionsByStatus: { [key: string]: number };
@@ -395,16 +633,69 @@ export interface IStorage extends PaymentAttemptRepository {
   // Subscription operations
   getOrCreateSubscription(merchantId: number): Promise<any>;
   getSubscription(merchantId: number): Promise<any | undefined>;
-  updateSubscriptionTier(merchantId: number, tier: string): Promise<any>;
-  updateSubscriptionBillingFrequency(merchantId: number, frequency: string): Promise<any>;
   incrementTransactionCount(merchantId: number): Promise<void>;
-  cancelSubscription(merchantId: number, reason: string): Promise<any>;
+  cancelSubscription(merchantId: number, reason: string): Promise<CancelSubscriptionResult>;
+  resumeSubscription(merchantId: number): Promise<any>;
   getBillingHistory(merchantId: number, limit?: number): Promise<any[]>;
   createBillingHistory(data: any): Promise<any>;
   resetMonthlyTransactionCount(merchantId: number): Promise<void>;
-  getUnbilledTransactions(merchantId: number): Promise<{ count: number; amount: number }>;
-  resetUnbilledTransactions(merchantId: number): Promise<void>;
-  
+  // Applies a plan change under a row lock, refusing a downgrade that would
+  // leave more active logins than the target plan allows.
+  changeSubscriptionPlan(merchantId: number, planId: PlanId, chargeUpgrade?: PlanUpgradeChargeExecutor): Promise<PlanChangeResult>;
+  saveSubscriptionCard(merchantId: number, card: SubscriptionCardInput): Promise<any>;
+  bindSubscriptionCardSession(merchantId: number, sessionId: string): Promise<boolean>;
+  completeSubscriptionCardSetup(
+    merchantId: number,
+    sessionId: string,
+    card: SubscriptionCardInput,
+    charge: SubscriptionCardChargeExecutor,
+  ): Promise<SubscriptionCardSetupResult>;
+  removeSubscriptionCard(merchantId: number): Promise<any>;
+  applySubscriptionBillingOutcome(subscriptionId: number, updates: Record<string, unknown>): Promise<void>;
+  getSubscriptionsDueForBilling(now: Date): Promise<MerchantSubscription[]>;
+  getCancelledSubscriptionsPastPeriodEnd(now: Date): Promise<MerchantSubscription[]>;
+  claimSubscriptionsDueForBilling(
+    now: Date,
+    limit?: number,
+    excludeSubscriptionIds?: readonly number[],
+    claimedAt?: Date,
+  ): Promise<MerchantSubscription[]>;
+  finalizeSubscriptionBillingClaim(
+    subscriptionId: number,
+    claimToken: string,
+    updates: Record<string, unknown>,
+    history: Record<string, unknown>,
+  ): Promise<boolean>;
+  releaseSubscriptionBillingClaim(subscriptionId: number, claimToken: string): Promise<void>;
+  expireCancelledSubscriptions(now: Date): Promise<number>;
+
+  // Team seat operations
+  getTeamMembers(merchantId: number): Promise<User[]>;
+  countSeatsInUse(merchantId: number): Promise<number>;
+  inviteTeamMember(merchantId: number, input: InviteTeamMemberInput): Promise<InviteTeamMemberResult>;
+  setTeamMemberStatus(merchantId: number, userId: number, status: UserStatus): Promise<TeamMemberStatusResult>;
+  rotateTeamInvite(
+    merchantId: number,
+    userId: number,
+    input: Pick<InviteTeamMemberInput, "inviteTokenHash" | "inviteExpiresAt" | "name"> & { expectedTokenHash: string },
+  ): Promise<RotateTeamInviteResult>;
+  revokeTeamInvite(merchantId: number, userId: number, expectedTokenHash?: string): Promise<boolean>;
+  removeTeamMember(merchantId: number, userId: number): Promise<boolean>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  getUserById(id: number): Promise<User | undefined>;
+  getUserByInviteToken(tokenHash: string): Promise<User | undefined>;
+  activateInvitedUser(userId: number, tokenHash: string, passwordHash: string, name?: string | null, now?: Date): Promise<User | null>;
+  recordUserLogin(userId: number, at: Date): Promise<void>;
+  updateUserPassword(userId: number, passwordHash: string): Promise<User | null>;
+  setUserResetToken(
+    userId: number,
+    tokenHash: string | null,
+    expiry: Date | null,
+  ): Promise<void>;
+  getUserByResetToken(tokenHash: string): Promise<User | undefined>;
+  resetUserPasswordByToken(tokenHash: string, passwordHash: string, now: Date): Promise<User | null>;
+
+
   // Push subscription operations
   createPushSubscription(data: PushSubscriptionInput): Promise<PushSubscription | null>;
   getPushSubscriptionsByMerchant(merchantId: number): Promise<PushSubscription[]>;
@@ -565,6 +856,9 @@ export class MemStorage implements IStorage {
   private merchantTransactionCounts: Map<number, number>;
   private taptStones: Map<number, TaptStone>;
   private stockItems: Map<number, StockItem>;
+  private users: Map<number, User>;
+  private subscriptions: Map<number, MerchantSubscription>;
+  private subscriptionHistory: Map<number, SubscriptionBillingHistory>;
   private currentMerchantId: number;
   private currentTransactionId: number;
   private currentPlatformFeeId: number;
@@ -572,9 +866,13 @@ export class MemStorage implements IStorage {
   private currentSplitPaymentId: number;
   private currentTaptStoneId: number;
   private currentStockItemId: number;
+  private currentUserId: number;
+  private currentSubscriptionId: number;
+  private currentSubscriptionHistoryId: number;
   private taptStoneCreationLocks: Map<number, Promise<void>>;
   private paymentAttemptLocks: Map<string, Promise<void>>;
   private billSplitLocks: Map<string, Promise<void>>;
+  private accountMutationLocks: Map<string, Promise<void>>;
   private pushSubs: PushSubscription[];
   private pushDeliveryClaims: Map<string, {
     status: PushNotificationDeliveryStatus | "claimed";
@@ -593,6 +891,9 @@ export class MemStorage implements IStorage {
     this.merchantTransactionCounts = new Map();
     this.taptStones = new Map();
     this.stockItems = new Map();
+    this.users = new Map();
+    this.subscriptions = new Map();
+    this.subscriptionHistory = new Map();
     this.pushSubs = [];
     this.pushDeliveryClaims = new Map();
     this.tutorialProgress = new Map();
@@ -603,9 +904,105 @@ export class MemStorage implements IStorage {
     this.currentSplitPaymentId = 1;
     this.currentTaptStoneId = 1;
     this.currentStockItemId = 1;
+    this.currentUserId = 1;
+    this.currentSubscriptionId = 1;
+    this.currentSubscriptionHistoryId = 1;
     this.taptStoneCreationLocks = new Map();
     this.paymentAttemptLocks = new Map();
     this.billSplitLocks = new Map();
+    this.accountMutationLocks = new Map();
+  }
+
+  private ensureMemSubscription(merchantId: number, now: Date = new Date()): MerchantSubscription {
+    const existing = this.subscriptions.get(merchantId);
+    if (existing) return existing;
+    const subscription = {
+      id: this.currentSubscriptionId++,
+      ...newSubscriptionValues(merchantId, now),
+      pendingPlanId: null,
+      pendingPlanEffectiveAt: null,
+      cancelAtPeriodEnd: false,
+      cancellationRequestedAt: null,
+      cancellationEffectiveDate: null,
+      cancellationReason: null,
+      windcaveCardId: null,
+      windcaveBillingRef: null,
+      cardBrand: null,
+      cardLast4: null,
+      cardExpiry: null,
+      failedPaymentCount: 0,
+      lastPaymentFailureAt: null,
+      lastPaymentFailureReason: null,
+      billingClaimToken: null,
+      billingClaimedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    } as MerchantSubscription;
+    this.subscriptions.set(merchantId, subscription);
+    return subscription;
+  }
+
+  private upsertMemOwner(merchant: Merchant, passwordHash: string): User {
+    const normalizedEmail = merchant.email.trim().toLowerCase();
+    const collision = Array.from(this.users.values()).find(
+      (user) => user.email.toLowerCase() === normalizedEmail && user.merchantId !== merchant.id,
+    );
+    if (collision) throw new Error("That email address already belongs to another login");
+    const current = Array.from(this.users.values()).find(
+      (user) => user.merchantId === merchant.id && user.role === "owner",
+    );
+    const user = {
+      ...(current ?? {}),
+      id: current?.id ?? this.currentUserId++,
+      email: normalizedEmail,
+      password: passwordHash,
+      merchantId: merchant.id,
+      role: "owner",
+      name: merchant.name,
+      status: "active",
+      inviteTokenHash: null,
+      inviteExpiresAt: null,
+      resetToken: current?.resetToken ?? null,
+      resetTokenExpiry: current?.resetTokenExpiry ?? null,
+      lastLoginAt: current?.lastLoginAt ?? null,
+      createdAt: current?.createdAt ?? new Date(),
+    } as User;
+    this.users.set(user.id, user);
+    return user;
+  }
+
+  private memSeatsInUse(merchantId: number, now: Date = new Date()): number {
+    return Array.from(this.users.values()).filter((user) =>
+      user.merchantId === merchantId
+      && (
+        user.status === "active"
+        || (
+          user.status === "invited"
+          && !!user.inviteExpiresAt
+          && new Date(user.inviteExpiresAt).getTime() > now.getTime()
+        )
+      )
+    ).length;
+  }
+
+  private memEffectiveSeatLimit(merchantId: number): number {
+    const subscription = this.subscriptions.get(merchantId);
+    const currentLimit = subscription?.seatLimit ?? planFor(DEFAULT_PLAN_ID).seats;
+    return subscription?.pendingPlanId
+      ? Math.min(currentLimit, planFor(subscription.pendingPlanId).seats)
+      : currentLimit;
+  }
+
+  private memSubscriptionById(subscriptionId: number): MerchantSubscription | undefined {
+    return Array.from(this.subscriptions.values()).find((row) => row.id === subscriptionId);
+  }
+
+  private memBillingHistoryByIdempotencyKey(
+    idempotencyKey: string,
+  ): SubscriptionBillingHistory | undefined {
+    return Array.from(this.subscriptionHistory.values()).find(
+      (row) => row.idempotencyKey === idempotencyKey,
+    );
   }
 
   async getMerchant(id: number): Promise<Merchant | undefined> {
@@ -619,8 +1016,9 @@ export class MemStorage implements IStorage {
   }
 
   async getMerchantByEmail(email: string): Promise<Merchant | undefined> {
+    const normalizedEmail = email.trim().toLowerCase();
     return Array.from(this.merchants.values()).find(
-      (merchant) => merchant.email === email,
+      (merchant) => merchant.email.trim().toLowerCase() === normalizedEmail,
     );
   }
 
@@ -718,11 +1116,15 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
       updatedAt: new Date(),
     };
+    this.upsertMemOwner(merchant, passwordHash);
     this.merchants.set(id, merchant);
+    this.ensureMemSubscription(id);
     return merchant;
   }
 
-  async createMerchantWithSignup(data: CreateMerchant & { verificationToken: string }): Promise<Merchant> {
+  async createMerchantWithSignup(data: MerchantSignupStorageInput): Promise<Merchant> {
+    const selectedPlan = planFor(data.planId ?? DEFAULT_PLAN_ID);
+    const normalizedEmail = data.email.trim().toLowerCase();
     const id = this.currentMerchantId++;
     const merchant: Merchant = {
       ...MEM_MERCHANT_DEFAULTS,
@@ -730,42 +1132,52 @@ export class MemStorage implements IStorage {
       name: data.name,
       businessName: data.businessName,
       businessType: data.businessType,
-      email: data.email,
+      email: normalizedEmail,
       phone: data.phone,
       address: data.address,
       status: "pending",
       verificationToken: data.verificationToken,
-      passwordHash: null,
-      qrCodeUrl: null,
-      paymentUrl: null,
+      passwordHash: data.passwordHash ?? null,
+      qrCodeUrl: `/api/merchants/${id}/qr`,
+      paymentUrl: `/pay/${id}`,
       themeId: "classic",
       currentProviderRate: "0.0290",
       ourRate: "0.0020",
-      contactEmail: data.email,
-      contactPhone: data.phone,
-      businessAddress: data.address,
+      contactEmail: data.contactEmail ?? normalizedEmail,
+      contactPhone: data.contactPhone ?? data.phone,
+      businessAddress: data.businessAddress ?? data.address,
       bankName: null,
       bankAccountNumber: null,
       bankBranch: null,
       accountHolderName: null,
-      gstNumber: null,
-      director: null,
-      nzbn: null,
+      gstNumber: data.gstNumber ?? null,
+      director: data.director ?? null,
+      nzbn: data.nzbn ?? null,
       customLogoUrl: null,
       windcaveApiKey: null,
+      businessDescription: data.businessDescription ?? null,
+      websiteUrl: data.websiteUrl ?? null,
+      estimatedAnnualTurnover: data.estimatedAnnualTurnover ?? null,
+      onboardingCompleted: data.onboardingCompleted ?? false,
       dailyGoal: "500.00",
       resetToken: null,
       resetTokenExpiry: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
+    if (data.passwordHash) this.upsertMemOwner(merchant, data.passwordHash);
     this.merchants.set(id, merchant);
+    Object.assign(
+      this.ensureMemSubscription(id),
+      immediatePlanUpdates(selectedPlan.id, new Date()),
+    );
     return merchant;
   }
 
   async verifyMerchant(token: string, passwordHash: string): Promise<Merchant | undefined> {
     const merchant = await this.getMerchantByToken(token);
     if (!merchant) return undefined;
+    this.upsertMemOwner(merchant, passwordHash);
     
     merchant.passwordHash = passwordHash;
     merchant.status = "verified";
@@ -789,6 +1201,7 @@ export class MemStorage implements IStorage {
   async updateMerchantPasswordHash(id: number, passwordHash: string): Promise<Merchant | undefined> {
     const merchant = this.merchants.get(id);
     if (!merchant) return undefined;
+    this.upsertMemOwner(merchant, passwordHash);
     
     merchant.passwordHash = passwordHash;
     merchant.updatedAt = new Date();
@@ -1086,7 +1499,6 @@ export class MemStorage implements IStorage {
                 attempt,
                 transaction,
                 splitPayment,
-                platformFee: null,
                 counterIncremented: false,
               }
             : { kind: "conflict", attempt };
@@ -1149,40 +1561,24 @@ export class MemStorage implements IStorage {
           updatedAt: input.now,
         };
 
-        let collectedFee: PlatformFee | null = null;
+        // No platform fee is charged or accrued — see the Postgres twin.
         let counterIncremented = false;
-        if (input.outcome === "approved") {
-          collectedFee = {
-            id: this.currentPlatformFeeId,
-            transactionId: transaction.id,
-            merchantId: transaction.merchantId,
-            feeAmount:
-              updatedSplit?.platformFeeAmount ?? transaction.platformFeeAmount ?? "0.10",
-            transactionAmount: updatedSplit?.amount ?? transaction.price,
-            status: "collected",
-            collectedAt: input.now,
-            createdAt: input.now,
-          };
-          this.currentPlatformFeeId += 1;
-          if (transaction.merchantId !== null) {
-            this.merchantTransactionCounts.set(
-              transaction.merchantId,
-              (this.merchantTransactionCounts.get(transaction.merchantId) ?? 0) + 1,
-            );
-            counterIncremented = true;
-          }
+        if (input.outcome === "approved" && transaction.merchantId !== null) {
+          this.merchantTransactionCounts.set(
+            transaction.merchantId,
+            (this.merchantTransactionCounts.get(transaction.merchantId) ?? 0) + 1,
+          );
+          counterIncremented = true;
         }
 
         if (updatedSplit) this.splitPayments.set(updatedSplit.id, updatedSplit);
         this.transactions.set(updatedTransaction.id, updatedTransaction);
-        if (collectedFee) this.platformFees.set(collectedFee.id, collectedFee);
         this.paymentAttempts.set(finalized.id, finalized);
         return {
           kind: "finalized",
           attempt: finalized,
           transaction: updatedTransaction,
           splitPayment: updatedSplit,
-          platformFee: collectedFee,
           counterIncremented,
         };
       },
@@ -1229,10 +1625,10 @@ export class MemStorage implements IStorage {
     const insertTransaction = sanitizeTransactionStorageInput(input);
     const id = this.currentTransactionId++;
     const transactionAmount = parseFloat(insertTransaction.price);
-    
-    // TaptPay fee: flat $0.10 per transaction, charged separately to merchant's card.
-    // Windcave handles their own fees on their backend — we do not track them.
-    const TAPTPAY_FEE = 0.10;
+
+    // TaptPay charges no per-transaction fee — merchants pay a monthly
+    // subscription (shared/plans.ts). The fee columns stay at zero so historical
+    // rows remain readable alongside new ones.
 
     const transaction: Transaction = {
       ...insertTransaction,
@@ -1248,7 +1644,7 @@ export class MemStorage implements IStorage {
       windcaveFeeRate: "0.0000",
       windcaveFeeAmount: "0.00",
       platformFeeRate: "0.0000",
-      platformFeeAmount: TAPTPAY_FEE.toFixed(2),
+      platformFeeAmount: "0.00",
       merchantNet: transactionAmount.toFixed(2),
       totalRefunded: "0.00",
       refundableAmount: transactionAmount.toString(),
@@ -1303,16 +1699,8 @@ export class MemStorage implements IStorage {
     return this.platformFees.get(id);
   }
 
-  async getTotalPlatformRevenue(): Promise<{ totalFees: number; totalTransactions: number }> {
-    const completedTransactions = Array.from(this.transactions.values())
-      .filter(transaction => transaction.status === "completed");
-    
-    const totalFees = completedTransactions
-      .reduce((sum, transaction) => sum + parseFloat(transaction.platformFeeAmount || "0"), 0);
-    
-    const totalTransactions = completedTransactions.length;
-    
-    return { totalFees, totalTransactions };
+  async getSubscriptionRevenue(): Promise<SubscriptionRevenue> {
+    return summariseSubscriptionRevenue(Array.from(this.subscriptions.values()));
   }
 
   // Refund methods
@@ -1536,7 +1924,7 @@ export class MemStorage implements IStorage {
         windcaveTransactionId: null,
         paymentMethod: "qr_code",
         windcaveFeeAmount: "0.00",
-        platformFeeAmount: "0.10",
+        platformFeeAmount: "0.00",
         merchantNet: amount,
         paidAt: null,
         createdAt: now,
@@ -1748,11 +2136,6 @@ export class MemStorage implements IStorage {
     totalTransactions: number;
     completedTransactions: number;
     totalRevenue: number;
-    currentProviderCost: number;
-    ourCost: number;
-    savings: number;
-    currentProviderRate: number;
-    ourRate: number;
     weeklyTransactions: number;
     weeklyRevenue: number;
     averageTransaction: number;
@@ -1778,22 +2161,10 @@ export class MemStorage implements IStorage {
     const weeklyCompletedTransactions = weeklyTransactionsList.filter(t => t.status === "completed");
     const weeklyRevenue = weeklyCompletedTransactions.reduce((sum, t) => sum + parseFloat(t.price), 0);
     
-    const currentProviderRate = parseFloat(merchant?.currentProviderRate || "0.029");
-    const ourRate = parseFloat(merchant?.ourRate || "0.002");
-    
-    const currentProviderCost = totalRevenue * currentProviderRate;
-    const ourCost = totalRevenue * ourRate;
-    const savings = currentProviderCost - ourCost;
-
     return {
       totalTransactions: transactions.length,
       completedTransactions: completedTransactions.length,
       totalRevenue,
-      currentProviderCost,
-      ourCost,
-      savings,
-      currentProviderRate: currentProviderRate * 100, // Convert to percentage
-      ourRate: ourRate * 100, // Convert to percentage
       weeklyTransactions: weeklyTransactionsList.length,
       weeklyRevenue,
       averageTransaction,
@@ -1827,11 +2198,6 @@ export class MemStorage implements IStorage {
     totalTransactions: number;
     completedTransactions: number;
     totalRevenue: number;
-    currentProviderCost: number;
-    ourCost: number;
-    savings: number;
-    currentProviderRate: number;
-    ourRate: number;
     dateRange: { start: Date | null; end: Date | null };
     averageTransactionValue: number;
     transactionsByStatus: { [key: string]: number };
@@ -1842,13 +2208,6 @@ export class MemStorage implements IStorage {
     const completedTransactions = transactions.filter(t => t.status === "completed");
     const totalRevenue = completedTransactions.reduce((sum, t) => sum + parseFloat(t.price), 0);
     
-    const currentProviderRate = parseFloat(merchant?.currentProviderRate || "0.029");
-    const ourRate = parseFloat(merchant?.ourRate || "0.002");
-    
-    const currentProviderCost = totalRevenue * currentProviderRate;
-    const ourCost = totalRevenue * ourRate;
-    const savings = currentProviderCost - ourCost;
-
     // Calculate transaction breakdown by status
     const transactionsByStatus: { [key: string]: number } = {};
     transactions.forEach(t => {
@@ -1859,11 +2218,6 @@ export class MemStorage implements IStorage {
       totalTransactions: transactions.length,
       completedTransactions: completedTransactions.length,
       totalRevenue,
-      currentProviderCost,
-      ourCost,
-      savings,
-      currentProviderRate: currentProviderRate * 100,
-      ourRate: ourRate * 100,
       dateRange: { 
         start: startDate || null, 
         end: endDate || null 
@@ -2022,7 +2376,7 @@ export class MemStorage implements IStorage {
         windcaveFeeRate: "0.0000",
         windcaveFeeAmount: "0.00",
         platformFeeRate: "0.0000",
-        platformFeeAmount: "0.10",
+        platformFeeAmount: "0.00",
         merchantNet: transaction.price,
         totalRefunded: "0.00",
         refundableAmount: transaction.price,
@@ -2389,44 +2743,123 @@ export class MemStorage implements IStorage {
     return false;
   }
 
-  // Subscription stub methods (not used in production)
-  async getOrCreateSubscription(merchantId: number): Promise<any> {
-    throw new Error('Subscriptions not supported in memory storage');
+  // Subscription methods for database-free local development and focused tests.
+  async getOrCreateSubscription(merchantId: number): Promise<MerchantSubscription> {
+    return this.ensureMemSubscription(merchantId);
   }
 
-  async getSubscription(merchantId: number): Promise<any | undefined> {
-    return undefined;
+  async getSubscription(merchantId: number): Promise<MerchantSubscription | undefined> {
+    return this.subscriptions.get(merchantId);
   }
 
-  async updateSubscriptionTier(merchantId: number, tier: string): Promise<any> {
-    throw new Error('Subscriptions not supported in memory storage');
+  async updateSubscriptionTier(merchantId: number, tier: string): Promise<MerchantSubscription> {
+    const subscription = this.ensureMemSubscription(merchantId);
+    subscription.tier = tier;
+    subscription.updatedAt = new Date();
+    return subscription;
   }
 
-  async updateSubscriptionBillingFrequency(merchantId: number, frequency: string): Promise<any> {
-    throw new Error('Subscriptions not supported in memory storage');
+  async updateSubscriptionBillingFrequency(
+    merchantId: number,
+    frequency: string,
+  ): Promise<MerchantSubscription> {
+    const subscription = this.ensureMemSubscription(merchantId);
+    const now = new Date();
+    const nextBillingDate = new Date(now);
+    if (frequency === "weekly") nextBillingDate.setDate(now.getDate() + 7);
+    else if (frequency === "bi_weekly") nextBillingDate.setDate(now.getDate() + 14);
+    else nextBillingDate.setMonth(now.getMonth() + 1);
+    Object.assign(subscription, {
+      billingFrequency: frequency,
+      nextBillingDate,
+      updatedAt: now,
+    });
+    return subscription;
   }
 
   async incrementTransactionCount(merchantId: number): Promise<void> {
+    const subscription = this.ensureMemSubscription(merchantId);
+    const now = new Date();
+    const monthStart = new Date(subscription.monthStartDate ?? now);
+    const monthsElapsed =
+      (now.getFullYear() - monthStart.getFullYear()) * 12
+      + now.getMonth() - monthStart.getMonth();
+    if (monthsElapsed >= 1) {
+      subscription.currentMonthTransactions = 0;
+      subscription.monthStartDate = now;
+    }
+    subscription.currentMonthTransactions = (subscription.currentMonthTransactions ?? 0) + 1;
+    subscription.totalLifetimeTransactions = (subscription.totalLifetimeTransactions ?? 0) + 1;
+    subscription.updatedAt = now;
     this.merchantTransactionCounts.set(
       merchantId,
       (this.merchantTransactionCounts.get(merchantId) ?? 0) + 1,
     );
   }
 
-  async cancelSubscription(merchantId: number, reason: string): Promise<any> {
-    throw new Error('Subscriptions not supported in memory storage');
+  async cancelSubscription(
+    merchantId: number,
+    reason: string,
+  ): Promise<CancelSubscriptionResult> {
+    return withMemLock(this.accountMutationLocks, `merchant:${merchantId}`, async () => {
+      const subscription = this.subscriptions.get(merchantId);
+      if (!subscription) return { ok: false as const, reason: "not-found" as const };
+      if (subscription.billingClaimToken) {
+        return { ok: false as const, reason: "billing-busy" as const };
+      }
+      const now = new Date();
+      const hasLivePaidPeriod =
+        subscription.status !== "cancelled"
+        && !!subscription.lastBillingDate
+        && !!subscription.currentPeriodEnd
+        && new Date(subscription.currentPeriodEnd).getTime() > now.getTime();
+      const effectiveDate = hasLivePaidPeriod
+        ? new Date(subscription.currentPeriodEnd!)
+        : now;
+      Object.assign(subscription, {
+        status: hasLivePaidPeriod ? subscription.status : "cancelled",
+        cancelAtPeriodEnd: hasLivePaidPeriod,
+        cancellationRequestedAt: now,
+        cancellationEffectiveDate: effectiveDate,
+        cancellationReason: reason,
+        windcaveBillingRef: null,
+        ...(!hasLivePaidPeriod ? {
+          lastBillingDate: null,
+          currentPeriodStart: null,
+          currentPeriodEnd: null,
+          nextBillingDate: null,
+        } : {}),
+        updatedAt: now,
+      });
+      return { ok: true as const, subscription };
+    });
   }
 
-  async getBillingHistory(merchantId: number, limit?: number): Promise<any[]> {
-    return [];
+  async getBillingHistory(merchantId: number, limit: number = 50): Promise<SubscriptionBillingHistory[]> {
+    return Array.from(this.subscriptionHistory.values())
+      .filter((row) => row.merchantId === merchantId)
+      .sort((a, b) => Number(b.createdAt) - Number(a.createdAt))
+      .slice(0, limit);
   }
 
-  async createBillingHistory(data: any): Promise<any> {
-    throw new Error('Subscriptions not supported in memory storage');
+  async createBillingHistory(data: any): Promise<SubscriptionBillingHistory> {
+    const row = {
+      ...data,
+      id: this.currentSubscriptionHistoryId++,
+      createdAt: data.createdAt ?? new Date(),
+    } as SubscriptionBillingHistory;
+    this.subscriptionHistory.set(row.id, row);
+    return row;
   }
 
   async resetMonthlyTransactionCount(merchantId: number): Promise<void> {
-    // No-op in memory storage
+    const subscription = this.subscriptions.get(merchantId);
+    if (subscription) {
+      const now = new Date();
+      subscription.currentMonthTransactions = 0;
+      subscription.monthStartDate = now;
+      subscription.updatedAt = now;
+    }
   }
 
   async getUnbilledTransactions(merchantId: number): Promise<{ count: number; amount: number }> {
@@ -2501,6 +2934,837 @@ export class MemStorage implements IStorage {
   async createJobEvent(data: any): Promise<any> { return undefined; }
   async getJobEventsByClient(clientProfileId: string, limit?: number): Promise<any[]> { return []; }
 
+  // ── Subscriptions and team seats — database-free development parity ────────
+  async resumeSubscription(merchantId: number): Promise<MerchantSubscription | null> {
+    return withMemLock(this.accountMutationLocks, `merchant:${merchantId}`, async () => {
+      const subscription = this.subscriptions.get(merchantId);
+      const now = new Date();
+      if (
+        !subscription
+        || !subscription.cancelAtPeriodEnd
+        || !["active", "past_due", "suspended"].includes(subscription.status)
+        || !subscription.currentPeriodEnd
+        || new Date(subscription.currentPeriodEnd).getTime() <= now.getTime()
+      ) {
+        return null;
+      }
+      Object.assign(subscription, {
+        cancelAtPeriodEnd: false,
+        cancellationRequestedAt: null,
+        cancellationEffectiveDate: null,
+        cancellationReason: null,
+        updatedAt: now,
+      });
+      return subscription;
+    });
+  }
+
+  async changeSubscriptionPlan(
+    merchantId: number,
+    planId: PlanId,
+    chargeUpgrade?: PlanUpgradeChargeExecutor,
+  ): Promise<PlanChangeResult> {
+    const plan = planFor(planId);
+    return withMemLock(this.accountMutationLocks, `merchant:${merchantId}`, async () => {
+      const subscription = this.subscriptions.get(merchantId);
+      if (!subscription) return { ok: false as const, reason: "not-found" as const };
+
+      const now = new Date();
+      const seatsInUse = this.memSeatsInUse(merchantId, now);
+      if (plan.seats < seatsInUse) {
+        return {
+          ok: false as const,
+          reason: "too-many-seats" as const,
+          seatsInUse,
+          seatLimit: plan.seats,
+        };
+      }
+      if (subscription.billingClaimToken) {
+        return {
+          ok: false as const,
+          reason: "billing-busy" as const,
+          message: "Billing is already in progress. Please try again shortly.",
+        };
+      }
+
+      const currentPlan = planForOrDefault(subscription.planId);
+      if (plan.id === currentPlan.id) {
+        return { ok: true as const, subscription, applied: "immediate" as const };
+      }
+      const currentPriceCents = subscription.priceCents ?? currentPlan.priceCents;
+      const upgrade = isUpgrade(currentPlan.id, plan.id);
+      const downgrade = !upgrade;
+      const hasLivePaidPeriod =
+        subscription.status !== "cancelled"
+        && !!subscription.lastBillingDate
+        && !!subscription.currentPeriodEnd
+        && new Date(subscription.currentPeriodEnd).getTime() > now.getTime();
+      if (downgrade && hasLivePaidPeriod) {
+        Object.assign(
+          subscription,
+          queuedPlanUpdates(planId, subscription.currentPeriodEnd ?? null, now),
+        );
+        return { ok: true as const, subscription, applied: "queued" as const };
+      }
+
+      const paidUpgrade = upgrade && hasLivePaidPeriod;
+      if (!paidUpgrade) {
+        Object.assign(subscription, immediatePlanUpdates(planId, now));
+        return { ok: true as const, subscription, applied: "immediate" as const };
+      }
+
+      if (
+        subscription.status !== "active"
+        || subscription.cancelAtPeriodEnd
+        || !subscription.currentPeriodStart
+        || !subscription.currentPeriodEnd
+      ) {
+        return {
+          ok: false as const,
+          reason: "invalid-state" as const,
+          message: "Resolve the current subscription state before upgrading.",
+        };
+      }
+      if (!subscription.windcaveCardId) {
+        return {
+          ok: false as const,
+          reason: "payment-method-required" as const,
+          message: "Add a payment method before upgrading.",
+        };
+      }
+
+      const amountCents = proratedUpgradeCents(
+        currentPriceCents,
+        plan.priceCents,
+        new Date(subscription.currentPeriodStart),
+        new Date(subscription.currentPeriodEnd),
+        now,
+      );
+      if (amountCents > 0) {
+        if (!chargeUpgrade) {
+          return {
+            ok: false as const,
+            reason: "charge-failed" as const,
+            message: "The upgrade charge could not be started.",
+          };
+        }
+        const anchor = new Date(subscription.currentPeriodStart)
+          .toISOString()
+          .slice(0, 10);
+        const idempotencyKey = `plan-${subscription.id}-${anchor}-${plan.id}`;
+        const charge = await chargeUpgrade({
+          subscriptionId: subscription.id,
+          merchantId,
+          targetPlanId: plan.id,
+          cardId: subscription.windcaveCardId,
+          amountCents,
+          idempotencyKey,
+          reference: `TAPTPAY-UPGRADE-M${merchantId}-${plan.id.toUpperCase()}-${anchor}`,
+        });
+        if (!charge.success) {
+          return {
+            ok: false as const,
+            reason: "charge-failed" as const,
+            message: "The upgrade payment could not be confirmed. Please try again.",
+          };
+        }
+        if (!charge.approved) {
+          return {
+            ok: false as const,
+            reason: "declined" as const,
+            message: charge.declineReason || "The upgrade payment was declined.",
+          };
+        }
+        if (!this.memBillingHistoryByIdempotencyKey(idempotencyKey)) {
+          await this.createBillingHistory({
+            merchantId,
+            subscriptionId: subscription.id,
+            billingType: "plan_change",
+            amount: (amountCents / 100).toFixed(2),
+            billingPeriodStart: now,
+            billingPeriodEnd: subscription.currentPeriodEnd,
+            windcaveTransactionId: charge.windcaveTransactionId ?? null,
+            idempotencyKey,
+            attemptNumber: 1,
+            status: "succeeded",
+            description: `Prorated upgrade to ${plan.name}`,
+            paidAt: now,
+          });
+        }
+      }
+
+      Object.assign(subscription, immediatePlanUpdates(planId, now));
+      return { ok: true as const, subscription, applied: "immediate" as const };
+    });
+  }
+
+  async saveSubscriptionCard(
+    merchantId: number,
+    card: SubscriptionCardInput,
+  ): Promise<MerchantSubscription> {
+    const subscription = this.ensureMemSubscription(merchantId);
+    Object.assign(subscription, {
+      windcaveCardId: card.windcaveCardId,
+      cardBrand: card.brand,
+      cardLast4: card.last4,
+      cardExpiry: card.expiry,
+      updatedAt: new Date(),
+    });
+    return subscription;
+  }
+
+  async bindSubscriptionCardSession(merchantId: number, sessionId: string): Promise<boolean> {
+    const normalizedSessionId = sessionId.trim();
+    if (!normalizedSessionId) return false;
+    const subscription = this.ensureMemSubscription(merchantId);
+    subscription.windcaveBillingRef = normalizedSessionId;
+    subscription.updatedAt = new Date();
+    return true;
+  }
+
+  async completeSubscriptionCardSetup(
+    merchantId: number,
+    sessionId: string,
+    card: SubscriptionCardInput,
+    charge: SubscriptionCardChargeExecutor,
+  ): Promise<SubscriptionCardSetupResult> {
+    const normalizedSessionId = sessionId.trim();
+    if (!normalizedSessionId || !card.windcaveCardId.trim()) {
+      return {
+        ok: false,
+        reason: "session-mismatch",
+        message: "The card session is invalid.",
+      };
+    }
+
+    return withMemLock(this.accountMutationLocks, `merchant:${merchantId}`, async () => {
+      const subscription = this.subscriptions.get(merchantId);
+      if (!subscription) {
+        return {
+          ok: false as const,
+          reason: "not-found" as const,
+          message: "Subscription not found.",
+        };
+      }
+      const cardSessionState = subscriptionCardSessionState(subscription, normalizedSessionId);
+      if (cardSessionState === "succeeded") {
+        const now = new Date();
+        const paidPeriodIsCurrent =
+          subscription.status === "active"
+          && !!subscription.lastBillingDate
+          && !!subscription.currentPeriodEnd
+          && new Date(subscription.currentPeriodEnd).getTime() > now.getTime();
+        if (paidPeriodIsCurrent) {
+          Object.assign(subscription, {
+            windcaveCardId: card.windcaveCardId,
+            cardBrand: card.brand,
+            cardLast4: card.last4,
+            cardExpiry: card.expiry,
+            windcaveBillingRef: terminalSubscriptionCardSessionRef("succeeded", normalizedSessionId),
+            updatedAt: now,
+          });
+        }
+        return { ok: true as const, subscription, charged: false };
+      }
+      if (cardSessionState === "declined") {
+        return {
+          ok: false as const,
+          reason: "declined" as const,
+          message: "The card was declined.",
+        };
+      }
+      if (cardSessionState !== "pending") {
+        return {
+          ok: false as const,
+          reason: "session-mismatch" as const,
+          message: "The card session does not belong to this account.",
+        };
+      }
+      if (subscription.billingClaimToken) {
+        return {
+          ok: false as const,
+          reason: "billing-busy" as const,
+          message: "Billing is already in progress. Please try again shortly.",
+        };
+      }
+
+      const now = new Date();
+      const paidPeriodIsCurrent =
+        subscription.status === "active"
+        && !!subscription.lastBillingDate
+        && !!subscription.currentPeriodEnd
+        && new Date(subscription.currentPeriodEnd).getTime() > now.getTime();
+      const cardFields = {
+        windcaveCardId: card.windcaveCardId,
+        cardBrand: card.brand,
+        cardLast4: card.last4,
+        cardExpiry: card.expiry,
+        updatedAt: now,
+      };
+      if (paidPeriodIsCurrent) {
+        Object.assign(subscription, cardFields, {
+          windcaveBillingRef: terminalSubscriptionCardSessionRef("succeeded", normalizedSessionId),
+        });
+        return { ok: true as const, subscription, charged: false };
+      }
+      if (
+        (subscription.cancelAtPeriodEnd && subscription.status !== "cancelled")
+        || !["pending", "active", "past_due", "suspended", "cancelled"].includes(subscription.status)
+      ) {
+        return {
+          ok: false as const,
+          reason: "invalid-state" as const,
+          message: "Resolve the pending cancellation before adding a payment method.",
+        };
+      }
+
+      const plan = renewalPlan(subscription);
+      const amountCents = subscription.pendingPlanId
+        ? plan.priceCents
+        : (subscription.priceCents ?? plan.priceCents);
+      const idempotencyKey =
+        `sub-${subscription.id}-card-${createHash("sha256")
+          .update(normalizedSessionId)
+          .digest("hex")
+          .slice(0, 16)}`;
+      const periodStart = nextBillingPeriodStart(subscription, now);
+      const periodEnd = addOneMonth(periodStart);
+      const prior = this.memBillingHistoryByIdempotencyKey(idempotencyKey);
+      if (prior?.status === "failed") {
+        subscription.windcaveBillingRef =
+          terminalSubscriptionCardSessionRef("declined", normalizedSessionId);
+        return {
+          ok: false as const,
+          reason: "declined" as const,
+          message: prior.failureReason || "The card was declined.",
+        };
+      }
+      if (prior && prior.status !== "succeeded") {
+        return {
+          ok: false as const,
+          reason: "billing-busy" as const,
+          message: "Card activation is already in progress.",
+        };
+      }
+      if (prior?.status === "succeeded") {
+        subscription.windcaveBillingRef =
+          terminalSubscriptionCardSessionRef("succeeded", normalizedSessionId);
+        return { ok: true as const, subscription, charged: false };
+      }
+      const attemptNumber = (subscription.failedPaymentCount ?? 0) + 1;
+
+      const outcome = await charge({
+            subscriptionId: subscription.id,
+            merchantId,
+            cardId: card.windcaveCardId,
+            amountCents,
+            idempotencyKey,
+            reference: `TAPTPAY-CARD-M${merchantId}-${plan.id.toUpperCase()}`,
+          });
+      if (!outcome.success) {
+        return {
+          ok: false as const,
+          reason: "charge-failed" as const,
+          message: "The payment could not be confirmed. Please try again.",
+        };
+      }
+      if (!outcome.approved) {
+        const failureReason = outcome.declineReason || "Card declined";
+        const exhausted =
+          (subscription.failedPaymentCount ?? 0) + 1 >= MAX_PAYMENT_ATTEMPTS;
+        if (!prior) {
+          await this.createBillingHistory({
+            merchantId,
+            subscriptionId: subscription.id,
+            billingType: "monthly_subscription",
+            amount: (amountCents / 100).toFixed(2),
+            billingPeriodStart: periodStart,
+            billingPeriodEnd: periodEnd,
+            windcaveTransactionId: outcome.windcaveTransactionId ?? null,
+            idempotencyKey,
+            attemptNumber,
+            status: "failed",
+            description: `${plan.name} subscription activation`,
+            failureReason,
+          });
+        }
+        Object.assign(subscription, {
+          ...cardFields,
+          ...failedPaymentUpdates(subscription, now, failureReason, exhausted),
+          cancelAtPeriodEnd: false,
+          cancellationRequestedAt: null,
+          cancellationEffectiveDate: null,
+          cancellationReason: null,
+          lastBillingDate: null,
+          currentPeriodStart: null,
+          currentPeriodEnd: null,
+          nextBillingDate: periodStart,
+          windcaveBillingRef: terminalSubscriptionCardSessionRef("declined", normalizedSessionId),
+        });
+        return {
+          ok: false as const,
+          reason: "declined" as const,
+          message: failureReason,
+        };
+      }
+
+      Object.assign(subscription, {
+        ...nextPeriodUpdates(subscription, now),
+        ...cardFields,
+        cancelAtPeriodEnd: false,
+        cancellationRequestedAt: null,
+        cancellationEffectiveDate: null,
+        cancellationReason: null,
+        windcaveBillingRef: terminalSubscriptionCardSessionRef("succeeded", normalizedSessionId),
+      });
+      if (!prior) {
+        await this.createBillingHistory({
+          merchantId,
+          subscriptionId: subscription.id,
+          billingType: "monthly_subscription",
+          amount: (amountCents / 100).toFixed(2),
+          billingPeriodStart: periodStart,
+          billingPeriodEnd: periodEnd,
+          windcaveTransactionId: outcome.windcaveTransactionId ?? null,
+          idempotencyKey,
+          attemptNumber,
+          status: "succeeded",
+          description: `${plan.name} subscription activation`,
+          paidAt: now,
+        });
+      }
+      return { ok: true as const, subscription, charged: true };
+    });
+  }
+
+  async removeSubscriptionCard(merchantId: number): Promise<MerchantSubscription> {
+    const subscription = this.ensureMemSubscription(merchantId);
+    Object.assign(subscription, {
+      windcaveCardId: null,
+      cardBrand: null,
+      cardLast4: null,
+      cardExpiry: null,
+      updatedAt: new Date(),
+    });
+    return subscription;
+  }
+
+  async applySubscriptionBillingOutcome(
+    subscriptionId: number,
+    updates: Record<string, unknown>,
+  ): Promise<void> {
+    const subscription = this.memSubscriptionById(subscriptionId);
+    if (subscription) Object.assign(subscription, updates);
+  }
+
+  async getSubscriptionsDueForBilling(now: Date): Promise<MerchantSubscription[]> {
+    return Array.from(this.subscriptions.values()).filter((subscription) =>
+      (subscription.status === "active" || subscription.status === "past_due")
+      && !subscription.cancelAtPeriodEnd
+      && !!subscription.windcaveCardId
+      && !!subscription.nextBillingDate
+      && new Date(subscription.nextBillingDate).getTime() <= now.getTime()
+    );
+  }
+
+  async getCancelledSubscriptionsPastPeriodEnd(
+    now: Date,
+  ): Promise<MerchantSubscription[]> {
+    return Array.from(this.subscriptions.values()).filter((subscription) =>
+      subscription.cancelAtPeriodEnd
+      && subscription.status !== "cancelled"
+      && !!subscription.currentPeriodEnd
+      && new Date(subscription.currentPeriodEnd).getTime() <= now.getTime()
+    );
+  }
+
+  async claimSubscriptionsDueForBilling(
+    now: Date,
+    limit: number = 50,
+    excludeSubscriptionIds: readonly number[] = [],
+    claimedAt: Date = now,
+  ): Promise<MerchantSubscription[]> {
+    return withMemLock(this.accountMutationLocks, "subscription-billing-claims", async () => {
+      const safeLimit = Math.max(1, Math.min(100, Math.trunc(limit)));
+      const excluded = new Set(excludeSubscriptionIds);
+      const staleBefore = new Date(
+        claimedAt.getTime() - SUBSCRIPTION_BILLING_CLAIM_LEASE_MS,
+      );
+      return Array.from(this.subscriptions.values())
+        .filter((subscription) =>
+          !excluded.has(subscription.id)
+          && decideBilling(subscription, now).action === "charge"
+          && (
+            !subscription.billingClaimToken
+            || !subscription.billingClaimedAt
+            || new Date(subscription.billingClaimedAt).getTime() < staleBefore.getTime()
+          )
+        )
+        .slice(0, safeLimit)
+        .map((subscription) => {
+          subscription.billingClaimToken = randomUUID();
+          subscription.billingClaimedAt = claimedAt;
+          subscription.updatedAt = claimedAt;
+          return subscription;
+        });
+    });
+  }
+
+  async finalizeSubscriptionBillingClaim(
+    subscriptionId: number,
+    claimToken: string,
+    updates: Record<string, unknown>,
+    history: Record<string, unknown>,
+  ): Promise<boolean> {
+    return withMemLock(this.accountMutationLocks, "subscription-billing-claims", async () => {
+      const subscription = this.memSubscriptionById(subscriptionId);
+      if (!subscription || subscription.billingClaimToken !== claimToken) return false;
+      Object.assign(subscription, updates, {
+        billingClaimToken: null,
+        billingClaimedAt: null,
+      });
+      const idempotencyKey =
+        typeof history.idempotencyKey === "string" ? history.idempotencyKey : null;
+      if (!idempotencyKey || !this.memBillingHistoryByIdempotencyKey(idempotencyKey)) {
+        await this.createBillingHistory(history);
+      }
+      return true;
+    });
+  }
+
+  async releaseSubscriptionBillingClaim(subscriptionId: number, claimToken: string): Promise<void> {
+    await withMemLock(this.accountMutationLocks, "subscription-billing-claims", async () => {
+      const subscription = this.memSubscriptionById(subscriptionId);
+      if (subscription?.billingClaimToken === claimToken) {
+        subscription.billingClaimToken = null;
+        subscription.billingClaimedAt = null;
+      }
+    });
+  }
+
+  async expireCancelledSubscriptions(now: Date): Promise<number> {
+    const rows = (await this.getCancelledSubscriptionsPastPeriodEnd(now))
+      .filter((row) => !row.billingClaimToken);
+    rows.forEach((row) => Object.assign(row, {
+      status: "cancelled",
+      cancelAtPeriodEnd: false,
+      lastBillingDate: null,
+      currentPeriodStart: null,
+      currentPeriodEnd: null,
+      nextBillingDate: null,
+      updatedAt: now,
+    }));
+    return rows.length;
+  }
+
+  async getTeamMembers(merchantId: number): Promise<User[]> {
+    return Array.from(this.users.values())
+      .filter((user) => user.merchantId === merchantId)
+      .sort((a, b) => a.id - b.id);
+  }
+
+  async countSeatsInUse(merchantId: number): Promise<number> {
+    return this.memSeatsInUse(merchantId);
+  }
+
+  async inviteTeamMember(
+    merchantId: number,
+    input: InviteTeamMemberInput,
+  ): Promise<InviteTeamMemberResult> {
+    return withMemLock(this.accountMutationLocks, `merchant:${merchantId}`, async () => {
+      const email = input.email.trim().toLowerCase();
+      const emailTaken = Array.from(this.users.values()).some(
+        (user) => user.email.trim().toLowerCase() === email,
+      );
+      if (emailTaken) {
+        return { ok: false as const, reason: "email-taken" as const };
+      }
+
+      const now = new Date();
+      const seatsInUse = this.memSeatsInUse(merchantId, now);
+      const seatLimit = this.memEffectiveSeatLimit(merchantId);
+      if (seatsInUse >= seatLimit) {
+        return {
+          ok: false as const,
+          reason: "seat-limit" as const,
+          seatsInUse,
+          seatLimit,
+        };
+      }
+
+      const user: User = {
+        id: this.currentUserId++,
+        email,
+        password: "!",
+        merchantId,
+        role: "member",
+        name: input.name ?? null,
+        status: "invited",
+        inviteTokenHash: input.inviteTokenHash,
+        inviteExpiresAt: input.inviteExpiresAt,
+        lastLoginAt: null,
+        resetToken: null,
+        resetTokenExpiry: null,
+        createdAt: now,
+      };
+      this.users.set(user.id, user);
+      return { ok: true as const, user };
+    });
+  }
+
+  async setTeamMemberStatus(
+    merchantId: number,
+    userId: number,
+    status: UserStatus,
+  ): Promise<TeamMemberStatusResult> {
+    return withMemLock(this.accountMutationLocks, `merchant:${merchantId}`, async () => {
+      const member = this.users.get(userId);
+      if (!member || member.merchantId !== merchantId) {
+        return { ok: false as const, reason: "not-found" as const };
+      }
+      if (member.role === "owner") {
+        return { ok: false as const, reason: "owner" as const };
+      }
+      if (
+        (member.status !== "active" && member.status !== "disabled")
+        || (status !== "active" && status !== "disabled")
+        || member.status === status
+      ) {
+        return { ok: false as const, reason: "invalid-state" as const };
+      }
+
+      if (status === "active") {
+        const seatsInUse = this.memSeatsInUse(merchantId);
+        const seatLimit = this.memEffectiveSeatLimit(merchantId);
+        if (seatsInUse >= seatLimit) {
+          return {
+            ok: false as const,
+            reason: "seat-limit" as const,
+            seatsInUse,
+            seatLimit,
+          };
+        }
+      }
+      member.status = status;
+      return { ok: true as const, user: member };
+    });
+  }
+
+  async rotateTeamInvite(
+    merchantId: number,
+    userId: number,
+    input: Pick<
+      InviteTeamMemberInput,
+      "inviteTokenHash" | "inviteExpiresAt" | "name"
+    > & { expectedTokenHash: string },
+  ): Promise<RotateTeamInviteResult> {
+    return withMemLock(this.accountMutationLocks, `merchant:${merchantId}`, async () => {
+      const invited = this.users.get(userId);
+      if (
+        !invited
+        || invited.merchantId !== merchantId
+        || invited.role === "owner"
+        || invited.status !== "invited"
+      ) {
+        return { ok: false as const, reason: "not-found" as const };
+      }
+      if (invited.inviteTokenHash !== input.expectedTokenHash) {
+        return { ok: false as const, reason: "conflict" as const };
+      }
+
+      const now = new Date();
+      const wasLive =
+        !!invited.inviteExpiresAt
+        && new Date(invited.inviteExpiresAt).getTime() > now.getTime();
+      if (!wasLive) {
+        const seatsInUse = this.memSeatsInUse(merchantId, now);
+        const seatLimit = this.memEffectiveSeatLimit(merchantId);
+        if (seatsInUse >= seatLimit) {
+          return {
+            ok: false as const,
+            reason: "seat-limit" as const,
+            seatsInUse,
+            seatLimit,
+          };
+        }
+      }
+
+      invited.inviteTokenHash = input.inviteTokenHash;
+      invited.inviteExpiresAt = input.inviteExpiresAt;
+      if (input.name !== undefined) invited.name = input.name;
+      return { ok: true as const, user: invited };
+    });
+  }
+
+  async revokeTeamInvite(
+    merchantId: number,
+    userId: number,
+    expectedTokenHash?: string,
+  ): Promise<boolean> {
+    return withMemLock(this.accountMutationLocks, `merchant:${merchantId}`, async () => {
+      const invited = this.users.get(userId);
+      if (
+        !invited
+        || invited.merchantId !== merchantId
+        || invited.role === "owner"
+        || invited.status !== "invited"
+        || (
+          expectedTokenHash !== undefined
+          && invited.inviteTokenHash !== expectedTokenHash
+        )
+      ) {
+        return false;
+      }
+      return this.users.delete(userId);
+    });
+  }
+
+  async removeTeamMember(merchantId: number, userId: number): Promise<boolean> {
+    return withMemLock(this.accountMutationLocks, `merchant:${merchantId}`, async () => {
+      const member = this.users.get(userId);
+      if (
+        !member
+        || member.merchantId !== merchantId
+        || member.role === "owner"
+      ) {
+        return false;
+      }
+      return this.users.delete(userId);
+    });
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const normalizedEmail = email.trim().toLowerCase();
+    return Array.from(this.users.values()).find(
+      (user) => user.email.trim().toLowerCase() === normalizedEmail,
+    );
+  }
+
+  async getUserById(id: number): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+
+  async getUserByInviteToken(tokenHash: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(
+      (user) => user.inviteTokenHash === tokenHash,
+    );
+  }
+
+  async activateInvitedUser(
+    userId: number,
+    tokenHash: string,
+    passwordHash: string,
+    name?: string | null,
+    now: Date = new Date(),
+  ): Promise<User | null> {
+    const candidate = this.users.get(userId);
+    const lockKey = candidate?.merchantId == null
+      ? `user:${userId}`
+      : `merchant:${candidate.merchantId}`;
+    return withMemLock(this.accountMutationLocks, lockKey, async () => {
+      const invited = this.users.get(userId);
+      if (
+        !invited
+        || invited.status !== "invited"
+        || invited.inviteTokenHash !== tokenHash
+        || !invited.inviteExpiresAt
+        || new Date(invited.inviteExpiresAt).getTime() <= now.getTime()
+      ) {
+        return null;
+      }
+      invited.password = passwordHash;
+      invited.status = "active";
+      invited.inviteTokenHash = null;
+      invited.inviteExpiresAt = null;
+      if (name != null) invited.name = name;
+      return invited;
+    });
+  }
+
+  async recordUserLogin(userId: number, at: Date): Promise<void> {
+    const user = this.users.get(userId);
+    if (user) user.lastLoginAt = at;
+  }
+
+  async updateUserPassword(userId: number, passwordHash: string): Promise<User | null> {
+    const user = this.users.get(userId);
+    if (!user) return null;
+    user.password = passwordHash;
+    if (user.role === "owner" && user.merchantId != null) {
+      const merchant = this.merchants.get(user.merchantId);
+      if (merchant) {
+        merchant.passwordHash = passwordHash;
+        merchant.updatedAt = new Date();
+      }
+    }
+    return user;
+  }
+
+  async setUserResetToken(
+    userId: number,
+    tokenHash: string | null,
+    expiry: Date | null,
+  ): Promise<void> {
+    const user = this.users.get(userId);
+    if (!user) return;
+    if (
+      tokenHash
+      && Array.from(this.users.values()).some(
+        (candidate) =>
+          candidate.id !== userId && candidate.resetToken === tokenHash,
+      )
+    ) {
+      throw new Error("Reset token already exists");
+    }
+    user.resetToken = tokenHash;
+    user.resetTokenExpiry = expiry;
+  }
+
+  async getUserByResetToken(tokenHash: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(
+      (user) => user.resetToken === tokenHash,
+    );
+  }
+
+  async resetUserPasswordByToken(
+    tokenHash: string,
+    passwordHash: string,
+    now: Date,
+  ): Promise<User | null> {
+    const candidate = Array.from(this.users.values()).find(
+      (user) => user.resetToken === tokenHash,
+    );
+    if (!candidate) return null;
+    const lockKey = candidate.merchantId == null
+      ? `user:${candidate.id}`
+      : `merchant:${candidate.merchantId}`;
+    return withMemLock(this.accountMutationLocks, lockKey, async () => {
+      const user = this.users.get(candidate.id);
+      if (
+        !user
+        || user.resetToken !== tokenHash
+        || user.status !== "active"
+        || (user.role !== "owner" && user.role !== "member")
+        || user.merchantId == null
+        || !user.resetTokenExpiry
+        || new Date(user.resetTokenExpiry).getTime() <= now.getTime()
+      ) {
+        return null;
+      }
+
+      user.password = passwordHash;
+      user.resetToken = null;
+      user.resetTokenExpiry = null;
+      if (user.role === "owner") {
+        const merchant = this.merchants.get(user.merchantId);
+        if (merchant) {
+          merchant.passwordHash = passwordHash;
+          merchant.updatedAt = now;
+        }
+      }
+      return user;
+    });
+  }
 }
 
 // Database Storage Implementation
@@ -2527,14 +3791,35 @@ export class DatabaseStorage implements IStorage {
 
   async createMerchantWithPassword(merchantData: any, passwordHash: string): Promise<Merchant> {
     if (!this.db) throw new Error('Database not available');
-    const insertData = {
-      ...merchantData,
-      passwordHash,
-      status: 'verified',
-      verificationToken: null
-    };
-    const result = await this.db.insert(merchants).values(insertData).returning();
-    return result[0];
+    return await this.db.transaction(async (tx) => {
+      const insertData = {
+        ...merchantData,
+        email: String(merchantData.email).trim().toLowerCase(),
+        contactEmail: merchantData.contactEmail ?? String(merchantData.email).trim().toLowerCase(),
+        contactPhone: merchantData.contactPhone ?? merchantData.phone ?? null,
+        businessAddress: merchantData.businessAddress ?? merchantData.address ?? null,
+        passwordHash,
+        status: 'verified',
+        verificationToken: null,
+      };
+      const result = await tx.insert(merchants).values(insertData).returning();
+      const inserted = result[0];
+      const updated = await tx
+        .update(merchants)
+        .set({
+          qrCodeUrl: `/api/merchants/${inserted.id}/qr`,
+          paymentUrl: `/pay/${inserted.id}`,
+        })
+        .where(eq(merchants.id, inserted.id))
+        .returning();
+      const merchant = updated[0];
+      await this.syncOwnerUser(merchant, passwordHash, tx);
+      await tx
+        .insert(merchantSubscriptions)
+        .values(newSubscriptionValues(merchant.id))
+        .onConflictDoNothing({ target: merchantSubscriptions.merchantId });
+      return merchant;
+    });
   }
 
   async updateMerchantRates(id: number, currentProviderRate: string): Promise<Merchant | undefined> {
@@ -2668,7 +3953,12 @@ export class DatabaseStorage implements IStorage {
 
   async getMerchantByEmail(email: string): Promise<Merchant | undefined> {
     if (!this.db) throw new Error('Database not available');
-    const result = await this.db.select().from(merchants).where(eq(merchants.email, email)).limit(1);
+    const normalizedEmail = email.trim().toLowerCase();
+    const result = await this.db
+      .select()
+      .from(merchants)
+      .where(sql`lower(${merchants.email}) = ${normalizedEmail}`)
+      .limit(1);
     return result[0];
   }
 
@@ -2689,53 +3979,126 @@ export class DatabaseStorage implements IStorage {
     return await this.db.select().from(merchants);
   }
 
-  async createMerchantWithSignup(data: CreateMerchant & { verificationToken: string }): Promise<Merchant> {
+  async createMerchantWithSignup(data: MerchantSignupStorageInput): Promise<Merchant> {
     if (!this.db) throw new Error('Database not available');
-    
-    // First insert without URLs to get the ID
-    const result = await this.db.insert(merchants).values({
-      name: data.name,
-      businessName: data.businessName,
-      businessType: data.businessType,
-      email: data.email,
-      phone: data.phone,
-      address: data.address,
-      status: "pending",
-      verificationToken: data.verificationToken,
-      currentProviderRate: "0.0290",
-      ourRate: "0.0020",
-      qrCodeUrl: "", // Temporary empty string
-      paymentUrl: "", // Temporary empty string
-    }).returning();
-    
-    const merchant = result[0];
-    
-    // Now update with proper URLs using the merchant ID
-    const updatedResult = await this.db
-      .update(merchants)
-      .set({
-        qrCodeUrl: `/api/merchants/${merchant.id}/qr`,
-        paymentUrl: `/pay/${merchant.id}`,
-      })
-      .where(eq(merchants.id, merchant.id))
-      .returning();
-    
-    return updatedResult[0];
+    return await this.db.transaction(async (tx) => {
+      const selectedPlan = planFor(data.planId ?? DEFAULT_PLAN_ID);
+      const result = await tx.insert(merchants).values({
+        name: data.name,
+        businessName: data.businessName,
+        businessType: data.businessType,
+        email: data.email.trim().toLowerCase(),
+        phone: data.phone,
+        address: data.address,
+        contactEmail: data.contactEmail ?? data.email.trim().toLowerCase(),
+        contactPhone: data.contactPhone ?? data.phone,
+        businessAddress: data.businessAddress ?? data.address,
+        nzbn: data.nzbn ?? null,
+        gstNumber: data.gstNumber ?? null,
+        director: data.director ?? null,
+        businessDescription: data.businessDescription ?? null,
+        websiteUrl: data.websiteUrl ?? null,
+        estimatedAnnualTurnover: data.estimatedAnnualTurnover ?? null,
+        onboardingCompleted: data.onboardingCompleted ?? false,
+        passwordHash: data.passwordHash ?? null,
+        status: "pending",
+        verificationToken: data.verificationToken,
+        currentProviderRate: "0.0290",
+        ourRate: "0.0020",
+        qrCodeUrl: "",
+        paymentUrl: "",
+      }).returning();
+      const merchant = result[0];
+
+      const updatedResult = await tx
+        .update(merchants)
+        .set({
+          qrCodeUrl: `/api/merchants/${merchant.id}/qr`,
+          paymentUrl: `/pay/${merchant.id}`,
+        })
+        .where(eq(merchants.id, merchant.id))
+        .returning();
+      const updated = updatedResult[0];
+
+      if (data.passwordHash) await this.syncOwnerUser(updated, data.passwordHash, tx);
+      await tx
+        .insert(merchantSubscriptions)
+        .values({
+          ...newSubscriptionValues(merchant.id),
+          planId: selectedPlan.id,
+          seatLimit: selectedPlan.seats,
+          priceCents: selectedPlan.priceCents,
+        })
+        .onConflictDoNothing({ target: merchantSubscriptions.merchantId });
+      return updated;
+    });
   }
 
   async verifyMerchant(token: string, passwordHash: string): Promise<Merchant | undefined> {
     if (!this.db) throw new Error('Database not available');
-    const result = await this.db
-      .update(merchants)
-      .set({ 
-        passwordHash, 
-        status: "verified", 
-        verificationToken: null,
-        updatedAt: new Date()
-      })
-      .where(eq(merchants.verificationToken, token))
-      .returning();
-    return result[0];
+    return await this.db.transaction(async (tx) => {
+      const result = await tx
+        .update(merchants)
+        .set({
+          passwordHash,
+          status: "verified",
+          verificationToken: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(merchants.verificationToken, token))
+        .returning();
+      if (result[0]) await this.syncOwnerUser(result[0], passwordHash, tx);
+      return result[0];
+    });
+  }
+
+  /**
+   * Keeps the owner's login row in step with the merchant record.
+   *
+   * `users` is the login identity now, but merchants.password_hash is still
+   * written by verification, password change and reset. Rather than chase every
+   * one of those call sites, both hash writers funnel through here — so a
+   * password change can never leave the owner unable to sign in.
+   */
+  private async syncOwnerUser(merchant: Merchant, passwordHash: string, executor: any = this.db): Promise<void> {
+    if (!executor) throw new Error('Database not available');
+    const normalizedEmail = merchant.email.trim().toLowerCase();
+    const emailRows = await executor
+      .select()
+      .from(users)
+      .where(sql`lower(${users.email}) = ${normalizedEmail}`)
+      .limit(1);
+    const existing = await executor
+      .select()
+      .from(users)
+      .where(and(eq(users.merchantId, merchant.id), eq(users.role, "owner")))
+      .limit(1);
+
+    const emailUser = emailRows[0];
+    if (emailUser && emailUser.id !== existing[0]?.id) {
+      throw new Error("That email address already belongs to another login");
+    }
+
+    if (existing[0]) {
+      await executor
+        .update(users)
+        .set({ password: passwordHash, email: normalizedEmail, status: "active" })
+        .where(eq(users.id, existing[0].id));
+      return;
+    }
+
+    // Do not ignore a collision: the surrounding transaction must roll back
+    // instead of committing a merchant that can never log in.
+    await executor
+      .insert(users)
+      .values({
+        email: normalizedEmail,
+        password: passwordHash,
+        merchantId: merchant.id,
+        role: "owner",
+        status: "active",
+        name: merchant.name,
+      });
   }
 
   async updateMerchantStatus(id: number, status: string): Promise<Merchant | undefined> {
@@ -2750,12 +4113,15 @@ export class DatabaseStorage implements IStorage {
 
   async updateMerchantPasswordHash(id: number, passwordHash: string): Promise<Merchant | undefined> {
     if (!this.db) throw new Error('Database not available');
-    const result = await this.db
-      .update(merchants)
-      .set({ passwordHash, updatedAt: new Date() })
-      .where(eq(merchants.id, id))
-      .returning();
-    return result[0];
+    return await this.db.transaction(async (tx) => {
+      const result = await tx
+        .update(merchants)
+        .set({ passwordHash, updatedAt: new Date() })
+        .where(eq(merchants.id, id))
+        .returning();
+      if (result[0]) await this.syncOwnerUser(result[0], passwordHash, tx);
+      return result[0];
+    });
   }
 
   async getTransaction(id: number): Promise<Transaction | undefined> {
@@ -3207,87 +4573,52 @@ export class DatabaseStorage implements IStorage {
         .returning();
       const updatedTransaction = updatedTransactionRows[0];
 
-      let collectedFee: PlatformFee | null = null;
+      // No platform fee is charged or accrued: merchants pay a monthly
+      // subscription. The counters below are a usage statistic only — they no
+      // longer gate anything, so there is no quota branch and no unbilled total.
       let counterIncremented = false;
-      if (input.outcome === "approved") {
-        const feeRows = await tx
-          .insert(platformFees)
-          .values({
-            transactionId: transaction.id,
-            merchantId: transaction.merchantId,
-            feeAmount:
-              updatedSplit?.platformFeeAmount ?? transaction.platformFeeAmount ?? "0.10",
-            transactionAmount: updatedSplit?.amount ?? transaction.price,
-            status: "collected",
-            collectedAt: input.now,
-          })
-          .returning();
-        collectedFee = feeRows[0];
-
-        if (transaction.merchantId !== null) {
-          let subscriptionRows = await tx
+      if (input.outcome === "approved" && transaction.merchantId !== null) {
+        let subscriptionRows = await tx
+          .select()
+          .from(merchantSubscriptions)
+          .where(eq(merchantSubscriptions.merchantId, transaction.merchantId))
+          .for("update")
+          .limit(1);
+        if (!subscriptionRows[0]) {
+          await tx
+            .insert(merchantSubscriptions)
+            .values(newSubscriptionValues(transaction.merchantId, input.now))
+            .onConflictDoNothing({ target: merchantSubscriptions.merchantId });
+          subscriptionRows = await tx
             .select()
             .from(merchantSubscriptions)
             .where(eq(merchantSubscriptions.merchantId, transaction.merchantId))
             .for("update")
             .limit(1);
-          if (!subscriptionRows[0]) {
-            const nextBillingDate = new Date(input.now);
-            nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
-            await tx
-              .insert(merchantSubscriptions)
-              .values({
-                merchantId: transaction.merchantId,
-                tier: "free",
-                status: "active",
-                currentMonthTransactions: 0,
-                totalLifetimeTransactions: 0,
-                monthStartDate: input.now,
-                billingFrequency: "monthly",
-                nextBillingDate,
-                unbilledTransactionCount: 0,
-                unbilledAmount: "0.00",
-              })
-              .onConflictDoNothing({ target: merchantSubscriptions.merchantId });
-            subscriptionRows = await tx
-              .select()
-              .from(merchantSubscriptions)
-              .where(eq(merchantSubscriptions.merchantId, transaction.merchantId))
-              .for("update")
-              .limit(1);
-          }
-          const subscription = subscriptionRows[0];
-          if (!subscription) {
-            throw new Error("Failed to create merchant subscription counter");
-          }
-          const monthStart = subscription.monthStartDate ?? input.now;
-          const monthsElapsed =
-            (input.now.getFullYear() - monthStart.getFullYear()) * 12 +
-            (input.now.getMonth() - monthStart.getMonth());
-          const currentMonthTransactions = monthsElapsed >= 1
-            ? 0
-            : subscription.currentMonthTransactions ?? 0;
-          const shouldCharge =
-            subscription.tier !== "free" || currentMonthTransactions >= 100;
-          await tx
-            .update(merchantSubscriptions)
-            .set({
-              currentMonthTransactions: currentMonthTransactions + 1,
-              totalLifetimeTransactions:
-                (subscription.totalLifetimeTransactions ?? 0) + 1,
-              monthStartDate:
-                monthsElapsed >= 1 ? input.now : subscription.monthStartDate,
-              unbilledTransactionCount: shouldCharge
-                ? (subscription.unbilledTransactionCount ?? 0) + 1
-                : subscription.unbilledTransactionCount,
-              unbilledAmount: shouldCharge
-                ? (Number(subscription.unbilledAmount ?? "0") + 0.1).toFixed(2)
-                : subscription.unbilledAmount,
-              updatedAt: input.now,
-            })
-            .where(eq(merchantSubscriptions.id, subscription.id));
-          counterIncremented = true;
         }
+        const subscription = subscriptionRows[0];
+        if (!subscription) {
+          throw new Error("Failed to create merchant subscription counter");
+        }
+        const monthStart = subscription.monthStartDate ?? input.now;
+        const monthsElapsed =
+          (input.now.getFullYear() - monthStart.getFullYear()) * 12 +
+          (input.now.getMonth() - monthStart.getMonth());
+        const currentMonthTransactions = monthsElapsed >= 1
+          ? 0
+          : subscription.currentMonthTransactions ?? 0;
+        await tx
+          .update(merchantSubscriptions)
+          .set({
+            currentMonthTransactions: currentMonthTransactions + 1,
+            totalLifetimeTransactions:
+              (subscription.totalLifetimeTransactions ?? 0) + 1,
+            monthStartDate:
+              monthsElapsed >= 1 ? input.now : subscription.monthStartDate,
+            updatedAt: input.now,
+          })
+          .where(eq(merchantSubscriptions.id, subscription.id));
+        counterIncremented = true;
       }
 
       const finalizedAttemptRows = await tx
@@ -3313,7 +4644,6 @@ export class DatabaseStorage implements IStorage {
         attempt: finalizedAttempt,
         transaction: updatedTransaction,
         splitPayment: updatedSplit,
-        platformFee: collectedFee,
         counterIncremented,
       };
     });
@@ -3382,9 +4712,10 @@ export class DatabaseStorage implements IStorage {
     const windcaveFeeAmount = hasProvidedFees
       ? parseFloat((insertTransaction as any).windcaveFeeAmount)
       : 0.00;
-    // TaptPay charges a flat $0.10 per transaction to the merchant's card separately.
-    // Windcave handles their own fees. merchantNet = full transaction price.
-    const platformFeeAmount = 0.10;
+    // TaptPay charges no per-transaction fee — merchants pay a monthly
+    // subscription (shared/plans.ts). Windcave handles their own fees, so
+    // merchantNet has always been the full transaction price.
+    const platformFeeAmount = 0;
     const merchantNet = transactionAmount;
 
     const transactionWithFees = {
@@ -3500,11 +4831,6 @@ export class DatabaseStorage implements IStorage {
     totalTransactions: number;
     completedTransactions: number;
     totalRevenue: number;
-    currentProviderCost: number;
-    ourCost: number;
-    savings: number;
-    currentProviderRate: number;
-    ourRate: number;
     weeklyTransactions: number;
     weeklyRevenue: number;
     averageTransaction: number;
@@ -3534,24 +4860,10 @@ export class DatabaseStorage implements IStorage {
     const weeklyCompletedTransactions = weeklyTransactionsList.filter(t => t.status === 'completed');
     const weeklyRevenue = weeklyCompletedTransactions.reduce((sum, t) => sum + parseFloat(t.price), 0);
     
-    const currentProviderRate = merchant && merchant.currentProviderRate 
-      ? parseFloat(merchant.currentProviderRate) 
-      : 2.9;
-    const ourRate = 0.2;
-    
-    const currentProviderCost = totalRevenue * (currentProviderRate / 100);
-    const ourCost = totalRevenue * (ourRate / 100);
-    const savings = currentProviderCost - ourCost;
-    
     return {
       totalTransactions,
       completedTransactions,
       totalRevenue,
-      currentProviderCost,
-      ourCost,
-      savings,
-      currentProviderRate,
-      ourRate,
       weeklyTransactions: weeklyTransactionsList.length,
       weeklyRevenue,
       averageTransaction,
@@ -3594,11 +4906,6 @@ export class DatabaseStorage implements IStorage {
     totalTransactions: number;
     completedTransactions: number;
     totalRevenue: number;
-    currentProviderCost: number;
-    ourCost: number;
-    savings: number;
-    currentProviderRate: number;
-    ourRate: number;
     dateRange: { start: Date | null; end: Date | null };
     averageTransactionValue: number;
     transactionsByStatus: { [key: string]: number };
@@ -3606,37 +4913,22 @@ export class DatabaseStorage implements IStorage {
     if (!this.db) throw new Error('Database not available');
     
     const merchantTransactions = await this.getTransactionsByMerchantWithDateRange(merchantId, startDate, endDate);
-    const merchant = await this.getMerchant(merchantId);
-    
+
     const totalTransactions = merchantTransactions.length;
     const completedTransactions = merchantTransactions.filter(t => t.status === 'completed');
     const totalRevenue = completedTransactions.reduce((sum, t) => sum + parseFloat(t.price), 0);
-    
-    const currentProviderRate = merchant && merchant.currentProviderRate 
-      ? parseFloat(merchant.currentProviderRate) 
-      : 2.9;
-    const ourRate = 0.2;
-    
-    const currentProviderCost = totalRevenue * (currentProviderRate / 100);
-    const ourCost = totalRevenue * (ourRate / 100);
-    const savings = currentProviderCost - ourCost;
 
     // Calculate transaction breakdown by status
     const transactionsByStatus: { [key: string]: number } = {};
     merchantTransactions.forEach(t => {
       transactionsByStatus[t.status] = (transactionsByStatus[t.status] || 0) + 1;
     });
-    
+
     return {
       totalTransactions,
       completedTransactions: completedTransactions.length,
       totalRevenue,
-      currentProviderCost,
-      ourCost,
-      savings,
-      currentProviderRate,
-      ourRate,
-      dateRange: { 
+      dateRange: {
         start: startDate || null, 
         end: endDate || null 
       },
@@ -3756,17 +5048,10 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async getTotalPlatformRevenue(): Promise<{ totalFees: number; totalTransactions: number }> {
+  async getSubscriptionRevenue(): Promise<SubscriptionRevenue> {
     if (!this.db) throw new Error('Database not available');
-    const result = await this.db.select().from(transactions);
-    const completedTransactions = result.filter(t => t.status === "completed");
-    
-    const totalFees = completedTransactions
-      .reduce((sum, transaction) => sum + parseFloat(transaction.platformFeeAmount || "0"), 0);
-    
-    const totalTransactions = completedTransactions.length;
-    
-    return { totalFees, totalTransactions };
+    const rows = await this.db.select().from(merchantSubscriptions);
+    return summariseSubscriptionRevenue(rows);
   }
 
   // Refund methods for DatabaseStorage
@@ -4204,7 +5489,7 @@ export class DatabaseStorage implements IStorage {
             windcaveTransactionId: null,
             paymentMethod: "qr_code",
             windcaveFeeAmount: "0.00",
-            platformFeeAmount: "0.10",
+            platformFeeAmount: "0.00",
             merchantNet: amount,
             paidAt: null,
           })));
@@ -4497,27 +5782,18 @@ export class DatabaseStorage implements IStorage {
       return existing[0];
     }
     
-    // Create new subscription with free tier
-    const nextMonth = new Date();
-    nextMonth.setMonth(nextMonth.getMonth() + 1);
-    
+    // Create a new subscription on the default plan. A concurrent caller may win
+    // the race, so fall back to reading the winner's row rather than throwing.
     const result = await this.db
       .insert(merchantSubscriptions)
-      .values({
-        merchantId,
-        tier: 'free',
-        status: 'active',
-        currentMonthTransactions: 0,
-        totalLifetimeTransactions: 0,
-        monthStartDate: new Date(),
-        billingFrequency: 'monthly',
-        nextBillingDate: nextMonth,
-        unbilledTransactionCount: 0,
-        unbilledAmount: '0.00',
-      })
+      .values(newSubscriptionValues(merchantId))
+      .onConflictDoNothing({ target: merchantSubscriptions.merchantId })
       .returning();
-    
-    return result[0];
+    if (result[0]) return result[0];
+
+    const winner = await this.getSubscription(merchantId);
+    if (!winner) throw new Error('Failed to create merchant subscription');
+    return winner;
   }
 
   async getSubscription(merchantId: number): Promise<MerchantSubscription | undefined> {
@@ -4601,51 +5877,93 @@ export class DatabaseStorage implements IStorage {
       subscription.currentMonthTransactions = 0;
     }
     
+    // Usage statistic only. There is no per-transaction charge and no quota, so
+    // nothing here affects what the merchant is billed.
     const currentCount = subscription.currentMonthTransactions || 0;
-    const isFreeTier = subscription.tier === 'free';
-    
-    // For free tier: only charge beyond 100 transactions
-    // For paid tier: charge every transaction
-    const shouldCharge = !isFreeTier || currentCount >= 100;
-    
-    // Increment counters
-    const updates: any = {
-      currentMonthTransactions: currentCount + 1,
-      totalLifetimeTransactions: (subscription.totalLifetimeTransactions || 0) + 1,
-      updatedAt: now
-    };
-    
-    // Add billing charges only if appropriate
-    if (shouldCharge) {
-      updates.unbilledTransactionCount = (subscription.unbilledTransactionCount || 0) + 1;
-      updates.unbilledAmount = String(parseFloat(subscription.unbilledAmount || '0') + 0.10);
-    }
-    
+
     await this.db
       .update(merchantSubscriptions)
-      .set(updates)
+      .set({
+        currentMonthTransactions: currentCount + 1,
+        totalLifetimeTransactions: (subscription.totalLifetimeTransactions || 0) + 1,
+        updatedAt: now,
+      })
       .where(eq(merchantSubscriptions.merchantId, merchantId));
   }
 
-  async cancelSubscription(merchantId: number, reason: string): Promise<MerchantSubscription> {
+  /**
+   * Cancels at period end: the merchant keeps everything they have paid for
+   * until `currentPeriodEnd`, and the billing job simply does not renew. Status
+   * stays `active` so nothing about the account degrades in the meantime.
+   */
+  async cancelSubscription(
+    merchantId: number,
+    reason: string,
+  ): Promise<CancelSubscriptionResult> {
     if (!this.db) throw new Error('Database not available');
-    
     const now = new Date();
-    const effectiveDate = new Date(now);
-    effectiveDate.setDate(now.getDate() + 30); // 30 days notice
-    
+    return await this.db.transaction(async (tx) => {
+      const rows = await tx
+        .select()
+        .from(merchantSubscriptions)
+        .where(eq(merchantSubscriptions.merchantId, merchantId))
+        .for("update")
+        .limit(1);
+      const existing = rows[0];
+      if (!existing) return { ok: false as const, reason: "not-found" as const };
+      if (existing.billingClaimToken) {
+        return { ok: false as const, reason: "billing-busy" as const };
+      }
+      const hasLivePaidPeriod =
+        existing.status !== "cancelled"
+        && !!existing.lastBillingDate
+        && !!existing.currentPeriodEnd
+        && new Date(existing.currentPeriodEnd).getTime() > now.getTime();
+      const effectiveDate = hasLivePaidPeriod ? new Date(existing.currentPeriodEnd!) : now;
+      const result = await tx
+        .update(merchantSubscriptions)
+        .set({
+          status: hasLivePaidPeriod ? existing.status : "cancelled",
+          cancelAtPeriodEnd: hasLivePaidPeriod,
+          cancellationRequestedAt: now,
+          cancellationEffectiveDate: effectiveDate,
+          cancellationReason: reason,
+          windcaveBillingRef: null,
+          ...(!hasLivePaidPeriod ? {
+            lastBillingDate: null,
+            currentPeriodStart: null,
+            currentPeriodEnd: null,
+            nextBillingDate: null,
+          } : {}),
+          updatedAt: now,
+        })
+        .where(eq(merchantSubscriptions.id, existing.id))
+        .returning();
+      return { ok: true as const, subscription: result[0] };
+    });
+  }
+
+  /** Undoes only a live, not-yet-effective cancellation. */
+  async resumeSubscription(merchantId: number): Promise<MerchantSubscription | null> {
+    if (!this.db) throw new Error('Database not available');
+    const now = new Date();
     const result = await this.db
       .update(merchantSubscriptions)
       .set({
-        status: 'cancelled',
-        cancellationRequestedAt: now,
-        cancellationEffectiveDate: effectiveDate,
-        cancellationReason: reason,
-        updatedAt: now
+        cancelAtPeriodEnd: false,
+        cancellationRequestedAt: null,
+        cancellationEffectiveDate: null,
+        cancellationReason: null,
+        updatedAt: now,
       })
-      .where(eq(merchantSubscriptions.merchantId, merchantId))
+      .where(and(
+        eq(merchantSubscriptions.merchantId, merchantId),
+        eq(merchantSubscriptions.cancelAtPeriodEnd, true),
+        inArray(merchantSubscriptions.status, ["active", "past_due", "suspended"]),
+        sql`${merchantSubscriptions.currentPeriodEnd} > ${now}`,
+      ))
       .returning();
-    return result[0];
+    return result[0] ?? null;
   }
 
   async getBillingHistory(merchantId: number, limit: number = 50): Promise<SubscriptionBillingHistory[]> {
@@ -4679,31 +5997,1094 @@ export class DatabaseStorage implements IStorage {
       .where(eq(merchantSubscriptions.merchantId, merchantId));
   }
 
-  async getUnbilledTransactions(merchantId: number): Promise<{ count: number; amount: number }> {
+  /**
+   * Applies a plan change.
+   *
+   * The subscription row is locked for the whole check-then-write so a
+   * concurrent invite cannot slip a seat in between counting and downgrading.
+   * A downgrade that would strand active logins is refused outright rather than
+   * silently disabling somebody's account to make the numbers fit.
+   */
+  async changeSubscriptionPlan(merchantId: number, planId: PlanId, chargeUpgrade?: PlanUpgradeChargeExecutor): Promise<PlanChangeResult> {
     if (!this.db) throw new Error('Database not available');
-    const subscription = await this.getSubscription(merchantId);
-    
-    if (!subscription) {
-      return { count: 0, amount: 0 };
-    }
-    
-    return {
-      count: subscription.unbilledTransactionCount || 0,
-      amount: parseFloat(subscription.unbilledAmount || '0')
-    };
+    const plan = planFor(planId);
+    const now = new Date();
+
+    return await this.db.transaction(async (tx) => {
+      const rows = await tx
+        .select()
+        .from(merchantSubscriptions)
+        .where(eq(merchantSubscriptions.merchantId, merchantId))
+        .for("update")
+        .limit(1);
+      const subscription = rows[0];
+      if (!subscription) return { ok: false as const, reason: "not-found" as const };
+
+      const seatRows = await tx
+        .select({ value: sql<number>`count(*)::int` })
+        .from(users)
+        .where(and(
+          eq(users.merchantId, merchantId),
+          or(
+            eq(users.status, "active"),
+            and(eq(users.status, "invited"), sql`${users.inviteExpiresAt} > ${now}`),
+          ),
+        ));
+      const seatsInUse = seatRows[0]?.value ?? 0;
+
+      const currentPlan = planForOrDefault(subscription.planId);
+      if (plan.id === currentPlan.id) {
+        return { ok: true as const, subscription, applied: "immediate" as const };
+      }
+      const currentPriceCents = subscription.priceCents ?? currentPlan.priceCents;
+      const upgrade = isUpgrade(currentPlan.id, plan.id);
+      const downgrade = !upgrade;
+
+      if (plan.seats < seatsInUse) {
+        return {
+          ok: false as const,
+          reason: "too-many-seats" as const,
+          seatsInUse,
+          seatLimit: plan.seats,
+        };
+      }
+
+      if (subscription.billingClaimToken) {
+        return {
+          ok: false as const,
+          reason: "billing-busy" as const,
+          message: "Billing is already in progress. Please try again shortly.",
+        };
+      }
+
+      // Downgrades wait for the already-paid period. New/unpaid subscriptions can
+      // choose any plan freely because no service has yet been delivered.
+      const hasLivePaidPeriod =
+        subscription.status !== "cancelled"
+        && !!subscription.lastBillingDate
+        && !!subscription.currentPeriodEnd
+        && new Date(subscription.currentPeriodEnd).getTime() > now.getTime();
+      if (downgrade && hasLivePaidPeriod) {
+        const updated = await tx
+          .update(merchantSubscriptions)
+          .set(queuedPlanUpdates(planId, subscription.currentPeriodEnd ?? null, now))
+          .where(eq(merchantSubscriptions.id, subscription.id))
+          .returning();
+        return { ok: true as const, subscription: updated[0], applied: "queued" as const };
+      }
+
+      const paidUpgrade = upgrade && hasLivePaidPeriod;
+      if (!paidUpgrade) {
+        const updated = await tx
+          .update(merchantSubscriptions)
+          .set(immediatePlanUpdates(planId, now))
+          .where(eq(merchantSubscriptions.id, subscription.id))
+          .returning();
+        return { ok: true as const, subscription: updated[0], applied: "immediate" as const };
+      }
+
+      if (
+        subscription.status !== "active"
+        || subscription.cancelAtPeriodEnd
+        || !subscription.currentPeriodStart
+        || !subscription.currentPeriodEnd
+      ) {
+        return {
+          ok: false as const,
+          reason: "invalid-state" as const,
+          message: "Resolve the current subscription state before upgrading.",
+        };
+      }
+      if (!subscription.windcaveCardId) {
+        return {
+          ok: false as const,
+          reason: "payment-method-required" as const,
+          message: "Add a payment method before upgrading.",
+        };
+      }
+
+      const amountCents = proratedUpgradeCents(
+        currentPriceCents,
+        plan.priceCents,
+        new Date(subscription.currentPeriodStart),
+        new Date(subscription.currentPeriodEnd),
+        now,
+      );
+      if (amountCents > 0) {
+        if (!chargeUpgrade) {
+          return {
+            ok: false as const,
+            reason: "charge-failed" as const,
+            message: "The upgrade charge could not be started.",
+          };
+        }
+        const anchor = new Date(subscription.currentPeriodStart).toISOString().slice(0, 10);
+        const keyPrefix = `plan-${subscription.id}-${anchor}-${plan.id}-a`;
+        const priorAttempts = await tx
+          .select({
+            value: sql<number>`coalesce(max(${subscriptionBillingHistory.attemptNumber}), 0)::int`,
+          })
+          .from(subscriptionBillingHistory)
+          .where(and(
+            eq(subscriptionBillingHistory.subscriptionId, subscription.id),
+            eq(subscriptionBillingHistory.billingType, "plan_change"),
+            sql`${subscriptionBillingHistory.idempotencyKey} like ${`${keyPrefix}%`}`,
+          ));
+        // A confirmed decline consumes an attempt and may be retried with a new
+        // card. An ambiguous transport failure writes no history and therefore
+        // deliberately reuses the same provider idempotency key.
+        const attemptNumber = (priorAttempts[0]?.value ?? 0) + 1;
+        const idempotencyKey = `${keyPrefix}${attemptNumber}`;
+        const charge = await chargeUpgrade({
+          subscriptionId: subscription.id,
+          merchantId,
+          targetPlanId: plan.id,
+          cardId: subscription.windcaveCardId,
+          amountCents,
+          idempotencyKey,
+          reference: `TAPTPAY-UPGRADE-M${merchantId}-${plan.id.toUpperCase()}-${anchor}-A${attemptNumber}`,
+        });
+        if (!charge.success) {
+          return {
+            ok: false as const,
+            reason: "charge-failed" as const,
+            message: "The upgrade payment could not be confirmed. Please try again.",
+          };
+        }
+
+        const historyBase = {
+          merchantId,
+          subscriptionId: subscription.id,
+          billingType: "plan_change",
+          amount: (amountCents / 100).toFixed(2),
+          billingPeriodStart: now,
+          billingPeriodEnd: subscription.currentPeriodEnd,
+          windcaveTransactionId: charge.windcaveTransactionId ?? null,
+          idempotencyKey,
+          attemptNumber,
+          description: `Prorated upgrade to ${plan.name}`,
+        };
+        if (!charge.approved) {
+          const failureReason = charge.declineReason || "The upgrade payment was declined.";
+          await tx
+            .insert(subscriptionBillingHistory)
+            .values({
+              ...historyBase,
+              status: "failed",
+              failureReason: failureReason.slice(0, 500),
+            })
+            .onConflictDoNothing();
+          return {
+            ok: false as const,
+            reason: "declined" as const,
+            message: failureReason,
+          };
+        }
+
+        await tx
+          .insert(subscriptionBillingHistory)
+          .values({
+            ...historyBase,
+            status: "succeeded",
+            paidAt: now,
+          })
+          .onConflictDoNothing();
+      }
+
+      const updated = await tx
+        .update(merchantSubscriptions)
+        .set(immediatePlanUpdates(planId, now))
+        .where(eq(merchantSubscriptions.id, subscription.id))
+        .returning();
+
+      return {
+        ok: true as const,
+        subscription: updated[0],
+        applied: "immediate" as const,
+      };
+    });
   }
 
-  async resetUnbilledTransactions(merchantId: number): Promise<void> {
+  async saveSubscriptionCard(merchantId: number, card: SubscriptionCardInput): Promise<MerchantSubscription> {
+    if (!this.db) throw new Error('Database not available');
+    await this.getOrCreateSubscription(merchantId);
+    const now = new Date();
+    const result = await this.db
+      .update(merchantSubscriptions)
+      .set({
+        windcaveCardId: card.windcaveCardId,
+        cardBrand: card.brand,
+        cardLast4: card.last4,
+        cardExpiry: card.expiry,
+        updatedAt: now,
+      })
+      .where(eq(merchantSubscriptions.merchantId, merchantId))
+      .returning();
+    return result[0];
+  }
+
+  /**
+   * Associates a provider-created card session with the authenticated merchant.
+   * Confirmation must present this exact opaque id, preventing one merchant
+   * from attaching a card token obtained from another merchant's session.
+   */
+  async bindSubscriptionCardSession(merchantId: number, sessionId: string): Promise<boolean> {
+    if (!this.db) throw new Error("Database not available");
+    const normalizedSessionId = sessionId.trim();
+    if (!normalizedSessionId) return false;
+
+    await this.getOrCreateSubscription(merchantId);
+    const rows = await this.db
+      .update(merchantSubscriptions)
+      .set({
+        windcaveBillingRef: normalizedSessionId,
+        updatedAt: new Date(),
+      })
+      .where(eq(merchantSubscriptions.merchantId, merchantId))
+      .returning({ id: merchantSubscriptions.id });
+    return rows.length === 1;
+  }
+
+  /**
+   * Completes card setup and, where necessary, establishes the paid period.
+   *
+   * The subscription row stays locked across the provider call. The stable
+   * session-derived idempotency key makes a provider success safe to replay if
+   * the database transaction subsequently aborts, while the row lock prevents
+   * two callbacks from advancing the period twice.
+   */
+  async completeSubscriptionCardSetup(
+    merchantId: number,
+    sessionId: string,
+    card: SubscriptionCardInput,
+    charge: SubscriptionCardChargeExecutor,
+  ): Promise<SubscriptionCardSetupResult> {
+    if (!this.db) throw new Error("Database not available");
+    const normalizedSessionId = sessionId.trim();
+    if (!normalizedSessionId || !card.windcaveCardId.trim()) {
+      return {
+        ok: false,
+        reason: "session-mismatch",
+        message: "The card session is invalid.",
+      };
+    }
+
+    return await this.db.transaction(async (tx) => {
+      const rows = await tx
+        .select()
+        .from(merchantSubscriptions)
+        .where(eq(merchantSubscriptions.merchantId, merchantId))
+        .for("update")
+        .limit(1);
+      const subscription = rows[0];
+      if (!subscription) {
+        return { ok: false as const, reason: "not-found" as const, message: "Subscription not found." };
+      }
+      const cardSessionState = subscriptionCardSessionState(subscription, normalizedSessionId);
+      if (cardSessionState === "succeeded") {
+        const now = new Date();
+        const paidPeriodIsCurrent =
+          subscription.status === "active"
+          && !!subscription.lastBillingDate
+          && !!subscription.currentPeriodEnd
+          && new Date(subscription.currentPeriodEnd).getTime() > now.getTime();
+        if (!paidPeriodIsCurrent) {
+          return { ok: true as const, subscription, charged: false };
+        }
+        const updated = await tx
+          .update(merchantSubscriptions)
+          .set({
+            windcaveCardId: card.windcaveCardId,
+            cardBrand: card.brand,
+            cardLast4: card.last4,
+            cardExpiry: card.expiry,
+            windcaveBillingRef: terminalSubscriptionCardSessionRef("succeeded", normalizedSessionId),
+            updatedAt: now,
+          })
+          .where(eq(merchantSubscriptions.id, subscription.id))
+          .returning();
+        return { ok: true as const, subscription: updated[0], charged: false };
+      }
+      if (cardSessionState === "declined") {
+        return {
+          ok: false as const,
+          reason: "declined" as const,
+          message: "The card was declined.",
+        };
+      }
+      if (cardSessionState !== "pending") {
+        return {
+          ok: false as const,
+          reason: "session-mismatch" as const,
+          message: "The card session does not belong to this account.",
+        };
+      }
+      if (subscription.billingClaimToken) {
+        return {
+          ok: false as const,
+          reason: "billing-busy" as const,
+          message: "Billing is already in progress. Please try again shortly.",
+        };
+      }
+
+      const now = new Date();
+      const paidPeriodIsCurrent =
+        subscription.status === "active"
+        && !!subscription.lastBillingDate
+        && !!subscription.currentPeriodEnd
+        && new Date(subscription.currentPeriodEnd).getTime() > now.getTime();
+      const cardFields = {
+        windcaveCardId: card.windcaveCardId,
+        cardBrand: card.brand,
+        cardLast4: card.last4,
+        cardExpiry: card.expiry,
+        updatedAt: now,
+      };
+
+      // Replacing a card during a paid period must not create another charge.
+      if (paidPeriodIsCurrent) {
+        const updated = await tx
+          .update(merchantSubscriptions)
+          .set({
+            ...cardFields,
+            windcaveBillingRef: terminalSubscriptionCardSessionRef("succeeded", normalizedSessionId),
+          })
+          .where(eq(merchantSubscriptions.id, subscription.id))
+          .returning();
+        return { ok: true as const, subscription: updated[0], charged: false };
+      }
+
+      if (
+        (subscription.cancelAtPeriodEnd && subscription.status !== "cancelled")
+        || !["pending", "active", "past_due", "suspended", "cancelled"].includes(subscription.status)
+      ) {
+        return {
+          ok: false as const,
+          reason: "invalid-state" as const,
+          message: "Resolve the pending cancellation before adding a payment method.",
+        };
+      }
+
+      const plan = renewalPlan(subscription);
+      const amountCents = subscription.pendingPlanId
+        ? plan.priceCents
+        : (subscription.priceCents ?? plan.priceCents);
+      const idempotencyKey =
+        `sub-${subscription.id}-card-${createHash("sha256")
+          .update(normalizedSessionId)
+          .digest("hex")
+          .slice(0, 16)}`;
+      const periodStart = nextBillingPeriodStart(subscription, now);
+      const periodEnd = addOneMonth(periodStart);
+
+      const priorRows = await tx
+        .select()
+        .from(subscriptionBillingHistory)
+        .where(eq(subscriptionBillingHistory.idempotencyKey, idempotencyKey))
+        .limit(1);
+      const prior = priorRows[0];
+      if (prior?.status === "failed") {
+        await tx
+          .update(merchantSubscriptions)
+          .set({ windcaveBillingRef: terminalSubscriptionCardSessionRef("declined", normalizedSessionId) })
+          .where(eq(merchantSubscriptions.id, subscription.id));
+        return {
+          ok: false as const,
+          reason: "declined" as const,
+          message: prior.failureReason || "The card was declined.",
+        };
+      }
+      if (prior && prior.status !== "succeeded") {
+        return {
+          ok: false as const,
+          reason: "billing-busy" as const,
+          message: "Card activation is already in progress.",
+        };
+      }
+      if (prior?.status === "succeeded") {
+        const updated = await tx
+          .update(merchantSubscriptions)
+          .set({ windcaveBillingRef: terminalSubscriptionCardSessionRef("succeeded", normalizedSessionId) })
+          .where(eq(merchantSubscriptions.id, subscription.id))
+          .returning();
+        return { ok: true as const, subscription: updated[0], charged: false };
+      }
+
+      const outcome = await charge({
+          subscriptionId: subscription.id,
+          merchantId,
+          cardId: card.windcaveCardId,
+          amountCents,
+          idempotencyKey,
+          reference: `TAPTPAY-CARD-M${merchantId}-${plan.id.toUpperCase()}`,
+        });
+
+      if (!outcome.success) {
+        return {
+          ok: false as const,
+          reason: "charge-failed" as const,
+          message: "The payment could not be confirmed. Please try again.",
+        };
+      }
+
+      if (!outcome.approved) {
+        const failureReason = outcome.declineReason || "Card declined";
+        const exhausted = (subscription.failedPaymentCount ?? 0) + 1 >= MAX_PAYMENT_ATTEMPTS;
+        await tx
+          .insert(subscriptionBillingHistory)
+          .values({
+            merchantId,
+            subscriptionId: subscription.id,
+            billingType: "monthly_subscription",
+            amount: (amountCents / 100).toFixed(2),
+            billingPeriodStart: periodStart,
+            billingPeriodEnd: periodEnd,
+            windcaveTransactionId: outcome.windcaveTransactionId ?? null,
+            idempotencyKey,
+            attemptNumber: (subscription.failedPaymentCount ?? 0) + 1,
+            status: "failed",
+            description: `${plan.name} subscription activation`,
+            failureReason,
+          })
+          .onConflictDoNothing();
+        await tx
+          .update(merchantSubscriptions)
+          .set({
+            ...cardFields,
+            ...failedPaymentUpdates(subscription, now, failureReason, exhausted),
+            cancelAtPeriodEnd: false,
+            cancellationRequestedAt: null,
+            cancellationEffectiveDate: null,
+            cancellationReason: null,
+            lastBillingDate: null,
+            currentPeriodStart: null,
+            currentPeriodEnd: null,
+            nextBillingDate: periodStart,
+            windcaveBillingRef: terminalSubscriptionCardSessionRef("declined", normalizedSessionId),
+          })
+          .where(eq(merchantSubscriptions.id, subscription.id));
+        return { ok: false as const, reason: "declined" as const, message: failureReason };
+      }
+
+      const updated = await tx
+        .update(merchantSubscriptions)
+        .set({
+          ...nextPeriodUpdates(subscription, now),
+          ...cardFields,
+          cancelAtPeriodEnd: false,
+          cancellationRequestedAt: null,
+          cancellationEffectiveDate: null,
+          cancellationReason: null,
+          windcaveBillingRef: terminalSubscriptionCardSessionRef("succeeded", normalizedSessionId),
+        })
+        .where(eq(merchantSubscriptions.id, subscription.id))
+        .returning();
+      if (!prior) {
+        await tx
+          .insert(subscriptionBillingHistory)
+          .values({
+            merchantId,
+            subscriptionId: subscription.id,
+            billingType: "monthly_subscription",
+            amount: (amountCents / 100).toFixed(2),
+            billingPeriodStart: periodStart,
+            billingPeriodEnd: periodEnd,
+            windcaveTransactionId: outcome.windcaveTransactionId ?? null,
+            idempotencyKey,
+            attemptNumber: (subscription.failedPaymentCount ?? 0) + 1,
+            status: "succeeded",
+            description: `${plan.name} subscription activation`,
+            paidAt: now,
+          })
+          .onConflictDoNothing();
+      }
+      return { ok: true as const, subscription: updated[0], charged: true };
+    });
+  }
+
+  async removeSubscriptionCard(merchantId: number): Promise<MerchantSubscription> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .update(merchantSubscriptions)
+      .set({
+        windcaveCardId: null,
+        cardBrand: null,
+        cardLast4: null,
+        cardExpiry: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(merchantSubscriptions.merchantId, merchantId))
+      .returning();
+    return result[0];
+  }
+
+  async applySubscriptionBillingOutcome(
+    subscriptionId: number,
+    updates: Record<string, unknown>,
+  ): Promise<void> {
     if (!this.db) throw new Error('Database not available');
     await this.db
       .update(merchantSubscriptions)
+      .set(updates as any)
+      .where(eq(merchantSubscriptions.id, subscriptionId));
+  }
+
+  /**
+   * Candidates for the billing run: due, not cancelled, not suspended, with a
+   * card. The final charge/skip decision is `decideBilling`, which also handles
+   * dunning back-off; this query only narrows the set.
+   */
+  async getSubscriptionsDueForBilling(now: Date): Promise<MerchantSubscription[]> {
+    if (!this.db) throw new Error('Database not available');
+    return await this.db
+      .select()
+      .from(merchantSubscriptions)
+      .where(and(
+        inArray(merchantSubscriptions.status, ["active", "past_due"]),
+        eq(merchantSubscriptions.cancelAtPeriodEnd, false),
+        isNotNull(merchantSubscriptions.windcaveCardId),
+        lte(merchantSubscriptions.nextBillingDate, now),
+      ));
+  }
+
+  async getCancelledSubscriptionsPastPeriodEnd(now: Date): Promise<MerchantSubscription[]> {
+    if (!this.db) throw new Error('Database not available');
+    return await this.db
+      .select()
+      .from(merchantSubscriptions)
+      .where(and(
+        eq(merchantSubscriptions.cancelAtPeriodEnd, true),
+        ne(merchantSubscriptions.status, "cancelled"),
+        lte(merchantSubscriptions.currentPeriodEnd, now),
+      ));
+  }
+
+  /** Claims due rows under SKIP LOCKED so overlapping instances cannot bill twice. */
+  async claimSubscriptionsDueForBilling(
+    now: Date,
+    limit: number = 50,
+    excludeSubscriptionIds: readonly number[] = [],
+    claimedAt: Date = now,
+  ): Promise<MerchantSubscription[]> {
+    if (!this.db) throw new Error('Database not available');
+    const safeLimit = Math.max(1, Math.min(100, Math.trunc(limit)));
+    const staleBefore = new Date(claimedAt.getTime() - SUBSCRIPTION_BILLING_CLAIM_LEASE_MS);
+
+    return await this.db.transaction(async (tx) => {
+      const candidates = await tx
+        .select()
+        .from(merchantSubscriptions)
+        .where(and(
+          inArray(merchantSubscriptions.status, ["active", "past_due"]),
+          eq(merchantSubscriptions.cancelAtPeriodEnd, false),
+          isNotNull(merchantSubscriptions.windcaveCardId),
+          lte(merchantSubscriptions.nextBillingDate, now),
+          or(
+            eq(merchantSubscriptions.status, "active"),
+            and(
+              eq(merchantSubscriptions.status, "past_due"),
+              sql`coalesce(${merchantSubscriptions.failedPaymentCount}, 0) < ${MAX_PAYMENT_ATTEMPTS}`,
+              sql`${merchantSubscriptions.nextBillingDate} + (
+                case coalesce(${merchantSubscriptions.failedPaymentCount}, 0)
+                  when 0 then interval '0 days'
+                  when 1 then interval '1 day'
+                  when 2 then interval '3 days'
+                  when 3 then interval '7 days'
+                  else interval '100 years'
+                end
+              ) <= ${now}`,
+            ),
+          ),
+          or(
+            isNull(merchantSubscriptions.billingClaimToken),
+            isNull(merchantSubscriptions.billingClaimedAt),
+            lt(merchantSubscriptions.billingClaimedAt, staleBefore),
+          ),
+          excludeSubscriptionIds.length > 0
+            ? notInArray(merchantSubscriptions.id, [...excludeSubscriptionIds])
+            : undefined,
+        ))
+        .orderBy(asc(merchantSubscriptions.nextBillingDate), asc(merchantSubscriptions.id))
+        .for("update", { skipLocked: true })
+        .limit(safeLimit);
+
+      const claimed: MerchantSubscription[] = [];
+      for (const candidate of candidates) {
+        const claimToken = randomUUID();
+        const rows = await tx
+          .update(merchantSubscriptions)
+          .set({ billingClaimToken: claimToken, billingClaimedAt: claimedAt, updatedAt: claimedAt })
+          .where(eq(merchantSubscriptions.id, candidate.id))
+          .returning();
+        if (rows[0]) claimed.push(rows[0]);
+      }
+      return claimed;
+    });
+  }
+
+  /** Applies the state change and reconciliation row in one claim-guarded commit. */
+  async finalizeSubscriptionBillingClaim(
+    subscriptionId: number,
+    claimToken: string,
+    updates: Record<string, unknown>,
+    history: Record<string, unknown>,
+  ): Promise<boolean> {
+    if (!this.db) throw new Error('Database not available');
+    return await this.db.transaction(async (tx) => {
+      const rows = await tx
+        .update(merchantSubscriptions)
+        .set({
+          ...(updates as any),
+          billingClaimToken: null,
+          billingClaimedAt: null,
+        })
+        .where(and(
+          eq(merchantSubscriptions.id, subscriptionId),
+          eq(merchantSubscriptions.billingClaimToken, claimToken),
+        ))
+        .returning({ id: merchantSubscriptions.id });
+      if (!rows[0]) return false;
+
+      await tx
+        .insert(subscriptionBillingHistory)
+        .values(history as any)
+        .onConflictDoNothing();
+      return true;
+    });
+  }
+
+  async releaseSubscriptionBillingClaim(subscriptionId: number, claimToken: string): Promise<void> {
+    if (!this.db) throw new Error('Database not available');
+    await this.db
+      .update(merchantSubscriptions)
+      .set({ billingClaimToken: null, billingClaimedAt: null })
+      .where(and(
+        eq(merchantSubscriptions.id, subscriptionId),
+        eq(merchantSubscriptions.billingClaimToken, claimToken),
+      ));
+  }
+
+  async expireCancelledSubscriptions(now: Date): Promise<number> {
+    if (!this.db) throw new Error('Database not available');
+    const rows = await this.db
+      .update(merchantSubscriptions)
       .set({
-        unbilledTransactionCount: 0,
-        unbilledAmount: '0.00',
-        lastBillingDate: new Date().toISOString(),
-        updatedAt: new Date()
+        status: "cancelled",
+        cancelAtPeriodEnd: false,
+        lastBillingDate: null,
+        currentPeriodStart: null,
+        currentPeriodEnd: null,
+        nextBillingDate: null,
+        updatedAt: now,
       })
-      .where(eq(merchantSubscriptions.merchantId, merchantId));
+      .where(and(
+        eq(merchantSubscriptions.cancelAtPeriodEnd, true),
+        ne(merchantSubscriptions.status, "cancelled"),
+        lte(merchantSubscriptions.currentPeriodEnd, now),
+        isNull(merchantSubscriptions.billingClaimToken),
+      ))
+      .returning({ id: merchantSubscriptions.id });
+    return rows.length;
+  }
+
+  // ── Team seats ─────────────────────────────────────────────────────────────
+
+  async getTeamMembers(merchantId: number): Promise<User[]> {
+    if (!this.db) throw new Error('Database not available');
+    return await this.db
+      .select()
+      .from(users)
+      .where(eq(users.merchantId, merchantId))
+      .orderBy(users.id);
+  }
+
+  async countSeatsInUse(merchantId: number): Promise<number> {
+    if (!this.db) throw new Error('Database not available');
+    const now = new Date();
+    const rows = await this.db
+      .select({ value: sql<number>`count(*)::int` })
+      .from(users)
+      .where(and(
+        eq(users.merchantId, merchantId),
+        or(
+          eq(users.status, "active"),
+          and(eq(users.status, "invited"), sql`${users.inviteExpiresAt} > ${now}`),
+        ),
+      ));
+    return rows[0]?.value ?? 0;
+  }
+
+  /**
+   * Creates an invited seat.
+   *
+   * Counting seats and inserting the row happen under a lock on the subscription
+   * row. Without it two concurrent invites both read "4 of 5 used" and both
+   * insert, producing a sixth seat on a five-seat plan.
+   */
+  async inviteTeamMember(
+    merchantId: number,
+    input: InviteTeamMemberInput,
+  ): Promise<InviteTeamMemberResult> {
+    if (!this.db) throw new Error('Database not available');
+    const email = input.email.trim().toLowerCase();
+
+    return await this.db.transaction(async (tx) => {
+      const subRows = await tx
+        .select()
+        .from(merchantSubscriptions)
+        .where(eq(merchantSubscriptions.merchantId, merchantId))
+        .for("update")
+        .limit(1);
+      const subscription = subRows[0];
+      const currentLimit = subscription?.seatLimit ?? planFor(DEFAULT_PLAN_ID).seats;
+      const seatLimit = subscription?.pendingPlanId
+        ? Math.min(currentLimit, planFor(subscription.pendingPlanId).seats)
+        : currentLimit;
+
+      const existing = await tx
+        .select()
+        .from(users)
+        .where(sql`lower(${users.email}) = ${email}`)
+        .limit(1);
+      if (existing[0]) return { ok: false as const, reason: "email-taken" as const };
+
+      const seatRows = await tx
+        .select({ value: sql<number>`count(*)::int` })
+        .from(users)
+        .where(and(
+          eq(users.merchantId, merchantId),
+          or(
+            eq(users.status, "active"),
+            and(
+              eq(users.status, "invited"),
+              sql`${users.inviteExpiresAt} > ${new Date()}`,
+            ),
+          ),
+        ));
+      const seatsInUse = seatRows[0]?.value ?? 0;
+      if (seatsInUse >= seatLimit) {
+        return { ok: false as const, reason: "seat-limit" as const, seatsInUse, seatLimit };
+      }
+
+      const inserted = await tx
+        .insert(users)
+        .values({
+          email,
+          // Placeholder hash: an invited user cannot sign in until they accept
+          // the invite and set a real password. bcrypt never produces "!".
+          password: "!",
+          merchantId,
+          role: "member",
+          status: "invited",
+          name: input.name ?? null,
+          inviteTokenHash: input.inviteTokenHash,
+          inviteExpiresAt: input.inviteExpiresAt,
+        })
+        .returning();
+
+      return { ok: true as const, user: inserted[0] };
+    });
+  }
+
+  async setTeamMemberStatus(
+    merchantId: number,
+    userId: number,
+    status: UserStatus,
+  ): Promise<TeamMemberStatusResult> {
+    if (!this.db) throw new Error('Database not available');
+    return await this.db.transaction(async (tx) => {
+      // Serialise re-enables with invites and plan changes on the same row.
+      const subscriptions = await tx
+        .select()
+        .from(merchantSubscriptions)
+        .where(eq(merchantSubscriptions.merchantId, merchantId))
+        .for("update")
+        .limit(1);
+      const subscription = subscriptions[0];
+      const currentLimit = subscription?.seatLimit ?? planFor(DEFAULT_PLAN_ID).seats;
+      const seatLimit = subscription?.pendingPlanId
+        ? Math.min(currentLimit, planFor(subscription.pendingPlanId).seats)
+        : currentLimit;
+
+      const rows = await tx
+        .select()
+        .from(users)
+        .where(and(eq(users.id, userId), eq(users.merchantId, merchantId)))
+        .for("update")
+        .limit(1);
+      const member = rows[0];
+      if (!member) return { ok: false as const, reason: "not-found" as const };
+      if (member.role === "owner") return { ok: false as const, reason: "owner" as const };
+      if (
+        (member.status !== "active" && member.status !== "disabled") ||
+        (status !== "active" && status !== "disabled") ||
+        member.status === status
+      ) {
+        return { ok: false as const, reason: "invalid-state" as const };
+      }
+
+      if (status === "active") {
+        const now = new Date();
+        const seats = await tx
+          .select({ value: sql<number>`count(*)::int` })
+          .from(users)
+          .where(and(
+            eq(users.merchantId, merchantId),
+            or(
+              eq(users.status, "active"),
+              and(eq(users.status, "invited"), sql`${users.inviteExpiresAt} > ${now}`),
+            ),
+          ));
+        const seatsInUse = seats[0]?.value ?? 0;
+        if (seatsInUse >= seatLimit) {
+          return { ok: false as const, reason: "seat-limit" as const, seatsInUse, seatLimit };
+        }
+      }
+
+      const updated = await tx
+        .update(users)
+        .set({ status })
+        .where(and(eq(users.id, userId), eq(users.status, member.status)))
+        .returning();
+      return updated[0]
+        ? { ok: true as const, user: updated[0] }
+        : { ok: false as const, reason: "invalid-state" as const };
+    });
+  }
+
+  async rotateTeamInvite(
+    merchantId: number,
+    userId: number,
+    input: Pick<InviteTeamMemberInput, "inviteTokenHash" | "inviteExpiresAt" | "name"> & { expectedTokenHash: string },
+  ): Promise<RotateTeamInviteResult> {
+    if (!this.db) throw new Error('Database not available');
+    return await this.db.transaction(async (tx) => {
+      const subscriptions = await tx
+        .select()
+        .from(merchantSubscriptions)
+        .where(eq(merchantSubscriptions.merchantId, merchantId))
+        .for("update")
+        .limit(1);
+      const subscription = subscriptions[0];
+      const currentLimit = subscription?.seatLimit ?? planFor(DEFAULT_PLAN_ID).seats;
+      const seatLimit = subscription?.pendingPlanId
+        ? Math.min(currentLimit, planFor(subscription.pendingPlanId).seats)
+        : currentLimit;
+
+      const rows = await tx
+        .select()
+        .from(users)
+        .where(and(eq(users.id, userId), eq(users.merchantId, merchantId)))
+        .for("update")
+        .limit(1);
+      const invited = rows[0];
+      if (!invited || invited.role === "owner" || invited.status !== "invited") {
+        return { ok: false as const, reason: "not-found" as const };
+      }
+      if (invited.inviteTokenHash !== input.expectedTokenHash) {
+        return { ok: false as const, reason: "conflict" as const };
+      }
+
+      const now = new Date();
+      const wasLive = !!invited.inviteExpiresAt && new Date(invited.inviteExpiresAt) > now;
+      if (!wasLive) {
+        const seats = await tx
+          .select({ value: sql<number>`count(*)::int` })
+          .from(users)
+          .where(and(
+            eq(users.merchantId, merchantId),
+            or(
+              eq(users.status, "active"),
+              and(eq(users.status, "invited"), sql`${users.inviteExpiresAt} > ${now}`),
+            ),
+          ));
+        const seatsInUse = seats[0]?.value ?? 0;
+        if (seatsInUse >= seatLimit) {
+          return { ok: false as const, reason: "seat-limit" as const, seatsInUse, seatLimit };
+        }
+      }
+
+      const result = await tx
+        .update(users)
+        .set({
+          inviteTokenHash: input.inviteTokenHash,
+          inviteExpiresAt: input.inviteExpiresAt,
+          ...(input.name !== undefined ? { name: input.name } : {}),
+        })
+        .where(and(
+          eq(users.id, userId),
+          eq(users.status, "invited"),
+          eq(users.inviteTokenHash, input.expectedTokenHash),
+        ))
+        .returning();
+      return result[0]
+        ? { ok: true as const, user: result[0] }
+        : { ok: false as const, reason: "conflict" as const };
+    });
+  }
+
+  async revokeTeamInvite(merchantId: number, userId: number, expectedTokenHash?: string): Promise<boolean> {
+    if (!this.db) throw new Error('Database not available');
+    const predicates = [
+      eq(users.id, userId),
+      eq(users.merchantId, merchantId),
+      eq(users.status, "invited"),
+      ne(users.role, "owner"),
+    ];
+    if (expectedTokenHash) predicates.push(eq(users.inviteTokenHash, expectedTokenHash));
+    const result = await this.db
+      .delete(users)
+      .where(and(...predicates))
+      .returning();
+    return result.length > 0;
+  }
+
+  async removeTeamMember(merchantId: number, userId: number): Promise<boolean> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .delete(users)
+      .where(and(
+        eq(users.id, userId),
+        eq(users.merchantId, merchantId),
+        ne(users.role, "owner"),
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .select()
+      .from(users)
+      .where(sql`lower(${users.email}) = ${email.trim().toLowerCase()}`)
+      .limit(1);
+    return result[0];
+  }
+
+  async getUserById(id: number): Promise<User | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db.select().from(users).where(eq(users.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getUserByInviteToken(tokenHash: string): Promise<User | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.inviteTokenHash, tokenHash))
+      .limit(1);
+    return result[0];
+  }
+
+  async activateInvitedUser(
+    userId: number,
+    tokenHash: string,
+    passwordHash: string,
+    name?: string | null,
+    now: Date = new Date(),
+  ): Promise<User | null> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .update(users)
+      .set({
+        password: passwordHash,
+        status: "active",
+        name: name ?? undefined,
+        // Burn the token so an intercepted invite email cannot be replayed.
+        inviteTokenHash: null,
+        inviteExpiresAt: null,
+      })
+      .where(and(
+        eq(users.id, userId),
+        eq(users.status, "invited"),
+        eq(users.inviteTokenHash, tokenHash),
+        sql`${users.inviteExpiresAt} > ${now}`,
+      ))
+      .returning();
+    return result[0] ?? null;
+  }
+
+  async recordUserLogin(userId: number, at: Date): Promise<void> {
+    if (!this.db) throw new Error('Database not available');
+    await this.db.update(users).set({ lastLoginAt: at }).where(eq(users.id, userId));
+  }
+
+  async updateUserPassword(userId: number, passwordHash: string): Promise<User | null> {
+    if (!this.db) throw new Error('Database not available');
+    const result = await this.db
+      .update(users)
+      .set({ password: passwordHash })
+      .where(eq(users.id, userId))
+      .returning();
+    const updated = result[0] ?? null;
+    // The owner's credential also lives on the merchant row (password reset and
+    // admin activation still read it), so keep the two in step.
+    if (updated?.role === "owner" && updated.merchantId) {
+      await this.db
+        .update(merchants)
+        .set({ passwordHash, updatedAt: new Date() })
+        .where(eq(merchants.id, updated.merchantId));
+    }
+    return updated;
+  }
+
+  async setUserResetToken(
+    userId: number,
+    tokenHash: string | null,
+    expiry: Date | null,
+  ): Promise<void> {
+    if (!this.db) throw new Error('Database not available');
+    await this.db
+      .update(users)
+      .set({ resetToken: tokenHash, resetTokenExpiry: expiry })
+      .where(eq(users.id, userId));
+  }
+
+  async getUserByResetToken(tokenHash: string): Promise<User | undefined> {
+    if (!this.db) throw new Error('Database not available');
+    const rows = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.resetToken, tokenHash))
+      .limit(1);
+    return rows[0];
+  }
+
+  /** Atomically consumes a live reset token and synchronises an owner hash. */
+  async resetUserPasswordByToken(
+    tokenHash: string,
+    passwordHash: string,
+    now: Date,
+  ): Promise<User | null> {
+    if (!this.db) throw new Error('Database not available');
+    return await this.db.transaction(async (tx) => {
+      const rows = await tx
+        .update(users)
+        .set({
+          password: passwordHash,
+          resetToken: null,
+          resetTokenExpiry: null,
+        })
+        .where(and(
+          eq(users.resetToken, tokenHash),
+          eq(users.status, "active"),
+          inArray(users.role, ["owner", "member"]),
+          isNotNull(users.merchantId),
+          sql`${users.resetTokenExpiry} > ${now}`,
+        ))
+        .returning();
+      const updated = rows[0] ?? null;
+
+      if (updated?.role === "owner" && updated.merchantId) {
+        await tx
+          .update(merchants)
+          .set({ passwordHash, updatedAt: now })
+          .where(eq(merchants.id, updated.merchantId));
+      }
+      return updated;
+    });
   }
 
   // ── Property management — DatabaseStorage implementations ──────────────────

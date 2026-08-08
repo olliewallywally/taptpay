@@ -6,23 +6,23 @@ import {
   BillSplitConflictError,
   TaptStoneCapacityError,
   TaptStoneConflictError,
+  subscriptionCardSessionState,
 } from "./storage";
 import { db } from "./db";
 import { uploadedFiles } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { TUTORIAL_PAGE_KEYS, isTutorialPageKey } from "@shared/tutorial";
-import { retailTransactionCreateRequestSchema, updateMerchantRatesSchema, updateMerchantDetailsSchema, updateThemeSchema, updateDailyGoalSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, pushNotificationPreferencesSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
-import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, simulateCreateSession, simulateQuerySession, simulateRentSession, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, simulateAttendedTapToPay } from "./windcave";
-import { authenticateUser, generateToken, authenticateToken, createUser, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
+import { inviteTeamMemberSchema, acceptInviteSchema, retailTransactionCreateRequestSchema, updateMerchantDetailsSchema, updateThemeSchema, updateDailyGoalSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, pushNotificationPreferencesSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
+import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, simulateCreateSession, simulateQuerySession, simulateRentSession, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, simulateAttendedTapToPay, createCardStorageSession, queryStoredCardSession, chargeStoredCard } from "./windcave";
+import { authenticateUser, generateToken, authenticateToken, createUser, isAccountOwner, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
 import { generateQuotePdf } from "./trades-quote-pdf";
 import { generateBusinessReportPdf } from "./report-generator";
 import { computeQuoteTotals } from "@shared/trades-gst";
 import { getBaseUrl, generatePaymentUrl, generateQrCodeUrl, generateStonePaymentUrl, generateNfcTagUrl } from "./url-utils";
-import { sendEmail } from "./email-service";
+import { sendEmail, sendTeamInviteEmail } from "./email-service";
 import QRCode from "qrcode";
 import { z } from "zod";
-import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import bcrypt from "bcrypt";
 import multer from "multer";
@@ -35,6 +35,7 @@ import { sendGstInvoices, extractEmails } from "./gst-invoice";
 import { BILLING_CARD_REQUIRED, billingCardIsReady, isCardExpiryValid, isLuhnValid } from "./billing-card";
 import {
   adminMerchantDto,
+  billingHistoryDto,
   adminMerchantSummaryDto,
   adminTransactionDto,
   merchantSseTransactionDto,
@@ -44,9 +45,12 @@ import {
   publicSplitPaymentDto,
   publicTransactionDto,
   pushNotificationPreferencesDto,
+  subscriptionDto,
+  teamMemberDto,
   tokenPaymentDto,
   tokenReceiptDto,
 } from "./http-contracts";
+import { PLAN_LIST, planIdSchema } from "@shared/plans";
 import { sseBroker, type SseAudience } from "./sse-broker";
 import {
   createRetailTransaction,
@@ -68,10 +72,43 @@ import {
 let cronRunning = false;
 
 async function requireBillingCard(merchantId: number, res: any): Promise<boolean> {
-  const merchant = await storage.getMerchant(merchantId);
-  if (billingCardIsReady(merchant)) return true;
+  const subscription = await storage.getOrCreateSubscription(merchantId);
+  if (billingCardIsReady(subscription)) return true;
   res.status(402).json(BILLING_CARD_REQUIRED);
   return false;
+}
+
+type StoredCardChargeRequest = {
+  idempotencyKey: string;
+  cardId: string;
+  amountCents: number;
+  reference: string;
+};
+
+async function executeStoredCardCharge(request: StoredCardChargeRequest) {
+  const outcome = await chargeStoredCard(
+    request.idempotencyKey,
+    request.cardId,
+    (request.amountCents / 100).toFixed(2),
+    request.reference,
+  );
+  if (!outcome.success) {
+    // Windcave already records a redacted audit event. Keep provider/transport
+    // detail out of storage result messages that could later reach an API.
+    return { success: false as const, error: "Stored-card charge could not be confirmed" };
+  }
+  return {
+    success: true as const,
+    approved: outcome.approved === true,
+    windcaveTransactionId: outcome.windcaveTransactionId,
+    declineReason: outcome.declineReason,
+  };
+}
+
+function safeBillingCardCallbackResult(value: unknown) {
+  return value === "approved" || value === "declined" || value === "cancelled"
+    ? value
+    : "unknown";
 }
 
 // Server-side cache of Windcave AJAX submit URLs per transaction.
@@ -345,47 +382,36 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   // Admin authentication middleware
-  const authenticateAdmin = (req: AuthenticatedRequest, res: any, next: any) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+  const authenticateAdmin = async (req: AuthenticatedRequest, res: any, next: any) => {
+    let authenticated = false;
+    await authenticateToken(req, res, () => {
+      authenticated = true;
+    });
+    if (!authenticated) return;
 
-    if (!token) {
-      return res.status(401).json({ message: 'Access token required' });
+    const adminEmail = process.env.ADMIN_EMAIL;
+    if (
+      req.user?.role !== "admin" ||
+      req.user.merchantId !== 0 ||
+      !adminEmail ||
+      req.user.email.toLowerCase() !== adminEmail.toLowerCase()
+    ) {
+      logSecurityEvent("ADMIN_ACCESS_DENIED", { role: req.user?.role });
+      return res.status(403).json({ message: "Admin access required" });
     }
 
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as any;
-      // Token decoded for admin middleware - details omitted for security
-      
-      // For admin users, we verify directly from the token.
-      // ADMIN_EMAIL must be set in env — no hardcoded fallback.
-      const adminEmail = process.env.ADMIN_EMAIL;
-      if (decoded.role === 'admin' && adminEmail && decoded.email === adminEmail) {
-        req.user = {
-          id: decoded.userId,
-          email: decoded.email,
-          merchantId: decoded.merchantId,
-          role: decoded.role,
-          password: '',
-          resetToken: undefined,
-          resetTokenExpiry: undefined,
-          createdAt: new Date(),
-        };
-        next();
-      } else {
-        logSecurityEvent('ADMIN_ACCESS_DENIED', { role: decoded.role });
-        return res.status(403).json({ message: "Admin access required" });
-      }
-    } catch (error) {
-      console.error('Admin middleware token error:', error);
-      return res.status(403).json({ message: "Invalid or expired token" });
-    }
+    return next();
   };
   
   function checkMerchantOwnership(req: AuthenticatedRequest, merchantId: number): boolean {
     if (!req.user) return false;
+    if (!Number.isInteger(merchantId) || merchantId <= 0) return false;
     if (req.user.role === 'admin') return true;
     return req.user.merchantId === merchantId;
+  }
+
+  function checkAccountOwnership(req: AuthenticatedRequest, merchantId: number): boolean {
+    return checkMerchantOwnership(req, merchantId) && isAccountOwner(req.user);
   }
 
   // Google OAuth routes
@@ -454,13 +480,32 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.redirect('/login?error=Google+account+has+no+email');
       }
 
-      // Look up existing merchant by email
-      let merchant = await storage.getMerchantByEmail(email);
+      const normalizedEmail = email.trim().toLowerCase();
+      const [existingMerchant, existingLogin] = await Promise.all([
+        storage.getMerchantByEmail(normalizedEmail),
+        storage.getUserByEmail(normalizedEmail),
+      ]);
+      if (!existingMerchant && existingLogin) {
+        return res.redirect('/login?error=That+email+already+has+a+TaptPay+login.');
+      }
+      if (
+        existingMerchant &&
+        existingLogin &&
+        (existingLogin.merchantId !== existingMerchant.id || existingLogin.role !== "owner")
+      ) {
+        return res.redirect('/login?error=That+email+already+has+a+TaptPay+login.');
+      }
+
+      let merchant = existingMerchant;
+      const randomPwd = crypto.randomBytes(32).toString("hex");
       let isNewUser = false;
 
       if (merchant) {
         if (merchant.status === 'pending') {
           return res.redirect('/login?error=Your+account+is+pending+verification.+Please+check+your+email.');
+        }
+        if (merchant.status !== "verified" && merchant.status !== "active") {
+          return res.redirect("/login?error=Your+account+is+not+active.");
         }
         // Save googleId if not already stored
         if (!merchant.googleId) {
@@ -468,21 +513,21 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         }
       } else {
         // Create new merchant account — Google already verified the email
-        merchant = await storage.createMerchant({
-          name: name || email.split('@')[0],
-          businessName: name || email.split('@')[0],
-          email,
+        const randomPasswordHash = await bcrypt.hash(randomPwd, 12);
+        merchant = await storage.createMerchantWithPassword({
+          name: name || normalizedEmail.split('@')[0],
+          businessName: name || normalizedEmail.split('@')[0],
+          email: normalizedEmail,
           status: 'verified',
           googleId,
-        } as any);
+        } as any, randomPasswordHash);
         isNewUser = true;
       }
 
       // Ensure the merchant can be resolved for token auth, which requires a
       // passwordHash on the record. Google users never log in with a password, so
       // seed a random unguessable one if absent (createUser is idempotent).
-      const randomPwd = crypto.randomBytes(32).toString('hex');
-      const authUser = await createUser(email, randomPwd, merchant.id);
+      const authUser = await createUser(normalizedEmail, randomPwd, merchant.id);
 
       const token = generateToken(authUser);
       const redirectParams = new URLSearchParams({
@@ -735,7 +780,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       merchantStatus = merchant?.status ?? null;
       gstRegistered = merchant?.gstRegistered ?? false;
       tradeGstMode = merchant?.tradeGstMode === "exclusive" ? "exclusive" : "inclusive";
-      billingCardReady = billingCardIsReady(merchant);
+      billingCardReady = billingCardIsReady(await storage.getOrCreateSubscription(merchantId));
     }
     res.json({
       user: {
@@ -849,9 +894,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.post("/api/merchants/:id/onboarding", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = parseInt(req.params.id);
-      const userMerchantId = req.user?.merchantId;
-
-      if (userMerchantId !== merchantId && req.user?.role !== 'admin') {
+      if (!Number.isInteger(merchantId) || !checkAccountOwnership(req, merchantId)) {
         return res.status(403).json({ message: "Forbidden" });
       }
 
@@ -928,37 +971,15 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  app.get("/api/admin/auth/me", (req: AuthenticatedRequest, res) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-
-    if (!token) {
-      return res.status(401).json({ message: 'Access token required' });
-    }
-
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as any;
-      // Token decoded for admin auth - details omitted for security
-      
-      // For admin users, we verify directly from the token since they're not stored in the users Map
-      const adminEmail = process.env.ADMIN_EMAIL;
-      if (decoded.role === 'admin' && adminEmail && decoded.email === adminEmail) {
-        res.json({
-          user: {
-            id: decoded.userId,
-            email: decoded.email,
-            merchantId: decoded.merchantId,
-            role: decoded.role,
-          },
-        });
-      } else {
-        logSecurityEvent('ADMIN_AUTH_DENIED', { role: decoded.role });
-        return res.status(403).json({ message: "Admin access required" });
-      }
-    } catch (error) {
-      console.error('Admin token verification error:', error);
-      return res.status(403).json({ message: "Invalid or expired token" });
-    }
+  app.get("/api/admin/auth/me", authenticateAdmin, (req: AuthenticatedRequest, res) => {
+    res.json({
+      user: {
+        id: req.user!.id,
+        email: req.user!.email,
+        merchantId: 0,
+        role: "admin",
+      },
+    });
   });
 
   // Generate QR code for merchant
@@ -1080,7 +1101,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.get("/api/merchants/:id/profile", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = parseInt(req.params.id);
-      if (!Number.isInteger(merchantId) || !checkMerchantOwnership(req, merchantId)) {
+      if (!Number.isInteger(merchantId) || !checkAccountOwnership(req, merchantId)) {
         return res.status(403).json({ message: "Access denied" });
       }
       const merchant = await storage.getMerchant(merchantId);
@@ -2074,7 +2095,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(400).json({ message: "Invalid price" });
       }
 
-      // TaptPay flat fee: $0.10 per transaction, charged separately to merchant's card.
+      // No per-transaction fee — merchants pay a monthly subscription.
       const transaction = await storage.createTransaction({
         merchantId: parseInt(merchantId),
         taptStoneId: stoneId ? parseInt(stoneId) : null,
@@ -2085,7 +2106,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         windcaveFeeRate: "0.0000",
         windcaveFeeAmount: "0.00",
         platformFeeRate: "0.0000",
-        platformFeeAmount: "0.10",
+        platformFeeAmount: "0.00",
         merchantNet: priceNum.toFixed(2),
         splitEnabled: false,
       } as any);
@@ -2532,15 +2553,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           windcaveTransactionId
         );
         
-        // Collect platform fee for successful payment
-        await storage.createPlatformFee({
-          transactionId: transaction.id,
-          merchantId: transaction.merchantId,
-          feeAmount: transaction.platformFeeAmount || "0.10",
-          transactionAmount: transaction.price,
-          status: 'collected',
-        });
-        
         // Notify clients of completion
         broadcastToStone(transaction.merchantId!, transaction.taptStoneId, { 
           type: 'nfc_payment_completed', 
@@ -2807,13 +2819,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const currentSplit = await storage.getNextPendingSplit(transactionId);
       if (currentSplit) {
         await storage.updateSplitPaymentStatus(currentSplit.id, "completed", windcaveTransactionId);
-        await storage.createPlatformFee({
-          transactionId,
-          merchantId: transaction.merchantId,
-          feeAmount: currentSplit.platformFeeAmount || "0.10",
-          transactionAmount: currentSplit.amount,
-          status: "collected",
-        });
         if (transaction.merchantId) {
           await storage.incrementTransactionCount(transaction.merchantId);
         }
@@ -2839,13 +2844,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const finalStatus = approved ? "completed" : "failed";
       const finalTxn = await storage.updateTransactionStatus(transactionId, finalStatus, windcaveTransactionId);
       if (finalTxn && approved) {
-        await storage.createPlatformFee({
-          transactionId,
-          merchantId: transaction.merchantId,
-          feeAmount: transaction.platformFeeAmount || "0.10",
-          transactionAmount: transaction.price,
-          status: "collected",
-        });
         if (transaction.merchantId) {
           await storage.incrementTransactionCount(transaction.merchantId);
         }
@@ -3406,35 +3404,20 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Update merchant rates
-  app.put("/api/merchants/:id/rates", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    try {
-      const merchantId = parseInt(req.params.id);
-      if (!checkMerchantOwnership(req, merchantId)) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-      const validation = updateMerchantRatesSchema.safeParse(req.body);
-      
-      if (!validation.success) {
-        return res.status(400).json({ message: "Invalid rate data", errors: validation.error.errors });
-      }
-
-      const updatedMerchant = await storage.updateMerchantRates(merchantId, validation.data.currentProviderRate);
-      if (!updatedMerchant) {
-        return res.status(404).json({ message: "Merchant not found" });
-      }
-
-      res.json(ownerMerchantDto(updatedMerchant));
-    } catch (error) {
-      res.status(500).json({ message: "Failed to update rates" });
-    }
+  // Merchant processing rates were only ever used to compute a "savings vs your
+  // current provider" comparison. TaptPay charges no percentage, so the rate is
+  // meaningless and this endpoint is retired.
+  app.put("/api/merchants/:id/rates", authenticateToken, async (_req: AuthenticatedRequest, res) => {
+    res.status(410).json({
+      message: "Processing rates are no longer used. TaptPay pricing is a monthly subscription.",
+    });
   });
 
   // Update merchant business details
   app.put("/api/merchants/:id/details", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = parseInt(req.params.id);
-      if (!checkMerchantOwnership(req, merchantId)) {
+      if (!checkAccountOwnership(req, merchantId)) {
         return res.status(403).json({ message: "Access denied" });
       }
       const validation = updateMerchantDetailsSchema.safeParse(req.body);
@@ -3470,23 +3453,27 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       const { currentPassword, newPassword } = validation.data;
 
-      // Get merchant to verify current password
-      const merchant = await storage.getMerchant(merchantId);
-      if (!merchant || !merchant.passwordHash) {
-        return res.status(404).json({ message: "Merchant not found or password not set" });
+      // Change the password of the signed-in login, not the merchant record: on a
+      // multi-seat plan a teammate must be able to change their own password
+      // without touching the owner's.
+      const userId = req.user?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      const userRow = await storage.getUserById(userId);
+      if (!userRow) {
+        return res.status(404).json({ message: "Login not found" });
       }
 
-      // Verify current password
-      const currentPasswordValid = await bcrypt.compare(currentPassword, merchant.passwordHash);
+      const currentPasswordValid = await bcrypt.compare(currentPassword, userRow.password);
       if (!currentPasswordValid) {
         return res.status(400).json({ message: "Current password is incorrect" });
       }
 
-      // Hash new password and update
       const newPasswordHash = await bcrypt.hash(newPassword, 12);
-      const updatedMerchant = await storage.verifyMerchant(merchant.verificationToken || '', newPasswordHash);
+      const updated = await storage.updateUserPassword(userId, newPasswordHash);
 
-      if (!updatedMerchant) {
+      if (!updated) {
         return res.status(500).json({ message: "Failed to update password" });
       }
 
@@ -3562,8 +3549,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const merchantId = parseInt(req.params.id);
       
-      // Verify user owns this merchant
-      if (!req.user || req.user.merchantId !== merchantId) {
+      // KYC, processor credentials and account details belong to the owner.
+      if (!checkAccountOwnership(req, merchantId)) {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
@@ -3574,7 +3561,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         address: z.string().optional(),
         nzbn: z.string().optional(),
         phone: z.string().optional(),
-        email: z.string().email().optional(),
         gstNumber: z.string().optional(),
         windcaveApiKey: z.string().optional(),
         contactEmail: z.string().email().optional(),
@@ -3841,14 +3827,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Platform fee analytics (admin only)
-  app.get("/api/admin/platform-fees", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
+  // Subscription revenue analytics (admin only)
+  app.get("/api/admin/subscription-revenue", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {
-      const totalFees = await storage.getTotalPlatformRevenue();
-      res.json(totalFees);
+      res.json(await storage.getSubscriptionRevenue());
     } catch (error) {
-      console.error("Error fetching platform fees:", error);
-      res.status(500).json({ message: "Failed to fetch platform fees" });
+      console.error("Error fetching subscription revenue:", error);
+      res.status(500).json({ message: "Failed to fetch subscription revenue" });
     }
   });
 
@@ -3904,13 +3889,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         const currentSplit = await storage.getNextPendingSplit(transaction.id);
         if (currentSplit) {
           await storage.updateSplitPaymentStatus(currentSplit.id, 'completed', queryResult.windcaveTransactionId);
-          await storage.createPlatformFee({
-            transactionId: transaction.id,
-            merchantId: transaction.merchantId,
-            feeAmount: currentSplit.platformFeeAmount || '0.10',
-            transactionAmount: currentSplit.amount,
-            status: 'collected',
-          });
           if (transaction.merchantId) {
             await storage.incrementTransactionCount(transaction.merchantId);
           }
@@ -3935,13 +3913,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         const finalStatus = queryResult.approved ? 'completed' : 'failed';
         const updatedTxn = await storage.updateTransactionStatus(transaction.id, finalStatus, queryResult.windcaveTransactionId);
         if (updatedTxn && queryResult.approved) {
-          await storage.createPlatformFee({
-            transactionId: transaction.id,
-            merchantId: transaction.merchantId,
-            feeAmount: transaction.platformFeeAmount || '0.10',
-            transactionAmount: transaction.price,
-            status: 'collected',
-          });
           if (transaction.merchantId) {
             await storage.incrementTransactionCount(transaction.merchantId);
           }
@@ -4070,13 +4041,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         const currentSplit = await storage.getNextPendingSplit(txnId);
         if (currentSplit) {
           await storage.updateSplitPaymentStatus(currentSplit.id, 'completed', queryResult.windcaveTransactionId);
-          await storage.createPlatformFee({
-            transactionId: txnId,
-            merchantId: transaction.merchantId,
-            feeAmount: currentSplit.platformFeeAmount || '0.10',
-            transactionAmount: currentSplit.amount,
-            status: 'collected',
-          });
           if (transaction.merchantId) {
             await storage.incrementTransactionCount(transaction.merchantId);
           }
@@ -4107,13 +4071,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         const finalStatus = queryResult.approved ? 'completed' : 'failed';
         const updatedTxn = await storage.updateTransactionStatus(txnId, finalStatus, queryResult.windcaveTransactionId);
         if (updatedTxn && queryResult.approved) {
-          await storage.createPlatformFee({
-            transactionId: txnId,
-            merchantId: transaction.merchantId,
-            feeAmount: transaction.platformFeeAmount || '0.10',
-            transactionAmount: transaction.price,
-            status: 'collected',
-          });
           if (transaction.merchantId) {
             await storage.incrementTransactionCount(transaction.merchantId);
           }
@@ -4215,7 +4172,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
 
       const activeMerchants = recentMerchants.filter(m => m.status === 'active').length;
-      const transactionFeeRevenue = totalCompletedTransactions * 0.10; // $0.10 flat fee per completed transaction
+      // Platform revenue is subscription MRR, not a cut of merchant turnover.
+      const subscriptionRevenue = await storage.getSubscriptionRevenue();
 
       res.json({
         totalMerchants: merchants.length,
@@ -4223,7 +4181,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         totalRevenue,
         totalTransactions,
         completedTransactions: totalCompletedTransactions,
-        transactionFeeRevenue,
+        monthlyRecurringRevenue: subscriptionRevenue.monthlyRecurringRevenue,
+        payingSubscriptions: subscriptionRevenue.payingSubscriptions,
         recentMerchants: recentMerchants.sort((a, b) => b.totalRevenue - a.totalRevenue),
       });
     } catch (error) {
@@ -4459,12 +4418,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // POST /api/admin/merchants/signup.)
 
   // Admin merchant management endpoints
-  app.put("/api/admin/merchants/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+  app.put("/api/admin/merchants/:id", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {
-      if (req.user?.role !== 'admin') {
-        return res.status(403).json({ message: "Admin access required" });
-      }
-
       const merchantId = parseInt(req.params.id);
       const updates = req.body;
 
@@ -4478,10 +4433,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         });
       }
 
-      if (updates.currentProviderRate) {
-        await storage.updateMerchantRates(merchantId, updates.currentProviderRate);
-      }
-
       const updatedMerchant = await storage.getMerchant(merchantId);
       if (!updatedMerchant) return res.status(404).json({ message: "Merchant not found" });
       res.json(adminMerchantDto(updatedMerchant));
@@ -4492,12 +4443,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   // Test payment link endpoint
-  app.post("/api/merchants/:id/test-payment-link", authenticateToken, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/merchants/:id/test-payment-link", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
     try {
-      if (req.user?.role !== 'admin') {
-        return res.status(403).json({ message: "Admin access required" });
-      }
-
       const merchantId = parseInt(req.params.id);
       const merchant = await storage.getMerchant(merchantId);
       
@@ -4986,14 +4933,18 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         businessDescription,
         websiteUrl,
         estimatedAnnualTurnover,
+        planId,
         password,
         confirmPassword,
       } = validation.data;
 
-      // Check if email already exists
-      const existingMerchant = await storage.getMerchantByEmail(email);
-      if (existingMerchant) {
-        return res.status(400).json({ message: "Email already registered" });
+      const normalizedEmail = email.trim().toLowerCase();
+      const [existingMerchant, existingLogin] = await Promise.all([
+        storage.getMerchantByEmail(normalizedEmail),
+        storage.getUserByEmail(normalizedEmail),
+      ]);
+      if (existingMerchant || existingLogin) {
+        return res.status(409).json({ message: "Email already registered" });
       }
 
       // Hash password for storage
@@ -5008,36 +4959,32 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         name,
         businessName,
         businessType,
-        email,
+        email: normalizedEmail,
         phone,
         address: businessAddress,
         password,
         confirmPassword,
         verificationToken,
+        passwordHash,
+        planId,
+        contactEmail: normalizedEmail,
+        contactPhone: phone,
+        businessAddress,
+        nzbn: nzbn || null,
+        gstNumber: gstNumber || null,
+        director,
+        businessDescription,
+        websiteUrl: websiteUrl || null,
+        estimatedAnnualTurnover,
+        onboardingCompleted: false,
       });
-
-      if (merchant) {
-        await storage.updateMerchantPasswordHash(merchant.id, passwordHash);
-        await storage.updateMerchant(merchant.id, {
-          contactEmail: email,
-          contactPhone: phone,
-          businessAddress,
-          nzbn: nzbn || null,
-          gstNumber: gstNumber || null,
-          director,
-          businessDescription,
-          websiteUrl: websiteUrl || null,
-          estimatedAnnualTurnover,
-          onboardingCompleted: false,
-        });
-      }
 
       // Send verification email
       const { sendMerchantVerificationEmail } = await import('./email-service-multi');
       const { getBaseUrl } = await import('./url-utils');
       const baseUrl = getBaseUrl(req);
       
-      const emailSent = await sendMerchantVerificationEmail(email, verificationToken, name, baseUrl);
+      const emailSent = await sendMerchantVerificationEmail(normalizedEmail, verificationToken, name, baseUrl);
       if (!emailSent) {
         console.warn('Failed to send verification email, but merchant account was created');
       }
@@ -5059,12 +5006,16 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   // Submit business details after signup
-  app.put("/api/merchants/:id/business-details", async (req, res) => {
+  app.put("/api/merchants/:id/business-details", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = parseInt(req.params.id);
       if (isNaN(merchantId)) {
         return res.status(400).json({ message: "Invalid merchant ID" });
       }
+      if (!checkAccountOwnership(req, merchantId)) {
+        return res.status(403).json({ message: "You can only update your own business details" });
+      }
+
 
       const merchant = await storage.getMerchant(merchantId);
       if (!merchant) {
@@ -5079,13 +5030,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(403).json({ message: "Email address must be verified before submitting business details" });
       }
 
-      // SECURITY (IDOR): this endpoint is necessarily unauthenticated — it is the
-      // pre-login onboarding step reached straight after email confirmation, with
-      // the merchant id taken from the URL query. Bind it to the onboarding window
-      // so it can NEVER overwrite an established merchant's details (business name,
-      // contact email, GST number, address). Once the merchant is active or has
-      // completed onboarding, edits must go through the authenticated settings API
-      // (PUT /api/merchants/:id/details, which enforces ownership).
+      // This legacy post-confirmation step may only fill an unfinished account.
+      // Established merchants edit these fields through authenticated Settings.
       if (merchant.status === "active" || merchant.onboardingCompleted === true) {
         return res.status(403).json({ message: "Business details can no longer be edited here. Please sign in to update your details." });
       }
@@ -5138,11 +5084,15 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       const { password, confirmPassword, ...merchantData } = validation.data;
 
-      // Check if email already exists
-      const existingMerchant = await storage.getMerchantByEmail(merchantData.email);
-      if (existingMerchant) {
-        return res.status(400).json({ message: "Email already registered" });
+      const normalizedEmail = merchantData.email.trim().toLowerCase();
+      const [existingMerchant, existingLogin] = await Promise.all([
+        storage.getMerchantByEmail(normalizedEmail),
+        storage.getUserByEmail(normalizedEmail),
+      ]);
+      if (existingMerchant || existingLogin) {
+        return res.status(409).json({ message: "Email already registered" });
       }
+      merchantData.email = normalizedEmail;
 
       // Hash the password
       const passwordHash = await bcrypt.hash(password, 12);
@@ -5158,6 +5108,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         qrCodeUrl: `temp`, // Will be updated after creation
         paymentUrl: `temp` // Will be updated after creation
       }, passwordHash);
+
+      // Do not report a usable account until the real owner identity exists.
+      await createUser(normalizedEmail, password, merchant.id);
 
       // Update with proper URLs now that we have the merchant ID
       const actualPaymentUrl = generatePaymentUrl(merchant.id);
@@ -5202,19 +5155,26 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     let audience: SseAudience;
     const authorization = req.headers.authorization;
     if (authorization !== undefined) {
-      const [scheme, token, ...extra] = authorization.split(" ");
-      if (scheme !== "Bearer" || !token || extra.length > 0) {
-        return res.status(401).json({ message: "Invalid or expired authentication" });
+      let authenticated = false;
+      await authenticateToken(req as AuthenticatedRequest, res, () => {
+        authenticated = true;
+      });
+      if (!authenticated) return;
+
+      const authenticatedRequest = req as AuthenticatedRequest;
+      if (!checkMerchantOwnership(authenticatedRequest, merchantId)) {
+        return res.status(403).json({ message: "Access denied" });
       }
-      try {
-        const decoded: any = jwt.verify(token, JWT_SECRET);
-        if (decoded?.role !== "admin" && decoded?.merchantId !== merchantId) {
-          return res.status(401).json({ message: "Invalid or expired authentication" });
-        }
-        audience = { kind: "merchant" };
-      } catch {
-        return res.status(401).json({ message: "Invalid or expired authentication" });
+
+      const userId = authenticatedRequest.user?.userId ?? authenticatedRequest.user?.id;
+      if (!userId) {
+        return res.status(403).json({ message: "Access denied" });
       }
+      audience = {
+        kind: "merchant",
+        userId,
+        principal: authenticatedRequest.user?.role === "admin" ? "admin" : "user",
+      };
     } else if (req.query.stoneId !== undefined) {
       if (typeof req.query.stoneId !== "string" || !/^\d+$/.test(req.query.stoneId)) {
         return res.status(400).json({ message: "Invalid payment board" });
@@ -6169,15 +6129,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           paymentResult.transactionId
         );
 
-        // Collect platform fee
-        await storage.createPlatformFee({
-          transactionId: transactionId,
-          merchantId: transaction.merchantId,
-          feeAmount: transaction.platformFeeAmount || "0.10",
-          transactionAmount: transaction.price,
-          status: 'collected',
-        });
-
         // Track transaction for subscription billing
         if (transaction.merchantId) {
           await storage.incrementTransactionCount(transaction.merchantId);
@@ -6240,15 +6191,6 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           "completed", 
           paymentResult.transactionId
         );
-
-        // Collect platform fee
-        await storage.createPlatformFee({
-          transactionId: transactionId,
-          merchantId: transaction.merchantId,
-          feeAmount: transaction.platformFeeAmount || "0.10",
-          transactionAmount: transaction.price,
-          status: 'collected',
-        });
 
         // Track transaction for subscription billing
         if (transaction.merchantId) {
@@ -6318,10 +6260,15 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(400).json({ message: "Merchant ID required" });
       }
 
+      if (!isAccountOwner(req.user)) {
+        return res.status(403).json({ message: "Only the account owner can view the subscription" });
+      }
       const subscription = await storage.getOrCreateSubscription(merchantId);
-      
+      const seatsInUse = await storage.countSeatsInUse(merchantId);
+
       res.json({
-        subscription
+        subscription: subscriptionDto(subscription, seatsInUse),
+        plans: PLAN_LIST,
       });
     } catch (error) {
       console.error("Get subscription error:", error);
@@ -6329,52 +6276,426 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Update billing frequency
-  app.put("/api/subscription/billing-frequency", authenticateToken, async (req: AuthenticatedRequest, res) => {
+  // Change plan. Upgrades apply immediately; downgrades queue to period end.
+  app.put("/api/subscription/plan", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
-      if (!merchantId) {
-        return res.status(400).json({ message: "Merchant ID required" });
+      if (!merchantId) return res.status(400).json({ message: "Merchant ID required" });
+      if (req.user?.role === "member") {
+        return res.status(403).json({ message: "Only the account owner can change the plan" });
       }
 
-      const { frequency } = req.body;
-      
-      if (!['weekly', 'bi_weekly', 'monthly'].includes(frequency)) {
-        return res.status(400).json({ message: "Invalid billing frequency" });
+      const parsed = planIdSchema.safeParse(req.body?.planId);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Unknown plan" });
       }
 
-      const subscription = await storage.updateSubscriptionBillingFrequency(merchantId, frequency);
-      
-      res.json({ subscription });
+      await storage.getOrCreateSubscription(merchantId);
+      const result = await storage.changeSubscriptionPlan(merchantId, parsed.data, executeStoredCardCharge);
+
+      if (!result.ok) {
+        if (result.reason === "too-many-seats") {
+          return res.status(409).json({
+            message: `That plan allows ${result.seatLimit} ${result.seatLimit === 1 ? "login" : "logins"}, but you have ${result.seatsInUse} in use. Remove some team logins first.`,
+            seatsInUse: result.seatsInUse,
+            seatLimit: result.seatLimit,
+          });
+        }
+        if (result.reason === "payment-method-required") {
+          return res.status(402).json({
+            code: BILLING_CARD_REQUIRED.code,
+            message: "Add a payment method before upgrading.",
+          });
+        }
+        if (result.reason === "declined") {
+          return res.status(422).json({ message: "The upgrade payment was declined. Check your card and try again." });
+        }
+        if (result.reason === "billing-busy") {
+          return res.status(409).json({ message: "Billing is already in progress. Please try again shortly." });
+        }
+        if (result.reason === "invalid-state") {
+          return res.status(409).json({ message: "Resolve the current subscription state before upgrading." });
+        }
+        if (result.reason === "charge-failed") {
+          return res.status(502).json({ message: "The upgrade payment could not be confirmed. Please try again." });
+        }
+        if (result.reason === "not-found") {
+          return res.status(404).json({ message: "Subscription not found" });
+        }
+        return res.status(500).json({ message: "The plan could not be changed." });
+      }
+
+      const seatsInUse = await storage.countSeatsInUse(merchantId);
+      res.json({
+        subscription: subscriptionDto(result.subscription, seatsInUse),
+        applied: result.applied,
+        message: result.applied === "immediate"
+          ? "Your new plan is active."
+          : "Your new plan starts at the end of the current billing period.",
+      });
     } catch (error) {
-      console.error("Update billing frequency error:", error);
-      res.status(500).json({ message: "Failed to update billing frequency" });
+      console.error("Change plan error:", error);
+      res.status(500).json({ message: "Failed to change plan" });
     }
   });
 
-  // Cancel subscription (30-day notice)
+  // Cancel at period end — access continues until the paid period runs out.
   app.post("/api/subscription/cancel", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
       if (!merchantId) {
         return res.status(400).json({ message: "Merchant ID required" });
       }
+      if (req.user?.role === "member") {
+        return res.status(403).json({ message: "Only the account owner can cancel the subscription" });
+      }
 
       const { reason } = req.body;
-      
+
       if (!reason || reason.trim().length === 0) {
         return res.status(400).json({ message: "Cancellation reason required" });
       }
 
-      const subscription = await storage.cancelSubscription(merchantId, reason);
-      
-      res.json({ 
-        subscription,
-        message: "Subscription will be cancelled after 30 days"
+      await storage.getOrCreateSubscription(merchantId);
+      const cancellation = await storage.cancelSubscription(
+        merchantId,
+        String(reason).slice(0, 500),
+      );
+      if (!cancellation.ok) {
+        if (cancellation.reason === "billing-busy") {
+          return res.status(409).json({ message: "Billing is already in progress. Please try again shortly." });
+        }
+        return res.status(404).json({ message: "Subscription not found" });
+      }
+      const subscription = cancellation.subscription;
+      const seatsInUse = await storage.countSeatsInUse(merchantId);
+
+      res.json({
+        subscription: subscriptionDto(subscription, seatsInUse),
+        message: subscription.cancelAtPeriodEnd && subscription.cancellationEffectiveDate
+          ? `Your subscription stays active until ${new Date(subscription.cancellationEffectiveDate).toLocaleDateString("en-NZ")}.`
+          : "Your subscription is cancelled. You can restart it from Billing at any time.",
       });
     } catch (error) {
       console.error("Cancel subscription error:", error);
       res.status(500).json({ message: "Failed to cancel subscription" });
+    }
+  });
+
+  // Undo a pending cancellation.
+  app.post("/api/subscription/resume", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(400).json({ message: "Merchant ID required" });
+      if (req.user?.role === "member") {
+        return res.status(403).json({ message: "Only the account owner can change the subscription" });
+      }
+
+      const subscription = await storage.resumeSubscription(merchantId);
+      if (!subscription) {
+        return res.status(409).json({ message: "This subscription does not have a cancellation that can be resumed." });
+      }
+      const seatsInUse = await storage.countSeatsInUse(merchantId);
+      res.json({
+        subscription: subscriptionDto(subscription, seatsInUse),
+        message: "Your subscription will renew as normal.",
+      });
+    } catch (error) {
+      console.error("Resume subscription error:", error);
+      res.status(500).json({ message: "Failed to resume subscription" });
+    }
+  });
+
+  // ============================================================================
+  // TEAM SEAT ROUTES
+  // ============================================================================
+
+  // Long enough to survive a weekend, short enough that a forwarded invite email
+  // does not stay live indefinitely.
+  const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+  app.get("/api/team", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(400).json({ message: "Merchant ID required" });
+
+      if (!isAccountOwner(req.user)) {
+        return res.status(403).json({ message: "Only the account owner can view team logins" });
+      }
+      const subscription = await storage.getOrCreateSubscription(merchantId);
+      const members = await storage.getTeamMembers(merchantId);
+      res.json({
+        members: members.map(teamMemberDto),
+        seatLimit: subscription?.seatLimit ?? 1,
+        seatsInUse: await storage.countSeatsInUse(merchantId),
+      });
+    } catch (error) {
+      console.error("Get team error:", error);
+      res.status(500).json({ message: "Failed to load team" });
+    }
+  });
+
+  app.post("/api/team/invite", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(400).json({ message: "Merchant ID required" });
+      if (!isAccountOwner(req.user)) {
+        return res.status(403).json({ message: "Only the account owner can invite logins" });
+      }
+
+      const parsed = inviteTeamMemberSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Enter a valid name and email", errors: parsed.error.errors });
+      }
+
+      await storage.getOrCreateSubscription(merchantId);
+      const rawToken = crypto.randomBytes(32).toString("hex");
+      const inviteTokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+      const inviteExpiresAt = new Date(Date.now() + INVITE_TTL_MS);
+      const result = await storage.inviteTeamMember(merchantId, {
+        email: parsed.data.email,
+        name: parsed.data.name ?? null,
+        inviteTokenHash,
+        inviteExpiresAt,
+      });
+
+      if (!result.ok) {
+        if (result.reason === "seat-limit") {
+          return res.status(409).json({
+            message: `Your plan includes ${result.seatLimit} ${result.seatLimit === 1 ? "login" : "logins"} and all are in use. Upgrade your plan to add more.`,
+            seatsInUse: result.seatsInUse,
+            seatLimit: result.seatLimit,
+          });
+        }
+        return res.status(409).json({ message: "That email address already has a TaptPay login." });
+      }
+
+      const merchant = await storage.getMerchant(merchantId);
+      let emailSent = false;
+      try {
+        emailSent = await sendTeamInviteEmail({
+          to: result.user.email,
+          businessName: merchant?.businessName || "your team",
+          inviteUrl: `${getBaseUrl(req)}/accept-invite?token=${rawToken}`,
+        });
+      } catch (error) {
+        console.error("Team invite email failed:", error);
+      }
+      if (!emailSent) {
+        const rolledBack = await storage.revokeTeamInvite(merchantId, result.user.id, inviteTokenHash);
+        if (!rolledBack) {
+          console.error("Team invite rollback failed:", { merchantId, userId: result.user.id });
+        }
+        return res.status(502).json({ message: "The invite email could not be sent. No seat was used." });
+      }
+
+      res.status(201).json({ member: teamMemberDto(result.user) });
+    } catch (error) {
+      console.error("Invite team member error:", error);
+      res.status(500).json({ message: "Failed to send invite" });
+    }
+  });
+
+  app.post("/api/team/:userId/resend", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(400).json({ message: "Merchant ID required" });
+      if (!isAccountOwner(req.user)) {
+        return res.status(403).json({ message: "Only the account owner can resend invites" });
+      }
+
+      const userId = parseInt(req.params.userId, 10);
+      if (!Number.isInteger(userId)) return res.status(400).json({ message: "Invalid invite" });
+      if (!checkResendRateLimit(`team-invite:${merchantId}:${userId}`)) {
+        return res.status(429).json({ message: "Too many resend attempts. Please try again later." });
+      }
+
+      const previous = await storage.getUserById(userId);
+      if (!previous || previous.merchantId !== merchantId || previous.status !== "invited" || !previous.inviteTokenHash) {
+        return res.status(404).json({ message: "Invite not found" });
+      }
+
+      const rawToken = crypto.randomBytes(32).toString("hex");
+      const inviteTokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+      const inviteExpiresAt = new Date(Date.now() + INVITE_TTL_MS);
+      const rotation = await storage.rotateTeamInvite(merchantId, userId, {
+        inviteTokenHash,
+        inviteExpiresAt,
+        expectedTokenHash: previous.inviteTokenHash,
+      });
+      if (!rotation.ok) {
+        if (rotation.reason === "seat-limit") {
+          return res.status(409).json({
+            message: "All of your plan's logins are in use. Upgrade your plan or remove another login first.",
+            seatsInUse: rotation.seatsInUse,
+            seatLimit: rotation.seatLimit,
+          });
+        }
+        if (rotation.reason === "conflict") {
+          return res.status(409).json({ message: "That invite changed in another request. Refresh and try again." });
+        }
+        return res.status(404).json({ message: "Invite not found" });
+      }
+      const rotated = rotation.user;
+
+      const merchant = await storage.getMerchant(merchantId);
+      let emailSent = false;
+      try {
+        emailSent = await sendTeamInviteEmail({
+          to: rotated.email,
+          businessName: merchant?.businessName || "your team",
+          inviteUrl: `${getBaseUrl(req)}/accept-invite?token=${rawToken}`,
+        });
+      } catch (error) {
+        console.error("Team invite resend failed:", error);
+      }
+
+      if (!emailSent) {
+        let restored = false;
+        if (previous.inviteExpiresAt) {
+          const restore = await storage.rotateTeamInvite(merchantId, userId, {
+            inviteTokenHash: previous.inviteTokenHash,
+            inviteExpiresAt: previous.inviteExpiresAt,
+            expectedTokenHash: inviteTokenHash,
+          });
+          restored = restore.ok;
+        }
+        if (!restored) {
+          await storage.revokeTeamInvite(merchantId, userId, inviteTokenHash);
+        }
+        return res.status(502).json({
+          message: restored
+            ? "The invite email could not be sent. The previous invite is unchanged."
+            : "The invite email could not be sent. No new invite was kept.",
+        });
+      }
+
+      res.json({ member: teamMemberDto(rotated) });
+    } catch (error) {
+      console.error("Resend team invite error:", error);
+      res.status(500).json({ message: "Failed to resend invite" });
+    }
+  });
+
+  app.delete("/api/team/:userId/invite", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(400).json({ message: "Merchant ID required" });
+      if (!isAccountOwner(req.user)) {
+        return res.status(403).json({ message: "Only the account owner can revoke invites" });
+      }
+      const userId = parseInt(req.params.userId, 10);
+      if (!Number.isInteger(userId)) return res.status(400).json({ message: "Invalid invite" });
+
+      const revoked = await storage.revokeTeamInvite(merchantId, userId);
+      if (!revoked) return res.status(404).json({ message: "Invite not found" });
+      res.json({ message: "Invite revoked" });
+    } catch (error) {
+      console.error("Revoke team invite error:", error);
+      res.status(500).json({ message: "Failed to revoke invite" });
+    }
+  });
+
+  app.put("/api/team/:userId/status", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(400).json({ message: "Merchant ID required" });
+      if (!isAccountOwner(req.user)) {
+        return res.status(403).json({ message: "Only the account owner can change logins" });
+      }
+
+      const userId = parseInt(req.params.userId, 10);
+      const status = req.body?.status;
+      if (!Number.isInteger(userId) || (status !== "active" && status !== "disabled")) {
+        return res.status(400).json({ message: "Invalid request" });
+      }
+
+      const result = await storage.setTeamMemberStatus(merchantId, userId, status);
+      if (!result.ok) {
+        if (result.reason === "seat-limit") {
+          return res.status(409).json({
+            message: "All of your plan's logins are in use. Upgrade your plan or remove another login first.",
+            seatsInUse: result.seatsInUse,
+            seatLimit: result.seatLimit,
+          });
+        }
+        if (result.reason === "invalid-state") {
+          return res.status(409).json({ message: "That login is already in this state or must be managed as a pending invite." });
+        }
+        if (result.reason === "owner") {
+          return res.status(403).json({ message: "The account owner cannot be disabled." });
+        }
+        return res.status(404).json({ message: "Login not found" });
+      }
+
+      if (status === "disabled") sseBroker.disconnectUser(merchantId, userId);
+      res.json({ member: teamMemberDto(result.user) });
+    } catch (error) {
+      console.error("Update team member error:", error);
+      res.status(500).json({ message: "Failed to update login" });
+    }
+  });
+
+  app.delete("/api/team/:userId", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(400).json({ message: "Merchant ID required" });
+      if (!isAccountOwner(req.user)) {
+        return res.status(403).json({ message: "Only the account owner can remove logins" });
+      }
+
+      const userId = parseInt(req.params.userId, 10);
+      if (!Number.isInteger(userId)) return res.status(400).json({ message: "Invalid login" });
+      const member = await storage.getUserById(userId);
+      if (!member || member.merchantId !== merchantId || member.role === "owner") {
+        return res.status(404).json({ message: "Login not found, or it is the account owner" });
+      }
+      if (member.status === "invited") {
+        return res.status(409).json({ message: "Use revoke invite for a pending invitation." });
+      }
+
+      const removed = await storage.removeTeamMember(merchantId, userId);
+      if (!removed) {
+        return res.status(404).json({ message: "Login not found, or it is the account owner" });
+      }
+      sseBroker.disconnectUser(merchantId, userId);
+      res.json({ message: "Login removed" });
+    } catch (error) {
+      console.error("Remove team member error:", error);
+      res.status(500).json({ message: "Failed to remove login" });
+    }
+  });
+
+  // Accept an invite: unauthenticated by design — the token IS the credential.
+  app.post("/api/team/accept-invite", async (req, res) => {
+    try {
+      const parsed = acceptInviteSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid invite details", errors: parsed.error.errors });
+      }
+
+      const tokenHash = crypto.createHash("sha256").update(parsed.data.token).digest("hex");
+      const invited = await storage.getUserByInviteToken(tokenHash);
+      const invalid = () => res.status(400).json({ message: "This invite is no longer valid. Ask the account owner to send a new one." });
+      const now = new Date();
+      if (!invited || invited.status !== "invited") return invalid();
+      if (!invited.inviteExpiresAt || new Date(invited.inviteExpiresAt) <= now) return invalid();
+
+      const passwordHash = await bcrypt.hash(parsed.data.password, 12);
+      const activated = await storage.activateInvitedUser(
+        invited.id,
+        tokenHash,
+        passwordHash,
+        parsed.data.name ?? null,
+        now,
+      );
+      if (!activated) return invalid();
+
+      logSecurityEvent("TEAM_INVITE_ACCEPTED", { userId: activated.id, merchantId: activated.merchantId });
+      res.json({ message: "Your login is ready. Please sign in." });
+    } catch (error) {
+      console.error("Accept invite error:", error);
+      res.status(500).json({ message: "Failed to accept invite" });
     }
   });
 
@@ -6385,94 +6706,214 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchantId) {
         return res.status(400).json({ message: "Merchant ID required" });
       }
+      if (!isAccountOwner(req.user)) {
+        return res.status(403).json({ message: "Only the account owner can view billing history" });
+      }
 
-      const limit = parseInt(req.query.limit as string) || 50;
+      const requestedLimit = Number.parseInt(String(req.query.limit ?? ""), 10);
+      const limit = Number.isInteger(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 50;
       const history = await storage.getBillingHistory(merchantId, limit);
       
-      res.json({ history });
+      res.json({ history: history.map(billingHistoryDto) });
     } catch (error) {
       console.error("Get billing history error:", error);
       res.status(500).json({ message: "Failed to get billing history" });
     }
   });
 
+  // ============================================================================
+  // SUBSCRIPTION PAYMENT METHOD — Windcave card-on-file
+  // ============================================================================
+  //
+  // The card number never reaches this server. We open a Windcave-hosted form,
+  // Windcave stores the card and hands back a token plus masked metadata, and we
+  // persist only those. That is what makes recurring billing possible without
+  // this service being in PCI scope.
+
   app.get("/api/billing/card", authenticateToken, async (req: AuthenticatedRequest, res) => {
     const merchantId = req.user?.merchantId;
     if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+    if (!isAccountOwner(req.user)) {
+      return res.status(403).json({ message: "Only the account owner can view the payment method" });
+    }
     const merchant = await storage.getMerchant(merchantId);
     if (!merchant) return res.status(404).json({ message: "Merchant not found" });
-    const ready = billingCardIsReady(merchant);
+
+    const subscription = await storage.getOrCreateSubscription(merchantId);
+    const ready = billingCardIsReady(subscription);
     res.json({
       ready,
-      card: merchant.billingCardLast4 ? {
-        last4: merchant.billingCardLast4,
-        brand: merchant.billingCardBrand,
-        expiry: merchant.billingCardExpiry,
-      } : null,
+      card: subscription?.cardLast4
+        ? {
+            last4: subscription.cardLast4,
+            brand: subscription.cardBrand,
+            expiry: subscription.cardExpiry,
+          }
+        : null,
     });
   });
 
-  // Save only masked card metadata. Full card number and CVC are never persisted.
-  app.post("/api/billing/card", authenticateToken, async (req: AuthenticatedRequest, res) => {
+  // Step 1: open a hosted Windcave page that captures and stores the card.
+  app.post("/api/billing/card/session", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
-
-      const { cardNumber, expiry, cvc } = req.body;
-      if (!cardNumber || !expiry || !cvc) {
-        return res.status(400).json({ message: "Card number, expiry and CVC are required" });
+      if (!isAccountOwner(req.user)) {
+        return res.status(403).json({ message: "Only the account owner can change the payment method" });
       }
 
-      const raw = String(cardNumber).replace(/\s+/g, '');
-      if (!/^\d{13,19}$/.test(raw)) {
-        return res.status(400).json({ message: "Invalid card number" });
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) return res.status(404).json({ message: "Merchant not found" });
+      if (!isWindcaveConfigured()) {
+        return res.status(503).json({ message: "Card storage is temporarily unavailable. Please try again later." });
       }
-      if (!isLuhnValid(raw)) {
-        return res.status(400).json({ message: "Please enter a valid card number" });
-      }
-      const cleanExpiry = String(expiry).trim();
-      if (!isCardExpiryValid(cleanExpiry)) {
-        return res.status(400).json({ message: "Please enter a valid, unexpired date in MM/YY format" });
-      }
-      if (!/^\d{3,4}$/.test(String(cvc))) {
-        return res.status(400).json({ message: "Invalid CVC" });
-      }
-      // CVC validated above but intentionally NOT stored — Windcave will tokenise when live.
 
-      const last4 = raw.slice(-4);
-      let brand: "Visa" | "Mastercard" | "Amex" | null = null;
-      if (/^4/.test(raw)) brand = "Visa";
-      else if (/^(5[1-5]|2[2-7])/.test(raw)) brand = "Mastercard";
-      else if (/^3[47]/.test(raw)) brand = "Amex";
-      if (!brand) return res.status(400).json({ message: "Please use a supported credit or debit card" });
+      await storage.getOrCreateSubscription(merchantId);
 
-      // TODO: When Windcave billing API is available, tokenise the card here and store the token.
-      // For now store masked placeholder only — no real card data is persisted.
-      const merchant = await storage.updateMerchantBillingCard(merchantId, {
-        last4,
-        brand,
-        expiry: cleanExpiry,
-      });
+      const xId = crypto.randomBytes(8).toString("hex");
+      const baseUrl = getBaseUrl(req);
+      const result = await createCardStorageSession(
+        xId,
+        `TAPTPAY-CARD-M${merchantId}-${Date.now()}`,
+        merchant.contactEmail || merchant.email,
+        `${baseUrl}/api/billing/card/callback?merchantId=${merchantId}`,
+        `${baseUrl}/api/billing/card/notification`,
+      );
+
+      if (!result.success || !result.sessionId || !result.hppUrl) {
+        console.error("Card storage session failed");
+        return res.status(502).json({ message: "Could not start card setup. Please try again." });
+      }
+
+      const bound = await storage.bindSubscriptionCardSession(merchantId, result.sessionId);
+      if (!bound) {
+        return res.status(500).json({ message: "Could not start card setup. Please try again." });
+      }
+
+      // The session id is the handle the client polls with; it is not a credential
+      // for anything other than reading back this one card-capture result.
+      res.json({ sessionId: result.sessionId, redirectUrl: result.hppUrl });
+    } catch (error) {
+      console.error("Create card session error:", error);
+      res.status(500).json({ message: "Failed to start card setup" });
+    }
+  });
+
+  // Step 2: read back the stored-card token once the shopper finishes.
+  app.post("/api/billing/card/confirm", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!isAccountOwner(req.user)) {
+        return res.status(403).json({ message: "Only the account owner can change the payment method" });
+      }
+
+      const sessionId = typeof req.body?.sessionId === "string" ? req.body.sessionId.trim() : "";
+      if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/.test(sessionId)) {
+        return res.status(400).json({ message: "A valid card setup session is required." });
+      }
+
+      const boundSubscription = await storage.getSubscription(merchantId);
+      const sessionState = subscriptionCardSessionState(boundSubscription, sessionId);
+      if (!boundSubscription || !sessionState) {
+        return res.status(403).json({ message: "This card setup session does not belong to your account." });
+      }
+      if (sessionState === "declined") {
+        return res.status(422).json({ message: "That card was declined. Please try another card." });
+      }
+      if (sessionState === "succeeded") {
+        const seatsInUse = await storage.countSeatsInUse(merchantId);
+        return res.json({
+          success: true,
+          ready: billingCardIsReady(boundSubscription),
+          charged: false,
+          card: {
+            last4: boundSubscription.cardLast4,
+            brand: boundSubscription.cardBrand,
+            expiry: boundSubscription.cardExpiry,
+          },
+          subscription: subscriptionDto(boundSubscription, seatsInUse),
+        });
+      }
+
+      const result = await queryStoredCardSession(sessionId);
+      if (!result.success) {
+        return res.status(502).json({ message: "Could not confirm the card. Please try again." });
+      }
+      if (!result.complete) {
+        return res.status(202).json({ pending: true });
+      }
+      if (!result.approved || !result.card) {
+        return res.status(422).json({ message: "That card could not be verified. Please try another card." });
+      }
+
+      const completion = await storage.completeSubscriptionCardSetup(merchantId, sessionId, {
+        windcaveCardId: result.card.cardId,
+        brand: result.card.brand,
+        last4: result.card.last4,
+        expiry: result.card.expiry,
+      }, executeStoredCardCharge);
+      if (!completion.ok) {
+        if (completion.reason === "session-mismatch") {
+          return res.status(403).json({ message: "This card setup session does not belong to your account." });
+        }
+        if (completion.reason === "billing-busy") {
+          return res.status(409).json({ message: "Billing is already in progress. Please try again shortly." });
+        }
+        if (completion.reason === "invalid-state") {
+          return res.status(409).json({ message: "Resolve the current subscription state before adding a card." });
+        }
+        if (completion.reason === "declined") {
+          return res.status(422).json({ message: "That card was declined. Please try another card." });
+        }
+        if (completion.reason === "charge-failed") {
+          return res.status(502).json({ message: "The card charge could not be confirmed. Please try again." });
+        }
+        if (completion.reason === "not-found") {
+          return res.status(404).json({ message: "Subscription not found" });
+        }
+        return res.status(500).json({ message: "The card could not be saved." });
+      }
+      const seatsInUse = await storage.countSeatsInUse(merchantId);
 
       res.json({
         success: true,
-        ready: true,
-        card: { last4, brand, expiry: cleanExpiry },
-        merchant,
+        ready: billingCardIsReady(completion.subscription),
+        charged: completion.charged,
+        card: { last4: result.card.last4, brand: result.card.brand, expiry: result.card.expiry },
+        subscription: subscriptionDto(completion.subscription, seatsInUse),
       });
     } catch (error) {
-      console.error("Save billing card error:", error);
+      console.error("Confirm billing card error:", error);
       res.status(500).json({ message: "Failed to save card" });
     }
   });
 
-  // Remove billing card
+  // Windcave posts here when a card-capture session settles. We do not trust its
+  // body: it is a nudge to re-read the session from Windcave, nothing more.
+  app.all("/api/billing/card/notification", async (_req, res) => {
+    res.sendStatus(200);
+  });
+
+  const billingCardCallback = (req: express.Request, res: express.Response) => {
+    const result = safeBillingCardCallbackResult(req.query.result ?? req.body?.result);
+    // The browser already holds its opaque session in sessionStorage. Never put
+    // that identifier into our URL, referrers, analytics or server access logs.
+    res.redirect(`/settings?section=billing&card=${result}`);
+  };
+  app.get("/api/billing/card/callback", billingCardCallback);
+  app.post("/api/billing/card/callback", billingCardCallback);
+
+  // Remove the stored card.
   app.delete("/api/billing/card", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = req.user?.merchantId;
       if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!isAccountOwner(req.user)) {
+        return res.status(403).json({ message: "Only the account owner can change the payment method" });
+      }
 
-      await storage.updateMerchantBillingCard(merchantId, null);
+      await storage.removeSubscriptionCard(merchantId);
       res.json({ success: true });
     } catch (error) {
       console.error("Remove billing card error:", error);
@@ -8052,6 +8493,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const { runTradesGeneratePass } = await import("./trades-cron");
       const { runTradesDispatchPass, runTradesOverduePass, runTradesReminderPass } = await import("./trades-delivery");
       const { runDailyPayoutNotificationPass } = await import("./daily-payout-notifications");
+      const { runSubscriptionBillingPass } = await import("./subscription-cron");
       const now = new Date();
       const baseUrl = getBaseUrl(req);
       // Sequential: generate must complete before dispatch (dispatch reads the
@@ -8065,8 +8507,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const reminders = await runReminderPass(baseUrl, now);
       const tradesReminders = await runTradesReminderPass(baseUrl, now);
       const dailyPayoutNotifications = await runDailyPayoutNotificationPass(now);
-      console.log(`[CRON] generate=${JSON.stringify(generate)} tradesGenerate=${JSON.stringify(tradesGenerate)} dispatch=${JSON.stringify(dispatch)} overdue=${JSON.stringify(overdue)} reminders=${JSON.stringify(reminders)} dailyPayoutNotifications=${JSON.stringify(dailyPayoutNotifications)}`);
-      res.json({ ok: true, ranAt: now.toISOString(), generate, tradesGenerate, dispatch, tradesDispatch, overdue, tradesOverdue, reminders, tradesReminders, dailyPayoutNotifications });
+      // Last: subscription billing is independent of the invoice passes, and a
+      // slow processor call must not delay merchants' own invoices going out.
+      const subscriptionBilling = await runSubscriptionBillingPass(now);
+      console.log(`[CRON] subscriptionBilling=${JSON.stringify(subscriptionBilling)} generate=${JSON.stringify(generate)} tradesGenerate=${JSON.stringify(tradesGenerate)} dispatch=${JSON.stringify(dispatch)} overdue=${JSON.stringify(overdue)} reminders=${JSON.stringify(reminders)} dailyPayoutNotifications=${JSON.stringify(dailyPayoutNotifications)}`);
+      res.json({ ok: true, ranAt: now.toISOString(), generate, tradesGenerate, dispatch, tradesDispatch, overdue, tradesOverdue, reminders, tradesReminders, dailyPayoutNotifications, subscriptionBilling });
     } catch (err) { console.error("[CRON]", err); res.status(500).json({ message: "Cron run failed" }); }
     finally { cronRunning = false; }
   });

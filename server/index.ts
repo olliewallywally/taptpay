@@ -63,6 +63,7 @@ app.use(compression({ threshold: 1024 }));
 // document receives the policy before any checkout script is loaded.
 app.use((req, res, next) => {
   if (
+    req.path === "/accept-invite" ||
     /^\/(?:pay|split|checkout|receipt)\/t\//.test(req.path) ||
     /^\/pay\/return\//.test(req.path) ||
     /^\/api\/pay\/(?:t|return)\//.test(req.path)

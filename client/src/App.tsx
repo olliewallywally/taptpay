@@ -42,6 +42,7 @@ const BusinessDetails       = lazy(() => import("@/pages/business-details"));
 const CheckEmail            = lazy(() => import("@/pages/check-email"));
 const ConfirmEmail          = lazy(() => import("@/pages/confirm-email"));
 const MerchantOnboarding    = lazy(() => import("@/pages/merchant-onboarding"));
+const AcceptInvite          = lazy(() => import("@/pages/accept-invite"));
 const SplitPayment          = lazy(() => import("@/pages/split-payment"));
 const PaymentResult         = lazy(() => import("@/pages/payment-result"));
 const PaymentReturn         = lazy(() => import("@/pages/payment-return"));
@@ -359,6 +360,7 @@ function Router({ deviceClass }: { deviceClass: DeviceClass }) {
           <Route path="/confirm-email" component={ConfirmEmail} />
           <Route path="/login" component={Login} />
           <Route path="/signup" component={MerchantSignup} />
+          <Route path="/accept-invite" component={AcceptInvite} />
           <Route path="/forgot-password" component={ForgotPassword} />
           <Route path="/reset-password" component={ResetPassword} />
           <Route path="/terminal">

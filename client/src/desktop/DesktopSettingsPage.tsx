@@ -6,13 +6,25 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getCurrentMerchantId } from "@/lib/auth";
+import { apiErrorMessage } from "@/lib/api-error";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import {
+  BILLING_CARD_SESSION_KEY,
+  useBillingCardReturn,
+} from "@/hooks/use-billing-card-return";
 import {
   usePushNotifications,
   type PushNotificationPreferenceKey,
 } from "@/hooks/use-push-notifications";
 import { readDesktopPrefs, writeDesktopPrefs, type HistoryStart } from "./data/desktop-prefs";
+import { PLAN_LIST, formatPlanPrice, planForOrDefault, type PlanId } from "@shared/plans";
+import {
+  cardSetupBillingDisclosure,
+  hasPaidCurrentSubscriptionPeriod,
+  planChangeBillingDisclosure,
+  subscriptionCancellationState,
+} from "@/lib/subscription-ui";
 import { saveDesktopMode, type DesktopVertical } from "./desktop-theme";
 import {
   DesktopPageScaffold,
@@ -29,6 +41,25 @@ const RED = "#F0656C";
 const OPEN_INK = "#04103A";
 
 type SectionKey = "business" | "prefs" | "billing" | "account" | "notifs";
+
+type TeamMember = {
+  id: number;
+  email: string;
+  name: string | null;
+  role: string;
+  status: string;
+};
+
+type BillingHistoryEntry = {
+  id: number;
+  billingType: string;
+  amount: string | number;
+  status: string;
+  description: string | null;
+  failureReason: string | null;
+  paidAt: string | null;
+  createdAt: string | null;
+};
 
 const SECTIONS: { k: SectionKey; title: string }[] = [
   { k: "business", title: "Business Details" },
@@ -84,12 +115,6 @@ const MODES: { k: DesktopVertical; label: string; sub: string; path: string; ico
   },
 ];
 
-const FREQUENCIES: { v: string; label: string }[] = [
-  { v: "weekly", label: "weekly" },
-  { v: "bi_weekly", label: "fortnightly" },
-  { v: "monthly", label: "monthly" },
-];
-
 function initialsOf(name: string): string {
   const parts = String(name ?? "")
     .trim()
@@ -108,6 +133,20 @@ const fmtDate = (v: unknown) => {
     : d.toLocaleDateString("en-NZ", { day: "numeric", month: "short", year: "numeric" });
 };
 
+const fmtMoney = (value: string | number) =>
+  new Intl.NumberFormat("en-NZ", { style: "currency", currency: "NZD" })
+    .format(Number(value) || 0);
+
+const BILLING_TYPE_LABELS: Record<string, string> = {
+  monthly_subscription: "Monthly subscription",
+  plan_change: "Plan change",
+  transaction_fees: "Legacy transaction fees",
+  tier_upgrade: "Legacy tier upgrade",
+};
+
+const billingTypeLabel = (value: string) =>
+  BILLING_TYPE_LABELS[value] ?? value.replace(/_/g, " ");
+
 export interface DesktopSettingsPageProps extends DesktopRoutePageProps {
   vertical: DesktopVertical;
 }
@@ -118,17 +157,18 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const push = usePushNotifications();
+  const { confirmingCard } = useBillingCardReturn();
 
   const [openSec, setOpenSec] = useState<SectionKey | null>("business");
   const [details, setDetails] = useState({ businessName: "", gstNumber: "", email: "" });
   const [detailsDirty, setDetailsDirty] = useState(false);
   const [dailyGoal, setDailyGoal] = useState("");
   const [historyStart, setHistoryStart] = useState<HistoryStart>("peek");
-  const [cardNumber, setCardNumber] = useState("");
-  const [cardExpiry, setCardExpiry] = useState("");
-  const [cardCvc, setCardCvc] = useState("");
-  const [showCardForm, setShowCardForm] = useState(false);
+  // The card itself is captured on Windcave's hosted page, so no PAN state here.
   const [cardBusy, setCardBusy] = useState<"save" | "remove" | null>(null);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [cancellationReason, setCancellationReason] = useState("");
+  const [showCancel, setShowCancel] = useState(false);
   const [pw, setPw] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
 
   const authFetch = async (path: string) => {
@@ -154,13 +194,25 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
     enabled: !!merchantId,
   });
 
-  const cardQuery = useQuery<{ ready: boolean; card: { last4: string; brand: string; expiry: string } | null }>({
-    queryKey: ["/api/billing/card"],
+  const authQuery = useQuery<{ user: { id: number; email: string; role: string } }>({
+    queryKey: ["/api/auth/me"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/auth/me");
+      if (!res.ok) throw new Error("Failed to load account access");
+      return res.json();
+    },
     enabled: !!merchantId,
+  });
+  const isOwner = authQuery.data?.user?.role === "owner" || authQuery.data?.user?.role === "admin";
+
+  const cardQuery = useQuery<{ ready: boolean; card: { last4: string; brand: string | null; expiry: string | null } | null }>({
+    queryKey: ["/api/billing/card"],
+    enabled: !!merchantId && isOwner,
   });
 
   const merchant = merchantQuery.data;
   const subscription = subscriptionQuery.data?.subscription;
+  const plan = planForOrDefault(subscription?.planId);
 
   /* Seed the editable fields once the merchant lands. */
   useEffect(() => {
@@ -220,17 +272,148 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
     onError: () => toast({ title: "Failed to save daily goal", variant: "destructive" }),
   });
 
-  const saveFrequency = useMutation({
-    mutationFn: async (frequency: string) => {
-      const res = await apiRequest("PUT", "/api/subscription/billing-frequency", { frequency });
-      if (!res.ok) throw new Error("frequency");
-      return res.json();
+  const teamQuery = useQuery<{ members: TeamMember[]; seatLimit: number; seatsInUse: number }>({
+    queryKey: ["/api/team"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/team");
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.message || "Failed to load team logins");
+      return body;
+    },
+    enabled: !!merchantId && isOwner && plan.id !== "solo",
+  });
+
+  const billingHistoryQuery = useQuery<{ history: BillingHistoryEntry[] }>({
+    queryKey: ["/api/subscription/billing-history"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/subscription/billing-history?limit=12");
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.message || "Failed to load billing history");
+      return body;
+    },
+    enabled: !!merchantId && isOwner,
+  });
+
+  const refreshBilling = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/subscription/billing-history"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/team"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/billing/card"] });
+  };
+
+  const changePlan = useMutation({
+    mutationFn: async (planId: PlanId) => {
+      const res = await apiRequest("PUT", "/api/subscription/plan", { planId });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((body as { message?: string }).message || "Failed to change plan");
+      return body;
+    },
+    onSuccess: (data: any) => {
+      refreshBilling();
+      toast({ title: data?.message || "Plan updated" });
+    },
+    onError: (error: unknown) => toast({ title: apiErrorMessage(error, "Failed to change plan"), variant: "destructive" }),
+  });
+
+  const inviteMember = useMutation({
+    mutationFn: async (email: string) => {
+      const res = await apiRequest("POST", "/api/team/invite", { email });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((body as { message?: string }).message || "Failed to send invite");
+      return body;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
-      toast({ title: "Billing frequency updated successfully" });
+      refreshBilling();
+      setInviteEmail("");
+      toast({ title: "Invite sent" });
     },
-    onError: () => toast({ title: "Failed to update billing frequency", variant: "destructive" }),
+    onError: (error: unknown) => toast({ title: apiErrorMessage(error, "Failed to send invite"), variant: "destructive" }),
+  });
+
+  const removeMember = useMutation({
+    mutationFn: async (userId: number) => {
+      const res = await apiRequest("DELETE", `/api/team/${userId}`, undefined);
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((body as { message?: string }).message || "Failed to remove login");
+      return body;
+    },
+    onSuccess: () => {
+      refreshBilling();
+      toast({ title: "Login removed" });
+    },
+    onError: (error: unknown) => toast({ title: apiErrorMessage(error, "Failed to remove login"), variant: "destructive" }),
+  });
+
+  const memberStatus = useMutation({
+    mutationFn: async ({ userId, status }: { userId: number; status: "active" | "disabled" }) => {
+      const res = await apiRequest("PUT", `/api/team/${userId}/status`, { status });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.message || "Failed to update login");
+      return body;
+    },
+    onSuccess: (_data, variables) => {
+      refreshBilling();
+      toast({ title: variables.status === "active" ? "Login enabled" : "Login disabled" });
+    },
+    onError: (error: unknown) => toast({ title: apiErrorMessage(error, "Failed to update login"), variant: "destructive" }),
+  });
+
+  const resendInvite = useMutation({
+    mutationFn: async (userId: number) => {
+      const res = await apiRequest("POST", `/api/team/${userId}/resend`, {});
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.message || "Failed to resend invite");
+      return body;
+    },
+    onSuccess: () => {
+      refreshBilling();
+      toast({ title: "Invite resent" });
+    },
+    onError: (error: unknown) => toast({ title: apiErrorMessage(error, "Failed to resend invite"), variant: "destructive" }),
+  });
+
+  const revokeInvite = useMutation({
+    mutationFn: async (userId: number) => {
+      const res = await apiRequest("DELETE", `/api/team/${userId}/invite`, undefined);
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.message || "Failed to revoke invite");
+      return body;
+    },
+    onSuccess: () => {
+      refreshBilling();
+      toast({ title: "Invite revoked" });
+    },
+    onError: (error: unknown) => toast({ title: apiErrorMessage(error, "Failed to revoke invite"), variant: "destructive" }),
+  });
+
+  const cancelSubscription = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/subscription/cancel", { reason: cancellationReason.trim() });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.message || "Failed to cancel subscription");
+      return body;
+    },
+    onSuccess: (data: any) => {
+      refreshBilling();
+      setCancellationReason("");
+      setShowCancel(false);
+      toast({ title: data?.message || "Your subscription will not renew." });
+    },
+    onError: (error: unknown) => toast({ title: apiErrorMessage(error, "Failed to cancel subscription"), variant: "destructive" }),
+  });
+
+  const resumeSubscription = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/subscription/resume", {});
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.message || "Failed to resume subscription");
+      return body;
+    },
+    onSuccess: (data: any) => {
+      refreshBilling();
+      toast({ title: data?.message || "Your subscription will renew as normal." });
+    },
+    onError: (error: unknown) => toast({ title: apiErrorMessage(error, "Failed to resume subscription"), variant: "destructive" }),
   });
 
   const changePassword = useMutation({
@@ -246,55 +429,23 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
       setPw({ currentPassword: "", newPassword: "", confirmPassword: "" });
       toast({ title: "Password changed" });
     },
-    onError: (e: any) => toast({ title: e?.message || "Failed to change password", variant: "destructive" }),
+    onError: (error: unknown) => toast({ title: apiErrorMessage(error, "Failed to change password"), variant: "destructive" }),
   });
 
-  /* Card add/remove — same validation and endpoints as the mobile page. */
-  const formatCardNumber = (v: string) =>
-    v.replace(/\D/g, "").slice(0, 19).replace(/(.{4})/g, "$1 ").trim();
-  const formatExpiry = (v: string) => {
-    const digits = v.replace(/\D/g, "").slice(0, 4);
-    return digits.length >= 3 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits;
-  };
-
-  const saveCard = async () => {
-    const raw = cardNumber.replace(/\s/g, "");
-    if (raw.length < 13 || raw.length > 19) {
-      toast({ title: "Please enter a valid card number", variant: "destructive" });
-      return;
-    }
-    if (!/^\d{2}\/\d{2}$/.test(cardExpiry)) {
-      toast({ title: "Please enter expiry in MM/YY format", variant: "destructive" });
-      return;
-    }
-    if (cardCvc.length < 3) {
-      toast({ title: "Please enter a valid CVC", variant: "destructive" });
-      return;
-    }
+  /* Card setup — same hosted Windcave flow as the mobile page. The card number
+     never reaches this component; we hand off and come back with a token. */
+  const startCardSetup = async () => {
     setCardBusy("save");
     try {
-      const token = localStorage.getItem("authToken");
-      const res = await fetch("/api/billing/card", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ cardNumber: raw, expiry: cardExpiry, cvc: cardCvc }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error((body as { message?: string }).message || "Failed to save card");
+      const res = await apiRequest("POST", "/api/billing/card/session", {});
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || !body?.redirectUrl) {
+        throw new Error((body as { message?: string }).message || "Could not start card setup");
       }
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["/api/billing/card"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] }),
-      ]);
-      setShowCardForm(false);
-      setCardNumber("");
-      setCardExpiry("");
-      setCardCvc("");
-      toast({ title: "Card saved successfully" });
-    } catch (e: any) {
-      toast({ title: e?.message || "Failed to save card", variant: "destructive" });
-    } finally {
+      sessionStorage.setItem(BILLING_CARD_SESSION_KEY, body.sessionId);
+      window.location.href = body.redirectUrl;
+    } catch (error: unknown) {
+      toast({ title: apiErrorMessage(error, "Could not start card setup"), variant: "destructive" });
       setCardBusy(null);
     }
   };
@@ -307,18 +458,37 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error("remove");
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.message || "Failed to remove card");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["/api/billing/card"] }),
         queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] }),
       ]);
       toast({ title: "Card removed" });
-    } catch {
-      toast({ title: "Failed to remove card", variant: "destructive" });
+    } catch (error: unknown) {
+      toast({
+        title: error instanceof Error ? error.message : "Failed to remove card",
+        variant: "destructive",
+      });
     } finally {
       setCardBusy(null);
     }
   };
+
+  /* ── derived ── */
+  const seatLimit = subscription?.seatLimit ?? plan.seats;
+  const seatsInUse = teamQuery.data?.seatsInUse ?? subscription?.seatsInUse ?? 0;
+  const cancellationState = subscriptionCancellationState(subscription);
+  const isCancelling = cancellationState === "scheduled";
+  const isCancelled = cancellationState === "cancelled";
+  const hasPaidCurrentPeriod = hasPaidCurrentSubscriptionPeriod(subscription);
+  const cardBillingDisclosure = cardSetupBillingDisclosure(
+    subscription,
+    formatPlanPrice(subscription?.priceCents ?? plan.priceCents),
+  );
+  const planBillingDisclosure = planChangeBillingDisclosure(subscription);
+  const isPastDue = subscription?.status === "past_due";
+  const isSuspended = subscription?.status === "suspended";
 
   /* ── actions ── */
   const businessName = merchant?.businessName || "Your Business";
@@ -459,11 +629,17 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
 
                 {open && sec.k === "business" && (
                   <div className="ds-sec-body">
+                    {!isOwner && (
+                      <div className="ds-warn ds-info">
+                        Business details are managed by the account owner.
+                      </div>
+                    )}
                     <div className="ds-grid">
                       <label className="ds-field">
                         <span className="ds-field-label">TRADING NAME</span>
                         <input
                           value={details.businessName}
+                          disabled={!isOwner}
                           onChange={(e) => {
                             setDetails((d) => ({ ...d, businessName: e.target.value }));
                             setDetailsDirty(true);
@@ -475,6 +651,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
                         <span className="ds-field-label">GST NUMBER</span>
                         <input
                           value={details.gstNumber}
+                          disabled={!isOwner}
                           onChange={(e) => {
                             setDetails((d) => ({ ...d, gstNumber: e.target.value }));
                             setDetailsDirty(true);
@@ -487,6 +664,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
                         <span className="ds-field-label">RECEIPT EMAIL</span>
                         <input
                           value={details.email}
+                          disabled={!isOwner}
                           onChange={(e) => {
                             setDetails((d) => ({ ...d, email: e.target.value }));
                             setDetailsDirty(true);
@@ -495,7 +673,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
                         />
                       </label>
                     </div>
-                    <div className="ds-actions">
+                    {isOwner && <div className="ds-actions">
                       <button
                         type="button"
                         className="ds-primary"
@@ -504,7 +682,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
                       >
                         {saveDetails.isPending ? "Saving…" : "Save changes"}
                       </button>
-                    </div>
+                    </div>}
                   </div>
                 )}
 
@@ -516,18 +694,19 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
                         <input
                           className="ds-inline-input"
                           value={dailyGoal}
+                          disabled={!isOwner}
                           onChange={(e) => setDailyGoal(e.target.value)}
                           inputMode="decimal"
                           aria-label="daily revenue goal"
                         />
-                        <button
+                        {isOwner && <button
                           type="button"
                           className="ds-primary ds-primary-sm"
                           disabled={saveGoal.isPending}
                           onClick={() => saveGoal.mutate(dailyGoal)}
                         >
                           {saveGoal.isPending ? "Saving…" : "Save"}
-                        </button>
+                        </button>}
                       </span>
                     </div>
                     <div className="ds-row">
@@ -552,91 +731,223 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
                     <div className="ds-row">
                       <span className="ds-row-label">Plan</span>
                       <span className="ds-row-value">
-                        {subscription ? `${subscription.tier === "paid" ? "Paid" : "Free"} · ${subscription.status}` : "—"}
+                        {plan.name} · {formatPlanPrice(subscription?.priceCents ?? plan.priceCents)}/mo · {seatsInUse} of {seatLimit} {seatLimit === 1 ? "login" : "logins"}
                       </span>
                     </div>
-                    <div className="ds-row">
-                      <span className="ds-row-label">Unbilled</span>
-                      <span className="ds-row-value">
-                        {subscription
-                          ? `${subscription.unbilledTransactionCount ?? 0} payments · $${subscription.unbilledAmount ?? "0.00"}`
-                          : "—"}
-                      </span>
-                    </div>
-                    <div className="ds-row">
-                      <span className="ds-row-label">Billing frequency</span>
-                      <span className="ds-row-controls">
-                        {FREQUENCIES.map((f) => (
-                          <button
-                            key={f.v}
-                            type="button"
-                            className="ds-chip"
-                            style={chip((subscription?.billingFrequency ?? "monthly") === f.v)}
-                            disabled={saveFrequency.isPending}
-                            onClick={() => saveFrequency.mutate(f.v)}
-                          >
-                            {f.label}
-                          </button>
-                        ))}
-                      </span>
-                    </div>
-                    <div className="ds-row">
-                      <span className="ds-row-label">Next invoice</span>
-                      <span className="ds-row-value">{fmtDate(subscription?.nextBillingDate)}</span>
-                    </div>
-
-                    <div className="ds-row ds-row-last ds-row-tall">
-                      <span className="ds-row-label">Payment method</span>
-                      {cardQuery.data?.card && !showCardForm ? (
-                        <span className="ds-row-controls">
-                          <span className="ds-row-value">
-                            {cardQuery.data.card.brand} ···· {cardQuery.data.card.last4} · expires {cardQuery.data.card.expiry}
-                          </span>
-                          <button type="button" className="ds-ghost" onClick={() => setShowCardForm(true)}>Replace</button>
-                          <button type="button" className="ds-ghost ds-ghost-danger" disabled={cardBusy === "remove"} onClick={removeCard}>
-                            {cardBusy === "remove" ? "Removing…" : "Remove"}
-                          </button>
+                    {subscription?.pendingPlanName && (
+                      <div className="ds-row">
+                        <span className="ds-row-label">Scheduled change</span>
+                        <span className="ds-row-value">
+                          {subscription.pendingPlanName} from {fmtDate(subscription.pendingPlanEffectiveAt)}
                         </span>
-                      ) : (
-                        <span className="ds-card-form">
-                          <input
-                            className="ds-inline-input ds-card-number"
-                            value={cardNumber}
-                            onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
-                            placeholder="card number"
-                            inputMode="numeric"
-                            aria-label="card number"
-                          />
-                          <input
-                            className="ds-inline-input ds-card-small"
-                            value={cardExpiry}
-                            onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
-                            placeholder="MM/YY"
-                            inputMode="numeric"
-                            aria-label="card expiry"
-                          />
-                          <input
-                            className="ds-inline-input ds-card-small"
-                            value={cardCvc}
-                            onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                            placeholder="CVC"
-                            inputMode="numeric"
-                            aria-label="card cvc"
-                          />
-                          <button type="button" className="ds-primary ds-primary-sm" disabled={cardBusy === "save"} onClick={saveCard}>
-                            {cardBusy === "save" ? "Saving…" : "Save card"}
-                          </button>
-                          {cardQuery.data?.card && (
-                            <button type="button" className="ds-ghost" onClick={() => setShowCardForm(false)}>Cancel</button>
-                          )}
-                        </span>
-                      )}
-                    </div>
-
-                    {cardQuery.data && !cardQuery.data.ready && (
-                      <div className="ds-warn">
-                        A valid card is required before you can send payments.
                       </div>
+                    )}
+                    <div className="ds-row">
+                      <span className="ds-row-label">
+                        {isCancelled ? "Subscription status" : isCancelling ? "Access until" : "Next invoice"}
+                      </span>
+                      <span className="ds-row-value">
+                        {isCancelled
+                          ? "Ended"
+                          : fmtDate(isCancelling
+                            ? subscription?.cancellationEffectiveDate ?? subscription?.currentPeriodEnd
+                            : subscription?.nextBillingDate)}
+                      </span>
+                    </div>
+
+                    {!isOwner ? (
+                      <div className="ds-warn ds-info">
+                        The account owner manages plans, team logins, payment methods and billing history.
+                      </div>
+                    ) : (
+                      <>
+                        <div className="ds-note ds-note-block" data-testid="plan-change-billing-disclosure">
+                          {planBillingDisclosure}
+                        </div>
+                        <div className="ds-row">
+                          <span className="ds-row-label">Change plan</span>
+                          <span className="ds-row-controls">
+                            {PLAN_LIST.map((p) => (
+                              <button
+                                key={p.id}
+                                type="button"
+                                className="ds-chip"
+                                style={chip(p.id === plan.id)}
+                                disabled={p.id === plan.id || changePlan.isPending}
+                                onClick={() => changePlan.mutate(p.id)}
+                              >
+                                {p.name.toLowerCase()} · {formatPlanPrice(p.priceCents)}
+                              </button>
+                            ))}
+                          </span>
+                        </div>
+
+                        {plan.id !== "solo" && (
+                          <div className="ds-row ds-row-tall">
+                            <span className="ds-row-label">Team logins</span>
+                            <span className="ds-card-form ds-team-list">
+                              {(teamQuery.data?.members ?? []).map((member) => (
+                                <span key={member.id} className="ds-row-value ds-team-member">
+                                  <span>{member.name || member.email}</span>
+                                  <em>{member.role === "owner" ? "owner" : member.status}</em>
+                                  {member.role !== "owner" && member.status === "invited" && (
+                                    <>
+                                      <button type="button" className="ds-ghost" disabled={resendInvite.isPending} onClick={() => resendInvite.mutate(member.id)}>resend</button>
+                                      <button type="button" className="ds-ghost ds-ghost-danger" disabled={revokeInvite.isPending} onClick={() => revokeInvite.mutate(member.id)}>revoke</button>
+                                    </>
+                                  )}
+                                  {member.role !== "owner" && member.status !== "invited" && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="ds-ghost"
+                                        disabled={memberStatus.isPending}
+                                        onClick={() => memberStatus.mutate({
+                                          userId: member.id,
+                                          status: member.status === "disabled" ? "active" : "disabled",
+                                        })}
+                                      >
+                                        {member.status === "disabled" ? "enable" : "disable"}
+                                      </button>
+                                      <button type="button" className="ds-ghost ds-ghost-danger" disabled={removeMember.isPending} onClick={() => removeMember.mutate(member.id)}>remove</button>
+                                    </>
+                                  )}
+                                </span>
+                              ))}
+                              {teamQuery.isLoading && <span className="ds-row-value">Loading team logins…</span>}
+                              {teamQuery.isError && (
+                                <span className="ds-warn">
+                                  {apiErrorMessage(teamQuery.error, "Failed to load team logins")}
+                                </span>
+                              )}
+                              {seatsInUse < seatLimit ? (
+                                <span className="ds-row-controls">
+                                  <input
+                                    className="ds-inline-input ds-invite-input"
+                                    type="email"
+                                    value={inviteEmail}
+                                    onChange={(e) => setInviteEmail(e.target.value)}
+                                    placeholder="teammate@business.co.nz"
+                                    aria-label="invite email"
+                                  />
+                                  <button type="button" className="ds-primary ds-primary-sm" disabled={inviteMember.isPending || !inviteEmail.trim()} onClick={() => inviteMember.mutate(inviteEmail.trim())}>
+                                    {inviteMember.isPending ? "Sending…" : "Invite"}
+                                  </button>
+                                </span>
+                              ) : (
+                                <span className="ds-row-value" style={{ opacity: 0.6 }}>all logins in use — upgrade to add more</span>
+                              )}
+                            </span>
+                          </div>
+                        )}
+
+                        <div className="ds-warn ds-info" data-testid="billing-card-charge-disclosure">
+                          {cardBillingDisclosure}
+                        </div>
+
+                        <div className="ds-row ds-row-tall">
+                          <span className="ds-row-label">Payment method</span>
+                          {cardQuery.data?.card ? (
+                            <span className="ds-row-controls">
+                              <span className="ds-row-value">
+                                {cardQuery.data.card.brand || "Card"} ···· {cardQuery.data.card.last4}
+                                {cardQuery.data.card.expiry ? ` · expires ${cardQuery.data.card.expiry}` : ""}
+                              </span>
+                              <button type="button" className="ds-ghost" disabled={cardBusy === "save" || confirmingCard} onClick={startCardSetup}>
+                                {confirmingCard ? "confirming…" : cardBusy === "save" ? "opening…" : isCancelled ? "restart" : "replace"}
+                              </button>
+                              <button type="button" className="ds-ghost ds-ghost-danger" disabled={cardBusy === "remove"} onClick={removeCard}>
+                                {cardBusy === "remove" ? "removing…" : "remove"}
+                              </button>
+                            </span>
+                          ) : (
+                            <span className="ds-row-controls">
+                              <button type="button" className="ds-primary ds-primary-sm" disabled={cardBusy === "save" || confirmingCard} onClick={startCardSetup}>
+                                {confirmingCard ? "Confirming payment method…" : cardBusy === "save" ? "Opening secure page…" : "Add payment method"}
+                              </button>
+                              <span className="ds-row-value" style={{ opacity: 0.6 }}>entered on Windcave's secure page</span>
+                            </span>
+                          )}
+                        </div>
+
+                        {isSuspended ? (
+                          <div className="ds-warn">Your subscription is suspended and payment requests are blocked. Add a working card to reactivate.</div>
+                        ) : isPastDue ? (
+                          <div className="ds-warn">Your last subscription payment failed. Update your card — we'll retry automatically.</div>
+                        ) : cardQuery.data && !cardQuery.data.ready ? (
+                          <div className="ds-warn">A payment method is required before you can send payments.</div>
+                        ) : null}
+
+                        <div className="ds-row ds-row-tall">
+                          <span className="ds-row-label">Billing history</span>
+                          <span className="ds-history">
+                            {billingHistoryQuery.isLoading ? (
+                              <span className="ds-row-value">Loading billing history…</span>
+                            ) : billingHistoryQuery.isError ? (
+                              <span className="ds-warn">
+                                {apiErrorMessage(billingHistoryQuery.error, "Failed to load billing history")}
+                              </span>
+                            ) : (billingHistoryQuery.data?.history ?? []).length === 0 ? (
+                              <span className="ds-row-value">No subscription invoices yet.</span>
+                            ) : (billingHistoryQuery.data?.history ?? []).map((entry) => (
+                              <span key={entry.id} className="ds-history-row">
+                                <span>
+                                  <strong>{entry.description || billingTypeLabel(entry.billingType)}</strong>
+                                  <small>{fmtDate(entry.paidAt || entry.createdAt)} · {entry.status}</small>
+                                  {entry.failureReason && <small style={{ color: "#8E1F26" }}>{entry.failureReason}</small>}
+                                </span>
+                                <strong>{fmtMoney(entry.amount)}</strong>
+                              </span>
+                            ))}
+                          </span>
+                        </div>
+
+                        <div className="ds-row ds-row-last ds-row-tall">
+                          <span className="ds-row-label">Subscription</span>
+                          {isCancelled ? (
+                            <span className="ds-row-controls">
+                              <span className="ds-row-value">Subscription ended</span>
+                              <button
+                                type="button"
+                                className="ds-primary ds-primary-sm"
+                                disabled={cardBusy === "save" || confirmingCard}
+                                onClick={startCardSetup}
+                                data-testid="button-restart-subscription"
+                              >
+                                {confirmingCard ? "Confirming…" : cardBusy === "save" ? "Opening…" : "Restart subscription"}
+                              </button>
+                            </span>
+                          ) : isCancelling ? (
+                            <span className="ds-row-controls">
+                              <span className="ds-row-value">Ends {fmtDate(subscription?.cancellationEffectiveDate ?? subscription?.currentPeriodEnd)}</span>
+                              <button type="button" className="ds-primary ds-primary-sm" disabled={resumeSubscription.isPending} onClick={() => resumeSubscription.mutate()}>
+                                {resumeSubscription.isPending ? "Resuming…" : "Keep subscription"}
+                              </button>
+                            </span>
+                          ) : showCancel ? (
+                            <span className="ds-row-controls">
+                              <span className="ds-row-value">
+                                {hasPaidCurrentPeriod ? `Access until ${fmtDate(subscription?.currentPeriodEnd)}` : "Ends immediately"}
+                              </span>
+                              <input
+                                className="ds-inline-input ds-cancel-input"
+                                value={cancellationReason}
+                                onChange={(e) => setCancellationReason(e.target.value)}
+                                placeholder="Why are you cancelling?"
+                                aria-label="cancellation reason"
+                              />
+                              <button type="button" className="ds-ghost" onClick={() => { setShowCancel(false); setCancellationReason(""); }}>keep</button>
+                              <button type="button" className="ds-ghost ds-ghost-danger" disabled={cancelSubscription.isPending || !cancellationReason.trim()} onClick={() => cancelSubscription.mutate()}>
+                                {cancelSubscription.isPending ? "Cancelling…" : "Confirm cancel"}
+                              </button>
+                            </span>
+                          ) : (
+                            <button type="button" className="ds-ghost ds-ghost-danger" onClick={() => setShowCancel(true)}>
+                              {hasPaidCurrentPeriod ? "Cancel at period end" : "Cancel subscription"}
+                            </button>
+                          )}
+                        </div>
+                      </>
                     )}
                   </div>
                 )}
@@ -645,7 +956,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
                   <div className="ds-sec-body">
                     <div className="ds-row">
                       <span className="ds-row-label">Email</span>
-                      <span className="ds-row-value">{merchant?.email || "—"}</span>
+                      <span className="ds-row-value">{authQuery.data?.user?.email || merchant?.email || "—"}</span>
                     </div>
                     <div className="ds-row">
                       <span className="ds-row-label">Phone</span>
@@ -809,6 +1120,7 @@ const DS_CSS = `
 .ds-note { font-weight:500; font-size:11.5px; color:rgba(4,16,58,0.6); }
 .ds-note-block { padding:6px 0 4px; font-size:13px; }
 .ds-warn { margin-top:12px; padding:10px 14px; border-radius:10px; background:rgba(142,31,38,0.12); font-weight:600; font-size:12.5px; color:#8E1F26; }
+.ds-info { background:rgba(4,16,58,0.1); color:${OPEN_INK}; }
 
 .ds-row { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:13px 0; border-bottom:1px solid rgba(4,16,58,0.14); }
 .ds-row-last { border-bottom:none; }
@@ -822,6 +1134,16 @@ const DS_CSS = `
 .ds-inline-input:focus { border-color:${OPEN_INK}; }
 .ds-inline-input::placeholder { color:rgba(4,16,58,0.45); }
 .ds-card-form { display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+.ds-team-list { flex-direction:column; align-items:flex-end; }
+.ds-team-member { display:flex; align-items:center; justify-content:flex-end; gap:7px; flex-wrap:wrap; }
+.ds-team-member em { opacity:.6; font-style:normal; }
+.ds-invite-input { width:210px; }
+.ds-cancel-input { width:230px; }
+.ds-history { width:min(100%,390px); display:flex; flex-direction:column; gap:7px; }
+.ds-history-row { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; padding:8px 10px; border-radius:9px; background:rgba(255,255,255,.26); color:${OPEN_INK}; text-align:left; }
+.ds-history-row > span { min-width:0; display:flex; flex-direction:column; }
+.ds-history-row strong { font-size:12px; }
+.ds-history-row small { margin-top:2px; font-size:10.5px; color:rgba(4,16,58,.62); }
 .ds-card-number { width:190px; }
 .ds-card-small { width:88px; }
 .ds-chip { height:32px; padding:0 14px; border-radius:9999px; font-size:12px; cursor:pointer; transition:background .15s ease, color .15s ease; }
