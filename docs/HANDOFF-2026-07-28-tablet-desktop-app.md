@@ -289,6 +289,32 @@ The historical list, for context on *why* each deviation existed:
   period-windowed one; the period segments only reframe revenue and the chart.
 - 3d peak dot inherits 4d's floating-dot geometry (above).
 
+### Transitions/cascade deviations — RULED 2026-08-08
+
+Raised as a single list once the page-transition integration finished (`666b898`
++ `a7d15a3`). Oliver ruled **keep all four as shipped**. Do not re-raise these,
+and do not "fix" them — each is load-bearing.
+
+| Kept as shipped | Because |
+|---|---|
+| Drag sheets (`.ra-sheet`/`.pa-sheet`/`.ta-sheet`) are excluded from the cascade; their contents pop in, the sheet shell does not | The sheets carry a live inline `transform: translateY(...)` for dragging, and a `both`-filled keyframe pins them at `translateY(0)`, breaking the drag |
+| `.pa-dot` chart peak marker does not pop in | It is centred by `transform: translate(-50%,-50%)`, which a cascade transform displaces. Independent of the already-ruled dot *position* fix (`4ade651`) |
+| Rails animate on `.rt-rail`/`.pt-rail`/`.tt-rail` themselves, never their slots — so rails do not stagger internally | A transform on a slot makes that slot the containing block for the `position:absolute` rail, moving the rail |
+| The property/trades analytics overview replays its cascade when a generated report is closed | The overview sits inside `{!report && …}`. Gating it is cheap if it ever grates |
+
+**Still open from that same list, NOT ruled:** cascade coverage has never been
+audited screen-by-screen (neither acceptance probe tests it); the six empty CSS
+declarations at `trades-terminal.tsx:1224-1229`; the four `403` console errors in
+both probe runs; and the visual side-by-side vs
+`docs/design/desktop-app/Taptpay Desktop.dc.html`.
+
+`scripts/desktop-shots/probe-transitions.mjs` **exits 1 on a healthy tree** — its
+detector logs a "loader flash" for any added `.animate-spin` node, catching
+`/board-builder`'s own content spinners. Desktop routes cannot render the
+full-screen loader at all (`PageLoader` is wired only to the mobile/public
+`Suspense`), and the same hop reports `chrome: kept` / `blank 0.0ms`. Narrowing
+that matcher is what would make the probe a usable gate.
+
 ---
 
 ## 7. Next actions, in order
