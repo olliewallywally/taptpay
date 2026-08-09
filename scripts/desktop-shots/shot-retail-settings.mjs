@@ -39,14 +39,14 @@ const SUBSCRIPTION = {
 
 async function installMocks(page, { withCard = true } = {}) {
   await page.addInitScript(({ merchantId }) => {
-    const payload = window.btoa(JSON.stringify({ userId: 1, email: "shot@example.invalid", merchantId, role: "merchant" }));
+    const payload = window.btoa(JSON.stringify({ userId: 1, email: "shot@example.invalid", merchantId, role: "owner" }));
     localStorage.setItem("authToken", `shot.${payload}.dummy`);
     localStorage.setItem("merchantId", String(merchantId));
     localStorage.setItem("taptMode", "retail");
   }, { merchantId: MERCHANT_ID });
 
   await page.route("**/api/auth/me", (r) =>
-    json(r, { user: { id: 1, email: "shot@example.invalid", merchantId: MERCHANT_ID, role: "merchant", onboardingCompleted: true } }));
+    json(r, { user: { id: 1, email: "shot@example.invalid", merchantId: MERCHANT_ID, role: "owner", onboardingCompleted: true } }));
   await page.route("**/api/tutorial/state", (r) => json(r, { generation: 1, autoEnabled: false, pageCount: 20, progress: {} }));
   await page.route("**/api/tutorial/**", (r) => json(r, {}));
   await page.route("**/api/subscription", (r) => json(r, SUBSCRIPTION));
@@ -54,6 +54,11 @@ async function installMocks(page, { withCard = true } = {}) {
     json(r, withCard ? { ready: true, card: { brand: "visa", last4: "4021", expiry: "08/29" } } : { ready: false, card: null }));
   await page.route("**/api/push/capabilities", (r) => json(r, { webPush: { available: true }, nativePush: { available: false } }));
   await page.route("**/api/push/status", (r) => json(r, { subscribed: false }));
+  /* Owner-only queries. They are gated behind `isOwner`, so before the fixtures
+     were corrected to a real `owner` role they never fired and never needed
+     mocking; with the role fixed they run and 403 against the dev server. */
+  await page.route("**/api/subscription/billing-history**", (r) => json(r, { history: [] }));
+  await page.route("**/api/team", (r) => json(r, { members: [], seatLimit: 1, seatsInUse: 1 }));
   await page.route("**/api/push/preferences", (r) => json(r, {
     preferences: { paymentReceived: true, dailyPayoutSummary: true, failedPaymentAlerts: false },
   }));
@@ -88,11 +93,16 @@ async function shoot(browser, label, ctxOpts, opts = {}) {
 
   await page.getByRole("button", { name: "Subscription & Billing" }).click();
   await shot("3-billing");
-  /* With a card on file the row shows it; without one it is already the form. */
-  if (await page.getByRole("button", { name: "Replace" }).count()) {
-    await page.getByRole("button", { name: "Replace" }).click();
-  }
-  await shot("4-card-form");
+  /* There is no inline card form to open any more: both "replace" and "Add
+     payment method" call `startCardSetup`, which POSTs /api/billing/card/session
+     and redirects to the hosted page (DesktopSettingsPage.tsx:856,865). Clicking
+     it here only 403'd and would navigate the shot off the app, and the shot it
+     produced was identical to 3-billing. The card-less state is still covered —
+     the tablet leg runs with `withCard: false`.
+
+     This branch never ran before: it is owner-only UI, and the fixtures used to
+     authenticate as the invalid role "merchant", so `isOwner` was false and the
+     button did not exist to be found. */
 
   await page.getByRole("button", { name: "Account" }).click();
   await shot("5-account");

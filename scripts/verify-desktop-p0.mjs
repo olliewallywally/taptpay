@@ -110,7 +110,7 @@ async function installMocks(page, { tutorialGate = null, tutorialEnabled = false
         userId: 1,
         email: "p0-browser@example.invalid",
         merchantId,
-        role: "merchant",
+        role: "owner",
       }),
     );
     localStorage.setItem("authToken", `p0.${payload}.dummy`);
@@ -124,7 +124,7 @@ async function installMocks(page, { tutorialGate = null, tutorialEnabled = false
         id: 1,
         email: "p0-browser@example.invalid",
         merchantId: MERCHANT_ID,
-        role: "merchant",
+        role: "owner",
         onboardingCompleted: true,
         gstRegistered: false,
         tradeGstMode: "inclusive",

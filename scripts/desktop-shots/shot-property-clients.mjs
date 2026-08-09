@@ -52,14 +52,14 @@ const json = (route, body, status = 200) =>
 
 async function installMocks(page) {
   await page.addInitScript(({ merchantId }) => {
-    const payload = window.btoa(JSON.stringify({ userId: 1, email: "shot@example.invalid", merchantId, role: "merchant" }));
+    const payload = window.btoa(JSON.stringify({ userId: 1, email: "shot@example.invalid", merchantId, role: "owner" }));
     localStorage.setItem("authToken", `shot.${payload}.dummy`);
     localStorage.setItem("merchantId", String(merchantId));
     localStorage.setItem("taptMode", "property");
   }, { merchantId: MERCHANT_ID });
 
   await page.route("**/api/auth/me", (r) =>
-    json(r, { user: { id: 1, email: "shot@example.invalid", merchantId: MERCHANT_ID, role: "merchant", onboardingCompleted: true } }));
+    json(r, { user: { id: 1, email: "shot@example.invalid", merchantId: MERCHANT_ID, role: "owner", onboardingCompleted: true } }));
   await page.route("**/api/tutorial/state", (r) => json(r, { generation: 1, autoEnabled: false, pageCount: 20, progress: {} }));
   await page.route("**/api/tutorial/**", (r) => json(r, {}));
   await page.route("**/api/property/tenants", (r) => json(r, TENANTS));

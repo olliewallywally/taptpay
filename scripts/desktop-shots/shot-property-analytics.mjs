@@ -312,7 +312,7 @@ async function installMocks(page) {
           userId: 1,
           email: "shot@example.invalid",
           merchantId,
-          role: "merchant",
+          role: "owner",
         }),
       );
       localStorage.setItem("authToken", `shot.${payload}.dummy`);
@@ -328,7 +328,7 @@ async function installMocks(page) {
         id: 1,
         email: "shot@example.invalid",
         merchantId: MERCHANT_ID,
-        role: "merchant",
+        role: "owner",
         onboardingCompleted: true,
       },
     }),

@@ -35,6 +35,13 @@ async function shoot(browser, label, contextOptions) {
     json(route, { webPush: { available: true }, nativePush: { available: false } }),
   );
   await page.route("**/api/push/status", (route) => json(route, { subscribed: false }));
+  /* Owner-only queries. They are gated behind `isOwner`, so before the fixtures
+     were corrected to a real `owner` role they never fired and never needed
+     mocking; with the role fixed they run and 403 against the dev server. */
+  await page.route("**/api/subscription/billing-history**", (route) => json(route, { history: [] }));
+  await page.route("**/api/team", (route) =>
+    json(route, { members: [], seatLimit: 1, seatsInUse: 1 }),
+  );
   await page.route("**/api/push/preferences", (route) => json(route, {
     preferences: { paymentReceived: true, dailyPayoutSummary: true, failedPaymentAlerts: false },
   }));
@@ -54,7 +61,14 @@ async function shoot(browser, label, contextOptions) {
     if ((await tradesTile.getAttribute("aria-pressed")) !== "true") {
       throw new Error("Expected the trades tile to be the active vertical");
     }
-    await assertVisible(page.getByText("Business Details"), "business details section");
+    /* The section heading, addressed as the control it is. `getByText` matched
+       case-insensitively on a *substring*, so it also hit the non-owner notice
+       "Business details are managed by the account owner." and tripped strict
+       mode — which is how the invalid `role: "merchant"` fixture was found. */
+    await assertVisible(
+      page.getByRole("button", { name: "Business Details", exact: true }),
+      "business details section",
+    );
     await screenshot("1-settings-trades");
 
     await page.getByRole("button", { name: "Subscription & Billing" }).click();

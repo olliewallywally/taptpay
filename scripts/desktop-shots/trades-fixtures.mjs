@@ -343,7 +343,7 @@ export async function installTradesMocks(page) {
           userId: 1,
           email: "shot@example.invalid",
           merchantId,
-          role: "merchant",
+          role: "owner",
         }),
       );
       localStorage.setItem("authToken", `shot.${payload}.dummy`);
@@ -359,7 +359,7 @@ export async function installTradesMocks(page) {
         id: 1,
         email: "shot@example.invalid",
         merchantId: MERCHANT_ID,
-        role: "merchant",
+        role: "owner",
         onboardingCompleted: true,
       },
     }),
