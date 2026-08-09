@@ -662,10 +662,18 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   app.get("/api/auth/validate-reset-token/:token", async (req, res) => {
-    const { token } = req.params;
-    const isValid = await validateResetToken(token);
-    
-    res.json({ valid: isValid });
+    try {
+      const { token } = req.params;
+      const isValid = await validateResetToken(token);
+
+      res.json({ valid: isValid });
+    } catch (error) {
+      // Answer with a failure rather than `valid: false`: the token may be
+      // perfectly good, and telling the user it expired would send them back to
+      // request another one that fails the same way.
+      console.error("Validate reset token error:", error);
+      res.status(500).json({ message: "Failed to validate the reset link" });
+    }
   });
 
   // Admin Authentication routes
@@ -767,34 +775,45 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   });
 
   // Regular user authentication check
+  // Every client gates its first paint on this route: the app shows a
+  // full-screen loader until it answers. Express 4 does not route an async
+  // rejection to the error handler, so an unhandled throw here leaves the
+  // request open forever and the whole app — mobile and desktop — spins on the
+  // loader with nothing to show. Always answer, even on failure: a 500 lets the
+  // client fall back to the login screen instead of hanging.
   app.get("/api/auth/me", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    const merchantId = req.user!.merchantId;
-    let onboardingCompleted = true; // default for non-merchant users
-    let merchantStatus: string | null = null;
-    let gstRegistered = false;
-    let tradeGstMode = "inclusive";
-    let billingCardReady = false;
-    if (merchantId) {
-      const merchant = await storage.getMerchant(merchantId);
-      onboardingCompleted = merchant?.onboardingCompleted ?? false;
-      merchantStatus = merchant?.status ?? null;
-      gstRegistered = merchant?.gstRegistered ?? false;
-      tradeGstMode = merchant?.tradeGstMode === "exclusive" ? "exclusive" : "inclusive";
-      billingCardReady = billingCardIsReady(await storage.getOrCreateSubscription(merchantId));
+    try {
+      const merchantId = req.user!.merchantId;
+      let onboardingCompleted = true; // default for non-merchant users
+      let merchantStatus: string | null = null;
+      let gstRegistered = false;
+      let tradeGstMode = "inclusive";
+      let billingCardReady = false;
+      if (merchantId) {
+        const merchant = await storage.getMerchant(merchantId);
+        onboardingCompleted = merchant?.onboardingCompleted ?? false;
+        merchantStatus = merchant?.status ?? null;
+        gstRegistered = merchant?.gstRegistered ?? false;
+        tradeGstMode = merchant?.tradeGstMode === "exclusive" ? "exclusive" : "inclusive";
+        billingCardReady = billingCardIsReady(await storage.getOrCreateSubscription(merchantId));
+      }
+      res.json({
+        user: {
+          id: req.user!.id,
+          email: req.user!.email,
+          merchantId: req.user!.merchantId,
+          role: req.user!.role,
+          onboardingCompleted,
+          merchantStatus,
+          gstRegistered,
+          tradeGstMode,
+          billingCardReady,
+        },
+      });
+    } catch (error) {
+      console.error("Auth me error:", error);
+      res.status(500).json({ message: "Failed to load the signed-in user" });
     }
-    res.json({
-      user: {
-        id: req.user!.id,
-        email: req.user!.email,
-        merchantId: req.user!.merchantId,
-        role: req.user!.role,
-        onboardingCompleted,
-        merchantStatus,
-        gstRegistered,
-        tradeGstMode,
-        billingCardReady,
-      },
-    });
   });
 
   const tutorialProgressSchema = z.object({
@@ -5152,56 +5171,67 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       return res.status(400).json({ message: "SSE credentials must use the Authorization header" });
     }
 
-    let audience: SseAudience;
-    const authorization = req.headers.authorization;
-    if (authorization !== undefined) {
-      let authenticated = false;
-      await authenticateToken(req as AuthenticatedRequest, res, () => {
-        authenticated = true;
+    // An unguarded throw while resolving the audience would leave the request
+    // open, and EventSource treats a socket that never answers as a connection
+    // still being made — the client would sit there rather than retrying.
+    try {
+      let audience: SseAudience;
+      const authorization = req.headers.authorization;
+      if (authorization !== undefined) {
+        let authenticated = false;
+        await authenticateToken(req as AuthenticatedRequest, res, () => {
+          authenticated = true;
+        });
+        if (!authenticated) return;
+
+        const authenticatedRequest = req as AuthenticatedRequest;
+        if (!checkMerchantOwnership(authenticatedRequest, merchantId)) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+
+        const userId = authenticatedRequest.user?.userId ?? authenticatedRequest.user?.id;
+        if (!userId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        audience = {
+          kind: "merchant",
+          userId,
+          principal: authenticatedRequest.user?.role === "admin" ? "admin" : "user",
+        };
+      } else if (req.query.stoneId !== undefined) {
+        if (typeof req.query.stoneId !== "string" || !/^\d+$/.test(req.query.stoneId)) {
+          return res.status(400).json({ message: "Invalid payment board" });
+        }
+        const stoneId = Number(req.query.stoneId);
+        const stone = await storage.getTaptStone(stoneId);
+        if (!stone || !stone.isActive || stone.merchantId !== merchantId) {
+          return res.status(404).json({ message: "Payment board not found" });
+        }
+        audience = { kind: "board", stoneId };
+      } else {
+        audience = { kind: "legacy-no-board" };
+      }
+
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'private, no-cache, no-store',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no',
       });
-      if (!authenticated) return;
+      res.flushHeaders?.();
 
-      const authenticatedRequest = req as AuthenticatedRequest;
-      if (!checkMerchantOwnership(authenticatedRequest, merchantId)) {
-        return res.status(403).json({ message: "Access denied" });
-      }
+      const unsubscribe = sseBroker.subscribe(merchantId, audience, res);
 
-      const userId = authenticatedRequest.user?.userId ?? authenticatedRequest.user?.id;
-      if (!userId) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-      audience = {
-        kind: "merchant",
-        userId,
-        principal: authenticatedRequest.user?.role === "admin" ? "admin" : "user",
-      };
-    } else if (req.query.stoneId !== undefined) {
-      if (typeof req.query.stoneId !== "string" || !/^\d+$/.test(req.query.stoneId)) {
-        return res.status(400).json({ message: "Invalid payment board" });
-      }
-      const stoneId = Number(req.query.stoneId);
-      const stone = await storage.getTaptStone(stoneId);
-      if (!stone || !stone.isActive || stone.merchantId !== merchantId) {
-        return res.status(404).json({ message: "Payment board not found" });
-      }
-      audience = { kind: "board", stoneId };
-    } else {
-      audience = { kind: "legacy-no-board" };
+      req.on('close', () => {
+        unsubscribe();
+      });
+    } catch (error) {
+      console.error("SSE subscribe error:", error);
+      // Once the stream is open a JSON body would corrupt it; close the socket
+      // instead so EventSource sees a drop and reconnects on its own schedule.
+      if (res.headersSent) res.end();
+      else res.status(500).json({ message: "Failed to open the event stream" });
     }
-
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'private, no-cache, no-store',
-      'Connection': 'keep-alive',
-      'X-Accel-Buffering': 'no',
-    });
-    res.flushHeaders?.();
-
-    const unsubscribe = sseBroker.subscribe(merchantId, audience, res);
-
-    req.on('close', () => {
-      unsubscribe();
-    });
   });
 
   // Push capabilities — reports which delivery paths are ready on this server
@@ -5968,15 +5998,23 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     } catch (error) {
       console.error("API transaction creation error:", error);
       const isCredentialCollision = error instanceof PaymentCredentialCollisionError;
-      await storage.logApiRequest({
-        apiKeyId: req.apiKey?.id,
-        merchantId: req.apiKey?.merchantId,
-        endpoint: '/api/v1/transactions',
-        method: 'POST',
-        statusCode: isCredentialCollision ? 503 : 500,
-        responseTime: Date.now() - startTime,
-        errorMessage: isCredentialCollision ? 'Payment credential allocation failed' : 'Internal server error'
-      });
+      // Best-effort: the usual reason we are in here is that the database is
+      // unreachable, which is also the reason this audit write would throw. A
+      // throw inside the catch escapes the handler, and Express 4 leaves the
+      // request open — the API client would hang instead of seeing the 500.
+      try {
+        await storage.logApiRequest({
+          apiKeyId: req.apiKey?.id,
+          merchantId: req.apiKey?.merchantId,
+          endpoint: '/api/v1/transactions',
+          method: 'POST',
+          statusCode: isCredentialCollision ? 503 : 500,
+          responseTime: Date.now() - startTime,
+          errorMessage: isCredentialCollision ? 'Payment credential allocation failed' : 'Internal server error'
+        });
+      } catch (logError) {
+        console.error("API request logging failed:", logError);
+      }
       res.status(isCredentialCollision ? 503 : 500).json({
         error: isCredentialCollision
           ? 'Could not create a payment link. Please try again.'
@@ -6037,15 +6075,20 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
     } catch (error) {
       console.error("API transaction fetch error:", error);
-      await storage.logApiRequest({
-        apiKeyId: req.apiKey?.id,
-        merchantId: req.apiKey?.merchantId,
-        endpoint: `/api/v1/transactions/${req.params.id}`,
-        method: 'GET',
-        statusCode: 500,
-        responseTime: Date.now() - startTime,
-        errorMessage: error instanceof Error ? error.message : 'Unknown error'
-      });
+      // Best-effort — see the note on the POST handler above.
+      try {
+        await storage.logApiRequest({
+          apiKeyId: req.apiKey?.id,
+          merchantId: req.apiKey?.merchantId,
+          endpoint: `/api/v1/transactions/${req.params.id}`,
+          method: 'GET',
+          statusCode: 500,
+          responseTime: Date.now() - startTime,
+          errorMessage: error instanceof Error ? error.message : 'Unknown error'
+        });
+      } catch (logError) {
+        console.error("API request logging failed:", logError);
+      }
       res.status(500).json({ error: 'Internal server error' });
     }
   });
@@ -6731,26 +6774,31 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // this service being in PCI scope.
 
   app.get("/api/billing/card", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    const merchantId = req.user?.merchantId;
-    if (!merchantId) return res.status(401).json({ message: "Authentication required" });
-    if (!isAccountOwner(req.user)) {
-      return res.status(403).json({ message: "Only the account owner can view the payment method" });
-    }
-    const merchant = await storage.getMerchant(merchantId);
-    if (!merchant) return res.status(404).json({ message: "Merchant not found" });
+    try {
+      const merchantId = req.user?.merchantId;
+      if (!merchantId) return res.status(401).json({ message: "Authentication required" });
+      if (!isAccountOwner(req.user)) {
+        return res.status(403).json({ message: "Only the account owner can view the payment method" });
+      }
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) return res.status(404).json({ message: "Merchant not found" });
 
-    const subscription = await storage.getOrCreateSubscription(merchantId);
-    const ready = billingCardIsReady(subscription);
-    res.json({
-      ready,
-      card: subscription?.cardLast4
-        ? {
-            last4: subscription.cardLast4,
-            brand: subscription.cardBrand,
-            expiry: subscription.cardExpiry,
-          }
-        : null,
-    });
+      const subscription = await storage.getOrCreateSubscription(merchantId);
+      const ready = billingCardIsReady(subscription);
+      res.json({
+        ready,
+        card: subscription?.cardLast4
+          ? {
+              last4: subscription.cardLast4,
+              brand: subscription.cardBrand,
+              expiry: subscription.cardExpiry,
+            }
+          : null,
+      });
+    } catch (error) {
+      console.error("Get billing card error:", error);
+      res.status(500).json({ message: "Failed to load the payment method" });
+    }
   });
 
   // Step 1: open a hosted Windcave page that captures and stores the card.
