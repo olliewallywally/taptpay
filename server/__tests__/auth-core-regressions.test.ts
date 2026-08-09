@@ -39,6 +39,7 @@ function response() {
   const value: any = {};
   value.status = jest.fn(() => value);
   value.json = jest.fn(() => value);
+  value.setHeader = jest.fn(() => value);
   return value;
 }
 
@@ -192,6 +193,144 @@ describe('admin token provenance', () => {
 
     expect(next).not.toHaveBeenCalled();
     expect(result.status).toHaveBeenCalledWith(403);
+  });
+});
+
+/**
+ * A database outage used to be reported as `404 User not found`, because the
+ * lookup's catch fell through to the same response as a missing row. To a
+ * signed-in merchant that is indistinguishable from "your account was deleted",
+ * and the client acted on it by wiping the session. These tests hold the line
+ * between "the database answered no" and "the database did not answer".
+ */
+describe('database outage versus a real rejection', () => {
+  function merchantToken() {
+    return generateToken({
+      id: 5,
+      userId: 5,
+      email: 'owner@example.test',
+      password: '',
+      merchantId: 22,
+      role: 'owner',
+      createdAt: new Date(),
+    });
+  }
+
+  async function callWithToken() {
+    const result = response();
+    const next = jest.fn();
+    await authenticateToken(
+      { headers: { authorization: `Bearer ${merchantToken()}` } } as any,
+      result,
+      next,
+    );
+    return { result, next };
+  }
+
+  function bodyOf(result: any) {
+    return result.json.mock.calls[0][0];
+  }
+
+  beforeEach(() => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  it('answers 503, not 404, when the users lookup cannot reach the database', async () => {
+    storageMock.getUserById.mockRejectedValue(new Error('ECONNREFUSED 10.0.0.5:5432'));
+
+    const { result, next } = await callWithToken();
+
+    expect(next).not.toHaveBeenCalled();
+    expect(result.status).toHaveBeenCalledWith(503);
+    expect(result.status).not.toHaveBeenCalledWith(404);
+  });
+
+  it('never tells a merchant their account is missing because of an outage', async () => {
+    storageMock.getUserById.mockRejectedValue(new Error('terminating connection due to administrator command'));
+
+    const { result } = await callWithToken();
+    const body = bodyOf(result);
+
+    expect(body.code).toBe('AUTH_BACKEND_UNAVAILABLE');
+    expect(body.message).not.toMatch(/not found/i);
+    expect(body.message).toMatch(/our side/i);
+    expect(result.setHeader).toHaveBeenCalledWith('Retry-After', '5');
+  });
+
+  it('answers 503 when the merchant lookup is the read that fails', async () => {
+    // The second read is reached only after the users row has already validated,
+    // so this covers the half of the outage window the first test cannot.
+    storageMock.getMerchant.mockRejectedValue(new Error('connection terminated unexpectedly'));
+
+    const { result, next } = await callWithToken();
+
+    expect(next).not.toHaveBeenCalled();
+    expect(result.status).toHaveBeenCalledWith(503);
+    expect(bodyOf(result).code).toBe('AUTH_BACKEND_UNAVAILABLE');
+  });
+
+  it('treats a synchronous driver throw as an outage too', async () => {
+    storageMock.getUserById.mockImplementation(() => {
+      throw new Error('pool destroyed');
+    });
+
+    const { result, next } = await callWithToken();
+
+    expect(next).not.toHaveBeenCalled();
+    expect(result.status).toHaveBeenCalledWith(503);
+  });
+
+  it('still answers 404 when the database says the merchant row is gone', async () => {
+    storageMock.getMerchant.mockResolvedValue(undefined);
+
+    const { result, next } = await callWithToken();
+
+    expect(next).not.toHaveBeenCalled();
+    expect(result.status).toHaveBeenCalledWith(404);
+    expect(bodyOf(result)).toEqual({ message: 'User not found' });
+  });
+
+  it.each(['pending', 'suspended', 'rejected'])(
+    'still answers 404 when the merchant row exists but is %s',
+    async (status) => {
+      storageMock.getMerchant.mockResolvedValue({ ...MERCHANT, status });
+
+      const { result, next } = await callWithToken();
+
+      expect(next).not.toHaveBeenCalled();
+      expect(result.status).toHaveBeenCalledWith(404);
+    },
+  );
+
+  it('still answers 403 for a revoked seat rather than hiding it behind 503', async () => {
+    storageMock.getUserById.mockResolvedValue({ ...ownerRow, status: 'disabled' });
+
+    const { result, next } = await callWithToken();
+
+    expect(next).not.toHaveBeenCalled();
+    expect(result.status).toHaveBeenCalledWith(403);
+    expect(result.status).not.toHaveBeenCalledWith(503);
+  });
+
+  it('does not consult the database at all for an unreadable token', async () => {
+    // Whether the database is up is irrelevant when the token itself is bad —
+    // that verdict must stay a 403 and must not become an outage report.
+    storageMock.getUserById.mockRejectedValue(new Error('db is down'));
+    const result = response();
+    const next = jest.fn();
+
+    await authenticateToken({ headers: { authorization: 'Bearer not-a-jwt' } } as any, result, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(result.status).toHaveBeenCalledWith(403);
+    expect(storageMock.getUserById).not.toHaveBeenCalled();
+  });
+
+  it('lets a healthy request through unchanged', async () => {
+    const { result, next } = await callWithToken();
+
+    expect(next).toHaveBeenCalled();
+    expect(result.status).not.toHaveBeenCalled();
   });
 });
 

@@ -357,6 +357,45 @@ export function verifyToken(token: string): any {
   }
 }
 
+/**
+ * Marks a storage read that never answered, as opposed to one that answered
+ * "no such row".
+ *
+ * Collapsing the two is how a database outage came to be reported to every
+ * signed-in merchant as `404 User not found` — indistinguishable from a deleted
+ * account. Reads on the authentication path go through `readForAuth`, which
+ * returns this marker instead of throwing, so the caller has to decide which of
+ * the two it is rather than falling through to the same answer for both.
+ */
+const STORAGE_UNAVAILABLE = Symbol('auth.storageUnavailable');
+
+async function readForAuth<T>(
+  what: string,
+  read: () => Promise<T>,
+): Promise<T | typeof STORAGE_UNAVAILABLE> {
+  try {
+    return await read();
+  } catch (error) {
+    // Never logged through logSecurityEvent: an outage makes this fire on every
+    // request, and the audit log is an append-only file on the same box.
+    console.error(`[AUTH_STORAGE_UNAVAILABLE] failed to ${what}:`, error);
+    return STORAGE_UNAVAILABLE;
+  }
+}
+
+/**
+ * The honest answer when we cannot tell whether a session is valid. 503 (not
+ * 401/403/404) so the client keeps the credentials it holds: nothing about them
+ * has been disproved, we simply could not check.
+ */
+function respondAuthBackendUnavailable(res: Response) {
+  res.setHeader('Retry-After', '5');
+  return res.status(503).json({
+    code: 'AUTH_BACKEND_UNAVAILABLE',
+    message: 'Could not verify your session right now. This is a problem on our side — please retry.',
+  });
+}
+
 export async function authenticateToken(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers['authorization'];
   const match = typeof authHeader === 'string' ? authHeader.match(/^Bearer ([^\s]+)$/i) : null;
@@ -409,27 +448,36 @@ export async function authenticateToken(req: AuthenticatedRequest, res: Response
     return res.status(404).json({ message: 'User not found' });
   }
 
-  try {
-    const { storage } = await import('./storage');
-    const userRow = await storage.getUserById(decoded.userId);
-    const user = userRow ? userRowToUser(userRow) : null;
+  // Each read is guarded on its own, and the decisions sit outside the guard, so
+  // that only a genuine answer from the database can produce a 403/404 — a
+  // rejection here is a statement about this principal, never about our uptime.
+  const storageModule = await readForAuth('load the storage module', () => import('./storage'));
+  if (storageModule === STORAGE_UNAVAILABLE) return respondAuthBackendUnavailable(res);
+  const { storage } = storageModule;
 
-    // Re-check the identity on every request so disabling a teammate takes effect
-    // within the token's remaining lifetime rather than at its natural expiry.
-    if (!userRow || !user || userRow.status !== 'active' || user.merchantId !== decoded.merchantId) {
-      return res.status(403).json({ message: 'Access revoked' });
-    }
+  const userRow = await readForAuth('read the users row', () => storage.getUserById(decoded.userId));
+  if (userRow === STORAGE_UNAVAILABLE) return respondAuthBackendUnavailable(res);
 
-    const merchant = await storage.getMerchant(decoded.merchantId);
-    if (merchant && (merchant.status === 'verified' || merchant.status === 'active')) {
-      // The database role is authoritative; stale JWT role claims are ignored.
-      req.user = user;
-      return next();
-    }
-  } catch {
-    // fall through to user not found below
+  const user = userRow ? userRowToUser(userRow) : null;
+
+  // Re-check the identity on every request so disabling a teammate takes effect
+  // within the token's remaining lifetime rather than at its natural expiry.
+  if (!userRow || !user || userRow.status !== 'active' || user.merchantId !== decoded.merchantId) {
+    return res.status(403).json({ message: 'Access revoked' });
   }
-  return res.status(404).json({ message: 'User not found' });
+
+  const merchant = await readForAuth('read the merchant row', () => storage.getMerchant(decoded.merchantId));
+  if (merchant === STORAGE_UNAVAILABLE) return respondAuthBackendUnavailable(res);
+
+  // A row that is absent, unverified or suspended — the database answered, and
+  // the answer is that this login has no usable account behind it.
+  if (!merchant || (merchant.status !== 'verified' && merchant.status !== 'active')) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  // The database role is authoritative; stale JWT role claims are ignored.
+  req.user = user;
+  return next();
 }
 
 // Enable the owner's login and return the real users-row principal. The merchant

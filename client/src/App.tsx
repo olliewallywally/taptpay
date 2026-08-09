@@ -1,5 +1,5 @@
 import { Switch, Route, useLocation } from "wouter";
-import { createContext, useContext, useEffect, useState, lazy, Suspense } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, lazy, Suspense } from "react";
 import { queryClient } from "./lib/queryClient";
 import "@/plugins/TaptPayPlugin";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -189,6 +189,58 @@ function PageLoader() {
   );
 }
 
+/**
+ * The recovery screen for "we could not find out whether you are signed in".
+ *
+ * Deliberately built from nothing: no lazy chunk, no shared component, no data
+ * of its own. It is shown precisely when the backend is failing, which is the
+ * worst possible moment to depend on it for anything.
+ */
+function AuthUnavailable({ detail, isRetrying, onRetry, onSignOut }: {
+  detail: string | null;
+  isRetrying: boolean;
+  onRetry: () => void;
+  onSignOut: () => void;
+}) {
+  return (
+    <div
+      data-testid="auth-unavailable"
+      role="alert"
+      className="min-h-screen flex items-center justify-center px-6"
+      style={{ background: "#060D1F" }}
+    >
+      <div className="w-full max-w-sm text-center">
+        <h1 className="text-white text-lg font-semibold">We couldn't check your session</h1>
+        <p className="mt-3 text-sm leading-relaxed" style={{ color: "#9AA7C2" }}>
+          {detail ?? "Something went wrong on our side."}
+        </p>
+        <p className="mt-2 text-sm leading-relaxed" style={{ color: "#9AA7C2" }}>
+          You have not been signed out — your sign-in is still saved on this device.
+        </p>
+        <button
+          type="button"
+          data-testid="auth-unavailable-retry"
+          onClick={onRetry}
+          disabled={isRetrying}
+          className="mt-6 w-full rounded-xl py-3 text-sm font-semibold disabled:opacity-60"
+          style={{ background: "#00DFC8", color: "#04121F" }}
+        >
+          {isRetrying ? "Trying again…" : "Try again"}
+        </button>
+        <button
+          type="button"
+          data-testid="auth-unavailable-signout"
+          onClick={onSignOut}
+          className="mt-3 w-full rounded-xl py-3 text-sm font-medium"
+          style={{ border: "1px solid rgba(255,255,255,0.18)", color: "#9AA7C2" }}
+        >
+          Sign out
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // Auth is checked ONCE at app load and cached here. ProtectedRoute reads from
 // this context so navigating between protected routes never shows a loader or
 // makes a redundant API call — both of which would destroy page transitions.
@@ -201,63 +253,322 @@ type AuthData = {
   tradeGstMode?: "inclusive" | "exclusive";
 };
 
-const AuthContext = createContext<{ auth: AuthData | null; isChecking: boolean }>({
+/**
+ * `checking`     — the session check is in flight. Always bounded; see below.
+ * `resolved`     — we know. `auth.isAuthenticated` is the answer.
+ * `unavailable`  — we could not find out. The stored credentials have NOT been
+ *                  touched, because nothing has disproved them.
+ *
+ * The third state is the whole point: without it, "the backend is broken" had
+ * to be squeezed into "signed out", which silently destroyed live sessions
+ * during an outage.
+ */
+type AuthPhase = "checking" | "resolved" | "unavailable";
+
+type AuthContextValue = {
+  auth: AuthData | null;
+  phase: AuthPhase;
+  /** Why we could not check, for the recovery screen. Null unless unavailable. */
+  detail: string | null;
+  isRetrying: boolean;
+  retry: () => void;
+  signOut: () => void;
+};
+
+// Exported (with AuthProvider and ProtectedRoute below) so the outage
+// behaviour can be tested directly — these bounds are only worth anything if
+// something proves they hold.
+export const AuthContext = createContext<AuthContextValue>({
   auth: null,
-  isChecking: true,
+  phase: "checking",
+  detail: null,
+  isRetrying: false,
+  retry: () => {},
+  signOut: () => {},
 });
 
-function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [auth, setAuth] = useState<AuthData | null>(null);
-  const [isChecking, setIsChecking] = useState(true);
+/* ── Bounds on every session check ────────────────────────────────────────────
+   `fetch` has no default timeout: a backend that accepts the connection and
+   then never answers hands back a promise that never settles. That is exactly
+   how this app once pinned itself on a full-screen loader with no way out.
+   Every number below exists to make an unbounded wait unrepresentable —
+   each attempt is aborted, the attempts are counted, and one deadline covers
+   the entire sequence including the gaps between attempts.
+   Invariant (asserted in the tests): the worst-case attempt sequence finishes
+   inside the deadline, so the deadline is a backstop and not the normal exit. */
+export const AUTH_ATTEMPT_TIMEOUT_MS = 4000;
+export const AUTH_MAX_ATTEMPTS = 3;
+export const AUTH_RETRY_DELAYS_MS = [300, 900];
+export const AUTH_TOTAL_DEADLINE_MS = 14000;
 
-  useEffect(() => {
-    const token = localStorage.getItem("authToken");
-    if (!token) {
-      setAuth({ isAuthenticated: false });
-      setIsChecking(false);
+type ProbeOutcome<T> =
+  /** The server answered and the session is good. */
+  | { kind: "ok"; value: T }
+  /** The server looked at the credentials and refused them. 401/403 only. */
+  | { kind: "rejected" }
+  /** We learned nothing about the credentials. Never a reason to discard them. */
+  | { kind: "unavailable"; detail: string; retryable: boolean };
+
+type SessionResult<T> =
+  | { kind: "ok"; value: T }
+  | { kind: "rejected" }
+  | { kind: "unavailable"; detail: string };
+
+function unreachableDetail(): string {
+  return typeof navigator !== "undefined" && navigator.onLine === false
+    ? "Your device looks offline. Check your connection and try again."
+    : "The server didn't respond in time.";
+}
+
+/**
+ * Runs `probe` until it produces a definite answer, or until the bounds above
+ * are spent — whichever comes first. `onResult` is called exactly once, with a
+ * result that is never "still waiting".
+ *
+ * Returns a cancel function: after it runs, `onResult` can no longer fire, so
+ * an unmounted consumer is never updated.
+ */
+function startBoundedSessionCheck<T>(
+  probe: (signal: AbortSignal) => Promise<ProbeOutcome<T>>,
+  onResult: (result: SessionResult<T>) => void,
+): () => void {
+  let settled = false;
+  const timers = new Set<ReturnType<typeof setTimeout>>();
+  const inFlight = new Set<AbortController>();
+
+  const stopEverything = () => {
+    timers.forEach(clearTimeout);
+    timers.clear();
+    inFlight.forEach((controller) => controller.abort());
+    inFlight.clear();
+  };
+
+  // The single exit. First definite answer wins and cancels everything else, so
+  // no straggler can revive the check or contradict the state it produced.
+  const settle = (result: SessionResult<T>) => {
+    if (settled) return;
+    settled = true;
+    stopEverything();
+    onResult(result);
+  };
+
+  const after = (ms: number, run: () => void) => {
+    const id = setTimeout(() => {
+      timers.delete(id);
+      if (!settled) run();
+    }, ms);
+    timers.add(id);
+    return id;
+  };
+
+  // The backstop. Nothing below is trusted to finish on its own: if the attempt
+  // sequence is somehow still running when this fires, the check ends here in a
+  // visible error rather than an open-ended spinner.
+  after(AUTH_TOTAL_DEADLINE_MS, () => settle({ kind: "unavailable", detail: unreachableDetail() }));
+
+  const attempt = async (n: number): Promise<void> => {
+    const controller = new AbortController();
+    inFlight.add(controller);
+    // Covers the whole attempt, response body included — a half-sent body is
+    // just as good at hanging as a request that is never answered.
+    const abortAt = after(AUTH_ATTEMPT_TIMEOUT_MS, () => controller.abort());
+
+    let outcome: ProbeOutcome<T>;
+    try {
+      outcome = await probe(controller.signal);
+    } catch {
+      // Network error, DNS failure, offline, or our own abort firing. None of
+      // these says anything about the credentials.
+      outcome = { kind: "unavailable", detail: unreachableDetail(), retryable: true };
+    } finally {
+      clearTimeout(abortAt);
+      timers.delete(abortAt);
+      inFlight.delete(controller);
+    }
+
+    if (settled) return;
+    if (outcome.kind !== "unavailable") {
+      settle(outcome);
       return;
     }
-    fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
-      .then(async r => {
-        if (r.ok) {
-          const data = await r.json();
-          setAuth({
+    if (outcome.retryable && n < AUTH_MAX_ATTEMPTS) {
+      const delay = AUTH_RETRY_DELAYS_MS[n - 1] ?? AUTH_RETRY_DELAYS_MS[AUTH_RETRY_DELAYS_MS.length - 1];
+      after(delay, () => runAttempt(n + 1));
+      return;
+    }
+    settle({ kind: "unavailable", detail: outcome.detail });
+  };
+
+  // Even an unforeseen throw ends in a definite state rather than a dangling
+  // promise. `settle` is idempotent, so this can never overwrite a real answer.
+  const runAttempt = (n: number) => {
+    void attempt(n).catch(() => settle({ kind: "unavailable", detail: unreachableDetail() }));
+  };
+
+  runAttempt(1);
+  return () => {
+    settled = true;
+    stopEverything();
+  };
+}
+
+/**
+ * One session probe. The classification here is the client half of the fix:
+ * only 401/403 — the server having looked at the credentials and refused them —
+ * counts as a rejection. Everything else is an outage of some kind, and an
+ * outage must never cost the user their session.
+ */
+async function probeSession<T>(
+  url: string,
+  token: string,
+  signal: AbortSignal,
+  read: (payload: any) => T,
+): Promise<ProbeOutcome<T>> {
+  const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, signal });
+
+  if (response.status === 401 || response.status === 403) {
+    return { kind: "rejected" };
+  }
+
+  if (response.ok) {
+    let payload: any = null;
+    try {
+      payload = await response.json();
+    } catch {
+      // A 200 we cannot parse is a proxy or a broken deploy talking, not a
+      // verdict on the session.
+      return { kind: "unavailable", detail: "The server sent a reply we couldn't read.", retryable: true };
+    }
+    return { kind: "ok", value: read(payload) };
+  }
+
+  if (response.status >= 500) {
+    return {
+      kind: "unavailable",
+      detail: `The server is having trouble right now (error ${response.status}).`,
+      retryable: true,
+    };
+  }
+
+  // Any other 4xx — including the 404 the server now reserves for an account
+  // that genuinely is not there. Asking again will not change it, and it is
+  // still not a rejection of these credentials, so the user gets the recovery
+  // screen with an explicit way to sign out.
+  return {
+    kind: "unavailable",
+    detail: `The server couldn't confirm this session (error ${response.status}). Signing out and back in may fix it.`,
+    retryable: false,
+  };
+}
+
+function readStoredToken(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    // Storage can be unavailable in privacy-restricted browser contexts.
+    return null;
+  }
+}
+
+function clearStoredSession(keys: string[]) {
+  try {
+    keys.forEach((key) => localStorage.removeItem(key));
+  } catch {
+    // Nothing to clear if storage is unreachable.
+  }
+}
+
+const MERCHANT_SESSION_KEYS = ["authToken", "user", "merchantId"];
+const ADMIN_SESSION_KEYS = ["adminAuthToken", "adminUser"];
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [state, setState] = useState<{ phase: AuthPhase; auth: AuthData | null; detail: string | null }>({
+    phase: "checking",
+    auth: null,
+    detail: null,
+  });
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [runId, setRunId] = useState(0);
+
+  useEffect(() => {
+    const token = readStoredToken("authToken");
+    if (!token) {
+      setState({ phase: "resolved", auth: { isAuthenticated: false }, detail: null });
+      setIsRetrying(false);
+      return;
+    }
+
+    return startBoundedSessionCheck(
+      (signal) =>
+        probeSession(
+          "/api/auth/me",
+          token,
+          signal,
+          (data): AuthData => ({
             isAuthenticated: true,
             merchantId: data?.user?.merchantId ?? null,
             role: data?.user?.role ?? null,
             onboardingCompleted: data?.user?.onboardingCompleted ?? null,
             gstRegistered: data?.user?.gstRegistered ?? false,
             tradeGstMode: data?.user?.tradeGstMode === "exclusive" ? "exclusive" : "inclusive",
-          });
-        } else {
-          localStorage.removeItem("authToken");
-          localStorage.removeItem("user");
-          localStorage.removeItem("merchantId");
-          setAuth({ isAuthenticated: false });
+          }),
+        ),
+      (result) => {
+        setIsRetrying(false);
+        if (result.kind === "ok") {
+          setState({ phase: "resolved", auth: result.value, detail: null });
+          return;
         }
-      })
-      .catch(() => {
-        localStorage.removeItem("authToken");
-        localStorage.removeItem("user");
-        localStorage.removeItem("merchantId");
-        setAuth({ isAuthenticated: false });
-      })
-      .finally(() => setIsChecking(false));
+        if (result.kind === "rejected") {
+          // The one and only place a failed check discards credentials.
+          clearStoredSession(MERCHANT_SESSION_KEYS);
+          setState({ phase: "resolved", auth: { isAuthenticated: false }, detail: null });
+          return;
+        }
+        setState({ phase: "unavailable", auth: null, detail: result.detail });
+      },
+    );
+  }, [runId]);
+
+  // Re-runs the effect above, which is bounded, so a user hammering this button
+  // can queue work but cannot produce an unbounded wait.
+  const retry = useCallback(() => {
+    setIsRetrying(true);
+    setRunId((n) => n + 1);
   }, []);
 
-  return <AuthContext.Provider value={{ auth, isChecking }}>{children}</AuthContext.Provider>;
+  // Bumping runId as well as setting the state cancels any check still in
+  // flight (the effect's cleanup), so a retry that lands after the user has
+  // chosen to sign out cannot quietly sign them back in.
+  const signOut = useCallback(() => {
+    clearStoredSession(MERCHANT_SESSION_KEYS);
+    setIsRetrying(false);
+    setState({ phase: "resolved", auth: { isAuthenticated: false }, detail: null });
+    setRunId((n) => n + 1);
+  }, []);
+
+  return (
+    <AuthContext.Provider
+      value={{ auth: state.auth, phase: state.phase, detail: state.detail, isRetrying, retry, signOut }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
-function ProtectedRoute({ children, skipOnboardingCheck = false, tutorialPage }: {
+export function ProtectedRoute({ children, skipOnboardingCheck = false, tutorialPage }: {
   children: React.ReactNode;
   skipOnboardingCheck?: boolean;
   tutorialPage?: TutorialPageKey;
 }) {
   const [, setLocation] = useLocation();
-  const { auth, isChecking } = useContext(AuthContext);
+  const { auth, phase, detail, isRetrying, retry, signOut } = useContext(AuthContext);
 
   useEffect(() => {
-    if (isChecking || !auth) return;
+    // `unavailable` deliberately does not redirect. Bouncing to /login during an
+    // outage hides the real fault behind a login form whose own requests are
+    // failing too, and looks to the merchant like their account was deleted.
+    if (phase !== "resolved" || !auth) return;
     if (!auth.isAuthenticated) {
       const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
       setLocation(`/login?returnTo=${returnTo}`);
@@ -271,9 +582,12 @@ function ProtectedRoute({ children, skipOnboardingCheck = false, tutorialPage }:
     ) {
       setLocation("/onboarding");
     }
-  }, [isChecking, auth, skipOnboardingCheck, setLocation]);
+  }, [phase, auth, skipOnboardingCheck, setLocation]);
 
-  if (isChecking) return <PageLoader />;
+  if (phase === "unavailable") {
+    return <AuthUnavailable detail={detail} isRetrying={isRetrying} onRetry={retry} onSignOut={signOut} />;
+  }
+  if (phase === "checking") return <PageLoader />;
   if (!auth?.isAuthenticated) return null;
   if (!skipOnboardingCheck && auth.merchantId && auth.role !== 'admin' && auth.onboardingCompleted === false) return null;
 
@@ -283,43 +597,62 @@ function ProtectedRoute({ children, skipOnboardingCheck = false, tutorialPage }:
 }
 
 function AdminProtectedRoute({ children }: { children: React.ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isChecking, setIsChecking] = useState(true);
+  // Same three-way split as the merchant provider, and for the same reason: the
+  // old version awaited a `fetch` with no timeout and only cleared its loading
+  // flag afterwards, so a hung backend left this on PageLoader indefinitely.
+  const [state, setState] = useState<{ phase: AuthPhase | "signedOut"; detail: string | null }>({
+    phase: "checking",
+    detail: null,
+  });
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [runId, setRunId] = useState(0);
 
   useEffect(() => {
-    const checkAdminAuth = async () => {
-      const token = localStorage.getItem("adminAuthToken");
-      if (!token) {
-        setIsAuthenticated(false);
-        setIsChecking(false);
-        window.location.href = "/login";
-        return;
-      }
-      try {
-        const response = await fetch("/api/admin/auth/me", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (response.ok) {
-          setIsAuthenticated(true);
-        } else {
-          localStorage.removeItem("adminAuthToken");
-          localStorage.removeItem("adminUser");
-          setIsAuthenticated(false);
-          window.location.href = "/login";
+    const token = readStoredToken("adminAuthToken");
+    if (!token) {
+      setState({ phase: "signedOut", detail: null });
+      return;
+    }
+
+    return startBoundedSessionCheck(
+      (signal) => probeSession("/api/admin/auth/me", token, signal, () => true),
+      (result) => {
+        setIsRetrying(false);
+        if (result.kind === "ok") {
+          setState({ phase: "resolved", detail: null });
+          return;
         }
-      } catch (error) {
-        localStorage.removeItem("adminAuthToken");
-        localStorage.removeItem("adminUser");
-        setIsAuthenticated(false);
-        window.location.href = "/login";
-      }
-      setIsChecking(false);
-    };
-    checkAdminAuth();
+        if (result.kind === "rejected") {
+          clearStoredSession(ADMIN_SESSION_KEYS);
+          setState({ phase: "signedOut", detail: null });
+          return;
+        }
+        setState({ phase: "unavailable", detail: result.detail });
+      },
+    );
+  }, [runId]);
+
+  useEffect(() => {
+    if (state.phase === "signedOut") window.location.href = "/login";
+  }, [state.phase]);
+
+  const retry = useCallback(() => {
+    setIsRetrying(true);
+    setRunId((n) => n + 1);
   }, []);
 
-  if (isChecking) return <PageLoader />;
-  return isAuthenticated ? <>{children}</> : null;
+  const signOut = useCallback(() => {
+    clearStoredSession(ADMIN_SESSION_KEYS);
+    setIsRetrying(false);
+    setState({ phase: "signedOut", detail: null });
+    setRunId((n) => n + 1);
+  }, []);
+
+  if (state.phase === "unavailable") {
+    return <AuthUnavailable detail={state.detail} isRetrying={isRetrying} onRetry={retry} onSignOut={signOut} />;
+  }
+  if (state.phase === "checking") return <PageLoader />;
+  return state.phase === "resolved" ? <>{children}</> : null;
 }
 
 function GA4PageTracker() {
