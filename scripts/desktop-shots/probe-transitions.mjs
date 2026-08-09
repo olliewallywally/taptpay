@@ -2,11 +2,20 @@
  *
  * Not a screenshot script — it instruments the DOM and reports, for every
  * navigation, whether the persistent app chrome (the 13" frame + header + nav)
- * survived, and whether the full-screen Suspense loader flashed in its place.
+ * survived, and whether anything painted over it.
  *
- * Expected state once the transition work lands:
- *   - "chrome" must be `kept` on every hop (no unmount/remount of the frame).
- *   - "loader" must be `no` on every hop, cold cache included.
+ * Three signals, and only the first two decide the exit code:
+ *   - chrome REMOUNTED — the frame was torn down and rebuilt.          GATES
+ *   - route-loader     — `[data-testid='page-loader']`, the full-screen
+ *                        loader, painted over the app.                 GATES
+ *   - page slot suspended / content spinner — the chrome held and a page
+ *                        showed its own loading state. Reported only.
+ *
+ * That split is the whole point: matching bare `.animate-spin` (as this once
+ * did) counts a page's own QR or PDF spinner as a full-screen flash, which made
+ * the probe fail on a healthy tree and unusable as a gate. Desktop app routes
+ * cannot render the route loader at all — their fallback is the deliberately
+ * empty `DesktopPageFallback` — so a spinner inside intact chrome is content.
  *
  * Usage: dev server on :5000, single instance.
  *   node scripts/desktop-shots/probe-transitions.mjs
@@ -26,6 +35,9 @@ const PRELOAD_DRAIN_MS = 20_000;
 // before each hop and read the events back per hop rather than keeping one
 // global timeline, so a stray reload costs one row instead of the whole run.
 
+/* Runs in the page via `page.evaluate`, so it is serialised and loses its
+   closure: every selector below must stay an inline literal. Hoisting them to
+   module constants would throw a ReferenceError inside the browser. */
 const INSTRUMENT = () => {
   const w = window;
   if (w.__probe) return;
@@ -34,21 +46,46 @@ const INSTRUMENT = () => {
     w.__probe.ev.push({ t: +(performance.now() - w.__probe.t0).toFixed(1), type, detail });
   w.__probeMark = (label) => log("MARK", label);
 
-  const hasFrame = (n) =>
-    n instanceof HTMLElement &&
-    (n.matches?.("[data-testid='desktop-frame']") ||
-      !!n.querySelector?.("[data-testid='desktop-frame']"));
+  /* React swaps whole subtrees, so the element of interest is usually a
+     descendant of the mutated node rather than the node itself. */
+  const find = (n, selector) =>
+    n instanceof HTMLElement
+      ? n.matches?.(selector)
+        ? n
+        : (n.querySelector?.(selector) ?? null)
+      : null;
 
   new MutationObserver((records) => {
     for (const r of records) {
-      for (const n of r.removedNodes) if (hasFrame(n)) log("chrome-unmounted", null);
+      for (const n of r.removedNodes) {
+        if (find(n, "[data-testid='desktop-frame']")) log("chrome-unmounted", null);
+        /* Paired with `page-fallback` to time how long the page area actually
+           stayed blank — a one-frame suspension is invisible, a long one is the
+           flash this whole exercise exists to prevent. */
+        if (find(n, "[data-testid='desktop-page-fallback']")) log("page-fallback-gone", null);
+      }
       for (const n of r.addedNodes) {
-        if (hasFrame(n)) log("chrome-mounted", null);
-        if (
-          n instanceof HTMLElement &&
-          (n.classList?.contains("animate-spin") || n.querySelector?.(".animate-spin"))
-        )
-          log("suspense-loader", null);
+        if (find(n, "[data-testid='desktop-frame']")) log("chrome-mounted", null);
+
+        /* The gating signal: the route-level loader painting over everything. */
+        if (find(n, "[data-testid='page-loader']")) {
+          log("route-loader", null);
+        } else {
+          /* Otherwise any spinner is page *content* — board-builder's QR
+             preview, a PDF button. Reported so it stays visible, never gating:
+             a page rendering its own loading state inside chrome that never
+             moved is correct behaviour, not a transition flash. Skipped above
+             so the route loader's own spinner child is not double-counted. */
+          /* `getAttribute`, not `className`: lucide spinners are <svg>, whose
+             `className` is an SVGAnimatedString and stringifies to junk. */
+          const spinner = find(n, ".animate-spin");
+          if (spinner) log("content-spinner", (spinner.getAttribute("class") ?? "").slice(0, 60));
+        }
+
+        /* Chrome held but the page slot suspended, so the page area went briefly
+           blank. Inherent to code-splitting the first time a route is visited,
+           hence reported rather than failed. */
+        if (find(n, "[data-testid='desktop-page-fallback']")) log("page-fallback", null);
       }
     }
   }).observe(document.body, { childList: true, subtree: true });
@@ -80,11 +117,10 @@ const DEVICE_CLASSES = [
 ];
 
 async function probe(browser, label, contextOptions) {
+  /* The property/trades/settings endpoints these hops touch are mocked by
+     `installRetailMocks` itself, so every script that walks past retail gets
+     them; this probe no longer patches them in on the side. */
   const { context, page, errors } = await newRetailPage(browser, label, contextOptions);
-  const json = (route, body) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
-  await page.route("**/api/property/**", (r) => json(r, []));
-  await page.route("**/api/trades/**", (r) => json(r, []));
 
   await page.goto(`${BASE_URL}/dashboard`, { waitUntil: "networkidle" });
   await page.getByTestId("desktop-frame").waitFor({ state: "visible" });
@@ -137,25 +173,50 @@ function report(label, hops) {
   const rows = hops.map(({ name, ev, reloadedBefore }) => {
     const unmount = ev.find((e) => e.type === "chrome-unmounted");
     const mount = unmount ? ev.find((e) => e.type === "chrome-mounted" && e.t >= unmount.t) : null;
+    const spinners = ev.filter((e) => e.type === "content-spinner");
+    const fbIn = ev.find((e) => e.type === "page-fallback");
+    const fbOut = fbIn ? ev.find((e) => e.type === "page-fallback-gone" && e.t >= fbIn.t) : null;
     return {
       hop: name,
       chrome: unmount ? "REMOUNTED" : "kept",
       gap: unmount && mount ? mount.t - unmount.t : 0,
-      loader: ev.some((e) => e.type === "suspense-loader"),
+      loader: ev.some((e) => e.type === "route-loader"),
+      fallback: !!fbIn,
+      /* null = appeared but never observed leaving within the hop window. */
+      fallbackMs: fbIn && fbOut ? fbOut.t - fbIn.t : null,
+      spinners: spinners.length,
+      spinnerClass: spinners[0]?.detail ?? null,
       reloadedBefore,
     };
   });
 
   console.log(`\n########## ${label} ##########`);
   for (const r of rows) {
+    /* Notes are informational only — see the gate below. */
+    const notes = [
+      r.fallback
+        ? `page slot blank ${r.fallbackMs === null ? "— never cleared" : `${r.fallbackMs.toFixed(1)}ms`}`
+        : null,
+      r.spinners ? `content spinner ×${r.spinners}${r.spinnerClass ? ` (${r.spinnerClass})` : ""}` : null,
+      r.reloadedBefore ? "vite full-reload before this hop" : null,
+    ].filter(Boolean);
     console.log(
-      `  ${r.hop.padEnd(26)} chrome: ${r.chrome.padEnd(10)} blank ${String(r.gap.toFixed(1)).padStart(7)}ms   loader: ${r.loader ? "YES — full-screen flash" : "no"}${r.reloadedBefore ? "   [vite full-reload before this hop]" : ""}`,
+      `  ${r.hop.padEnd(26)} chrome: ${r.chrome.padEnd(10)} blank ${String(r.gap.toFixed(1)).padStart(7)}ms   loader: ${r.loader ? "YES — full-screen flash" : "no"}${notes.length ? `   [${notes.join("; ")}]` : ""}`,
     );
   }
   const remounts = rows.filter((r) => r.chrome === "REMOUNTED").length;
   const loaders = rows.filter((r) => r.loader).length;
-  console.log(`  → ${remounts}/${rows.length} hops remounted the chrome, ${loaders} showed the full-screen loader`);
-  return { remounts, loaders, total: rows.length };
+  const fallbacks = rows.filter((r) => r.fallback).length;
+  const spinners = rows.filter((r) => r.spinners > 0).length;
+  const blanks = rows.map((r) => r.fallbackMs).filter((ms) => ms !== null);
+  const worstBlank = blanks.length ? Math.max(...blanks) : 0;
+  const stuck = rows.filter((r) => r.fallback && r.fallbackMs === null).length;
+  console.log(`  → ${remounts}/${rows.length} hops remounted the chrome, ${loaders} showed the route loader`);
+  console.log(
+    `    informational: ${fallbacks} suspended the page slot (worst ${worstBlank.toFixed(1)}ms` +
+      `${stuck ? `, ${stuck} never cleared` : ""}), ${spinners} rendered a content spinner`,
+  );
+  return { remounts, loaders, fallbacks, spinners, worstBlank, stuck, total: rows.length };
 }
 
 await mkdir(OUT, { recursive: true });
@@ -174,7 +235,14 @@ try {
 console.log("\n===== summary =====");
 let bad = 0;
 for (const [label, t] of totals) {
-  console.log(`${label}: ${t.remounts} chrome remounts, ${t.loaders} loader flashes (of ${t.total} hops)`);
+  console.log(
+    `${label}: ${t.remounts} chrome remounts, ${t.loaders} route-loader flashes (of ${t.total} hops)` +
+      `  —  informational: ${t.fallbacks} page-slot suspensions (worst ${t.worstBlank.toFixed(1)}ms` +
+      `${t.stuck ? `, ${t.stuck} never cleared` : ""}), ${t.spinners} content spinners`,
+  );
+  /* Only the two signals that mean "the user saw the app come apart" gate the
+     run. Page-slot suspensions and content spinners are normal behaviour inside
+     chrome that never moved. */
   bad += t.remounts + t.loaders;
 }
 if (WANT_SHOTS) console.log(`mid-transition screenshots → ${OUT}`);

@@ -302,18 +302,59 @@ and do not "fix" them — each is load-bearing.
 | Rails animate on `.rt-rail`/`.pt-rail`/`.tt-rail` themselves, never their slots — so rails do not stagger internally | A transform on a slot makes that slot the containing block for the `position:absolute` rail, moving the rail |
 | The property/trades analytics overview replays its cascade when a generated report is closed | The overview sits inside `{!report && …}`. Gating it is cheap if it ever grates |
 
-**Still open from that same list, NOT ruled:** cascade coverage has never been
-audited screen-by-screen (neither acceptance probe tests it); the six empty CSS
-declarations at `trades-terminal.tsx:1224-1229`; the four `403` console errors in
-both probe runs; and the visual side-by-side vs
-`docs/design/desktop-app/Taptpay Desktop.dc.html`.
+### Closed 2026-08-09
 
-`scripts/desktop-shots/probe-transitions.mjs` **exits 1 on a healthy tree** — its
-detector logs a "loader flash" for any added `.animate-spin` node, catching
-`/board-builder`'s own content spinners. Desktop routes cannot render the
-full-screen loader at all (`PageLoader` is wired only to the mobile/public
-`Suspense`), and the same hop reports `chrome: kept` / `blank 0.0ms`. Narrowing
-that matcher is what would make the probe a usable gate.
+Everything left open on that list is now done except the visual side-by-side.
+
+**`probe-transitions.mjs` is a usable gate — it exits 0 on a healthy tree.** It
+used to log a "loader flash" for any added `.animate-spin` node, catching
+`/board-builder`'s own content spinners. It now separates three signals, and only
+the first two decide the exit code:
+
+| Signal | Meaning | Gates? |
+|---|---|---|
+| chrome `REMOUNTED` | the frame was torn down and rebuilt | yes |
+| `route-loader` | `[data-testid='page-loader']`, the full-screen loader, painted over the app | yes |
+| page-slot suspension / content spinner | chrome held; a page showed its own loading state | reported only |
+
+Desktop routes cannot render the route loader at all — their fallback is the
+deliberately empty `DesktopPageFallback`, which now carries
+`data-testid='desktop-page-fallback'` so a suspended page slot can be *timed*
+rather than confused with a flash. Current run, both device classes:
+**0/21 chrome remounts, 0 route-loader flashes**, 14 page-slot suspensions
+(worst ~130ms) and 1 content spinner, all informational.
+
+**Cascade coverage is audited, by a new probe.** `scripts/desktop-shots/probe-cascade.mjs`
+samples `document.getAnimations()` right after each hop and reports how many
+elements actually run `desktopBounceIn` and how deep the stagger goes. Two things
+fail it: a screen that cascades nothing, and — the expensive one — an element
+carrying `.dt-rise`/`.dt-cascade > *` that settles at opacity 0. The rule ships
+`opacity: 0` under an `animation: … both` fill, so a block whose animation never
+runs is not merely un-animated, it is *permanently invisible*, and nothing else
+in the suite would catch that. Result: **13/13 screens on both desktop and
+tablet**, every one genuinely staggered (4–12 steps at the 52ms interval), zero
+stuck invisible.
+
+**The six empty CSS declarations at `trades-terminal.tsx:1224-1229` are filled.**
+They were the quick-invoice recipient block's `color:`/`background:` with the
+values dropped. The file's own convention settles what they should be — pressed
+chip = `ACTIVE` background + `NAVY` text, unpressed = `ACCENT_SOFT` on
+transparent (see the inline styles at lines 698, 801, 968, and the quick pills
+already carried the matching `rgba(94,158,255,0.5)` border).
+
+**The `403` console errors are gone; they were a fixture gap, not an app bug.**
+`installRetailMocks` was retail-only, but the probes walk `/property`, `/trades`
+and settings. `/api/push/preferences` and `/api/subscription` reached the real
+dev server with a dummy token. The cross-vertical and settings endpoints are now
+mocked in `retail-fixtures.mjs` for every script that uses it, so
+`probe-transitions.mjs` no longer patches property/trades in on the side. Match
+them **by prefix**: a Playwright glob matches the full URL including its query
+string, so an exact pattern misses `/tenants/1`, `/tenants/1/events` and
+`/invoices?tenantId=1`. Both probe runs are now free of console errors, and
+`/property/tenants/1` renders in ~21ms instead of ~292ms on the 403 error path.
+
+**Still open, NOT ruled:** the visual side-by-side vs
+`docs/design/desktop-app/Taptpay Desktop.dc.html`.
 
 ---
 

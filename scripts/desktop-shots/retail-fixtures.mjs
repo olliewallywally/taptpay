@@ -78,6 +78,39 @@ async function installRetailMocks(page) {
     json(route, RETAIL_STOCK));
   await page.route(`**/api/merchants/${MERCHANT_ID}/profile`, (route) => json(route, merchant));
   await page.route(`**/api/merchants/${MERCHANT_ID}`, (route) => json(route, merchant));
+
+  /* The cross-vertical endpoints. These fixtures began as retail-only, but the
+     transition probe walks /property and /trades too, and those pages query
+     their own routes. Unmocked, they reach the real dev server with a dummy
+     token and answer 403 — which is what put four "403 (Forbidden)" console
+     errors in every probe run. The pages render their empty states from these,
+     which is all a transition probe needs; a screenshot script wanting populated
+     property/trades data should add its own richer overrides after this call.
+
+     Matched by prefix, not by exact path: these pages call `/tenants/1`,
+     `/tenants/1/events` and `/invoices?tenantId=1`, and a Playwright glob
+     matches the full URL including its query string, so an exact pattern
+     silently misses every parameterised call. */
+  for (const prefix of ["/api/property/", "/api/trades/"]) {
+    await page.route(`**${prefix}**`, (route) => json(route, []));
+  }
+
+  /* Shapes mirror the server DTOs: `pushNotificationPreferencesDto` and
+     `subscriptionDto` in server/http-contracts.ts. Settings reads both. */
+  await page.route("**/api/push/preferences", (route) => json(route, {
+    preferences: { paymentReceived: true, dailyPayoutSummary: false, failedPaymentAlerts: false },
+  }));
+  await page.route("**/api/subscription", (route) => json(route, {
+    subscription: {
+      planId: "solo",
+      planName: "Solo",
+      status: "active",
+      priceCents: 799,
+      seatLimit: 1,
+      seatsInUse: 1,
+      pendingPlanId: null,
+    },
+  }));
 }
 
 export async function newRetailPage(browser, label, contextOptions) {

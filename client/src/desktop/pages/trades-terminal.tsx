@@ -1221,12 +1221,12 @@ const TT_CSS = `
 .tt-inv-form { position:absolute; left:668px; top:436px; width:430px; display:flex; flex-direction:column; gap:14px; animation:tileIn .35s cubic-bezier(.22,.9,.3,1) both; }
 .tt-field { display:flex; flex-direction:column; gap:8px; }
 .tt-quick-recipient { margin-top:14px; display:grid; grid-template-columns:1fr auto; gap:8px; }
-.tt-quick-recipient > input { grid-column:1 / -1; height:34px; padding:0 12px; border-radius:10px; border:1px solid rgba(94,158,255,.42); background:rgba(255,255,255,.05); color:; outline:none; }
+.tt-quick-recipient > input { grid-column:1 / -1; height:34px; padding:0 12px; border-radius:10px; border:1px solid rgba(94,158,255,.42); background:rgba(255,255,255,.05); color:${TEXT_SOFT}; outline:none; }
 .tt-quick-channel { display:flex; gap:6px; grid-column:1 / -1; }
-.tt-quick-channel button { border:1px solid rgba(94,158,255,.5); border-radius:999px; background:transparent; color:; padding:5px 13px; }
-.tt-quick-channel button[aria-pressed="true"] { background:; color:; }
-.tt-quick-success { margin:14px auto 0; display:flex; align-items:center; justify-content:center; gap:14px; color:; font-size:13px; }
-.tt-quick-success button { border:1px solid rgba(94,158,255,.6); border-radius:999px; background:transparent; color:; padding:7px 15px; }
+.tt-quick-channel button { border:1px solid rgba(94,158,255,.5); border-radius:999px; background:transparent; color:${ACCENT_SOFT}; padding:5px 13px; }
+.tt-quick-channel button[aria-pressed="true"] { background:${ACTIVE}; color:${NAVY}; }
+.tt-quick-success { margin:14px auto 0; display:flex; align-items:center; justify-content:center; gap:14px; color:${GREEN}; font-size:13px; }
+.tt-quick-success button { border:1px solid rgba(94,158,255,.6); border-radius:999px; background:transparent; color:${ACCENT_SOFT}; padding:7px 15px; }
 .tt-note { height:50px; box-sizing:border-box; border-radius:9999px; border:none; outline:none; background:#fff; padding:0 22px; color:#12162E; font-family:'Outfit',sans-serif; font-weight:600; font-size:13.5px; }
 .tt-via { display:flex; align-items:center; gap:14px; height:54px; padding:0 20px; box-sizing:border-box; border-radius:12px; border:1.5px solid rgba(94,158,255,0.55); }
 .tt-via-text { display:flex; flex-direction:column; gap:1px; min-width:0; }

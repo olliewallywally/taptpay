@@ -76,9 +76,14 @@ const DesktopChrome           = lazy(() => import("@/desktop/DesktopChrome"));
  * already on screen — the incoming page's own cascade is the only motion the
  * user should see. Defined here rather than imported, so that reaching for the
  * fallback does not drag the desktop chunk into the entry bundle.
+ *
+ * Being empty makes it invisible to a probe watching for painted loaders, so it
+ * carries a `data-testid` instead: a suspended page slot is worth *reporting*
+ * (the chrome held, the page area went briefly blank) without failing a run, and
+ * that is only distinguishable from a real flash if it can be seen.
  */
 function DesktopPageFallback() {
-  return <div className="tapt-desktop-page-fallback" aria-hidden="true" />;
+  return <div data-testid="desktop-page-fallback" className="tapt-desktop-page-fallback" aria-hidden="true" />;
 }
 
 const DesktopRetailHome       = lazy(() => import("@/desktop/pages/retail-home"));
@@ -169,9 +174,16 @@ function useRoutePreload(enabled: boolean, deviceClass: DeviceClass) {
   }, [deviceClass, enabled]);
 }
 
+/**
+ * The route-level full-screen loader, for mobile and public routes.
+ *
+ * `data-testid` marks it as exactly that: the transition probes gate on this
+ * element appearing, and must not confuse it with a page's own content spinner,
+ * which shares the `animate-spin` utility class but covers nothing.
+ */
 function PageLoader() {
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: "#060D1F" }}>
+    <div data-testid="page-loader" className="min-h-screen flex items-center justify-center" style={{ background: "#060D1F" }}>
       <div className="w-8 h-8 border-2 border-[#00DFC8] border-t-transparent rounded-full animate-spin" />
     </div>
   );
