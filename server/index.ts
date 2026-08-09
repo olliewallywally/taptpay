@@ -129,6 +129,28 @@ app.use(createRequestLogger(log));
     }
   }
 
+  // ── Pending-migration check (report only, never applies) ─────────────────
+  // The `migrations/*.sql` files used to be applied by hand or not at all,
+  // which is how the dev database silently fell three migrations behind
+  // `shared/schema.ts` and started throwing `column ... does not exist` on
+  // every logged-in request. `server/migrate.ts` now records what a database
+  // has actually seen, and this check makes a gap impossible to miss.
+  //
+  // DATA SAFETY: this is read-only and deliberately does NOT apply anything —
+  // replit.md "Data Safety Policy" and .agents/memory/schema-push-and-drift.md
+  // require that schema sync is never an unconditional app-start side effect.
+  // Applying stays a deliberate `npm run db:migrate`. It is also fire-and-
+  // forget: it owns its own short-lived connection with a 5s timeout, swallows
+  // every error, and can never delay or crash startup.
+  void (async () => {
+    try {
+      const { reportPendingMigrations } = await import("./migrate");
+      await reportPendingMigrations();
+    } catch (error) {
+      log(`⚠️  Migration check unavailable (non-fatal): ${error}`);
+    }
+  })();
+
   // ── Schema push (drizzle-kit push) ───────────────────────────────────────
   // Never run schema sync as a normal app-start side effect. The trades branch
   // must use reviewed additive SQL, and drizzle-kit push can propose destructive

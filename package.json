@@ -13,7 +13,10 @@
     "test:server": "jest --selectProjects server --runInBand",
     "test:server:postgres": "node --test scripts/postgres-verifier-safety.test.mjs && node scripts/verify-server-postgres.mjs",
     "test:server:postgres:safety": "node --test scripts/postgres-verifier-safety.test.mjs",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "db:migrate": "tsx server/migrate.ts",
+    "db:migrate:status": "tsx server/migrate.ts --status",
+    "db:migrate:baseline": "tsx server/migrate.ts --baseline"
   },
   "dependencies": {
     "@babel/core": "^7.28.4",
