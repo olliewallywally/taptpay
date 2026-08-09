@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
+import { installAsyncRouteGuard } from "./async-route-guard";
 import {
   storage,
   BillSplitConflictError,
@@ -308,6 +309,13 @@ function escHtml(s: string | null | undefined): string {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Express 4 drops an async handler's rejection on the floor — nothing calls
+  // next(err), so the request is never answered and the client hangs forever.
+  // This patches the registration methods themselves, so every route below is
+  // covered; it must stay the first statement, because it only reaches
+  // handlers registered after it. See server/async-route-guard.ts.
+  installAsyncRouteGuard(app);
+
   const paymentAttempts = new PaymentAttemptService(storage);
 
   app.get("/robots.txt", (_req, res) => {
