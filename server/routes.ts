@@ -5,6 +5,7 @@ import { installAsyncRouteGuard } from "./async-route-guard";
 import {
   storage,
   BillSplitConflictError,
+  SubscriptionBillingBusyError,
   TaptStoneCapacityError,
   TaptStoneConflictError,
   subscriptionCardSessionState,
@@ -33,13 +34,20 @@ import { sendPushToMerchant } from "./push";
 import { resendInvoiceEmail } from "./property-cron";
 import { resendTradeInvoice, sendTradePaymentInvoice, sendTradeQuote } from "./trades-delivery";
 import { sendGstInvoices, extractEmails } from "./gst-invoice";
-import { BILLING_CARD_REQUIRED, billingCardIsReady, isCardExpiryValid, isLuhnValid } from "./billing-card";
+import {
+  BILLING_CARD_REQUIRED,
+  billingCardIsReady,
+  renewalPaymentMethodIsReady,
+  isCardExpiryValid,
+  isLuhnValid,
+} from "./billing-card";
 import {
   adminMerchantDto,
   billingHistoryDto,
   adminMerchantSummaryDto,
   adminTransactionDto,
   merchantSseTransactionDto,
+  memberMerchantSettingsDto,
   ownerMerchantDto,
   ownerTransactionDto,
   publicMerchantBrandDto,
@@ -71,6 +79,34 @@ import {
 
 // Guards against overlapping cron runs (see POST /api/internal/cron).
 let cronRunning = false;
+let cronStartedAt: string | null = null;
+let lastCronRun: {
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  ok: boolean;
+  failedPasses: string[];
+  subscriptionBilling: unknown;
+} | null = null;
+
+function authorizeCronRequest(req: express.Request, res: express.Response): boolean {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    res.status(503).json({ message: "Cron not configured" });
+    return false;
+  }
+  const provided = req.headers["x-cron-secret"];
+  const providedBuf = Buffer.from(Array.isArray(provided) ? "" : (provided ?? ""));
+  const secretBuf = Buffer.from(cronSecret);
+  if (
+    providedBuf.length !== secretBuf.length
+    || !crypto.timingSafeEqual(providedBuf, secretBuf)
+  ) {
+    res.status(401).json({ message: "Unauthorized" });
+    return false;
+  }
+  return true;
+}
 
 async function requireBillingCard(merchantId: number, res: any): Promise<boolean> {
   const subscription = await storage.getOrCreateSubscription(merchantId);
@@ -1123,22 +1159,28 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Authenticated owner profile. Keep this separate from the public brand route
-  // so caches and callers cannot accidentally receive a broader shape.
+  // Authenticated settings profile. Owners receive the full allowlisted account
+  // projection; teammates receive only the read-only business fields rendered
+  // by their disabled Settings form.
   app.get("/api/merchants/:id/profile", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const merchantId = parseInt(req.params.id);
-      if (!Number.isInteger(merchantId) || !checkAccountOwnership(req, merchantId)) {
+      if (!Number.isInteger(merchantId) || !checkMerchantOwnership(req, merchantId)) {
         return res.status(403).json({ message: "Access denied" });
       }
       const merchant = await storage.getMerchant(merchantId);
       if (!merchant) return res.status(404).json({ message: "Merchant not found" });
 
-      res.json(ownerMerchantDto({
+      const withUrls = {
         ...merchant,
         paymentUrl: generatePaymentUrl(merchantId, undefined, req),
         qrCodeUrl: generateQrCodeUrl(merchantId, undefined, req),
-      }));
+      };
+      res.json(
+        isAccountOwner(req.user)
+          ? ownerMerchantDto(withUrls)
+          : memberMerchantSettingsDto(withUrls),
+      );
     } catch (error) {
       res.status(500).json({ message: "Failed to get merchant profile" });
     }
@@ -4780,13 +4822,16 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         merchant.estimatedAnnualTurnover
       );
 
-      // Mark email verified and promote status to 'verified' so merchant can log in.
-      await storage.updateMerchant(merchant.id, {
-        emailVerified: true,
-        verificationToken: null,
-        status: 'verified',
-        onboardingCompleted: hasCompleteApplication,
-      });
+      // Promote the merchant and its pending subscription atomically. The
+      // subscription becomes eligible for card activation at the same moment
+      // the account becomes eligible to sign in.
+      const confirmedMerchant = await storage.confirmMerchantEmail(
+        token,
+        hasCompleteApplication,
+      );
+      if (!confirmedMerchant) {
+        return res.status(400).json({ message: "Invalid or expired verification token" });
+      }
 
       // Sync auth store so the merchant can log in immediately
       const { syncVerifiedMerchants } = await import('./auth');
@@ -6311,14 +6356,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(400).json({ message: "Merchant ID required" });
       }
 
-      if (!isAccountOwner(req.user)) {
-        return res.status(403).json({ message: "Only the account owner can view the subscription" });
-      }
       const subscription = await storage.getOrCreateSubscription(merchantId);
       const seatsInUse = await storage.countSeatsInUse(merchantId);
+      const view = subscriptionDto(subscription, seatsInUse);
+      if (!isAccountOwner(req.user)) view.card = null;
 
       res.json({
-        subscription: subscriptionDto(subscription, seatsInUse),
+        subscription: view,
         plans: PLAN_LIST,
       });
     } catch (error) {
@@ -6792,7 +6836,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       if (!merchant) return res.status(404).json({ message: "Merchant not found" });
 
       const subscription = await storage.getOrCreateSubscription(merchantId);
-      const ready = billingCardIsReady(subscription);
+      const ready = renewalPaymentMethodIsReady(subscription);
       res.json({
         ready,
         card: subscription?.cardLast4
@@ -6881,7 +6925,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         const seatsInUse = await storage.countSeatsInUse(merchantId);
         return res.json({
           success: true,
-          ready: billingCardIsReady(boundSubscription),
+          ready: renewalPaymentMethodIsReady(boundSubscription),
           charged: false,
           card: {
             last4: boundSubscription.cardLast4,
@@ -6934,7 +6978,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       res.json({
         success: true,
-        ready: billingCardIsReady(completion.subscription),
+        ready: renewalPaymentMethodIsReady(completion.subscription),
         charged: completion.charged,
         card: { last4: result.card.last4, brand: result.card.brand, expiry: result.card.expiry },
         subscription: subscriptionDto(completion.subscription, seatsInUse),
@@ -6973,6 +7017,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       res.json({ success: true });
     } catch (error) {
       console.error("Remove billing card error:", error);
+      if (error instanceof SubscriptionBillingBusyError) {
+        return res.status(409).json({ message: "Billing is already in progress. Please try again shortly." });
+      }
       res.status(500).json({ message: "Failed to remove card" });
     }
   });
@@ -8528,48 +8575,139 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
   // ── Cron endpoint ─────────────────────────────────────────────────────────
 
+  app.get("/api/internal/cron/status", (req, res) => {
+    if (!authorizeCronRequest(req, res)) return;
+    res.json({
+      configured: true,
+      running: cronRunning,
+      startedAt: cronStartedAt,
+      lastRun: lastCronRun,
+    });
+  });
+
   app.post("/api/internal/cron", async (req, res) => {
-    const cronSecret = process.env.CRON_SECRET;
-    if (!cronSecret) return res.status(503).json({ message: "Cron not configured" });
-    // Constant-time comparison to avoid leaking the secret via timing.
-    const provided = req.headers["x-cron-secret"];
-    const providedBuf = Buffer.from(Array.isArray(provided) ? "" : (provided ?? ""));
-    const secretBuf = Buffer.from(cronSecret);
-    if (providedBuf.length !== secretBuf.length || !crypto.timingSafeEqual(providedBuf, secretBuf)) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
+    if (!authorizeCronRequest(req, res)) return;
     // Serialize cron runs. Overlapping invocations (scheduler double-fire, or a run
     // that exceeds the schedule interval) would otherwise double-generate invoices
     // and double-dispatch tenant emails, since generate/dispatch are fetch-then-write
     // and advance nextRunDate non-atomically.
     if (cronRunning) return res.status(409).json({ message: "A cron run is already in progress" });
     cronRunning = true;
+    const started = new Date();
+    cronStartedAt = started.toISOString();
     try {
-      const { runGeneratePass, runDispatchPass, runOverduePass, runReminderPass } = await import("./property-cron");
-      const { runTradesGeneratePass } = await import("./trades-cron");
-      const { runTradesDispatchPass, runTradesOverduePass, runTradesReminderPass } = await import("./trades-delivery");
-      const { runDailyPayoutNotificationPass } = await import("./daily-payout-notifications");
-      const { runSubscriptionBillingPass } = await import("./subscription-cron");
       const now = new Date();
       const baseUrl = getBaseUrl(req);
-      // Sequential: generate must complete before dispatch (dispatch reads the
-      // invoices generate creates), and overdue must precede the reminder pass.
-      const generate  = await runGeneratePass(now);
-      const tradesGenerate = await runTradesGeneratePass(now);
-      const dispatch  = await runDispatchPass(baseUrl);
-      const tradesDispatch = await runTradesDispatchPass(baseUrl);
-      const overdue   = await runOverduePass(now);
-      const tradesOverdue = await runTradesOverduePass(now);
-      const reminders = await runReminderPass(baseUrl, now);
-      const tradesReminders = await runTradesReminderPass(baseUrl, now);
-      const dailyPayoutNotifications = await runDailyPayoutNotificationPass(now);
-      // Last: subscription billing is independent of the invoice passes, and a
-      // slow processor call must not delay merchants' own invoices going out.
-      const subscriptionBilling = await runSubscriptionBillingPass(now);
-      console.log(`[CRON] subscriptionBilling=${JSON.stringify(subscriptionBilling)} generate=${JSON.stringify(generate)} tradesGenerate=${JSON.stringify(tradesGenerate)} dispatch=${JSON.stringify(dispatch)} overdue=${JSON.stringify(overdue)} reminders=${JSON.stringify(reminders)} dailyPayoutNotifications=${JSON.stringify(dailyPayoutNotifications)}`);
-      res.json({ ok: true, ranAt: now.toISOString(), generate, tradesGenerate, dispatch, tradesDispatch, overdue, tradesOverdue, reminders, tradesReminders, dailyPayoutNotifications, subscriptionBilling });
-    } catch (err) { console.error("[CRON]", err); res.status(500).json({ message: "Cron run failed" }); }
-    finally { cronRunning = false; }
+      const failedPasses: string[] = [];
+      const runPass = async <T>(name: string, task: () => Promise<T>): Promise<T | { error: string }> => {
+        try {
+          return await task();
+        } catch (error) {
+          failedPasses.push(name);
+          console.error(`[CRON] ${name} failed:`, error);
+          return { error: "Pass failed" };
+        }
+      };
+
+      // Subscription billing starts independently. A property/trades/push pass
+      // can fail without preventing renewals, and a slow provider call does not
+      // hold up the start of merchant invoice processing.
+      const subscriptionBillingPromise = runPass(
+        "subscriptionBilling",
+        async () => {
+          const { runSubscriptionBillingPass } = await import("./subscription-cron");
+          return runSubscriptionBillingPass(now);
+        },
+      );
+
+      // Keep the useful ordering within each vertical, but isolate failures so
+      // one subsystem (including its module load) cannot suppress every later pass.
+      const generate = await runPass("generate", async () => {
+        const { runGeneratePass } = await import("./property-cron");
+        return runGeneratePass(now);
+      });
+      const tradesGenerate = await runPass("tradesGenerate", async () => {
+        const { runTradesGeneratePass } = await import("./trades-cron");
+        return runTradesGeneratePass(now);
+      });
+      const dispatch = await runPass("dispatch", async () => {
+        const { runDispatchPass } = await import("./property-cron");
+        return runDispatchPass(baseUrl);
+      });
+      const tradesDispatch = await runPass("tradesDispatch", async () => {
+        const { runTradesDispatchPass } = await import("./trades-delivery");
+        return runTradesDispatchPass(baseUrl);
+      });
+      const overdue = await runPass("overdue", async () => {
+        const { runOverduePass } = await import("./property-cron");
+        return runOverduePass(now);
+      });
+      const tradesOverdue = await runPass("tradesOverdue", async () => {
+        const { runTradesOverduePass } = await import("./trades-delivery");
+        return runTradesOverduePass(now);
+      });
+      const reminders = await runPass("reminders", async () => {
+        const { runReminderPass } = await import("./property-cron");
+        return runReminderPass(baseUrl, now);
+      });
+      const tradesReminders = await runPass(
+        "tradesReminders",
+        async () => {
+          const { runTradesReminderPass } = await import("./trades-delivery");
+          return runTradesReminderPass(baseUrl, now);
+        },
+      );
+      const dailyPayoutNotifications = await runPass(
+        "dailyPayoutNotifications",
+        async () => {
+          const { runDailyPayoutNotificationPass } = await import("./daily-payout-notifications");
+          return runDailyPayoutNotificationPass(now);
+        },
+      );
+      const subscriptionBilling = await subscriptionBillingPromise;
+      const finished = new Date();
+      const ok = failedPasses.length === 0;
+      lastCronRun = {
+        startedAt: started.toISOString(),
+        finishedAt: finished.toISOString(),
+        durationMs: finished.getTime() - started.getTime(),
+        ok,
+        failedPasses,
+        subscriptionBilling,
+      };
+      console.log(`[CRON] ok=${ok} durationMs=${lastCronRun.durationMs} failedPasses=${failedPasses.join(",") || "none"} subscriptionBilling=${JSON.stringify(subscriptionBilling)}`);
+      res.status(ok ? 200 : 207).json({
+        ok,
+        ranAt: now.toISOString(),
+        failedPasses,
+        generate,
+        tradesGenerate,
+        dispatch,
+        tradesDispatch,
+        overdue,
+        tradesOverdue,
+        reminders,
+        tradesReminders,
+        dailyPayoutNotifications,
+        subscriptionBilling,
+      });
+    } catch (err) {
+      const finished = new Date();
+      lastCronRun = {
+        startedAt: started.toISOString(),
+        finishedAt: finished.toISOString(),
+        durationMs: finished.getTime() - started.getTime(),
+        ok: false,
+        failedPasses: ["cron"],
+        subscriptionBilling: null,
+      };
+      console.error("[CRON]", err);
+      res.status(500).json({ message: "Cron run failed" });
+    }
+    finally {
+      cronRunning = false;
+      cronStartedAt = null;
+    }
   });
 
   const httpServer = createServer(app);

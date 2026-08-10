@@ -18,6 +18,7 @@ import {
   wrapAsyncHandler,
   asyncRouteGuardInternals,
 } from "../async-route-guard";
+import { createGlobalErrorHandler } from "../http-error-handler";
 
 type SeenError = { err: any; headersSent: boolean };
 
@@ -37,13 +38,10 @@ function createHarness(options: { guarded?: boolean } = {}): Harness {
 
   const seenErrors: SeenError[] = [];
   const useGlobalErrorHandler = () => {
-    const handler: express.ErrorRequestHandler = (err, _req, res, _next) => {
+    const productionHandler = createGlobalErrorHandler(() => undefined);
+    const handler: express.ErrorRequestHandler = (err, req, res, next) => {
       seenErrors.push({ err, headersSent: res.headersSent });
-      const status = err.status || err.statusCode || 500;
-      const message = err.message || "Internal Server Error";
-      if (!res.headersSent) {
-        res.status(status).json({ message });
-      }
+      productionHandler(err, req, res, next);
     };
     app.use(handler);
   };
@@ -171,7 +169,7 @@ describe("async route guard — the hang it exists to prevent", () => {
 
     const reply = await request(server.port, "/boom");
     expect(reply.status).toBe(500);
-    expect(JSON.parse(reply.body)).toEqual({ message: "guarded" });
+    expect(JSON.parse(reply.body)).toEqual({ message: "Internal Server Error" });
     expect(seenErrors).toHaveLength(1);
     expect(seenErrors[0].headersSent).toBe(false);
   });
@@ -187,7 +185,8 @@ describe("async route guard — the hang it exists to prevent", () => {
 
     const reply = await request(server.port, "/late");
     expect(reply.status).toBe(500);
-    expect(JSON.parse(reply.body).message).toContain("billing_claim_token");
+    expect(JSON.parse(reply.body)).toEqual({ message: "Internal Server Error" });
+    expect(reply.body).not.toContain("billing_claim_token");
   });
 
   test("a status carried on the rejected error is preserved", async () => {
@@ -248,16 +247,14 @@ describe("async route guard — the hang it exists to prevent", () => {
         method,
       });
       expect(reply.status).toBe(500);
-      expect(JSON.parse(reply.body).message).toBe(
-        `${method.toLowerCase()} failed`,
-      );
+      expect(JSON.parse(reply.body).message).toBe("Internal Server Error");
     }
 
     const all = await request(server.port, "/m/all", { method: "PUT" });
-    expect(JSON.parse(all.body).message).toBe("all failed");
+    expect(JSON.parse(all.body).message).toBe("Internal Server Error");
 
     const used = await request(server.port, "/m/use");
-    expect(JSON.parse(used.body).message).toBe("use failed");
+    expect(JSON.parse(used.body).message).toBe("Internal Server Error");
   });
 });
 
@@ -322,7 +319,7 @@ describe("async route guard — what it must not break", () => {
     // Unchanged from today: Express's own try/catch already forwards this.
     const thrown = await request(server.port, "/sync-throw");
     expect(thrown.status).toBe(500);
-    expect(JSON.parse(thrown.body).message).toBe("sync boom");
+    expect(JSON.parse(thrown.body).message).toBe("Internal Server Error");
   });
 
   test("a sync handler's return value passes straight through", () => {
@@ -550,6 +547,7 @@ describe("async route guard — already-responded handlers", () => {
     useGlobalErrorHandler();
     const server = await listen(app);
 
+    const started = Date.now();
     const raw = await collectRaw(server.port, "/events", 400);
 
     expect(raw).toContain("Content-Type: text/event-stream");
@@ -560,9 +558,10 @@ describe("async route guard — already-responded handlers", () => {
     expect(countResponses(raw)).toBe(1);
     expect(raw).not.toContain('{"message"');
     expect(raw.endsWith('data: {"type":"connected"}\n\n\r\n')).toBe(true);
-    // No terminating chunk: the stream is still open, exactly as EventSource
-    // needs it to be.
+    // No JSON or terminating chunk is appended. The connection itself is
+    // closed promptly so EventSource can reconnect instead of hanging forever.
     expect(raw).not.toContain("\r\n0\r\n\r\n");
+    expect(Date.now() - started).toBeLessThan(350);
 
     expect(seenErrors).toHaveLength(1);
     expect(seenErrors[0].headersSent).toBe(true);

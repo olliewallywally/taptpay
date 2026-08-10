@@ -13,7 +13,6 @@ function handler(method: "get" | "post" | "put" | "delete", route: string): stri
 
 describe("subscription and team route authorization", () => {
   test.each([
-    ["get", "/api/subscription", "storage.getOrCreateSubscription("],
     ["get", "/api/team", "storage.getOrCreateSubscription("],
     ["get", "/api/subscription/billing-history", "storage.getBillingHistory("],
     ["get", "/api/billing/card", "storage.getMerchant("],
@@ -25,14 +24,29 @@ describe("subscription and team route authorization", () => {
     expect(read).toBeGreaterThan(gate);
   });
 
+  test("get /api/subscription is member-readable but remains authenticated", () => {
+    const body = handler("get", "/api/subscription");
+    expect(body.slice(0, body.indexOf("async ("))).toContain("authenticateToken");
+    expect(body).not.toContain("res.status(403)");
+    expect(body.indexOf("isAccountOwner(req.user)"))
+      .toBeGreaterThan(body.indexOf("storage.getOrCreateSubscription("));
+    expect(body).toContain("subscriptionDto(subscription, seatsInUse)");
+  });
+
   test.each([
     ["post", "/api/merchants/:id/onboarding"],
-    ["get", "/api/merchants/:id/profile"],
     ["put", "/api/merchants/:id/details"],
     ["put", "/api/merchants/:id/business-details"],
     ["put", "/api/merchants/:id"],
   ] as const)("%s %s requires account ownership", (method, route) => {
     expect(handler(method, route)).toContain("checkAccountOwnership(req, merchantId)");
+  });
+
+  test("member Settings receives a restricted merchant profile", () => {
+    const profile = handler("get", "/api/merchants/:id/profile");
+    expect(profile).toContain("checkMerchantOwnership(req, merchantId)");
+    expect(profile).toContain("isAccountOwner(req.user)");
+    expect(profile).toContain("memberMerchantSettingsDto(withUrls)");
   });
 
   test("general merchant updates cannot change the login email", () => {
@@ -74,7 +88,7 @@ describe("subscription card and paid-plan route integration", () => {
     expect(confirm).toContain('completion.reason === "invalid-state"');
     expect(confirm).toContain('completion.reason === "declined"');
     expect(confirm).toContain('completion.reason === "charge-failed"');
-    expect(confirm).toContain("ready: billingCardIsReady(completion.subscription)");
+    expect(confirm).toContain("ready: renewalPaymentMethodIsReady(completion.subscription)");
     expect(source).toContain('app.all("/api/billing/card/notification"');
   });
 
@@ -96,6 +110,30 @@ describe("subscription card and paid-plan route integration", () => {
     expect(callback).toContain('app.post("/api/billing/card/callback", billingCardCallback)');
     expect(callback).not.toContain("sessionId");
     expect(callback).not.toContain("&session=");
+  });
+});
+
+describe("internal cron isolation and observability", () => {
+  test("status and execution routes share the protected cron authorization", () => {
+    expect(handler("get", "/api/internal/cron/status")).toContain(
+      "authorizeCronRequest(req, res)",
+    );
+    expect(handler("post", "/api/internal/cron")).toContain(
+      "authorizeCronRequest(req, res)",
+    );
+  });
+
+  test("subscription billing starts independently and every module load is pass-isolated", () => {
+    const cron = handler("post", "/api/internal/cron");
+    const subscriptionStart = cron.indexOf("const subscriptionBillingPromise = runPass(");
+    const propertyStart = cron.indexOf('const generate = await runPass("generate"');
+    expect(subscriptionStart).toBeGreaterThan(0);
+    expect(propertyStart).toBeGreaterThan(subscriptionStart);
+    expect(cron).toContain('await import("./subscription-cron")');
+    expect(cron).toContain('await import("./property-cron")');
+    expect(cron).toContain('failedPasses.push(name)');
+    expect(cron).toContain("res.status(ok ? 200 : 207)");
+    expect(cron).toContain('failedPasses: ["cron"]');
   });
 });
 

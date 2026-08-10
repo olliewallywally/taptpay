@@ -146,6 +146,38 @@ export function ownerMerchantDto(merchant: MerchantInput) {
   };
 }
 
+/**
+ * Read-only business settings visible to a teammate. This intentionally omits
+ * KYC/application data, tutorial controls, processor-card metadata and every
+ * credential while retaining the fields the disabled Settings form displays.
+ */
+export function memberMerchantSettingsDto(merchant: MerchantInput) {
+  return {
+    id: merchant.id,
+    name: merchant.name,
+    businessName: merchant.businessName,
+    businessType: merchant.businessType,
+    email: merchant.contactEmail ?? merchant.email,
+    phone: merchant.contactPhone ?? merchant.phone,
+    address: merchant.businessAddress ?? merchant.address,
+    status: merchant.status,
+    qrCodeUrl: merchant.qrCodeUrl,
+    paymentUrl: merchant.paymentUrl,
+    director: merchant.director,
+    nzbn: merchant.nzbn,
+    contactEmail: merchant.contactEmail,
+    contactPhone: merchant.contactPhone,
+    businessAddress: merchant.businessAddress,
+    gstNumber: merchant.gstNumber,
+    customLogoUrl: merchant.customLogoUrl,
+    themeId: merchant.themeId,
+    gstRegistered: merchant.gstRegistered,
+    tradeGstMode: merchant.tradeGstMode,
+    dailyGoal: merchant.dailyGoal,
+    windcaveApiConfigured: false,
+  };
+}
+
 export function adminMerchantSummaryDto(merchant: MerchantInput) {
   return {
     id: merchant.id,
