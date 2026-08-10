@@ -445,7 +445,7 @@ export async function authenticateToken(req: AuthenticatedRequest, res: Response
     !isPositiveInteger(decoded.userId) ||
     !isMerchantUserRole(decoded.role)
   ) {
-    return res.status(404).json({ message: 'User not found' });
+    return res.status(401).json({ code: 'INVALID_SESSION', message: 'Invalid session' });
   }
 
   // Each read is guarded on its own, and the decisions sit outside the guard, so
@@ -472,7 +472,7 @@ export async function authenticateToken(req: AuthenticatedRequest, res: Response
   // A row that is absent, unverified or suspended — the database answered, and
   // the answer is that this login has no usable account behind it.
   if (!merchant || (merchant.status !== 'verified' && merchant.status !== 'active')) {
-    return res.status(404).json({ message: 'User not found' });
+    return res.status(403).json({ code: 'ACCESS_REVOKED', message: 'Access revoked' });
   }
 
   // The database role is authoritative; stale JWT role claims are ignored.

@@ -280,25 +280,25 @@ describe('database outage versus a real rejection', () => {
     expect(result.status).toHaveBeenCalledWith(503);
   });
 
-  it('still answers 404 when the database says the merchant row is gone', async () => {
+  it('answers 403 when the database says the merchant principal is gone', async () => {
     storageMock.getMerchant.mockResolvedValue(undefined);
 
     const { result, next } = await callWithToken();
 
     expect(next).not.toHaveBeenCalled();
-    expect(result.status).toHaveBeenCalledWith(404);
-    expect(bodyOf(result)).toEqual({ message: 'User not found' });
+    expect(result.status).toHaveBeenCalledWith(403);
+    expect(bodyOf(result)).toEqual({ code: 'ACCESS_REVOKED', message: 'Access revoked' });
   });
 
   it.each(['pending', 'suspended', 'rejected'])(
-    'still answers 404 when the merchant row exists but is %s',
+    'answers 403 when the merchant row exists but is %s',
     async (status) => {
       storageMock.getMerchant.mockResolvedValue({ ...MERCHANT, status });
 
       const { result, next } = await callWithToken();
 
       expect(next).not.toHaveBeenCalled();
-      expect(result.status).toHaveBeenCalledWith(404);
+      expect(result.status).toHaveBeenCalledWith(403);
     },
   );
 

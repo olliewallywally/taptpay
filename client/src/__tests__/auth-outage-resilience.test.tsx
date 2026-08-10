@@ -52,6 +52,19 @@ function jsonResponse(status: number, body: unknown) {
   } as unknown as Response;
 }
 
+function validAuthBody(overrides: Record<string, unknown> = {}) {
+  return {
+    user: {
+      id: 7,
+      email: "owner@example.test",
+      merchantId: "22",
+      role: "owner",
+      onboardingCompleted: true,
+      ...overrides,
+    },
+  };
+}
+
 /** A backend that accepts the request and then simply never answers. */
 function neverAnswers() {
   return jest.fn(() => new Promise<Response>(() => {}));
@@ -197,7 +210,7 @@ describe("infrastructure failure never costs the session", () => {
       call += 1;
       return call === 1
         ? jsonResponse(500, { message: "boom" })
-        : jsonResponse(200, { user: { merchantId: "22", role: "owner", onboardingCompleted: true } });
+        : jsonResponse(200, validAuthBody());
     }) as any;
     renderProtectedApp();
 
@@ -207,21 +220,33 @@ describe("infrastructure failure never costs the session", () => {
     expect(removeItem).not.toHaveBeenCalled();
   });
 
-  it("does not retry a 404, and still does not discard the session", async () => {
-    // The server now reserves 404 for an account that genuinely is not there.
-    // Asking again cannot change that, but it is still not a rejection of these
-    // credentials — so: no retry, no clearing, an explicit way out on screen.
+  it("rejects a 404 principal once instead of presenting it as an outage", async () => {
+    // `/api/auth/me` uses 404 only when the signed token's user or merchant no
+    // longer exists. Retaining that token can never recover the principal.
     jest.useFakeTimers();
     const fetchSpy = jest.fn(async () => jsonResponse(404, { message: "User not found" }));
     global.fetch = fetchSpy as any;
     renderProtectedApp();
 
-    await advance(AUTH_TOTAL_DEADLINE_MS);
+    await flush();
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
-    expect(removeItem).not.toHaveBeenCalled();
+    expect(removeItem).toHaveBeenCalledWith("authToken");
+    expect(screen.queryByTestId("auth-unavailable")).not.toBeInTheDocument();
+  });
+
+  it("never authenticates a malformed 200 response", async () => {
+    jest.useFakeTimers();
+    const fetchSpy = jest.fn(async () => jsonResponse(200, {}));
+    global.fetch = fetchSpy as any;
+    renderProtectedApp();
+
+    await advance(AUTH_TOTAL_DEADLINE_MS);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(AUTH_MAX_ATTEMPTS);
+    expect(screen.queryByTestId("protected-content")).not.toBeInTheDocument();
     expect(screen.getByTestId("auth-unavailable")).toBeInTheDocument();
-    expect(screen.getByTestId("auth-unavailable-signout")).toBeInTheDocument();
+    expect(removeItem).not.toHaveBeenCalled();
   });
 });
 
@@ -240,7 +265,7 @@ describe("a rejected credential is still a rejected credential", () => {
 
   it("signs a valid session in without touching storage", async () => {
     global.fetch = jest.fn(async () =>
-      jsonResponse(200, { user: { merchantId: "22", role: "owner", onboardingCompleted: true } }),
+      jsonResponse(200, validAuthBody()),
     ) as any;
     renderProtectedApp();
     await flush();
@@ -267,7 +292,7 @@ describe("the recovery screen is a way out, not a dead end", () => {
     let healthy = false;
     global.fetch = jest.fn(async () =>
       healthy
-        ? jsonResponse(200, { user: { merchantId: "22", role: "owner", onboardingCompleted: true } })
+        ? jsonResponse(200, validAuthBody())
         : jsonResponse(503, { message: "down" }),
     ) as any;
     renderProtectedApp();
@@ -349,7 +374,7 @@ describe("the recovery screen is a way out, not a dead end", () => {
     // The backend recovers a moment too late — it must not resurrect a session
     // the user has explicitly ended.
     await act(async () => {
-      release?.(jsonResponse(200, { user: { merchantId: "22", role: "owner", onboardingCompleted: true } }));
+      release?.(jsonResponse(200, validAuthBody()));
     });
     await advance(1000);
 
