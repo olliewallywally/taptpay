@@ -194,29 +194,6 @@ app.use(createRequestLogger(log));
     }
   }
 
-  // Consolidated signup KYC fields. This is an additive, idempotent migration
-  // and intentionally lives outside drizzle-kit push so production deploys do
-  // not require RUN_SCHEMA_PUSH for these non-destructive columns.
-  if (isDatabaseConnected()) {
-    try {
-      const pgDb = getDb();
-      if (pgDb) {
-        await pgDb.execute(sql`
-          ALTER TABLE merchants
-            ADD COLUMN IF NOT EXISTS business_description text,
-            ADD COLUMN IF NOT EXISTS website_url text,
-            ADD COLUMN IF NOT EXISTS estimated_annual_turnover text
-        `);
-        log("✅ Merchant signup KYC columns ready");
-      }
-    } catch (error) {
-      if (isProduction) {
-        console.error("FATAL: Failed to prepare merchant signup KYC columns:", error);
-        process.exit(1);
-      }
-      log(`⚠️ Failed to prepare merchant signup KYC columns: ${error}`);
-    }
-  }
 
   const server = await registerRoutes(app);
 
@@ -237,50 +214,6 @@ app.use(createRequestLogger(log));
     log(`⚠️ Failed to sync verified merchants: ${error}`);
   }
 
-  // Ensure info_pack_leads table exists (additive migration, safe to re-run)
-  if (isDatabaseConnected()) {
-    try {
-      const { getDb } = await import("./database");
-      const { sql } = await import("drizzle-orm");
-      const pgDb = getDb();
-      if (pgDb) {
-        await pgDb.execute(sql`
-          CREATE TABLE IF NOT EXISTS info_pack_leads (
-            id serial PRIMARY KEY,
-            name text NOT NULL,
-            email text NOT NULL,
-            created_at timestamp DEFAULT now()
-          )
-        `);
-        log("✅ info_pack_leads table ready");
-      }
-    } catch (error) {
-      log(`⚠️ Failed to ensure info_pack_leads table: ${error}`);
-    }
-  }
-
-  // Ensure uploaded_files table exists (additive migration, safe to re-run).
-  // Merchant logos and invoice documents are stored here instead of the local
-  // filesystem, which is wiped on every autoscale deploy/restart.
-  if (isDatabaseConnected()) {
-    try {
-      const pgDb = getDb();
-      if (pgDb) {
-        await pgDb.execute(sql`
-          CREATE TABLE IF NOT EXISTS uploaded_files (
-            id serial PRIMARY KEY,
-            path text NOT NULL UNIQUE,
-            mime_type text NOT NULL,
-            data bytea NOT NULL,
-            created_at timestamp DEFAULT now() NOT NULL
-          )
-        `);
-        log("✅ uploaded_files table ready");
-      }
-    } catch (error) {
-      log(`⚠️ Failed to ensure uploaded_files table: ${error}`);
-    }
-  }
 
   // Dev-only automatic DB backups: snapshot both databases (workspace helium +
   // production Neon) on every boot and then daily, via pg_dump into db-backups/.
