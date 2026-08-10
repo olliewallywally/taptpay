@@ -93,8 +93,10 @@ describe("Phase 2 Drizzle schema", () => {
     const parsedInsert = insertTransactionSchema.parse({
       ...base,
       paymentTokenHash: "a".repeat(64),
+      completedAt: new Date("2026-08-09T00:00:00.000Z"),
     }) as Record<string, unknown>;
     expect(parsedInsert).not.toHaveProperty("paymentTokenHash");
+    expect(parsedInsert).not.toHaveProperty("completedAt");
   });
 });
 

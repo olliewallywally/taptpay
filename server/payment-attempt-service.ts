@@ -4,7 +4,6 @@ import {
   paymentAttemptOutcomes,
   type PaymentAttempt,
   type PaymentAttemptOutcome,
-  type PlatformFee,
   type SplitPayment,
   type Transaction,
 } from "@shared/schema";

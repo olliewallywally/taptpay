@@ -1,4 +1,4 @@
-import { users, type User, type UserStatus, merchants, merchantTutorialProgress, transactions, merchantSettlements, platformFees, refunds, splitPayments, paymentAttempts, PAYMENT_RETURN_STATE_MAX_AGE_MS, taptStones, stockItems, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, pushNotificationDeliveries, normalizePushNotificationPreferences, DEFAULT_PUSH_NOTIFICATION_PREFERENCES, tenantProfiles, activeSchedules, invoicesRentRequests, transactionEvents, clientProfiles, quotes, jobInvoices, jobSchedules, jobEvents, type Merchant, type MerchantTutorialProgress, type Transaction, type SplitPayment, type PaymentAttempt, type InsertMerchant, type InsertTransaction, type CreateMerchant, type PlatformFee, type InsertPlatformFee, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type MerchantSubscription, type SubscriptionBillingHistory, type PushSubscription, type PushNotificationPreferences, type PushNotificationEventType } from "@shared/schema";
+import { users, type User, type UserStatus, merchants, merchantTutorialProgress, transactions, merchantSettlements, refunds, splitPayments, paymentAttempts, PAYMENT_RETURN_STATE_MAX_AGE_MS, taptStones, stockItems, merchantSubscriptions, subscriptionBillingHistory, pushSubscriptions, pushNotificationDeliveries, normalizePushNotificationPreferences, DEFAULT_PUSH_NOTIFICATION_PREFERENCES, tenantProfiles, activeSchedules, invoicesRentRequests, transactionEvents, clientProfiles, quotes, jobInvoices, jobSchedules, jobEvents, type Merchant, type MerchantTutorialProgress, type Transaction, type SplitPayment, type PaymentAttempt, type InsertMerchant, type InsertTransaction, type CreateMerchant, type Refund, type InsertRefund, type TaptStone, type InsertTaptStone, type StockItem, type InsertStockItem, type MerchantSubscription, type SubscriptionBillingHistory, type PushSubscription, type PushNotificationPreferences, type PushNotificationEventType } from "@shared/schema";
 import { DEFAULT_PLAN_ID, isUpgrade, planFor, planForOrDefault, type PlanId } from "@shared/plans";
 import { decideBilling, failedPaymentUpdates, immediatePlanUpdates, MAX_PAYMENT_ATTEMPTS, nextBillingPeriodStart, nextPeriodUpdates, proratedUpgradeCents, queuedPlanUpdates, renewalPlan } from "./subscription-billing";
 import { getDb, isDatabaseConnected } from "./database";
@@ -39,6 +39,15 @@ export type PushNotificationDeliveryStatus = "processed" | "skipped" | "failed";
 export const PUSH_NOTIFICATION_DELIVERY_LEASE_MS = 15 * 60 * 1000;
 export const SUBSCRIPTION_BILLING_CLAIM_LEASE_MS = 15 * 60 * 1000;
 
+export class SubscriptionBillingBusyError extends Error {
+  readonly code = "SUBSCRIPTION_BILLING_BUSY";
+
+  constructor() {
+    super("Subscription billing is already in progress");
+    this.name = "SubscriptionBillingBusyError";
+  }
+}
+
 /**
  * Internal transaction input accepted by storage implementations. The external
  * insert/request schemas omit the digest; only a server service can add it while
@@ -54,6 +63,7 @@ export type TransactionServerOwnedFields = Readonly<{
 }>;
 
 type RuntimeTransactionFields = InsertTransaction & {
+  completedAt?: unknown;
   paymentTokenHash?: unknown;
   rawToken?: unknown;
   paymentToken?: unknown;
@@ -70,6 +80,7 @@ export function toTransactionStorageInput(
 ): TransactionStorageInput {
   const {
     selectedStoneId,
+    completedAt: _callerCompletedAt,
     paymentTokenHash: _callerPaymentTokenHash,
     rawToken: _rawToken,
     paymentToken: _paymentToken,
@@ -97,12 +108,14 @@ function sanitizeTransactionStorageInput(
 ): TransactionStorageInput {
   const {
     selectedStoneId,
+    completedAt: _callerCompletedAt,
     rawToken: _rawToken,
     paymentToken: _paymentToken,
     token: _token,
     ...canonical
   } = input as TransactionStorageInput & {
     selectedStoneId?: number | null;
+    completedAt?: unknown;
     rawToken?: unknown;
     paymentToken?: unknown;
     token?: unknown;
@@ -511,9 +524,9 @@ export interface IStorage extends PaymentAttemptRepository {
   createMerchantWithPassword(merchantData: any, passwordHash: string): Promise<Merchant>;
   createMerchantWithSignup(data: MerchantSignupStorageInput): Promise<Merchant>;
   verifyMerchant(token: string, passwordHash: string): Promise<Merchant | undefined>;
+  confirmMerchantEmail(token: string, onboardingCompleted: boolean): Promise<Merchant | undefined>;
   updateMerchantStatus(id: number, status: string): Promise<Merchant | undefined>;
   updateMerchantPasswordHash(id: number, passwordHash: string): Promise<Merchant | undefined>;
-  updateMerchantRates(id: number, currentProviderRate: string): Promise<Merchant | undefined>;
   updateMerchant(id: number, updates: Partial<Merchant>): Promise<Merchant | undefined>;
   updateMerchantDetails(id: number, details: { businessName: string; contactEmail: string; contactPhone: string; businessAddress: string }): Promise<Merchant | undefined>;
   updateMerchantBankAccount(id: number, bankDetails: { bankName: string; bankAccountNumber: string; bankBranch: string; accountHolderName: string }): Promise<Merchant | undefined>;
@@ -552,12 +565,9 @@ export interface IStorage extends PaymentAttemptRepository {
   updateSplitPaymentStatus(id: number, status: string, windcaveTransactionId?: string): Promise<any>;
   getNextPendingSplit(transactionId: number): Promise<any | undefined>;
   
-  // Platform revenue operations (Marketplace Model)
-  createPlatformFee(data: InsertPlatformFee): Promise<PlatformFee>;
-  getPlatformFee(id: number): Promise<PlatformFee | undefined>;
-  getPlatformFeesByMerchant(merchantId: number): Promise<PlatformFee[]>;
-  updatePlatformFeeStatus(id: number, status: string): Promise<PlatformFee | undefined>;
-  // Platform revenue is subscription MRR — TaptPay takes no cut of merchant turnover.
+  // Platform revenue is subscription MRR — TaptPay takes no cut of merchant
+  // turnover. The historical platform_fees table remains read-only for old
+  // accounting records; storage exposes no API capable of adding new fee rows.
   getSubscriptionRevenue(): Promise<SubscriptionRevenue>;
   
   // Refund operations
@@ -637,8 +647,6 @@ export interface IStorage extends PaymentAttemptRepository {
   cancelSubscription(merchantId: number, reason: string): Promise<CancelSubscriptionResult>;
   resumeSubscription(merchantId: number): Promise<any>;
   getBillingHistory(merchantId: number, limit?: number): Promise<any[]>;
-  createBillingHistory(data: any): Promise<any>;
-  resetMonthlyTransactionCount(merchantId: number): Promise<void>;
   // Applies a plan change under a row lock, refusing a downgrade that would
   // leave more active logins than the target plan allows.
   changeSubscriptionPlan(merchantId: number, planId: PlanId, chargeUpgrade?: PlanUpgradeChargeExecutor): Promise<PlanChangeResult>;
@@ -651,9 +659,6 @@ export interface IStorage extends PaymentAttemptRepository {
     charge: SubscriptionCardChargeExecutor,
   ): Promise<SubscriptionCardSetupResult>;
   removeSubscriptionCard(merchantId: number): Promise<any>;
-  applySubscriptionBillingOutcome(subscriptionId: number, updates: Record<string, unknown>): Promise<void>;
-  getSubscriptionsDueForBilling(now: Date): Promise<MerchantSubscription[]>;
-  getCancelledSubscriptionsPastPeriodEnd(now: Date): Promise<MerchantSubscription[]>;
   claimSubscriptionsDueForBilling(
     now: Date,
     limit?: number,
@@ -849,7 +854,6 @@ const MEM_MERCHANT_DEFAULTS = {
 export class MemStorage implements IStorage {
   private merchants: Map<number, Merchant>;
   private transactions: Map<number, Transaction>;
-  private platformFees: Map<number, PlatformFee>;
   private refunds: Map<number, Refund>;
   private splitPayments: Map<number, SplitPayment>;
   private paymentAttempts: Map<string, PaymentAttempt>;
@@ -861,7 +865,6 @@ export class MemStorage implements IStorage {
   private subscriptionHistory: Map<number, SubscriptionBillingHistory>;
   private currentMerchantId: number;
   private currentTransactionId: number;
-  private currentPlatformFeeId: number;
   private currentRefundId: number;
   private currentSplitPaymentId: number;
   private currentTaptStoneId: number;
@@ -884,7 +887,6 @@ export class MemStorage implements IStorage {
   constructor() {
     this.merchants = new Map();
     this.transactions = new Map();
-    this.platformFees = new Map();
     this.refunds = new Map();
     this.splitPayments = new Map();
     this.paymentAttempts = new Map();
@@ -899,7 +901,6 @@ export class MemStorage implements IStorage {
     this.tutorialProgress = new Map();
     this.currentMerchantId = 1;
     this.currentTransactionId = 1;
-    this.currentPlatformFeeId = 1;
     this.currentRefundId = 1;
     this.currentSplitPaymentId = 1;
     this.currentTaptStoneId = 1;
@@ -1183,9 +1184,39 @@ export class MemStorage implements IStorage {
     merchant.status = "verified";
     merchant.verificationToken = null;
     merchant.updatedAt = new Date();
+    const subscription = this.ensureMemSubscription(merchant.id);
+    if (subscription.status === "pending") {
+      subscription.status = "active";
+      subscription.updatedAt = merchant.updatedAt;
+    }
     
     this.merchants.set(merchant.id, merchant);
     return merchant;
+  }
+
+  async confirmMerchantEmail(
+    token: string,
+    onboardingCompleted: boolean,
+  ): Promise<Merchant | undefined> {
+    const merchant = await this.getMerchantByToken(token);
+    if (!merchant) return undefined;
+    return withMemLock(this.accountMutationLocks, `merchant:${merchant.id}`, async () => {
+      if (merchant.verificationToken !== token) return undefined;
+      const now = new Date();
+      Object.assign(merchant, {
+        emailVerified: true,
+        verificationToken: null,
+        status: "verified",
+        onboardingCompleted,
+        updatedAt: now,
+      });
+      const subscription = this.ensureMemSubscription(merchant.id);
+      if (subscription.status === "pending") {
+        subscription.status = "active";
+        subscription.updatedAt = now;
+      }
+      return merchant;
+    });
   }
 
   async updateMerchantStatus(id: number, status: string): Promise<Merchant | undefined> {
@@ -1544,6 +1575,10 @@ export class MemStorage implements IStorage {
         const updatedTransaction: Transaction = {
           ...transaction,
           status: transactionStatus,
+          completedAt:
+            transactionStatus === "completed"
+              ? transaction.completedAt ?? input.now
+              : transaction.completedAt,
           completedSplits,
           windcaveTransactionId:
             input.processorTransactionId ?? transaction.windcaveTransactionId,
@@ -1625,6 +1660,7 @@ export class MemStorage implements IStorage {
     const insertTransaction = sanitizeTransactionStorageInput(input);
     const id = this.currentTransactionId++;
     const transactionAmount = parseFloat(insertTransaction.price);
+    const createdAt = new Date();
 
     // TaptPay charges no per-transaction fee — merchants pay a monthly
     // subscription (shared/plans.ts). The fee columns stay at zero so historical
@@ -1639,7 +1675,7 @@ export class MemStorage implements IStorage {
       completedSplits: insertTransaction.completedSplits ?? 0,
       splitAmount: insertTransaction.splitAmount ?? null,
       id,
-      createdAt: new Date(),
+      createdAt,
       windcaveTransactionId: null,
       windcaveFeeRate: "0.0000",
       windcaveFeeAmount: "0.00",
@@ -1656,47 +1692,10 @@ export class MemStorage implements IStorage {
       windcaveSessionState: null,
       windcaveXId: null,
       paymentTokenHash: insertTransaction.paymentTokenHash ?? null,
+      completedAt: insertTransaction.status === "completed" ? createdAt : null,
     };
     this.transactions.set(id, transaction);
     return transaction;
-  }
-
-  async createPlatformFee(insertPlatformFee: InsertPlatformFee): Promise<PlatformFee> {
-    const id = this.currentPlatformFeeId++;
-    const platformFee: PlatformFee = {
-      ...insertPlatformFee,
-      merchantId: insertPlatformFee.merchantId ?? null,
-      transactionId: insertPlatformFee.transactionId ?? null,
-      status: insertPlatformFee.status ?? "pending",
-      id,
-      createdAt: new Date(),
-      collectedAt: null,
-    };
-    this.platformFees.set(id, platformFee);
-    return platformFee;
-  }
-
-  async getPlatformFeesByMerchant(merchantId: number): Promise<PlatformFee[]> {
-    return Array.from(this.platformFees.values()).filter(
-      (fee) => fee.merchantId === merchantId
-    );
-  }
-
-  async updatePlatformFeeStatus(id: number, status: string): Promise<PlatformFee | undefined> {
-    const fee = this.platformFees.get(id);
-    if (!fee) return undefined;
-    
-    const updatedFee = {
-      ...fee,
-      status,
-      collectedAt: status === "collected" ? new Date() : fee.collectedAt,
-    };
-    this.platformFees.set(id, updatedFee);
-    return updatedFee;
-  }
-
-  async getPlatformFee(id: number): Promise<PlatformFee | undefined> {
-    return this.platformFees.get(id);
   }
 
   async getSubscriptionRevenue(): Promise<SubscriptionRevenue> {
@@ -1814,10 +1813,12 @@ export class MemStorage implements IStorage {
   async updateTransactionStatus(id: number, status: string, windcaveTransactionId?: string): Promise<Transaction | undefined> {
     const transaction = this.transactions.get(id);
     if (!transaction) return undefined;
-    
+    const now = new Date();
     const updatedTransaction = {
       ...transaction,
       status,
+      completedAt:
+        status === "completed" ? transaction.completedAt ?? now : transaction.completedAt,
       windcaveTransactionId: windcaveTransactionId || transaction.windcaveTransactionId,
     };
     this.transactions.set(id, updatedTransaction);
@@ -1968,12 +1969,13 @@ export class MemStorage implements IStorage {
   async updateSplitPaymentStatus(id: number, status: string, windcaveTransactionId?: string): Promise<any> {
     const splitPayment = this.splitPayments.get(id);
     if (!splitPayment) return undefined;
+    const now = new Date();
 
     const updatedSplit = {
       ...splitPayment,
       status,
       windcaveTransactionId: windcaveTransactionId || splitPayment.windcaveTransactionId,
-      paidAt: status === "completed" ? new Date() : splitPayment.paidAt,
+      paidAt: status === "completed" ? splitPayment.paidAt ?? now : splitPayment.paidAt,
     };
     
     this.splitPayments.set(id, updatedSplit);
@@ -1988,7 +1990,11 @@ export class MemStorage implements IStorage {
         const updatedTransaction = {
           ...transaction,
           completedSplits: completedSplits,
-          status: completedSplits >= (transaction.totalSplits ?? 1) ? "completed" : "pending"
+          status: completedSplits >= (transaction.totalSplits ?? 1) ? "completed" : "pending",
+          completedAt:
+            completedSplits >= (transaction.totalSplits ?? 1)
+              ? transaction.completedAt ?? now
+              : transaction.completedAt,
         };
         
         this.transactions.set(splitPayment.transactionId, updatedTransaction);
@@ -2001,18 +2007,6 @@ export class MemStorage implements IStorage {
   async getNextPendingSplit(transactionId: number): Promise<any | undefined> {
     const splits = await this.getSplitPaymentsByTransaction(transactionId);
     return splits.find(split => split.status === "pending");
-  }
-
-  async updateMerchantRates(id: number, currentProviderRate: string): Promise<Merchant | undefined> {
-    const merchant = this.merchants.get(id);
-    if (!merchant) return undefined;
-    
-    const updatedMerchant = {
-      ...merchant,
-      currentProviderRate,
-    };
-    this.merchants.set(id, updatedMerchant);
-    return updatedMerchant;
   }
 
   async updateMerchant(id: number, updates: Partial<Merchant>): Promise<Merchant | undefined> {
@@ -2386,6 +2380,10 @@ export class MemStorage implements IStorage {
         windcaveXId: null,
         paymentTokenHash: null,
         createdAt: createdDate,
+        completedAt:
+          ["completed", "partially_refunded", "refunded"].includes(transaction.status)
+            ? createdDate
+            : null,
       };
       this.transactions.set(id, newTransaction);
     }
@@ -2512,18 +2510,33 @@ export class MemStorage implements IStorage {
 
   async getDailyPushPaymentSummaries(start: Date, end: Date): Promise<DailyPushPaymentSummary[]> {
     const summaries = new Map<number, { amountCents: number; paymentCount: number }>();
-    for (const fee of this.platformFees.values()) {
-      if (
-        fee.status !== "collected"
-        || fee.merchantId == null
-        || !fee.collectedAt
-        || fee.collectedAt < start
-        || fee.collectedAt >= end
-      ) continue;
-      const current = summaries.get(fee.merchantId) ?? { amountCents: 0, paymentCount: 0 };
-      current.amountCents += Math.round(Number(fee.transactionAmount) * 100);
+    const addPayment = (merchantId: number, amount: string) => {
+      const current = summaries.get(merchantId) ?? { amountCents: 0, paymentCount: 0 };
+      current.amountCents += Math.round(Number(amount) * 100);
       current.paymentCount += 1;
-      summaries.set(fee.merchantId, current);
+      summaries.set(merchantId, current);
+    };
+    for (const transaction of this.transactions.values()) {
+      if (
+        transaction.merchantId == null
+        || transaction.isSplit
+        || ["cash", "manual"].includes(transaction.paymentMethod ?? "")
+        || !["completed", "partially_refunded", "refunded"].includes(transaction.status)
+        || !transaction.completedAt
+        || transaction.completedAt < start
+        || transaction.completedAt >= end
+      ) continue;
+      addPayment(transaction.merchantId, transaction.price);
+    }
+    for (const split of this.splitPayments.values()) {
+      if (
+        split.merchantId == null
+        || split.status !== "completed"
+        || !split.paidAt
+        || split.paidAt < start
+        || split.paidAt >= end
+      ) continue;
+      addPayment(split.merchantId, split.amount);
     }
     return Array.from(summaries, ([merchantId, summary]) => ({
       merchantId,
@@ -2752,31 +2765,6 @@ export class MemStorage implements IStorage {
     return this.subscriptions.get(merchantId);
   }
 
-  async updateSubscriptionTier(merchantId: number, tier: string): Promise<MerchantSubscription> {
-    const subscription = this.ensureMemSubscription(merchantId);
-    subscription.tier = tier;
-    subscription.updatedAt = new Date();
-    return subscription;
-  }
-
-  async updateSubscriptionBillingFrequency(
-    merchantId: number,
-    frequency: string,
-  ): Promise<MerchantSubscription> {
-    const subscription = this.ensureMemSubscription(merchantId);
-    const now = new Date();
-    const nextBillingDate = new Date(now);
-    if (frequency === "weekly") nextBillingDate.setDate(now.getDate() + 7);
-    else if (frequency === "bi_weekly") nextBillingDate.setDate(now.getDate() + 14);
-    else nextBillingDate.setMonth(now.getMonth() + 1);
-    Object.assign(subscription, {
-      billingFrequency: frequency,
-      nextBillingDate,
-      updatedAt: now,
-    });
-    return subscription;
-  }
-
   async incrementTransactionCount(merchantId: number): Promise<void> {
     const subscription = this.ensureMemSubscription(merchantId);
     const now = new Date();
@@ -2850,24 +2838,6 @@ export class MemStorage implements IStorage {
     } as SubscriptionBillingHistory;
     this.subscriptionHistory.set(row.id, row);
     return row;
-  }
-
-  async resetMonthlyTransactionCount(merchantId: number): Promise<void> {
-    const subscription = this.subscriptions.get(merchantId);
-    if (subscription) {
-      const now = new Date();
-      subscription.currentMonthTransactions = 0;
-      subscription.monthStartDate = now;
-      subscription.updatedAt = now;
-    }
-  }
-
-  async getUnbilledTransactions(merchantId: number): Promise<{ count: number; amount: number }> {
-    return { count: 0, amount: 0 };
-  }
-
-  async resetUnbilledTransactions(merchantId: number): Promise<void> {
-    // No-op in memory storage
   }
 
   // ── Property management — MemStorage stubs (DB-only feature) ────────────────
@@ -3117,6 +3087,7 @@ export class MemStorage implements IStorage {
     const normalizedSessionId = sessionId.trim();
     if (!normalizedSessionId) return false;
     const subscription = this.ensureMemSubscription(merchantId);
+    if (subscription.billingClaimToken) return false;
     subscription.windcaveBillingRef = normalizedSessionId;
     subscription.updatedAt = new Date();
     return true;
@@ -3309,7 +3280,7 @@ export class MemStorage implements IStorage {
       }
 
       Object.assign(subscription, {
-        ...nextPeriodUpdates(subscription, now),
+        ...nextPeriodUpdates(subscription, now, periodStart),
         ...cardFields,
         cancelAtPeriodEnd: false,
         cancellationRequestedAt: null,
@@ -3338,33 +3309,18 @@ export class MemStorage implements IStorage {
   }
 
   async removeSubscriptionCard(merchantId: number): Promise<MerchantSubscription> {
-    const subscription = this.ensureMemSubscription(merchantId);
-    Object.assign(subscription, {
-      windcaveCardId: null,
-      cardBrand: null,
-      cardLast4: null,
-      cardExpiry: null,
-      updatedAt: new Date(),
+    return withMemLock(this.accountMutationLocks, `merchant:${merchantId}`, async () => {
+      const subscription = this.ensureMemSubscription(merchantId);
+      if (subscription.billingClaimToken) throw new SubscriptionBillingBusyError();
+      Object.assign(subscription, {
+        windcaveCardId: null,
+        cardBrand: null,
+        cardLast4: null,
+        cardExpiry: null,
+        updatedAt: new Date(),
+      });
+      return subscription;
     });
-    return subscription;
-  }
-
-  async applySubscriptionBillingOutcome(
-    subscriptionId: number,
-    updates: Record<string, unknown>,
-  ): Promise<void> {
-    const subscription = this.memSubscriptionById(subscriptionId);
-    if (subscription) Object.assign(subscription, updates);
-  }
-
-  async getSubscriptionsDueForBilling(now: Date): Promise<MerchantSubscription[]> {
-    return Array.from(this.subscriptions.values()).filter((subscription) =>
-      (subscription.status === "active" || subscription.status === "past_due")
-      && !subscription.cancelAtPeriodEnd
-      && !!subscription.windcaveCardId
-      && !!subscription.nextBillingDate
-      && new Date(subscription.nextBillingDate).getTime() <= now.getTime()
-    );
   }
 
   async getCancelledSubscriptionsPastPeriodEnd(
@@ -3393,7 +3349,8 @@ export class MemStorage implements IStorage {
       return Array.from(this.subscriptions.values())
         .filter((subscription) =>
           !excluded.has(subscription.id)
-          && decideBilling(subscription, now).action === "charge"
+          && ["active", "past_due"].includes(subscription.status)
+          && decideBilling(subscription, now).action !== "skip"
           && (
             !subscription.billingClaimToken
             || !subscription.billingClaimedAt
@@ -3404,6 +3361,8 @@ export class MemStorage implements IStorage {
         .map((subscription) => {
           subscription.billingClaimToken = randomUUID();
           subscription.billingClaimedAt = claimedAt;
+          subscription.nextBillingDate ??=
+            subscription.currentPeriodEnd ?? nextBillingPeriodStart(subscription, now);
           subscription.updatedAt = claimedAt;
           return subscription;
         });
@@ -3687,17 +3646,24 @@ export class MemStorage implements IStorage {
   }
 
   async updateUserPassword(userId: number, passwordHash: string): Promise<User | null> {
-    const user = this.users.get(userId);
-    if (!user) return null;
-    user.password = passwordHash;
-    if (user.role === "owner" && user.merchantId != null) {
-      const merchant = this.merchants.get(user.merchantId);
-      if (merchant) {
-        merchant.passwordHash = passwordHash;
-        merchant.updatedAt = new Date();
+    const candidate = this.users.get(userId);
+    if (!candidate) return null;
+    const lockKey = candidate.merchantId == null
+      ? `user:${userId}`
+      : `merchant:${candidate.merchantId}`;
+    return withMemLock(this.accountMutationLocks, lockKey, async () => {
+      const user = this.users.get(userId);
+      if (!user) return null;
+      user.password = passwordHash;
+      if (user.role === "owner" && user.merchantId != null) {
+        const merchant = this.merchants.get(user.merchantId);
+        if (merchant) {
+          merchant.passwordHash = passwordHash;
+          merchant.updatedAt = new Date();
+        }
       }
-    }
-    return user;
+      return user;
+    });
   }
 
   async setUserResetToken(
@@ -3820,16 +3786,6 @@ export class DatabaseStorage implements IStorage {
         .onConflictDoNothing({ target: merchantSubscriptions.merchantId });
       return merchant;
     });
-  }
-
-  async updateMerchantRates(id: number, currentProviderRate: string): Promise<Merchant | undefined> {
-    if (!this.db) throw new Error('Database not available');
-    const result = await this.db
-      .update(merchants)
-      .set({ currentProviderRate })
-      .where(eq(merchants.id, id))
-      .returning();
-    return result[0];
   }
 
   async updateMerchant(id: number, updates: Partial<Merchant>): Promise<Merchant | undefined> {
@@ -4048,7 +4004,47 @@ export class DatabaseStorage implements IStorage {
         .where(eq(merchants.verificationToken, token))
         .returning();
       if (result[0]) await this.syncOwnerUser(result[0], passwordHash, tx);
+      if (result[0]) {
+        await tx
+          .update(merchantSubscriptions)
+          .set({ status: "active", updatedAt: new Date() })
+          .where(and(
+            eq(merchantSubscriptions.merchantId, result[0].id),
+            eq(merchantSubscriptions.status, "pending"),
+          ));
+      }
       return result[0];
+    });
+  }
+
+  async confirmMerchantEmail(
+    token: string,
+    onboardingCompleted: boolean,
+  ): Promise<Merchant | undefined> {
+    if (!this.db) throw new Error("Database not available");
+    return await this.db.transaction(async (tx) => {
+      const now = new Date();
+      const rows = await tx
+        .update(merchants)
+        .set({
+          emailVerified: true,
+          verificationToken: null,
+          status: "verified",
+          onboardingCompleted,
+          updatedAt: now,
+        })
+        .where(eq(merchants.verificationToken, token))
+        .returning();
+      const merchant = rows[0];
+      if (!merchant) return undefined;
+      await tx
+        .update(merchantSubscriptions)
+        .set({ status: "active", updatedAt: now })
+        .where(and(
+          eq(merchantSubscriptions.merchantId, merchant.id),
+          eq(merchantSubscriptions.status, "pending"),
+        ));
+      return merchant;
     });
   }
 
@@ -4508,7 +4504,6 @@ export class DatabaseStorage implements IStorage {
               attempt,
               transaction,
               splitPayment,
-              platformFee: null,
               counterIncremented: false,
             }
           : { kind: "conflict", attempt };
@@ -4560,6 +4555,10 @@ export class DatabaseStorage implements IStorage {
         .update(transactions)
         .set({
           status: transactionStatus,
+          completedAt:
+            transactionStatus === "completed"
+              ? transaction.completedAt ?? input.now
+              : transaction.completedAt,
           completedSplits,
           windcaveTransactionId:
             input.processorTransactionId ?? transaction.windcaveTransactionId,
@@ -4706,17 +4705,12 @@ export class DatabaseStorage implements IStorage {
     const insertTransaction = sanitizeTransactionStorageInput(input);
     const transactionAmount = parseFloat(insertTransaction.price);
 
-    // Use caller-provided fees if present (e.g. cash sales have 0 Windcave fee),
-    // otherwise apply the standard fixed fee structure.
-    const hasProvidedFees = (insertTransaction as any).windcaveFeeAmount !== undefined;
-    const windcaveFeeAmount = hasProvidedFees
-      ? parseFloat((insertTransaction as any).windcaveFeeAmount)
-      : 0.00;
     // TaptPay charges no per-transaction fee — merchants pay a monthly
     // subscription (shared/plans.ts). Windcave handles their own fees, so
     // merchantNet has always been the full transaction price.
     const platformFeeAmount = 0;
     const merchantNet = transactionAmount;
+    const completedAt = insertTransaction.status === "completed" ? new Date() : null;
 
     const transactionWithFees = {
       ...insertTransaction,
@@ -4727,6 +4721,7 @@ export class DatabaseStorage implements IStorage {
       merchantNet: merchantNet.toFixed(2),
       totalRefunded: "0.00",
       refundableAmount: merchantNet.toFixed(2),
+      completedAt,
     };
 
     const result = await this.db.insert(transactions).values(transactionWithFees).returning();
@@ -4735,7 +4730,12 @@ export class DatabaseStorage implements IStorage {
 
   async updateTransactionStatus(id: number, status: string, windcaveTransactionId?: string): Promise<Transaction | undefined> {
     if (!this.db) throw new Error('Database not available');
-    const updateData: any = { status };
+    const updateData: any = {
+      status,
+      ...(status === "completed"
+        ? { completedAt: sql`coalesce(${transactions.completedAt}, now())` }
+        : {}),
+    };
     if (windcaveTransactionId) {
       updateData.windcaveTransactionId = windcaveTransactionId;
     }
@@ -5014,38 +5014,6 @@ export class DatabaseStorage implements IStorage {
       console.error('Error deleting merchant:', error);
       return false;
     }
-  }
-
-  async createPlatformFee(insertPlatformFee: InsertPlatformFee): Promise<PlatformFee> {
-    if (!this.db) throw new Error('Database not available');
-    const result = await this.db.insert(platformFees).values(insertPlatformFee).returning();
-    return result[0];
-  }
-
-  async getPlatformFeesByMerchant(merchantId: number): Promise<PlatformFee[]> {
-    if (!this.db) throw new Error('Database not available');
-    return await this.db.select().from(platformFees).where(eq(platformFees.merchantId, merchantId));
-  }
-
-  async updatePlatformFeeStatus(id: number, status: string): Promise<PlatformFee | undefined> {
-    if (!this.db) throw new Error('Database not available');
-    const updateData: any = { status };
-    if (status === "collected") {
-      updateData.collectedAt = new Date();
-    }
-    
-    const result = await this.db
-      .update(platformFees)
-      .set(updateData)
-      .where(eq(platformFees.id, id))
-      .returning();
-    return result[0];
-  }
-
-  async getPlatformFee(id: number): Promise<PlatformFee | undefined> {
-    if (!this.db) throw new Error('Database not available');
-    const result = await this.db.select().from(platformFees).where(eq(platformFees.id, id)).limit(1);
-    return result[0];
   }
 
   async getSubscriptionRevenue(): Promise<SubscriptionRevenue> {
@@ -5333,25 +5301,90 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getDailyPushPaymentSummaries(start: Date, end: Date): Promise<DailyPushPaymentSummary[]> {
-    const rows = await this.db!
-      .select({
-        merchantId: platformFees.merchantId,
-        amount: sql<string>`coalesce(sum(${platformFees.transactionAmount}::numeric), 0)::text`,
-        paymentCount: sql<number>`count(*)::int`,
-      })
-      .from(platformFees)
-      .where(and(
-        eq(platformFees.status, "collected"),
-        isNotNull(platformFees.merchantId),
-        isNotNull(platformFees.collectedAt),
-        gte(platformFees.collectedAt, start),
-        lt(platformFees.collectedAt, end),
-      ))
-      .groupBy(platformFees.merchantId);
-    return rows.map((row) => ({
-      merchantId: row.merchantId!,
-      amount: Number(row.amount).toFixed(2),
-      paymentCount: Number(row.paymentCount),
+    const db = this.db;
+    if (!db) throw new Error("Database not available");
+
+    // Read from the records that actually prove funds were received. The old
+    // platform_fees table stopped receiving rows when TaptPay moved to monthly
+    // subscriptions, so it is historical accounting data, not a payout ledger.
+    const [retailRows, splitRows, rentRows, tradeRows] = await Promise.all([
+      db
+        .select({
+          merchantId: transactions.merchantId,
+          amountCents: sql<number>`round(coalesce(sum(${transactions.price}::numeric), 0) * 100)::int`,
+          paymentCount: sql<number>`count(*)::int`,
+        })
+        .from(transactions)
+        .where(and(
+          isNotNull(transactions.merchantId),
+          or(eq(transactions.isSplit, false), isNull(transactions.isSplit)),
+          or(
+            isNull(transactions.paymentMethod),
+            notInArray(transactions.paymentMethod, ["cash", "manual"]),
+          ),
+          inArray(transactions.status, ["completed", "partially_refunded", "refunded"]),
+          isNotNull(transactions.completedAt),
+          gte(transactions.completedAt, start),
+          lt(transactions.completedAt, end),
+        ))
+        .groupBy(transactions.merchantId),
+      db
+        .select({
+          merchantId: splitPayments.merchantId,
+          amountCents: sql<number>`round(coalesce(sum(${splitPayments.amount}::numeric), 0) * 100)::int`,
+          paymentCount: sql<number>`count(*)::int`,
+        })
+        .from(splitPayments)
+        .where(and(
+          isNotNull(splitPayments.merchantId),
+          eq(splitPayments.status, "completed"),
+          isNotNull(splitPayments.paidAt),
+          gte(splitPayments.paidAt, start),
+          lt(splitPayments.paidAt, end),
+        ))
+        .groupBy(splitPayments.merchantId),
+      db
+        .select({
+          merchantId: invoicesRentRequests.merchantId,
+          amountCents: sql<number>`coalesce(sum(${invoicesRentRequests.amountCents}), 0)::int`,
+          paymentCount: sql<number>`count(*)::int`,
+        })
+        .from(invoicesRentRequests)
+        .where(and(
+          eq(invoicesRentRequests.status, "paid"),
+          isNotNull(invoicesRentRequests.paidAt),
+          gte(invoicesRentRequests.paidAt, start),
+          lt(invoicesRentRequests.paidAt, end),
+        ))
+        .groupBy(invoicesRentRequests.merchantId),
+      db
+        .select({
+          merchantId: jobInvoices.merchantId,
+          amountCents: sql<number>`coalesce(sum(${jobInvoices.amountCents}), 0)::int`,
+          paymentCount: sql<number>`count(*)::int`,
+        })
+        .from(jobInvoices)
+        .where(and(
+          eq(jobInvoices.status, "paid"),
+          isNotNull(jobInvoices.paidAt),
+          gte(jobInvoices.paidAt, start),
+          lt(jobInvoices.paidAt, end),
+        ))
+        .groupBy(jobInvoices.merchantId),
+    ]);
+
+    const summaries = new Map<number, { amountCents: number; paymentCount: number }>();
+    for (const row of [...retailRows, ...splitRows, ...rentRows, ...tradeRows]) {
+      if (row.merchantId == null) continue;
+      const current = summaries.get(row.merchantId) ?? { amountCents: 0, paymentCount: 0 };
+      current.amountCents += Number(row.amountCents);
+      current.paymentCount += Number(row.paymentCount);
+      summaries.set(row.merchantId, current);
+    }
+    return Array.from(summaries, ([merchantId, summary]) => ({
+      merchantId,
+      amount: (summary.amountCents / 100).toFixed(2),
+      paymentCount: summary.paymentCount,
     }));
   }
 
@@ -5546,13 +5579,14 @@ export class DatabaseStorage implements IStorage {
 
   async updateSplitPaymentStatus(id: number, status: string, windcaveTransactionId?: string): Promise<any> {
     try {
+      const now = new Date();
       // Update the split payment
       const [updatedSplit] = await this.db!
         .update(splitPayments)
         .set({
           status,
           windcaveTransactionId: windcaveTransactionId || undefined,
-          paidAt: status === "completed" ? new Date() : undefined,
+          paidAt: status === "completed" ? now : undefined,
         })
         .where(eq(splitPayments.id, id))
         .returning();
@@ -5576,7 +5610,10 @@ export class DatabaseStorage implements IStorage {
             .update(transactions)
             .set({
               completedSplits: completedSplits,
-              status: finalStatus
+              status: finalStatus,
+              ...(finalStatus === "completed"
+                ? { completedAt: sql`coalesce(${transactions.completedAt}, ${now})` }
+                : {}),
             })
             .where(eq(transactions.id, updatedSplit.transactionId!));
         }
@@ -5806,48 +5843,6 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async updateSubscriptionTier(merchantId: number, tier: string): Promise<MerchantSubscription> {
-    if (!this.db) throw new Error('Database not available');
-    const result = await this.db
-      .update(merchantSubscriptions)
-      .set({ tier, updatedAt: new Date() })
-      .where(eq(merchantSubscriptions.merchantId, merchantId))
-      .returning();
-    return result[0];
-  }
-
-  async updateSubscriptionBillingFrequency(merchantId: number, frequency: string): Promise<MerchantSubscription> {
-    if (!this.db) throw new Error('Database not available');
-    
-    // Calculate next billing date based on frequency
-    const now = new Date();
-    let nextBillingDate = new Date(now);
-    
-    switch (frequency) {
-      case 'weekly':
-        nextBillingDate.setDate(now.getDate() + 7);
-        break;
-      case 'bi_weekly':
-        nextBillingDate.setDate(now.getDate() + 14);
-        break;
-      case 'monthly':
-      default:
-        nextBillingDate.setMonth(now.getMonth() + 1);
-        break;
-    }
-    
-    const result = await this.db
-      .update(merchantSubscriptions)
-      .set({ 
-        billingFrequency: frequency,
-        nextBillingDate,
-        updatedAt: new Date() 
-      })
-      .where(eq(merchantSubscriptions.merchantId, merchantId))
-      .returning();
-    return result[0];
-  }
-
   async incrementTransactionCount(merchantId: number): Promise<void> {
     if (!this.db) throw new Error('Database not available');
     
@@ -5985,18 +5980,6 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async resetMonthlyTransactionCount(merchantId: number): Promise<void> {
-    if (!this.db) throw new Error('Database not available');
-    await this.db
-      .update(merchantSubscriptions)
-      .set({
-        currentMonthTransactions: 0,
-        monthStartDate: new Date(),
-        updatedAt: new Date()
-      })
-      .where(eq(merchantSubscriptions.merchantId, merchantId));
-  }
-
   /**
    * Applies a plan change.
    *
@@ -6010,7 +5993,7 @@ export class DatabaseStorage implements IStorage {
     const plan = planFor(planId);
     const now = new Date();
 
-    return await this.db.transaction(async (tx) => {
+    const prepared = await this.db.transaction(async (tx) => {
       const rows = await tx
         .select()
         .from(merchantSubscriptions)
@@ -6018,7 +6001,12 @@ export class DatabaseStorage implements IStorage {
         .for("update")
         .limit(1);
       const subscription = rows[0];
-      if (!subscription) return { ok: false as const, reason: "not-found" as const };
+      if (!subscription) {
+        return {
+          kind: "done" as const,
+          result: { ok: false as const, reason: "not-found" as const },
+        };
+      }
 
       const seatRows = await tx
         .select({ value: sql<number>`count(*)::int` })
@@ -6034,7 +6022,10 @@ export class DatabaseStorage implements IStorage {
 
       const currentPlan = planForOrDefault(subscription.planId);
       if (plan.id === currentPlan.id) {
-        return { ok: true as const, subscription, applied: "immediate" as const };
+        return {
+          kind: "done" as const,
+          result: { ok: true as const, subscription, applied: "immediate" as const },
+        };
       }
       const currentPriceCents = subscription.priceCents ?? currentPlan.priceCents;
       const upgrade = isUpgrade(currentPlan.id, plan.id);
@@ -6042,18 +6033,29 @@ export class DatabaseStorage implements IStorage {
 
       if (plan.seats < seatsInUse) {
         return {
-          ok: false as const,
-          reason: "too-many-seats" as const,
-          seatsInUse,
-          seatLimit: plan.seats,
+          kind: "done" as const,
+          result: {
+            ok: false as const,
+            reason: "too-many-seats" as const,
+            seatsInUse,
+            seatLimit: plan.seats,
+          },
         };
       }
 
-      if (subscription.billingClaimToken) {
+      const staleBefore = new Date(now.getTime() - SUBSCRIPTION_BILLING_CLAIM_LEASE_MS);
+      const claimIsLive =
+        !!subscription.billingClaimToken
+        && !!subscription.billingClaimedAt
+        && new Date(subscription.billingClaimedAt).getTime() >= staleBefore.getTime();
+      if (claimIsLive) {
         return {
-          ok: false as const,
-          reason: "billing-busy" as const,
-          message: "Billing is already in progress. Please try again shortly.",
+          kind: "done" as const,
+          result: {
+            ok: false as const,
+            reason: "billing-busy" as const,
+            message: "Billing is already in progress. Please try again shortly.",
+          },
         };
       }
 
@@ -6070,7 +6072,10 @@ export class DatabaseStorage implements IStorage {
           .set(queuedPlanUpdates(planId, subscription.currentPeriodEnd ?? null, now))
           .where(eq(merchantSubscriptions.id, subscription.id))
           .returning();
-        return { ok: true as const, subscription: updated[0], applied: "queued" as const };
+        return {
+          kind: "done" as const,
+          result: { ok: true as const, subscription: updated[0], applied: "queued" as const },
+        };
       }
 
       const paidUpgrade = upgrade && hasLivePaidPeriod;
@@ -6080,7 +6085,10 @@ export class DatabaseStorage implements IStorage {
           .set(immediatePlanUpdates(planId, now))
           .where(eq(merchantSubscriptions.id, subscription.id))
           .returning();
-        return { ok: true as const, subscription: updated[0], applied: "immediate" as const };
+        return {
+          kind: "done" as const,
+          result: { ok: true as const, subscription: updated[0], applied: "immediate" as const },
+        };
       }
 
       if (
@@ -6090,16 +6098,22 @@ export class DatabaseStorage implements IStorage {
         || !subscription.currentPeriodEnd
       ) {
         return {
-          ok: false as const,
-          reason: "invalid-state" as const,
-          message: "Resolve the current subscription state before upgrading.",
+          kind: "done" as const,
+          result: {
+            ok: false as const,
+            reason: "invalid-state" as const,
+            message: "Resolve the current subscription state before upgrading.",
+          },
         };
       }
       if (!subscription.windcaveCardId) {
         return {
-          ok: false as const,
-          reason: "payment-method-required" as const,
-          message: "Add a payment method before upgrading.",
+          kind: "done" as const,
+          result: {
+            ok: false as const,
+            reason: "payment-method-required" as const,
+            message: "Add a payment method before upgrading.",
+          },
         };
       }
 
@@ -6110,93 +6124,174 @@ export class DatabaseStorage implements IStorage {
         new Date(subscription.currentPeriodEnd),
         now,
       );
-      if (amountCents > 0) {
-        if (!chargeUpgrade) {
-          return {
+      if (amountCents <= 0) {
+        const updated = await tx
+          .update(merchantSubscriptions)
+          .set(immediatePlanUpdates(planId, now))
+          .where(eq(merchantSubscriptions.id, subscription.id))
+          .returning();
+        return {
+          kind: "done" as const,
+          result: { ok: true as const, subscription: updated[0], applied: "immediate" as const },
+        };
+      }
+      if (!chargeUpgrade) {
+        return {
+          kind: "done" as const,
+          result: {
             ok: false as const,
             reason: "charge-failed" as const,
             message: "The upgrade charge could not be started.",
-          };
-        }
-        const anchor = new Date(subscription.currentPeriodStart).toISOString().slice(0, 10);
-        const keyPrefix = `plan-${subscription.id}-${anchor}-${plan.id}-a`;
-        const priorAttempts = await tx
-          .select({
-            value: sql<number>`coalesce(max(${subscriptionBillingHistory.attemptNumber}), 0)::int`,
-          })
-          .from(subscriptionBillingHistory)
-          .where(and(
-            eq(subscriptionBillingHistory.subscriptionId, subscription.id),
-            eq(subscriptionBillingHistory.billingType, "plan_change"),
-            sql`${subscriptionBillingHistory.idempotencyKey} like ${`${keyPrefix}%`}`,
-          ));
-        // A confirmed decline consumes an attempt and may be retried with a new
-        // card. An ambiguous transport failure writes no history and therefore
-        // deliberately reuses the same provider idempotency key.
-        const attemptNumber = (priorAttempts[0]?.value ?? 0) + 1;
-        const idempotencyKey = `${keyPrefix}${attemptNumber}`;
-        const charge = await chargeUpgrade({
-          subscriptionId: subscription.id,
-          merchantId,
-          targetPlanId: plan.id,
-          cardId: subscription.windcaveCardId,
-          amountCents,
-          idempotencyKey,
-          reference: `TAPTPAY-UPGRADE-M${merchantId}-${plan.id.toUpperCase()}-${anchor}-A${attemptNumber}`,
-        });
-        if (!charge.success) {
-          return {
-            ok: false as const,
-            reason: "charge-failed" as const,
-            message: "The upgrade payment could not be confirmed. Please try again.",
-          };
-        }
-
-        const historyBase = {
-          merchantId,
-          subscriptionId: subscription.id,
-          billingType: "plan_change",
-          amount: (amountCents / 100).toFixed(2),
-          billingPeriodStart: now,
-          billingPeriodEnd: subscription.currentPeriodEnd,
-          windcaveTransactionId: charge.windcaveTransactionId ?? null,
-          idempotencyKey,
-          attemptNumber,
-          description: `Prorated upgrade to ${plan.name}`,
+          },
         };
-        if (!charge.approved) {
-          const failureReason = charge.declineReason || "The upgrade payment was declined.";
-          await tx
-            .insert(subscriptionBillingHistory)
-            .values({
-              ...historyBase,
-              status: "failed",
-              failureReason: failureReason.slice(0, 500),
-            })
-            .onConflictDoNothing();
-          return {
-            ok: false as const,
-            reason: "declined" as const,
-            message: failureReason,
-          };
-        }
+      }
 
+      const anchor = new Date(subscription.currentPeriodStart).toISOString().slice(0, 10);
+      const keyPrefix = `plan-${subscription.id}-${anchor}-${plan.id}-a`;
+      const priorAttempts = await tx
+        .select({
+          value: sql<number>`coalesce(max(${subscriptionBillingHistory.attemptNumber}), 0)::int`,
+        })
+        .from(subscriptionBillingHistory)
+        .where(and(
+          eq(subscriptionBillingHistory.subscriptionId, subscription.id),
+          eq(subscriptionBillingHistory.billingType, "plan_change"),
+          sql`${subscriptionBillingHistory.idempotencyKey} like ${`${keyPrefix}%`}`,
+        ));
+      const attemptNumber = (priorAttempts[0]?.value ?? 0) + 1;
+      const idempotencyKey = `${keyPrefix}${attemptNumber}`;
+      const claimToken = randomUUID();
+      const claimedRows = await tx
+        .update(merchantSubscriptions)
+        .set({
+          billingClaimToken: claimToken,
+          billingClaimedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(merchantSubscriptions.id, subscription.id))
+        .returning();
+      return {
+        kind: "charge" as const,
+        subscription: claimedRows[0],
+        claimToken,
+        amountCents,
+        anchor,
+        attemptNumber,
+        idempotencyKey,
+      };
+    });
+
+    if (prepared.kind === "done") return prepared.result;
+
+    let charge: PlanUpgradeChargeResult;
+    try {
+      charge = await chargeUpgrade!({
+        subscriptionId: prepared.subscription.id,
+        merchantId,
+        targetPlanId: plan.id,
+        cardId: prepared.subscription.windcaveCardId!,
+        amountCents: prepared.amountCents,
+        idempotencyKey: prepared.idempotencyKey,
+        reference: `TAPTPAY-UPGRADE-M${merchantId}-${plan.id.toUpperCase()}-${prepared.anchor}-A${prepared.attemptNumber}`,
+      });
+    } catch (error) {
+      await this.releaseSubscriptionBillingClaim(
+        prepared.subscription.id,
+        prepared.claimToken,
+      );
+      throw error;
+    }
+    if (!charge.success) {
+      await this.releaseSubscriptionBillingClaim(
+        prepared.subscription.id,
+        prepared.claimToken,
+      );
+      return {
+        ok: false as const,
+        reason: "charge-failed" as const,
+        message: "The upgrade payment could not be confirmed. Please try again.",
+      };
+    }
+
+    return await this.db.transaction(async (tx) => {
+      const claimedRows = await tx
+        .select()
+        .from(merchantSubscriptions)
+        .where(and(
+          eq(merchantSubscriptions.id, prepared.subscription.id),
+          eq(merchantSubscriptions.billingClaimToken, prepared.claimToken),
+        ))
+        .for("update")
+        .limit(1);
+      const claimed = claimedRows[0];
+      if (!claimed) {
+        return {
+          ok: false as const,
+          reason: "billing-busy" as const,
+          message: "Billing was reconciled by another worker. Refresh and try again.",
+        };
+      }
+      const completedAt = new Date();
+      const historyBase = {
+        merchantId,
+        subscriptionId: claimed.id,
+        billingType: "plan_change",
+        amount: (prepared.amountCents / 100).toFixed(2),
+        billingPeriodStart: now,
+        billingPeriodEnd: claimed.currentPeriodEnd,
+        windcaveTransactionId: charge.windcaveTransactionId ?? null,
+        idempotencyKey: prepared.idempotencyKey,
+        attemptNumber: prepared.attemptNumber,
+        description: `Prorated upgrade to ${plan.name}`,
+      };
+      if (!charge.approved) {
+        const failureReason = charge.declineReason || "The upgrade payment was declined.";
         await tx
           .insert(subscriptionBillingHistory)
           .values({
             ...historyBase,
-            status: "succeeded",
-            paidAt: now,
+            status: "failed",
+            failureReason: failureReason.slice(0, 500),
           })
           .onConflictDoNothing();
+        await tx
+          .update(merchantSubscriptions)
+          .set({
+            billingClaimToken: null,
+            billingClaimedAt: null,
+            updatedAt: completedAt,
+          })
+          .where(and(
+            eq(merchantSubscriptions.id, claimed.id),
+            eq(merchantSubscriptions.billingClaimToken, prepared.claimToken),
+          ));
+        return {
+          ok: false as const,
+          reason: "declined" as const,
+          message: failureReason,
+        };
       }
 
+      await tx
+        .insert(subscriptionBillingHistory)
+        .values({
+          ...historyBase,
+          status: "succeeded",
+          paidAt: completedAt,
+        })
+        .onConflictDoNothing();
       const updated = await tx
         .update(merchantSubscriptions)
-        .set(immediatePlanUpdates(planId, now))
-        .where(eq(merchantSubscriptions.id, subscription.id))
+        .set({
+          ...immediatePlanUpdates(planId, completedAt),
+          billingClaimToken: null,
+          billingClaimedAt: null,
+        })
+        .where(and(
+          eq(merchantSubscriptions.id, claimed.id),
+          eq(merchantSubscriptions.billingClaimToken, prepared.claimToken),
+        ))
         .returning();
-
       return {
         ok: true as const,
         subscription: updated[0],
@@ -6240,7 +6335,10 @@ export class DatabaseStorage implements IStorage {
         windcaveBillingRef: normalizedSessionId,
         updatedAt: new Date(),
       })
-      .where(eq(merchantSubscriptions.merchantId, merchantId))
+      .where(and(
+        eq(merchantSubscriptions.merchantId, merchantId),
+        isNull(merchantSubscriptions.billingClaimToken),
+      ))
       .returning({ id: merchantSubscriptions.id });
     return rows.length === 1;
   }
@@ -6248,10 +6346,12 @@ export class DatabaseStorage implements IStorage {
   /**
    * Completes card setup and, where necessary, establishes the paid period.
    *
-   * The subscription row stays locked across the provider call. The stable
-   * session-derived idempotency key makes a provider success safe to replay if
-   * the database transaction subsequently aborts, while the row lock prevents
-   * two callbacks from advancing the period twice.
+   * A short database transaction validates the session and takes a durable
+   * claim. The provider call happens after that transaction commits, then a
+   * second claim-guarded transaction records history and advances the period.
+   * This avoids holding a row lock or database connection over network I/O.
+   * The session-derived provider key makes a lost response/finalize safe to
+   * replay after the claim lease expires.
    */
   async completeSubscriptionCardSetup(
     merchantId: number,
@@ -6269,7 +6369,7 @@ export class DatabaseStorage implements IStorage {
       };
     }
 
-    return await this.db.transaction(async (tx) => {
+    const prepared = await this.db.transaction(async (tx) => {
       const rows = await tx
         .select()
         .from(merchantSubscriptions)
@@ -6278,7 +6378,14 @@ export class DatabaseStorage implements IStorage {
         .limit(1);
       const subscription = rows[0];
       if (!subscription) {
-        return { ok: false as const, reason: "not-found" as const, message: "Subscription not found." };
+        return {
+          kind: "done" as const,
+          result: {
+            ok: false as const,
+            reason: "not-found" as const,
+            message: "Subscription not found.",
+          },
+        };
       }
       const cardSessionState = subscriptionCardSessionState(subscription, normalizedSessionId);
       if (cardSessionState === "succeeded") {
@@ -6289,7 +6396,10 @@ export class DatabaseStorage implements IStorage {
           && !!subscription.currentPeriodEnd
           && new Date(subscription.currentPeriodEnd).getTime() > now.getTime();
         if (!paidPeriodIsCurrent) {
-          return { ok: true as const, subscription, charged: false };
+          return {
+            kind: "done" as const,
+            result: { ok: true as const, subscription, charged: false },
+          };
         }
         const updated = await tx
           .update(merchantSubscriptions)
@@ -6303,31 +6413,48 @@ export class DatabaseStorage implements IStorage {
           })
           .where(eq(merchantSubscriptions.id, subscription.id))
           .returning();
-        return { ok: true as const, subscription: updated[0], charged: false };
+        return {
+          kind: "done" as const,
+          result: { ok: true as const, subscription: updated[0], charged: false },
+        };
       }
       if (cardSessionState === "declined") {
         return {
-          ok: false as const,
-          reason: "declined" as const,
-          message: "The card was declined.",
+          kind: "done" as const,
+          result: {
+            ok: false as const,
+            reason: "declined" as const,
+            message: "The card was declined.",
+          },
         };
       }
       if (cardSessionState !== "pending") {
         return {
-          ok: false as const,
-          reason: "session-mismatch" as const,
-          message: "The card session does not belong to this account.",
+          kind: "done" as const,
+          result: {
+            ok: false as const,
+            reason: "session-mismatch" as const,
+            message: "The card session does not belong to this account.",
+          },
         };
       }
-      if (subscription.billingClaimToken) {
+      const now = new Date();
+      const staleBefore = new Date(now.getTime() - SUBSCRIPTION_BILLING_CLAIM_LEASE_MS);
+      const claimIsLive =
+        !!subscription.billingClaimToken
+        && !!subscription.billingClaimedAt
+        && new Date(subscription.billingClaimedAt).getTime() >= staleBefore.getTime();
+      if (claimIsLive) {
         return {
-          ok: false as const,
-          reason: "billing-busy" as const,
-          message: "Billing is already in progress. Please try again shortly.",
+          kind: "done" as const,
+          result: {
+            ok: false as const,
+            reason: "billing-busy" as const,
+            message: "Billing is already in progress. Please try again shortly.",
+          },
         };
       }
 
-      const now = new Date();
       const paidPeriodIsCurrent =
         subscription.status === "active"
         && !!subscription.lastBillingDate
@@ -6351,7 +6478,10 @@ export class DatabaseStorage implements IStorage {
           })
           .where(eq(merchantSubscriptions.id, subscription.id))
           .returning();
-        return { ok: true as const, subscription: updated[0], charged: false };
+        return {
+          kind: "done" as const,
+          result: { ok: true as const, subscription: updated[0], charged: false },
+        };
       }
 
       if (
@@ -6359,9 +6489,12 @@ export class DatabaseStorage implements IStorage {
         || !["pending", "active", "past_due", "suspended", "cancelled"].includes(subscription.status)
       ) {
         return {
-          ok: false as const,
-          reason: "invalid-state" as const,
-          message: "Resolve the pending cancellation before adding a payment method.",
+          kind: "done" as const,
+          result: {
+            ok: false as const,
+            reason: "invalid-state" as const,
+            message: "Resolve the pending cancellation before adding a payment method.",
+          },
         };
       }
 
@@ -6389,16 +6522,22 @@ export class DatabaseStorage implements IStorage {
           .set({ windcaveBillingRef: terminalSubscriptionCardSessionRef("declined", normalizedSessionId) })
           .where(eq(merchantSubscriptions.id, subscription.id));
         return {
-          ok: false as const,
-          reason: "declined" as const,
-          message: prior.failureReason || "The card was declined.",
+          kind: "done" as const,
+          result: {
+            ok: false as const,
+            reason: "declined" as const,
+            message: prior.failureReason || "The card was declined.",
+          },
         };
       }
       if (prior && prior.status !== "succeeded") {
         return {
-          ok: false as const,
-          reason: "billing-busy" as const,
-          message: "Card activation is already in progress.",
+          kind: "done" as const,
+          result: {
+            ok: false as const,
+            reason: "billing-busy" as const,
+            message: "Card activation is already in progress.",
+          },
         };
       }
       if (prior?.status === "succeeded") {
@@ -6407,43 +6546,111 @@ export class DatabaseStorage implements IStorage {
           .set({ windcaveBillingRef: terminalSubscriptionCardSessionRef("succeeded", normalizedSessionId) })
           .where(eq(merchantSubscriptions.id, subscription.id))
           .returning();
-        return { ok: true as const, subscription: updated[0], charged: false };
-      }
-
-      const outcome = await charge({
-          subscriptionId: subscription.id,
-          merchantId,
-          cardId: card.windcaveCardId,
-          amountCents,
-          idempotencyKey,
-          reference: `TAPTPAY-CARD-M${merchantId}-${plan.id.toUpperCase()}`,
-        });
-
-      if (!outcome.success) {
         return {
-          ok: false as const,
-          reason: "charge-failed" as const,
-          message: "The payment could not be confirmed. Please try again.",
+          kind: "done" as const,
+          result: { ok: true as const, subscription: updated[0], charged: false },
         };
       }
 
+      const claimToken = randomUUID();
+      const claimedRows = await tx
+        .update(merchantSubscriptions)
+        .set({
+          billingClaimToken: claimToken,
+          billingClaimedAt: now,
+          nextBillingDate: subscription.nextBillingDate ?? periodStart,
+          updatedAt: now,
+        })
+        .where(eq(merchantSubscriptions.id, subscription.id))
+        .returning();
+      return {
+        kind: "charge" as const,
+        subscription: claimedRows[0],
+        claimToken,
+        plan,
+        amountCents,
+        idempotencyKey,
+        periodStart,
+        periodEnd,
+        attemptNumber: (subscription.failedPaymentCount ?? 0) + 1,
+      };
+    });
+
+    if (prepared.kind === "done") return prepared.result;
+
+    let outcome: PlanUpgradeChargeResult;
+    try {
+      outcome = await charge({
+        subscriptionId: prepared.subscription.id,
+        merchantId,
+        cardId: card.windcaveCardId,
+        amountCents: prepared.amountCents,
+        idempotencyKey: prepared.idempotencyKey,
+        reference: `TAPTPAY-CARD-M${merchantId}-${prepared.plan.id.toUpperCase()}`,
+      });
+    } catch (error) {
+      await this.releaseSubscriptionBillingClaim(
+        prepared.subscription.id,
+        prepared.claimToken,
+      );
+      throw error;
+    }
+
+    if (!outcome.success) {
+      await this.releaseSubscriptionBillingClaim(
+        prepared.subscription.id,
+        prepared.claimToken,
+      );
+      return {
+        ok: false as const,
+        reason: "charge-failed" as const,
+        message: "The payment could not be confirmed. Please try again.",
+      };
+    }
+
+    return await this.db.transaction(async (tx) => {
+      const claimedRows = await tx
+        .select()
+        .from(merchantSubscriptions)
+        .where(and(
+          eq(merchantSubscriptions.id, prepared.subscription.id),
+          eq(merchantSubscriptions.billingClaimToken, prepared.claimToken),
+        ))
+        .for("update")
+        .limit(1);
+      const claimed = claimedRows[0];
+      if (!claimed) {
+        return {
+          ok: false as const,
+          reason: "billing-busy" as const,
+          message: "Billing was reconciled by another worker. Refresh and try again.",
+        };
+      }
+      const completedAt = new Date();
+      const cardFields = {
+        windcaveCardId: card.windcaveCardId,
+        cardBrand: card.brand,
+        cardLast4: card.last4,
+        cardExpiry: card.expiry,
+        updatedAt: completedAt,
+      };
       if (!outcome.approved) {
         const failureReason = outcome.declineReason || "Card declined";
-        const exhausted = (subscription.failedPaymentCount ?? 0) + 1 >= MAX_PAYMENT_ATTEMPTS;
+        const exhausted = prepared.attemptNumber >= MAX_PAYMENT_ATTEMPTS;
         await tx
           .insert(subscriptionBillingHistory)
           .values({
             merchantId,
-            subscriptionId: subscription.id,
+            subscriptionId: claimed.id,
             billingType: "monthly_subscription",
-            amount: (amountCents / 100).toFixed(2),
-            billingPeriodStart: periodStart,
-            billingPeriodEnd: periodEnd,
+            amount: (prepared.amountCents / 100).toFixed(2),
+            billingPeriodStart: prepared.periodStart,
+            billingPeriodEnd: prepared.periodEnd,
             windcaveTransactionId: outcome.windcaveTransactionId ?? null,
-            idempotencyKey,
-            attemptNumber: (subscription.failedPaymentCount ?? 0) + 1,
+            idempotencyKey: prepared.idempotencyKey,
+            attemptNumber: prepared.attemptNumber,
             status: "failed",
-            description: `${plan.name} subscription activation`,
+            description: `${prepared.plan.name} subscription activation`,
             failureReason,
           })
           .onConflictDoNothing();
@@ -6451,7 +6658,7 @@ export class DatabaseStorage implements IStorage {
           .update(merchantSubscriptions)
           .set({
             ...cardFields,
-            ...failedPaymentUpdates(subscription, now, failureReason, exhausted),
+            ...failedPaymentUpdates(claimed, completedAt, failureReason, exhausted),
             cancelAtPeriodEnd: false,
             cancellationRequestedAt: null,
             cancellationEffectiveDate: null,
@@ -6459,92 +6666,82 @@ export class DatabaseStorage implements IStorage {
             lastBillingDate: null,
             currentPeriodStart: null,
             currentPeriodEnd: null,
-            nextBillingDate: periodStart,
+            nextBillingDate: prepared.periodStart,
             windcaveBillingRef: terminalSubscriptionCardSessionRef("declined", normalizedSessionId),
+            billingClaimToken: null,
+            billingClaimedAt: null,
           })
-          .where(eq(merchantSubscriptions.id, subscription.id));
+          .where(and(
+            eq(merchantSubscriptions.id, claimed.id),
+            eq(merchantSubscriptions.billingClaimToken, prepared.claimToken),
+          ));
         return { ok: false as const, reason: "declined" as const, message: failureReason };
       }
 
       const updated = await tx
         .update(merchantSubscriptions)
         .set({
-          ...nextPeriodUpdates(subscription, now),
+          ...nextPeriodUpdates(claimed, completedAt, prepared.periodStart),
           ...cardFields,
           cancelAtPeriodEnd: false,
           cancellationRequestedAt: null,
           cancellationEffectiveDate: null,
           cancellationReason: null,
           windcaveBillingRef: terminalSubscriptionCardSessionRef("succeeded", normalizedSessionId),
+          billingClaimToken: null,
+          billingClaimedAt: null,
         })
-        .where(eq(merchantSubscriptions.id, subscription.id))
+        .where(and(
+          eq(merchantSubscriptions.id, claimed.id),
+          eq(merchantSubscriptions.billingClaimToken, prepared.claimToken),
+        ))
         .returning();
-      if (!prior) {
-        await tx
-          .insert(subscriptionBillingHistory)
-          .values({
-            merchantId,
-            subscriptionId: subscription.id,
-            billingType: "monthly_subscription",
-            amount: (amountCents / 100).toFixed(2),
-            billingPeriodStart: periodStart,
-            billingPeriodEnd: periodEnd,
-            windcaveTransactionId: outcome.windcaveTransactionId ?? null,
-            idempotencyKey,
-            attemptNumber: (subscription.failedPaymentCount ?? 0) + 1,
-            status: "succeeded",
-            description: `${plan.name} subscription activation`,
-            paidAt: now,
-          })
-          .onConflictDoNothing();
-      }
+      await tx
+        .insert(subscriptionBillingHistory)
+        .values({
+          merchantId,
+          subscriptionId: claimed.id,
+          billingType: "monthly_subscription",
+          amount: (prepared.amountCents / 100).toFixed(2),
+          billingPeriodStart: prepared.periodStart,
+          billingPeriodEnd: prepared.periodEnd,
+          windcaveTransactionId: outcome.windcaveTransactionId ?? null,
+          idempotencyKey: prepared.idempotencyKey,
+          attemptNumber: prepared.attemptNumber,
+          status: "succeeded",
+          description: `${prepared.plan.name} subscription activation`,
+          paidAt: completedAt,
+        })
+        .onConflictDoNothing();
       return { ok: true as const, subscription: updated[0], charged: true };
     });
   }
 
   async removeSubscriptionCard(merchantId: number): Promise<MerchantSubscription> {
     if (!this.db) throw new Error('Database not available');
-    const result = await this.db
-      .update(merchantSubscriptions)
-      .set({
-        windcaveCardId: null,
-        cardBrand: null,
-        cardLast4: null,
-        cardExpiry: null,
-        updatedAt: new Date(),
-      })
-      .where(eq(merchantSubscriptions.merchantId, merchantId))
-      .returning();
-    return result[0];
-  }
-
-  async applySubscriptionBillingOutcome(
-    subscriptionId: number,
-    updates: Record<string, unknown>,
-  ): Promise<void> {
-    if (!this.db) throw new Error('Database not available');
-    await this.db
-      .update(merchantSubscriptions)
-      .set(updates as any)
-      .where(eq(merchantSubscriptions.id, subscriptionId));
-  }
-
-  /**
-   * Candidates for the billing run: due, not cancelled, not suspended, with a
-   * card. The final charge/skip decision is `decideBilling`, which also handles
-   * dunning back-off; this query only narrows the set.
-   */
-  async getSubscriptionsDueForBilling(now: Date): Promise<MerchantSubscription[]> {
-    if (!this.db) throw new Error('Database not available');
-    return await this.db
-      .select()
-      .from(merchantSubscriptions)
-      .where(and(
-        inArray(merchantSubscriptions.status, ["active", "past_due"]),
-        eq(merchantSubscriptions.cancelAtPeriodEnd, false),
-        isNotNull(merchantSubscriptions.windcaveCardId),
-        lte(merchantSubscriptions.nextBillingDate, now),
-      ));
+    return await this.db.transaction(async (tx) => {
+      const rows = await tx
+        .select()
+        .from(merchantSubscriptions)
+        .where(eq(merchantSubscriptions.merchantId, merchantId))
+        .for("update")
+        .limit(1);
+      const subscription = rows[0];
+      if (!subscription) throw new Error("Subscription not found");
+      if (subscription.billingClaimToken) throw new SubscriptionBillingBusyError();
+      const result = await tx
+        .update(merchantSubscriptions)
+        .set({
+          windcaveCardId: null,
+          cardBrand: null,
+          cardLast4: null,
+          cardExpiry: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(merchantSubscriptions.id, subscription.id))
+        .returning();
+      return result[0];
+    });
   }
 
   async getCancelledSubscriptionsPastPeriodEnd(now: Date): Promise<MerchantSubscription[]> {
@@ -6577,8 +6774,7 @@ export class DatabaseStorage implements IStorage {
         .where(and(
           inArray(merchantSubscriptions.status, ["active", "past_due"]),
           eq(merchantSubscriptions.cancelAtPeriodEnd, false),
-          isNotNull(merchantSubscriptions.windcaveCardId),
-          lte(merchantSubscriptions.nextBillingDate, now),
+          sql`coalesce(${merchantSubscriptions.nextBillingDate}, ${merchantSubscriptions.currentPeriodEnd}) <= ${now}`,
           or(
             eq(merchantSubscriptions.status, "active"),
             and(
@@ -6604,16 +6800,28 @@ export class DatabaseStorage implements IStorage {
             ? notInArray(merchantSubscriptions.id, [...excludeSubscriptionIds])
             : undefined,
         ))
-        .orderBy(asc(merchantSubscriptions.nextBillingDate), asc(merchantSubscriptions.id))
+        .orderBy(
+          sql`coalesce(${merchantSubscriptions.nextBillingDate}, ${merchantSubscriptions.currentPeriodEnd}) asc`,
+          asc(merchantSubscriptions.id),
+        )
         .for("update", { skipLocked: true })
         .limit(safeLimit);
 
       const claimed: MerchantSubscription[] = [];
       for (const candidate of candidates) {
         const claimToken = randomUUID();
+        const periodAnchor =
+          candidate.nextBillingDate
+          ?? candidate.currentPeriodEnd
+          ?? nextBillingPeriodStart(candidate, now);
         const rows = await tx
           .update(merchantSubscriptions)
-          .set({ billingClaimToken: claimToken, billingClaimedAt: claimedAt, updatedAt: claimedAt })
+          .set({
+            billingClaimToken: claimToken,
+            billingClaimedAt: claimedAt,
+            nextBillingDate: periodAnchor,
+            updatedAt: claimedAt,
+          })
           .where(eq(merchantSubscriptions.id, candidate.id))
           .returning();
         if (rows[0]) claimed.push(rows[0]);
@@ -7013,21 +7221,24 @@ export class DatabaseStorage implements IStorage {
 
   async updateUserPassword(userId: number, passwordHash: string): Promise<User | null> {
     if (!this.db) throw new Error('Database not available');
-    const result = await this.db
-      .update(users)
-      .set({ password: passwordHash })
-      .where(eq(users.id, userId))
-      .returning();
-    const updated = result[0] ?? null;
-    // The owner's credential also lives on the merchant row (password reset and
-    // admin activation still read it), so keep the two in step.
-    if (updated?.role === "owner" && updated.merchantId) {
-      await this.db
-        .update(merchants)
-        .set({ passwordHash, updatedAt: new Date() })
-        .where(eq(merchants.id, updated.merchantId));
-    }
-    return updated;
+    const now = new Date();
+    return this.db.transaction(async (tx) => {
+      const result = await tx
+        .update(users)
+        .set({ password: passwordHash })
+        .where(eq(users.id, userId))
+        .returning();
+      const updated = result[0] ?? null;
+      // The owner's credential also lives on the merchant row (password reset
+      // and admin activation still read it), so commit both or neither.
+      if (updated?.role === "owner" && updated.merchantId) {
+        await tx
+          .update(merchants)
+          .set({ passwordHash, updatedAt: now })
+          .where(eq(merchants.id, updated.merchantId));
+      }
+      return updated;
+    });
   }
 
   async setUserResetToken(

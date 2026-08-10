@@ -219,9 +219,6 @@ describe("PaymentAttemptService with MemStorage", () => {
       },
       counterIncremented: true,
     });
-    // No fee row is written: pricing is a monthly subscription, not per payment.
-    await expect(storage.getPlatformFeesByMerchant(1)).resolves.toHaveLength(0);
-
     const replay = await service.finalize({
       attemptId: claim.attempt.id,
       processorSessionId: "session-approved",
@@ -233,7 +230,6 @@ describe("PaymentAttemptService with MemStorage", () => {
       kind: "reused",
       counterIncremented: false,
     });
-    await expect(storage.getPlatformFeesByMerchant(1)).resolves.toHaveLength(0);
     await expect(storage.getTransaction(transaction.id)).resolves.toMatchObject({
       windcaveTransactionId: "processor-txn-approved",
       paymentMethod: "card",
@@ -277,7 +273,6 @@ describe("PaymentAttemptService with MemStorage", () => {
         },
         counterIncremented: false,
       });
-      await expect(storage.getPlatformFeesByMerchant(1)).resolves.toHaveLength(0);
     },
   );
 
@@ -452,7 +447,5 @@ describe("PaymentAttemptService with MemStorage", () => {
       status: "completed",
       completedSplits: 3,
     });
-    // Each share settles without writing a fee row — see the unsplit case above.
-    await expect(storage.getPlatformFeesByMerchant(1)).resolves.toHaveLength(0);
   });
 });

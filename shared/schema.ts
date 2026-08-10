@@ -196,6 +196,10 @@ export const transactions = pgTable("transactions", {
   splitEnabled: boolean("split_enabled").default(false),
   
   createdAt: timestamp("created_at").defaultNow(),
+  // Canonical settlement time for non-split retail payments. Unlike createdAt,
+  // this is written only when payment reaches a completed state and therefore
+  // safely supports date-windowed payout summaries.
+  completedAt: timestamp("completed_at"),
 }, (t) => ({
   merchantIdIdx: index("transactions_merchant_id_idx").on(t.merchantId),
   taptStoneIdIdx: index("transactions_tapt_stone_id_idx").on(t.taptStoneId),
@@ -497,10 +501,6 @@ export const verifyMerchantSchema = z.object({
   path: ["confirmPassword"],
 });
 
-export const updateMerchantRatesSchema = z.object({
-  currentProviderRate: z.string().regex(/^\d+(\.\d{1,4})?$/, "Rate must be a valid percentage"),
-});
-
 export const updateMerchantDetailsSchema = z.object({
   businessName: z.string().min(1, "Business name is required").max(100),
   contactEmail: z.string().email("Valid email is required"),
@@ -528,6 +528,7 @@ export const changePasswordSchema = z.object({
 export const insertTransactionSchema = createInsertSchema(transactions).omit({
   id: true,
   createdAt: true,
+  completedAt: true,
   windcaveTransactionId: true,
   windcaveSessionId: true,
   windcaveSessionState: true,
@@ -572,12 +573,6 @@ export const resetPasswordSchema = z.object({
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
-});
-
-export const insertPlatformFeeSchema = createInsertSchema(platformFees).omit({
-  id: true,
-  createdAt: true,
-  collectedAt: true,
 });
 
 // Tapt Stones table - multiple QR codes per merchant
@@ -964,11 +959,6 @@ export const insertMerchantSubscriptionSchema = createInsertSchema(merchantSubsc
   updatedAt: true,
 });
 
-export const updateSubscriptionSchema = z.object({
-  tier: z.enum(["free", "paid"]).optional(),
-  billingFrequency: z.enum(["weekly", "bi_weekly", "monthly"]).optional(),
-});
-
 export const cancelSubscriptionSchema = z.object({
   cancellationReason: z.string().min(1, "Cancellation reason is required").max(500, "Reason too long"),
 });
@@ -990,8 +980,6 @@ export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type SplitPayment = typeof splitPayments.$inferSelect;
 export type PaymentAttempt = typeof paymentAttempts.$inferSelect;
 export type InsertPaymentAttempt = typeof paymentAttempts.$inferInsert;
-export type PlatformFee = typeof platformFees.$inferSelect;
-export type InsertPlatformFee = z.infer<typeof insertPlatformFeeSchema>;
 export type MerchantSettlement = typeof merchantSettlements.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -1014,7 +1002,6 @@ export type CreateStockItem = z.infer<typeof createStockItemSchema>;
 // Subscription types
 export type MerchantSubscription = typeof merchantSubscriptions.$inferSelect;
 export type InsertMerchantSubscription = z.infer<typeof insertMerchantSubscriptionSchema>;
-export type UpdateSubscription = z.infer<typeof updateSubscriptionSchema>;
 export type CancelSubscription = z.infer<typeof cancelSubscriptionSchema>;
 
 // Billing History types

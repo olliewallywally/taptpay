@@ -138,15 +138,70 @@ describe("transaction storage addressing", () => {
       rawToken: "must-not-be-stored",
       paymentToken: "must-not-be-stored",
       token: "must-not-be-stored",
+      completedAt: new Date("2026-08-09T00:00:00.000Z"),
     } as unknown as TransactionStorageInput);
 
     expect(transaction).not.toHaveProperty("rawToken");
     expect(transaction).not.toHaveProperty("paymentToken");
     expect(transaction).not.toHaveProperty("token");
+    expect(transaction.completedAt).toBeNull();
+  });
+
+  test("timestamps an atomic completed insert at creation", async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date("2026-08-09T04:05:06.000Z"));
+    try {
+      const storage = new MemStorage();
+      const transaction = await storage.createTransaction(transactionInput({
+        status: "completed",
+        paymentMethod: "tap_to_pay",
+      }));
+      expect(transaction.createdAt).toEqual(new Date("2026-08-09T04:05:06.000Z"));
+      expect(transaction.completedAt).toEqual(transaction.createdAt);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 
 describe("push notification preference storage", () => {
+  test("summarizes canonical completion times without platform-fee rows or split double counting", async () => {
+    jest.useFakeTimers();
+    try {
+      const storage = new MemStorage();
+      jest.setSystemTime(new Date("2026-08-06T09:00:00.000Z"));
+      const retail = await storage.createTransaction(transactionInput({ price: "10.00" }));
+      const failed = await storage.createTransaction(transactionInput({ price: "99.00" }));
+      const cash = await storage.createTransaction(transactionInput({
+        price: "25.00",
+        paymentMethod: "cash",
+      }));
+      const split = await storage.createTransaction(transactionInput({ price: "12.00" }));
+      await storage.createBillSplit(split.id, 2);
+
+      jest.setSystemTime(new Date("2026-08-06T10:05:00.000Z"));
+      await storage.updateTransactionStatus(retail.id, "completed");
+      await storage.updateTransactionStatus(failed.id, "failed");
+      await storage.updateTransactionStatus(cash.id, "completed");
+      const splitRows = await storage.getSplitPaymentsByTransaction(split.id);
+      await storage.updateSplitPaymentStatus(splitRows[0].id, "completed", "split-one");
+
+      jest.setSystemTime(new Date("2026-08-06T11:05:00.000Z"));
+      await storage.updateSplitPaymentStatus(splitRows[1].id, "completed", "split-two");
+
+      await expect(storage.getDailyPushPaymentSummaries(
+        new Date("2026-08-06T10:00:00.000Z"),
+        new Date("2026-08-06T11:00:00.000Z"),
+      )).resolves.toEqual([{ merchantId: 1, amount: "16.00", paymentCount: 2 }]);
+      await expect(storage.getTransaction(retail.id)).resolves.toMatchObject({
+        createdAt: new Date("2026-08-06T09:00:00.000Z"),
+        completedAt: new Date("2026-08-06T10:05:00.000Z"),
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   test("persists preferences across unsubscribe and reactivation", async () => {
     const storage = new MemStorage();
     const created = await storage.createPushSubscription({
@@ -230,6 +285,26 @@ describe("push notification preference storage", () => {
       7, "daily_payout_summary", otherDate,
       new Date(startedAt.getTime() + PUSH_NOTIFICATION_DELIVERY_LEASE_MS),
     )).resolves.toEqual(expect.any(String));
+  });
+});
+
+describe("owner credential storage", () => {
+  test("updates the owner login and merchant credential together", async () => {
+    const storage = new MemStorage();
+    const merchant = await storage.createMerchantWithPassword({
+      name: "Owner",
+      businessName: "Atomic Shop",
+      email: "owner@atomic.test",
+    }, "old-hash");
+    const owner = await storage.getUserByEmail("owner@atomic.test");
+    if (!owner) throw new Error("expected owner login");
+
+    await expect(storage.updateUserPassword(owner.id, "new-hash")).resolves.toMatchObject({
+      password: "new-hash",
+    });
+    await expect(storage.getMerchant(merchant.id)).resolves.toMatchObject({
+      passwordHash: "new-hash",
+    });
   });
 });
 
