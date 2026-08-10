@@ -55,6 +55,7 @@ const REAL_MIGRATIONS = [
   "0014_reconcile_subscription_activation.sql",
   "0015_startup_schema_cleanup.sql",
   "0016_transaction_completion_time.sql",
+  "0017_schema_history_catchup.sql",
 ];
 
 /** Migrations that own a `BEGIN;` / `COMMIT;` pair. */

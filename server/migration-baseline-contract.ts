@@ -87,6 +87,21 @@ export const BASELINE_EFFECT_REQUIREMENTS: readonly Requirement[] = [
 
   r("0016_transaction_completion_time.sql", "column", "transactions", "completed_at"),
   r("0016_transaction_completion_time.sql", "index", "transactions", "transactions_merchant_completed_at_idx"),
+
+  r("0017_schema_history_catchup.sql", "column", "merchants", "google_id"),
+  r("0017_schema_history_catchup.sql", "column", "merchants", "windcave_api_key"),
+  r("0017_schema_history_catchup.sql", "column", "merchants", "daily_goal"),
+  r("0017_schema_history_catchup.sql", "column", "merchants", "reset_token_expiry"),
+  r("0017_schema_history_catchup.sql", "column", "invoices_rent_requests", "kind"),
+  r("0017_schema_history_catchup.sql", "column", "invoices_rent_requests", "document_url"),
+  r("0017_schema_history_catchup.sql", "table", "refunds"),
+  r("0017_schema_history_catchup.sql", "index", "refunds", "refunds_merchant_id_idx"),
+  r("0017_schema_history_catchup.sql", "table", "merchant_settlements"),
+  r("0017_schema_history_catchup.sql", "table", "stock_items"),
+  r("0017_schema_history_catchup.sql", "table", "api_keys"),
+  r("0017_schema_history_catchup.sql", "constraint", "api_keys", "api_keys_api_key_unique"),
+  r("0017_schema_history_catchup.sql", "table", "api_requests"),
+  r("0017_schema_history_catchup.sql", "table", "webhook_deliveries"),
 ];
 
 export const FIND_MISSING_BASELINE_EFFECTS_SQL = `
