@@ -70,6 +70,7 @@
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
+import { findMissingBaselineEffects } from "./migration-baseline-contract";
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -619,6 +620,13 @@ export class MigrationChecksumDriftError extends Error {
     this.drifted = drifted;
   }
 }
+export class MigrationHistoryError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MigrationHistoryError";
+  }
+}
+
 
 // ---------------------------------------------------------------------------
 // Ledger
@@ -637,6 +645,24 @@ export const CREATE_LEDGER_TABLE_SQL = `CREATE TABLE IF NOT EXISTS ${LEDGER_QUAL
 export const SELECT_LEDGER_SQL = `SELECT filename, checksum, applied_at, baselined FROM ${LEDGER_QUALIFIED}`;
 
 export const INSERT_LEDGER_SQL = `INSERT INTO ${LEDGER_QUALIFIED} (filename, checksum, execution_ms, baselined) VALUES ($1, $2, $3, $4)`;
+
+export const ACQUIRE_MIGRATION_LOCK_SQL =
+  "SELECT pg_advisory_lock(hashtext('taptpay:migration-runner'))";
+export const RELEASE_MIGRATION_LOCK_SQL =
+  "SELECT pg_advisory_unlock(hashtext('taptpay:migration-runner'))";
+
+/** Serialize deploys for the full plan/apply/baseline operation. */
+export async function withMigrationAdvisoryLock<T>(
+  client: MigrationClient,
+  work: () => Promise<T>,
+): Promise<T> {
+  await client.query(ACQUIRE_MIGRATION_LOCK_SQL);
+  try {
+    return await work();
+  } finally {
+    await client.query(RELEASE_MIGRATION_LOCK_SQL).catch(() => undefined);
+  }
+}
 
 /** Postgres "relation does not exist". */
 const UNDEFINED_TABLE = "42P01";
@@ -757,17 +783,16 @@ export async function runPendingMigrations(
   if (plan.drifted.length > 0) throw new MigrationChecksumDriftError(plan.drifted);
 
   if (plan.orphaned.length > 0) {
-    log(
-      `⚠️  ${plan.orphaned.length} migration(s) recorded in ${LEDGER_QUALIFIED} ` +
-        `have no file on disk: ${plan.orphaned.join(", ")}. The repository and ` +
-        `this database disagree about history.`,
+    throw new MigrationHistoryError(
+      `${plan.orphaned.length} migration(s) recorded in ${LEDGER_QUALIFIED} ` +
+        `have no file on disk: ${plan.orphaned.join(", ")}. Refusing to run ` +
+        `until repository and database history agree.`,
     );
   }
   if (plan.outOfOrder.length > 0) {
-    log(
-      `⚠️  Out-of-order migration(s) pending: ${plan.outOfOrder.join(", ")}. ` +
-        `They sort before migrations this database has already applied and ` +
-        `will be applied now regardless — check they are still safe.`,
+    throw new MigrationHistoryError(
+      `Out-of-order migration(s) pending: ${plan.outOfOrder.join(", ")}. ` +
+        `Refusing to alter history; ship a new forward migration instead.`,
     );
   }
 
@@ -817,6 +842,8 @@ export interface BaselineOptions extends RunOptions {
   confirm?: boolean;
   /** Allow baselining when the ledger already has rows. */
   force?: boolean;
+  /** Injectable only so unit tests with synthetic migration names can opt in. */
+  effectVerifier?: typeof findMissingBaselineEffects;
 }
 
 export const COUNT_PUBLIC_TABLES_SQL = `SELECT count(*)::int AS count FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'`;
@@ -896,6 +923,18 @@ export async function baselineMigrations(
         `migration(s) are genuinely pending. Run \`npm run db:migrate\` to ` +
         `apply them. Pass --force only if you are certain they are already ` +
         `applied by hand.`,
+    );
+  }
+
+  const missingEffects = await (options.effectVerifier ?? findMissingBaselineEffects)(
+    client,
+    toRecord,
+  );
+  if (missingEffects.length > 0) {
+    throw new BaselineRefusedError(
+      `Refusing to baseline: the database is missing required migration ` +
+        `effects:\n  • ${missingEffects.join("\n  • ")}\n` +
+        `Apply the migrations instead of recording work that has not run.`,
     );
   }
 
@@ -985,6 +1024,7 @@ export interface StartupCheckOptions {
   connectionString?: string;
   log?: (message: string) => void;
   connectionTimeoutMs?: number;
+  failOnIssues?: boolean;
 }
 
 /**
@@ -996,12 +1036,19 @@ export async function reportPendingMigrations(
   options: StartupCheckOptions = {},
 ): Promise<void> {
   const log = options.log ?? ((message: string) => console.warn(message));
+  const failOnIssues = options.failOnIssues ?? false;
   try {
     const connectionString = options.connectionString ?? process.env.DATABASE_URL;
-    if (!connectionString) return;
+    if (!connectionString) {
+      if (failOnIssues) throw new MigrationHistoryError("DATABASE_URL is not set");
+      return;
+    }
 
     const dir = options.dir ?? defaultMigrationsDir();
-    if (!fs.existsSync(dir)) return;
+    if (!fs.existsSync(dir)) {
+      if (failOnIssues) throw new MigrationHistoryError(`Migrations directory not found: ${dir}`);
+      return;
+    }
 
     let ordered: string[];
     let checksums: Map<string, string>;
@@ -1009,10 +1056,14 @@ export async function reportPendingMigrations(
       ordered = listMigrationFiles(dir);
       checksums = checksumAll(dir, ordered);
     } catch (error) {
+      if (failOnIssues) throw error;
       log(`⚠️  Migration check skipped: ${(error as Error).message}`);
       return;
     }
-    if (ordered.length === 0) return;
+    if (ordered.length === 0) {
+      if (failOnIssues) throw new MigrationHistoryError("No migration files found");
+      return;
+    }
 
     // Imported lazily so a missing/broken `pg` install can never block boot.
     const pg = await import("pg");
@@ -1043,6 +1094,9 @@ export async function reportPendingMigrations(
         );
         log(`   Otherwise:                                   npm run db:migrate`);
         log(RULE);
+        if (failOnIssues) {
+          throw new MigrationHistoryError(`Migration ledger ${LEDGER_QUALIFIED} is not initialised`);
+        }
         return;
       }
 
@@ -1055,6 +1109,14 @@ export async function reportPendingMigrations(
         return;
       }
       for (const line of lines) log(line);
+      if (failOnIssues && (
+        plan.drifted.length > 0 || plan.pending.length > 0 ||
+        plan.orphaned.length > 0 || plan.outOfOrder.length > 0
+      )) {
+        throw new MigrationHistoryError(
+          `Database migration gate failed: ${plan.pending.length} pending, ${plan.drifted.length} drifted, ${plan.orphaned.length} orphaned, ${plan.outOfOrder.length} out of order`,
+        );
+      }
     } finally {
       try {
         await client.end();
@@ -1065,6 +1127,7 @@ export async function reportPendingMigrations(
   } catch (error) {
     // Never fatal: a migration check must not be able to stop the server.
     log(`⚠️  Migration check failed (non-fatal): ${(error as Error).message}`);
+    if (failOnIssues) throw error;
   }
 }
 
@@ -1171,19 +1234,28 @@ async function main(): Promise<void> {
       );
       const lines = formatPendingReport(plan);
       for (const line of lines) console.log(line);
-      if (plan.drifted.length > 0 || plan.pending.length > 0) process.exitCode = 1;
+      if (
+        plan.drifted.length > 0 ||
+        plan.pending.length > 0 ||
+        plan.orphaned.length > 0 ||
+        plan.outOfOrder.length > 0
+      ) process.exitCode = 1;
       return;
     }
 
     if (options.mode === "baseline") {
-      await baselineMigrations(client as MigrationClient, {
-        confirm: options.confirm,
-        force: options.force,
-      });
+      await withMigrationAdvisoryLock(client as MigrationClient, () =>
+        baselineMigrations(client as MigrationClient, {
+          confirm: options.confirm,
+          force: options.force,
+        }),
+      );
       return;
     }
 
-    await runPendingMigrations(client as MigrationClient, { dryRun: options.dryRun });
+    await withMigrationAdvisoryLock(client as MigrationClient, () =>
+      runPendingMigrations(client as MigrationClient, { dryRun: options.dryRun }),
+    );
   } finally {
     await client.end().catch(() => undefined);
   }

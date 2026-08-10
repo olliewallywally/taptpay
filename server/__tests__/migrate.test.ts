@@ -52,6 +52,9 @@ const REAL_MIGRATIONS = [
   "0011_payment_links_and_board_numbers.sql",
   "0012_push_notification_preferences.sql",
   "0013_subscription_plans.sql",
+  "0014_reconcile_subscription_activation.sql",
+  "0015_startup_schema_cleanup.sql",
+  "0016_transaction_completion_time.sql",
 ];
 
 /** Migrations that own a `BEGIN;` / `COMMIT;` pair. */
@@ -625,6 +628,8 @@ describe("runPendingMigrations", () => {
 });
 
 describe("baseline mode", () => {
+  const acceptSyntheticEffects = async () => [] as string[];
+
   let dir: string;
 
   beforeEach(() => {
@@ -673,6 +678,7 @@ describe("baseline mode", () => {
     const result = await baselineMigrations(client, {
       dir,
       confirm: true,
+      effectVerifier: acceptSyntheticEffects,
       log: (m) => log.push(m),
     });
 
@@ -718,6 +724,7 @@ describe("baseline mode", () => {
       dir,
       confirm: true,
       force: true,
+      effectVerifier: acceptSyntheticEffects,
       log: () => undefined,
     });
     expect(result.recorded).toEqual(["0001_b.sql"]);
