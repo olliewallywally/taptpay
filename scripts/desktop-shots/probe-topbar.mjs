@@ -13,7 +13,13 @@
 import { BASE_URL, newRetailPage, CHROMIUM_PATH } from "./retail-fixtures.mjs";
 import { chromium } from "playwright";
 
-const NAV_HOPS = ["stock", "terminal", "analytics", "settings", "home"];
+const NAV_HOPS = [
+  { label: "stock", path: "/stock", page: "directory" },
+  { label: "terminal", path: "/terminal", page: "terminal" },
+  { label: "analytics", path: "/transactions", page: "analytics" },
+  { label: "settings", path: "/settings", page: "settings" },
+  { label: "home", path: "/dashboard", page: "home" },
+];
 const EPSILON = 0.5; // sub-pixel tolerance: the canvas is transform-scaled
 
 const READ = () => {
@@ -25,11 +31,15 @@ const READ = () => {
   const mark = document.querySelector(".tapt-desktop-wordmark");
   const bubble = document.querySelector(".tapt-desktop-nav-bubble");
   const items = [...document.querySelectorAll(".tapt-desktop-nav-item")];
+  const surface = document.querySelector("[data-desktop-page]");
   return {
     wordmark: mark ? box(mark) : null,
     bubble: bubble ? box(bubble) : null,
     active: items.find((i) => i.getAttribute("aria-current") === "page")?.dataset.navId ?? null,
     items: items.map((i) => ({ id: i.dataset.navId, ...box(i) })),
+    path: location.pathname,
+    page: surface?.dataset.desktopPage ?? null,
+    vertical: surface?.dataset.desktopVertical ?? null,
   };
 };
 
@@ -37,7 +47,7 @@ const drift = (a, b) =>
   Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y), Math.abs(a.w - b.w), Math.abs(a.h - b.h));
 
 async function run(browser, label, contextOptions) {
-  const { context, page } = await newRetailPage(browser, label, contextOptions);
+  const { context, page, errors } = await newRetailPage(browser, label, contextOptions);
   const json = (route, body) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
   await page.route("**/api/property/**", (r) => json(r, []));
@@ -52,11 +62,12 @@ async function run(browser, label, contextOptions) {
   let failures = 0;
 
   for (const nav of NAV_HOPS) {
-    await page.getByRole("button", { name: nav, exact: true }).click();
+    await page.getByRole("button", { name: nav.label, exact: true }).click();
     await page.waitForTimeout(900); // let the 420ms bubble slide settle
     const now = await page.evaluate(READ);
 
-    const markDrift = base.wordmark && now.wordmark ? drift(base.wordmark, now.wordmark) : 0;
+    const missing = !base.wordmark || !now.wordmark || !now.bubble || base.items.length !== 5 || now.items.length !== 5;
+    const markDrift = base.wordmark && now.wordmark ? drift(base.wordmark, now.wordmark) : Infinity;
     let itemDrift = 0;
     for (const item of now.items) {
       const was = base.items.find((i) => i.id === item.id);
@@ -70,20 +81,26 @@ async function run(browser, label, contextOptions) {
         ? Math.max(Math.abs(activeBox.x - now.bubble.x), Math.abs(activeBox.w - now.bubble.w))
         : Infinity;
 
-    const ok = markDrift <= EPSILON && itemDrift <= EPSILON && bubbleOff <= 2;
+    const wrongSurface =
+      now.active !== nav.label ||
+      now.path !== nav.path ||
+      now.page !== nav.page ||
+      now.vertical !== "retail";
+    const ok = !missing && !wrongSurface && markDrift <= EPSILON && itemDrift <= EPSILON && bubbleOff <= 2;
     if (!ok) failures += 1;
-    rows.push({ nav, markDrift, itemDrift, bubbleOff, active: now.active, ok });
+    rows.push({ nav: nav.label, markDrift, itemDrift, bubbleOff, active: now.active, missing, wrongSurface, ok });
   }
 
   await context.close();
+  failures += errors.length;
 
   console.log(`\n########## ${label} ##########`);
   for (const r of rows) {
     console.log(
-      `  → ${r.nav.padEnd(10)} wordmark ${r.markDrift.toFixed(2)}px   labels ${r.itemDrift.toFixed(2)}px   bubble-on-active ${r.bubbleOff.toFixed(2)}px   active=${String(r.active).padEnd(9)} ${r.ok ? "OK" : "FAIL"}`,
+      `  → ${r.nav.padEnd(10)} wordmark ${r.markDrift.toFixed(2)}px   labels ${r.itemDrift.toFixed(2)}px   bubble-on-active ${r.bubbleOff.toFixed(2)}px   active=${String(r.active).padEnd(9)}${r.missing ? " MISSING SELECTOR" : ""}${r.wrongSurface ? " WRONG SURFACE" : ""} ${r.ok ? "OK" : "FAIL"}`,
     );
   }
-  console.log(`  → ${rows.length - failures}/${rows.length} hops held the top bar still`);
+  console.log(`  → ${rows.filter((row) => row.ok).length}/${rows.length} hops held the top bar still; ${errors.length} browser/HTTP errors`);
   return failures;
 }
 

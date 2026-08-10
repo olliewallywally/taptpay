@@ -4,18 +4,19 @@
  * navigation, whether the persistent app chrome (the 13" frame + header + nav)
  * survived, and whether anything painted over it.
  *
- * Three signals, and only the first two decide the exit code:
+ * Every signal below decides the exit code:
  *   - chrome REMOUNTED — the frame was torn down and rebuilt.          GATES
  *   - route-loader     — `[data-testid='page-loader']`, the full-screen
  *                        loader, painted over the app.                 GATES
- *   - page slot suspended / content spinner — the chrome held and a page
- *                        showed its own loading state. Reported only.
+ *   - page slot suspended — allowed only while visible, bounded, and cleared.
+ *   - route identity / browser errors — must match the requested screen and be
+ *                        free of page, console, request, and HTTP failures.
  *
  * That split is the whole point: matching bare `.animate-spin` (as this once
  * did) counts a page's own QR or PDF spinner as a full-screen flash, which made
  * the probe fail on a healthy tree and unusable as a gate. Desktop app routes
- * cannot render the route loader at all — their fallback is the deliberately
- * empty `DesktopPageFallback` — so a spinner inside intact chrome is content.
+ * cannot render the route loader at all. Its page fallback is deliberately
+ * visible and bounded, so a spinner inside intact chrome is content.
  *
  * Usage: dev server on :5000, single instance.
  *   node scripts/desktop-shots/probe-transitions.mjs
@@ -30,6 +31,7 @@ const WANT_SHOTS = process.argv.includes("--shots");
 // Long enough for the 16-route DESKTOP_PRELOAD_ROUTES idle chain to drain, so a
 // "warm" hop really is warm.
 const PRELOAD_DRAIN_MS = 20_000;
+const MAX_FALLBACK_MS = 1_500;
 // In dev, an unrelated file save makes Vite issue a `full-reload`, which wipes
 // the injected instrumentation and resets every React.lazy wrapper. Re-inject
 // before each hop and read the events back per hop rather than keeping one
@@ -85,7 +87,14 @@ const INSTRUMENT = () => {
         /* Chrome held but the page slot suspended, so the page area went briefly
            blank. Inherent to code-splitting the first time a route is visited,
            hence reported rather than failed. */
-        if (find(n, "[data-testid='desktop-page-fallback']")) log("page-fallback", null);
+        const fallback = find(n, "[data-testid='desktop-page-fallback']");
+        if (fallback) {
+          log("page-fallback", {
+            blank: !fallback.textContent?.trim(),
+            state: fallback.dataset.loadingState ?? null,
+          });
+        }
+        if (find(n, "[data-testid='desktop-page-error']")) log("page-chunk-error", null);
       }
     }
   }).observe(document.body, { childList: true, subtree: true });
@@ -93,22 +102,28 @@ const INSTRUMENT = () => {
 
 /* Nav-bar clicks within the retail vertical, run twice: lap 1 initialises each
    React.lazy wrapper, lap 2 is the steady state. */
-const NAV_HOPS = ["stock", "terminal", "analytics", "settings", "home"];
+const NAV_HOPS = [
+  { label: "stock", path: "/stock", page: "directory" },
+  { label: "terminal", path: "/terminal", page: "terminal" },
+  { label: "analytics", path: "/transactions", page: "analytics" },
+  { label: "settings", path: "/settings", page: "settings" },
+  { label: "home", path: "/dashboard", page: "home" },
+];
 
 /* Routes the nav bar cannot reach: the other two verticals, a quick action with
    a one-shot param, and the two legacy mobile-in-a-column screens. */
 const PUSH_ROUTES = [
-  "/property",
-  "/property/tenants",
-  "/property/terminal",
-  "/property/analytics",
-  "/trades",
-  "/trades/clients",
-  "/trades/terminal",
-  "/trades/analytics",
-  "/terminal?quick=1",
-  "/property/tenants/1",
-  "/board-builder",
+  { route: "/property", path: "/property", vertical: "property", page: "home" },
+  { route: "/property/tenants", path: "/property/tenants", vertical: "property", page: "directory" },
+  { route: "/property/terminal", path: "/property/terminal", vertical: "property", page: "terminal" },
+  { route: "/property/analytics", path: "/property/analytics", vertical: "property", page: "analytics" },
+  { route: "/trades", path: "/trades", vertical: "trades", page: "home" },
+  { route: "/trades/clients", path: "/trades/clients", vertical: "trades", page: "directory" },
+  { route: "/trades/terminal", path: "/trades/terminal", vertical: "trades", page: "terminal" },
+  { route: "/trades/analytics", path: "/trades/analytics", vertical: "trades", page: "analytics" },
+  { route: "/terminal?quick=1", path: "/terminal", vertical: "retail", page: "terminal" },
+  { route: "/property/tenants/1", path: "/property/tenants/1", vertical: "property", page: "directory" },
+  { route: "/board-builder", path: "/board-builder", vertical: "retail", page: "settings" },
 ];
 
 const DEVICE_CLASSES = [
@@ -127,7 +142,7 @@ async function probe(browser, label, contextOptions) {
   await page.waitForTimeout(PRELOAD_DRAIN_MS);
 
   const hops = [];
-  const runHop = async (name, act, shotName) => {
+  const runHop = async (name, expected, act, shotName) => {
     const alive = await page.evaluate(() => !!window.__probe);
     await page.evaluate(INSTRUMENT);
     await act();
@@ -138,30 +153,42 @@ async function probe(browser, label, contextOptions) {
     } else {
       await page.waitForTimeout(1200);
     }
-    const ev = await page.evaluate(() => {
+    const result = await page.evaluate(() => {
       const out = window.__probe?.ev ?? [];
       if (window.__probe) window.__probe.ev = [];
-      return out;
+      const surface = document.querySelector("[data-desktop-page]");
+      return {
+        ev: out,
+        actual: {
+          path: location.pathname,
+          page: surface?.dataset.desktopPage ?? null,
+          vertical: surface?.dataset.desktopVertical ?? null,
+          fallbackState:
+            document.querySelector("[data-testid='desktop-page-fallback']")?.dataset.loadingState ?? null,
+          pageError: !!document.querySelector("[data-testid='desktop-page-error']"),
+        },
+      };
     });
-    hops.push({ name, ev, reloadedBefore: !alive });
+    hops.push({ name, expected, ...result, reloadedBefore: !alive });
   };
 
   for (const lap of [1, 2]) {
     for (const nav of NAV_HOPS) {
       await runHop(
-        `lap${lap} nav → ${nav}`,
-        () => page.getByRole("button", { name: nav, exact: true }).click(),
-        WANT_SHOTS && lap === 1 ? nav : null,
+        `lap${lap} nav → ${nav.label}`,
+        { path: nav.path, vertical: "retail", page: nav.page },
+        () => page.getByRole("button", { name: nav.label, exact: true }).click(),
+        WANT_SHOTS && lap === 1 ? nav.label : null,
       );
     }
   }
 
-  for (const route of PUSH_ROUTES) {
-    await runHop(`push → ${route}`, () =>
+  for (const spec of PUSH_ROUTES) {
+    await runHop(`push → ${spec.route}`, spec, () =>
       page.evaluate((p) => {
         history.pushState({}, "", p);
         window.dispatchEvent(new PopStateEvent("popstate"));
-      }, route),
+      }, spec.route),
     );
   }
 
@@ -170,7 +197,7 @@ async function probe(browser, label, contextOptions) {
 }
 
 function report(label, hops) {
-  const rows = hops.map(({ name, ev, reloadedBefore }) => {
+  const rows = hops.map(({ name, expected, actual, ev, reloadedBefore }) => {
     const unmount = ev.find((e) => e.type === "chrome-unmounted");
     const mount = unmount ? ev.find((e) => e.type === "chrome-mounted" && e.t >= unmount.t) : null;
     const spinners = ev.filter((e) => e.type === "content-spinner");
@@ -182,8 +209,16 @@ function report(label, hops) {
       gap: unmount && mount ? mount.t - unmount.t : 0,
       loader: ev.some((e) => e.type === "route-loader"),
       fallback: !!fbIn,
+      blankFallback: !!fbIn?.detail?.blank,
       /* null = appeared but never observed leaving within the hop window. */
       fallbackMs: fbIn && fbOut ? fbOut.t - fbIn.t : null,
+      chunkError: ev.some((e) => e.type === "page-chunk-error") || actual.pageError,
+      wrongRoute:
+        actual.path !== expected.path ||
+        actual.page !== expected.page ||
+        actual.vertical !== expected.vertical,
+      expected,
+      actual,
       spinners: spinners.length,
       spinnerClass: spinners[0]?.detail ?? null,
       reloadedBefore,
@@ -195,9 +230,14 @@ function report(label, hops) {
     /* Notes are informational only — see the gate below. */
     const notes = [
       r.fallback
-        ? `page slot blank ${r.fallbackMs === null ? "— never cleared" : `${r.fallbackMs.toFixed(1)}ms`}`
+        ? `page fallback ${r.fallbackMs === null ? "— never cleared" : `${r.fallbackMs.toFixed(1)}ms`}`
         : null,
       r.spinners ? `content spinner ×${r.spinners}${r.spinnerClass ? ` (${r.spinnerClass})` : ""}` : null,
+      r.blankFallback ? "fallback had no accessible message" : null,
+      r.chunkError ? "chunk error" : null,
+      r.wrongRoute
+        ? `wrong surface ${r.actual.path} ${r.actual.vertical ?? "?"}/${r.actual.page ?? "?"}`
+        : null,
       r.reloadedBefore ? "vite full-reload before this hop" : null,
     ].filter(Boolean);
     console.log(
@@ -211,12 +251,29 @@ function report(label, hops) {
   const blanks = rows.map((r) => r.fallbackMs).filter((ms) => ms !== null);
   const worstBlank = blanks.length ? Math.max(...blanks) : 0;
   const stuck = rows.filter((r) => r.fallback && r.fallbackMs === null).length;
+  const slow = rows.filter((r) => r.fallbackMs !== null && r.fallbackMs > MAX_FALLBACK_MS).length;
+  const blankFallbacks = rows.filter((r) => r.blankFallback).length;
+  const chunkErrors = rows.filter((r) => r.chunkError).length;
+  const wrongRoutes = rows.filter((r) => r.wrongRoute).length;
   console.log(`  → ${remounts}/${rows.length} hops remounted the chrome, ${loaders} showed the route loader`);
   console.log(
-    `    informational: ${fallbacks} suspended the page slot (worst ${worstBlank.toFixed(1)}ms` +
-      `${stuck ? `, ${stuck} never cleared` : ""}), ${spinners} rendered a content spinner`,
+    `    ${fallbacks} used the page fallback (worst ${worstBlank.toFixed(1)}ms` +
+      `${stuck ? `, ${stuck} never cleared` : ""}${slow ? `, ${slow} exceeded ${MAX_FALLBACK_MS}ms` : ""}` +
+      `${blankFallbacks ? `, ${blankFallbacks} blank` : ""}), ${spinners} rendered a content spinner`,
   );
-  return { remounts, loaders, fallbacks, spinners, worstBlank, stuck, total: rows.length };
+  return {
+    remounts,
+    loaders,
+    fallbacks,
+    spinners,
+    worstBlank,
+    stuck,
+    slow,
+    blankFallbacks,
+    chunkErrors,
+    wrongRoutes,
+    total: rows.length,
+  };
 }
 
 await mkdir(OUT, { recursive: true });
@@ -225,7 +282,9 @@ const totals = [];
 try {
   for (const [label, opts] of DEVICE_CLASSES) {
     const { hops, errors } = await probe(browser, label, opts);
-    totals.push([label, report(label, hops)]);
+    const total = report(label, hops);
+    total.errors = errors.length;
+    totals.push([label, total]);
     if (errors.length) console.log(`  ${label} page errors (${errors.length}): ${errors[0]}`);
   }
 } finally {
@@ -237,13 +296,20 @@ let bad = 0;
 for (const [label, t] of totals) {
   console.log(
     `${label}: ${t.remounts} chrome remounts, ${t.loaders} route-loader flashes (of ${t.total} hops)` +
-      `  —  informational: ${t.fallbacks} page-slot suspensions (worst ${t.worstBlank.toFixed(1)}ms` +
-      `${t.stuck ? `, ${t.stuck} never cleared` : ""}), ${t.spinners} content spinners`,
+      `  —  ${t.fallbacks} page fallbacks (worst ${t.worstBlank.toFixed(1)}ms` +
+      `${t.stuck ? `, ${t.stuck} never cleared` : ""}${t.slow ? `, ${t.slow} slow` : ""}` +
+      `${t.blankFallbacks ? `, ${t.blankFallbacks} blank` : ""}), ${t.wrongRoutes} wrong surfaces` +
+      `, ${t.chunkErrors} chunk errors, ${t.errors} browser/HTTP errors, ${t.spinners} content spinners`,
   );
-  /* Only the two signals that mean "the user saw the app come apart" gate the
-     run. Page-slot suspensions and content spinners are normal behaviour inside
-     chrome that never moved. */
-  bad += t.remounts + t.loaders;
+  bad +=
+    t.remounts +
+    t.loaders +
+    t.stuck +
+    t.slow +
+    t.blankFallbacks +
+    t.chunkErrors +
+    t.wrongRoutes +
+    t.errors;
 }
 if (WANT_SHOTS) console.log(`mid-transition screenshots → ${OUT}`);
 process.exitCode = bad === 0 ? 0 : 1;

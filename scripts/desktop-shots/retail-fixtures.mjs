@@ -97,9 +97,23 @@ async function installRetailMocks(page) {
 
   /* Shapes mirror the server DTOs: `pushNotificationPreferencesDto` and
      `subscriptionDto` in server/http-contracts.ts. Settings reads both. */
+  await page.route("**/api/push/**", (route) => json(route, {}));
   await page.route("**/api/push/preferences", (route) => json(route, {
     preferences: { paymentReceived: true, dailyPayoutSummary: false, failedPaymentAlerts: false },
   }));
+  await page.route("**/api/push/capabilities", (route) => json(route, {
+    webPush: { available: false },
+    nativePush: { available: false },
+  }));
+  await page.route("**/api/billing/**", (route) => json(route, {}));
+  await page.route("**/api/billing/card", (route) => json(route, {
+    ready: true,
+    card: { brand: "Visa", last4: "4242", expiry: "12/30" },
+  }));
+  await page.route("**/api/team/**", (route) => json(route, { members: [], seatLimit: 1, seatsInUse: 1 }));
+  await page.route("**/api/team", (route) => json(route, { members: [], seatLimit: 1, seatsInUse: 1 }));
+  await page.route("**/api/subscription/**", (route) => json(route,
+    route.request().url().includes("/billing-history") ? { history: [] } : {}));
   await page.route("**/api/subscription", (route) => json(route, {
     subscription: {
       planId: "solo",
@@ -125,6 +139,21 @@ export async function newRetailPage(browser, label, contextOptions) {
   page.on("pageerror", (error) => errors.push(`${label} page: ${error.message}`));
   page.on("console", (message) => {
     if (message.type() === "error") errors.push(`${label} console: ${message.text()}`);
+  });
+  page.on("requestfailed", (request) => {
+    errors.push(`${label} request failed: ${request.method()} ${request.url()} — ${request.failure()?.errorText ?? "unknown"}`);
+  });
+  page.on("response", (response) => {
+    if (response.status() < 400) return;
+    try {
+      const url = new URL(response.url());
+      if (url.origin !== new URL(BASE_URL).origin) return;
+      errors.push(
+        `${label} HTTP ${response.status()}: ${response.request().method()} ${url.pathname}${url.search}`,
+      );
+    } catch {
+      errors.push(`${label} HTTP ${response.status()}: ${response.url()}`);
+    }
   });
   await installRetailMocks(page);
   return { context, page, errors };
