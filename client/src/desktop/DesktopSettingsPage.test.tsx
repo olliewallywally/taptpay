@@ -7,6 +7,7 @@ import { BILLING_CARD_SESSION_KEY } from "@/hooks/use-billing-card-return";
 import { DesktopSettingsPage } from "./DesktopSettingsPage";
 
 const mockSetPreference = jest.fn();
+const mockRestartTutorials = jest.fn();
 
 jest.mock("wouter", () => ({
   useLocation: () => ["/settings", jest.fn()],
@@ -22,6 +23,16 @@ jest.mock("@/lib/queryClient", () => ({
 
 jest.mock("@/hooks/use-toast", () => ({
   useToast: () => ({ toast: jest.fn() }),
+}));
+
+jest.mock("@/features/tutorial/tutorial", () => ({
+  useTutorial: () => ({
+    restartTutorials: mockRestartTutorials,
+    visitedPages: 3,
+    pageCount: 20,
+    isRestarting: false,
+    canRestart: true,
+  }),
 }));
 
 jest.mock("@/hooks/use-push-notifications", () => ({
@@ -83,6 +94,7 @@ describe("desktop settings business-details save contract", () => {
     planId = "solo";
     billingHistory = [];
     subscriptionOverrides = {};
+    mockRestartTutorials.mockResolvedValue(undefined);
     apiRequestMock.mockImplementation(async (method: string, path: string) => {
       if (method === "GET" && path === "/api/auth/me") {
         return jsonResponse({ user: { id: 7, email: `${authRole}@example.test`, role: authRole } });
@@ -205,6 +217,46 @@ describe("desktop settings business-details save contract", () => {
     expect(failed).not.toBeChecked();
     await user.click(failed);
     expect(mockSetPreference).toHaveBeenCalledWith("failedPaymentAlerts", true);
+  });
+
+  it("renders stable tutorial anchors and restarts every page walkthrough", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          queryFn: async ({ queryKey }) => {
+            if (queryKey[0] === "/api/billing/card") return { ready: false, card: null };
+            throw new Error(`Unexpected query: ${String(queryKey[0])}`);
+          },
+        },
+      },
+    });
+    const user = userEvent.setup();
+    const confirmSpy = jest.spyOn(window, "confirm").mockReturnValue(true);
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <DesktopSettingsPage deviceClass="desktop" vertical="retail" />
+      </QueryClientProvider>,
+    );
+
+    await screen.findByRole("textbox", { name: "trading name" });
+    for (const id of [
+      "settings-business",
+      "settings-goal",
+      "settings-billing",
+      "settings-payment-page",
+      "settings-tutorial-help",
+    ]) {
+      expect(document.querySelector(`[data-tutorial-id="${id}"]`)).toBeInTheDocument();
+    }
+
+    await user.click(screen.getByRole("button", { name: "Tutorial & Help" }));
+    expect(screen.getByRole("progressbar", { name: "tutorial progress" })).toHaveAttribute("aria-valuenow", "3");
+    await user.click(screen.getByRole("button", { name: "Restart Tutorials" }));
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(mockRestartTutorials).toHaveBeenCalledTimes(1));
+    confirmSpy.mockRestore();
   });
 
   it("hides team management on Solo", async () => {

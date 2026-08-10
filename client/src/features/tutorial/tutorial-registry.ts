@@ -107,11 +107,11 @@ export const TUTORIAL_REGISTRY: Record<TutorialPageKey, TutorialPageDefinition> 
   settings: {
     label: "Settings",
     steps: [
-      { target: '[data-tutorial-id="set-business"]', fallbackTarget: '[data-testid="input-business-name"]', tag: "Business", title: "Keep your details current", body: "Update your business name, director, address and GST details from this section." },
-      { target: '[data-tutorial-id="set-goal"]', fallbackTarget: '[data-testid="input-daily-goal"]', tag: "Daily goal", title: "Set a daily target", body: "Choose a daily sales goal so your dashboard can track progress against it." },
-      { target: '[data-settings-section="billing"]', fallbackTarget: '[data-testid="button-customer-page"]', tag: "Payment card", title: "Keep payments ready", body: "A valid credit or debit card is required here before any payment request can be sent." },
-      { target: '[data-testid="button-customer-page"]', fallbackTarget: '[data-settings-section="billing"]', tag: "Your page", title: "Share your payment page", body: "Open the public customer page you can print or link so customers can pay you." },
-      { target: '[data-tutorial-id="settings-tutorial-help"]', fallbackTarget: '[data-testid="button-logout"]', tag: "Tutorial & help", title: "Restart whenever you need", body: "You can restart every page tutorial here without changing any of your business data." },
+      { target: '[data-tutorial-id="set-business"]', fallbackTarget: '[data-testid="input-business-name"]', desktopTarget: '[data-tutorial-id="settings-business"]', tag: "Business", title: "Keep your details current", body: "Update your business name, director, address and GST details from this section." },
+      { target: '[data-tutorial-id="set-goal"]', fallbackTarget: '[data-testid="input-daily-goal"]', desktopTarget: '[data-tutorial-id="settings-goal"]', tag: "Daily goal", title: "Set a daily target", body: "Choose a daily sales goal so your dashboard can track progress against it." },
+      { target: '[data-settings-section="billing"]', fallbackTarget: '[data-testid="button-customer-page"]', desktopTarget: '[data-tutorial-id="settings-billing"]', tag: "Payment card", title: "Keep payments ready", body: "A valid credit or debit card is required here before any payment request can be sent." },
+      { target: '[data-testid="button-customer-page"]', fallbackTarget: '[data-settings-section="billing"]', desktopTarget: '[data-tutorial-id="settings-payment-page"]', tag: "Your page", title: "Share your payment page", body: "Open the public customer page you can print or link so customers can pay you." },
+      { target: '[data-tutorial-id="settings-tutorial-help"]', fallbackTarget: '[data-testid="button-logout"]', desktopTarget: '[data-tutorial-id="settings-tutorial-help"]', tag: "Tutorial & help", title: "Restart whenever you need", body: "You can restart every page tutorial here without changing any of your business data." },
     ],
   },
   "property-dashboard": {
@@ -188,18 +188,18 @@ export const TUTORIAL_REGISTRY: Record<TutorialPageKey, TutorialPageDefinition> 
   "trades-quote": {
     label: "Quote builder",
     steps: [
-      { target: 'input[aria-label^="Item"]', fallbackTarget: '[data-tutorial-id="tq-totals"]', tag: "Line items", title: "Build the quote", body: "Add descriptions, quantities and prices. Add a line for each part of the job." },
-      { target: '[data-tutorial-id="tq-deposit"]', fallbackTarget: '[data-tutorial-id="tq-totals"]', tag: "Deposit", title: "Ask for a deposit", body: "Optionally require a percentage or fixed deposit before the work begins." },
-      { target: '[data-tutorial-id="tq-totals"]', fallbackTarget: "main", tag: "Totals", title: "Check GST and totals", body: "Review the subtotal, GST and final total before you send the quote." },
-      { target: '[data-tutorial-id="tq-create"]', fallbackTarget: "main", tag: "Create quote", title: "Send it to the client", body: "When every detail is right, create the quote to send it for acceptance." },
+      { target: 'input[aria-label^="Item"]', fallbackTarget: '[data-tutorial-id="tq-totals"]', desktopTarget: '[data-tutorial-id="trades-quote-lines"]', tag: "Line items", title: "Build the quote", body: "Add descriptions, quantities and prices. Add a line for each part of the job.", desktopBody: "Add descriptions, quantities and prices in the desktop composer, with one line for each part of the job." },
+      { target: '[data-tutorial-id="tq-deposit"]', fallbackTarget: '[data-tutorial-id="tq-totals"]', desktopTarget: '[data-tutorial-id="trades-quote-deposit"]', tag: "Deposit", title: "Ask for a deposit", body: "Optionally require a percentage or fixed deposit before the work begins." },
+      { target: '[data-tutorial-id="tq-totals"]', fallbackTarget: "main", desktopTarget: '[data-tutorial-id="trades-quote-totals"]', tag: "Totals", title: "Check GST and totals", body: "Review the subtotal, GST and final total before you send the quote." },
+      { target: '[data-tutorial-id="tq-create"]', fallbackTarget: "main", desktopTarget: '[data-tutorial-id="trades-quote-create"]', tag: "Create quote", title: "Send it to the client", body: "When every detail is right, create the quote to send it for acceptance." },
     ],
   },
   "trades-recurring": {
     label: "Recurring invoices",
     steps: [
-      { target: '[data-tutorial-id="tr-create"]', fallbackTarget: "main", tag: "New schedule", title: "Set up repeat work", body: "Pick a client, amount, frequency and delivery channel to invoice retainers automatically." },
-      { target: '[data-tutorial-id="tr-reminders"]', fallbackTarget: '[role="switch"]', tag: "Reminders", title: "Chase overdue invoices", body: "Turn automatic overdue reminders on or off without touching the schedules themselves." },
-      { target: '[data-tutorial-id="tr-schedules"]', fallbackTarget: "main", tag: "Schedules", title: "Manage repeat invoices", body: "Every active schedule sits here so you can pause, resume or cancel it any time." },
+      { target: '[data-tutorial-id="tr-create"]', fallbackTarget: "main", desktopTarget: '[data-tutorial-id="trades-recurring-create"]', tag: "New schedule", title: "Set up repeat work", body: "Pick a client, amount, frequency and delivery channel to invoice retainers automatically." },
+      { target: '[data-tutorial-id="tr-reminders"]', fallbackTarget: '[role="switch"]', desktopTarget: '[data-tutorial-id="trades-recurring-reminders"]', tag: "Reminders", title: "Chase overdue invoices", body: "Turn automatic overdue reminders on or off without touching the schedules themselves." },
+      { target: '[data-tutorial-id="tr-schedules"]', fallbackTarget: "main", desktopTarget: '[data-tutorial-id="trades-recurring-schedules"]', tag: "Schedules", title: "Manage repeat invoices", body: "Every active schedule sits here so you can pause, resume or cancel it any time." },
     ],
   },
   "trades-analytics": {

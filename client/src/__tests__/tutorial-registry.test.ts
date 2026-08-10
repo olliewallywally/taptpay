@@ -22,6 +22,7 @@ const DESKTOP_TUTORIAL_SOURCES: Partial<Record<TutorialPageKey, string>> = {
   "retail-payment-stack": "desktop/pages/retail-terminal.tsx",
   "retail-transactions": "desktop/pages/retail-analytics.tsx",
   "retail-stock": "desktop/pages/retail-stock.tsx",
+  settings: "desktop/DesktopSettingsPage.tsx",
   "property-dashboard": "desktop/pages/property-home.tsx",
   "property-tenants": "desktop/pages/property-clients.tsx",
   "property-terminal": "desktop/pages/property-terminal.tsx",
@@ -29,9 +30,18 @@ const DESKTOP_TUTORIAL_SOURCES: Partial<Record<TutorialPageKey, string>> = {
   "trades-dashboard": "desktop/pages/trades-home.tsx",
   "trades-clients": "desktop/pages/trades-clients.tsx",
   "trades-terminal": "desktop/pages/trades-terminal.tsx",
+  "trades-quote": "desktop/pages/trades-terminal.tsx",
+  "trades-recurring": "desktop/pages/trades-terminal.tsx",
   "trades-analytics": "desktop/pages/trades-analytics.tsx",
 };
 
+
+const DESKTOP_LEGACY_TUTORIAL_SOURCES: Partial<Record<TutorialPageKey, string>> = {
+  "retail-nfc": "pages/nfc-payment.tsx",
+  "payment-board-builder": "pages/board-builder.tsx",
+  "property-tenant-profile": "pages/property/tenant-profile.tsx",
+  "trades-client-profile": "pages/trades/client-profile.tsx",
+};
 function collectSource(): string {
   const root = join(__dirname, "..");
   let out = "";
@@ -101,8 +111,11 @@ describe("merchant tutorial registry", () => {
           if (!match) continue;
           const id = match[1];
           // The anchor is rendered either directly (data-tutorial-id="id")
-          // or via a section component's `anchor="id"` prop.
-          if (!source.includes(`data-tutorial-id="${id}"`) && !source.includes(`anchor="${id}"`)) {
+          // via a section component's `anchor="id"` prop, or from a typed id
+          // passed to data-tutorial-id at render time.
+          if (!source.includes(`data-tutorial-id="${id}"`) &&
+              !source.includes(`anchor="${id}"`) &&
+              !source.includes(`"${id}"`)) {
             missing.push(`${pageKey}: ${id}`);
           }
         }
@@ -118,13 +131,39 @@ describe("merchant tutorial registry", () => {
         expect(step.desktopTarget).toBeDefined();
         const match = step.desktopTarget!.match(DESKTOP_TARGET);
         expect(match).not.toBeNull();
-        expect(source).toContain(`data-tutorial-id="${match![1]}"`);
+        expect(source).toContain(`"${match![1]}"`);
 
         if (step.desktopFallbackTarget) {
           const fallback = step.desktopFallbackTarget.match(DESKTOP_TARGET);
           expect(fallback).not.toBeNull();
-          expect(source).toContain(`data-tutorial-id="${fallback![1]}"`);
+          expect(source).toContain(`"${fallback![1]}"`);
         }
+      }
+    }
+  });
+
+  it("covers all 20 registered pages on tablet/desktop, including legacy-column pages", () => {
+    const covered = new Set([
+      ...Object.keys(DESKTOP_TUTORIAL_SOURCES),
+      ...Object.keys(DESKTOP_LEGACY_TUTORIAL_SOURCES),
+    ]);
+    expect([...covered].sort()).toEqual([...TUTORIAL_PAGE_KEYS].sort());
+
+    for (const [pageKey, relativeSource] of Object.entries(DESKTOP_LEGACY_TUTORIAL_SOURCES) as Array<[TutorialPageKey, string]>) {
+      const source = readFileSync(join(__dirname, "..", relativeSource), "utf8");
+      for (const step of tutorialStepsForDevice(pageKey, "desktop")) {
+        const dataAnchor = step.target.match(/\[data-tutorial-id="([^"]+)"\]/);
+        if (dataAnchor) {
+          const id = dataAnchor[1];
+          expect(
+            source.includes(`data-tutorial-id="${id}"`) || source.includes(`anchor="${id}"`),
+          ).toBe(true);
+          continue;
+        }
+
+        const ariaAnchor = step.target.match(/\[aria-label="([^"]+)"\]/);
+        expect(ariaAnchor).not.toBeNull();
+        expect(source).toContain(`aria-label="${ariaAnchor![1]}"`);
       }
     }
   });

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { tradesFetch } from "@/lib/trades-api";
@@ -95,17 +96,30 @@ interface QuoteLineDraft {
   unitPrice: string;
 }
 
+interface TradesSchedule {
+  id: string;
+  clientProfileId: string;
+  amountCents: number;
+  frequency: string;
+  deliveryChannel: string;
+  status: "active" | "paused" | "terminated";
+  nextRunDate?: string | null;
+}
+
 const EMPTY_LINE: QuoteLineDraft = { description: "", qty: "1", unitPrice: "" };
 
 export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
   const merchantId = getCurrentMerchantId();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [location] = useLocation();
+  const routePath = location.split(/[?#]/, 1)[0];
   const quickEntry = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("quick") === "1";
-  const quoteEntry = typeof window !== "undefined" && window.location.pathname === "/trades/quote";
-  const recurringEntry = typeof window !== "undefined" && window.location.pathname === "/trades/recurring";
+  const quoteEntry = routePath === "/trades/quote";
+  const recurringEntry = routePath === "/trades/recurring";
+  const routeEntry = recurringEntry ? "recurring" : quoteEntry ? "quote" : quickEntry ? "quick" : "terminal";
 
-  const [mode, setMode] = useState<Mode>(recurringEntry ? "recurring" : quoteEntry ? "quote" : quickEntry ? "invoice" : "keypad");
+  const [mode, setMode] = useState<Mode>(recurringEntry ? "recurring" : quoteEntry ? "quote" : "invoice");
   const [railMoving, setRailMoving] = useState(false);
   const [siteFilter, setSiteFilter] = useState<string | null>(null);
   const [scopeOpen, setScopeOpen] = useState(false);
@@ -131,16 +145,33 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
   const [recurringError, setRecurringError] = useState("");
 
   useEffect(() => {
-    if (!quickEntry) return;
-    const url = new URL(window.location.href);
-    url.searchParams.delete("quick");
-    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
-  }, []);
+    if (routeEntry === "recurring") {
+      setMode("recurring");
+      setQuickMode(false);
+      return;
+    }
+    if (routeEntry === "quote") {
+      setMode("quote");
+      setQuickMode(false);
+      return;
+    }
+    setMode("invoice");
+    setQuickMode(routeEntry === "quick");
+  }, [routeEntry]);
 
   const clientsQuery = useTradesClientsQuery();
   const invoicesQuery = useTradesInvoicesQuery();
   const quotesQuery = useTradesQuotesQuery();
-  const schedulesQuery = useQuery<any[]>({ queryKey: ["/api/trades/schedules"], queryFn: () => tradesFetch("/api/trades/schedules").then((r) => r.ok ? r.json() : []) });
+  const schedulesQuery = useQuery<TradesSchedule[]>({ queryKey: ["/api/trades/schedules"], queryFn: () => tradesFetch("/api/trades/schedules").then((r) => r.ok ? r.json() : []) });
+  const reminderSettingsQuery = useQuery<{ tradeRemindersEnabled: boolean }>({
+    queryKey: ["/api/trades/reminder-settings"],
+    queryFn: async () => {
+      const response = await tradesFetch("/api/trades/reminder-settings");
+      if (!response.ok) throw new Error("Could not load reminder settings");
+      const body = await response.json();
+      return { tradeRemindersEnabled: body?.tradeRemindersEnabled !== false };
+    },
+  });
 
   const merchantQuery = useQuery<any>({
     queryKey: ["/api/merchants", merchantId, "profile"],
@@ -488,6 +519,53 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
     onError: (error) => setRecurringError(error instanceof Error ? error.message : "Could not create recurring invoice"),
   });
 
+  const toggleReminders = useMutation({
+    mutationFn: async (tradeRemindersEnabled: boolean) => {
+      const response = await tradesFetch("/api/trades/reminder-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tradeRemindersEnabled }),
+      });
+      if (!response.ok) throw new Error("Could not save reminder settings");
+      return response.json();
+    },
+    onSuccess: (body) => {
+      queryClient.setQueryData(["/api/trades/reminder-settings"], {
+        tradeRemindersEnabled: body?.tradeRemindersEnabled !== false,
+      });
+      toast({ title: "Reminder settings saved" });
+    },
+    onError: () => toast({ title: "Could not save reminder settings", variant: "destructive" }),
+  });
+
+  const updateSchedule = useMutation({
+    mutationFn: async ({
+      scheduleId,
+      action,
+      status,
+    }: {
+      scheduleId: string;
+      action: "update" | "cancel";
+      status?: "active" | "paused";
+    }) => {
+      const response = await tradesFetch(`/api/trades/schedules/${scheduleId}`, {
+        method: action === "cancel" ? "DELETE" : "PUT",
+        headers: action === "cancel" ? undefined : { "Content-Type": "application/json" },
+        body: action === "cancel" ? undefined : JSON.stringify({ status }),
+      });
+      if (!response.ok) throw new Error(action === "cancel" ? "Could not cancel schedule" : "Could not update schedule");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/trades/schedules"] });
+      toast({ title: "Recurring schedule updated" });
+    },
+    onError: (error: unknown) => toast({
+      title: error instanceof Error ? error.message : "Could not update schedule",
+      variant: "destructive",
+    }),
+  });
+
   const markReceived = useMutation({
     mutationFn: async (invoiceId: string) => {
       const res = await tradesFetch(`/api/trades/invoices/${invoiceId}/mark-paid-external`, {
@@ -568,6 +646,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
   };
 
   const isLoading = clientsQuery.isLoading || invoicesQuery.isLoading || quotesQuery.isLoading;
+  const remindersEnabled = reminderSettingsQuery.data?.tradeRemindersEnabled ?? true;
   const quickRecipientValid = recipient.name.trim().length > 0 &&
     (recipient.channel === "email" ? recipient.email.trim().length > 0 : recipient.phone.trim().length > 0);
   const canSend =
@@ -887,7 +966,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
               </div>
 
               <div className="tt-field-label tt-q-head">LINE ITEMS</div>
-              <div className="tt-q-lines">
+              <div className="tt-q-lines" data-tutorial-id="trades-quote-lines">
                 {lines.map((line, index) => (
                   <div key={index} className="tt-q-line">
                     <input
@@ -953,7 +1032,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
               </div>
 
               <div className="tt-field-label tt-q-head">REQUIRE DEPOSIT</div>
-              <div className="tt-q-dep">
+              <div className="tt-q-dep" data-tutorial-id="trades-quote-deposit">
                 {DEPOSIT_CHIPS.map((c) => {
                   const on = depositChip === c;
                   return (
@@ -976,7 +1055,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
                 })}
               </div>
 
-              <div className="tt-q-totals">
+              <div className="tt-q-totals" data-tutorial-id="trades-quote-totals">
                 {gstRegistered && (
                   <>
                     <div className="tt-q-tot-row">
@@ -1009,6 +1088,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
               <button
                 type="button"
                 className="tt-q-create"
+                data-tutorial-id="trades-quote-create"
                 disabled={!selectedClient || quoteTotals.totalCents <= 0 || createQuote.isPending}
                 onClick={() => createQuote.mutate()}
               >
@@ -1058,7 +1138,7 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
           {mode === "recurring" && (
             <div className="tt-mode tt-recurring">
               <div className="tt-mode-title">Recurring invoices</div>
-              <div className="tt-rec-grid">
+              <div className="tt-rec-grid" data-tutorial-id="trades-recurring-create">
                 <select aria-label="recurring client" value={recurring.clientProfileId} onChange={(e) => setRecurring({ ...recurring, clientProfileId: e.target.value })}>
                   <option value="">choose client</option>
                   {clients.filter((c) => !["archived", "prospect"].includes(c.status)).map((c) => <option key={c.id} value={c.id}>{clientName(c)} — {c.siteAddress}</option>)}
@@ -1070,8 +1150,63 @@ export default function DesktopTradesTerminal(props: DesktopRoutePageProps) {
               </div>
               {recurringError && <div className="tt-rec-error">{recurringError}</div>}
               <button type="button" className="tt-rec-create" disabled={createRecurring.isPending} onClick={() => createRecurring.mutate()}>{createRecurring.isPending ? "saving…" : "create recurring invoice"}</button>
-              <div className="tt-rec-title">active schedules</div>
-              <div className="tt-rec-list">{(schedulesQuery.data ?? []).length === 0 ? <div className="tt-empty">no recurring invoices</div> : (schedulesQuery.data ?? []).map((schedule) => <div className="tt-rec-row" key={schedule.id}><span><strong>{clientName(clientById.get(schedule.clientProfileId)) || "client"}</strong><small>{schedule.frequency} · {schedule.deliveryChannel}</small></span><strong>{formatNzd(schedule.amountCents)}</strong></div>)}</div>
+
+              <div className="tt-rec-reminders" data-tutorial-id="trades-recurring-reminders">
+                <span>
+                  <strong>Overdue reminders</strong>
+                  <small>Automatically chase unpaid job invoices after their due date</small>
+                </span>
+                <button
+                  type="button"
+                  className="tt-rec-switch"
+                  role="switch"
+                  aria-label="toggle trades reminders"
+                  aria-checked={remindersEnabled}
+                  disabled={reminderSettingsQuery.isLoading || toggleReminders.isPending}
+                  onClick={() => toggleReminders.mutate(!remindersEnabled)}
+                >
+                  <span style={{ transform: remindersEnabled ? "translateX(20px)" : "translateX(0)" }} />
+                </button>
+              </div>
+
+              <div className="tt-rec-title" data-tutorial-id="trades-recurring-schedules">active schedules</div>
+              <div className="tt-rec-list">
+                {(schedulesQuery.data ?? []).length === 0 ? (
+                  <div className="tt-empty">no recurring invoices</div>
+                ) : (schedulesQuery.data ?? []).map((schedule) => (
+                  <div className="tt-rec-row" key={schedule.id}>
+                    <span>
+                      <strong>{clientName(clientById.get(schedule.clientProfileId)) || "client"}</strong>
+                      <small>{schedule.frequency} · {schedule.deliveryChannel} · {schedule.status}</small>
+                    </span>
+                    <span className="tt-rec-row-actions">
+                      <strong>{formatNzd(schedule.amountCents)}</strong>
+                      {schedule.status !== "terminated" && (
+                        <span>
+                          <button
+                            type="button"
+                            disabled={updateSchedule.isPending}
+                            onClick={() => updateSchedule.mutate({
+                              scheduleId: schedule.id,
+                              action: "update",
+                              status: schedule.status === "paused" ? "active" : "paused",
+                            })}
+                          >
+                            {schedule.status === "paused" ? "resume" : "pause"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={updateSchedule.isPending}
+                            onClick={() => updateSchedule.mutate({ scheduleId: schedule.id, action: "cancel" })}
+                          >
+                            cancel
+                          </button>
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -1297,6 +1432,17 @@ const TT_CSS = `
 
 /* mark received */
 .tt-recurring { padding-top:58px; width:445px; }.tt-rec-grid { margin-top:18px; display:grid; grid-template-columns:1fr 1fr; gap:10px; }.tt-rec-grid select,.tt-rec-grid input { min-width:0; height:44px; border-radius:11px; border:1px solid rgba(94,158,255,.35); background:rgba(94,158,255,.08); color:#fff; padding:0 12px; font:inherit; }.tt-rec-grid select:first-child { grid-column:1/-1; }.tt-rec-grid option { color:#000F3F; }.tt-rec-create { margin-top:14px; height:44px; width:100%; border-radius:999px; background:${ACTIVE}; color:${NAVY}; font-weight:800; cursor:pointer; }.tt-rec-create:disabled { opacity:.5; }.tt-rec-error { margin-top:10px; color:#FFB3B8; font-size:12px; }.tt-rec-title { margin-top:28px; color:${ACCENT_SOFT}; font-size:11px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; }.tt-rec-list { margin-top:8px; max-height:230px; overflow:auto; }.tt-rec-row { display:flex; justify-content:space-between; align-items:center; padding:11px 2px; border-bottom:1px solid rgba(94,158,255,.14); }.tt-rec-row span { display:flex; flex-direction:column; gap:2px; }.tt-rec-row strong { font-size:13px; }.tt-rec-row small { color:rgba(244,246,255,.5); font-size:10.5px; }
+.tt-rec-reminders { margin-top:18px; display:flex; align-items:center; justify-content:space-between; gap:18px; padding:12px 14px; border-radius:13px; background:rgba(94,158,255,.08); }
+.tt-rec-reminders > span { display:flex; flex-direction:column; gap:3px; }
+.tt-rec-reminders strong { font-size:13px; }
+.tt-rec-reminders small { color:rgba(244,246,255,.55); font-size:10.5px; }
+.tt-rec-switch { position:relative; flex:0 0 46px; width:46px; height:27px; padding:0; border:1px solid rgba(94,158,255,.5); border-radius:999px; background:rgba(94,158,255,.2); cursor:pointer; }
+.tt-rec-switch[aria-checked="true"] { background:${ACTIVE}; }
+.tt-rec-switch:disabled { opacity:.55; cursor:default; }
+.tt-rec-switch > span { position:absolute; left:3px; top:3px; width:19px; height:19px; border-radius:50%; background:#fff; transition:transform .18s ease; }
+.tt-rec-row > .tt-rec-row-actions { align-items:flex-end; gap:5px; }
+.tt-rec-row-actions > span { display:flex; flex-direction:row; gap:5px; }
+.tt-rec-row-actions button { padding:3px 7px; border:1px solid rgba(94,158,255,.4); border-radius:999px; background:transparent; color:${ACCENT_SOFT}; font:inherit; font-size:10px; cursor:pointer; }
 
 .tt-paid-title { margin-top:100px; }
 .tt-paid-sub { margin-top:4px; font-weight:500; font-size:12px; color:rgba(244,246,255,0.45); }

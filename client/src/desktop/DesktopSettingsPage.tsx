@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { apiErrorMessage } from "@/lib/api-error";
 import { apiRequest } from "@/lib/queryClient";
+import { useTutorial } from "@/features/tutorial/tutorial";
 import { useToast } from "@/hooks/use-toast";
 import {
   BILLING_CARD_SESSION_KEY,
@@ -40,7 +41,7 @@ const GREEN = "#35D07F";
 const RED = "#F0656C";
 const OPEN_INK = "#04103A";
 
-type SectionKey = "business" | "prefs" | "billing" | "account" | "notifs";
+type SectionKey = "business" | "prefs" | "billing" | "account" | "notifs" | "tutorial";
 
 type TeamMember = {
   id: number;
@@ -67,6 +68,7 @@ const SECTIONS: { k: SectionKey; title: string }[] = [
   { k: "billing", title: "Subscription & Billing" },
   { k: "account", title: "Account" },
   { k: "notifs", title: "Transaction Notifications" },
+  { k: "tutorial", title: "Tutorial & Help" },
 ];
 
 const NOTIFICATION_OPTIONS: Array<{
@@ -158,6 +160,13 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
   const { toast } = useToast();
   const push = usePushNotifications();
   const { confirmingCard } = useBillingCardReturn();
+  const {
+    restartTutorials,
+    visitedPages: tutorialVisitedPages,
+    pageCount: tutorialPageCount,
+    isRestarting: tutorialRestarting,
+    canRestart: tutorialReady,
+  } = useTutorial();
 
   const [openSec, setOpenSec] = useState<SectionKey | null>("business");
   const [details, setDetails] = useState({ businessName: "", gstNumber: "", email: "" });
@@ -518,6 +527,27 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
     toast({ title: `Payment history opens ${v === "peek" ? "as a peek" : "expanded"}` });
   };
 
+  const handleRestartTutorials = async () => {
+    const confirmed = window.confirm(
+      "Restart all page tutorials? Settings will begin now, and every other tutorial will appear as you visit that page.",
+    );
+    if (!confirmed) return;
+    try {
+      await restartTutorials();
+      setOpenSec("tutorial");
+      toast({
+        title: "Tutorials restarted",
+        description: "Open each page normally to see its tutorial again.",
+      });
+    } catch (error: unknown) {
+      toast({
+        title: "Could not restart tutorials",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const modeCards = useMemo(
     () => MODES.map((m) => ({ ...m, on: m.k === vertical })),
     [vertical],
@@ -546,7 +576,13 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
           <span className="ds-name">{businessName}</span>
           <span className="ds-kicker">SETTINGS</span>
 
-          <button type="button" className="ds-pay-page" onClick={openPaymentPage}>
+          <button
+            type="button"
+            className="ds-pay-page"
+            onClick={openPaymentPage}
+            data-testid="button-customer-page"
+            data-tutorial-id="settings-payment-page"
+          >
             Customer Payment Page
           </button>
 
@@ -578,7 +614,7 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
             ))}
           </div>
 
-          <button type="button" className="ds-logout" onClick={logout}>
+          <button type="button" className="ds-logout" onClick={logout} data-testid="button-logout">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={RED} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M9 4H5v16h4" /><path d="M14 8l4 4-4 4M18 12H9" /></svg>
             <span>Log Out</span>
           </button>
@@ -603,6 +639,14 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
               <div
                 key={sec.k}
                 className="ds-sec"
+                data-settings-section={sec.k}
+                data-tutorial-id={
+                  sec.k === "business" ? "settings-business" :
+                  sec.k === "prefs" ? "settings-goal" :
+                  sec.k === "billing" ? "settings-billing" :
+                  sec.k === "tutorial" ? "settings-tutorial-help" :
+                  undefined
+                }
                 style={{
                   background: open ? ACTIVE : "rgba(255,255,255,0.06)",
                   border: `1px solid rgba(255,255,255,${open ? 0.14 : 0.1})`,
@@ -1050,6 +1094,46 @@ export function DesktopSettingsPage({ vertical, ...props }: DesktopSettingsPageP
                     )}
                   </div>
                 )}
+
+                {open && sec.k === "tutorial" && (
+                  <div className="ds-sec-body ds-tutorial-body">
+                    <div className="ds-tutorial-intro">
+                      <strong>Page-by-page walkthroughs</strong>
+                      <span>
+                        Tutorials appear when you open each page. They never navigate for you or change business data.
+                      </span>
+                    </div>
+                    <div className="ds-tutorial-progress-copy">
+                      <span>Tutorial progress</span>
+                      <strong>
+                        {tutorialVisitedPages} of {tutorialPageCount || 20} pages introduced
+                      </strong>
+                    </div>
+                    <div
+                      className="ds-tutorial-progress"
+                      role="progressbar"
+                      aria-label="tutorial progress"
+                      aria-valuemin={0}
+                      aria-valuemax={tutorialPageCount || 20}
+                      aria-valuenow={tutorialVisitedPages}
+                    >
+                      <span
+                        style={{
+                          width: `${Math.min(100, (tutorialVisitedPages / (tutorialPageCount || 20)) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="ds-primary ds-tutorial-restart"
+                      onClick={handleRestartTutorials}
+                      disabled={!tutorialReady || tutorialRestarting}
+                      data-testid="button-restart-tutorials"
+                    >
+                      {tutorialRestarting ? "Restarting…" : tutorialVisitedPages ? "Restart Tutorials" : "Start Tutorials"}
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -1156,4 +1240,13 @@ const DS_CSS = `
 .ds-switch { position:relative; width:48px; height:29px; border-radius:9999px; cursor:pointer; transition:background .18s ease; flex:0 0 auto; }
 .ds-switch:disabled { opacity:0.6; cursor:default; }
 .ds-knob { position:absolute; top:4px; left:4px; width:21px; height:21px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(10,17,40,0.25); transition:transform .18s ease; }
+.ds-tutorial-body { gap:13px; }
+.ds-tutorial-intro { display:flex; flex-direction:column; gap:4px; color:${OPEN_INK}; }
+.ds-tutorial-intro strong { font-size:14px; }
+.ds-tutorial-intro span { font-size:12px; line-height:1.45; color:rgba(4,16,58,.66); }
+.ds-tutorial-progress-copy { display:flex; justify-content:space-between; gap:12px; color:${OPEN_INK}; font-size:12px; }
+.ds-tutorial-progress-copy strong { color:#244E91; font-size:11px; }
+.ds-tutorial-progress { height:8px; overflow:hidden; border-radius:999px; background:rgba(4,16,58,.14); }
+.ds-tutorial-progress > span { display:block; height:100%; border-radius:inherit; background:${OPEN_INK}; transition:width .2s ease; }
+.ds-tutorial-restart { align-self:flex-start; margin-top:2px; }
 `;
