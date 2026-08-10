@@ -129,27 +129,20 @@ app.use(createRequestLogger(log));
     }
   }
 
-  // ── Pending-migration check (report only, never applies) ─────────────────
-  // The `migrations/*.sql` files used to be applied by hand or not at all,
-  // which is how the dev database silently fell three migrations behind
-  // `shared/schema.ts` and started throwing `column ... does not exist` on
-  // every logged-in request. `server/migrate.ts` now records what a database
-  // has actually seen, and this check makes a gap impossible to miss.
-  //
-  // DATA SAFETY: this is read-only and deliberately does NOT apply anything —
-  // replit.md "Data Safety Policy" and .agents/memory/schema-push-and-drift.md
-  // require that schema sync is never an unconditional app-start side effect.
-  // Applying stays a deliberate `npm run db:migrate`. It is also fire-and-
-  // forget: it owns its own short-lived connection with a 5s timeout, swallows
-  // every error, and can never delay or crash startup.
-  void (async () => {
-    try {
-      const { reportPendingMigrations } = await import("./migrate");
-      await reportPendingMigrations();
-    } catch (error) {
-      log(`⚠️  Migration check unavailable (non-fatal): ${error}`);
+  // ── Read-only migration gate ─────────────────────────────────────────────
+  // Production must never accept traffic against pending, drifted, orphaned,
+  // or out-of-order schema history. Development reports the same issues loudly.
+  try {
+    const { reportPendingMigrations } = await import("./migrate");
+    await reportPendingMigrations({ failOnIssues: isProduction });
+  } catch (error) {
+    if (isProduction) {
+      console.error("[FATAL] Database migration gate failed.");
+      console.error(error);
+      process.exit(1);
     }
-  })();
+    log(`⚠️  Migration check unavailable (non-fatal in development): ${error}`);
+  }
 
   // ── Schema push (drizzle-kit push) ───────────────────────────────────────
   // Never run schema sync as a normal app-start side effect. The trades branch
@@ -161,7 +154,11 @@ app.use(createRequestLogger(log));
   // a non-zero exit code instead of silently destroying live data. If you need
   // to apply schema changes, run `npm run db:push` manually after reviewing
   // exactly what will be changed, or start with RUN_SCHEMA_PUSH=true.
-  const runSchemaPush = process.env.RUN_SCHEMA_PUSH === 'true' || process.env.RUN_MIGRATIONS === 'true';
+  if (process.env.RUN_MIGRATIONS === 'true') {
+    console.error('[FATAL] RUN_MIGRATIONS is retired; run `npm run db:migrate` as a deliberate deploy step.');
+    process.exit(1);
+  }
+  const runSchemaPush = process.env.RUN_SCHEMA_PUSH === 'true';
   if (isDatabaseConnected() && runSchemaPush) {
     log('Running schema push to sync database...');
     try {
