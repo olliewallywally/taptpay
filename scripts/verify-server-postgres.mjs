@@ -37,6 +37,9 @@ const PRE_INDEX_MIGRATIONS = [
 const FINAL_MIGRATION = "0011_payment_links_and_board_numbers.sql";
 const PUSH_NOTIFICATIONS_MIGRATION = "0012_push_notification_preferences.sql";
 const SUBSCRIPTION_MIGRATION = "0013_subscription_plans.sql";
+const SUBSCRIPTION_RECONCILIATION_MIGRATION = "0014_reconcile_subscription_activation.sql";
+const STARTUP_SCHEMA_CLEANUP_MIGRATION = "0015_startup_schema_cleanup.sql";
+const TRANSACTION_COMPLETION_MIGRATION = "0016_transaction_completion_time.sql";
 
 function stage(message) {
   console.log(`[postgres-verifier] ${message}`);
@@ -434,9 +437,13 @@ async function verifySubscriptionMigration(
     [seeded.plan_id, seeded.seat_limit, seeded.price_cents, seeded.status],
     ["solo", 1, 799, "active"],
   );
-  assert.equal(seeded.current_period_start, null);
-  assert.equal(seeded.current_period_end, null);
-  assert.equal(seeded.next_billing_date, null);
+  assert.ok(seeded.current_period_start instanceof Date);
+  assert.ok(seeded.current_period_end instanceof Date);
+  assert.ok(seeded.next_billing_date instanceof Date);
+  assert.ok(
+    seeded.next_billing_date.getTime() <= Date.now() + 10_000,
+    "an existing active merchant was not made immediately due",
+  );
 
   const verifiedUsers = await client.query(
     `SELECT email, password, role, status
@@ -634,7 +641,7 @@ async function verifySubscriptionMigration(
   );
 
   stage(
-    "proved 0013 pending/legacy seed semantics, owner backfill, zero-fee defaults, and reconciliation indexes",
+    "proved 0013/0014 pending and verified activation semantics, owner backfill, zero-fee defaults, and reconciliation indexes",
   );
   return { billingKey };
 }
@@ -668,7 +675,7 @@ async function verifySubscriptionMigrationRerun(
     [billingKey],
   );
   assert.equal(billingCount.rows[0].rows, 1);
-  stage("proved 0013 rerun preserves live plan choices and unique billing history");
+  stage("proved 0013/0014 reruns preserve live plan choices and unique billing history");
 }
 
 async function verifyPostIndexConstraints(client, schemaName) {
@@ -939,6 +946,21 @@ async function main() {
         schemaName,
         SUBSCRIPTION_MIGRATION,
       );
+      await applyMigration(
+        migrationClient,
+        schemaName,
+        SUBSCRIPTION_RECONCILIATION_MIGRATION,
+      );
+      await applyMigration(
+        migrationClient,
+        schemaName,
+        STARTUP_SCHEMA_CLEANUP_MIGRATION,
+      );
+      await applyMigration(
+        migrationClient,
+        schemaName,
+        TRANSACTION_COMPLETION_MIGRATION,
+      );
       const { billingKey } = await verifySubscriptionMigration(
         migrationClient,
         schemaName,
@@ -956,6 +978,21 @@ async function main() {
         migrationClient,
         schemaName,
         SUBSCRIPTION_MIGRATION,
+      );
+      await applyMigration(
+        migrationClient,
+        schemaName,
+        SUBSCRIPTION_RECONCILIATION_MIGRATION,
+      );
+      await applyMigration(
+        migrationClient,
+        schemaName,
+        STARTUP_SCHEMA_CLEANUP_MIGRATION,
+      );
+      await applyMigration(
+        migrationClient,
+        schemaName,
+        TRANSACTION_COMPLETION_MIGRATION,
       );
       await verifySubscriptionMigrationRerun(
         migrationClient,
