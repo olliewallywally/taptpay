@@ -4,7 +4,11 @@ jest.mock("../database", () => ({
 }));
 
 import type { PlanId } from "@shared/plans";
-import { MemStorage, type MerchantSignupStorageInput } from "../storage";
+import {
+  MemStorage,
+  SubscriptionBillingBusyError,
+  type MerchantSignupStorageInput,
+} from "../storage";
 
 function signupInput(
   email: string,
@@ -87,6 +91,72 @@ describe("MemStorage auth, team, and subscription parity", () => {
       seatLimit: 10,
       priceCents: 1299,
     });
+  });
+
+  test("promotes the pending subscription atomically with email confirmation", async () => {
+    const storage = new MemStorage();
+    const input = signupInput("owner@example.test", "team");
+    const merchant = await storage.createMerchantWithSignup(input);
+
+    await expect(storage.confirmMerchantEmail(input.verificationToken, true))
+      .resolves.toMatchObject({
+        id: merchant.id,
+        status: "verified",
+        emailVerified: true,
+        verificationToken: null,
+      });
+    await expect(storage.getSubscription(merchant.id)).resolves.toMatchObject({
+      status: "active",
+      planId: "team",
+    });
+    await expect(storage.confirmMerchantEmail(input.verificationToken, true))
+      .resolves.toBeUndefined();
+  });
+
+  test("card removal preserves paid-period state and due cardless rows are claimed", async () => {
+    jest.useFakeTimers();
+    const now = new Date("2026-08-07T12:00:00.000Z");
+    jest.setSystemTime(now);
+    try {
+      const storage = new MemStorage();
+      const input = signupInput("owner@example.test", "solo");
+      const merchant = await storage.createMerchantWithSignup(input);
+      await storage.confirmMerchantEmail(input.verificationToken, true);
+      await storage.bindSubscriptionCardSession(merchant.id, "paid-session");
+      await storage.completeSubscriptionCardSetup(
+        merchant.id,
+        "paid-session",
+        {
+          windcaveCardId: "card-one",
+          brand: "visa",
+          last4: "4242",
+          expiry: "12/30",
+        },
+        async () => ({ success: true, approved: true }),
+      );
+
+      const paid = await storage.getSubscription(merchant.id);
+      const paidPeriodEnd = paid!.currentPeriodEnd;
+      await storage.removeSubscriptionCard(merchant.id);
+      await expect(storage.getSubscription(merchant.id)).resolves.toMatchObject({
+        status: "active",
+        windcaveCardId: null,
+        currentPeriodEnd: paidPeriodEnd,
+      });
+
+      const due = new Date(paidPeriodEnd!);
+      const claimed = await storage.claimSubscriptionsDueForBilling(due);
+      expect(claimed).toHaveLength(1);
+      expect(claimed[0]).toMatchObject({
+        id: paid!.id,
+        windcaveCardId: null,
+        billingClaimToken: expect.any(String),
+      });
+      await expect(storage.removeSubscriptionCard(merchant.id))
+        .rejects.toBeInstanceOf(SubscriptionBillingBusyError);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   test("enforces invite CAS, expiry, status transitions, and global email uniqueness", async () => {

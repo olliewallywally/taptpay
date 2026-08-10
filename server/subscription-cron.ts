@@ -2,12 +2,16 @@ import { addOneMonth, storage } from "./storage";
 import { planFor } from "@shared/plans";
 import { sendSubscriptionPaymentFailedEmail } from "./email-service";
 import {
+  billingIdempotencyKey,
   chargeSubscriptionPeriod,
   decideBilling,
   DUNNING_RETRY_DAYS,
   failedPaymentUpdates,
   nextBillingPeriodStart,
   nextPeriodUpdates,
+  renewalPlan,
+  MAX_PAYMENT_ATTEMPTS,
+  type SubscriptionChargeOutcome,
 } from "./subscription-billing";
 
 export interface SubscriptionBillingPassResult {
@@ -70,7 +74,29 @@ export async function runSubscriptionBillingPass(
         continue;
       }
 
-      const outcome = await chargeSubscriptionPeriod(subscription, now);
+      const periodStart = nextBillingPeriodStart(subscription, now);
+      const plan = renewalPlan(subscription);
+      const amountCents = subscription.pendingPlanId
+        ? plan.priceCents
+        : (subscription.priceCents ?? plan.priceCents);
+      const attemptNumber = (subscription.failedPaymentCount ?? 0) + 1;
+      const outcome: SubscriptionChargeOutcome =
+        decision.action === "record_failure"
+          ? {
+              charged: true,
+              approved: false,
+              failureReason: decision.reason ?? "No payment method on file",
+              exhausted: attemptNumber >= MAX_PAYMENT_ATTEMPTS,
+              idempotencyKey: billingIdempotencyKey(
+                subscription.id,
+                periodStart,
+                attemptNumber,
+              ),
+              attemptNumber,
+              amountCents,
+              planId: plan.id,
+            }
+          : await chargeSubscriptionPeriod(subscription, now, periodStart);
 
       if (!outcome.charged) {
         await storage.releaseSubscriptionBillingClaim(subscription.id, claimToken);
@@ -82,13 +108,15 @@ export async function runSubscriptionBillingPass(
         continue;
       }
 
-      if (!outcome.planId || !outcome.amountCents || !outcome.idempotencyKey || !outcome.attemptNumber) {
+      if (
+        !outcome.planId
+        || outcome.amountCents === undefined
+        || !outcome.idempotencyKey
+        || !outcome.attemptNumber
+      ) {
         throw new Error("Charge outcome omitted reconciliation metadata");
       }
-      const plan = planFor(outcome.planId);
-      const periodStart = new Date(
-        subscription.currentPeriodEnd ?? subscription.nextBillingDate ?? now,
-      );
+      const billedPlan = planFor(outcome.planId);
       const periodEnd = addOneMonth(periodStart);
       const historyBase = {
         merchantId: subscription.merchantId,
@@ -106,11 +134,11 @@ export async function runSubscriptionBillingPass(
         const applied = await storage.finalizeSubscriptionBillingClaim(
           subscription.id,
           claimToken,
-          nextPeriodUpdates(subscription, now),
+          nextPeriodUpdates(subscription, now, periodStart),
           {
             ...historyBase,
             status: "succeeded",
-            description: `${plan.name} plan — ${periodStart.toLocaleDateString("en-NZ")}`,
+            description: `${billedPlan.name} plan — ${periodStart.toLocaleDateString("en-NZ")}`,
             paidAt: now,
           },
         );
@@ -126,7 +154,7 @@ export async function runSubscriptionBillingPass(
           {
             ...historyBase,
             status: "failed",
-            description: `${plan.name} plan — payment failed`,
+            description: `${billedPlan.name} plan — payment failed`,
             failureReason: reason.slice(0, 500),
           },
         );
@@ -147,7 +175,7 @@ export async function runSubscriptionBillingPass(
           const emailed = await sendSubscriptionPaymentFailedEmail({
             to: merchant.contactEmail || merchant.email,
             businessName: merchant.businessName || merchant.name,
-            planName: plan.name,
+            planName: billedPlan.name,
             amount: (outcome.amountCents / 100).toFixed(2),
             nextRetryAt,
             suspended: exhausted,

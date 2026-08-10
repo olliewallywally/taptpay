@@ -6,9 +6,9 @@ import {
   decideBilling,
   failedPaymentUpdates,
   immediatePlanUpdates,
+  nextBillingPeriodStart,
   nextPeriodUpdates,
   queuedPlanUpdates,
-  subscriptionAllowsSending,
   proratedUpgradeCents,
 } from "../subscription-billing";
 import { addOneMonth, summariseSubscriptionRevenue } from "../storage";
@@ -124,9 +124,11 @@ describe("decideBilling", () => {
       .toEqual({ action: "skip", reason: "cancelled" });
   });
 
-  it("skips suspended subscriptions and ones with no card", () => {
+  it("skips suspended subscriptions and records a due missing-card failure", () => {
     expect(decideBilling(subscription({ status: "suspended" }), due).reason).toBe("suspended");
-    expect(decideBilling(subscription({ windcaveCardId: null }), due).reason).toBe("no_card");
+    expect(decideBilling(subscription({ status: "pending" }), due).reason).toBe("inactive");
+    expect(decideBilling(subscription({ windcaveCardId: null }), due))
+      .toEqual({ action: "record_failure", reason: "No payment method on file" });
   });
 
   it("backs off between dunning retries instead of hammering the card", () => {
@@ -167,6 +169,25 @@ describe("billing outcome updates", () => {
     expect(updates.nextBillingDate).toEqual(updates.currentPeriodEnd);
   });
 
+  it("keeps the original initial-dunning anchor across calendar-day retries", () => {
+    const anchor = new Date("2026-09-01T08:15:00Z");
+    const initialDunning = subscription({
+      status: "past_due",
+      lastBillingDate: null,
+      currentPeriodStart: null,
+      currentPeriodEnd: null,
+      nextBillingDate: anchor,
+      failedPaymentCount: 1,
+    });
+    const dayThree = new Date("2026-09-04T09:00:00Z");
+    const daySeven = new Date("2026-09-08T09:00:00Z");
+    expect(nextBillingPeriodStart(initialDunning, dayThree)).toEqual(anchor);
+    expect(nextBillingPeriodStart(initialDunning, daySeven)).toEqual(anchor);
+    expect(billingIdempotencyKey(1, nextBillingPeriodStart(initialDunning, dayThree), 2))
+      .toBe(billingIdempotencyKey(1, nextBillingPeriodStart(initialDunning, daySeven), 2));
+    expect(nextPeriodUpdates(initialDunning, daySeven).currentPeriodStart).toEqual(anchor);
+  });
+
   it("applies a queued downgrade at the period boundary, not before", () => {
     const updates = nextPeriodUpdates(subscription({ planId: "crew", pendingPlanId: "solo" }), now);
     expect(updates.planId).toBe("solo");
@@ -198,9 +219,6 @@ describe("billing outcome updates", () => {
   });
 
   it("keeps sending allowed until billing actually gives up", () => {
-    expect(subscriptionAllowsSending({ status: "active" } as any)).toBe(true);
-    expect(subscriptionAllowsSending({ status: "past_due" } as any)).toBe(true);
-    expect(subscriptionAllowsSending({ status: "suspended" } as any)).toBe(false);
   });
 });
 

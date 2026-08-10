@@ -39,13 +39,8 @@ export function billingReference(merchantId: number, planId: string, periodStart
   return `TAPTPAY-${planId.toUpperCase()}-M${merchantId}-${periodStart.toISOString().slice(0, 10)}`;
 }
 
-/** Only paid or temporarily past-due subscriptions may send payments. */
-export function subscriptionAllowsSending(subscription: Pick<MerchantSubscription, "status"> | null | undefined): boolean {
-  return subscription?.status === "active" || subscription?.status === "past_due";
-}
-
 export interface BillingDecision {
-  action: "charge" | "skip";
+  action: "charge" | "record_failure" | "skip";
   reason?: string;
 }
 
@@ -65,10 +60,9 @@ export function decideBilling(
   if (subscription.status === "suspended") {
     return { action: "skip", reason: "suspended" };
   }
-  if (!subscription.windcaveCardId) {
-    return { action: "skip", reason: "no_card" };
+  if (subscription.status !== "active" && subscription.status !== "past_due") {
+    return { action: "skip", reason: "inactive" };
   }
-
   const due = subscription.nextBillingDate ?? subscription.currentPeriodEnd;
   if (!due) return { action: "skip", reason: "no_billing_date" };
   if (now < new Date(due)) return { action: "skip", reason: "not_due" };
@@ -87,6 +81,10 @@ export function decideBilling(
       nextRetryAt.setUTCDate(nextRetryAt.getUTCDate() + retryDay);
       if (now < nextRetryAt) return { action: "skip", reason: "retry_backoff" };
     }
+  }
+
+  if (!subscription.windcaveCardId) {
+    return { action: "record_failure", reason: "No payment method on file" };
   }
 
   return { action: "charge" };
@@ -119,11 +117,18 @@ export function nextBillingPeriodStart(
   subscription: MerchantSubscription,
   now: Date,
 ): Date {
-  return subscription.status !== "cancelled"
-    && !!subscription.lastBillingDate
-    && !!subscription.currentPeriodEnd
-    ? new Date(subscription.currentPeriodEnd)
-    : now;
+  if (
+    subscription.status !== "cancelled"
+    && subscription.lastBillingDate
+    && subscription.currentPeriodEnd
+  ) {
+    return new Date(subscription.currentPeriodEnd);
+  }
+  // Initial dunning has no paid period yet. Its persisted due date is the
+  // original period anchor and must survive a retry on another calendar day.
+  if (subscription.nextBillingDate) return new Date(subscription.nextBillingDate);
+  if (subscription.currentPeriodStart) return new Date(subscription.currentPeriodStart);
+  return now;
 }
 
 
@@ -134,6 +139,7 @@ export function nextBillingPeriodStart(
 export async function chargeSubscriptionPeriod(
   subscription: MerchantSubscription,
   now: Date,
+  periodStart: Date = nextBillingPeriodStart(subscription, now),
 ): Promise<SubscriptionChargeOutcome> {
   if (!subscription.windcaveCardId) {
     return { charged: false, approved: false, failureReason: "No card on file" };
@@ -142,7 +148,6 @@ export async function chargeSubscriptionPeriod(
     return { charged: false, approved: false, failureReason: "Windcave is not configured" };
   }
 
-  const periodStart = nextBillingPeriodStart(subscription, now);
   const plan = renewalPlan(subscription);
   const amountCents = subscription.pendingPlanId
     ? plan.priceCents
@@ -183,14 +188,17 @@ export async function chargeSubscriptionPeriod(
 }
 
 /** Column updates that advance a subscription into its next paid period. */
-export function nextPeriodUpdates(subscription: MerchantSubscription, now: Date) {
+export function nextPeriodUpdates(
+  subscription: MerchantSubscription,
+  now: Date,
+  periodStart: Date = nextBillingPeriodStart(subscription, now),
+) {
   // A queued downgrade lands at the period boundary, so the merchant keeps the
   // seats they paid for until the moment the cheaper plan starts.
   const pendingPlan = subscription.pendingPlanId as PlanId | null;
   const currentPlan = planForOrDefault(subscription.planId);
   const plan = pendingPlan ? planFor(pendingPlan) : currentPlan;
   // Preserve the calendar anchor when a cron runs late.
-  const periodStart = nextBillingPeriodStart(subscription, now);
   const periodEnd = addOneMonth(periodStart);
 
   return {
