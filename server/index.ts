@@ -1,4 +1,4 @@
-import express, { type Request, Response, NextFunction } from "express";
+import express from "express";
 import fs from "fs";
 import path from "path";
 import helmet from "helmet";
@@ -15,6 +15,7 @@ import {
   getPortConflictHelp 
 } from "./port-manager";
 import { createRequestLogger } from "./request-log";
+import { createGlobalErrorHandler } from "./http-error-handler";
 
 const app = express();
 
@@ -233,38 +234,8 @@ app.use(createRequestLogger(log));
     }
   }
 
-  // Mark all pre-existing verified/active merchants as onboarding completed
-  // so they aren't forced through the new onboarding flow
-  if (isDatabaseConnected()) {
-    try {
-      const { db } = await import("./db");
-      const { merchants } = await import("../shared/schema");
-      const { eq, or } = await import("drizzle-orm");
-      await db.update(merchants)
-        .set({ onboardingCompleted: true })
-        .where(
-          or(
-            eq(merchants.status, 'verified'),
-            eq(merchants.status, 'active')
-          )
-        );
-      log("✅ Existing verified merchants marked as onboarding completed");
-    } catch (error) {
-      log(`⚠️ Failed to mark existing merchants as onboarded: ${error}`);
-    }
-  }
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    if (!res.headersSent) {
-      res.status(status).json({ message });
-    }
-    // Log instead of re-throwing: a re-thrown error here escapes Express and
-    // (combined with process-level handlers) previously took the server down.
-    console.error("[EXPRESS_ERROR]", err);
-  });
+  app.use(createGlobalErrorHandler());
 
 
   const CRAWLER_UA_PATTERN = /bot|crawl|spider|slurp|facebookexternalhit|linkedinbot|twitterbot|whatsapp|telegram|pinterest|googlebot|bingbot|yandex|baiduspider|duckduckbot|applebot|ia_archiver|semrush|ahrefs|mj12bot/i;
