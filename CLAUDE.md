@@ -19,4 +19,12 @@ That work carries a list of deliberate design deviations that Oliver wants raise
 a single list when the integration is finished — see §6 of the handoff. Do not
 silently "fix" them mid-stream.
 
+There is ~1 hour of uncommitted, unreviewed work in the tree from an interrupted
+review pass, and the tree is currently in a broken state that looks fine. Before
+running or committing anything, read:
+
+- `docs/PLAN-2026-08-10-finish-review-and-fix.md` — what that pass landed, the
+  decisions awaiting Oliver, and the ordered path to finishing it. Step 0 (apply the
+  three pending migrations) comes before everything else.
+
 Do not blindly run git add -A. Exclude .claude-home/** and .claude/settings.local.json, preserve the requested source changes, and review the generated client/public/app hash rollover as a single unit.
