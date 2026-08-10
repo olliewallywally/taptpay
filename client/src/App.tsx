@@ -1,5 +1,16 @@
 import { Switch, Route, useLocation } from "wouter";
-import { createContext, useCallback, useContext, useEffect, useState, lazy, Suspense } from "react";
+import {
+  Component,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  lazy,
+  Suspense,
+  type ErrorInfo,
+  type ReactNode,
+} from "react";
 import { queryClient } from "./lib/queryClient";
 import "@/plugins/TaptPayPlugin";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -70,20 +81,157 @@ const TradesRecurring       = lazy(() => import("@/pages/trades/recurring-schedu
 // entry chunk that phones also load.
 const DesktopChrome           = lazy(() => import("@/desktop/DesktopChrome"));
 
-/**
- * Suspense fallback for the desktop chrome and its page slot. Deliberately
- * empty: a lazy chunk resolving must never paint a spinner over chrome that is
- * already on screen — the incoming page's own cascade is the only motion the
- * user should see. Defined here rather than imported, so that reaching for the
- * fallback does not drag the desktop chunk into the entry bundle.
- *
- * Being empty makes it invisible to a probe watching for painted loaders, so it
- * carries a `data-testid` instead: a suspended page slot is worth *reporting*
- * (the chrome held, the page area went briefly blank) without failing a run, and
- * that is only distinguishable from a real flash if it can be seen.
- */
-function DesktopPageFallback() {
-  return <div data-testid="desktop-page-fallback" className="tapt-desktop-page-fallback" aria-hidden="true" />;
+/** A lazy desktop chunk must never leave a blank slot forever. */
+export const DESKTOP_CHUNK_TIMEOUT_MS = 8_000;
+
+function reloadDesktopApp() {
+  window.location.reload();
+}
+
+function DesktopLoadState({ fullScreen = false }: { fullScreen?: boolean }) {
+  const [timedOut, setTimedOut] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setTimedOut(true), DESKTOP_CHUNK_TIMEOUT_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  return (
+    <div
+      data-testid={fullScreen ? "desktop-chrome-fallback" : "desktop-page-fallback"}
+      data-loading-state={timedOut ? "timed-out" : "loading"}
+      role={timedOut ? "alert" : "status"}
+      aria-live="polite"
+      aria-busy={!timedOut}
+      style={{
+        alignItems: "center",
+        background: "#000926",
+        color: "#F4F6FF",
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+        height: fullScreen ? "100vh" : "100%",
+        justifyContent: "center",
+        minHeight: fullScreen ? "100vh" : 240,
+        padding: 24,
+        textAlign: "center",
+        width: "100%",
+      }}
+    >
+      <strong>{timedOut ? "This page is taking too long to load" : "Loading page…"}</strong>
+      {timedOut ? (
+        <>
+          <span style={{ color: "#AFC4E8", maxWidth: 420 }}>
+            Check your connection, then reload the app. Your signed-in session is preserved.
+          </span>
+          <button
+            type="button"
+            onClick={reloadDesktopApp}
+            data-testid="desktop-chunk-retry"
+            style={{
+              background: "#66A9FF",
+              border: 0,
+              borderRadius: 999,
+              color: "#000F3F",
+              cursor: "pointer",
+              fontWeight: 700,
+              padding: "11px 20px",
+            }}
+          >
+            Reload app
+          </button>
+        </>
+      ) : (
+        <span style={{ color: "#AFC4E8" }}>The app frame will stay in place while this finishes.</span>
+      )}
+    </div>
+  );
+}
+
+function DesktopChunkError({ fullScreen = false }: { fullScreen?: boolean }) {
+  return (
+    <div
+      data-testid="desktop-page-error"
+      role="alert"
+      style={{
+        alignItems: "center",
+        background: "#000926",
+        color: "#F4F6FF",
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+        height: fullScreen ? "100vh" : "100%",
+        justifyContent: "center",
+        minHeight: fullScreen ? "100vh" : 240,
+        padding: 24,
+        textAlign: "center",
+        width: "100%",
+      }}
+    >
+      <strong>We couldn't load this part of the app</strong>
+      <span style={{ color: "#AFC4E8", maxWidth: 420 }}>
+        Reload to try the download again. Your signed-in session is preserved.
+      </span>
+      <button
+        type="button"
+        onClick={reloadDesktopApp}
+        data-testid="desktop-chunk-retry"
+        style={{
+          background: "#66A9FF",
+          border: 0,
+          borderRadius: 999,
+          color: "#000F3F",
+          cursor: "pointer",
+          fontWeight: 700,
+          padding: "11px 20px",
+        }}
+      >
+        Reload app
+      </button>
+    </div>
+  );
+}
+
+type DesktopChunkErrorBoundaryProps = {
+  children: ReactNode;
+  fullScreen?: boolean;
+  resetKey: string;
+};
+
+class DesktopChunkErrorBoundary extends Component<
+  DesktopChunkErrorBoundaryProps,
+  { failed: boolean }
+> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("Desktop chunk failed to load", error, info.componentStack);
+  }
+
+  componentDidUpdate(previous: DesktopChunkErrorBoundaryProps) {
+    if (this.state.failed && previous.resetKey !== this.props.resetKey) {
+      this.setState({ failed: false });
+    }
+  }
+
+  render() {
+    if (this.state.failed) return <DesktopChunkError fullScreen={this.props.fullScreen} />;
+    return this.props.children;
+  }
+}
+
+function DesktopChunkBoundary({ children, fullScreen = false, resetKey }: DesktopChunkErrorBoundaryProps) {
+  return (
+    <DesktopChunkErrorBoundary fullScreen={fullScreen} resetKey={resetKey}>
+      <Suspense fallback={<DesktopLoadState fullScreen={fullScreen} />}>
+        {children}
+      </Suspense>
+    </DesktopChunkErrorBoundary>
+  );
 }
 
 const DesktopRetailHome       = lazy(() => import("@/desktop/pages/retail-home"));
@@ -253,6 +401,47 @@ type AuthData = {
   tradeGstMode?: "inclusive" | "exclusive";
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * A parseable 200 is not sufficient proof of a session. Proxies and partial
+ * deploys can return `{}` (or an HTML error serialised as JSON), and treating
+ * that as authenticated creates a contradictory UI with no merchant identity.
+ */
+function readMerchantAuthData(payload: unknown): AuthData {
+  if (!isRecord(payload) || !isRecord(payload.user)) {
+    throw new Error("Missing signed-in user");
+  }
+
+  const user = payload.user;
+  const validId = typeof user.id === "number" || typeof user.id === "string";
+  const validMerchantId =
+    user.merchantId === null ||
+    typeof user.merchantId === "number" ||
+    typeof user.merchantId === "string";
+
+  if (
+    !validId ||
+    typeof user.email !== "string" ||
+    typeof user.role !== "string" ||
+    !validMerchantId ||
+    typeof user.onboardingCompleted !== "boolean"
+  ) {
+    throw new Error("Incomplete signed-in user");
+  }
+
+  return {
+    isAuthenticated: true,
+    merchantId: user.merchantId === null ? null : String(user.merchantId),
+    role: user.role,
+    onboardingCompleted: user.onboardingCompleted,
+    gstRegistered: user.gstRegistered === true,
+    tradeGstMode: user.tradeGstMode === "exclusive" ? "exclusive" : "inclusive",
+  };
+}
+
 /**
  * `checking`     — the session check is in flight. Always bounded; see below.
  * `resolved`     — we know. `auth.isAuthenticated` is the answer.
@@ -304,7 +493,7 @@ export const AUTH_TOTAL_DEADLINE_MS = 14000;
 type ProbeOutcome<T> =
   /** The server answered and the session is good. */
   | { kind: "ok"; value: T }
-  /** The server looked at the credentials and refused them. 401/403 only. */
+  /** The server looked at the credentials/principal and refused them. */
   | { kind: "rejected" }
   /** We learned nothing about the credentials. Never a reason to discard them. */
   | { kind: "unavailable"; detail: string; retryable: boolean };
@@ -426,7 +615,7 @@ async function probeSession<T>(
 ): Promise<ProbeOutcome<T>> {
   const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, signal });
 
-  if (response.status === 401 || response.status === 403) {
+  if (response.status === 401 || response.status === 403 || response.status === 404) {
     return { kind: "rejected" };
   }
 
@@ -439,7 +628,17 @@ async function probeSession<T>(
       // verdict on the session.
       return { kind: "unavailable", detail: "The server sent a reply we couldn't read.", retryable: true };
     }
-    return { kind: "ok", value: read(payload) };
+    try {
+      return { kind: "ok", value: read(payload) };
+    } catch {
+      // A successful status with an incomplete body is a broken deploy, not a
+      // valid identity. Keep the token and retry within the same hard bounds.
+      return {
+        kind: "unavailable",
+        detail: "The server sent an incomplete session reply.",
+        retryable: true,
+      };
+    }
   }
 
   if (response.status >= 500) {
@@ -450,13 +649,11 @@ async function probeSession<T>(
     };
   }
 
-  // Any other 4xx — including the 404 the server now reserves for an account
-  // that genuinely is not there. Asking again will not change it, and it is
-  // still not a rejection of these credentials, so the user gets the recovery
-  // screen with an explicit way to sign out.
+  // Other 4xx responses are protocol/client failures, not proof that the stored
+  // credential itself is invalid.
   return {
     kind: "unavailable",
-    detail: `The server couldn't confirm this session (error ${response.status}). Signing out and back in may fix it.`,
+    detail: `The server couldn't confirm this session (error ${response.status}).`,
     retryable: false,
   };
 }
@@ -504,14 +701,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           "/api/auth/me",
           token,
           signal,
-          (data): AuthData => ({
-            isAuthenticated: true,
-            merchantId: data?.user?.merchantId ?? null,
-            role: data?.user?.role ?? null,
-            onboardingCompleted: data?.user?.onboardingCompleted ?? null,
-            gstRegistered: data?.user?.gstRegistered ?? false,
-            tradeGstMode: data?.user?.tradeGstMode === "exclusive" ? "exclusive" : "inclusive",
-          }),
+          readMerchantAuthData,
         ),
       (result) => {
         setIsRetrying(false);
@@ -717,25 +907,28 @@ function Router({ deviceClass }: { deviceClass: DeviceClass }) {
       return (
         <>
           <GA4PageTracker />
-          {/* Outer boundary covers only the chrome's own chunk on cold load;
-              once resolved it stays mounted, so navigation never suspends here
-              and the frame cannot blink between screens. */}
-          <Suspense fallback={<DesktopPageFallback />}>
-            <DesktopChrome deviceClass={deviceClass} route={chromeRoute}>
-              <Suspense fallback={<DesktopPageFallback />}>
-                {/* Keyed on the screen, not the raw location, so the cascade
-                    replays whenever the user lands on a different screen but a
-                    one-shot param (?quick=1) or an id segment does not throw away
-                    a screen the user is already on. */}
-                <RouteTable
-                  key={`${chromeRoute.vertical}/${chromeRoute.page}`}
-                  location={location}
-                  deviceClass={deviceClass}
-                  merchantMode={merchantMode}
-                />
-              </Suspense>
-            </DesktopChrome>
-          </Suspense>
+          {/* Resolve both auth and onboarding before importing or mounting the
+              signed-in frame. Login, outage and onboarding surfaces therefore
+              remain normal full-window pages on tablet/desktop. The inner
+              route gates still own tutorial registration for each page. */}
+          <ProtectedRoute>
+            <DesktopChunkBoundary fullScreen resetKey="desktop-chrome">
+              <DesktopChrome deviceClass={deviceClass} route={chromeRoute}>
+                <DesktopChunkBoundary resetKey={location}>
+                  {/* Keyed on the screen, not the raw location, so the cascade
+                      replays whenever the user lands on a different screen but
+                      a one-shot param (?quick=1) or an id segment does not throw
+                      away a screen the user is already on. */}
+                  <RouteTable
+                    key={`${chromeRoute.vertical}/${chromeRoute.page}`}
+                    location={location}
+                    deviceClass={deviceClass}
+                    merchantMode={merchantMode}
+                  />
+                </DesktopChunkBoundary>
+              </DesktopChrome>
+            </DesktopChunkBoundary>
+          </ProtectedRoute>
         </>
       );
     }
