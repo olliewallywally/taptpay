@@ -1,0 +1,230 @@
+@font-face {
+  font-family: "Outfit";
+  src: url("/assets/fonts/Outfit-Regular.otf") format("opentype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Outfit";
+  src: url("/assets/fonts/Outfit-SemiBold.otf") format("opentype");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Outfit";
+  src: url("/assets/fonts/Outfit-Bold.otf") format("opentype");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+:root {
+  color: #000926;
+  background: #eef6ff;
+  font-family: "Outfit", system-ui, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 390px;
+  min-width: 390px;
+  max-width: 390px;
+  height: 844px;
+  min-height: 844px;
+  max-height: 844px;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background:
+    radial-gradient(circle at 78% 14%, rgba(94, 158, 255, 0.18), transparent 34%),
+    linear-gradient(180deg, #f7fbff 0%, #e8f3ff 100%);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.landing-demo {
+  position: relative;
+  isolation: isolate;
+  width: 390px;
+  height: 844px;
+  overflow: hidden;
+  color: #000926;
+}
+
+.landing-demo-pointer {
+  position: absolute;
+  z-index: 1000;
+  width: 22px;
+  height: 22px;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  background: rgba(27, 112, 255, 0.72);
+  box-shadow: 0 0 0 8px rgba(27, 112, 255, 0.18);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.landing-demo-pointer.is-pressing {
+  animation: landing-demo-pointer-press 300ms ease-out both;
+}
+
+@keyframes landing-demo-pointer-press {
+  0% { transform: translate(-50%, -50%) scale(0.72); opacity: 0.55; }
+  55% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1.18); opacity: 0; }
+}
+
+.landing-demo__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 76px;
+  padding: 22px 22px 16px;
+}
+
+.landing-demo__wordmark {
+  margin: 0;
+  font-size: 23px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+
+.landing-demo__wordmark-dot {
+  color: #1b70ff;
+}
+
+.landing-demo__mode {
+  margin: 0;
+  padding: 7px 11px;
+  border: 1px solid rgba(0, 9, 38, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: rgba(0, 9, 38, 0.62);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.landing-demo__content {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  height: calc(100% - 76px);
+  padding: 44px 26px 32px;
+}
+
+.landing-demo__eyebrow {
+  margin: 0;
+  color: #1b70ff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.landing-demo__title {
+  max-width: 320px;
+  margin: 0;
+  font-size: 38px;
+  font-weight: 600;
+  letter-spacing: -0.045em;
+  line-height: 0.98;
+}
+
+.landing-demo__copy {
+  max-width: 310px;
+  margin: 0;
+  color: rgba(0, 9, 38, 0.66);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.landing-demo__card {
+  display: grid;
+  grid-template-columns: 52px 1fr auto;
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 17px;
+  border: 1px solid rgba(0, 9, 38, 0.09);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: 0 22px 70px rgba(0, 34, 91, 0.12);
+}
+
+.landing-demo__icon {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border-radius: 17px;
+  background: #1b70ff;
+  color: #fff;
+  font-size: 23px;
+  font-weight: 700;
+}
+
+.landing-demo__card-label,
+.landing-demo__card-value {
+  margin: 0;
+}
+
+.landing-demo__card-label {
+  color: rgba(0, 9, 38, 0.56);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.landing-demo__card-value {
+  margin-top: 3px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.landing-demo__status {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #16a36a;
+  box-shadow: 0 0 0 6px rgba(22, 163, 106, 0.12);
+}
+
+.landing-demo__footer {
+  align-self: end;
+  margin: 0;
+  color: rgba(0, 9, 38, 0.52);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,15 +1,17 @@
 # Landing real-app phone and coin recovery plan
 
-Status: Phase 2 visual/autoplay slice implemented; shared-view sandbox pending product/security approval
+Status: paused checkpoint — Phase 2 committed; retail/property/trades extraction and sandbox/document foundations implemented; production-store gate pending
 Date: 2026-08-11
 Scope: landing page only, plus shared mobile view extraction and an isolated landing-demo service
-Implementation state: visual/autoplay recovery is implemented in the dirty worktree; the shared-view sandbox remains unimplemented
+Implementation state: safe foundations are implemented and verified; the standalone document still renders its neutral placeholder and is not wired into either landing phone
 
 Execution checkpoint (2026-08-11):
 
 - Completed: landing-only recovery checkpoint, branded coin mounting/position fix, responsive CSS phone depth/front/back shell, stable deferred host sizing, Industries flow spacing, and scroll-select/beat-autoplay behavior.
-- Verified: TypeScript check, production build, focused scene tests, overlap audit (0 problems), and browser autoplay verifier (9/9).
-- Not completed: shared production-view extraction, isolated landing-demo document, sandbox service, and real-app live interaction. The existing production controllers are unsafe to embed, so that phase remains deliberately unimplemented.
+- Completed in the paused foundation checkpoint: pure retail, property, trades and quote presentation boundaries; production effect adapters; strict shared demo contracts; deterministic in-memory reducer/service; exact demo routes and security tests; second Vite HTML entry; explicit development/production document serving; path-scoped frame/CSP headers; versioned postMessage guards; in-memory browser session client; and an abortable real-control driver foundation.
+- Verified at pause: TypeScript check; production build with both HTML documents; 25 focused client tests; 26 focused server tests; static client/server effect-boundary scan; and clean whitespace validation.
+- Safety gate: the current deployment is autoscaled without proven route affinity. Demo API routes therefore remain development-only. Do not enable them in production until an approved shared ephemeral store or stateless signed-state design is implemented and tested.
+- Not completed: checkout/quote-acceptance/split-customer extraction; dashboard/dock extraction; deterministic fixtures and all eight scenario manifests; mounting shared views in LandingDemoApp; iframe integration into either landing phone; real-app browser/pixel/API-trace approval; demo graph approval/budget fixture; production-safe cross-replica state; final filmstrips; and superseded-code cleanup.
 
 ## 1. Product decision
 

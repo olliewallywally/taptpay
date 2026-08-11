@@ -41,6 +41,28 @@ export async function setupVite(app: Express, server: Server) {
   });
 
   app.use(vite.middlewares);
+  app.get("/landing-demo.html", async (req, res, next) => {
+    try {
+      const clientTemplate = path.resolve(
+        import.meta.dirname,
+        "..",
+        "client",
+        "landing-demo.html",
+      );
+      let template = await fs.promises.readFile(clientTemplate, "utf-8");
+      const entry = "/src/landing-demo/main.tsx";
+      template = template.replace(
+        `src="${entry}"`,
+        `src="${entry}?v=${nanoid()}"`,
+      );
+      const page = await vite.transformIndexHtml(req.originalUrl, template);
+      res.status(200).set({ "Content-Type": "text/html" }).end(page);
+    } catch (error) {
+      vite.ssrFixStacktrace(error as Error);
+      next(error);
+    }
+  });
+
   app.use("*", async (req, res, next) => {
     const url = req.originalUrl;
 
@@ -52,11 +74,12 @@ export async function setupVite(app: Express, server: Server) {
         "index.html",
       );
 
-      // always reload the index.html file from disk incase it changes
+      // Always reload the main HTML entry from disk in case it changes.
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
+      const entry = "/src/main.tsx";
       template = template.replace(
-        `src="/src/main.tsx"`,
-        `src="/src/main.tsx?v=${nanoid()}"`,
+        `src="${entry}"`,
+        `src="${entry}?v=${nanoid()}"`,
       );
       const page = await vite.transformIndexHtml(url, template);
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
@@ -75,6 +98,15 @@ export function serveStatic(app: Express) {
       `Could not find the build directory: ${distPath}, make sure to build the client first`,
     );
   }
+
+  app.get("/landing-demo.html", (_req, res) => {
+    const demoDocument = path.resolve(distPath, "landing-demo.html");
+    if (!fs.existsSync(demoDocument)) {
+      res.status(404).type("text/plain").send("Landing demo build is unavailable");
+      return;
+    }
+    res.sendFile(demoDocument);
+  });
 
   app.use(express.static(distPath));
 

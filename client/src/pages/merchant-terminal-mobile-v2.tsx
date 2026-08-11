@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { QRCodeDisplay } from "@/components/qr-code-display";
 import { apiRequest } from "@/lib/queryClient";
 import { sseClient } from "@/lib/sse-client";
@@ -9,9 +10,50 @@ import { useDeviceStatusMonitoring, useSSEConnectionMonitoring } from "@/compone
 import { getCurrentMerchantId } from "@/lib/auth";
 import { Loader2, CheckCircle, XCircle, Waves, X } from "lucide-react";
 import { canTapToPay } from "@/lib/native";
-import SmartTransitions from "@/components/SmartTransitions";
+import RetailTerminalView, {
+  type RetailCreateOptions,
+  type RetailRefundIntent,
+  type RetailSaleDraft,
+  type RetailShareIntent,
+  type RetailTerminalState,
+} from "@/features/terminal/retail/RetailTerminalView";
 
 const BRAND = "#00DFC8";
+
+const RETAIL_QR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 60 60" fill="none"><rect width="60" height="60" fill="#040D6D"/><path d="M6 14V8a2 2 0 012-2h6" stroke="#58ABFF" stroke-width="3" stroke-linecap="round"/><path d="M54 14V8a2 2 0 00-2-2h-6" stroke="#58ABFF" stroke-width="3" stroke-linecap="round"/><path d="M6 46v6a2 2 0 002 2h6" stroke="#58ABFF" stroke-width="3" stroke-linecap="round"/><path d="M54 46v6a2 2 0 01-2 2h-6" stroke="#58ABFF" stroke-width="3" stroke-linecap="round"/><rect x="18" y="18" width="9" height="9" rx="1.5" fill="#58ABFF"/><rect x="33" y="18" width="9" height="9" rx="1.5" fill="#58ABFF"/><rect x="18" y="33" width="9" height="9" rx="1.5" fill="#58ABFF"/><rect x="33" y="33" width="3" height="3" fill="#58ABFF"/><rect x="38" y="33" width="3" height="3" fill="#58ABFF"/><rect x="33" y="38" width="3" height="3" fill="#58ABFF"/><rect x="38" y="38" width="3" height="3" fill="#58ABFF"/></svg>`;
+
+async function handleBrowserShare(intent: RetailShareIntent): Promise<void> {
+  if (intent.channel === "copy") {
+    await navigator.clipboard?.writeText(intent.url).catch(() => {});
+    return;
+  }
+
+  if (intent.channel === "download-qr") {
+    const blob = new Blob([RETAIL_QR_SVG], { type: "image/svg+xml" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${intent.kind}-qr.svg`;
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return;
+  }
+
+  const subject = intent.kind === "receipt"
+    ? "Your Receipt"
+    : `Payment Request — $${(intent.amountCents / 100).toFixed(2)}`;
+  const body = intent.kind === "receipt"
+    ? `Your receipt: ${intent.url}`
+    : `Pay here: ${intent.url}`;
+
+  if (intent.channel === "email") {
+    window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
+    return;
+  }
+
+  const isAppleDevice = /Mac|iPhone|iPad/.test(navigator.userAgent);
+  window.open(`sms:${isAppleDevice ? "&" : "?"}body=${encodeURIComponent(body)}`);
+}
 
 export default function MerchantTerminalMobile() {
   const [selectedStoneId, setSelectedStoneId] = useState<number | null>(null);
@@ -71,6 +113,7 @@ export default function MerchantTerminalMobile() {
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const merchantId = getCurrentMerchantId();
 
   const { data: merchant } = useQuery({
@@ -336,7 +379,7 @@ export default function MerchantTerminalMobile() {
       };
     });
 
-  const liveState = { items: [], pending: null, sent };
+  const liveState: RetailTerminalState = { items: [], pending: null, sent };
 
   const liveStones = (taptStones as any[]).map((s: any) => ({
     id: s.id,
@@ -354,8 +397,8 @@ export default function MerchantTerminalMobile() {
   );
 
   const handleLiveSend = async (
-    draft: { name: string; amount: number; splitEnabled?: boolean },
-    options: { paywave?: boolean } = {}
+    draft: RetailSaleDraft,
+    options: Partial<RetailCreateOptions> = {}
   ) => {
     const newTx = await createTransactionMutation.mutateAsync({
       itemName: draft.name,
@@ -383,13 +426,44 @@ export default function MerchantTerminalMobile() {
     }
   };
 
+  const handleCreateSale = async (draft: RetailSaleDraft, options: RetailCreateOptions) => {
+    if (options.existing && options.paywave) {
+      await startTapToPayPayment();
+      return;
+    }
+    await handleLiveSend(draft, options);
+  };
+
+  const handleRefund = async ({
+    transactionId,
+    refundAmount,
+    refundReason,
+    refundMethod,
+  }: RetailRefundIntent) => {
+    const token = localStorage.getItem("authToken");
+    const response = await fetch(`/api/transactions/${transactionId}/refunds`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ refundAmount, refundReason, refundMethod }),
+    });
+    if (response.ok) return;
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Refund failed");
+  };
+
   return (
     <div style={{ position: "fixed", inset: 0 }}>
-      <SmartTransitions
+      <RetailTerminalView
         liveState={liveState}
-        onLiveSend={handleLiveSend}
-        onLiveCancel={handleLiveCancel}
-        onLivePaywave={startTapToPayPayment}
+        onCreateSale={handleCreateSale}
+        onCreateSplit={handleCreateSale}
+        onCancel={handleLiveCancel}
+        onShare={handleBrowserShare}
+        onRefund={handleRefund}
+        onOpenReceipt={(transaction) => setLocation(`/receipt/${transaction.id}`)}
         onBoardSelect={(stoneId: number) => setSelectedStoneId(stoneId)}
         selectedStoneId={selectedStoneId}
         onStoneCreate={() => createStoneMutation.mutateAsync()}
