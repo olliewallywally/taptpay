@@ -1,18 +1,14 @@
 /**
- * Scroll → scene/step resolution for the landing phone demo.
+ * Scene resolution and deterministic state helpers for the landing phone demo.
  *
- * The whole controller is pure arithmetic over a scroll progress value. That is
- * deliberate: it is what makes the plan's scroll requirements (§3.2) provable
- * in a unit test rather than eyeballed in a browser.
+ * Overall scroll progress resolves the current scene. The autoplay hook uses
+ * the pure sceneAtProgress helper while its clock advances authored beats:
  *
- *   forward   — every milestone is visited, in order
- *   backward  — rewinds through the same milestones, symmetrically
- *   jump      — any progress maps to exactly one state, with no replay
+ *   ordering  — scene order remains stable
+ *   jump      — any progress maps immediately to exactly one scene
  *   re-entry  — a zone always starts at its own step 0
  *
- * Because state is a pure function of progress, there is no in-flight timer or
- * queued animation that can survive a scene change and leak into the next one.
- * Scenes render from `step`; they must not schedule their own transitions.
+ * Scenes render from `step` alone and schedule no transitions of their own.
  */
 import type { LandingPhoneScene, LandingPhoneState } from './types';
 
@@ -52,6 +48,21 @@ export function stepAtProgress(steps: number, local: number): number {
   const slice = Math.floor(clamp01(local) * steps);
   return Math.min(slice, steps - 1);
 }
+
+/* ── frame-authoring emphasis metadata ─────────────────────────────────────
+   Scene modules use these values to drive taps, readable screens and results. */
+
+/** A press: long enough to see the key light and the control sink, no longer. */
+export const TAP_MS = 300;
+/** A screen the eye has to actually read before the next move. */
+export const BEAT_MS = 780;
+/** A moment on something worth looking at — an amount landing, a QR appearing. */
+export const DWELL_MS = 1150;
+/**
+ * A completed result, marked as the scene's strongest visual emphasis.
+ */
+export const HOLD_MS = 2100;
+
 
 export type StepsFor = (scene: LandingPhoneScene) => number;
 

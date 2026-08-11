@@ -22,10 +22,12 @@
  * figures, captions and dock items — so switching vertical here is exactly what
  * the real app does when the merchant changes mode.
  */
+import { Fragment } from 'react';
 import type { ReactNode } from 'react';
+import { DWELL_MS, HOLD_MS, TAP_MS } from '../reducer';
 import type { SceneDefinition, SceneProps } from '../types';
 import { BLUE, NAVY, OFFW, WHITE } from '../tokens';
-import { Screen } from '../primitives';
+import { Press, Screen } from '../primitives';
 
 /* ── colours the demo needs that aren't shared tokens ───────────────────────
    The retail home is the one merchant surface on its own palette
@@ -136,8 +138,6 @@ const VERTICALS: Vertical[] = [
   },
 ];
 
-/** Which vertical each milestone shows. Beat 4 settles back on Property. */
-const AT_STEP = [0, 0, 1, 2, 0];
 
 /* ── the home surface ───────────────────────────────────────────────────── */
 
@@ -171,7 +171,7 @@ function Bars({ v }: { v: Vertical }) {
   );
 }
 
-function Dashboard({ v, step }: { v: Vertical; step: number }) {
+function Dashboard({ v, step, tapDock, tapAction, seq = 0 }: { v: Vertical; step: number; tapDock?: number; tapAction?: number; seq?: number }) {
   const dim = alpha(v.accent, 0.6);
   const sheetInk = v.id === 'retail' ? RETAIL_BASE : NAVY;
   const dock = v.id === 'trades' ? { bg: NAVY, on: OFFW, off: 'rgba(244,244,244,0.5)' } : { bg: DOCK, on: BLUE, off: 'rgba(88,171,255,0.45)' };
@@ -240,11 +240,13 @@ function Dashboard({ v, step }: { v: Vertical; step: number }) {
 
       {/* shortcuts */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr 1fr', gap: 12, padding: '16px 22px 0', flexShrink: 0 }}>
-        {v.actions.map(([label, aria, Icon]) => (
-          <div key={aria} className="lp-t" style={{ background: WHITE, borderRadius: 18, padding: '14px 14px 12px', display: 'flex', flexDirection: 'column', gap: 12, minHeight: 84, boxShadow: `0 4px 14px ${alpha(v.base, 0.08)}` }}>
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>{Icon(sheetInk)}</div>
-            <div style={{ fontWeight: 600, fontSize: 12, color: sheetInk, lineHeight: 1.3, whiteSpace: 'pre-line' }}>{label}</div>
-          </div>
+        {v.actions.map(([label, aria, Icon], i) => (
+          <Press key={aria} on={i === tapAction} seq={seq} radius={46} style={{ display: 'flex' }}>
+            <div className="lp-t" style={{ background: WHITE, borderRadius: 18, padding: '14px 14px 12px', display: 'flex', flexDirection: 'column', gap: 12, minHeight: 84, width: '100%', boxSizing: 'border-box', boxShadow: `0 4px 14px ${alpha(v.base, 0.08)}` }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>{Icon(sheetInk)}</div>
+              <div style={{ fontWeight: 600, fontSize: 12, color: sheetInk, lineHeight: 1.3, whiteSpace: 'pre-line' }}>{label}</div>
+            </div>
+          </Press>
         ))}
       </div>
 
@@ -253,9 +255,11 @@ function Dashboard({ v, step }: { v: Vertical; step: number }) {
         <div style={{ position: 'relative', width: 280, height: 48, background: dock.bg, borderRadius: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '0 16px', boxSizing: 'border-box' }}>
           <div className="lp-t" style={{ position: 'absolute', left: 8, top: -5, width: 65, height: 58, background: dock.bg, borderRadius: 29, boxShadow: '0 4px 20px rgba(0,0,0,0.45)' }} />
           {v.dock.map((Icon, i) => (
-            <div key={i} className="lp-t" style={{ position: 'relative', zIndex: 1, padding: 8, display: 'flex', transform: i === 0 ? 'scale(1.15)' : 'none' }}>
-              {Icon(i === 0 ? dock.on : dock.off)}
-            </div>
+            <Press key={i} on={i === tapDock} seq={seq} radius={30} style={{ position: 'relative', zIndex: 1 }}>
+              <div className="lp-t" style={{ padding: 8, display: 'flex', transform: i === 0 ? 'scale(1.15)' : 'none' }}>
+                {Icon(i === 0 ? dock.on : dock.off)}
+              </div>
+            </Press>
           ))}
         </div>
       </div>
@@ -263,14 +267,42 @@ function Dashboard({ v, step }: { v: Vertical; step: number }) {
   );
 }
 
+/* ── the session ──────────────────────────────────────────────────────────
+   The story opens here, on the home dashboard, and its job is to show that one
+   app covers all three verticals. So it *is* the dashboard from the first frame:
+   the reader watches the analytics tab being pressed and the vertical change
+   under it, rather than the three sliding past on their own. */
+
+type Frame = { ms: number; screen: string; render: (seq: number) => ReactNode };
+
+/** The dock's analytics slot — the press that moves between verticals. */
+const ANALYTICS = 3;
+
+const frames = (i: number, hold = false): Frame[] => [
+  { ms: hold ? HOLD_MS : DWELL_MS, screen: `v${i}`, render: () => <Dashboard v={VERTICALS[i]} step={i} /> },
+  { ms: TAP_MS, screen: `v${i}`, render: (seq) => <Dashboard v={VERTICALS[i]} step={i} tapDock={ANALYTICS} seq={seq} /> },
+];
+
+const FRAMES: Frame[] = [
+  // Tour all three verticals, then return to Property for the hand-off into
+  // the first property workflow.
+  ...frames(0),
+  ...frames(1),
+  { ms: DWELL_MS, screen: 'v2', render: () => <Dashboard v={VERTICALS[2]} step={2} /> },
+  { ms: TAP_MS, screen: 'v2', render: (seq) => <Dashboard v={VERTICALS[2]} step={2} tapDock={ANALYTICS} seq={seq} /> },
+  { ms: HOLD_MS, screen: 'v0', render: () => <Dashboard v={VERTICALS[0]} step={0} /> },
+];
+
 function Overview({ step }: SceneProps) {
-  const v = VERTICALS[AT_STEP[Math.min(step, AT_STEP.length - 1)] ?? 0];
-  return <Dashboard v={v} step={step} />;
+  const i = Math.min(Math.max(step, 0), FRAMES.length - 1);
+  const frame = FRAMES[i];
+  return <Fragment key={frame.screen}>{frame.render(i)}</Fragment>;
 }
 
 export const overviewScene: SceneDefinition = {
   id: 'overview',
-  steps: 5,
+  steps: FRAMES.length,
+  beats: FRAMES.map((f) => f.ms),
   label: 'taptpay home, showing property, trades and retail',
   Component: Overview,
 };

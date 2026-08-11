@@ -19,7 +19,7 @@
 import { Component, Suspense, lazy, useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { SCREEN_H, SCREEN_W } from './tokens';
 import type { LandingPhoneScene, LandingPhoneState } from './types';
-import { useApproaching, useStillPreference, useStoryProgress } from './useStoryProgress';
+import { useApproaching, useOnScreen, useStillPreference, useStoryProgress } from './useStoryProgress';
 
 const PhoneStage = lazy(() => import('./LandingPhoneDemo'));
 
@@ -74,9 +74,10 @@ class PhoneBoundary extends Component<{ fallback: ReactNode; children: ReactNode
 
 export type LandingPhoneMountProps = {
   /**
-   * cinematic — scroll drives scene and step across the eight story zones.
-   * industries — the tab picks the scene; step is driven by the tab's own
-   * progress or pinned to the finished frame.
+   * cinematic — scroll deterministically picks both the story scene and its
+   * milestone.
+   * industries — the tab picks the scene; step is driven by tap-through or
+   * pinned to the finished frame.
    */
   variant: 'cinematic' | 'industries';
   /** Industries only: which scene the selected tab shows. */
@@ -96,6 +97,8 @@ export type LandingPhoneMountProps = {
   steps?: number;
   /** Render the screen only, for callers that draw their own phone body. */
   bare?: boolean;
+  /** Explicit page-level preference, combined with the browser preference. */
+  reducedMotion?: boolean;
   /**
    * Cinematic only: selector for the tall element whose scroll travel is the
    * story. Omit when the mount itself is what scrolls.
@@ -107,10 +110,11 @@ export type LandingPhoneMountProps = {
 
 export function LandingPhoneMount({
   variant, scene, state, scale = 1, spin = [-18, 18], interactive = false, steps,
-  bare = false, storySelector, className, style,
+  bare = false, reducedMotion: reducedMotionOverride = false, storySelector, className, style,
 }: LandingPhoneMountProps) {
   const [ref, near] = useApproaching<HTMLDivElement>('600px');
-  const { reducedMotion, saveData } = useStillPreference();
+  const onScreen = useOnScreen<HTMLDivElement>(ref);
+  const { reducedMotion: prefersReducedMotion, saveData } = useStillPreference();
   const progress = useStoryProgress(ref, near && variant === 'cinematic', storySelector);
 
   // Tap-through state for the Industries phone. Selecting a different tab
@@ -121,10 +125,10 @@ export function LandingPhoneMount({
     setStep((s) => (steps && steps > 0 ? (s + 1) % steps : s + 1));
   }, [steps]);
 
-  const still = reducedMotion || saveData;
+  const still = reducedMotionOverride || prefersReducedMotion || saveData;
   // Save-Data viewers get the shell until the story is actually in view, not
   // merely approaching, so the chunk is never speculatively fetched for them.
-  const load = saveData ? near && progress > 0 : near;
+  const load = saveData ? onScreen : near;
   const rotateY = variant === 'cinematic' ? spin[0] + (spin[1] - spin[0]) * progress : 0;
 
   const shell = <StaticShell scale={scale} rotateY={rotateY} bare={bare} />;
@@ -160,6 +164,7 @@ export function LandingPhoneMount({
               rotateY={rotateY}
               scale={scale}
               still={still}
+              playing={variant === 'cinematic' && onScreen && !still}
               bare={bare}
             />
           </Suspense>
@@ -179,7 +184,7 @@ export function LandingPhoneMount({
             type="button"
             onClick={advance}
             aria-label={`step through the ${scene ?? 'demo'} workflow`}
-            style={{ position: 'absolute', inset: 0, background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
+            style={{ position: 'absolute', inset: '0 0 80px', zIndex: 2, background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
           />
           <button
             type="button"
@@ -187,7 +192,7 @@ export function LandingPhoneMount({
             style={{
               // Bare mounts sit inside a clipping phone screen, so the control
               // has to live above the bottom edge rather than under it.
-              position: 'absolute', bottom: bare ? 16 : -14, left: '50%', transform: 'translateX(-50%)',
+              position: 'absolute', zIndex: 3, bottom: bare ? 16 : -14, left: '50%', transform: 'translateX(-50%)',
               padding: '8px 18px', borderRadius: 999, border: '1px solid rgba(94,157,255,0.5)',
               background: 'rgba(4,13,109,0.9)', color: '#5E9DFF', cursor: 'pointer',
               font: "600 12px/1 'Outfit', system-ui", letterSpacing: '0.06em',

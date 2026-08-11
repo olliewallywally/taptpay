@@ -13,12 +13,12 @@
  * additive: if the transform layer fails or is unsupported, the screen still
  * renders flat rather than going blank.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import './landing-phone.css';
 import { SCREEN_H, SCREEN_W } from './tokens';
 import type { LandingPhoneScene, LandingPhoneState } from './types';
 import { SCENES, stepsFor } from './scenes/registry';
-import { createSceneController, finalState, resolveState } from './reducer';
+import { sceneAtProgress, finalState } from './reducer';
 
 export type LandingPhoneDemoProps = {
   /** Which frame to show. Callers own the state; the phone is presentational. */
@@ -34,7 +34,7 @@ export type LandingPhoneDemoProps = {
    * Screen only — no rim, back face, glare or dynamic island.
    *
    * The landing page already draws a phone around this slot (the cinematic
-   * WebGL body, and the tilting `.tp-phone` in Industries), so drawing our own
+   * CSS-3D body, and the tilting `.tp-phone` in Industries), so drawing our own
    * would nest a phone inside a phone. `bare` is what the landing page uses;
    * the full chrome exists for standalone use, where the demo *is* the phone.
    */
@@ -138,22 +138,69 @@ export function LandingPhoneDemo({ state, rotateY = 0, rotateX = 0, scale = 1, s
 }
 
 /**
- * Scroll → state for the cinematic phone.
- *
- * The controller only reports milestone changes, so scrolling does not set
- * React state on every frame. `still` viewers jump straight to each scene's
- * finished frame instead of watching it assemble.
+ * Story state for the cinematic phone. Scroll selects the scene; once parked,
+ * authored beat durations advance the real controls and loop. Visibility and
+ * reduced-motion preferences pause the clock.
  */
-export function useStoryScene(progress: number, still = false): LandingPhoneState {
-  const controller = useMemo(() => createSceneController(stepsFor), []);
-  const [state, setState] = useState<LandingPhoneState>(() => resolveState(progress, stepsFor));
+export function useStoryScene(progress: number, still = false, playing = false): LandingPhoneState {
+  const scene = sceneAtProgress(progress).scene;
+  const [state, setState] = useState<LandingPhoneState>(() =>
+    still ? finalState(scene, stepsFor) : { scene, step: 0 },
+  );
+  const sceneRef = useRef(scene);
 
   useEffect(() => {
-    const resolved = resolveState(progress, stepsFor);
-    const next = still ? finalState(resolved.scene, stepsFor) : resolved;
-    const changed = controller.set(next);
-    if (changed) setState(changed);
-  }, [progress, still, controller]);
+    sceneRef.current = scene;
+    setState(still ? finalState(scene, stepsFor) : { scene, step: 0 });
+  }, [scene, still]);
+
+  useEffect(() => {
+    if (!playing || still) return;
+    let raf = 0;
+    let last = performance.now();
+    let elapsed = 0;
+    let currentScene = scene;
+
+    const getDurations = () => {
+      const beats = SCENES[currentScene].beats;
+      return beats && beats.length === stepsFor(currentScene)
+        ? beats
+        : Array.from({ length: stepsFor(currentScene) }, () => 700);
+    };
+
+    const tick = (now: number) => {
+      if (document.hidden) {
+        last = now;
+        raf = requestAnimationFrame(tick);
+        return;
+      }
+      const delta = Math.min(Math.max(0, now - last), 250);
+      last = now;
+      if (sceneRef.current !== currentScene) return;
+      elapsed += delta;
+      const durations = getDurations();
+      const total = durations.reduce((sum, value) => sum + Math.max(1, value), 0);
+      let cursor = elapsed % total;
+      let step = durations.length - 1;
+      for (let i = 0; i < durations.length; i += 1) {
+        const duration = Math.max(1, durations[i]);
+        if (cursor < duration) {
+          step = i;
+          break;
+        }
+        cursor -= duration;
+      }
+      setState((previous) =>
+        previous.scene === currentScene && previous.step === step
+          ? previous
+          : { scene: currentScene, step },
+      );
+      raf = requestAnimationFrame(tick);
+    };
+
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, scene, still]);
 
   return state;
 }
@@ -161,10 +208,9 @@ export function useStoryScene(progress: number, still = false): LandingPhoneStat
 /**
  * Mode-aware entry point for the lazily loaded chunk.
  *
- * The cinematic phone passes `progress` and lets the controller pick the
- * scene; the Industries phone passes an explicit `state` for the selected tab.
- * Both render the same scenes from the same registry, so the two phones cannot
- * drift apart (§3.3).
+ * The cinematic phone passes progress and lets the clock play the selected
+ * scene; the Industries phone passes an explicit state for the selected tab.
+ * Both render the same scene registry, so the two phones cannot drift apart.
  *
  * This is the chunk's default export: LandingPhoneMount lazy-imports this
  * module, so everything below — scenes, primitives, CSS — lands in one chunk
@@ -173,11 +219,12 @@ export function useStoryScene(progress: number, still = false): LandingPhoneStat
 export type PhoneStageProps = Omit<LandingPhoneDemoProps, 'state'> & {
   progress?: number;
   state?: LandingPhoneState;
+  playing?: boolean;
 };
 
-export function PhoneStage({ progress = 0, state, still = false, ...rest }: PhoneStageProps) {
-  const scrolled = useStoryScene(progress, still);
-  return <LandingPhoneDemo {...rest} still={still} state={state ?? scrolled} />;
+export function PhoneStage({ progress = 0, state, still = false, playing = false, ...rest }: PhoneStageProps) {
+  const story = useStoryScene(progress, still, playing);
+  return <LandingPhoneDemo {...rest} still={still} state={state ?? story} />;
 }
 
 export default PhoneStage;

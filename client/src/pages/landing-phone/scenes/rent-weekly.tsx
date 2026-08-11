@@ -21,10 +21,13 @@
  * Property scenes cost one copy of it rather than two (§6 rule 3). They are
  * candidates for promotion into primitives.tsx once every lane has landed.
  */
+import { Fragment } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { SceneDefinition, SceneProps } from '../types';
 import { BLUE, GREEN, NAVY, NAVY_35, NAVY_50, fmt } from '../tokens';
-import { Amount, BottomHalf, Ic, Keypad, Screen, SubHead, TopHalf } from '../primitives';
+import { Amount, BottomHalf, Ic, Keypad, Press, Screen, SubHead, TopHalf } from '../primitives';
+import { HomeScreen } from './property-bill';
+import { BEAT_MS, DWELL_MS, HOLD_MS, TAP_MS } from '../reducer';
 import { PROPERTY } from '../fixtures';
 
 /* ── production colour mixes, by value (property-terminal.tsx) ───────────── */
@@ -61,7 +64,7 @@ const BAR_ITEMS = [
   { id: 'external', label: 'external', Icon: Tic.External },
 ] as const;
 
-export function ActionBar({ active, top = 'calc(50% - 57px)', send = false }: { active?: string; top?: string; send?: boolean }) {
+export function ActionBar({ active, top = 'calc(50% - 57px)', send = false, tap, tapSend = false, seq = 0 }: { active?: string; top?: string; send?: boolean; tap?: string; tapSend?: boolean; seq?: number }) {
   return (
     <div style={{ position: 'absolute', left: 0, right: 0, top, height: 37, padding: '0 22px', boxSizing: 'border-box', display: 'flex', alignItems: 'center', gap: 8, zIndex: 30 }}>
       <div style={{ flex: '1 1 auto', minWidth: 0, display: 'flex', justifyContent: 'center' }}>
@@ -69,19 +72,21 @@ export function ActionBar({ active, top = 'calc(50% - 57px)', send = false }: { 
           {BAR_ITEMS.map(({ id, label, Icon }) => {
             const on = id === active;
             return (
-              <div
-                key={id}
-                className="lp-t"
-                style={{ height: 27, padding: send ? '0 11px' : '0 22px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 16, background: on ? NAVY : 'transparent', color: on ? BLUE : 'rgba(4,13,109,0.55)', boxShadow: on ? '0 4px 16px rgba(4,13,109,0.4)' : 'none' }}
-              >
-                {Icon(18)}
-                {on && <span style={{ fontWeight: 600, fontSize: 12, letterSpacing: '0.4px', color: BLUE, whiteSpace: 'nowrap' }}>{label}</span>}
-              </div>
+              <Press key={id} on={id === tap} seq={seq} radius={26}>
+                <div
+                  className="lp-t"
+                  style={{ height: 27, padding: send ? '0 11px' : '0 22px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 16, background: on ? NAVY : 'transparent', color: on ? BLUE : 'rgba(4,13,109,0.55)', boxShadow: on ? '0 4px 16px rgba(4,13,109,0.4)' : 'none' }}
+                >
+                  {Icon(18)}
+                  {on && <span style={{ fontWeight: 600, fontSize: 12, letterSpacing: '0.4px', color: BLUE, whiteSpace: 'nowrap' }}>{label}</span>}
+                </div>
+              </Press>
             );
           })}
         </div>
       </div>
       {send && (
+        <Press on={tapSend} seq={seq} radius={38} style={{ flexShrink: 0 }}>
         <div className="lp-send" style={{ flexShrink: 0 }}>
           <span className="lp-send-circle" style={{ color: NAVY }}>
             <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke={NAVY} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -90,6 +95,7 @@ export function ActionBar({ active, top = 'calc(50% - 57px)', send = false }: { 
           </span>
           <span className="lp-send-label">send</span>
         </div>
+        </Press>
       )}
     </div>
   );
@@ -98,8 +104,9 @@ export function ActionBar({ active, top = 'calc(50% - 57px)', send = false }: { 
 /* ── the terminal's confirm button ──────────────────────────────────────────
    WireframeLiquidButton at CTA_SIZE: rests as a wireframe pill, fills solid
    from the bottom on press. `filled` is the topped-out end of that fill. */
-export function WireCta({ label, filled = false, dim = false }: { label: string; filled?: boolean; dim?: boolean }) {
+export function WireCta({ label, filled = false, dim = false, tap = false, seq = 0 }: { label: string; filled?: boolean; dim?: boolean; tap?: boolean; seq?: number }) {
   return (
+    <Press on={tap} seq={seq} radius={48}>
     <div
       className="lp-t"
       style={{
@@ -112,6 +119,7 @@ export function WireCta({ label, filled = false, dim = false }: { label: string;
     >
       {label}
     </div>
+    </Press>
   );
 }
 
@@ -133,7 +141,7 @@ const INITIALS = TENANT.name.slice(0, 1).toUpperCase();
 
 /** ChooseTenant. Production navigates away on tap, so `selected` is the demo's
  *  way of holding the tap visible for a beat. */
-export function TenantPicker({ selected, amount }: { selected: boolean; amount?: number }) {
+export function TenantPicker({ selected, amount, tap = false, seq = 0 }: { selected: boolean; amount?: number; tap?: boolean; seq?: number }) {
   return (
     <Screen>
       <TopHalf>
@@ -148,10 +156,11 @@ export function TenantPicker({ selected, amount }: { selected: boolean; amount?:
           {Tic.Search(16)}
           <span style={{ fontWeight: 500, fontSize: 14, color: sky(0.5) }}>search tenants or address</span>
         </div>
+        <Press on={tap} seq={seq} radius={40} style={{ display: 'flex' }}>
         <div
           className="lp-t"
           style={{
-            display: 'flex', alignItems: 'center', gap: 13, padding: '14px 16px', borderRadius: 18,
+            display: 'flex', alignItems: 'center', gap: 13, padding: '14px 16px', borderRadius: 18, width: '100%', boxSizing: 'border-box',
             border: `1.5px solid ${selected ? BLUE : sky(0.28)}`,
             background: selected ? sky(0.18) : 'transparent',
             boxShadow: selected ? `inset 0 0 0 1.5px ${BLUE}` : 'none',
@@ -173,6 +182,7 @@ export function TenantPicker({ selected, amount }: { selected: boolean; amount?:
             )}
           </div>
         </div>
+        </Press>
       </BottomHalf>
       <ActionBar active="tenants" />
     </Screen>
@@ -180,11 +190,11 @@ export function TenantPicker({ selected, amount }: { selected: boolean; amount?:
 }
 
 /** RentAmount — the keypad. `hit` lights the key the script is pressing. */
-export function AmountScreen({ cents, hit }: { cents: number; hit?: string }) {
+export function AmountScreen({ cents, hit, seq = 0, tapCommit = false }: { cents: number; hit?: string; seq?: number; tapCommit?: boolean }) {
   return (
     <Screen>
       <TopHalf>
-        <SubHead commitReady={cents > 0} />
+        <SubHead commitReady={cents > 0} tapCommit={tapCommit} seq={seq} />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
           <Amount cents={cents} style={{ marginTop: 18 }} />
           <div style={{ fontWeight: 500, fontSize: 15, color: NAVY_50, paddingBottom: 8 }}>{`${TENANT.name} · ${TENANT.address}`}</div>
@@ -192,7 +202,7 @@ export function AmountScreen({ cents, hit }: { cents: number; hit?: string }) {
         <div style={{ height: 52 }} />
       </TopHalf>
       <BottomHalf>
-        <Keypad hit={hit} />
+        <Keypad hit={hit} seq={seq} />
       </BottomHalf>
       <ActionBar />
     </Screen>
@@ -238,7 +248,7 @@ const FREQ = [
 const NEXT_RUN = PROPERTY.scheduleNote.split(' from ')[1];
 
 /** SendRentLink — amount, channel, repeat, schedule summary, commit. */
-function SendRent({ step }: { step: number }) {
+function SendRent({ step, tapSend = false, seq = 0 }: { step: number; tapSend?: boolean; seq?: number }) {
   const freqOn = step >= 3;
   return (
     <Screen>
@@ -345,17 +355,50 @@ function ScheduleScreen() {
   );
 }
 
+/* ── the session ──────────────────────────────────────────────────────────
+   Opens on the property terminal home — the same surface property-bill opens on,
+   because it is the same app — then requests the week's rent from it and ends on
+   the automation it created. Every screen change is preceded by a press. */
+
+const RENT_KEYS = ['6', '2', '0', '0', '0'] as const;
+/** $0.06 → $0.62 → $6.20 → $62.00 → $620.00, filling right to left. */
+const RENT_AMOUNTS = [6, 62, 620, 6200, 62000];
+
+type Frame = { ms: number; screen: string; render: (seq: number) => ReactNode };
+
+const FRAMES: Frame[] = [
+  { ms: BEAT_MS, screen: 'home', render: () => <HomeScreen /> },
+  // Tap "tenants" to pick who the rent request is for.
+  { ms: TAP_MS, screen: 'home', render: (seq) => <HomeScreen tapBar="tenants" seq={seq} /> },
+  { ms: BEAT_MS, screen: 'tenant', render: () => <TenantPicker selected={false} /> },
+  { ms: TAP_MS, screen: 'tenant', render: (seq) => <TenantPicker selected={false} tap seq={seq} /> },
+  { ms: 480, screen: 'tenant', render: () => <TenantPicker selected /> },
+  { ms: 440, screen: 'amount', render: () => <AmountScreen cents={0} /> },
+  ...RENT_KEYS.map((k, i) => ({
+    ms: TAP_MS,
+    screen: 'amount',
+    render: (seq: number) => <AmountScreen cents={RENT_AMOUNTS[i]} hit={k} seq={seq} />,
+  })),
+  { ms: DWELL_MS, screen: 'amount', render: () => <AmountScreen cents={PROPERTY.rentCents} /> },
+  { ms: TAP_MS, screen: 'amount', render: (seq) => <AmountScreen cents={PROPERTY.rentCents} tapCommit seq={seq} /> },
+  // The compose screen, then the weekly repeat that makes it an automation.
+  { ms: BEAT_MS, screen: 'send', render: () => <SendRent step={2} /> },
+  { ms: DWELL_MS, screen: 'send', render: () => <SendRent step={3} /> },
+  { ms: TAP_MS, screen: 'send', render: (seq) => <SendRent step={4} tapSend seq={seq} /> },
+  { ms: DWELL_MS, screen: 'sent', render: () => <SuccessScreen cents={PROPERTY.rentCents} title="rent link sent" /> },
+  { ms: HOLD_MS, screen: 'schedule', render: () => <ScheduleScreen /> },
+];
+
 function RentWeekly({ step }: SceneProps) {
-  if (step <= 1) return <TenantPicker selected={step === 1} />;
-  if (step === 2) return <AmountScreen cents={PROPERTY.rentCents} hit="0" />;
-  if (step <= 5) return <SendRent step={step} />;
-  if (step === 6) return <SuccessScreen cents={PROPERTY.rentCents} title="rent link sent" />;
-  return <ScheduleScreen />;
+  const i = Math.min(Math.max(step, 0), FRAMES.length - 1);
+  const frame = FRAMES[i];
+  return <Fragment key={frame.screen}>{frame.render(i)}</Fragment>;
 }
 
 export const rentWeeklyScene: SceneDefinition = {
   id: 'rent-weekly',
-  steps: 8,
+  steps: FRAMES.length,
+  beats: FRAMES.map((f) => f.ms),
   label: 'weekly rent request sent and automated for $620',
   Component: RentWeekly,
 };

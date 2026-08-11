@@ -16,14 +16,14 @@ import type { LandingPhoneScene } from './types';
 
 /** Milestones per scene. `step` runs 0 … steps - 1. */
 export const SCENE_STEPS: Record<LandingPhoneScene, number> = {
-  overview: 5,
-  'rent-weekly': 8,
-  'property-bill': 9,
-  'trades-invoice': 8,
-  'quote-deposit': 8,
-  'retail-sale': 6,
-  'retail-split': 8,
-  'checkout-wallet': 7,
+  overview: 7,
+  'rent-weekly': 18,
+  'property-bill': 19,
+  'trades-invoice': 19,
+  'quote-deposit': 13,
+  'retail-sale': 16,
+  'retail-split': 18,
+  'checkout-wallet': 8,
 };
 
 /** Default scene per Industries tab (§3.3). */

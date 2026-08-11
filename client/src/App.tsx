@@ -1,14 +1,10 @@
 import { Switch, Route, useLocation } from "wouter";
 import {
-  Component,
   createContext,
   useCallback,
   useContext,
   useEffect,
   useState,
-  lazy,
-  Suspense,
-  type ErrorInfo,
   type ReactNode,
 } from "react";
 import { queryClient } from "./lib/queryClient";
@@ -20,6 +16,12 @@ import { NotificationProvider } from "@/components/notification-system";
 
 import { PageTransition } from "@/components/page-transition";
 import { BottomNavigation } from "@/components/bottom-navigation";
+import {
+  ChunkBoundary,
+  ChunkErrorBoundary,
+  PageLoader,
+} from "@/components/chunk-boundary";
+import { CHUNK_LOAD_TIMEOUT_MS, lazyWithRetry } from "@/lib/lazy-with-retry";
 import { TutorialPageBoundary, TutorialProvider } from "@/features/tutorial/tutorial";
 import { useDeviceClass, type DeviceClass } from "@/hooks/use-device-class";
 import { desktopChromeForLocation } from "@/lib/desktop-chrome-route";
@@ -31,225 +33,93 @@ import Login from "@/pages/login";
 import AppLogin from "@/pages/app-login";
 import MerchantSignup from "@/pages/merchant-signup";
 
-const NotFound              = lazy(() => import("@/pages/not-found"));
-const MerchantTerminalMobile = lazy(() => import("@/pages/merchant-terminal-mobile-v2"));
-const PaymentStack           = lazy(() => import("@/pages/payment-stack"));
-const MerchantTerminal      = lazy(() => import("@/pages/merchant-terminal"));
-const DemoTerminal          = lazy(() => import("@/pages/demo-terminal"));
-const CustomerPayment       = lazy(() => import("@/pages/customer-payment"));
-const TokenPaymentEntry      = lazy(() => import("@/pages/token-payment"));
-const Receipt               = lazy(() => import("@/pages/receipt"));
-const Dashboard             = lazy(() => import("@/pages/dashboard"));
-const Settings              = lazy(() => import("@/pages/settings"));
-const Transactions          = lazy(() => import("@/pages/transactions"));
-const NFCPayment            = lazy(() => import("@/pages/nfc-payment"));
-const ForgotPassword        = lazy(() => import("@/pages/forgot-password"));
-const ResetPassword         = lazy(() => import("@/pages/reset-password"));
-const NewAdminDashboard     = lazy(() => import("@/pages/admin/AdminDashboard"));
-const CreateMerchant        = lazy(() => import("@/pages/create-merchant"));
-const StockManagement       = lazy(() => import("@/pages/stock-management"));
-const LegalPage             = lazy(() => import("@/pages/legal"));
-const InfoPage              = lazy(() => import("@/pages/info"));
-const BusinessDetails       = lazy(() => import("@/pages/business-details"));
-const CheckEmail            = lazy(() => import("@/pages/check-email"));
-const ConfirmEmail          = lazy(() => import("@/pages/confirm-email"));
-const MerchantOnboarding    = lazy(() => import("@/pages/merchant-onboarding"));
-const AcceptInvite          = lazy(() => import("@/pages/accept-invite"));
-const SplitPayment          = lazy(() => import("@/pages/split-payment"));
-const PaymentResult         = lazy(() => import("@/pages/payment-result"));
-const PaymentReturn         = lazy(() => import("@/pages/payment-return"));
-const Checkout              = lazy(() => import("@/pages/checkout"));
-const BoardBuilder          = lazy(() => import("@/pages/board-builder"));
-const SmartTerminal         = lazy(() => import("@/components/SmartTransitions"));
-const PropertyDashboard     = lazy(() => import("@/pages/property/property-dashboard"));
-const TenantDirectory       = lazy(() => import("@/pages/property/tenant-directory"));
-const TenantProfile         = lazy(() => import("@/pages/property/tenant-profile"));
-const PropertyAnalytics     = lazy(() => import("@/pages/property/property-analytics"));
-const PropertyTerminal      = lazy(() => import("@/pages/property/property-terminal"));
-const TradesDashboard       = lazy(() => import("@/pages/trades/trades-dashboard"));
-const TradesClientDirectory = lazy(() => import("@/pages/trades/client-directory"));
-const TradesClientProfile   = lazy(() => import("@/pages/trades/client-profile"));
-const TradesAnalytics       = lazy(() => import("@/pages/trades/trades-analytics"));
-const TradesTerminal        = lazy(() => import("@/pages/trades/trades-terminal"));
-const TradesQuoteBuilder    = lazy(() => import("@/pages/trades/quote-builder"));
-const TradesRecurring       = lazy(() => import("@/pages/trades/recurring-schedules"));
+const NotFound              = lazyWithRetry(() => import("@/pages/not-found"));
+const MerchantTerminalMobile = lazyWithRetry(() => import("@/pages/merchant-terminal-mobile-v2"));
+const PaymentStack           = lazyWithRetry(() => import("@/pages/payment-stack"));
+const MerchantTerminal      = lazyWithRetry(() => import("@/pages/merchant-terminal"));
+const DemoTerminal          = lazyWithRetry(() => import("@/pages/demo-terminal"));
+const CustomerPayment       = lazyWithRetry(() => import("@/pages/customer-payment"));
+const TokenPaymentEntry      = lazyWithRetry(() => import("@/pages/token-payment"));
+const Receipt               = lazyWithRetry(() => import("@/pages/receipt"));
+const Dashboard             = lazyWithRetry(() => import("@/pages/dashboard"));
+const Settings              = lazyWithRetry(() => import("@/pages/settings"));
+const Transactions          = lazyWithRetry(() => import("@/pages/transactions"));
+const NFCPayment            = lazyWithRetry(() => import("@/pages/nfc-payment"));
+const ForgotPassword        = lazyWithRetry(() => import("@/pages/forgot-password"));
+const ResetPassword         = lazyWithRetry(() => import("@/pages/reset-password"));
+const NewAdminDashboard     = lazyWithRetry(() => import("@/pages/admin/AdminDashboard"));
+const CreateMerchant        = lazyWithRetry(() => import("@/pages/create-merchant"));
+const StockManagement       = lazyWithRetry(() => import("@/pages/stock-management"));
+const LegalPage             = lazyWithRetry(() => import("@/pages/legal"));
+const InfoPage              = lazyWithRetry(() => import("@/pages/info"));
+const BusinessDetails       = lazyWithRetry(() => import("@/pages/business-details"));
+const CheckEmail            = lazyWithRetry(() => import("@/pages/check-email"));
+const ConfirmEmail          = lazyWithRetry(() => import("@/pages/confirm-email"));
+const MerchantOnboarding    = lazyWithRetry(() => import("@/pages/merchant-onboarding"));
+const AcceptInvite          = lazyWithRetry(() => import("@/pages/accept-invite"));
+const SplitPayment          = lazyWithRetry(() => import("@/pages/split-payment"));
+const PaymentResult         = lazyWithRetry(() => import("@/pages/payment-result"));
+const PaymentReturn         = lazyWithRetry(() => import("@/pages/payment-return"));
+const Checkout              = lazyWithRetry(() => import("@/pages/checkout"));
+const BoardBuilder          = lazyWithRetry(() => import("@/pages/board-builder"));
+const SmartTerminal         = lazyWithRetry(() => import("@/components/SmartTransitions"));
+const PropertyDashboard     = lazyWithRetry(() => import("@/pages/property/property-dashboard"));
+const TenantDirectory       = lazyWithRetry(() => import("@/pages/property/tenant-directory"));
+const TenantProfile         = lazyWithRetry(() => import("@/pages/property/tenant-profile"));
+const PropertyAnalytics     = lazyWithRetry(() => import("@/pages/property/property-analytics"));
+const PropertyTerminal      = lazyWithRetry(() => import("@/pages/property/property-terminal"));
+const TradesDashboard       = lazyWithRetry(() => import("@/pages/trades/trades-dashboard"));
+const TradesClientDirectory = lazyWithRetry(() => import("@/pages/trades/client-directory"));
+const TradesClientProfile   = lazyWithRetry(() => import("@/pages/trades/client-profile"));
+const TradesAnalytics       = lazyWithRetry(() => import("@/pages/trades/trades-analytics"));
+const TradesTerminal        = lazyWithRetry(() => import("@/pages/trades/trades-terminal"));
+const TradesQuoteBuilder    = lazyWithRetry(() => import("@/pages/trades/quote-builder"));
+const TradesRecurring       = lazyWithRetry(() => import("@/pages/trades/recurring-schedules"));
 
 // Tablet/desktop pages live in their own lazy chunks. Keep these as direct
 // imports (rather than an eager barrel) so phones never download the second UI.
 // The chrome is lazy for the same reason: it is mounted once above the router,
 // but a static import would put the frame, shell, canvas and desktop.css in the
 // entry chunk that phones also load.
-const DesktopChrome           = lazy(() => import("@/desktop/DesktopChrome"));
+const DesktopChrome           = lazyWithRetry(() => import("@/desktop/DesktopChrome"));
 
-/** A lazy desktop chunk must never leave a blank slot forever. */
-export const DESKTOP_CHUNK_TIMEOUT_MS = 8_000;
+/**
+ * A lazy desktop chunk must never leave a blank slot forever.
+ *
+ * This is the import bound itself, not a second copy of it: the fallback gives
+ * up at exactly the moment `lazyWithRetry` does, so the two can never disagree
+ * about whether a chunk is still coming.
+ */
+export const DESKTOP_CHUNK_TIMEOUT_MS = CHUNK_LOAD_TIMEOUT_MS;
 
-function reloadDesktopApp() {
-  window.location.reload();
-}
-
-function DesktopLoadState({ fullScreen = false }: { fullScreen?: boolean }) {
-  const [timedOut, setTimedOut] = useState(false);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setTimedOut(true), DESKTOP_CHUNK_TIMEOUT_MS);
-    return () => window.clearTimeout(timer);
-  }, []);
-
-  return (
-    <div
-      data-testid={fullScreen ? "desktop-chrome-fallback" : "desktop-page-fallback"}
-      data-loading-state={timedOut ? "timed-out" : "loading"}
-      role={timedOut ? "alert" : "status"}
-      aria-live="polite"
-      aria-busy={!timedOut}
-      style={{
-        alignItems: "center",
-        background: "#000926",
-        color: "#F4F6FF",
-        display: "flex",
-        flexDirection: "column",
-        gap: 12,
-        height: fullScreen ? "100vh" : "100%",
-        justifyContent: "center",
-        minHeight: fullScreen ? "100vh" : 240,
-        padding: 24,
-        textAlign: "center",
-        width: "100%",
-      }}
-    >
-      <strong>{timedOut ? "This page is taking too long to load" : "Loading page…"}</strong>
-      {timedOut ? (
-        <>
-          <span style={{ color: "#AFC4E8", maxWidth: 420 }}>
-            Check your connection, then reload the app. Your signed-in session is preserved.
-          </span>
-          <button
-            type="button"
-            onClick={reloadDesktopApp}
-            data-testid="desktop-chunk-retry"
-            style={{
-              background: "#66A9FF",
-              border: 0,
-              borderRadius: 999,
-              color: "#000F3F",
-              cursor: "pointer",
-              fontWeight: 700,
-              padding: "11px 20px",
-            }}
-          >
-            Reload app
-          </button>
-        </>
-      ) : (
-        <span style={{ color: "#AFC4E8" }}>The app frame will stay in place while this finishes.</span>
-      )}
-    </div>
-  );
-}
-
-function DesktopChunkError({ fullScreen = false }: { fullScreen?: boolean }) {
-  return (
-    <div
-      data-testid="desktop-page-error"
-      role="alert"
-      style={{
-        alignItems: "center",
-        background: "#000926",
-        color: "#F4F6FF",
-        display: "flex",
-        flexDirection: "column",
-        gap: 12,
-        height: fullScreen ? "100vh" : "100%",
-        justifyContent: "center",
-        minHeight: fullScreen ? "100vh" : 240,
-        padding: 24,
-        textAlign: "center",
-        width: "100%",
-      }}
-    >
-      <strong>We couldn't load this part of the app</strong>
-      <span style={{ color: "#AFC4E8", maxWidth: 420 }}>
-        Reload to try the download again. Your signed-in session is preserved.
-      </span>
-      <button
-        type="button"
-        onClick={reloadDesktopApp}
-        data-testid="desktop-chunk-retry"
-        style={{
-          background: "#66A9FF",
-          border: 0,
-          borderRadius: 999,
-          color: "#000F3F",
-          cursor: "pointer",
-          fontWeight: 700,
-          padding: "11px 20px",
-        }}
-      >
-        Reload app
-      </button>
-    </div>
-  );
-}
-
-type DesktopChunkErrorBoundaryProps = {
+function DesktopChunkBoundary({ children, fullScreen = false, resetKey }: {
   children: ReactNode;
   fullScreen?: boolean;
   resetKey: string;
-};
-
-class DesktopChunkErrorBoundary extends Component<
-  DesktopChunkErrorBoundaryProps,
-  { failed: boolean }
-> {
-  state = { failed: false };
-
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-
-  componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("Desktop chunk failed to load", error, info.componentStack);
-  }
-
-  componentDidUpdate(previous: DesktopChunkErrorBoundaryProps) {
-    if (this.state.failed && previous.resetKey !== this.props.resetKey) {
-      this.setState({ failed: false });
-    }
-  }
-
-  render() {
-    if (this.state.failed) return <DesktopChunkError fullScreen={this.props.fullScreen} />;
-    return this.props.children;
-  }
-}
-
-function DesktopChunkBoundary({ children, fullScreen = false, resetKey }: DesktopChunkErrorBoundaryProps) {
+}) {
   return (
-    <DesktopChunkErrorBoundary fullScreen={fullScreen} resetKey={resetKey}>
-      <Suspense fallback={<DesktopLoadState fullScreen={fullScreen} />}>
-        {children}
-      </Suspense>
-    </DesktopChunkErrorBoundary>
+    <ChunkBoundary slot={fullScreen ? "desktop-chrome" : "desktop-page"} resetKey={resetKey}>
+      {children}
+    </ChunkBoundary>
   );
 }
 
-const DesktopRetailHome       = lazy(() => import("@/desktop/pages/retail-home"));
-const DesktopRetailStock      = lazy(() => import("@/desktop/pages/retail-stock"));
-const DesktopRetailTerminal   = lazy(() => import("@/desktop/pages/retail-terminal"));
-const DesktopRetailAnalytics  = lazy(() => import("@/desktop/pages/retail-analytics"));
-const DesktopRetailSettings   = lazy(() => import("@/desktop/pages/retail-settings"));
-const DesktopPropertyHome      = lazy(() => import("@/desktop/pages/property-home"));
-const DesktopPropertyClients   = lazy(() => import("@/desktop/pages/property-clients"));
-const DesktopPropertyTerminal  = lazy(() => import("@/desktop/pages/property-terminal"));
-const DesktopPropertyAnalytics = lazy(() => import("@/desktop/pages/property-analytics"));
-const DesktopPropertySettings  = lazy(() => import("@/desktop/pages/property-settings"));
-const DesktopTradesHome         = lazy(() => import("@/desktop/pages/trades-home"));
-const DesktopTradesClients      = lazy(() => import("@/desktop/pages/trades-clients"));
-const DesktopTradesTerminal     = lazy(() => import("@/desktop/pages/trades-terminal"));
-const DesktopTradesAnalytics    = lazy(() => import("@/desktop/pages/trades-analytics"));
-const DesktopTradesSettings     = lazy(() => import("@/desktop/pages/trades-settings"));
-const DesktopLegacyPage         = lazy(() => import("@/desktop/DesktopLegacyPage"));
+const DesktopRetailHome       = lazyWithRetry(() => import("@/desktop/pages/retail-home"));
+const DesktopRetailStock      = lazyWithRetry(() => import("@/desktop/pages/retail-stock"));
+const DesktopRetailTerminal   = lazyWithRetry(() => import("@/desktop/pages/retail-terminal"));
+const DesktopRetailAnalytics  = lazyWithRetry(() => import("@/desktop/pages/retail-analytics"));
+const DesktopRetailSettings   = lazyWithRetry(() => import("@/desktop/pages/retail-settings"));
+const DesktopPropertyHome      = lazyWithRetry(() => import("@/desktop/pages/property-home"));
+const DesktopPropertyClients   = lazyWithRetry(() => import("@/desktop/pages/property-clients"));
+const DesktopPropertyTerminal  = lazyWithRetry(() => import("@/desktop/pages/property-terminal"));
+const DesktopPropertyAnalytics = lazyWithRetry(() => import("@/desktop/pages/property-analytics"));
+const DesktopPropertySettings  = lazyWithRetry(() => import("@/desktop/pages/property-settings"));
+const DesktopTradesHome         = lazyWithRetry(() => import("@/desktop/pages/trades-home"));
+const DesktopTradesClients      = lazyWithRetry(() => import("@/desktop/pages/trades-clients"));
+const DesktopTradesTerminal     = lazyWithRetry(() => import("@/desktop/pages/trades-terminal"));
+const DesktopTradesAnalytics    = lazyWithRetry(() => import("@/desktop/pages/trades-analytics"));
+const DesktopTradesSettings     = lazyWithRetry(() => import("@/desktop/pages/trades-settings"));
+const DesktopLegacyPage         = lazyWithRetry(() => import("@/desktop/DesktopLegacyPage"));
 
 /* Route chunks a signed-in merchant navigates between. Warmed one at a time
    during browser idle after first paint, so by the time they tap the dock the
@@ -320,21 +190,6 @@ function useRoutePreload(enabled: boolean, deviceClass: DeviceClass) {
     const t = setTimeout(() => idle(next), 1000);
     return () => { stopped = true; clearTimeout(t); };
   }, [deviceClass, enabled]);
-}
-
-/**
- * The route-level full-screen loader, for mobile and public routes.
- *
- * `data-testid` marks it as exactly that: the transition probes gate on this
- * element appearing, and must not confuse it with a page's own content spinner,
- * which shares the `animate-spin` utility class but covers nothing.
- */
-function PageLoader() {
-  return (
-    <div data-testid="page-loader" className="min-h-screen flex items-center justify-center" style={{ background: "#060D1F" }}>
-      <div className="w-8 h-8 border-2 border-[#00DFC8] border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
 }
 
 /**
@@ -942,13 +797,20 @@ function Router({ deviceClass }: { deviceClass: DeviceClass }) {
       {(transitionLocation) => (
         <>
           <GA4PageTracker />
-          <Suspense fallback={<PageLoader />}>
+          {/* Every mobile and public route hangs off this one Suspense, and
+              until Step 4 there was no boundary above it: a chunk that 404'd
+              after a deploy rolled its hash unmounted the tree and left a blank
+              screen, and a chunk that hung left the spinner up forever. The
+              reset key is the location, so a route whose chunk is genuinely
+              broken cannot hold the rest of the app hostage — navigating away
+              clears the failure. */}
+          <ChunkBoundary slot="route" resetKey={transitionLocation}>
             <RouteTable
               location={transitionLocation}
               deviceClass={deviceClass}
               merchantMode={merchantMode}
             />
-          </Suspense>
+          </ChunkBoundary>
         </>
       )}
     </PageTransition>
@@ -1119,12 +981,26 @@ function AppRoutes() {
   // Only warm app chunks for signed-in merchants — marketing visitors on the
   // landing page shouldn't download the entire app in the background.
   const { auth } = useContext(AuthContext);
+  const [location] = useLocation();
   const deviceClass = useDeviceClass();
   useRoutePreload(auth?.isAuthenticated === true, deviceClass);
   const tutorialEnabled = auth?.isAuthenticated === true && auth.role !== "admin" && !!auth.merchantId && auth.onboardingCompleted === true;
   return (
     <TutorialProvider enabled={tutorialEnabled}>
-      <Router deviceClass={deviceClass} />
+      {/* The backstop, above the router rather than inside it, because the
+          router itself renders things the route-level boundary cannot cover:
+          the landing page and the desktop chrome branch both live outside that
+          Suspense. Nothing below this point may take the whole window down to
+          a white screen.
+
+          No Suspense here on purpose — an extra one above the router would let
+          any stray suspension replace the entire app with a loader instead of
+          resolving inside the boundary that owns it. BottomNavigation stays a
+          sibling, so on mobile there is still a way to navigate out of a
+          failure, which is what clears the reset key. */}
+      <ChunkErrorBoundary slot="route" resetKey={location}>
+        <Router deviceClass={deviceClass} />
+      </ChunkErrorBoundary>
       {deviceClass === "mobile" && <BottomNavigation />}
     </TutorialProvider>
   );

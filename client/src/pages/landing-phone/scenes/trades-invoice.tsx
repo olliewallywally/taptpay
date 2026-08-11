@@ -18,10 +18,12 @@
  * JobsHome and its TP_TERM_CSS block). Nothing here is stateful, timed, or
  * capable of a side effect: the frame is a pure function of `step`.
  */
+import { Fragment } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { SceneDefinition, SceneProps } from '../types';
 import { BLUE, FONT, GREEN, NAVY, NAVY_35, NAVY_50, OFFW, fmt } from '../tokens';
-import { Amount, Ic, Keypad, Screen, SubHead } from '../primitives';
+import { Amount, Ic, Keypad, Press, Screen, SubHead } from '../primitives';
+import { BEAT_MS, DWELL_MS, HOLD_MS, TAP_MS } from '../reducer';
 import { TRADES } from '../fixtures';
 
 /* ── icons the terminal's chrome needs and primitives.Ic does not carry ───── */
@@ -89,10 +91,14 @@ export function TradesSubBar({ active = -1, top }: { active?: number; top: numbe
 }
 
 /** Production `.tp-fab` — sits on the 50% boundary of the jobs home. */
-function Fab() {
+function Fab({ tap = false, seq = 0 }: { tap?: boolean; seq?: number }) {
   return (
-    <div className="lp-fab" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 30, color: OFFW }} aria-hidden>
-      <Ic.Plus size={30} />
+    <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 30 }}>
+      <Press on={tap} seq={seq} radius={48}>
+        <div className="lp-fab" style={{ color: OFFW }} aria-hidden>
+          <Ic.Plus size={30} />
+        </div>
+      </Press>
     </div>
   );
 }
@@ -120,8 +126,9 @@ function Field({ value, placeholder, style }: { value?: string; placeholder?: st
 }
 
 /** Production `.tp-cta` / `.tp-cta-wire`. */
-function Cta({ label, wire = false, dim = false, pressed = false, style }: { label: string; wire?: boolean; dim?: boolean; pressed?: boolean; style?: CSSProperties }) {
+function Cta({ label, wire = false, dim = false, pressed = false, style, tap = false, seq = 0 }: { label: string; wire?: boolean; dim?: boolean; pressed?: boolean; style?: CSSProperties; tap?: boolean; seq?: number }) {
   return (
+    <Press on={tap} seq={seq} radius={54}>
     <div
       className="lp-t"
       style={{
@@ -134,6 +141,7 @@ function Cta({ label, wire = false, dim = false, pressed = false, style }: { lab
     >
       {label}
     </div>
+    </Press>
   );
 }
 
@@ -142,7 +150,7 @@ const INITIALS = TRADES.client.name.split(' ').map((w) => w[0]).join('').toUpper
 /* ── screens ──────────────────────────────────────────────────────────────── */
 
 /** Steps 0–1 — production ChooseClient, entered from the invoice flow. */
-function ChooseClient({ picked }: { picked: boolean }) {
+function ChooseClient({ picked, tap = false, seq = 0 }: { picked: boolean; tap?: boolean; seq?: number }) {
   return (
     <div style={LAYER}>
       <div style={PANEL}>
@@ -159,7 +167,7 @@ function ChooseClient({ picked }: { picked: boolean }) {
           <span style={{ fontWeight: 500, fontSize: 14, color: 'rgba(244,244,244,0.45)' }}>search clients or site</span>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'stretch' }}>
           {/* "no client — just enter their details": the Quick Invoice entry. */}
           <div style={{ background: 'rgba(88,171,255,0.1)', border: '1.5px dashed rgba(88,171,255,0.45)', borderRadius: 18, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 13 }}>
             <div style={{ width: 38, height: 38, borderRadius: 999, border: `1.5px solid ${BLUE}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: BLUE }}>
@@ -172,8 +180,10 @@ function ChooseClient({ picked }: { picked: boolean }) {
           </div>
 
           {/* The fixed client. `picked` draws the tap the script is performing. */}
+          <Press on={tap} seq={seq} radius={40} style={{ display: 'flex' }}>
           <div
             className="lp-t"
+            data-role="client-row"
             style={{
               background: picked ? 'rgba(88,171,255,0.18)' : 'rgba(255,255,255,0.06)',
               border: `1px solid ${picked ? BLUE : 'rgba(88,171,255,0.15)'}`,
@@ -188,6 +198,7 @@ function ChooseClient({ picked }: { picked: boolean }) {
             </div>
             <div style={{ fontWeight: 700, fontSize: 14, color: OFFW, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>—</div>
           </div>
+          </Press>
         </div>
       </div>
 
@@ -197,13 +208,13 @@ function ChooseClient({ picked }: { picked: boolean }) {
 }
 
 /** Step 2 — production AmountKeypad with the client carried through. */
-function AmountKeypad() {
+function AmountKeypad({ cents = TRADES.invoiceCents, hit, seq = 0, tapCommit = false }: { cents?: number; hit?: string; seq?: number; tapCommit?: boolean }) {
   return (
     <div style={LAYER}>
       <div style={PANEL}>
-        <SubHead commitReady />
+        <SubHead commitReady={cents > 0} tapCommit={tapCommit} seq={seq} />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <Amount cents={TRADES.invoiceCents} style={{ marginTop: 18 }} />
+          <Amount cents={cents} style={{ marginTop: 18 }} />
           <div style={{ fontWeight: 500, fontSize: 15, color: NAVY_50, paddingBottom: 8 }}>
             {`${TRADES.client.name} · ${TRADES.client.site}`}
           </div>
@@ -212,7 +223,7 @@ function AmountKeypad() {
       </div>
 
       <div style={{ ...LOWER, padding: '38px 28px 28px' }}>
-        <Keypad hit="0" />
+        <Keypad hit={hit} seq={seq} />
       </div>
 
       <TradesSubBar top={365} />
@@ -221,7 +232,7 @@ function AmountKeypad() {
 }
 
 /** Steps 3–4 — production QuickInvoice composer for a selected client. */
-function Composer({ sending }: { sending: boolean }) {
+function Composer({ sending, tapSend = false, seq = 0 }: { sending: boolean; tapSend?: boolean; seq?: number }) {
   return (
     <div style={LAYER}>
       <div style={PANEL}>
@@ -262,7 +273,7 @@ function Composer({ sending }: { sending: boolean }) {
 
         <div style={{ flex: 1 }} />
 
-        <Cta label={sending ? 'sending…' : 'send invoice'} dim={sending} pressed={sending} style={{ minWidth: 220, flexShrink: 0 }} />
+        <Cta label={sending ? 'sending…' : 'send invoice'} dim={sending} pressed={sending} tap={tapSend} seq={seq} style={{ minWidth: 220, flexShrink: 0 }} />
       </div>
 
       <TradesSubBar active={2} top={365} />
@@ -297,7 +308,7 @@ function SentSuccess() {
 }
 
 /** Steps 6–7 — production JobsHome: the invoice lands, then settles. */
-function JobsHome({ paid }: { paid: boolean }) {
+export function JobsHome({ paid, tapFab = false, seq = 0 }: { paid: boolean; tapFab?: boolean; seq?: number }) {
   return (
     <div style={LAYER}>
       <div style={{ background: NAVY, height: '50%', padding: '100px 28px 28px', display: 'flex', flexDirection: 'column', flexShrink: 0, boxSizing: 'border-box' }}>
@@ -324,7 +335,7 @@ function JobsHome({ paid }: { paid: boolean }) {
         </div>
       </div>
 
-      <Fab />
+      <Fab tap={tapFab} seq={seq} />
       <TradesSubBar top={489} />
     </div>
   );
@@ -332,21 +343,54 @@ function JobsHome({ paid }: { paid: boolean }) {
 
 /* ── scene ────────────────────────────────────────────────────────────────── */
 
+/* ── the session ──────────────────────────────────────────────────────────
+   Opens on the jobs home — where a tradie actually opens the app, and where the
+   outstanding total lives — then raises an invoice from it and returns there to
+   watch it settle. Every screen change is preceded by a visible press. */
+
+const INV_KEYS = ['4', '8', '0', '0', '0'] as const;
+/** $0.04 → $0.48 → $4.80 → $48.00 → $480.00, filling right to left. */
+const INV_AMOUNTS = [4, 48, 480, 4800, 48000];
+
+type Frame = { ms: number; screen: string; render: (seq: number) => ReactNode };
+
+const FRAMES: Frame[] = [
+  { ms: BEAT_MS, screen: 'jobs', render: () => <JobsHome paid={false} /> },
+  { ms: TAP_MS, screen: 'jobs', render: (seq) => <JobsHome paid={false} tapFab seq={seq} /> },
+  { ms: BEAT_MS, screen: 'client', render: () => <ChooseClient picked={false} /> },
+  { ms: TAP_MS, screen: 'client', render: (seq) => <ChooseClient picked={false} tap seq={seq} /> },
+  { ms: 480, screen: 'client', render: () => <ChooseClient picked /> },
+  { ms: 440, screen: 'keypad', render: () => <AmountKeypad cents={0} /> },
+  ...INV_KEYS.map((k, i) => ({
+    ms: TAP_MS,
+    screen: 'keypad',
+    render: (seq: number) => <AmountKeypad cents={INV_AMOUNTS[i]} hit={k} seq={seq} />,
+  })),
+  { ms: DWELL_MS, screen: 'keypad', render: () => <AmountKeypad /> },
+  { ms: TAP_MS, screen: 'keypad', render: (seq) => <AmountKeypad tapCommit seq={seq} /> },
+  { ms: DWELL_MS, screen: 'composer', render: () => <Composer sending={false} /> },
+  { ms: TAP_MS, screen: 'composer', render: (seq) => <Composer sending={false} tapSend seq={seq} /> },
+  { ms: 620, screen: 'composer', render: () => <Composer sending /> },
+  { ms: DWELL_MS, screen: 'sent', render: () => <SentSuccess /> },
+  // Back on the jobs home: the invoice is out, then the client pays it.
+  { ms: DWELL_MS, screen: 'jobs-after', render: () => <JobsHome paid={false} /> },
+  { ms: HOLD_MS, screen: 'jobs-after', render: () => <JobsHome paid /> },
+];
+
 function TradesInvoice({ step }: SceneProps) {
+  const i = Math.min(Math.max(step, 0), FRAMES.length - 1);
+  const frame = FRAMES[i];
   return (
     <Screen>
-      {step <= 1 && <ChooseClient picked={step === 1} />}
-      {step === 2 && <AmountKeypad />}
-      {(step === 3 || step === 4) && <Composer sending={step === 4} />}
-      {step === 5 && <SentSuccess />}
-      {step >= 6 && <JobsHome paid={step >= 7} />}
+      <Fragment key={frame.screen}>{frame.render(i)}</Fragment>
     </Screen>
   );
 }
 
 export const tradesInvoiceScene: SceneDefinition = {
   id: 'trades-invoice',
-  steps: 8,
+  steps: FRAMES.length,
+  beats: FRAMES.map((f) => f.ms),
   label: 'emergency callout invoice for $480 sent',
   Component: TradesInvoice,
 };

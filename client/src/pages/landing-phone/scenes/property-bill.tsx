@@ -19,9 +19,12 @@
  * The Property chrome (action bar, tenant picker, keypad, confirmation, CTA)
  * comes from rent-weekly.tsx so the two Property scenes ship one copy of it.
  */
+import { Fragment } from 'react';
+import type { ReactNode } from 'react';
 import type { SceneDefinition, SceneProps } from '../types';
 import { BLUE, GREEN, NAVY, NAVY_50, OFFW, fmt } from '../tokens';
-import { BottomHalf, Ic, Screen, SubHead, TopHalf } from '../primitives';
+import { BottomHalf, Ic, Press, Screen, SubHead, TopHalf } from '../primitives';
+import { BEAT_MS, DWELL_MS, HOLD_MS, TAP_MS } from '../reducer';
 import { PROPERTY } from '../fixtures';
 import {
   ActionBar,
@@ -46,7 +49,7 @@ const CHARGE_LABEL = 'Water / utilities';
 const DUE_ACTIVE = PROPERTY.billDue.replace('due ', '');
 
 /** ChargeBill — what for, description, invoice document, due. */
-function BillCompose({ step }: { step: number }) {
+function BillCompose({ step, tapSend = false, seq = 0 }: { step: number; tapSend?: boolean; seq?: number }) {
   const doc = step >= 4;
   return (
     <Screen>
@@ -121,7 +124,7 @@ function BillCompose({ step }: { step: number }) {
 
         <div style={{ flex: 1 }} />
         <div style={{ flexShrink: 0, padding: '8px 0 14px', display: 'flex', justifyContent: 'center' }}>
-          <WireCta label="send bill" filled={step >= 5} />
+          <WireCta label="send bill" filled={step >= 5} tap={tapSend} seq={seq} />
         </div>
       </BottomHalf>
       <ActionBar active="bill" />
@@ -156,7 +159,7 @@ const FILTERS = ['all', 'overdue', 'sent', 'paid', 'failed'];
 /** RequestsHome — the terminal's resting surface. It opens the scene (tapping
  *  `bill` is the expense intent) and closes it, because it is also where the
  *  tenant's bill visibly settles from sent to paid. */
-function HomeScreen({ bill, active }: { bill?: 'sent' | 'paid'; active?: string }) {
+export function HomeScreen({ bill, active, tapFab = false, tapBar, seq = 0 }: { bill?: 'sent' | 'paid'; active?: string; tapFab?: boolean; tapBar?: string; seq?: number }) {
   return (
     <Screen background={OFFW}>
       <div style={{ background: NAVY, height: '40%', padding: '86px 28px 24px', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
@@ -189,27 +192,62 @@ function HomeScreen({ bill, active }: { bill?: 'sent' | 'paid'; active?: string 
 
       {/* the home overlay: new-request FAB over the boundary, action bar below */}
       <div style={{ position: 'absolute', top: '40%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 30 }}>
-        <div className="lp-fab"><Ic.Plus size={30} /></div>
+        <Press on={tapFab} seq={seq} radius={48}>
+          <div className="lp-fab"><Ic.Plus size={30} /></div>
+        </Press>
       </div>
-      <ActionBar top="calc(40% + 67px)" send active={active} />
+      <ActionBar top="calc(40% + 67px)" send active={active} tap={tapBar} seq={seq} />
     </Screen>
   );
 }
 
+/* ── the session ──────────────────────────────────────────────────────────
+   Opens on the property terminal home — outstanding rent and expenses, which is
+   what a manager opens the app to see — then raises a water bill from it and
+   returns there to watch it settle. Every screen change is preceded by a press. */
+
+const BILL_KEYS = ['8', '6', '4', '0'] as const;
+/** $0.08 → $0.86 → $8.64 → $86.40, filling right to left. */
+const BILL_AMOUNTS = [8, 86, 864, 8640];
+
+type Frame = { ms: number; screen: string; render: (seq: number) => ReactNode };
+
+const FRAMES: Frame[] = [
+  { ms: BEAT_MS, screen: 'home', render: () => <HomeScreen /> },
+  // Tap "bill" on the action bar — the expense intent.
+  { ms: TAP_MS, screen: 'home', render: (seq) => <HomeScreen tapBar="bill" seq={seq} /> },
+  { ms: 480, screen: 'home', render: () => <HomeScreen active="bill" /> },
+  { ms: BEAT_MS, screen: 'tenant', render: () => <TenantPicker selected={false} amount={PROPERTY.rentCents} /> },
+  { ms: TAP_MS, screen: 'tenant', render: (seq) => <TenantPicker selected={false} amount={PROPERTY.rentCents} tap seq={seq} /> },
+  { ms: 480, screen: 'tenant', render: () => <TenantPicker selected amount={PROPERTY.rentCents} /> },
+  { ms: 440, screen: 'amount', render: () => <AmountScreen cents={0} /> },
+  ...BILL_KEYS.map((k, i) => ({
+    ms: TAP_MS,
+    screen: 'amount',
+    render: (seq: number) => <AmountScreen cents={BILL_AMOUNTS[i]} hit={k} seq={seq} />,
+  })),
+  { ms: DWELL_MS, screen: 'amount', render: () => <AmountScreen cents={PROPERTY.billCents} /> },
+  { ms: TAP_MS, screen: 'amount', render: (seq) => <AmountScreen cents={PROPERTY.billCents} tapCommit seq={seq} /> },
+  // The composer fills in: charge type, description, then the attached invoice.
+  { ms: BEAT_MS, screen: 'compose', render: () => <BillCompose step={3} /> },
+  { ms: DWELL_MS, screen: 'compose', render: () => <BillCompose step={4} /> },
+  { ms: TAP_MS, screen: 'compose', render: (seq) => <BillCompose step={4} tapSend seq={seq} /> },
+  { ms: DWELL_MS, screen: 'sent', render: () => <SuccessScreen cents={PROPERTY.billCents} title="bill sent" /> },
+  // Back home: the bill is outstanding, then the tenant pays it.
+  { ms: DWELL_MS, screen: 'home-after', render: () => <HomeScreen bill="sent" /> },
+  { ms: HOLD_MS, screen: 'home-after', render: () => <HomeScreen bill="paid" /> },
+];
+
 function PropertyBill({ step }: SceneProps) {
-  /* 0 opens bill mode from the terminal home; the no-tenant prompt production
-     shows next is folded into the tenant pick at step 1. */
-  if (step === 0) return <HomeScreen active="bill" />;
-  if (step === 1) return <TenantPicker selected amount={PROPERTY.rentCents} />;
-  if (step === 2) return <AmountScreen cents={PROPERTY.billCents} hit="0" />;
-  if (step <= 5) return <BillCompose step={step} />;
-  if (step === 6) return <SuccessScreen cents={PROPERTY.billCents} title="bill sent" />;
-  return <HomeScreen bill={step >= 8 ? 'paid' : 'sent'} />;
+  const i = Math.min(Math.max(step, 0), FRAMES.length - 1);
+  const frame = FRAMES[i];
+  return <Fragment key={frame.screen}>{frame.render(i)}</Fragment>;
 }
 
 export const propertyBillScene: SceneDefinition = {
   id: 'property-bill',
-  steps: 9,
+  steps: FRAMES.length,
+  beats: FRAMES.map((f) => f.ms),
   label: 'water bill for $86.40 sent and paid',
   Component: PropertyBill,
 };

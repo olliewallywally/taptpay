@@ -26,8 +26,8 @@ export type LandingPhoneState = {
 };
 
 /**
- * Scenes render from `step` alone. They hold no state of their own, so any
- * scroll position — forward, backward, or jumped — produces the same frame.
+ * Scenes render from step alone. Scroll selects the scene; the autoplay driver
+ * advances its step from beats while the scene is visible.
  */
 export type SceneProps = {
   step: number;
@@ -39,6 +39,12 @@ export type SceneDefinition = {
   id: LandingPhoneScene;
   /** Milestone count. `step` runs 0 … steps - 1. */
   steps: number;
+  /**
+   * Optional authoring metadata, one emphasis duration per step. The autoplay
+   * controller consumes these durations after scroll selects the scene.
+   *
+   */
+  beats?: readonly number[];
   /** Announced politely when the scene reaches its final milestone. */
   label: string;
   Component: ComponentType<SceneProps>;

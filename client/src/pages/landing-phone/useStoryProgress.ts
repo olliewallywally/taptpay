@@ -41,6 +41,35 @@ export function useApproaching<T extends Element>(margin = '600px'): [React.RefO
 }
 
 /**
+ * Whether the element is on screen right now.
+ *
+ * Unlike `useApproaching` this flips both ways and lets Save-Data wait for true
+ * visibility before fetching. Scroll progress itself cannot be gated on it: a
+ * jump straight past the story can cross no observer threshold, which would
+ * leave the phone stranded on a stale frame.
+ *
+ */
+export function useOnScreen<T extends Element>(ref: React.RefObject<T>): boolean {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      setVisible(true);
+      return;
+    }
+    const io = new IntersectionObserver((entries) => {
+      setVisible(entries.some((e) => e.isIntersecting));
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [ref]);
+
+  return visible;
+}
+
+/**
  * Progress of an element through the viewport, 0 → 1.
  *
  * Rounded to a small grid before it reaches React: the scene controller only

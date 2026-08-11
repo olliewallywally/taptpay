@@ -31,15 +31,65 @@ export const Ic = {
   Send: (p?: { size?: number }) => svg(<path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />, p?.size ?? 14, 2.2),
 };
 
+/* ── the press ─────────────────────────────────────────────────────────────
+   A viewer has to *see* the finger land, or the screen appears to change by
+   itself and the demo stops reading as somebody using the app.
+
+   The ripple is rendered by the control being pressed rather than positioned
+   over it from a coordinate table: a table would silently drift the moment a
+   screen's padding changed, and there is no layout measurement here to keep it
+   honest. */
+
+/**
+ * Wraps a control so a press on it is visible: the control sinks, and a ripple
+ * expands from its centre.
+ *
+ * `seq` keys the ripple so a repeated press on the *same* control — typing 2, 2
+ * on the keypad — restarts the animation instead of React reusing a finished
+ * one and showing nothing.
+ */
+export function Press({ on = false, seq = 0, radius, children, style }: {
+  on?: boolean;
+  seq?: number;
+  /** Ripple size; defaults to covering a typical 56px control. */
+  radius?: number;
+  children: ReactNode;
+  style?: CSSProperties;
+}) {
+  return (
+    <span
+      className="lp-press"
+      data-pressed={on ? '1' : undefined}
+      style={{ transform: on ? 'scale(0.94)' : undefined, ...style }}
+    >
+      {children}
+      {on && (
+        <span
+          key={seq}
+          className="lp-tap"
+          aria-hidden
+          style={radius ? { width: radius * 2, height: radius * 2, marginLeft: -radius, marginTop: -radius } : undefined}
+        />
+      )}
+    </span>
+  );
+}
+
 /* ── screen shell ───────────────────────────────────────────────────────── */
 
 /**
  * The terminal's two-part screen: an off-white working half over a navy half.
  * `topHeight` matches the production `height: 50%` unless a scene overrides it.
  */
+/**
+ * Carries `lp-screen-in`, so a screen arrives rather than cuts. It replays only
+ * when the element is remounted, which is why scenes key their frames on the
+ * screen's identity: typing four digits must not re-animate the keypad, but
+ * leaving the keypad for the next screen must.
+ */
 export function Screen({ children, background = NAVY, style }: { children: ReactNode; background?: string; style?: CSSProperties }) {
   return (
-    <div className="lp-screen" style={{ background, color: NAVY, ...style }}>
+    <div className="lp-screen lp-screen-in" style={{ background, color: NAVY, ...style }}>
       {children}
     </div>
   );
@@ -62,13 +112,22 @@ export function BottomHalf({ children, padding = '38px 28px 28px' }: { children:
 }
 
 /** Cancel / commit header used by every compose screen. */
-export function SubHead({ commitReady = false }: { commitReady?: boolean }) {
+export function SubHead({ commitReady = false, tapCommit = false, tapCancel = false, seq = 0 }: {
+  commitReady?: boolean;
+  tapCommit?: boolean;
+  tapCancel?: boolean;
+  seq?: number;
+}) {
   return (
     <div className="lp-subhead">
-      <div className="lp-subhead-btn"><Ic.Close size={18} /></div>
-      <div className="lp-subhead-btn" style={{ borderColor: commitReady ? NAVY : 'rgba(4,13,109,0.25)', color: commitReady ? NAVY : NAVY_25 }}>
-        <Ic.Check size={18} />
-      </div>
+      <Press on={tapCancel} seq={seq} radius={32}>
+        <div className="lp-subhead-btn"><Ic.Close size={18} /></div>
+      </Press>
+      <Press on={tapCommit} seq={seq} radius={32}>
+        <div className="lp-subhead-btn" style={{ borderColor: commitReady ? NAVY : 'rgba(4,13,109,0.25)', color: commitReady ? NAVY : NAVY_25 }}>
+          <Ic.Check size={18} />
+        </div>
+      </Press>
     </div>
   );
 }
@@ -95,18 +154,23 @@ export function Amount({ cents, size = 82, color, muted = false, style }: { cent
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
 /**
- * The 3×4 keypad. `hit` lights the key the script is currently pressing —
- * the demo shows the press, it does not simulate a real one.
+ * The 3×4 keypad. `hit` lights the key the script is currently pressing and
+ * ripples on it — the demo shows the press, it does not simulate a real one.
  */
-export function Keypad({ hit }: { hit?: string }) {
+export function Keypad({ hit, seq = 0, tapBack = false }: { hit?: string; seq?: number; tapBack?: boolean }) {
+  const key = (d: string) => (
+    <Press key={d} on={hit === d} seq={seq} radius={36}>
+      <div className={`lp-kp lp-t${hit === d ? ' hit' : ''}`}>{d}</div>
+    </Press>
+  );
   return (
     <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, alignItems: 'center', justifyItems: 'center' }}>
-      {KEYS.map((d) => (
-        <div key={d} className={`lp-kp lp-t${hit === d ? ' hit' : ''}`}>{d}</div>
-      ))}
+      {KEYS.map(key)}
       <div className="lp-kp" style={{ visibility: 'hidden' }} aria-hidden />
-      <div className={`lp-kp lp-t${hit === '0' ? ' hit' : ''}`}>0</div>
-      <div className="lp-kp outline"><Ic.Back size={22} /></div>
+      {key('0')}
+      <Press on={tapBack} seq={seq} radius={36}>
+        <div className="lp-kp outline"><Ic.Back size={22} /></div>
+      </Press>
     </div>
   );
 }

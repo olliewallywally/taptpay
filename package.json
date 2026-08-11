@@ -11,6 +11,7 @@
     "test": "jest",
     "test:client": "jest --selectProjects client",
     "test:server": "jest --selectProjects server --runInBand",
+    "verify:landing-demo-boundary": "node scripts/verify-landing-demo-boundary.mjs",
     "test:server:postgres": "node --test scripts/postgres-verifier-safety.test.mjs && node scripts/verify-server-postgres.mjs",
     "test:server:postgres:safety": "node --test scripts/postgres-verifier-safety.test.mjs",
     "db:push": "drizzle-kit push",

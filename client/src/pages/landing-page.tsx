@@ -3,11 +3,8 @@
 import { useEffect, useState } from 'react';
 import './landing.css';
 import { PLANS, formatPlanPrice } from "@shared/plans";
-import { LandingPhoneMount } from './landing-phone/LandingPhoneMount';
-// Pure data, no runtime: importing scenes/registry here would pull all eight
-// scenes and every primitive into the main landing chunk and break the "zero
-// phone bytes before the story approaches" budget (plan §6).
-import { INDUSTRY_SCENE, SCENE_STEPS, isIndustryKey, type IndustryKey } from './landing-phone/manifest';
+import { DeferredLandingPhone, INDUSTRY_PHONE, isIndustryKey, type IndustryKey } from './DeferredLandingPhone';
+import { LandingCoinField } from './landing-phone/LandingCoinField';
 
 export interface LandingPageProps {
   /** hero coin density (0.4–2) */
@@ -51,20 +48,14 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
   }, []);
 
   useEffect(() => {
-    // The runtime pulls in three.js (~1.2 MB min), so it's loaded on demand:
-    // the static markup paints immediately and the scroll/3D rig attaches a
-    // beat later. Keeping it out of the entry chunk means app users who never
-    // see the landing page never download three.js.
     let cancelled = false;
+    let runtime = null;
     import('./landingRuntime').then(({ LandingRuntime }) => {
       if (cancelled) return;
-      const rt = new LandingRuntime({ coinDensity, defaultIndustry, reducedMotion });
-      rt.init();
+      runtime = new LandingRuntime({ coinDensity, defaultIndustry, reducedMotion });
+      runtime.init();
     });
-    // Prototype parity: the runtime registers window-level listeners and rAF
-    // loops once and does not tear down — mount this page once per app load.
-    // The cancelled flag only guards the unmount-before-load race.
-    return () => { cancelled = true; };
+    return () => { cancelled = true; runtime?.destroy(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -148,7 +139,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
         {' '}
         <div style={{ position: "absolute", bottom: "-25vh", left: "-18vw", width: "55vw", height: "55vw", borderRadius: "50%", background: "radial-gradient(circle,rgba(94,157,255,0.16) 0%,rgba(94,157,255,0) 65%)", pointerEvents: "none" }} />
         {' '}
-        <canvas id="tp-coins" style={{ position: "fixed", inset: "0", width: "100%", height: "100%", display: "block", pointerEvents: "none", zIndex: "0" }} />
+        <LandingCoinField density={coinDensity} reducedMotion={reducedMotion} />
         {' '}
         <div id="tp-hero-content" style={{ position: "relative", zIndex: "4", padding: "0 clamp(20px,7vw,9vw)", maxWidth: "1100px", willChange: "transform,opacity" }}>
           {' '}
@@ -246,23 +237,21 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
                 {' '}
                 <div id="tp-cine-turn" style={{ willChange: "transform" }}>
                   {' '}
-                  <div id="tp3" style={{ position: "relative", width: "clamp(190px,29vh,306px)", aspectRatio: "473/969" }}>
+                  <div id="tp3" style={{ position: "relative", width: "clamp(190px,29vh,306px)", aspectRatio: "473/969", borderRadius: "13%/6.1%", background: "transparent", boxShadow: "0 42px 90px rgba(0,0,0,.48)" }}>
                     {' '}
                     <div style={{ position: "absolute", left: "50%", top: "103%", width: "130%", height: "24%", transform: "translate(-50%,-50%)", background: "radial-gradient(ellipse 50% 50% at 50% 50%,rgba(1,3,34,0.6) 0%,rgba(1,3,34,0) 70%)", pointerEvents: "none" }} />
-                    {' '}
-                    <canvas id="tp3-gl" style={{ position: "absolute", left: "50%", top: "50%", width: "230%", height: "124%", transform: "translate(-50%,-50%)", pointerEvents: "none" }} />
                     {' '}
                     <div id="tp3-css" style={{ position: "absolute", inset: "0", perspective: "1100px", perspectiveOrigin: "50% 50%" }}>
                       {' '}
                       <div id="tp3-spin" style={{ position: "absolute", inset: "0", transformStyle: "preserve-3d", willChange: "transform" }}>
                         {' '}
-                        <div id="tp3-face" style={{ position: "absolute", inset: "0", backfaceVisibility: "hidden" }}>
+                        <div id="tp3-face" style={{ position: "absolute", inset: "0", backfaceVisibility: "hidden", background: "transparent url('/assets/shell-front.webp') center/100% 100% no-repeat" }}>
                           {' '}
                           <div style={{ position: "absolute", left: "2.75%", right: "2.54%", top: "0.83%", bottom: "0.83%", borderRadius: "13%/6.1%", background: "#050508" }} />
                           {' '}
                           <div className="tp-phone-scale" style={{ position: "absolute", left: "4.4%", right: "4.2%", top: "1.75%", bottom: "1.75%", borderRadius: "11%/5.2%", overflow: "hidden", background: "#fff" }}>
                             {' '}
-                            <LandingPhoneMount variant="cinematic" bare storySelector="#tp-story-wrap" className="tp-app-frame" style={{ pointerEvents: "none", display: "block" }} />
+                            <DeferredLandingPhone variant="cinematic" bare reducedMotion={reducedMotion} storySelector="#tp-story-wrap" className="tp-app-frame" style={{ pointerEvents: "none", display: "block" }} />
                             {' '}
                           </div>
                           {' '}
@@ -279,6 +268,16 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
                           </div>
                           {' '}
                         </div>
+                        {' '}
+                        <div id="tp3-edge-left" aria-hidden style={{ position: "absolute", left: "-5.5%", top: "5%", width: "11%", height: "90%", borderRadius: "40% 0 0 40%", background: "linear-gradient(90deg,#07104a,#162a83 45%,#080b19)", transform: "rotateY(-90deg)", transformOrigin: "100% 50%", backfaceVisibility: "hidden" }} />
+                        {' '}
+                        <div id="tp3-edge-right" aria-hidden style={{ position: "absolute", right: "-5.5%", top: "5%", width: "11%", height: "90%", borderRadius: "0 40% 40% 0", background: "linear-gradient(90deg,#080b19,#162a83 55%,#07104a)", transform: "rotateY(90deg)", transformOrigin: "0 50%", backfaceVisibility: "hidden" }} />
+                        {' '}
+                        <div id="tp3-edge-top" aria-hidden style={{ position: "absolute", left: "5%", top: "-5.5%", width: "90%", height: "11%", borderRadius: "40% 40% 0 0", background: "linear-gradient(180deg,#07104a,#162a83 55%,#080b19)", transform: "rotateX(90deg)", transformOrigin: "50% 100%", backfaceVisibility: "hidden" }} />
+                        {' '}
+                        <div id="tp3-edge-bottom" aria-hidden style={{ position: "absolute", left: "5%", bottom: "-5.5%", width: "90%", height: "11%", borderRadius: "0 0 40% 40%", background: "linear-gradient(180deg,#080b19,#162a83 45%,#07104a)", transform: "rotateX(-90deg)", transformOrigin: "50% 0", backfaceVisibility: "hidden" }} />
+                        {' '}
+                        <div id="tp3-back" aria-hidden style={{ position: "absolute", inset: "1% 2.6%", borderRadius: "13%/6.1%", backfaceVisibility: "hidden", transform: "rotateY(180deg)", background: "#080b19 url('/assets/shell-back.webp') center/cover no-repeat", boxShadow: "inset 0 0 0 2px rgba(160,183,230,.45)" }} />
                         {' '}
                       </div>
                       {' '}
@@ -409,7 +408,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
           {' '}
         </div>
         {' '}
-        <div className="tp-rev" style={{ position: "relative", zIndex: "2", marginTop: "44px", display: "inline-flex", padding: "5px", borderRadius: "9999px", background: "rgba(244,241,232,0.05)", border: "1px solid rgba(244,241,232,0.12)", gap: "5px", flexWrap: "wrap" }}>
+              <div className="tp-rev" style={{ position: "relative", zIndex: "2", marginTop: "44px", display: "inline-flex", padding: "5px", borderRadius: "9999px", background: "rgba(244,241,232,0.05)", border: "1px solid rgba(244,241,232,0.12)", gap: "8px", flexWrap: "wrap" }}>
           {' '}
           <button id="tp-tab-property" className="tp-tab" data-ind="property" style={{ padding: "13px 26px", borderRadius: "9999px", border: "none", background: "#5E9DFF", color: "#040D6D", fontFamily: "'Outfit'", fontWeight: "600", fontSize: "14px", cursor: "pointer", transition: "background .3s ease,color .3s ease" }}>{"property"}</button>
           {' '}
@@ -433,7 +432,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
               {' '}
               <div>
                 <div id="tp-ind-s1v" style={{ fontFamily: "'Outfit'", fontWeight: "700", fontSize: "clamp(26px,2.6vw,38px)", color: "#5E9DFF" }}>{"$0"}</div>
-                <div id="tp-ind-s1l" style={{ marginTop: "4px", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.5)" }}>{"per transaction"}</div>
+                <div id="tp-ind-s1l" style={{ marginTop: "4px", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.5)" }}>{"TaptPay platform fee"}</div>
               </div>
               {' '}
               <div>
@@ -460,16 +459,16 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
                 {' '}
                 <div className="tp-tilt-inner" style={{ transformStyle: "preserve-3d", transition: "transform .25s ease" }}>
                   {' '}
-                  <div className="tp-phone" style={{ position: "relative", width: "255px", aspectRatio: "390/844", borderRadius: "clamp(32px,4.2vh,46px)", background: "#0b0b14", padding: "clamp(6px,0.9vh,9px)", boxShadow: "0 40px 70px rgba(0,0,0,0.45), inset 0 0 0 2px rgba(120,140,220,0.35)", top: "-114px", height: "545px" }}>
+                  <div className="tp-phone" style={{ position: "relative", width: "255px", aspectRatio: "473/969", borderRadius: "13%/6.1%", background: "#0b0b14", padding: "clamp(6px,0.9vh,9px)", boxShadow: "0 40px 70px rgba(0,0,0,0.45), inset 0 0 0 2px rgba(120,140,220,0.35)" }}>
                     {' '}
                     <div className="tp-phone-scale" style={{ position: "absolute", inset: "clamp(6px,0.9vh,9px)", borderRadius: "clamp(26px,3.4vh,38px)", overflow: "hidden", background: "#fff" }}>
                       {' '}
-                      <LandingPhoneMount variant="industries" bare interactive={industryLive} scene={INDUSTRY_SCENE[industry]} steps={SCENE_STEPS[INDUSTRY_SCENE[industry]]} className="tp-app-frame" style={{ pointerEvents: industryLive ? "auto" : "none", display: "block" }} />
+                      <DeferredLandingPhone variant="industries" bare reducedMotion={reducedMotion} interactive={industryLive} scene={INDUSTRY_PHONE[industry].scene} steps={INDUSTRY_PHONE[industry].steps} className="tp-app-frame" style={{ pointerEvents: industryLive ? "auto" : "none", display: "block" }} />
                       {' '}
                     </div>
                     {' '}
                   </div>
-                  <button className="tp-phone-live" type="button" style={{ padding: "11px 22px", borderRadius: "9999px", border: "1.5px solid #5E9DFF", background: "transparent", color: "#5E9DFF", fontFamily: "'Outfit'", fontWeight: "500", fontSize: "14px", cursor: "pointer", transition: "background .25s ease,color .25s ease", position: "absolute", top: "472px", left: "80px" }}>{"try it live"}</button>
+                  <button className="tp-phone-live" type="button" style={{ marginTop: "4px", padding: "11px 22px", borderRadius: "9999px", border: "1.5px solid #5E9DFF", background: "transparent", color: "#5E9DFF", fontFamily: "'Outfit'", fontWeight: "500", fontSize: "14px", cursor: "pointer", transition: "background .25s ease,color .25s ease", position: "static" }}>{"try it live"}</button>
                   {' '}
                 </div>
                 {' '}

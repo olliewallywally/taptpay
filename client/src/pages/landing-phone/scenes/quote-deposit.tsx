@@ -30,12 +30,14 @@
  * marks the quote viewed, and accepting it mints an invoice. No timers, no
  * state, no effects — the frame is a pure function of `step`.
  */
+import { Fragment } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { SceneDefinition, SceneProps } from '../types';
 import { BLUE, FONT, GREEN, NAVY, NAVY_35, NAVY_50, OFFW, WHITE, fmt } from '../tokens';
-import { Screen, SubHead } from '../primitives';
+import { Press, Screen, SubHead } from '../primitives';
+import { BEAT_MS, DWELL_MS, HOLD_MS, TAP_MS } from '../reducer';
 import { TRADES } from '../fixtures';
-import { TradesSubBar } from './trades-invoice';
+import { JobsHome, TradesSubBar } from './trades-invoice';
 import { includedGstCents } from '@/lib/trades-money';
 
 /* ── quote maths (production semantics, evaluated once at module load) ─────── */
@@ -96,7 +98,7 @@ function Toggle({ on }: { on: boolean }) {
  */
 const SCROLL: readonly number[] = [0, 0, 28, 54, 0];
 
-function QuoteBuilder({ step }: { step: number }) {
+function QuoteBuilder({ step, tapDone = false, seq = 0 }: { step: number; tapDone?: boolean; seq?: number }) {
   const hasLine = step >= 1;
   const deposit = step >= 2;
   const created = step >= 4;
@@ -128,7 +130,9 @@ function QuoteBuilder({ step }: { step: number }) {
               <WireBtn label="download PDF" style={{ width: '100%' }} />
             </div>
             <div style={{ flexShrink: 0, padding: '12px 0 20px', display: 'flex', justifyContent: 'center' }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 220, padding: '14px 36px', borderRadius: 999, background: BLUE, color: OFFW, fontFamily: FONT, fontWeight: 600, fontSize: 15 }}>done</div>
+              <Press on={tapDone} seq={seq} radius={54}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 220, padding: '14px 36px', borderRadius: 999, background: BLUE, color: OFFW, fontFamily: FONT, fontWeight: 600, fontSize: 15 }}>done</div>
+              </Press>
             </div>
           </>
         ) : (
@@ -241,7 +245,7 @@ function CustomerCard({ children, minHeight = 520 }: { children: ReactNode; minH
 }
 
 /** Steps 5–6 — the quote the customer is asked to accept. */
-function CustomerQuote({ confirmStep }: { confirmStep: boolean }) {
+function CustomerQuote({ confirmStep, tap = false, seq = 0 }: { confirmStep: boolean; tap?: boolean; seq?: number }) {
   return (
     <CustomerCard>
       <div style={{ flex: 1, minHeight: 20 }} />
@@ -251,7 +255,9 @@ function CustomerQuote({ confirmStep }: { confirmStep: boolean }) {
       <div style={{ flex: 1, minHeight: 24 }} />
 
       <div style={{ display: 'flex', gap: 12, width: '100%' }}>
-        <div className="lp-t" style={{ ...OUTLINE_BTN, flex: 1 }}>{confirmStep ? 'confirm' : 'view quote'}</div>
+        <Press on={tap} seq={seq} radius={48} style={{ flex: 1 }}>
+          <div className="lp-t" style={{ ...OUTLINE_BTN, flex: 1, width: '100%', boxSizing: 'border-box' }}>{confirmStep ? 'confirm' : 'view quote'}</div>
+        </Press>
         {confirmStep && (
           <div className="lp-t" style={{ background: 'transparent', color: SKY, border: `1.5px solid ${SKY}`, borderRadius: 14, width: 52, height: 52, flex: '0 0 52px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-hidden>
             <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -295,32 +301,45 @@ function DepositCheckout() {
 
 /* ── scene ────────────────────────────────────────────────────────────────── */
 
+/* ── the session ──────────────────────────────────────────────────────────
+   Opens on the trades jobs home, the same surface trades-invoice opens on, then
+   builds a quote from it and follows the quote to the customer, who accepts it
+   and is asked for the deposit. Every screen change is preceded by a press. */
+
+type Frame = { ms: number; screen: string; render: (seq: number) => ReactNode };
+
+const FRAMES: Frame[] = [
+  { ms: BEAT_MS, screen: 'jobs', render: () => <JobsHome paid={false} /> },
+  { ms: TAP_MS, screen: 'jobs', render: (seq) => <JobsHome paid={false} tapFab seq={seq} /> },
+  // The builder fills in: client, then the line item, then the deposit toggle.
+  { ms: BEAT_MS, screen: 'builder', render: () => <QuoteBuilder step={0} /> },
+  { ms: DWELL_MS, screen: 'builder', render: () => <QuoteBuilder step={1} /> },
+  { ms: DWELL_MS, screen: 'builder', render: () => <QuoteBuilder step={2} /> },
+  { ms: BEAT_MS, screen: 'builder', render: () => <QuoteBuilder step={3} /> },
+  { ms: DWELL_MS, screen: 'created', render: () => <QuoteBuilder step={4} /> },
+  { ms: TAP_MS, screen: 'created', render: (seq) => <QuoteBuilder step={4} tapDone seq={seq} /> },
+  // Over to the customer, who opens the quote and accepts it.
+  { ms: DWELL_MS, screen: 'customer', render: () => <CustomerQuote confirmStep={false} /> },
+  { ms: TAP_MS, screen: 'customer', render: (seq) => <CustomerQuote confirmStep={false} tap seq={seq} /> },
+  { ms: DWELL_MS, screen: 'confirm', render: () => <CustomerQuote confirmStep /> },
+  { ms: TAP_MS, screen: 'confirm', render: (seq) => <CustomerQuote confirmStep tap seq={seq} /> },
+  { ms: HOLD_MS, screen: 'deposit', render: () => <DepositCheckout /> },
+];
+
 function QuoteDeposit({ step }: SceneProps) {
-  // §4.5 beat 6 is a crossfade, so both surfaces are mounted across the hand-off
-  // and only their opacity changes. Nothing is scheduled: at any step the pair
-  // of opacities is a pure function of `step`, so a scroll jump in either
-  // direction lands on exactly this frame.
-  const customerOn = step >= 5;
+  const i = Math.min(Math.max(step, 0), FRAMES.length - 1);
+  const frame = FRAMES[i];
   return (
     <Screen>
-      {step <= 5 && (
-        <div className="lp-t" style={{ position: 'absolute', inset: 0, opacity: customerOn ? 0 : 1 }}>
-          <QuoteBuilder step={Math.min(step, 4)} />
-        </div>
-      )}
-      {step >= 4 && step <= 6 && (
-        <div className="lp-t" style={{ position: 'absolute', inset: 0, opacity: customerOn ? 1 : 0 }}>
-          <CustomerQuote confirmStep={step === 6} />
-        </div>
-      )}
-      {step >= 7 && <DepositCheckout />}
+      <Fragment key={frame.screen}>{frame.render(i)}</Fragment>
     </Screen>
   );
 }
 
 export const quoteDepositScene: SceneDefinition = {
   id: 'quote-deposit',
-  steps: 8,
+  steps: FRAMES.length,
+  beats: FRAMES.map((f) => f.ms),
   label: '$1,250 quote confirmed with a $250 deposit requested',
   Component: QuoteDeposit,
 };

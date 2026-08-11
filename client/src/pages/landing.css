@@ -16,5 +16,13 @@ html{scroll-behavior:auto;}
 @keyframes tpPopIn{0%{opacity:0;transform:translateY(52px) scale(0.9);}62%{opacity:1;transform:translateY(-10px) scale(1.02);}82%{transform:translateY(4px) scale(0.995);}100%{opacity:1;transform:translateY(0) scale(1);}}
 @keyframes tpPopOut{0%{opacity:1;transform:translateY(0) scale(1);}28%{opacity:1;transform:translateY(-12px) scale(1.02);}100%{opacity:0;transform:translateY(56px) scale(0.9);}}
 @keyframes tpGlare{0%{transform:translateX(-170%) skewX(-14deg);}100%{transform:translateX(310%) skewX(-14deg);}}
+@keyframes tpCoinDrift{0%{translate:0 0;}50%{translate:7px -12px;}100%{translate:-5px 9px;}}
+.tp-coins{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;}
+.tp-coin{position:absolute;pointer-events:none;transform-style:preserve-3d;filter:drop-shadow(0 10px 12px rgba(1,7,60,.34));}
+.tp-coin svg{display:block;width:100%;height:100%;overflow:visible;}
+.tp-coin-near{filter:drop-shadow(0 16px 18px rgba(1,7,60,.42));}
+.tp-coin-far{filter:blur(.35px) drop-shadow(0 7px 9px rgba(1,7,60,.25));}
+@media (max-width:767px){.tp-coin{scale:.8;}}
 #tp-contact input::placeholder, #tp-contact textarea::placeholder{color:rgba(244,241,232,0.4);}
 #tp-contact input:focus, #tp-contact textarea:focus{border-color:rgba(94,157,255,0.7) !important;background:rgba(244,241,232,0.09) !important;}
+@media (prefers-reduced-motion:reduce){#tp-root *,#tp-root *::before,#tp-root *::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important;scroll-behavior:auto !important;}}

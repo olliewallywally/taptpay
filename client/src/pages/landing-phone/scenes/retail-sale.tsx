@@ -1,13 +1,11 @@
 /**
  * Scene: retail-sale (story card 05) — §4.6 Retail, normal sale
  *
- * Milestones:
- *   0  open the keypad and enter $12.50
- *   1  set "flat white ×2"
- *   2  confirm the sale
- *   3  show the current share/QR state (no working external link)
- *   4  move the item into the payment stack
- *   5  transition awaiting payment → paid
+ * Plays as one continuous session rather than a set of milestones: it opens on
+ * the terminal home, where the merchant actually opens the app, and every screen
+ * change is preceded by a visible press on the control that causes it —
+ * + → keypad → 1 2 5 0 → ✓ → details → confirm → send → QR → stack → paid.
+ * See FRAMES at the bottom; it is the script, in order, with its own timing.
  *
  * Fidelity source: client/src/components/SmartTransitions.jsx — the retail
  * terminal the merchant actually uses (Keypad → EnterDetails → pending home →
@@ -19,10 +17,12 @@
  * active stack, success banner) that retail-split re-uses, so the two retail
  * scenes cost one copy of it rather than two.
  */
+import { Fragment } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { SceneDefinition, SceneProps } from '../types';
 import { BLUE, GREEN, NAVY, OFFW, WHITE } from '../tokens';
-import { BottomHalf, Ic, Keypad, Screen, SubHead, TopHalf } from '../primitives';
+import { BottomHalf, Ic, Keypad, Press, Screen, SubHead, TopHalf } from '../primitives';
+import { BEAT_MS, DWELL_MS, HOLD_MS, TAP_MS } from '../reducer';
 import { RETAIL } from '../fixtures';
 
 /* ── retail money ─────────────────────────────────────────────────────────
@@ -77,16 +77,18 @@ function SubIcon({ id, c }: { id: SubTab; c: string }) {
   );
 }
 
-function SendPill() {
+function SendPill({ tap = false, seq = 0 }: { tap?: boolean; seq?: number }) {
   return (
-    <div className="lp-send">
-      <span className="lp-send-circle">
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke={NAVY} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <line x1="3" y1="8" x2="13" y2="8" /><polyline points="9,4 13,8 9,12" />
-        </svg>
-      </span>
-      <span className="lp-send-label">send</span>
-    </div>
+    <Press on={tap} seq={seq} radius={38}>
+      <div className="lp-send">
+        <span className="lp-send-circle">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke={NAVY} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <line x1="3" y1="8" x2="13" y2="8" /><polyline points="9,4 13,8 9,12" />
+          </svg>
+        </span>
+        <span className="lp-send-label">send</span>
+      </div>
+    </Press>
   );
 }
 
@@ -94,7 +96,7 @@ function SendPill() {
  * `feature` screens park the bar 20px above the panel seam; the home terminal
  * parks it 67px below, beside the send pill when a sale is pending.
  */
-export function SubBar({ active, feature = false, send = false }: { active?: SubTab; feature?: boolean; send?: boolean }) {
+export function SubBar({ active, feature = false, send = false, tapSend = false, seq = 0 }: { active?: SubTab; feature?: boolean; send?: boolean; tapSend?: boolean; seq?: number }) {
   return (
     <div
       style={{
@@ -127,32 +129,43 @@ export function SubBar({ active, feature = false, send = false }: { active?: Sub
           );
         })}
       </div>
-      {send && <SendPill />}
+      {send && <SendPill tap={tapSend} seq={seq} />}
     </div>
   );
 }
 
-/** The + that opens the keypad — centred on the panel seam. */
-export function Fab() {
+/**
+ * The + that opens the keypad — centred on the panel seam.
+ *
+ * The centring transform stays on an outer element: `Press` animates `transform`
+ * to sink the control, and sharing one transform would fight the centring.
+ */
+export function Fab({ tap = false, seq = 0 }: { tap?: boolean; seq?: number }) {
   return (
-    <div className="lp-fab lp-t" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }}>
-      <Ic.Plus size={30} />
+    <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }}>
+      <Press on={tap} seq={seq} radius={48}>
+        <div className="lp-fab lp-t">
+          <Ic.Plus size={30} />
+        </div>
+      </Press>
     </div>
   );
 }
 
 /** Sky pill CTA — "confirm", "copy link". */
-export function Cta({ label, style }: { label: string; style?: CSSProperties }) {
+export function Cta({ label, style, tap = false, seq = 0 }: { label: string; style?: CSSProperties; tap?: boolean; seq?: number }) {
   return (
-    <div
-      className="lp-t"
-      style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '14px 36px', borderRadius: 999,
-        background: BLUE, color: NAVY, fontWeight: 600, fontSize: 15, whiteSpace: 'nowrap', ...style,
-      }}
-    >
-      {label}
-    </div>
+    <Press on={tap} seq={seq} radius={54}>
+      <div
+        className="lp-t"
+        style={{
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '14px 36px', borderRadius: 999,
+          background: BLUE, color: NAVY, fontWeight: 600, fontSize: 15, whiteSpace: 'nowrap', ...style,
+        }}
+      >
+        {label}
+      </div>
+    </Press>
   );
 }
 
@@ -255,7 +268,7 @@ export function PaidBanner({ amount }: { amount: number }) {
 /* ── screens ──────────────────────────────────────────────────────────────*/
 
 /** Terminal home: navy amount half over the off-white active stack. */
-export function Terminal({ total, line, sub, items, cancel = false, send = false, banner }: {
+export function Terminal({ total, line, sub, items, cancel = false, send = false, banner, tapFab = false, tapSend = false, seq = 0 }: {
   total: number;
   line: string;
   sub?: string;
@@ -263,6 +276,9 @@ export function Terminal({ total, line, sub, items, cancel = false, send = false
   cancel?: boolean;
   send?: boolean;
   banner?: number;
+  tapFab?: boolean;
+  tapSend?: boolean;
+  seq?: number;
 }) {
   return (
     <Screen>
@@ -285,37 +301,47 @@ export function Terminal({ total, line, sub, items, cancel = false, send = false
       <div style={{ flex: 1, background: OFFW, padding: '154px 22px 90px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <ActiveStack items={items} />
       </div>
-      <Fab />
-      <SubBar send={send} />
+      <Fab tap={tapFab} seq={seq} />
+      <SubBar send={send} tapSend={tapSend} seq={seq} />
       {banner !== undefined && <PaidBanner amount={banner} />}
     </Screen>
   );
 }
 
 /** Keypad compose screen. `hit` lights the key the script is pressing. */
-export function KeypadScreen({ cents, hit, splitOn = false, commitReady = false }: { cents: number; hit?: string; splitOn?: boolean; commitReady?: boolean }) {
+export function KeypadScreen({ cents, hit, splitOn = false, commitReady = false, tapCommit = false, tapSplit = false, seq = 0 }: {
+  cents: number;
+  hit?: string;
+  splitOn?: boolean;
+  commitReady?: boolean;
+  tapCommit?: boolean;
+  tapSplit?: boolean;
+  seq?: number;
+}) {
   return (
     <Screen>
       <TopHalf>
-        <SubHead commitReady={commitReady} />
+        <SubHead commitReady={commitReady} tapCommit={tapCommit} seq={seq} />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
           <Amt cents={cents} color={cents === 0 ? 'rgba(4,13,109,0.32)' : NAVY} style={{ marginTop: 18 }} />
-          <div
-            className="lp-pill lp-t"
-            style={{
-              alignSelf: 'flex-start', padding: '8px 16px',
-              background: splitOn ? NAVY : 'transparent',
-              color: splitOn ? BLUE : NAVY,
-              boxShadow: splitOn ? 'none' : 'inset 0 0 0 1px rgba(4,13,109,0.5)',
-            }}
-          >
-            split bill
-          </div>
+          <Press on={tapSplit} seq={seq} radius={40} style={{ alignSelf: 'flex-start' }}>
+            <div
+              className="lp-pill lp-t"
+              style={{
+                padding: '8px 16px',
+                background: splitOn ? NAVY : 'transparent',
+                color: splitOn ? BLUE : NAVY,
+                boxShadow: splitOn ? 'none' : 'inset 0 0 0 1px rgba(4,13,109,0.5)',
+              }}
+            >
+              split bill
+            </div>
+          </Press>
         </div>
         <div style={{ height: 52 }} />
       </TopHalf>
       <BottomHalf>
-        <Keypad hit={hit} />
+        <Keypad hit={hit} seq={seq} />
       </BottomHalf>
       <SubBar feature />
     </Screen>
@@ -348,7 +374,7 @@ function Minus({ size = 14 }: { size?: number }) {
 }
 
 /** Keypad ✓ morphs into this: name the item, set the quantity, confirm. */
-function DetailsScreen() {
+function DetailsScreen({ tapConfirm = false, seq = 0 }: { tapConfirm?: boolean; seq?: number } = {}) {
   return (
     <Screen>
       <TopHalf>
@@ -372,7 +398,7 @@ function DetailsScreen() {
           <Stepper size={32}><Ic.Plus size={14} /></Stepper>
         </div>
         <div style={{ flex: 1 }} />
-        <div style={{ display: 'flex', justifyContent: 'center' }}><Cta label="confirm" /></div>
+        <div style={{ display: 'flex', justifyContent: 'center' }}><Cta label="confirm" tap={tapConfirm} seq={seq} /></div>
       </BottomHalf>
       <SubBar feature />
     </Screen>
@@ -444,27 +470,74 @@ function ShareScreen() {
   );
 }
 
+/* ── the session ──────────────────────────────────────────────────────────
+   One pass through the retail terminal, written as the frames a viewer sees
+   rather than as milestones. It opens where the merchant actually opens the
+   app — the terminal home — and every screen change is preceded by a visible
+   press on the control that causes it, so the phone reads as somebody using it
+   rather than as a slideshow advancing itself.
+
+   `ms` is how long the frame holds. Presses are brief; the screens they open
+   linger. */
+type Frame = {
+  ms: number;
+  /**
+   * Which screen this frame is. Frames are keyed on it, so a screen change
+   * remounts and replays `lp-screen-in` while four keypresses on one keypad do
+   * not.
+   */
+  screen: string;
+  render: (seq: number) => ReactNode;
+};
+
+const KEY_SEQUENCE = ['1', '2', '5', '0'] as const;
+/** The amount as each key lands: $0.00 → $1.25 → $12.50. */
+const KEY_AMOUNTS = [1, 12, 125, 1250];
+
+const PENDING = { total: RETAIL.saleCents, line: RETAIL.saleItem, sub: 'tap send to share payment' } as const;
+const STACKED = (status: 'awaiting payment' | 'paid'): StackItem[] => [
+  { name: RETAIL.saleItem, amount: RETAIL.saleCents, status },
+];
+
+const FRAMES: Frame[] = [
+  // Terminal home, nothing pending — where the merchant actually opens the app.
+  { ms: BEAT_MS, screen: 'home', render: () => <Terminal total={0} line="no items yet" items={[]} /> },
+  // Tap + to start a sale.
+  { ms: TAP_MS, screen: 'home', render: (seq) => <Terminal total={0} line="no items yet" items={[]} tapFab seq={seq} /> },
+  // Keypad opens empty.
+  { ms: 440, screen: 'keypad', render: () => <KeypadScreen cents={0} /> },
+  // Type 1, 2, 5, 0 — each press visible, the amount building as it goes.
+  ...KEY_SEQUENCE.map((k, i) => ({
+    ms: TAP_MS,
+    screen: 'keypad',
+    render: (seq: number) => <KeypadScreen cents={KEY_AMOUNTS[i]} hit={k} seq={seq} commitReady={i > 0} />,
+  })),
+  // The finished amount, read for a moment before committing.
+  { ms: DWELL_MS, screen: 'keypad', render: () => <KeypadScreen cents={RETAIL.saleCents} commitReady /> },
+  // Tap ✓ to name the item.
+  { ms: TAP_MS, screen: 'keypad', render: (seq) => <KeypadScreen cents={RETAIL.saleCents} commitReady tapCommit seq={seq} /> },
+  { ms: DWELL_MS, screen: 'details', render: () => <DetailsScreen /> },
+  { ms: TAP_MS, screen: 'details', render: (seq) => <DetailsScreen tapConfirm seq={seq} /> },
+  { ms: BEAT_MS, screen: 'pending', render: () => <Terminal {...PENDING} items={[]} cancel send /> },
+  // Tap send to raise the QR.
+  { ms: TAP_MS, screen: 'pending', render: (seq) => <Terminal {...PENDING} items={[]} cancel send tapSend seq={seq} /> },
+  { ms: DWELL_MS + 400, screen: 'share', render: () => <ShareScreen /> },
+  // Back on the terminal, the sale sitting in the stack awaiting the customer.
+  { ms: DWELL_MS, screen: 'stack', render: () => <Terminal total={0} line="no items yet" items={STACKED('awaiting payment')} /> },
+  // The customer pays: banner drops in, the row flips to paid.
+  { ms: HOLD_MS, screen: 'stack', render: () => <Terminal total={0} line="no items yet" items={STACKED('paid')} banner={RETAIL.saleCents} /> },
+];
+
 function RetailSale({ step }: SceneProps) {
-  if (step <= 0) return <KeypadScreen cents={RETAIL.saleCents} hit="0" commitReady />;
-  if (step === 1) return <DetailsScreen />;
-  if (step === 2) {
-    return <Terminal total={RETAIL.saleCents} line={RETAIL.saleItem} sub="tap send to share payment" items={[]} cancel send />;
-  }
-  if (step === 3) return <ShareScreen />;
-  const paid = step >= 5;
-  return (
-    <Terminal
-      total={0}
-      line="no items yet"
-      items={[{ name: RETAIL.saleItem, amount: RETAIL.saleCents, status: paid ? 'paid' : 'awaiting payment' }]}
-      banner={paid ? RETAIL.saleCents : undefined}
-    />
-  );
+  const i = Math.min(Math.max(step, 0), FRAMES.length - 1);
+  const frame = FRAMES[i];
+  return <Fragment key={frame.screen}>{frame.render(i)}</Fragment>;
 }
 
 export const retailSaleScene: SceneDefinition = {
   id: 'retail-sale',
-  steps: 6,
+  steps: FRAMES.length,
+  beats: FRAMES.map((f) => f.ms),
   label: '$12.50 flat white sale paid',
   Component: RetailSale,
 };

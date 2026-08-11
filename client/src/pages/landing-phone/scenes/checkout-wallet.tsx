@@ -23,9 +23,12 @@
  * and its renderTerminal "Payment confirmed" state) with the token values from
  * client/src/lib/checkout-theme.ts.
  */
+import { Fragment } from 'react';
 import type { ReactNode } from 'react';
 import type { SceneDefinition, SceneProps } from '../types';
 import { BLUE, fmt } from '../tokens';
+import { Press } from '../primitives';
+import { BEAT_MS, DWELL_MS, HOLD_MS, TAP_MS } from '../reducer';
 import { CHECKOUT } from '../fixtures';
 import { CardAmount, CardLabel, CheckCircleMark, CustomerCard, SKY_DIM, TaptMark } from './retail-split';
 
@@ -51,13 +54,16 @@ function Brand() {
 
 type Focus = 'apple' | 'google' | 'card' | null;
 
-function WalletBtn({ children, focused = false, pressed = false, dim = false }: {
+function WalletBtn({ children, focused = false, pressed = false, dim = false, tap = false, seq = 0 }: {
   children: ReactNode;
   focused?: boolean;
   pressed?: boolean;
   dim?: boolean;
+  tap?: boolean;
+  seq?: number;
 }) {
   return (
+    <Press on={tap} seq={seq} radius={44} style={{ width: '100%' }}>
     <div
       className="lp-t"
       style={{
@@ -70,6 +76,7 @@ function WalletBtn({ children, focused = false, pressed = false, dim = false }: 
     >
       {children}
     </div>
+    </Press>
   );
 }
 
@@ -138,7 +145,7 @@ function CardLink({ focused = false, dim = false }: { focused?: boolean; dim?: b
  * `focus` walks the affordances for beat 2; `chosen` is the tap on the
  * deterministic demo method; `processing` is the short local wait that follows.
  */
-function PayScreen({ focus, chosen = false, processing = false }: { focus: Focus; chosen?: boolean; processing?: boolean }) {
+function PayScreen({ focus, chosen = false, processing = false, tap = false, seq = 0 }: { focus: Focus; chosen?: boolean; processing?: boolean; tap?: boolean; seq?: number }) {
   const apple = focus === 'apple';
   return (
     <CustomerCard minHeight={600}>
@@ -148,7 +155,7 @@ function PayScreen({ focus, chosen = false, processing = false }: { focus: Focus
       <CardAmount text={fmt(CHECKOUT.amountCents)} size={64} />
       <div style={{ flex: 1, minHeight: 24 }} />
 
-      <WalletBtn focused={apple && !processing} pressed={chosen} dim={processing || (focus !== null && !apple)}>
+      <WalletBtn focused={apple && !processing} pressed={chosen} tap={tap} seq={seq} dim={processing || (focus !== null && !apple)}>
         {processing ? <Spinner /> : <ApplePayMark />}
       </WalletBtn>
       <WalletBtn focused={focus === 'google'} dim={processing || chosen || (focus !== null && focus !== 'google')}>
@@ -193,18 +200,38 @@ function Confirmed() {
   );
 }
 
-const FOCUS: Focus[] = [null, 'apple', 'google', 'card'];
+
+/* ── the session ──────────────────────────────────────────────────────────
+   The one customer-side scene, so it opens on the payment link itself rather than
+   on a merchant terminal — that *is* where the payer starts. The eye is walked
+   across the three ways to pay, then one is actually pressed. */
+
+type Frame = { ms: number; screen: string; render: (seq: number) => ReactNode };
+
+const FRAMES: Frame[] = [
+  // The link opens: amount and reference, nothing highlighted yet.
+  { ms: DWELL_MS, screen: 'pay', render: () => <PayScreen focus={null} /> },
+  // The three ways to pay, considered in turn.
+  { ms: BEAT_MS, screen: 'pay', render: () => <PayScreen focus="apple" /> },
+  { ms: BEAT_MS, screen: 'pay', render: () => <PayScreen focus="google" /> },
+  { ms: BEAT_MS, screen: 'pay', render: () => <PayScreen focus="card" /> },
+  { ms: 520, screen: 'pay', render: () => <PayScreen focus="apple" /> },
+  // Apple Pay pressed, then the short wait that follows.
+  { ms: TAP_MS, screen: 'pay', render: (seq) => <PayScreen focus="apple" chosen tap seq={seq} /> },
+  { ms: 900, screen: 'pay', render: () => <PayScreen focus="apple" processing /> },
+  { ms: HOLD_MS, screen: 'confirmed', render: () => <Confirmed /> },
+];
 
 function CheckoutWallet({ step }: SceneProps) {
-  if (step >= 6) return <Confirmed />;
-  if (step === 5) return <PayScreen focus="apple" processing />;
-  if (step === 4) return <PayScreen focus="apple" chosen />;
-  return <PayScreen focus={FOCUS[step < 0 ? 0 : step]} />;
+  const i = Math.min(Math.max(step, 0), FRAMES.length - 1);
+  const frame = FRAMES[i];
+  return <Fragment key={frame.screen}>{frame.render(i)}</Fragment>;
 }
 
 export const checkoutWalletScene: SceneDefinition = {
   id: 'checkout-wallet',
-  steps: 7,
+  steps: FRAMES.length,
+  beats: FRAMES.map((f) => f.ms),
   label: '$250 deposit paid and confirmed',
   Component: CheckoutWallet,
 };

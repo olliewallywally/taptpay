@@ -16,6 +16,8 @@ import {
   stepAtProgress,
 } from '@/pages/landing-phone/reducer';
 import { SCENES, stepsFor } from '@/pages/landing-phone/scenes/registry';
+import { INDUSTRY_SCENE, SCENE_STEPS } from '@/pages/landing-phone/manifest';
+import { INDUSTRY_PHONE } from '@/pages/DeferredLandingPhone';
 import type { LandingPhoneScene, LandingPhoneState } from '@/pages/landing-phone/types';
 
 const key = (s: LandingPhoneState) => `${s.scene}#${s.step}`;
@@ -35,6 +37,35 @@ describe('scene registry', () => {
   it('registers exactly one scene per story zone', () => {
     expect(SCENE_ORDER).toHaveLength(ZONE_COUNT);
     expect(Object.keys(SCENES).sort()).toEqual([...SCENE_ORDER].sort());
+  });
+
+  /**
+   * manifest.ts duplicates the step counts so landing-page.tsx can size the
+   * Industries phone without importing the registry (which would drag all eight
+   * scenes into the main chunk). Its docblock has always claimed this test
+   * guards the duplication; until now it did not, and the two silently drifted.
+   *
+   * Drift is not cosmetic: the Industries phone rests on `SCENE_STEPS - 1`, so a
+   * stale count leaves a tab sitting on a half-finished workflow.
+   */
+  it('keeps the landing page manifest in step with the registry', () => {
+    for (const id of SCENE_ORDER) {
+      expect(SCENE_STEPS[id]).toBe(SCENES[id].steps);
+    }
+    expect(Object.keys(SCENE_STEPS).sort()).toEqual([...SCENE_ORDER].sort());
+  });
+
+  it('points every Industries tab at a registered scene', () => {
+    for (const scene of Object.values(INDUSTRY_SCENE)) {
+      expect(SCENES[scene]).toBeDefined();
+    }
+  });
+
+  it('keeps the eager Industries metadata in step with the lazy registry', () => {
+    for (const { scene, steps } of Object.values(INDUSTRY_PHONE)) {
+      expect(SCENES[scene]).toBeDefined();
+      expect(steps).toBe(SCENES[scene].steps);
+    }
   });
 
   it('gives every scene at least one milestone and a matching id', () => {

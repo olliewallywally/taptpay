@@ -19,10 +19,12 @@
  * checkout-theme.ts (the customer card: navy 44px card on off-white, sky type,
  * segment progress bars, outline pill actions).
  */
+import { Fragment } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { SceneDefinition, SceneProps } from '../types';
 import { BLUE, NAVY, OFFW } from '../tokens';
 import { Screen } from '../primitives';
+import { BEAT_MS, DWELL_MS, HOLD_MS, TAP_MS } from '../reducer';
 import { RETAIL } from '../fixtures';
 import { KeypadScreen, Terminal, d2 } from './retail-sale';
 
@@ -234,22 +236,55 @@ function AllDone() {
   );
 }
 
+/* ── the session ──────────────────────────────────────────────────────────
+   Opens on the retail terminal home, rings up $120 on the keypad a digit at a
+   time, turns on split bill, and then hands over to the customer's own screen —
+   which is the point of the scene, so the handover is given a beat of its own
+   rather than being a cut nobody notices. */
+
+const SPLIT_KEYS = ['1', '2', '0', '0', '0'] as const;
+/** $0.01 → $0.12 → $1.20 → $12.00 → $120.00, as the terminal fills right to left. */
+const SPLIT_AMOUNTS = [1, 12, 120, 1200, 12000];
+
+const SPLIT_PENDING = [{ name: ITEM, amount: RETAIL.splitTotalCents, split: 'setup' as const }];
+
+type Frame = { ms: number; screen: string; render: (seq: number) => ReactNode };
+
+const FRAMES: Frame[] = [
+  // The terminal home the merchant opens the app on.
+  { ms: BEAT_MS, screen: 'home', render: () => <Terminal total={0} line="no items yet" items={[]} /> },
+  { ms: TAP_MS, screen: 'home', render: (seq) => <Terminal total={0} line="no items yet" items={[]} tapFab seq={seq} /> },
+  { ms: 440, screen: 'keypad', render: () => <KeypadScreen cents={0} /> },
+  ...SPLIT_KEYS.map((k, i) => ({
+    ms: TAP_MS,
+    screen: 'keypad',
+    render: (seq: number) => <KeypadScreen cents={SPLIT_AMOUNTS[i]} hit={k} seq={seq} commitReady={i > 0} />,
+  })),
+  // Tap "split bill" — the control this whole scene exists to show.
+  { ms: TAP_MS, screen: 'keypad', render: (seq) => <KeypadScreen cents={RETAIL.splitTotalCents} commitReady tapSplit seq={seq} /> },
+  { ms: DWELL_MS, screen: 'keypad', render: () => <KeypadScreen cents={RETAIL.splitTotalCents} splitOn commitReady /> },
+  { ms: TAP_MS, screen: 'keypad', render: (seq) => <KeypadScreen cents={RETAIL.splitTotalCents} splitOn commitReady tapCommit seq={seq} /> },
+  // Split-flagged on the terminal, waiting on the customer.
+  { ms: DWELL_MS, screen: 'pending', render: () => <Terminal total={0} line="no items yet" items={SPLIT_PENDING} /> },
+  // Over to the customer's phone: two ways, then they raise it to four.
+  { ms: DWELL_MS, screen: 'customer', render: () => <FirstPayer people={2} /> },
+  { ms: TAP_MS, screen: 'customer', render: () => <FirstPayer people={2} plusPressed /> },
+  { ms: DWELL_MS, screen: 'customer', render: () => <FirstPayer people={RETAIL.splitPeople} /> },
+  { ms: BEAT_MS, screen: 'paying', render: () => <NextPayer done={1} /> },
+  { ms: BEAT_MS, screen: 'paying', render: () => <NextPayer done={RETAIL.splitPeople - 1} /> },
+  { ms: HOLD_MS, screen: 'done', render: () => <AllDone /> },
+];
+
 function RetailSplit({ step }: SceneProps) {
-  if (step <= 0) return <KeypadScreen cents={RETAIL.splitTotalCents} hit="0" commitReady />;
-  if (step === 1) return <KeypadScreen cents={RETAIL.splitTotalCents} splitOn commitReady />;
-  if (step === 2) {
-    return <Terminal total={0} line="no items yet" items={[{ name: ITEM, amount: RETAIL.splitTotalCents, split: 'setup' }]} />;
-  }
-  if (step === 3) return <FirstPayer people={2} />;
-  if (step === 4) return <FirstPayer people={RETAIL.splitPeople} plusPressed />;
-  if (step === 5) return <NextPayer done={1} />;
-  if (step === 6) return <NextPayer done={RETAIL.splitPeople - 1} />;
-  return <AllDone />;
+  const i = Math.min(Math.max(step, 0), FRAMES.length - 1);
+  const frame = FRAMES[i];
+  return <Fragment key={frame.screen}>{frame.render(i)}</Fragment>;
 }
 
 export const retailSplitScene: SceneDefinition = {
   id: 'retail-split',
-  steps: 8,
+  steps: FRAMES.length,
+  beats: FRAMES.map((f) => f.ms),
   label: '$120 bill split four ways and fully paid',
   Component: RetailSplit,
 };

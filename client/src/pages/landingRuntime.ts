@@ -1,33 +1,114 @@
 // @ts-nocheck
 /*
- * LandingRuntime — ported VERBATIM from the design prototype.
- * All scroll-linking, camera animation, and three.js scene setup live here as
- * readable source (nothing precompiled or inlined). Kept imperative by design:
+ * LandingRuntime — adapted from the design prototype.
+ * Scroll-linking and camera animation live here as readable source. Kept
+ * imperative by design:
  * it queries the DOM rendered by LandingPage.tsx via stable element ids.
  * ts-nocheck: this is prototype-fidelity code; typing it would mean rewriting it.
  */
-import * as THREE from 'three';
 
 export class LandingRuntime {
   props;
-  constructor(props = {}) { this.props = props; }
+  constructor(props = {}) {
+    this.props = props;
+    this._cleanups = [];
+    this._timeouts = new Set();
+    this._frames = new Set();
+    this._observers = new Set();
+    this._animations = new Set();
+    this._destroyed = false;
+  }
+
+  listen(target, type, handler, options) {
+    target.addEventListener(type, handler, options);
+    const cleanup = () => target.removeEventListener(type, handler, options);
+    this._cleanups.push(cleanup);
+    return cleanup;
+  }
+
+  later(callback, delay) {
+    const id = window.setTimeout(() => {
+      this._timeouts.delete(id);
+      if (!this._destroyed) callback();
+    }, delay);
+    this._timeouts.add(id);
+    return id;
+  }
+
+  frame(callback) {
+    const id = requestAnimationFrame((time) => {
+      this._frames.delete(id);
+      if (!this._destroyed) callback(time);
+    });
+    this._frames.add(id);
+    return id;
+  }
+
+  cancelFrame(id) {
+    if (!id) return;
+    cancelAnimationFrame(id);
+    this._frames.delete(id);
+  }
+
+  trackObserver(observer) {
+    this._observers.add(observer);
+    return observer;
+  }
+
+  trackAnimation(animation) {
+    this._animations.add(animation);
+    animation.finished.catch(() => {}).finally(() => this._animations.delete(animation));
+    return animation;
+  }
+
+  destroy() {
+    if (this._destroyed) return;
+    this._destroyed = true;
+    this.cancelFrame(this._raf);
+    this._raf = null;
+    for (const id of this._frames) cancelAnimationFrame(id);
+    this._frames.clear();
+    for (const id of this._timeouts) clearTimeout(id);
+    this._timeouts.clear();
+    for (const observer of this._observers) observer.disconnect();
+    this._observers.clear();
+    for (const animation of this._animations) animation.cancel();
+    this._animations.clear();
+    for (const cleanup of this._cleanups.splice(0).reverse()) {
+      try { cleanup(); } catch (error) {}
+    }
+    this.closeMenu?.();
+    if (this._countedActive) {
+      const active = Number(document.documentElement.dataset.landingRuntimeActive || 1);
+      document.documentElement.dataset.landingRuntimeActive = String(Math.max(0, active - 1));
+      this._countedActive = false;
+    }
+    document.body.style.overflow = '';
+    this._cine = null;
+    this._p3 = null;
+  }
 
   init() {
+    this._destroyed = false;
     this._raf = null;
+    this.reducedMotion = Boolean(this.props.reducedMotion) || Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+    const active = Number(document.documentElement.dataset.landingRuntimeActive || 0);
+    document.documentElement.dataset.landingRuntimeActive = String(active + 1);
+    this._countedActive = true;
     const $ = (s) => document.querySelector(s);
     const $$ = (s) => Array.from(document.querySelectorAll(s));
     const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
     const map = (p, a, b) => clamp((p - a) / (b - a), 0, 1);
     this.$ = $; this.$$ = $$;
     this._mx = 0; this._my = 0;
-    window.addEventListener('pointermove', (e) => {
+    this.listen(window, 'pointermove', (e) => {
       this._mx = (e.clientX / window.innerWidth) * 2 - 1;
       this._my = (e.clientY / window.innerHeight) * 2 - 1;
     });
 
     // wireframe buttons: solid on click
     $$('.tp-wire').forEach((btn) => {
-      btn.addEventListener('click', () => {
+      this.listen(btn, 'click', () => {
         const on = btn.getAttribute('data-solid') === '1';
         btn.setAttribute('data-solid', on ? '0' : '1');
         btn.style.background = on ? 'transparent' : '#5E9DFF';
@@ -37,13 +118,13 @@ export class LandingRuntime {
 
     // smooth anchors
     $$('.tp-anchor').forEach((a) => {
-      a.addEventListener('click', (e) => {
+      this.listen(a, 'click', (e) => {
         const href = a.getAttribute('href') || '';
         if (!href.startsWith('#')) return;
         const t = document.getElementById(href.slice(1));
         if (!t) return;
         e.preventDefault();
-        window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY, behavior: 'smooth' });
+        window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY, behavior: this.reducedMotion ? 'auto' : 'smooth' });
         this.closeMenu && this.closeMenu();
       });
     });
@@ -58,13 +139,13 @@ export class LandingRuntime {
       document.body.style.overflow = '';
     };
     if (burger && menu) {
-      burger.addEventListener('click', () => {
+      this.listen(burger, 'click', () => {
         menu.style.opacity = '1';
         menu.style.pointerEvents = 'auto';
         document.body.style.overflow = 'hidden';
       });
       const mc = $('#tp-menu-close');
-      if (mc) mc.addEventListener('click', this.closeMenu);
+      if (mc) this.listen(mc, 'click', this.closeMenu);
     }
     const syncNavMode = () => {
       const mobile = window.innerWidth < 900;
@@ -73,7 +154,7 @@ export class LandingRuntime {
       if (burger) burger.style.display = mobile ? 'block' : 'none';
     };
     syncNavMode();
-    window.addEventListener('resize', syncNavMode);
+    this.listen(window, 'resize', syncNavMode);
 
     // reveal-on-scroll
     const vh0 = window.innerHeight;
@@ -85,15 +166,15 @@ export class LandingRuntime {
       }
       el.style.transition = 'opacity .85s ease, transform .85s cubic-bezier(.22,1,.36,1)';
     });
-    const io = new IntersectionObserver((es) => {
+    const io = this.trackObserver(new IntersectionObserver((es) => {
       es.forEach((en) => {
         if (en.isIntersecting) {
           const el = en.target;
-          setTimeout(() => { el.style.opacity = '1'; el.style.transform = 'translateY(0)'; }, 60);
+          this.later(() => { el.style.opacity = '1'; el.style.transform = 'translateY(0)'; }, 60);
           io.unobserve(el);
         }
       });
-    }, { threshold: 0.18 });
+    }, { threshold: 0.18 }));
     revs.forEach((el) => io.observe(el));
 
     // measurements
@@ -110,8 +191,8 @@ export class LandingRuntime {
       grab('#tp-words-wrap', 'wordsTop', 'wordsLen');
     };
     measure();
-    window.addEventListener('resize', measure);
-    window.addEventListener('load', measure);
+    this.listen(window, 'resize', measure);
+    this.listen(window, 'load', measure);
 
     // cinema
     this.initCinema();
@@ -180,39 +261,39 @@ export class LandingRuntime {
         if (line) line.style.width = (strike * 104) + '%';
       });
 
-      this._raf = requestAnimationFrame(tick);
+      this._raf = this.frame(tick);
     };
-    this._raf = requestAnimationFrame(tick);
+    this._raf = this.frame(tick);
 
     // industries
     this.industryData = {
       property: {
         tag: 'property management', h: 'rent that collects itself.',
         sub: 'set the schedule once. taptpay invoices every cycle, chases every late payment, and marks every dollar the moment it lands.',
-        stats: [['$0', 'per transaction'], ['2–10', 'way rent splits'], ['auto', 'reminders, never duplicated']],
+        stats: [['$0', 'TaptPay platform fee'], ['2–10', 'way rent splits'], ['auto', 'reminders, never duplicated']],
         feats: ['recurring rent schedules on autopilot', 'overdue reminders that never double-send', 'utility bills & expenses, sent as payment links', 'gst receipts emailed automatically']
       },
       trades: {
         tag: 'trades & services', h: 'quote → deposit → balance → done.',
         sub: 'the quote and the money are one object. the customer accepting the job is the deposit hitting your account.',
-        stats: [['$0', 'per transaction'], ['on accept', 'deposit link presented'], ['auto', 'gst receipts emailed']],
+        stats: [['$0', 'TaptPay platform fee'], ['on accept', 'deposit link presented'], ['auto', 'gst receipts emailed']],
         feats: ['line-item quote builder with deposit toggles', 'quick invoice for callouts — keypad, client, send', 'incl gst / + gst, snapshotted per quote', 'client profiles with full event timelines']
       },
       retail: {
         tag: 'retail & hospitality', h: 'a terminal in every pocket.',
         sub: 'cafés, markets, food trucks — keypad to charge, tap or scan to pay, split the table without maths at the counter.',
-        stats: [['$0', 'per transaction, ever'], ['multi', 'stack — unlimited payments at once'], ['2–10', 'way bill splits']],
+        stats: [['$0', 'TaptPay platform fee'], ['multi', 'stack — unlimited payments at once'], ['2–10', 'way bill splits']],
         feats: ['charge in seconds from the keypad', 'payment boards — customers scan or tap the counter', 'per-person receipts on splits', 'live transaction history & analytics']
       }
     };
     this.renderIndustry(this.props.defaultIndustry ?? 'property', true);
     $$('.tp-tab').forEach((tab) => {
-      tab.addEventListener('click', () => this.renderIndustry(tab.getAttribute('data-ind'), false));
+      this.listen(tab, 'click', () => this.renderIndustry(tab.getAttribute('data-ind'), false));
     });
 
     this.initContact();
     this.initMobileLayout();
-    // ---- adaptive quality: device tier + live FPS governor ----
+    // ---- adaptive motion quality ----
     const mem = navigator.deviceMemory || 8, cores = navigator.hardwareConcurrency || 8;
     let tier = 2;
     if (mem <= 4 || cores <= 4 || window.innerWidth < 880) tier = 1;
@@ -230,28 +311,10 @@ export class LandingRuntime {
     // themselves behind their own IntersectionObserver, so there is nothing to
     // stagger here any more.
 
-    // governor: sustained jank -> lower render resolution + blur, never touches layout/design
-    let gT = performance.now(), gAcc = 0, gN = 0;
-    const gov = (now) => {
-      requestAnimationFrame(gov);
-      const d = now - gT; gT = now;
-      if (document.hidden || d <= 0 || d > 250) return;
-      gAcc += d; gN++;
-      if (gN >= 110) {
-        const avg = gAcc / gN; gAcc = 0; gN = 0;
-        if (avg > 26 && this._dprCap > 0.9) {
-          this._dprCap = Math.max(0.85, this._dprCap - 0.35);
-          this._blurMax = Math.max(1.2, this._blurMax - 1);
-          this._prSetters.forEach((fn) => { try { fn(); } catch (e) {} });
-          if (this._rebuildCoins && !this._coinsCut) { this._coinsCut = true; this._rebuildCoins((this.props.coinDensity ?? 1.4) * 0.72); }
-        }
-      }
-    };
-    requestAnimationFrame(gov);
 
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) { if (this._raf) cancelAnimationFrame(this._raf); this._raf = null; }
-      else if (!this._raf) { lastY = window.scrollY; this._raf = requestAnimationFrame(tick); }
+    this.listen(document, 'visibilitychange', () => {
+      if (document.hidden) { this.cancelFrame(this._raf); this._raf = null; }
+      else if (!this._raf) { lastY = window.scrollY; this._raf = this.frame(tick); }
     });
   }
 
@@ -407,20 +470,21 @@ export class LandingRuntime {
     world.style.transform = 'translate3d(0px,0px,-260px)';
     const camGo = (tx, ty, tz, ms, rollDir) => {
       if (worldAnim) { try { worldAnim.cancel(); } catch (e) {} worldAnim = null; }
+      if (this.reducedMotion) ms = 0;
       const to = 'translate3d(' + (-tx) + 'px,' + (-ty) + 'px,' + tz + 'px)';
       if (!ms) { world.style.transform = to; camX = tx; camY = ty; camZ = tz; return; }
       const from = 'translate3d(' + (-camX) + 'px,' + (-camY) + 'px,' + camZ + 'px)';
       const mid = 'translate3d(' + (-(camX + tx) / 2) + 'px,' + (-(camY + ty) / 2) + 'px,' + (tz - 170) + 'px) rotateZ(' + (rollDir * 1.5) + 'deg) rotateX(' + (ty > camY ? 2.4 : -2.4) + 'deg)';
       world.style.transform = to;
-      worldAnim = world.animate(
+      worldAnim = this.trackAnimation(world.animate(
         [{ transform: from }, { transform: mid, offset: 0.5 }, { transform: to }],
         { duration: ms, easing: EASE }
-      );
+      ));
       // motion blur during the flight — peaks mid-transit, sharp at rest
       if (vpEl) {
         if (blurAnim) { try { blurAnim.cancel(); } catch (e) {} }
         const bm = this._blurMax ?? 3.5;
-        blurAnim = vpEl.animate(
+        blurAnim = this.trackAnimation(vpEl.animate(
           [
             { filter: 'blur(0px)' },
             { filter: 'blur(' + (bm * 0.57).toFixed(2) + 'px)', offset: 0.3 },
@@ -429,7 +493,7 @@ export class LandingRuntime {
             { filter: 'blur(0px)' }
           ],
           { duration: ms, easing: 'linear' }
-        );
+        ));
       }
       camX = tx; camY = ty; camZ = tz;
     };
@@ -437,13 +501,14 @@ export class LandingRuntime {
     // ---- phone rig ----
     const rigTo = (x, y, ms) => {
       rig.style.transition = ms ? 'transform ' + ms + 'ms ' + EASE : 'none';
+      if (this.reducedMotion) ms = 0;
       rig.style.transform = 'translate3d(' + x + 'px,' + y + 'px,0) translate(-50%,-50%)';
     };
     const turnTo = (deg, ms) => {
-      if (this._p3) this._p3.setRot(deg, ms);
+      if (this._p3) this._p3.setRot(deg, this.reducedMotion ? 0 : ms);
     };
     const sweep = () => {
-      if (!glare) return;
+      if (this.reducedMotion || !glare) return;
       glare.style.animation = 'none';
       void glare.offsetWidth;
       glare.style.animation = 'tpGlare 1.5s cubic-bezier(.5,.06,.3,1) 1';
@@ -468,8 +533,14 @@ export class LandingRuntime {
     let hideT = null, showT = null, glareT = null;
     let visCard = null;
 
-    const popIn = (el) => { el.style.animation = 'tpPopIn .75s cubic-bezier(.34,1.45,.5,1) forwards'; };
-    const popOut = (el) => { el.style.animation = 'tpPopOut .45s cubic-bezier(.5,.06,.4,1) forwards'; };
+    const popIn = (el) => {
+      el.style.animation = this.reducedMotion ? 'none' : 'tpPopIn .75s cubic-bezier(.34,1.45,.5,1) forwards';
+      if (this.reducedMotion) { el.style.opacity = '1'; el.style.transform = 'none'; }
+    };
+    const popOut = (el) => {
+      el.style.animation = this.reducedMotion ? 'none' : 'tpPopOut .45s cubic-bezier(.5,.06,.4,1) forwards';
+      if (this.reducedMotion) { el.style.opacity = '0'; el.style.transform = 'none'; }
+    };
 
     const applyBeat = (i, prev) => {
       const bt = B[i];
@@ -484,7 +555,7 @@ export class LandingRuntime {
       turnTo(rot, 1150);
       if (glow) glow.style.opacity = i === 0 ? '0.8' : '0.55';
 
-      glareT = setTimeout(sweep, 1080);
+      glareT = this.later(sweep, 1080);
 
       if (headB) headB.style.opacity = i === 0 ? headB.style.opacity : '0';
       if (headA) headA.style.opacity = i === 0 ? headA.style.opacity : '0';
@@ -496,7 +567,7 @@ export class LandingRuntime {
         if (visCard) { popOut(visCard); visCard = null; }
         if (i === 0) {
           popOut(hud); hud.style.pointerEvents = 'none';
-          hideT = setTimeout(() => { hud.style.display = 'none'; }, 460);
+          hideT = this.later(() => { hud.style.display = 'none'; }, 460);
         } else {
           hud.style.display = 'block';
           if (bt.wallets) { hud.style.bottom = 'auto'; hud.style.top = '8vh'; hud.style.width = 'calc(100vw - 28px)'; hud.style.textAlign = 'center'; }
@@ -506,7 +577,7 @@ export class LandingRuntime {
           if (bt.side === 'R') { hud.style.right = '14px'; hud.style.left = 'auto'; }
           else { hud.style.left = '14px'; hud.style.right = 'auto'; }
           popOut(hud);
-          showT = setTimeout(() => {
+          showT = this.later(() => {
             hud.innerHTML = mPanelHTML(bt);
             popIn(hud);
             hud.style.pointerEvents = 'auto';
@@ -518,7 +589,7 @@ export class LandingRuntime {
         if (visCard && visCard !== card) popOut(visCard);
         if (card) {
           if (visCard === card) popOut(card);
-          showT = setTimeout(() => { popIn(card); }, 560);
+          showT = this.later(() => { popIn(card); }, 560);
           visCard = card;
         } else {
           visCard = null;
@@ -529,7 +600,7 @@ export class LandingRuntime {
     };
     this._applyCineBeat = applyBeat;
 
-    window.addEventListener('resize', () => { setPlaces(); placeGhost(); if (cur >= 0) applyBeat(cur, cur); });
+    this.listen(window, 'resize', () => { setPlaces(); placeGhost(); if (cur >= 0) applyBeat(cur, cur); });
 
     const easeOut = (t) => 1 - Math.pow(1 - t, 3);
 
@@ -610,7 +681,7 @@ export class LandingRuntime {
     if (instant || !panel) { apply(); return; }
     panel.style.opacity = '0';
     panel.style.transform = 'translateY(14px)';
-    setTimeout(() => {
+    this.later(() => {
       apply();
       panel.style.opacity = '1';
       panel.style.transform = 'translateY(0)';
@@ -624,7 +695,7 @@ export class LandingRuntime {
     if (!shell || !head) return;
     const EASE = 'cubic-bezier(.22,1,.36,1)';
     let open = false;
-    head.addEventListener('click', () => {
+    this.listen(head, 'click', () => {
       open = !open;
       if (open) {
         shell.style.transition = 'width .42s ' + EASE + ', height .55s ' + EASE + ' .34s, border-radius .42s ease, background .4s ease';
@@ -647,7 +718,7 @@ export class LandingRuntime {
       }
     });
     const send = $('#tpc-send');
-    if (send) send.addEventListener('click', () => {
+    if (send) this.listen(send, 'click', () => {
       const f = $('#tpc-fields'); const t = $('#tpc-thanks');
       if (f) f.style.display = 'none';
       if (t) t.style.display = 'flex';
@@ -656,21 +727,11 @@ export class LandingRuntime {
 
   // ---------------- live app phones ----------------
   initPhones() {
-    const scales = Array.from(document.querySelectorAll('.tp-phone-scale'));
-    const fit = () => scales.forEach((sc) => {
-      const f = sc.querySelector('.tp-app-frame');
-      if (!f) return;
-      const w = sc.clientWidth;
-      if (w > 0) f.style.transform = 'scale(' + (w / 390) + ')';
-    });
-    fit();
-    window.addEventListener('resize', fit);
-    setTimeout(fit, 400); setTimeout(fit, 1500); setTimeout(fit, 4000);
-    // The screen's own pointer-events are React's (landing-page.tsx watches this
-    // same click), so this handler owns nothing but the button's own appearance.
-    // Two writers on one inline style is how they would drift apart.
+    // The React host owns phone-screen scale with ResizeObserver. Runtime must
+    // not write transforms or schedule delayed refits: a lazy swap can otherwise
+    // replace the scaled node with a full-size 390×844 screen.
     document.querySelectorAll('.tp-phone-live').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
+      this.listen(btn, 'click', (e) => {
         e.stopPropagation();
         const live = btn.getAttribute('data-live') === '1';
         btn.setAttribute('data-live', live ? '0' : '1');
@@ -682,13 +743,13 @@ export class LandingRuntime {
     document.querySelectorAll('.tp-tilt').forEach((t) => {
       const inner = t.querySelector('.tp-tilt-inner');
       if (!inner) return;
-      t.addEventListener('pointermove', (e) => {
+      this.listen(t, 'pointermove', (e) => {
         const r = t.getBoundingClientRect();
         const x = (e.clientX - r.left) / r.width - 0.5;
         const y = (e.clientY - r.top) / r.height - 0.5;
         inner.style.transform = 'rotateY(' + (x * 16) + 'deg) rotateX(' + (-y * 12) + 'deg)';
       });
-      t.addEventListener('pointerleave', () => { inner.style.transform = 'rotateY(0deg) rotateX(0deg)'; });
+      this.listen(t, 'pointerleave', () => { inner.style.transform = 'rotateY(0deg) rotateX(0deg)'; });
     });
   }
 
@@ -788,11 +849,11 @@ export class LandingRuntime {
       clearTimeout(animT);
       tab.style.transform = 'translateX(110%)'; tab.style.opacity = '0'; tab.style.pointerEvents = 'none';
       copy.style.opacity = '0'; copy.style.transform = 'translateX(-28px)';
-      animT = setTimeout(() => {
+      animT = this.later(() => {
         copy.style.display = 'none';
         phoneCol.style.display = 'flex';
         window.dispatchEvent(new Event('resize'));
-        requestAnimationFrame(() => requestAnimationFrame(() => {
+        this.frame(() => this.frame(() => {
           phoneCol.style.opacity = '1'; phoneCol.style.transform = 'translateX(0)';
         }));
       }, 340);
@@ -801,345 +862,56 @@ export class LandingRuntime {
       if (!open) return; open = false;
       clearTimeout(animT);
       phoneCol.style.opacity = '0'; phoneCol.style.transform = 'translateX(80px)';
-      animT = setTimeout(() => {
+      animT = this.later(() => {
         phoneCol.style.display = 'none';
         copy.style.display = 'block';
-        requestAnimationFrame(() => requestAnimationFrame(() => {
+        this.frame(() => this.frame(() => {
           copy.style.opacity = '1'; copy.style.transform = 'translateX(0)';
         }));
         tab.style.transform = 'translateX(0)'; tab.style.opacity = '1'; tab.style.pointerEvents = 'auto';
       }, 400);
     };
-    tab.addEventListener('click', reveal);
-    hideBtn.addEventListener('click', hide);
+    this.listen(tab, 'click', reveal);
+    this.listen(hideBtn, 'click', hide);
   }
 
-  // ---------------- true-3d phone (webgl body + projection-matched screen) ----------------
+  // ---------------- CSS-3D phone body ----------------
   initPhone3D() {
-    const canvas = document.getElementById('tp3-gl');
     const box = document.getElementById('tp3');
     const spin = document.getElementById('tp3-spin');
     const face = document.getElementById('tp3-face');
-    const wrapEl = document.getElementById('tp-story-wrap');
-    if (!canvas || !box || !spin || !face || !THREE) return;
-    const P = 1100; // must equal #tp3-css perspective
-
-    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: (this._tier ?? 2) > 0, powerPreference: 'high-performance' });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this._dprCap ?? 2));
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(30, 1, 40, 6000);
-    camera.position.set(0, 0, P);
-
-    scene.add(new THREE.HemisphereLight(0xbcd2ff, 0x040a2e, 0.95));
-    const key = new THREE.DirectionalLight(0xffffff, 1.5); key.position.set(500, 620, 900); scene.add(key);
-    const rimL = new THREE.PointLight(0x5e9dff, 2.4, 5000); rimL.position.set(-720, 180, -420); scene.add(rimL);
-    const fill = new THREE.PointLight(0x2f57ff, 0.9, 5000); fill.position.set(320, -340, 720); scene.add(fill);
-    const sweep = new THREE.DirectionalLight(0xdfe9ff, 0.7); scene.add(sweep);
-
-    const loader = new THREE.TextureLoader();
-    const mkTex = (url) => { const t = loader.load(url, () => { frontM.needsUpdate = true; backM.needsUpdate = true; }); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; };
-    const frontM = new THREE.MeshStandardMaterial({ map: mkTex('/assets/shell-front.webp'), transparent: true, alphaTest: 0.08, metalness: 0.35, roughness: 0.42 });
-    const backM = new THREE.MeshStandardMaterial({ map: mkTex('/assets/shell-back.webp'), transparent: true, alphaTest: 0.08, metalness: 0.35, roughness: 0.42 });
-    const rimM = new THREE.MeshStandardMaterial({ color: 0x8ea9dd, metalness: 0.95, roughness: 0.3 });
-    const capM = new THREE.MeshStandardMaterial({ color: 0x0a1035, metalness: 0.6, roughness: 0.55 });
-
-    const group = new THREE.Group();
-    scene.add(group);
-
+    const back = document.getElementById('tp3-back');
+    if (!box || !spin || !face) return;
     if (window.innerWidth < 880) box.style.width = 'clamp(150px,22.5vh,240px)';
-    const w0 = box.offsetWidth || 280, h0 = box.offsetHeight || (w0 / 473 * 969);
-    const t = w0 * 0.11, R = w0 * 0.135;
-    const rr = (w, h, r) => {
-      const s = new THREE.Shape(), x = -w / 2, y = -h / 2;
-      s.moveTo(x + r, y);
-      s.lineTo(x + w - r, y); s.absarc(x + w - r, y + r, r, -Math.PI / 2, 0, false);
-      s.lineTo(x + w, y + h - r); s.absarc(x + w - r, y + h - r, r, 0, Math.PI / 2, false);
-      s.lineTo(x + r, y + h); s.absarc(x + r, y + h - r, r, Math.PI / 2, Math.PI, false);
-      s.lineTo(x, y + r); s.absarc(x + r, y + r, r, Math.PI, Math.PI * 1.5, false);
-      return s;
+    box.style.transformStyle = 'preserve-3d';
+    spin.style.transformStyle = 'preserve-3d';
+    const fitDepth = () => {
+      const depth = Math.max(12, box.getBoundingClientRect().width * 0.11);
+      const half = depth / 2;
+      face.style.transform = 'translateZ(' + half + 'px)';
+      if (back) back.style.transform = 'rotateY(180deg) translateZ(' + half + 'px)';
     };
-    const slabG = new THREE.ExtrudeGeometry(rr(w0 - 3, h0 - 3, R), { depth: t, bevelEnabled: true, bevelThickness: 1.6, bevelSize: 1.4, bevelSegments: 3, curveSegments: 24 });
-    slabG.translate(0, 0, -t / 2);
-    group.add(new THREE.Mesh(slabG, [capM, rimM]));
-    const fp = new THREE.Mesh(new THREE.PlaneGeometry(w0, h0), frontM); fp.position.z = t / 2 + 0.8; group.add(fp);
-    const bp = new THREE.Mesh(new THREE.PlaneGeometry(w0 * 1.017, h0), backM); bp.rotation.y = Math.PI; bp.position.z = -(t / 2 + 0.8); group.add(bp);
-    const btn = (side, fromTop, hFrac) => {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(4.5, h0 * hFrac, t * 0.5), rimM);
-      m.position.set(side * (w0 / 2 - 0.5), h0 * (0.5 - fromTop), 0);
-      group.add(m);
-    };
-    btn(1, 0.26, 0.105); btn(-1, 0.155, 0.045); btn(-1, 0.225, 0.062); btn(-1, 0.305, 0.062);
+    fitDepth();
+    if (typeof ResizeObserver !== 'undefined') {
+      this.trackObserver(new ResizeObserver(fitDepth)).observe(box);
+    }
 
-    const tz = t / 2 + 1;
-    let scl = 1;
-    const resize = () => {
-      const cw = canvas.offsetWidth || 1, ch = canvas.offsetHeight || 1;
-      renderer.setSize(cw, ch, false);
-      camera.aspect = cw / ch;
-      camera.fov = 2 * Math.atan((ch / 2) / P) * 180 / Math.PI;
-      camera.updateProjectionMatrix();
-      scl = (box.offsetWidth || w0) / w0;
-      group.scale.setScalar(scl);
-    };
-    resize();
-    window.addEventListener('resize', resize);
-    if (this._prSetters) this._prSetters.push(() => { renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this._dprCap)); resize(); });
-
-    // cubic-bezier(.6,.04,.16,1) — same curve as the camera flights
-    const bez = (p1x, p1y, p2x, p2y) => {
-      const cx = 3 * p1x, bx = 3 * (p2x - p1x) - cx, ax = 1 - cx - bx;
-      const cy = 3 * p1y, by = 3 * (p2y - p1y) - cy, ay = 1 - cy - by;
-      const xAt = (u) => ((ax * u + bx) * u + cx) * u;
-      const dxAt = (u) => (3 * ax * u + 2 * bx) * u + cx;
-      return (x) => {
-        let u = x;
-        for (let i = 0; i < 6; i++) { const e = xAt(u) - x, d = dxAt(u); if (Math.abs(e) < 1e-4 || d === 0) break; u -= e / d; }
-        return ((ay * u + by) * u + cy) * u;
-      };
-    };
-    const ease = bez(0.6, 0.04, 0.16, 1);
-
-    let rot = -540, anim = null;
+    let rot = -540;
     const setRot = (deg, ms) => {
-      if (!ms) { rot = deg; anim = null; return; }
-      anim = { from: rot, to: deg, start: performance.now(), dur: ms };
+      spin.style.transition = ms ? 'transform ' + ms + 'ms cubic-bezier(.6,.04,.16,1)' : 'none';
+      spin.style.transform = 'rotateY(' + deg + 'deg)';
+      rot = deg;
     };
 
-    let skip = 0;
-    const tick = () => {
-      requestAnimationFrame(tick);
-      if (document.hidden) return;
-      if ((this._tier ?? 2) === 0 && (skip = 1 - skip)) return;
-      const now = performance.now();
-      if (anim) {
-        const k = (now - anim.start) / anim.dur;
-        if (k >= 1) { rot = anim.to; anim = null; }
-        else rot = anim.from + (anim.to - anim.from) * ease(k);
-      }
-      const r = wrapEl ? wrapEl.getBoundingClientRect() : null;
-      if (r && (r.bottom < -window.innerHeight * 0.6 || r.top > window.innerHeight * 1.6)) return;
-      const rx = Math.sin(now * 0.00055) * 1.1;
-      group.rotation.x = -rx * Math.PI / 180;
-      group.rotation.y = rot * Math.PI / 180;
-      sweep.position.set(Math.sin(rot * Math.PI / 180 + 0.9) * 800, 260, Math.cos(rot * Math.PI / 180 + 0.9) * 800);
-      spin.style.transform = 'rotateX(' + rx + 'deg) rotateY(' + rot + 'deg)';
-      face.style.transform = 'translateZ(' + (tz * scl) + 'px)';
-      renderer.render(scene, camera);
-    };
-    tick();
-
+    setRot(rot, 0);
     this._p3 = { setRot };
   }
 
-  // ---------------- three.js hero coins (mixed faces) ----------------
+  // Decorative hero field is CSS-only; reduced-motion viewers get a still wash.
   initCoins() {
-    const canvas = document.querySelector('#tp-coins');
-    const hero = document.querySelector('#tp-hero');
-    if (!canvas || !hero || !THREE) return;
-    const reduced = this.props.reducedMotion ?? false;
-    const density = this.props.coinDensity ?? 1.4;
-    const isMobile = window.innerWidth < 768;
-
-    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: (this._tier ?? 2) > 0, powerPreference: 'high-performance' });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this._dprCap ?? 2));
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
-    camera.position.set(0, 0, 26);
-
-    scene.add(new THREE.HemisphereLight(0x8fb8ff, 0x02063a, 0.85));
-    const key = new THREE.DirectionalLight(0xdfe9ff, 0.75); key.position.set(6, 10, 8); scene.add(key);
-    const rim = new THREE.PointLight(0x5e9dff, 1.0, 60); rim.position.set(-10, -4, 8); scene.add(rim);
-    const deep = new THREE.PointLight(0x2f57ff, 0.8, 60); deep.position.set(10, -8, -6); scene.add(deep);
-
-    // face factory: kind 'glyph' = t.  |  kind 'word' = full taptpay. wordmark
-    const mkFace = (kind) => {
-      const c = document.createElement('canvas'); c.width = c.height = 512;
-      const g = c.getContext('2d');
-      const rad = g.createRadialGradient(200, 190, 40, 256, 256, 300);
-      rad.addColorStop(0, '#2445b8'); rad.addColorStop(0.55, '#152e96'); rad.addColorStop(1, '#091862');
-      const drawText = (ctx, fill) => {
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        if (kind === 'glyph') {
-          ctx.font = '900 250px Larken, Georgia, serif';
-          ctx.fillStyle = fill; ctx.fillText('t.', 256, 266);
-        } else {
-          const upr = '900 96px Larken, Georgia, serif';
-          const ita = 'italic 900 96px Larken, Georgia, serif';
-          ctx.font = upr; const w1 = ctx.measureText('tapt').width;
-          ctx.font = ita; const w2 = ctx.measureText('pay.').width;
-          const total = w1 + w2;
-          const x0 = 256 - total / 2;
-          ctx.textAlign = 'left';
-          ctx.fillStyle = fill;
-          ctx.font = upr; ctx.fillText('tapt', x0, 268);
-          ctx.font = ita; ctx.fillText('pay.', x0 + w1, 268);
-          ctx.textAlign = 'center';
-        }
-      };
-      const draw = () => {
-        g.clearRect(0, 0, 512, 512);
-        g.fillStyle = rad; g.fillRect(0, 0, 512, 512);
-        g.strokeStyle = 'rgba(148,178,238,0.55)'; g.lineWidth = 10;
-        g.beginPath(); g.arc(256, 256, 225, 0, Math.PI * 2); g.stroke();
-        g.strokeStyle = 'rgba(110,148,230,0.28)'; g.lineWidth = 3;
-        g.beginPath(); g.arc(256, 256, 205, 0, Math.PI * 2); g.stroke();
-        g.save(); g.translate(5, 9); drawText(g, 'rgba(10,20,90,0.55)'); g.restore();
-        drawText(g, '#a7c2f0');
-      };
-      draw();
-      const tex = new THREE.CanvasTexture(c);
-      const b = document.createElement('canvas'); b.width = b.height = 512;
-      const bg2 = b.getContext('2d');
-      const drawBump = () => {
-        bg2.filter = 'none';
-        bg2.fillStyle = '#000'; bg2.fillRect(0, 0, 512, 512);
-        // blurred pass = smooth bevel ramp, sharp pass = flat raised top
-        bg2.filter = 'blur(3px)';
-        bg2.strokeStyle = '#fff'; bg2.lineWidth = 13;
-        bg2.beginPath(); bg2.arc(256, 256, 225, 0, Math.PI * 2); bg2.stroke();
-        drawText(bg2, '#fff');
-        bg2.filter = 'none';
-        bg2.strokeStyle = '#fff'; bg2.lineWidth = 10;
-        bg2.beginPath(); bg2.arc(256, 256, 225, 0, Math.PI * 2); bg2.stroke();
-        drawText(bg2, '#fff');
-      };
-      drawBump();
-      const btex = new THREE.CanvasTexture(b);
-      return { tex, btex, redraw: () => { draw(); drawBump(); tex.needsUpdate = true; btex.needsUpdate = true; } };
-    };
-    const faceGlyph = mkFace('glyph');
-    const faceWord = mkFace('word');
-    try { document.fonts.load('900 96px Larken').then(() => { faceGlyph.redraw(); faceWord.redraw(); }); } catch (e) {}
-    try { document.fonts.load('italic 900 96px Larken'); } catch (e) {}
-
-    const matGlyph = new THREE.MeshStandardMaterial({ map: faceGlyph.tex, bumpMap: faceGlyph.btex, bumpScale: 0.065, metalness: 0.15, roughness: 0.8 });
-    const matWord = new THREE.MeshStandardMaterial({ map: faceWord.tex, bumpMap: faceWord.btex, bumpScale: 0.065, metalness: 0.15, roughness: 0.8 });
-    const sideMat = new THREE.MeshStandardMaterial({ color: 0x1b34a0, metalness: 0.2, roughness: 0.82 });
-    const geo = new THREE.CylinderGeometry(1, 1, 0.14, 72);
-
-    const group = new THREE.Group();
-    scene.add(group);
-    let coins = [];
-    const buildCoins = (dens) => {
-      coins.forEach((c) => group.remove(c.mesh));
-      coins = [];
-      const N = Math.round((isMobile ? 7 : 13) * dens);
-      for (let i = 0; i < N; i++) {
-        const fm = (i % 2 === 0) ? matWord : matGlyph;
-        const mesh = new THREE.Mesh(geo, [sideMat, fm, fm]);
-        const s = 0.7 + Math.random() * 1.05;
-        mesh.scale.setScalar(s);
-        // spawn without overlapping an existing coin
-        let sx = 0, sy = 0, sz = 0, tries = 0;
-        do {
-          sx = (Math.random() * 2 - 1) * 15; sy = (Math.random() * 2 - 1) * 11; sz = -6 + Math.random() * 10;
-          tries++;
-        } while (tries < 14 && coins.some((o) => {
-          const ddx = o.mesh.position.x - sx, ddy = o.mesh.position.y - sy, ddz = o.mesh.position.z - sz;
-          const md = o.r + s; return ddx * ddx + ddy * ddy + ddz * ddz < md * md;
-        }));
-        mesh.position.set(sx, sy, sz);
-        mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-        group.add(mesh);
-        const rx0 = (Math.random() - 0.5) * 0.012;
-        const ry0 = (Math.random() - 0.5) * 0.012;
-        const rz0 = (Math.random() - 0.5) * 0.008;
-        coins.push({
-          mesh, r: s,
-          vy: 0.008 + Math.random() * 0.014,
-          rx: rx0, ry: ry0, rz: rz0,
-          rx0, ry0, rz0,
-          ivx: 0, ivy: 0, ivz: 0,
-          px: Math.random() * Math.PI * 2,
-          sway: 0.3 + Math.random() * 0.7
-        });
-      }
-    };
-    buildCoins(density);
-    this._rebuildCoins = buildCoins;
-
-    const resize = () => {
-      const r = hero.getBoundingClientRect();
-      renderer.setSize(r.width, r.height, false);
-      camera.aspect = r.width / r.height;
-      camera.updateProjectionMatrix();
-    };
-    resize();
-    window.addEventListener('resize', resize);
-
-    const sm = { x: 0, y: 0 };
-    if (this._prSetters) this._prSetters.push(() => { renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this._dprCap)); resize(); });
-    let t0 = performance.now();
-    const loop = () => {
-      requestAnimationFrame(loop);
-      const now = performance.now();
-      const dt = Math.min((now - t0) / 16.6, 3); t0 = now;
-      if (document.hidden || this._coinsOpacity <= 0.001) return;
-      const t = now / 1000;
-      sm.x += (this._mx - sm.x) * 0.05;
-      sm.y += (this._my - sm.y) * 0.05;
-      camera.position.x = sm.x * 1.6;
-      camera.position.y = -sm.y * 1.2;
-      camera.lookAt(0, 0, 0);
-      const sv = Math.max(-30, Math.min(30, this._scrollVel || 0));
-      coins.forEach((c) => {
-        if (!reduced) {
-          const p = c.mesh.position;
-          p.y -= (c.vy + sv * 0.0009) * dt * 1.9;
-          p.x += Math.sin(t * c.sway + c.px) * 0.004 * dt;
-          // bounce impulses from collisions, decaying back to a calm drift
-          p.x += c.ivx * dt; p.y += c.ivy * dt; p.z += c.ivz * dt;
-          const dk = Math.pow(0.972, dt);
-          c.ivx *= dk; c.ivy *= dk; c.ivz *= dk;
-          // spin relaxes back to its base tumble after a knock
-          c.rx += (c.rx0 - c.rx) * 0.012 * dt;
-          c.ry += (c.ry0 - c.ry) * 0.012 * dt;
-          c.rz += (c.rz0 - c.rz) * 0.012 * dt;
-          c.mesh.rotation.x += c.rx * dt;
-          c.mesh.rotation.y += c.ry * dt;
-          c.mesh.rotation.z += c.rz * dt;
-          if (p.x > 16) p.x = 16; else if (p.x < -16) p.x = -16;
-          if (p.z > 4.5) p.z = 4.5; else if (p.z < -6.5) p.z = -6.5;
-          if (p.y < -13) { p.y = 13; p.x = (Math.random() * 2 - 1) * 15; c.ivx = 0; c.ivy = 0; c.ivz = 0; }
-          if (p.y > 13.6) { p.y = -13; }
-        }
-      });
-      // solid-body pass: coins shove each other apart and trade a bounce + spin
-      if (!reduced) {
-        for (let i = 0; i < coins.length; i++) {
-          for (let j = i + 1; j < coins.length; j++) {
-            const a = coins[i], b = coins[j];
-            const pa = a.mesh.position, pb = b.mesh.position;
-            const dx = pb.x - pa.x, dy = pb.y - pa.y, dz = pb.z - pa.z;
-            const minD = (a.r + b.r) * 0.85;
-            const d2 = dx * dx + dy * dy + dz * dz;
-            if (d2 === 0 || d2 >= minD * minD) continue;
-            const d = Math.sqrt(d2);
-            const nx = dx / d, ny = dy / d, nz = dz / d;
-            const ma = a.r * a.r, mb = b.r * b.r, mt = ma + mb;
-            // push out of overlap (heavier coin budges less)
-            const ov = (minD - d);
-            pa.x -= nx * ov * (mb / mt); pa.y -= ny * ov * (mb / mt); pa.z -= nz * ov * (mb / mt);
-            pb.x += nx * ov * (ma / mt); pb.y += ny * ov * (ma / mt); pb.z += nz * ov * (ma / mt);
-            // impulse only if still approaching
-            const rvx = b.ivx - a.ivx;
-            const rvy = (b.ivy - b.vy * 1.9) - (a.ivy - a.vy * 1.9);
-            const rvz = b.ivz - a.ivz;
-            const rel = rvx * nx + rvy * ny + rvz * nz;
-            if (rel < 0) {
-              const imp = Math.min(-rel * 1.5, 0.12);
-              const ja = imp * (mb / mt), jb = imp * (ma / mt);
-              a.ivx -= nx * ja; a.ivy -= ny * ja; a.ivz -= nz * ja;
-              b.ivx += nx * jb; b.ivy += ny * jb; b.ivz += nz * jb;
-              const kick = Math.min(imp * 0.5, 0.03);
-              a.rx += (Math.random() - 0.5) * kick; a.ry += (Math.random() - 0.5) * kick; a.rz += (Math.random() - 0.5) * kick * 0.6;
-              b.rx += (Math.random() - 0.5) * kick; b.ry += (Math.random() - 0.5) * kick; b.rz += (Math.random() - 0.5) * kick * 0.6;
-            }
-          }
-        }
-      }
-      renderer.render(scene, camera);
-    };
-    loop();
+    const coins = document.querySelector('#tp-coins');
+    if (!coins) return;
+    coins.style.transition = 'opacity .2s linear';
+    if (this.props.reducedMotion) coins.style.opacity = '0.45';
   }
 }
