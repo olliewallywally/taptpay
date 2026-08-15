@@ -16,7 +16,6 @@ import {
 } from "./port-manager";
 import { createRequestLogger } from "./request-log";
 import { createGlobalErrorHandler } from "./http-error-handler";
-import { registerLandingDemoRoutes } from "./landing-demo-routes";
 
 const app = express();
 
@@ -56,47 +55,9 @@ app.use(helmet({
   crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
 }));
 
-// The standalone landing demo is the only application document allowed inside
-// a same-origin frame. Keep the normal app/payment documents on Helmet's DENY
-// policy and replace the headers for this exact path only.
-const LANDING_DEMO_DOCUMENT_CSP = [
-  "default-src 'none'",
-  "script-src 'self'",
-  "style-src 'self' 'unsafe-inline'",
-  "connect-src 'self'",
-  "img-src 'self' data:",
-  "font-src 'self'",
-  "object-src 'none'",
-  "base-uri 'none'",
-  "form-action 'none'",
-  "frame-ancestors 'self'",
-].join("; ");
-
-app.use((req, res, next) => {
-  if (req.path === "/landing-demo.html") {
-    res.set({
-      "X-Frame-Options": "SAMEORIGIN",
-      "Content-Security-Policy": LANDING_DEMO_DOCUMENT_CSP,
-      "X-Robots-Tag": "noindex, nofollow",
-      "X-Content-Type-Options": "nosniff",
-      "Cache-Control": "private, no-store",
-      "Referrer-Policy": "no-referrer",
-    });
-  }
-  next();
-});
-
 // Gzip compression for all responses — skips already-compressed assets and
 // very small payloads (< 1 KB) where compression overhead outweighs savings.
 app.use(compression({ threshold: 1024 }));
-
-// Development can exercise the isolated in-memory sandbox. Production is an
-// autoscale deployment without proven sticky routing, so mounting the Map-backed
-// service there would strand sessions across instances. Keep it fail-closed
-// until the deployment-store gate in the landing plan is resolved.
-if (!isProduction) {
-  registerLandingDemoRoutes(app);
-}
 
 // Bearer-addressed payment pages must not leak their URL through browser
 // referrers or shared caches. This runs before Vite/static fallback, so the HTML
@@ -119,11 +80,7 @@ app.use((req, res, next) => {
 
 // Skip JSON parsing for webhook routes to preserve raw body for signature verification
 app.use((req, res, next) => {
-  if (
-    req.path === '/api/windcave/notification' ||
-    req.path === '/api/landing-demo' ||
-    req.path.startsWith('/api/landing-demo/')
-  ) {
+  if (req.path === '/api/windcave/notification') {
     next();
   } else {
     express.json()(req, res, next);

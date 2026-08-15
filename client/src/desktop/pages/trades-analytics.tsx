@@ -811,7 +811,7 @@ const TA_CSS = `
 .ta-chart-summary { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 
 /* ── generated report ── */
-.ta-report { animation:reportIn .55s cubic-bezier(.22,.9,.3,1) both; display:flex; flex-direction:column; height:408px; }
+.ta-report { animation:reportIn var(--m-dur-ui) var(--m-ease-out) both; display:flex; flex-direction:column; height:408px; }
 .ta-rep-head { display:flex; align-items:center; gap:14px; }
 .ta-back { display:inline-flex; align-items:center; gap:8px; padding:9px 18px; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); background:transparent; font-weight:600; font-size:12.5px; color:${ACCENT_SOFT}; cursor:pointer; transition:background .15s ease; }
 .ta-back:hover { background:rgba(94,158,255,0.08); }
@@ -834,7 +834,7 @@ const TA_CSS = `
 .ta-legend-val { font-weight:700; font-size:12px; color:${TEXT_SOFT}; }
 .ta-bars { margin-top:26px; display:flex; align-items:flex-end; gap:12px; height:162px; }
 .ta-bar-col { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:8px; height:100%; }
-.ta-bar { width:100%; max-width:44px; border-radius:8px; background:${ACCENT}; animation:tileIn .45s cubic-bezier(.22,.9,.3,1) both; }
+.ta-bar { width:100%; max-width:44px; border-radius:8px; background:${ACCENT}; animation:tileIn var(--m-dur-ui) var(--m-ease-out) both; }
 .ta-bar-label { font-weight:700; font-size:11.5px; color:${ACCENT_SOFT}; }
 .ta-rep-right { flex:1; display:flex; flex-direction:column; min-width:0; }
 .ta-rep-detail-title { font-weight:700; font-size:11px; letter-spacing:0.18em; color:${NAV_DIM}; }
@@ -877,7 +877,7 @@ const TA_CSS = `
 .ta-tx-right { display:flex; flex-direction:column; align-items:flex-end; gap:3px; flex:0 0 auto; }
 .ta-tx-amt { font-weight:700; font-size:15.5px; color:${INK}; font-variant-numeric:tabular-nums; }
 .ta-tx-status { font-weight:500; font-size:11.5px; color:${SHEET_LABEL}; }
-.ta-tiles-wrap { animation:tileIn .4s cubic-bezier(.22,.9,.3,1) both; }
+.ta-tiles-wrap { animation:tileIn var(--m-dur-ui) var(--m-ease-out) both; }
 .ta-tiles-hint { font-weight:600; font-size:13px; color:${SHEET_DIM}; }
 .ta-tiles { margin-top:16px; display:grid; grid-template-columns:repeat(5,1fr); gap:10px; }
 .ta-tile { display:flex; flex-direction:column; align-items:flex-start; gap:11px; padding:16px; border-radius:14px; background:${SHEET_BG}; border:0; cursor:pointer; text-align:left; transition:background .15s ease; }
@@ -887,7 +887,7 @@ const TA_CSS = `
 .ta-tile-title { font-weight:700; font-size:13.5px; color:${SHEET_INK}; }
 .ta-tile-desc { font-weight:500; font-size:11px; line-height:1.35; color:${SHEET_DIM}; }
 
-.ta-filters { animation:tileIn .4s cubic-bezier(.22,.9,.3,1) both; display:flex; flex-direction:column; gap:22px; }
+.ta-filters { animation:tileIn var(--m-dur-ui) var(--m-ease-out) both; display:flex; flex-direction:column; gap:22px; }
 .ta-filter-group { display:flex; flex-direction:column; gap:10px; }
 .ta-filter-label { font-weight:700; font-size:11px; letter-spacing:0.16em; color:${SHEET_LABEL}; }
 .ta-filter-chips { display:flex; flex-wrap:wrap; gap:8px; }

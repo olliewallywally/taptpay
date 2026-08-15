@@ -1,0 +1,9 @@
+{
+  "id": "7",
+  "subject": "Step 11 — close the loop in docs and memory",
+  "description": "Update replit.md for the new startup contract, HANDOFF §6 with the decision rulings, and rewrite the dev-db-unapplied-migrations memory's Still open list against what actually closed.",
+  "activeForm": "Updating docs and memory",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

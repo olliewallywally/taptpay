@@ -43,6 +43,7 @@ import {
   DesktopPageScaffold,
   type DesktopRoutePageProps,
 } from "../DesktopPageScaffold";
+import { entranceProps, useListEntrance } from "../list-entrance";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -270,6 +271,17 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
       { label: "EARLIER", rows: earlier },
     ].filter((g) => g.rows.length > 0);
   }, [transactions]);
+
+  /* Row entrance: seeded from the whole transaction dataset, so switching the
+     sheet or re-rendering a group never replays a sale already seen. Visible
+     order is the flattened group order, which is what the stagger follows. */
+  const entrance = useListEntrance(
+    useMemo(() => transactions.map((t) => String(t.id)), [transactions]),
+    useMemo(
+      () => historyGroups.flatMap((g) => g.rows.map((t) => String(t.id))),
+      [historyGroups],
+    ),
+  );
 
   const itemOptions = useMemo(() => itemChips(stockItems, transactions), [stockItems, transactions]);
 
@@ -705,7 +717,7 @@ export default function DesktopRetailAnalytics(props: DesktopRoutePageProps) {
                         <div key={tx.id}>
                           <button
                             type="button"
-                            className="ra-tx-row"
+                            {...entranceProps(entrance, String(tx.id), "ra-tx-row")}
                             aria-expanded={open}
                             onClick={() => {
                               setOpenTxId(open ? null : tx.id);
@@ -914,7 +926,7 @@ const RA_CSS = `
 .ra-chart-summary { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 
 /* ── generated report ── */
-.ra-report { animation:reportIn .55s cubic-bezier(.22,.9,.3,1) both; display:flex; flex-direction:column; height:408px; }
+.ra-report { animation:reportIn var(--m-dur-ui) var(--m-ease-out) both; display:flex; flex-direction:column; height:408px; }
 .ra-rep-head { display:flex; align-items:center; gap:14px; }
 .ra-back { display:inline-flex; align-items:center; gap:8px; padding:9px 18px; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); background:transparent; font-weight:600; font-size:12.5px; color:${ACCENT_SOFT}; cursor:pointer; transition:background .15s ease; }
 .ra-back:hover { background:rgba(94,158,255,0.08); }
@@ -937,7 +949,7 @@ const RA_CSS = `
 .ra-legend-val { font-weight:700; font-size:12px; color:${TEXT_SOFT}; }
 .ra-bars { margin-top:26px; display:flex; align-items:flex-end; gap:12px; height:162px; }
 .ra-bar-col { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:8px; height:100%; }
-.ra-bar { width:100%; max-width:44px; border-radius:8px; background:${ACCENT}; animation:tileIn .45s cubic-bezier(.22,.9,.3,1) both; }
+.ra-bar { width:100%; max-width:44px; border-radius:8px; background:${ACCENT}; animation:tileIn var(--m-dur-ui) var(--m-ease-out) both; }
 .ra-bar-label { font-weight:700; font-size:11.5px; color:${ACCENT_SOFT}; }
 .ra-rep-right { flex:1; display:flex; flex-direction:column; min-width:0; }
 .ra-rep-detail-title { font-weight:700; font-size:11px; letter-spacing:0.18em; color:${NAV_DIM}; }
@@ -981,7 +993,7 @@ const RA_CSS = `
 .ra-tx-right { display:flex; flex-direction:column; align-items:flex-end; gap:3px; flex:0 0 auto; }
 .ra-tx-amt { font-weight:700; font-size:15.5px; color:${INK}; font-variant-numeric:tabular-nums; }
 .ra-tx-status { font-weight:500; font-size:11.5px; color:${SHEET_LABEL}; }
-.ra-tx-detail { padding:14px 0 18px 62px; border-bottom:1px solid #E6E8F0; animation:tileIn .25s ease both; }
+.ra-tx-detail { padding:14px 0 18px 62px; border-bottom:1px solid #E6E8F0; animation:tileIn var(--m-dur-ui) var(--m-ease-out) both; }
 .ra-tx-acts { display:flex; flex-wrap:wrap; gap:10px; }
 .ra-refund { margin-top:14px; display:flex; align-items:flex-end; flex-wrap:wrap; gap:12px; }
 .ra-refund-field { display:flex; flex-direction:column; gap:6px; }
@@ -992,7 +1004,7 @@ const RA_CSS = `
 .ra-refund-grow input { width:100%; }
 .ra-refund-note { font-weight:500; font-size:11.5px; color:${SHEET_LABEL}; padding-bottom:12px; }
 
-.ra-tiles-wrap { animation:tileIn .4s cubic-bezier(.22,.9,.3,1) both; }
+.ra-tiles-wrap { animation:tileIn var(--m-dur-ui) var(--m-ease-out) both; }
 .ra-tiles-hint { font-weight:600; font-size:13px; color:${SHEET_DIM}; }
 .ra-tiles { margin-top:16px; display:grid; grid-template-columns:repeat(5,1fr); gap:10px; }
 .ra-tile { display:flex; flex-direction:column; align-items:flex-start; gap:11px; padding:16px; border-radius:14px; background:#fff; border:1px solid #E6E8F0; cursor:pointer; text-align:left; transition:background .15s ease, transform .15s ease; }
@@ -1002,7 +1014,7 @@ const RA_CSS = `
 .ra-tile-title { font-weight:700; font-size:13.5px; color:${SHEET_INK}; }
 .ra-tile-desc { font-weight:500; font-size:11px; line-height:1.35; color:${SHEET_DIM}; }
 
-.ra-filters { animation:tileIn .4s cubic-bezier(.22,.9,.3,1) both; display:flex; flex-direction:column; gap:22px; }
+.ra-filters { animation:tileIn var(--m-dur-ui) var(--m-ease-out) both; display:flex; flex-direction:column; gap:22px; }
 .ra-filter-group { display:flex; flex-direction:column; gap:10px; }
 .ra-filter-label { font-weight:700; font-size:11px; letter-spacing:0.16em; color:${SHEET_LABEL}; }
 .ra-filter-chips { display:flex; flex-wrap:wrap; gap:8px; }

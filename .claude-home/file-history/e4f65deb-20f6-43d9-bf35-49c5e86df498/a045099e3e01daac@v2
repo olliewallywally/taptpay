@@ -1,0 +1,42 @@
+---
+name: landing-pricing-repositioning
+description: "Landing page still advertises retired 10¢/0.3% transaction pricing; the subscription rewrite sits uncommitted in stash@{1}"
+metadata: 
+  node_type: memory
+  type: project
+  originSessionId: e4f65deb-20f6-43d9-bf35-49c5e86df498
+  modified: 2026-08-08T05:02:46.562Z
+---
+
+TaptPay moved from transaction-fee pricing to **subscription-only, $0 per
+transaction**. The backend half shipped in commit `c350644` (2026-08-08), which
+added `shared/plans.ts` — Solo $7.99/1 seat, Team $8.99/5 seats (popular),
+Crew $12.99/10 seats — plus `formatPlanPrice()`.
+
+The **landing page half never shipped**. As of 2026-08-08 the working tree still
+advertises the retired model, so the marketing site contradicts what the product
+now bills:
+
+- `client/src/pages/landing-page.tsx` — nav still reads
+  `"pricing: 10¢ retail · 0.3% everything else"`; the revenue panel shows a
+  150px `10¢` and `0.3%`; the three plan cards hardcode `$7.99` / `$8.99` /
+  `$12.99` and their seat blurbs instead of reading `PLANS`.
+- `client/src/pages/landingRuntime.ts` — all three industry stat rows still show
+  `0.3% platform fee` / `10¢ per transaction, flat`, and story beat `05` still
+  says `10¢ flat per transaction, not a percentage` (in **both** the live
+  `initCinema()` beat list and the dead `_cinemaLegacy()` copy).
+
+The finished rewrite is in `stash@{1}`, based on `c350644` and applying cleanly.
+It replaces the hardcoded values with `PLANS` / `formatPlanPrice` imports from
+`@shared/plans`, restates the headline as `$0` / `no transaction fee` /
+`3-in-1 · retail, property and trades. one subscription.`, and deletes the dead
+`client/src/components/PricingSection.tsx` (no importers; a legacy Tailwind/motion
+component advertising the old `$0.10 per transaction`).
+
+The same stash removes the now-unused Stripe deps (`stripe`,
+`stripe-replit-sync`, `@stripe/*`) from `package.json` — billing is Windcave —
+and strips the "savings vs current provider" card from `server/report-generator.ts`,
+which only made sense under percentage pricing.
+
+Restoring the stash is also required to make HEAD compile at all — see
+[[head-broken-stash1-fix]]. Related: [[landing-phone-demo-status]].

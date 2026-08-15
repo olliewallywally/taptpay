@@ -1,0 +1,9 @@
+{
+  "id": "1",
+  "subject": "Step 1 — green baseline, then commit the review pass in slices",
+  "description": "Re-run tsc + both jest projects + postgres verifier post-migration, then commit the 2026-08-09 review pass in the §6 slices. Never git add -A; exclude .claude-home/** and .claude/settings.local.json; both index.html files go as one unit. RATIFY items get isolated commits.",
+  "activeForm": "Committing the review pass in slices",
+  "status": "in_progress",
+  "blocks": [],
+  "blockedBy": []
+}

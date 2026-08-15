@@ -1,0 +1,9 @@
+{
+  "id": "2",
+  "subject": "Step 3 — repair the landing-phone budget gate",
+  "description": "scripts/landing-phone-build-graph.mjs:125 matches manifest keys by source path; the DeferredLandingPhone wrapper made LandingPhoneMount a shared chunk keyed _LandingPhoneMount-*.js. Re-point the resolution at node.file/isDynamicEntry, keep all three assertions. Gate: verify-landing-phone.mjs exits 0 within budget.",
+  "activeForm": "Repairing the landing-phone budget gate",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

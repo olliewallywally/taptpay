@@ -1,0 +1,42 @@
+/* What the mobile app's background actually looks like. */
+import { mkdir } from "node:fs/promises";
+import { BASE_URL, newRetailPage } from "/home/runner/workspace/scripts/desktop-shots/retail-fixtures.mjs";
+import { chromium } from "/home/runner/workspace/node_modules/playwright/index.mjs";
+
+const CHROMIUM_PATH =
+  "/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium";
+const OUT = "/tmp/claude-1000/-home-runner-workspace/e250668d-66ab-4253-93b0-0a4d7795f53f/scratchpad/shots";
+
+await mkdir(OUT, { recursive: true });
+const browser = await chromium.launch({ executablePath: CHROMIUM_PATH });
+try {
+  const { context, page } = await newRetailPage(browser, "mobile", {
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+    isMobile: true,
+  });
+  try {
+    await page.goto(`${BASE_URL}/dashboard`, { waitUntil: "networkidle" });
+    await page.waitForTimeout(1500);
+    const probe = await page.evaluate(() => ({
+      html: getComputedStyle(document.documentElement).backgroundColor,
+      body: getComputedStyle(document.body).backgroundColor,
+      root: document.querySelector("#root")
+        ? getComputedStyle(document.querySelector("#root")).backgroundColor
+        : null,
+      firstDivs: Array.from(document.querySelectorAll("#root > div, #root > div > div"))
+        .slice(0, 6)
+        .map((el) => ({
+          cls: el.className?.toString().slice(0, 60),
+          bg: getComputedStyle(el).backgroundColor,
+        })),
+    }));
+    console.log(JSON.stringify(probe, null, 2));
+    await page.screenshot({ path: `${OUT}/mobile.png` });
+  } finally {
+    await context.close();
+  }
+} finally {
+  await browser.close();
+}
+console.log("done");

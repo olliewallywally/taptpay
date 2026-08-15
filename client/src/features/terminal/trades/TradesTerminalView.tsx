@@ -100,6 +100,7 @@ function SubBar({ activeIdx = -1, onPick, compact = false, hideLabel = false }: 
           return (
             <button key={id} ref={(el: any) => (btnRefs.current[i] = el)}
               className={`tp-subbar-btn${active ? ' active' : ''}`}
+              data-demo-id={`trades-mode-${id}`}
               onClick={() => onPick?.(i)} aria-label={label}>
               <Icon sz={18} c={ic} />
               {active && !hideLabel && <span className="tp-subbar-label">{label}</span>}
@@ -150,11 +151,11 @@ function TopBanner({ msg }: { msg: string | null }) {
 }
 
 /* ═══ SUBHEAD (cancel / confirm) ═══ */
-function SubHead({ onCancel, onCommit }: any) {
+function SubHead({ onCancel, onCommit, demoCommitId }: any) {
   return (
     <div className="tp-subhead">
       <button className="tp-subhead-btn" onClick={onCancel} aria-label="cancel"><Ic.X /></button>
-      <button className="tp-subhead-btn" onClick={onCommit} aria-label="confirm"><Ic.Check /></button>
+      <button className="tp-subhead-btn" onClick={onCommit} aria-label="confirm" data-demo-id={demoCommitId}><Ic.Check /></button>
     </div>
   );
 }
@@ -246,7 +247,7 @@ function ChooseClient({ clients, invoices, go, onSelect, onQuickInvoice }: any) 
         <div className="tp-thin-scroll" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 130 }}>
           {/* Invoice flow only: skip the client entirely — type details inline */}
           {onQuickInvoice && !q && (
-            <button onClick={onQuickInvoice}
+            <button onClick={onQuickInvoice} data-demo-id="trades-quick-invoice"
               style={{ textAlign: 'left', background: 'rgba(88,171,255,0.1)', border: '1.5px dashed rgba(88,171,255,0.45)', borderRadius: 18, padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 13 }}>
               <div style={{ width: 38, height: 38, borderRadius: 999, border: `1.5px solid ${BLUE}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: BLUE }}>
                 <Ic.Plus sz={18} sw={2.6} />
@@ -265,7 +266,7 @@ function ChooseClient({ clients, invoices, go, onSelect, onQuickInvoice }: any) 
             const st = inv ? invoiceStatusFor(inv) : null;
             const dotCls = st === 'paid' ? 'paid' : st === 'failed' ? 'declined' : 'awaiting';
             return (
-              <button key={t.id} onClick={() => onSelect(t)}
+              <button key={t.id} onClick={() => onSelect(t)} data-demo-id={`trades-client-${t.id}`}
                 style={{ textAlign: 'left', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(88,171,255,0.15)', borderRadius: 18, padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 13 }}>
                 <div style={{ width: 38, height: 38, borderRadius: 999, background: BLUE, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, fontWeight: 800, color: OFFW }}>
                   {clientInitials(t)}
@@ -298,9 +299,9 @@ function AmountKeypad({ go, selectedClient, onCommit, backTo = 'invoice' }: any)
   return (
     <div className="tp-screen" style={{ background: NAVY }}>
       <div className="stagger" style={{ background: OFFW, color: NAVY, height: '50%', display: 'flex', flexDirection: 'column' }}>
-        <SubHead onCancel={() => go(backTo, 'down')} onCommit={commit} />
+        <SubHead onCancel={() => go(backTo, 'down')} onCommit={commit} demoCommitId="trades-amount-confirm" />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <div className="tp-amount" style={{ fontSize: 82, color: cents === 0 ? 'rgba(4,13,109,0.25)' : NAVY, marginTop: 18 }}>{fmt(cents)}</div>
+          <div className="tp-amount" data-demo-id="trades-amount" style={{ fontSize: 82, color: cents === 0 ? 'rgba(4,13,109,0.25)' : NAVY, marginTop: 18 }}>{fmt(cents)}</div>
           {selectedClient && (
             <div style={{ fontWeight: 500, fontSize: 15, color: 'rgba(4,13,109,0.5)', paddingBottom: 8 }}>
               {clientName(selectedClient)} · {selectedClient.siteAddress}
@@ -312,12 +313,12 @@ function AmountKeypad({ go, selectedClient, onCommit, backTo = 'invoice' }: any)
       <div className="stagger" style={{ flex: 1, background: NAVY, padding: '38px 28px 28px', display: 'flex', flexDirection: 'column' }}>
         <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, alignItems: 'center', justifyItems: 'center' }}>
           {['1','2','3','4','5','6','7','8','9'].map(d => (
-            <button key={d} className="tp-kp" onClick={() => press(d)}>{d}</button>
+            <button key={d} className="tp-kp" data-demo-id={`trades-key-${d}`} onClick={() => press(d)}>{d}</button>
           ))}
           {/* Amounts entered in cents — no decimal key; this cell is an inert spacer. */}
           <div className="tp-kp" style={{ visibility: 'hidden' }} aria-hidden />
-          <button className="tp-kp" onClick={() => press('0')}>0</button>
-          <button className="tp-kp outline" onClick={back}><Ic.Back /></button>
+          <button className="tp-kp" data-demo-id="trades-key-0" onClick={() => press('0')}>0</button>
+          <button className="tp-kp outline" data-demo-id="trades-key-back" onClick={back}><Ic.Back /></button>
         </div>
       </div>
     </div>
@@ -357,7 +358,7 @@ function QuickInvoice({ go, selectedClient, quickMode, recipient, setRecipient, 
       <div className="stagger" style={{ background: OFFW, color: NAVY, height: '50%', display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={() => go('home', 'down')} onCommit={onSend} />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <button onClick={onEditAmount} style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'baseline', gap: 10 }}>
+          <button onClick={onEditAmount} data-demo-id="trades-invoice-amount" style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'baseline', gap: 10 }}>
             <span className="tp-amount" style={{ fontSize: 82, color: amount === 0 ? 'rgba(4,13,109,0.25)' : NAVY }}>{fmt(amount)}</span>
             <span style={{ fontWeight: 600, fontSize: 12, color: 'rgba(4,13,109,0.4)', textDecoration: 'underline', textUnderlineOffset: 2 }}>edit</span>
           </button>
@@ -374,23 +375,23 @@ function QuickInvoice({ go, selectedClient, quickMode, recipient, setRecipient, 
         {isQuick && (
           <div style={{ width: '100%', marginBottom: 18 }}>
             <div style={QI_LABEL}>send to</div>
-            <input className="tp-field" value={recipient.name} maxLength={120}
+            <input className="tp-field" data-demo-id="trades-recipient-name" value={recipient.name} maxLength={120}
               onChange={e => setRecipient((r: any) => ({ ...r, name: e.target.value }))}
               placeholder="customer name" />
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
               {(['email', 'sms'] as const).map(ch => (
-                <button key={ch} type="button" onClick={() => setRecipient((r: any) => ({ ...r, channel: ch }))} aria-pressed={channel === ch}
+                <button key={ch} type="button" data-demo-id={`trades-recipient-channel-${ch}`} onClick={() => setRecipient((r: any) => ({ ...r, channel: ch }))} aria-pressed={channel === ch}
                   style={{ flex: 1, padding: '11px 0', borderRadius: 999, border: `1.5px solid ${channel === ch ? BLUE : 'rgba(88,171,255,0.25)'}`, background: channel === ch ? BLUE : 'transparent', color: channel === ch ? NAVY : 'rgba(244,244,244,0.65)', fontWeight: 700, fontSize: 12.5, letterSpacing: '0.06em', textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Outfit, system-ui', transition: 'background 0.18s, color 0.18s, border-color 0.18s' }}>
                   {ch === 'sms' ? 'text' : 'email'}
                 </button>
               ))}
             </div>
             {channel === 'email' ? (
-              <input key="qi-email" className="tp-field" type="email" inputMode="email" autoComplete="email" value={recipient.email} maxLength={200}
+              <input key="qi-email" className="tp-field" data-demo-id="trades-recipient-email" type="email" inputMode="email" autoComplete="email" value={recipient.email} maxLength={200}
                 onChange={e => setRecipient((r: any) => ({ ...r, email: e.target.value }))}
                 placeholder="customer email" style={{ marginTop: 10 }} />
             ) : (
-              <input key="qi-phone" className="tp-field" type="tel" inputMode="tel" autoComplete="tel" value={recipient.phone} maxLength={40}
+              <input key="qi-phone" className="tp-field" data-demo-id="trades-recipient-phone" type="tel" inputMode="tel" autoComplete="tel" value={recipient.phone} maxLength={40}
                 onChange={e => setRecipient((r: any) => ({ ...r, phone: e.target.value }))}
                 placeholder="mobile number" style={{ marginTop: 10 }} />
             )}
@@ -400,7 +401,7 @@ function QuickInvoice({ go, selectedClient, quickMode, recipient, setRecipient, 
         {/* Job note */}
         <div style={{ width: '100%' }}>
           <div style={QI_LABEL}>job note <span style={{ opacity: 0.6 }}>· optional</span></div>
-          <input className="tp-field" value={jobNote} onChange={e => setJobNote(e.target.value)} maxLength={500}
+          <input className="tp-field" data-demo-id="trades-job-note" value={jobNote} onChange={e => setJobNote(e.target.value)} maxLength={500}
             placeholder="what's this invoice for?" />
         </div>
 
@@ -416,7 +417,7 @@ function QuickInvoice({ go, selectedClient, quickMode, recipient, setRecipient, 
         </div>
 
         {/* Split bill — merchant enables; customer divides at pay time */}
-        <button type="button" onClick={() => setSplitEnabled((v: boolean) => !v)} aria-pressed={splitEnabled}
+        <button type="button" data-demo-id="trades-split-toggle" onClick={() => setSplitEnabled((v: boolean) => !v)} aria-pressed={splitEnabled}
           style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '13px 16px', borderRadius: 16, marginTop: 14, border: `1px solid ${splitEnabled ? 'rgba(88,171,255,0.4)' : 'rgba(88,171,255,0.15)'}`, background: splitEnabled ? 'rgba(88,171,255,0.1)' : 'rgba(255,255,255,0.04)', cursor: 'pointer', fontFamily: 'Outfit, system-ui' }}>
           <span style={{ flex: 1, textAlign: 'left' }}>
             <span style={{ display: 'block', fontWeight: 600, fontSize: 13.5, color: BLUE }}>split the bill</span>
@@ -431,6 +432,7 @@ function QuickInvoice({ go, selectedClient, quickMode, recipient, setRecipient, 
 
         <button
           className="tp-cta"
+          data-demo-id="trades-invoice-send"
           onClick={onSend}
           disabled={sending || amount <= 0 || !quickOk}
           style={{ minWidth: 220, opacity: sending || amount <= 0 || !quickOk ? 0.65 : 1, flexShrink: 0 }}

@@ -1,0 +1,9 @@
+{
+  "id": "3",
+  "subject": "Step 4 — finish P0 chunk resilience for the non-desktop router",
+  "description": "Global ErrorBoundary above the router at client/src/App.tsx:945 plus a lazyWithRetry helper (bounded retry, timeout, hard-reload fallback) applied to every lazy() in App.tsx. Model on the existing DesktopChunkErrorBoundary. Gate: abort and hang harness both end in something actionable; client tests added.",
+  "activeForm": "Finishing P0 chunk resilience",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

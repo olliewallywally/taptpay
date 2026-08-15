@@ -1,0 +1,61 @@
+---
+name: dev-db-unapplied-migrations
+description: "2026-08-09 app-wouldn't-load incident — dev DB was 3 migrations behind; fixed + committed, with 4 open flags for next session"
+metadata: 
+  node_type: memory
+  type: project
+  originSessionId: aca5eae5-d8cf-4e6b-9c02-a28ab6636e9c
+  modified: 2026-08-09T05:44:52.150Z
+---
+
+**2026-08-09: "app just loads forever after login" on desktop AND mobile.** Root cause was
+the dev database (helium), not the UI.
+
+`shared/schema.ts` had run ahead of the dev DB: migrations **0011, 0012, 0013 were never
+applied** there. Drizzle's `select()` enumerates every declared column, so
+`getOrCreateSubscription()` issued `select … billing_claim_token …` against a table without
+it → Postgres `42703 undefined_column`.
+
+**Why that bricked the whole app rather than showing an error:** Express 4 does not route an
+async handler's rejection to the error handler, so the unguarded throw left the request open
+forever. `AuthProvider` in `client/src/App.tsx` gates first paint on that single
+`/api/auth/me` call (`isChecking` only clears in `.finally()`), so every device class sat on
+`PageLoader` indefinitely.
+
+**Fixed and committed as `5022431`** on `feat/tablet-desktop-app`: applied 0011/0012/0013 with
+`psql -v ON_ERROR_STOP=1` (verified first that 0013's destructive `UPDATE` matched 0 rows and
+no user's role would flip), and guarded the 5 leaking handlers. Drift went 2 tables + 7 columns
+→ 0.
+
+An AST pass over all 204 async handlers found exactly **5** leaks — `/api/auth/me`,
+`/api/billing/card`, `/api/merchants/:id/events` (SSE), and both `/api/v1/transactions*`
+(their unguarded await sat *inside* the catch, so the public API hung precisely when the DB
+was broken). An earlier grep suggested ~25; that was wrong — it only checked whether `try`
+appeared on the handler's first line.
+
+## Open flags for next session
+
+1. **HIGHEST — there is no migration runner, and production may be drifted too.** Nothing
+   applies `migrations/*.sql`; `drizzle.__drizzle_migrations` is empty; the startup
+   `drizzle-kit push` is opt-in behind `RUN_SCHEMA_PUSH`/`RUN_MIGRATIONS` (`server/index.ts:142`).
+   Only a bespoke `ALTER TABLE merchants ADD COLUMN IF NOT EXISTS …` block runs unconditionally
+   (`server/index.ts:178`). **Check prod for the same missing columns before the next deploy** —
+   if it is also behind, `/api/auth/me` hangs there exactly as dev did.
+2. **Router-level async safety net (~15 lines).** Wrap `app.get/post/…` so a returned promise
+   gets `.catch(next)`, routing rejections into the existing error handler at
+   `server/index.ts:305`. That handler already checks `!res.headersSent`, so the fast-ack
+   webhooks and the SSE stream would only log. Without it, route #205 reintroduces the hang.
+   Oliver was asked and had not yet decided when the session ended.
+3. **`authenticateToken` reports a DB outage as `404 User not found`** (`server/auth.ts`, the
+   catch around the user lookup). The client reads that as a dead session and bounces to
+   login — during an outage a merchant sees what looks like a deleted account.
+4. **`replit.md` lines 80-82 are stale/wrong** — they claim "the server startup runs
+   `drizzle-kit push`", which is what makes people assume new columns auto-apply on restart.
+   It is opt-in. See `.agents/memory/schema-push-and-drift.md`, which is correct.
+
+**Re-diagnosing drift (the reliable way):** diff `getTableConfig()` over every export of
+`shared/schema.ts` against `information_schema.columns`. Do NOT `npm run db:push` — see
+[[db-schema-drift-fk-sequences]]. Note `pg_stat_activity.state` is `'disabled'` on this Neon
+instance (track_activities off), so it cannot prove "no query is running".
+
+Related: [[data-persistence-topology]], [[playwright-nix-chromium]], [[server-crash-hardening]].

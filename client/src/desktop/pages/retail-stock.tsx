@@ -7,6 +7,7 @@ import {
   DesktopPageScaffold,
   type DesktopRoutePageProps,
 } from "../DesktopPageScaffold";
+import { entranceProps, useListEntrance } from "../list-entrance";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -207,6 +208,13 @@ export default function DesktopRetailStock(props: DesktopRoutePageProps) {
     });
   }, [stockItems, search, sortKey]);
 
+  /* Card entrance: seeded from the whole inventory, so searching or re-sorting
+     never replays a product the user has already seen. */
+  const entrance = useListEntrance(
+    useMemo(() => stockItems.map((i) => String(i.id)), [stockItems]),
+    useMemo(() => filtered.map((i) => String(i.id)), [filtered]),
+  );
+
   const bestSeller = useMemo(() => {
     let best: { name: string; sold: number } | null = null;
     stockItems.forEach((i) => {
@@ -309,10 +317,9 @@ export default function DesktopRetailStock(props: DesktopRoutePageProps) {
 
         {/* ── RIGHT: card grid ── */}
         {/* last step of the entry cascade, after the left column's five */}
-        <div
-          className="rs-right dt-rise"
-          style={{ "--dt-i": 5 } as CSSProperties}
-        >
+        {/* No dt-rise here: the cards own the entrance, and stacking a wrapper
+            rise on top of it would run two entrances against each other. */}
+        <div className="rs-right">
           <div className="rs-grid">
             <button type="button" className="rs-add" data-tutorial-id="retail-stock-add" aria-label="add product" onClick={openAdd}>
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
@@ -331,7 +338,7 @@ export default function DesktopRetailStock(props: DesktopRoutePageProps) {
                 return (
                   <div
                     key={p.id}
-                    className="rs-card"
+                    {...entranceProps(entrance, String(p.id), "rs-card")}
                     role="button"
                     tabIndex={0}
                     onClick={() => openEdit(p)}
@@ -496,8 +503,8 @@ const RS_CSS = `
 .rs-card-sub { margin-top:2px; font-weight:500; font-size:11px; color:#8A90A4; }
 .rs-card-price { position:absolute; top:16px; right:16px; font-family:'Outfit',sans-serif; font-weight:800; font-size:15px; color:${DEEP_BLUE}; }
 
-.rs-modal-scrim { position:absolute; inset:0; z-index:40; display:flex; align-items:center; justify-content:center; background:rgba(0,6,26,0.62); backdrop-filter:blur(3px); animation:reportIn .2s ease both; }
-.rs-modal { width:420px; max-height:760px; overflow-y:auto; border-radius:20px; background:#071138; border:1px solid rgba(94,158,255,0.3); box-shadow:0 30px 80px rgba(0,0,0,0.5); padding:22px 24px; animation:tileIn .26s cubic-bezier(.22,.9,.3,1) both; }
+.rs-modal-scrim { position:absolute; inset:0; z-index:40; display:flex; align-items:center; justify-content:center; background:rgba(0,6,26,0.62); backdrop-filter:blur(3px); animation:reportIn var(--m-dur-ui) var(--m-ease-out) both; }
+.rs-modal { width:420px; max-height:760px; overflow-y:auto; border-radius:20px; background:#071138; border:1px solid rgba(94,158,255,0.3); box-shadow:0 30px 80px rgba(0,0,0,0.5); padding:22px 24px; animation:tileIn var(--m-dur-ui) var(--m-ease-out) both; }
 .rs-modal-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
 .rs-modal-title { font-weight:700; font-size:18px; color:#fff; text-transform:capitalize; }
 .rs-modal-x { width:30px; height:30px; border-radius:50%; border:1px solid rgba(94,158,255,0.4); display:flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s ease; }

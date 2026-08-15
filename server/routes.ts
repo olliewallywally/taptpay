@@ -3790,8 +3790,20 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(404).json({ message: "Merchant not found" });
       }
 
-      const newStone = await storage.createNextTaptStone(merchantId);
-      
+      /* An optional name lets the client create and name a board in one call.
+         Omitted or blank falls back to the auto "Stone N" name, so existing
+         callers that POST an empty body are unaffected. */
+      const rawName = (req.body as { name?: unknown } | undefined)?.name;
+      if (rawName !== undefined && typeof rawName !== "string") {
+        return res.status(400).json({ message: "Board name must be a string" });
+      }
+      const requestedName = typeof rawName === "string" ? rawName.trim() : "";
+      if (requestedName.length > 60) {
+        return res.status(400).json({ message: "Board name must be 60 characters or fewer" });
+      }
+
+      const newStone = await storage.createNextTaptStone(merchantId, requestedName || undefined);
+
       // Generate QR code and payment URL for the new stone
       const baseUrl = getBaseUrl(req);
       const stoneId = Number(newStone.id); // Ensure it's a number

@@ -143,6 +143,7 @@ function SubBar({ activeIdx = -1, onPick, compact = false, hideLabel = false }: 
           return (
             <button key={id} ref={(el: any) => (btnRefs.current[i] = el)}
               className={`tp-subbar-btn${active ? ' active' : ''}`}
+              data-demo-id={`property-mode-${id}`}
               onClick={() => onPick?.(i)} aria-label={label}>
               <Icon sz={18} c={ic} />
               {active && !hideLabel && <span className="tp-subbar-label">{label}</span>}
@@ -193,11 +194,11 @@ function TopBanner({ msg }: { msg: string | null }) {
 }
 
 /* ═══ SUBHEAD (cancel / confirm) ═══ */
-function SubHead({ onCancel, onCommit }: any) {
+function SubHead({ onCancel, onCommit, demoCommitId }: any) {
   return (
     <div className="tp-subhead">
       <button className="tp-subhead-btn" onClick={onCancel} aria-label="cancel"><Ic.X /></button>
-      <button className="tp-subhead-btn" onClick={onCommit} aria-label="confirm"><Ic.Check /></button>
+      <button className="tp-subhead-btn" onClick={onCommit} aria-label="confirm" data-demo-id={demoCommitId}><Ic.Check /></button>
     </div>
   );
 }
@@ -379,7 +380,7 @@ function ChooseTenant({ tenants, invoices, go, onSelect, splitMode, onToggleSpli
             const st = inv ? invoiceStatusFor(inv) : null;
             const dotCls = st === 'paid' ? 'paid' : (st === 'overdue' || st === 'failed') ? 'declined' : 'awaiting';
             return (
-              <button key={t.id} onClick={() => onSelect(t, amount)}
+              <button key={t.id} onClick={() => onSelect(t, amount)} data-demo-id={`property-tenant-${t.id}`}
                 style={{ textAlign: 'left', background: 'transparent', border: '1.5px solid rgba(88,171,255,0.28)', borderRadius: 18, padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 13 }}>
                 <div style={{ width: 38, height: 38, borderRadius: 999, background: BLUE, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, fontWeight: 800, color: NAVY }}>
                   {tenantInitials(t)}
@@ -412,9 +413,9 @@ function RentAmount({ go, selectedTenant, onCommit, backTo = 'send' }: any) {
   return (
     <div className="tp-screen" style={{ background: NAVY }}>
       <div className="stagger" style={{ background: OFFW, color: NAVY, height: '50%', display: 'flex', flexDirection: 'column' }}>
-        <SubHead onCancel={() => go(backTo, 'down')} onCommit={commit} />
+        <SubHead onCancel={() => go(backTo, 'down')} onCommit={commit} demoCommitId="property-amount-confirm" />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <div className="tp-amount" style={{ fontSize: 82, color: cents === 0 ? 'rgba(4,13,109,0.25)' : NAVY, marginTop: 18 }}>{fmt(cents)}</div>
+          <div className="tp-amount" data-demo-id="property-amount" style={{ fontSize: 82, color: cents === 0 ? 'rgba(4,13,109,0.25)' : NAVY, marginTop: 18 }}>{fmt(cents)}</div>
           {selectedTenant && (
             <div style={{ fontWeight: 500, fontSize: 15, color: 'rgba(4,13,109,0.5)', paddingBottom: 8 }}>
               {tenantName(selectedTenant)} · {selectedTenant.propertyAddress}
@@ -426,13 +427,13 @@ function RentAmount({ go, selectedTenant, onCommit, backTo = 'send' }: any) {
       <div className="stagger" style={{ flex: 1, background: NAVY, padding: '38px 28px 28px', display: 'flex', flexDirection: 'column' }}>
         <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, alignItems: 'center', justifyItems: 'center' }}>
           {['1','2','3','4','5','6','7','8','9'].map(d => (
-            <button key={d} className="tp-kp" onClick={() => press(d)}>{d}</button>
+            <button key={d} className="tp-kp" data-demo-id={`property-key-${d}`} onClick={() => press(d)}>{d}</button>
           ))}
           {/* Amounts are entered in cents (e.g. 5000 → $50.00), so there is no
               decimal key — this cell is an inert spacer to keep the 3×4 grid. */}
           <div className="tp-kp" style={{ visibility: 'hidden' }} aria-hidden />
-          <button className="tp-kp" onClick={() => press('0')}>0</button>
-          <button className="tp-kp outline" onClick={back}><Ic.Back /></button>
+          <button className="tp-kp" data-demo-id="property-key-0" onClick={() => press('0')}>0</button>
+          <button className="tp-kp outline" data-demo-id="property-key-back" onClick={back}><Ic.Back /></button>
         </div>
       </div>
     </div>
@@ -486,7 +487,7 @@ function SendRentLink({ go, selectedTenant, amount, onSend, sending, frequency, 
             <Ic.Receipt sz={15} c="rgba(88,171,255,0.7)" />
             <span style={{ fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>rent amount</span>
           </div>
-          <button onClick={() => (onEditAmount ? onEditAmount() : go('amount'))}
+          <button onClick={() => (onEditAmount ? onEditAmount() : go('amount'))} data-demo-id="property-rent-amount"
             style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '15px 18px', borderRadius: 16, border: `1.5px solid rgba(88,171,255,0.2)`, background: 'rgba(255,255,255,0.05)', cursor: 'pointer', fontFamily: 'Outfit, system-ui' }}>
             <span style={{ fontWeight: 700, fontSize: 24, color: amount > 0 ? BLUE : 'rgba(88,171,255,0.4)', fontVariantNumeric: 'tabular-nums' }}>{fmt(amount)}</span>
             <span style={{ fontWeight: 600, fontSize: 12.5, color: BLUE }}>{amount > 0 ? 'edit' : 'set amount'} ›</span>
@@ -514,7 +515,7 @@ function SendRentLink({ go, selectedTenant, amount, onSend, sending, frequency, 
             {FREQ_OPTIONS.map(({ id, label }) => {
               const on = frequency === id;
               return (
-                <button key={id} onClick={() => setFrequency(id)}
+                <button key={id} onClick={() => setFrequency(id)} data-demo-id={`property-rent-frequency-${id}`}
                   style={{ padding: '12px 4px', borderRadius: 14, border: `1.5px solid ${on ? BLUE : 'rgba(88,171,255,0.35)'}`, background: on ? BLUE : 'transparent', color: on ? NAVY : BLUE, fontWeight: 700, fontSize: 12.5, cursor: 'pointer', transition: 'all 0.18s ease', fontFamily: 'Outfit, system-ui' }}>
                   {label}
                 </button>
@@ -540,7 +541,7 @@ function SendRentLink({ go, selectedTenant, amount, onSend, sending, frequency, 
 
         <div style={{ flex: 1 }} />
 
-        <WireframeLiquidButton onClick={onSend} busy={sending} style={CTA_SIZE}>
+        <WireframeLiquidButton onClick={onSend} busy={sending} style={CTA_SIZE} data-demo-id="property-rent-send">
           {sending ? 'sending…' : recurring ? 'send & automate' : 'send rent request'}
         </WireframeLiquidButton>
       </div>
@@ -588,7 +589,7 @@ function ChargeBill({ go, selectedTenant, amount, onEditAmount, chargeType, setC
       <div className="stagger" style={{ background: OFFW, color: NAVY, height: '50%', display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={() => go('home', 'down')} onCommit={() => ready && onSend()} />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <button onClick={onEditAmount} style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'baseline', gap: 10 }}>
+          <button onClick={onEditAmount} data-demo-id="property-bill-amount" style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'baseline', gap: 10 }}>
             <span className="tp-amount" style={{ fontSize: 82, color: amount === 0 ? 'rgba(4,13,109,0.25)' : NAVY }}>{fmt(amount)}</span>
             <span style={{ fontWeight: 600, fontSize: 12, color: 'rgba(4,13,109,0.4)', textDecoration: 'underline', textUnderlineOffset: 2 }}>edit</span>
           </button>
@@ -609,7 +610,7 @@ function ChargeBill({ go, selectedTenant, amount, onEditAmount, chargeType, setC
             {CHARGE_TYPES.map((c: any) => {
               const on = chargeType === c.id;
               return (
-                <button key={c.id} onClick={() => pickType(c.id)}
+                <button key={c.id} onClick={() => pickType(c.id)} data-demo-id={`property-bill-type-${c.id}`}
                   style={{ padding: '10px 16px', borderRadius: 999, border: `1.5px solid ${on ? BLUE : 'rgba(88,171,255,0.35)'}`, background: on ? BLUE : 'transparent', color: on ? NAVY : BLUE, fontWeight: 700, fontSize: 13, cursor: 'pointer', transition: 'all 0.16s ease', fontFamily: 'Outfit, system-ui' }}>
                   {c.label}
                 </button>
@@ -619,19 +620,19 @@ function ChargeBill({ go, selectedTenant, amount, onEditAmount, chargeType, setC
 
           {/* Description */}
           <div style={{ fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>description</div>
-          <input className="tp-field" value={label} onChange={e => setLabel(e.target.value)}
+          <input className="tp-field" data-demo-id="property-bill-description" value={label} onChange={e => setLabel(e.target.value)}
             placeholder={chargeType === 'other' ? 'what is this charge for?' : 'add a note (optional)'} style={{ marginBottom: 20 }} />
 
           {/* Invoice document — optional PDF/image the tenant can view from the checkout page */}
           <div style={{ fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>invoice <span style={{ opacity: 0.6 }}>· optional</span></div>
           {docUrl ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '13px 16px', background: 'rgba(88,171,255,0.1)', border: '1px solid rgba(88,171,255,0.4)', borderRadius: 16, marginBottom: 20 }}>
+            <div data-demo-id="property-bill-document" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '13px 16px', background: 'rgba(88,171,255,0.1)', border: '1px solid rgba(88,171,255,0.4)', borderRadius: 16, marginBottom: 20 }}>
               <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={BLUE} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 13h6M9 16.5h6"/></svg>
               <span style={{ flex: 1, minWidth: 0, fontWeight: 500, fontSize: 13.5, color: BLUE, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{docName || 'attached'}</span>
               <button onClick={onClearDoc} style={{ background: 'none', border: 'none', color: 'rgba(88,171,255,0.7)', fontWeight: 600, fontSize: 12.5, cursor: 'pointer', flexShrink: 0, fontFamily: 'Outfit, system-ui' }}>remove</button>
             </div>
           ) : (
-            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, padding: '13px 16px', background: 'rgba(255,255,255,0.05)', border: '1.5px dashed rgba(88,171,255,0.4)', borderRadius: 16, marginBottom: 20, cursor: uploadingDoc ? 'wait' : 'pointer', opacity: uploadingDoc ? 0.6 : 1 }}>
+            <label data-demo-id="property-bill-document" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, padding: '13px 16px', background: 'rgba(255,255,255,0.05)', border: '1.5px dashed rgba(88,171,255,0.4)', borderRadius: 16, marginBottom: 20, cursor: uploadingDoc ? 'wait' : 'pointer', opacity: uploadingDoc ? 0.6 : 1 }}>
               <svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke={BLUE} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg>
               <span style={{ fontWeight: 600, fontSize: 13.5, color: BLUE, fontFamily: 'Outfit, system-ui' }}>{uploadingDoc ? 'uploading…' : 'attach invoice (PDF/image)'}</span>
               <input type="file" accept="application/pdf,image/*" disabled={uploadingDoc}
@@ -646,7 +647,7 @@ function ChargeBill({ go, selectedTenant, amount, onEditAmount, chargeType, setC
             {DUE_OPTIONS.map((d: any) => {
               const on = dueSel === d.id;
               return (
-                <button key={d.id} onClick={() => setDueSel(d.id)}
+                <button key={d.id} onClick={() => setDueSel(d.id)} data-demo-id={`property-bill-due-${d.id}`}
                   style={{ padding: '12px 4px', borderRadius: 14, border: `1.5px solid ${on ? BLUE : 'rgba(88,171,255,0.35)'}`, background: on ? BLUE : 'transparent', color: on ? NAVY : BLUE, fontWeight: 700, fontSize: 12.5, cursor: 'pointer', transition: 'all 0.18s ease', fontFamily: 'Outfit, system-ui' }}>
                   {d.label}
                 </button>
@@ -655,7 +656,7 @@ function ChargeBill({ go, selectedTenant, amount, onEditAmount, chargeType, setC
           </div>
 
           {/* Split toggle */}
-          <button onClick={onToggleSplit} aria-pressed={splitOn}
+          <button onClick={onToggleSplit} aria-pressed={splitOn} data-demo-id="property-bill-split-toggle"
             style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '13px 16px', borderRadius: 16, border: `1px solid ${splitOn ? 'rgba(88,171,255,0.4)' : 'rgba(88,171,255,0.15)'}`, background: splitOn ? 'rgba(88,171,255,0.1)' : 'rgba(255,255,255,0.04)', cursor: 'pointer', marginBottom: 12, fontFamily: 'Outfit, system-ui' }}>
             <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={BLUE} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="7" r="3.2"/><circle cx="17" cy="8" r="2.4"/><path d="M3 20c0-3.3 2.7-5.8 6-5.8s6 2.5 6 5.8"/><path d="M17.5 14.3c2.1.3 3.7 2 3.7 4.2"/></svg>
             <span style={{ flex: 1, textAlign: 'left', fontWeight: 600, fontSize: 13.5, color: BLUE }}>split this bill</span>
@@ -676,7 +677,7 @@ function ChargeBill({ go, selectedTenant, amount, onEditAmount, chargeType, setC
 
         {/* CTA — lifted clear of the floating bottom nav */}
         <div style={{ flexShrink: 0, padding: '12px 0 90px', display: 'flex', justifyContent: 'center' }}>
-          <WireframeLiquidButton onClick={() => ready && onSend()} disabled={!ready} busy={sending} style={CTA_SIZE}>
+          <WireframeLiquidButton onClick={() => ready && onSend()} disabled={!ready} busy={sending} style={CTA_SIZE} data-demo-id="property-bill-send">
             {sending ? 'sending…' : 'send bill'}
           </WireframeLiquidButton>
         </div>
@@ -1294,7 +1295,7 @@ export function PropertyTerminalView(props: PropertyTerminalViewProps) {
   const conveyorDirection = props.conveyor?.dir || 'up';
 
   return (
-    <div className="tp-viewport" ref={viewportRef}>
+    <div className="tp-viewport" ref={viewportRef} data-demo-id="property-terminal">
       <style>{TP_TERM_CSS}</style>
       {props.conveyor && <div
         key={'leave-' + props.conveyor.prevId}

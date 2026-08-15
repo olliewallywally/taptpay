@@ -1,0 +1,9 @@
+{
+  "id": "4",
+  "subject": "Code review: server (auth, routes, storage, payments, cron)",
+  "description": "Line-level review of server/*.ts for correctness, authz, tenancy isolation, money handling, error paths.",
+  "activeForm": "Reviewing server code",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

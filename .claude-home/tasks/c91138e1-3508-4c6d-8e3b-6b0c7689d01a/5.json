@@ -1,0 +1,9 @@
+{
+  "id": "5",
+  "subject": "Step 6 — promote pg out of devDependencies",
+  "description": "Move pg to dependencies; decide and record whether db:migrate ships a compiled entry point or is formally dev/CI-only. Gate: npm ci --omit=dev && node -e \"require('pg')\" succeeds, or the decision is written into replit.md.",
+  "activeForm": "Promoting pg to a runtime dependency",
+  "status": "completed",
+  "blocks": [],
+  "blockedBy": []
+}

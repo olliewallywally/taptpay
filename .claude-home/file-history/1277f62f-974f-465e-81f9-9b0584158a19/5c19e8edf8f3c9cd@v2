@@ -1,0 +1,51 @@
+---
+name: desktop-transitions-work
+description: "Desktop/tablet page-transition work: root causes of the flash, the acceptance probe, and Oliver's three requirements"
+metadata: 
+  node_type: memory
+  type: project
+  originSessionId: 1277f62f-974f-465e-81f9-9b0584158a19
+  modified: 2026-08-08T05:06:08.508Z
+---
+
+Started 2026-08-08 on `feat/tablet-desktop-app`. Oliver's requirements, verbatim
+intent: **no flash/reloads on any page change**; the **top bar must never move**
+except the page-selector bubble; **every component on every page** gets a smooth
+**bounce pop-in with a cascading stagger**.
+
+There is no standalone transitions plan doc — searched `docs/`, `.agents/`, and
+all ~45 session transcripts. The motion spec is §7 (`:201`) + P6 (`:230`) of
+`docs/PLAN-2026-07-24-tablet-desktop-app.md`.
+
+Root causes (verified in code, not assumed):
+
+1. **Flash** — every one of the 15 desktop pages renders its own
+   `DesktopFrame → ScaledCanvas → DesktopShell` via `DesktopPageScaffold.tsx:33-41`,
+   so a route change remounts the whole chrome. `ScaledCanvas.tsx:34,90` starts at
+   `scale = 0` / `visibility: hidden` and only measures in a layout effect, so each
+   remount blanks the frame for a frame. First visit adds a second flash via the
+   full-screen `PageLoader` at `App.tsx:354` (lazy chunks, `App.tsx:67-82`).
+2. **Top bar moves** — `.tapt-desktop-nav` is `justify-content: space-between` and
+   `.tapt-desktop-nav-item` has `padding: 0` while `[aria-current="page"]` gets
+   `padding: 8px 22px` (`desktop.css:291-318`); the active pill is ~44px wider, so
+   every sibling redistributes on each page change.
+3. **Pop-in too soft** — desktop `popIn` (`desktop.css:99`) is a single overshoot.
+   The real bounce already exists on mobile: `bouncePopIn` (`index.css:1022`) driven
+   by `.pt-bounce` with a `--pt-d` stagger var. Reuse it; do **not** add
+   framer-motion (§7 forbids it).
+
+**Acceptance harness already written**: `scripts/desktop-shots/probe-transitions.mjs`
+(untracked). Instruments the DOM per navigation and reports whether the chrome
+survived and whether the Suspense loader flashed, across 10 nav hops × 2 laps +
+11 pushed routes, at 1440×900 and 1194×834. Target: `chrome: kept` and
+`loader: no` on every hop. Run with the dev server on :5000, single instance
+(see [[dev-server-single-instance]], [[playwright-nix-chromium]]).
+
+Baseline: HEAD did not typecheck until `stash@{1}` was applied — see
+[[head-broken-stash1-fix]]. Applied 2026-08-08, `tsc` now exits 0. That stash also
+carries the landing/pricing work ([[landing-pricing-repositioning]]), so it is
+~35 files in the tree that are **not** part of the transitions work — do not commit
+them together.
+
+Mobile must stay byte-identical; the shell hoist must not disturb
+`PageTransition`'s Switch pinning ([[quickinv-pagetransition-fix]]).

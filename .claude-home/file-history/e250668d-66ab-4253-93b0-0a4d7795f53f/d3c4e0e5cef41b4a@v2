@@ -1,0 +1,69 @@
+/* Backdrop check: what colour sits behind the scaled tablet canvas. */
+import { mkdir } from "node:fs/promises";
+import { BASE_URL, newRetailPage } from "/home/runner/workspace/scripts/desktop-shots/retail-fixtures.mjs";
+import { chromium } from "/home/runner/workspace/node_modules/playwright/index.mjs";
+
+const CHROMIUM_PATH =
+  "/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium";
+const OUT = "/tmp/claude-1000/-home-runner-workspace/e250668d-66ab-4253-93b0-0a4d7795f53f/scratchpad/shots";
+
+const VIEWPORTS = [
+  ["tablet-landscape", { width: 1194, height: 834 }],
+  ["tablet-portrait", { width: 834, height: 1194 }],
+  ["tablet-tall", { width: 1024, height: 1366 }],
+  ["desktop", { width: 1440, height: 900 }],
+];
+
+await mkdir(OUT, { recursive: true });
+const browser = await chromium.launch({ executablePath: CHROMIUM_PATH });
+try {
+  for (const [label, viewport] of VIEWPORTS) {
+    const { context, page } = await newRetailPage(browser, label, {
+      viewport,
+      hasTouch: label.startsWith("tablet"),
+      isMobile: false,
+    });
+    try {
+      await page.goto(`${BASE_URL}/dashboard`, { waitUntil: "networkidle" });
+      await page.getByTestId("desktop-frame").waitFor({ state: "visible" });
+      await page.waitForTimeout(900);
+
+      const probe = await page.evaluate(() => {
+        const get = (sel) => {
+          const el = document.querySelector(sel);
+          if (!el) return null;
+          const cs = getComputedStyle(el);
+          const r = el.getBoundingClientRect();
+          return {
+            bg: cs.backgroundColor,
+            bgImage: cs.backgroundImage,
+            rect: [Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)],
+          };
+        };
+        return {
+          deviceClass: document
+            .querySelector(".tapt-desktop-viewport")
+            ?.getAttribute("data-device-class") ?? null,
+          html: getComputedStyle(document.documentElement).backgroundColor,
+          body: getComputedStyle(document.body).backgroundColor,
+          root: get("#root"),
+          viewport: get(".tapt-desktop-viewport"),
+          frame: get(".tapt-desktop-frame"),
+          stage: get(".tapt-desktop-scale-stage"),
+          box: get(".tapt-desktop-scale-box"),
+          canvas: get(".tapt-desktop-canvas"),
+          scale: document
+            .querySelector("[data-desktop-scale]")
+            ?.getAttribute("data-desktop-scale") ?? null,
+        };
+      });
+      console.log(label, JSON.stringify(probe, null, 2));
+      await page.screenshot({ path: `${OUT}/${label}.png` });
+    } finally {
+      await context.close();
+    }
+  }
+} finally {
+  await browser.close();
+}
+console.log(`shots → ${OUT}`);

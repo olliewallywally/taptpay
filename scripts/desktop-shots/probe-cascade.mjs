@@ -5,8 +5,8 @@
  * transition: the per-screen entry cascade. This probe covers that gap.
  *
  * For every screen it lands on, it samples `document.getAnimations()` straight
- * after the hop and reports how many elements are actually running
- * `desktopBounceIn`, and how deep the stagger goes.
+ * after the hop and reports how many elements are actually running the cascade
+ * keyframe (`CASCADE_KEYFRAME` below), and how deep the stagger goes.
  *
  * Two failures gate the run:
  *   - NO CASCADE — a screen entered without a single running animation. Either
@@ -23,11 +23,33 @@
  */
 
 import { BASE_URL, newRetailPage, CHROMIUM_PATH } from "./retail-fixtures.mjs";
+
+/* `newRetailPage` scopes HTTP-status errors to our origin but records every
+   failed request, including third-party ones (the Replit dev-banner tag in
+   client/index.html, blocked by ORB, and the analytics beacon aborted on
+   navigation). Those cannot indicate a cascade defect and are not ours to fix
+   from here, so they are reported and not gated. Everything else still gates. */
+const OUR_ORIGIN = new URL(BASE_URL).origin;
+function isExternalRequestFailure(entry) {
+  const match = /request failed: \S+ (\S+)/.exec(String(entry));
+  if (!match) return false;
+  try {
+    return new URL(match[1]).origin !== OUR_ORIGIN;
+  } catch {
+    return false;
+  }
+}
 import { chromium } from "playwright";
 
-/* 52ms per step x the 10 indexed steps + the 540ms keyframe, plus headroom.
+/* The keyframe the cascade runs. Renamed from `desktopBounceIn` on 2026-08-15
+   when the three-overshoot bounce became a plain rise — see
+   docs/PLAN-2026-08-15-motion-toning.md. */
+const CASCADE_KEYFRAME = "desktopRiseIn";
+
+/* 28ms per step x the 6 indexed steps (168ms) + the 280ms keyframe + the
+   largest `--dt-d` offset in the app (112ms) = 560ms, plus headroom.
    Sampling must happen inside this window or every animation is already done. */
-const CASCADE_WINDOW_MS = 1100;
+const CASCADE_WINDOW_MS = 800;
 const PRELOAD_DRAIN_MS = 20_000;
 
 /* Every screen of the 3 verticals x 5, plus the two shared surfaces. Nav-bar
@@ -56,14 +78,15 @@ const DEVICE_CLASSES = [
   ["tablet", { viewport: { width: 1194, height: 834 }, hasTouch: true, isMobile: false }],
 ];
 
-/* Runs in the page via `page.evaluate` — serialised, so no closure. */
-const SAMPLE = (since) => {
+/* Runs in the page via `page.evaluate` — serialised, so no closure: the
+   keyframe name has to be passed in alongside the timestamp. */
+const SAMPLE = ([since, keyframe]) => {
   const bounce = document
     .getAnimations()
     .filter((a) => {
       const startTime = a.startTime;
       return (
-        a.animationName === "desktopBounceIn" &&
+        a.animationName === keyframe &&
         a.playState === "running" &&
         typeof startTime === "number" &&
         startTime >= since - 80
@@ -85,7 +108,10 @@ const SAMPLE = (since) => {
 /* Run after the cascade window has closed: anything still transparent is stuck. */
 const FIND_STUCK = () => {
   const out = [];
-  for (const el of document.querySelectorAll(".dt-rise, .dt-cascade > *")) {
+  /* `.dt-list-row` joins the sweep for the same reason as the cascade tiers: it
+     ships opacity 0 under an `animation: ... both` fill, so a row whose entrance
+     never runs is permanently invisible rather than merely un-animated. */
+  for (const el of document.querySelectorAll(".dt-rise, .dt-cascade > *, .dt-list-row")) {
     const cs = getComputedStyle(el);
     if (cs.display === "none" || cs.visibility === "hidden") continue;
     if (parseFloat(cs.opacity) < 0.05) {
@@ -95,6 +121,30 @@ const FIND_STUCK = () => {
     }
   }
   return out;
+};
+
+
+/* The list entrance is a separate tier with its own tokens (§5.3). Assert the
+   numbers rather than trusting the stylesheet: a token typo silently degrades
+   into a snap, and the six-step cap is what keeps a long list's tail from
+   running away. */
+const CHECK_LIST_ENTRANCE = () => {
+  const rows = [...document.querySelectorAll(".dt-list-row")];
+  if (rows.length === 0) return null;
+  const root = document.querySelector(".tapt-desktop-viewport");
+  const cs = getComputedStyle(root);
+  const dur = cs.getPropertyValue("--m-dur-list").trim();
+  const stagger = cs.getPropertyValue("--m-stagger-list").trim();
+  const ease = cs.getPropertyValue("--m-ease-list").trim();
+  const delays = rows.map((el) => Math.round(parseFloat(getComputedStyle(el).animationDelay) * 1000));
+  return {
+    rows: rows.length,
+    dur,
+    stagger,
+    ease,
+    maxDelay: Math.max(...delays),
+    steps: [...new Set(delays)].sort((a, b) => a - b),
+  };
 };
 
 async function probe(browser, label, contextOptions) {
@@ -115,7 +165,7 @@ async function probe(browser, label, contextOptions) {
     let best = { count: 0, steps: [] };
     const deadline = Date.now() + CASCADE_WINDOW_MS;
     while (Date.now() < deadline) {
-      const s = await page.evaluate(SAMPLE, since);
+      const s = await page.evaluate(SAMPLE, [since, CASCADE_KEYFRAME]);
       if (s.count > best.count) best = s;
       await page.waitForTimeout(60);
     }
@@ -156,8 +206,19 @@ async function probe(browser, label, contextOptions) {
     );
   }
 
+  /* Sample a real list surface for the §5.3 contract before tearing down.
+     It must be one the fixtures actually populate: the property/trades
+     endpoints are mocked to empty arrays, so only retail has rows. Stock tiles
+     mount directly on the page with no sheet to open. */
+  await page.evaluate((p) => {
+    history.pushState({}, "", p);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  }, "/stock");
+  await page.waitForSelector(".rs-card", { timeout: 10_000 }).catch(() => {});
+  const listEntrance = await page.evaluate(CHECK_LIST_ENTRANCE);
+
   await context.close();
-  return { screens, errors };
+  return { screens, errors, listEntrance };
 }
 
 function report(label, screens) {
@@ -184,11 +245,27 @@ const browser = await chromium.launch({ executablePath: CHROMIUM_PATH });
 const totals = [];
 try {
   for (const [label, opts] of DEVICE_CLASSES) {
-    const { screens, errors } = await probe(browser, label, opts);
+    const { screens, errors, listEntrance } = await probe(browser, label, opts);
     const total = report(label, screens);
-    total.errors = errors.length;
+    const realErrors = errors.filter((e) => !isExternalRequestFailure(e));
+    const external = errors.length - realErrors.length;
+    total.errors = realErrors.length;
     totals.push([label, total]);
-    if (errors.length) console.log(`  ${label} page errors (${errors.length}): ${errors[0]}`);
+    if (!listEntrance) {
+      console.log(`  ✗ ${label}: list entrance never sampled — no .dt-list-row on /stock`);
+      total.wrong += 1;
+    } else {
+      console.log(
+        `  list entrance: ${listEntrance.rows} rows, ${listEntrance.dur}/${listEntrance.stagger} ${listEntrance.ease}` +
+          `, ${listEntrance.steps.length} step(s), max delay ${listEntrance.maxDelay}ms`,
+      );
+      if (listEntrance.maxDelay > 200) {
+        console.log(`  ✗ ${label}: list entrance exceeds the six-step cap (${listEntrance.maxDelay}ms > 200ms)`);
+        total.wrong += 1;
+      }
+    }
+    if (realErrors.length) console.log(`  ${label} page errors (${realErrors.length}): ${realErrors[0]}`);
+    if (external) console.log(`  · ${label}: ${external} third-party request failure(s), not gated`);
   }
 } finally {
   await browser.close();

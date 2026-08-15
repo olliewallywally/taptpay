@@ -1,0 +1,862 @@
+import { useCallback, useMemo, useRef, useState } from "react";
+import { getCurrentMerchantId } from "@/lib/auth";
+import {
+  usePropertyInvoices,
+  usePropertySchedules,
+  usePropertyTenants,
+} from "@/lib/property-data";
+import { useMerchantProfile } from "@/lib/merchant";
+import {
+  buildBuckets,
+  collectedCents,
+  filterByProperty,
+  growthPct,
+  periodWindow,
+  type Timeframe,
+} from "@/lib/property-dashboard-data";
+import { fmtNZD } from "@/lib/report-utils";
+import { ReportModal } from "@/components/reports/ReportModal";
+import { PROPERTY_REPORT_OPTIONS } from "@/lib/report-pdf/reports/property-options";
+import type { PropertyReportData } from "@/lib/report-pdf/reports/property";
+import { readDesktopPrefs } from "../data/desktop-prefs";
+import {
+  ALL_PROPERTIES,
+  PROPERTY_DESKTOP_REPORTS,
+  PROPERTY_PERIOD_CHIPS,
+  PROPERTY_REPORT_BY_ID,
+  buildPropertyReport,
+  propertyChips,
+  type PropertyInvoice,
+  type PropertyPeriodChip,
+  type PropertyReportId,
+  type PropertySchedule,
+  type PropertyTenant,
+} from "../data/property-reports";
+import {
+  DesktopPageScaffold,
+  type DesktopRoutePageProps,
+} from "../DesktopPageScaffold";
+
+/* ── palette ── */
+const ACCENT = "#5E9EFF";
+const ACCENT_SOFT = "#7FB2FF";
+const NAV_DIM = "#4A86F0";
+const ACTIVE = "#66A9FF";
+const TEXT_SOFT = "#F4F6FF";
+const NAVY = "#000F3F";
+const INK = "#12162E";
+const DEEP_BLUE = "#1D48C8";
+const SHEET_BG = "#F4F5F8";
+const SHEET_INK = "#04103A";
+const SHEET_DIM = "#8A90A4";
+const SHEET_LABEL = "#9AA0B2";
+const DONUT_COLORS = ["#5E9EFF", "#93BAFF", "#DCE7FF", "rgba(94,158,255,0.35)", "rgba(94,158,255,0.18)"];
+
+/* Sheet geometry, straight from the prototype. */
+const SHEET_H = 664;
+/* Rest the sheet 20px below Property's plotted SVG (frame y ≈ 488). */
+const CLOSED = 339;
+
+const RANGES: { k: Timeframe; label: string }[] = [
+  { k: "day", label: "Day" },
+  { k: "week", label: "Week" },
+  { k: "month", label: "Month" },
+  { k: "year", label: "Year" },
+];
+
+type SheetMode = "history" | "tiles" | "filters";
+
+interface Invoice extends PropertyInvoice {
+  owingCents?: number | null;
+  splitCount?: number | null;
+  splitPaidCount?: number | null;
+}
+
+const money = (c: number) => fmtNZD(c);
+const moneyWhole = (c: number) => "$" + Math.round(c / 100).toLocaleString("en-NZ");
+
+function initials(name: string): string {
+  const parts = String(name ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter((p) => /^[a-z0-9]/i.test(p));
+  if (parts.length === 0) return "–";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  paid: "Paid",
+  paid_external: "Paid externally",
+  overdue: "Overdue",
+  dispatch_failed: "Not delivered",
+  pending_dispatch: "Queued",
+  dispatched: "Sent",
+};
+
+const isPaid = (invoice: Invoice) =>
+  invoice.status === "paid" || invoice.status === "paid_external";
+const isLive = (invoice: Invoice) =>
+  !isPaid(invoice) && invoice.status !== "voided";
+const invoiceAmount = (invoice: Invoice) => invoice.amountCents ?? 0;
+const invoiceOwing = (invoice: Invoice) =>
+  invoice.owingCents ?? invoice.amountCents ?? 0;
+const tenantName = (tenant: PropertyTenant | undefined) =>
+  [tenant?.firstName, tenant?.lastName].filter(Boolean).join(" ").trim();
+
+/** Catmull-Rom → cubic bezier: the prototypes curve, same geometry. */
+function curve(vals: number[]) {
+  const W = 1076;
+  const H = 240;
+  const TOP = 16;
+  const BOT = 24;
+  const pts = vals.length < 2 ? [vals[0] ?? 0, vals[0] ?? 0] : vals;
+  const m = pts.length;
+  const P = pts.map((v, i) => [i * (W / (m - 1)), H - BOT - v * (H - TOP - BOT)] as const);
+  let d = `M${P[0][0].toFixed(1)},${P[0][1].toFixed(1)}`;
+  for (let i = 1; i < m; i++) {
+    const p0 = P[i - 1];
+    const p1 = P[i];
+    const pm = P[i - 2] ?? p0;
+    const pn = P[i + 1] ?? p1;
+    const c1x = p0[0] + (p1[0] - pm[0]) / 6;
+    const c1y = p0[1] + (p1[1] - pm[1]) / 6;
+    const c2x = p1[0] - (pn[0] - p0[0]) / 6;
+    const c2y = p1[1] - (pn[1] - p0[1]) / 6;
+    d += ` C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p1[0].toFixed(1)},${p1[1].toFixed(1)}`;
+  }
+  return { d, P, W, H };
+}
+
+export default function DesktopPropertyAnalytics(props: DesktopRoutePageProps) {
+  const merchantId = getCurrentMerchantId();
+  const merchantQuery = useMerchantProfile();
+  const tenantsQuery = usePropertyTenants();
+  const invoicesQuery = usePropertyInvoices();
+  const schedulesQuery = usePropertySchedules();
+
+  const [tf, setTf] = useState<Timeframe>("year");
+  const [scope, setScope] = useState<string>(ALL_PROPERTIES);
+  const [scopeOpen, setScopeOpen] = useState(false);
+  const [report, setReport] = useState<PropertyReportId | null>(null);
+  const [pendReport, setPendReport] = useState<PropertyReportId>("rent-roll");
+  const [sheetMode, setSheetMode] = useState<SheetMode>("history");
+  const [sheetOpen, setSheetOpen] = useState(
+    () => readDesktopPrefs(merchantId).historyStart === "expanded",
+  );
+  const [dragging, setDragging] = useState(false);
+  const [dragY, setDragY] = useState(CLOSED);
+  const [fPeriod, setFPeriod] = useState<PropertyPeriodChip>("This month");
+  const [fProperty, setFProperty] = useState<string>(ALL_PROPERTIES);
+  const [fExtra, setFExtra] = useState<string>(
+    PROPERTY_REPORT_BY_ID["rent-roll"].extra[0],
+  );
+  const [exportOpen, setExportOpen] = useState(false);
+
+  const drag = useRef({ startY: 0, startT: CLOSED, moved: false, scale: 1 });
+
+  const tenants = (tenantsQuery.data ?? []) as PropertyTenant[];
+  const invoices = (invoicesQuery.data ?? []) as Invoice[];
+  const schedules = (schedulesQuery.data ?? []) as PropertySchedule[];
+  const merchant = merchantQuery.data;
+  const propertyOptions = useMemo(() => propertyChips(tenants), [tenants]);
+  const tenantById = useMemo(
+    () => new Map(tenants.map((tenant) => [tenant.id, tenant])),
+    [tenants],
+  );
+  const scoped = useMemo(
+    () =>
+      filterByProperty(
+        invoices,
+        tenants,
+        scope === ALL_PROPERTIES ? null : scope,
+      ) as { invoices: Invoice[]; tenants: PropertyTenant[] },
+    [invoices, tenants, scope],
+  );
+
+  /* One scoped model drives every overview number and point. */
+  const overview = useMemo(() => {
+    const win = periodWindow(tf);
+    const total = collectedCents(scoped.invoices, win.start, win.end);
+    const growth = growthPct(
+      total,
+      collectedCents(scoped.invoices, win.prevStart, win.prevEnd),
+    );
+    const outstanding = scoped.invoices
+      .filter(isLive)
+      .filter((invoice) => {
+        const created = new Date(invoice.createdAt ?? 0);
+        return created >= win.start && created < win.end;
+      })
+      .reduce((sum, invoice) => sum + invoiceOwing(invoice), 0);
+    const buckets = buildBuckets(scoped.invoices, tf);
+    const max = Math.max(...buckets.map((bucket) => bucket.valueCents), 1);
+    let peak = 0;
+    buckets.forEach((bucket, index) => {
+      if (bucket.valueCents > buckets[peak].valueCents) peak = index;
+    });
+    const { d, P, W } = curve(
+      buckets.map((bucket) => bucket.valueCents / max),
+    );
+    const peakPoint = P[Math.min(peak, P.length - 1)];
+    return {
+      total,
+      growth,
+      outstanding,
+      buckets,
+      lineD: d,
+      areaD: d + " L" + W + ",240 L0,240 Z",
+      dotLeft: (-86 + (peakPoint[0] / W) * 1214).toFixed(1) + "px",
+      floatingDotLeft:
+        (52 - 86 + (peakPoint[0] / W) * 1214).toFixed(1) + "px",
+      peakValue: buckets[peak]?.valueCents ?? 0,
+    };
+  }, [scoped.invoices, tf]);
+
+  /* Payment history follows the selected scope and period, grouped by day. */
+  const historyGroups = useMemo(() => {
+    const win = periodWindow(tf);
+    const dayStart = new Date();
+    dayStart.setHours(0, 0, 0, 0);
+    const yesterdayStart = new Date(dayStart.getTime() - 86_400_000);
+    const today: Invoice[] = [];
+    const yesterday: Invoice[] = [];
+    const earlier: Invoice[] = [];
+    for (const invoice of [...scoped.invoices]
+      .filter((row) => row.status !== "voided")
+      .filter((row) => {
+        const at = new Date(row.createdAt ?? 0);
+        return at >= win.start && at < win.end;
+      })
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt ?? 0).getTime() -
+          new Date(a.createdAt ?? 0).getTime(),
+      )) {
+      const at = new Date(invoice.createdAt ?? 0);
+      if (at >= dayStart) today.push(invoice);
+      else if (at >= yesterdayStart) yesterday.push(invoice);
+      else earlier.push(invoice);
+    }
+    return [
+      { label: "TODAY", rows: today },
+      { label: "YESTERDAY", rows: yesterday },
+      { label: "EARLIER", rows: earlier },
+    ].filter((group) => group.rows.length > 0);
+  }, [scoped.invoices, tf]);
+
+  const reportResult = useMemo(
+    () =>
+      report
+        ? buildPropertyReport(report, {
+            tenants,
+            invoices,
+            schedules,
+            period: fPeriod,
+            property: fProperty,
+            extra: fExtra,
+          })
+        : null,
+    [report, tenants, invoices, schedules, fPeriod, fProperty, fExtra],
+  );
+
+  const scopedTenantIds = useMemo(
+    () => new Set(scoped.tenants.map((tenant) => tenant.id)),
+    [scoped.tenants],
+  );
+  const scopedSchedules = useMemo(
+    () =>
+      scope === ALL_PROPERTIES
+        ? schedules
+        : schedules.filter((schedule) =>
+            scopedTenantIds.has(schedule.tenantProfileId),
+          ),
+    [scope, schedules, scopedTenantIds],
+  );
+  const exportData: PropertyReportData = {
+    merchant: merchant ?? {},
+    tenants: scoped.tenants,
+    invoices: scoped.invoices,
+    schedules: scopedSchedules,
+    scope: scope === ALL_PROPERTIES ? undefined : scope,
+  };
+
+  /* ── sheet drag: the prototype physics, corrected for the scaled canvas ── */
+  const sheetY = dragging ? dragY : sheetOpen ? 0 : CLOSED;
+
+  const onSheetDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      e.currentTarget.setPointerCapture(e.pointerId);
+      const canvas = e.currentTarget.closest("[data-desktop-scale]") as HTMLElement | null;
+      const scale = Number(canvas?.dataset.desktopScale) || 1;
+      const from = sheetOpen ? 0 : CLOSED;
+      drag.current = { startY: e.clientY, startT: from, moved: false, scale };
+      setDragY(from);
+      setDragging(true);
+    },
+    [sheetOpen],
+  );
+
+  const onSheetMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!dragging) return;
+      /* Pointer deltas are viewport px; the sheet moves in canvas px. */
+      const dy = (e.clientY - drag.current.startY) / (drag.current.scale || 1);
+      drag.current.moved = drag.current.moved || Math.abs(dy) > 6;
+      setDragY(Math.max(0, Math.min(CLOSED, drag.current.startT + dy)));
+    },
+    [dragging],
+  );
+
+  const onSheetUp = useCallback(() => {
+    if (!dragging) return;
+    setDragging(false);
+    setSheetOpen(drag.current.moved ? dragY < CLOSED / 2 : !sheetOpen);
+  }, [dragging, dragY, sheetOpen]);
+
+  /* ── actions ── */
+  const openReports = () => {
+    setSheetMode("tiles");
+    setSheetOpen(true);
+  };
+
+  const pickTile = (id: PropertyReportId) => {
+    setPendReport(id);
+    setFPeriod("This month");
+    setFProperty(scope);
+    setFExtra(PROPERTY_REPORT_BY_ID[id].extra[0]);
+    setSheetMode("filters");
+  };
+
+  const generate = () => {
+    setReport(pendReport);
+    setSheetOpen(false);
+    setSheetMode("tiles");
+  };
+
+  const sheetTitle =
+    sheetMode === "history"
+      ? "Payment History"
+      : sheetMode === "tiles"
+        ? "Reports"
+        : PROPERTY_REPORT_BY_ID[pendReport].title;
+
+  const lightChip = (on: boolean) => ({
+    border: `1.5px solid ${on ? ACTIVE : "#D6DAE6"}`,
+    background: on ? ACTIVE : "transparent",
+    color: on ? NAVY : "#5A6480",
+    fontWeight: on ? 700 : 600,
+  });
+
+  const donutBg = (segs: { pct: number }[]) => {
+    let acc = 0;
+    const stops = segs.map((s, i) => {
+      const part = `${DONUT_COLORS[i % DONUT_COLORS.length]} ${acc}% ${acc + s.pct}%`;
+      acc += s.pct;
+      return part;
+    });
+    return `conic-gradient(${stops.join(", ")})`;
+  };
+
+  return (
+    <DesktopPageScaffold {...props} vertical="property" page="analytics" showScope={false}>
+      <style>{PA_CSS}</style>
+      <div className="pa-body">
+        {/* ── OVERVIEW ── */}
+        {!report && (
+          <>
+            <div className="pa-overview-head dt-cascade">
+              <div className="pa-scope-wrap">
+                <button
+                  type="button"
+                  className="pa-scope"
+                  aria-label={(scope === ALL_PROPERTIES ? "all properties" : scope) + " scope"}
+                  aria-haspopup="listbox"
+                  aria-expanded={scopeOpen}
+                  onClick={() => setScopeOpen((open) => !open)}
+                >
+                  <span>{scope === ALL_PROPERTIES ? "all properties" : scope}</span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+                </button>
+                {scopeOpen && (
+                  <div className="pa-scope-menu" role="listbox" aria-label="property scope">
+                    {propertyOptions.map((property) => (
+                      <button
+                        key={property}
+                        type="button"
+                        role="option"
+                        aria-selected={scope === property}
+                        className="pa-scope-option"
+                        onClick={() => {
+                          setScope(property);
+                          setScopeOpen(false);
+                        }}
+                      >
+                        {property === ALL_PROPERTIES ? "all properties" : property}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="pa-segs" role="tablist" aria-label="revenue range" data-tutorial-id="pa-period">
+                {RANGES.map((range) => {
+                  const on = range.k === tf;
+                  return (
+                    <button
+                      key={range.k}
+                      type="button"
+                      role="tab"
+                      aria-selected={on}
+                      className="pa-seg"
+                      style={{
+                        background: on ? ACTIVE : "transparent",
+                        color: on ? NAVY : "#6B7BB8",
+                        fontWeight: on ? 700 : 600,
+                      }}
+                      onClick={() => setTf(range.k)}
+                    >
+                      {range.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="pa-hero-row" data-tutorial-id="pa-total">
+              <div className="pa-hero-col dt-cascade">
+                <div className="pa-hero-amt-row">
+                  <span className="pa-hero">{invoicesQuery.isLoading ? "—" : money(overview.total)}</span>
+                  {overview.growth !== null && (
+                    <span className="pa-hero-pill">
+                      {overview.growth >= 0 ? "+" : ""}
+                      {overview.growth}%
+                    </span>
+                  )}
+                </div>
+                <span className="pa-hero-sub">total revenue</span>
+                <span className="pa-hero-out">
+                  {invoicesQuery.isLoading ? "—" : money(overview.outstanding)}
+                </span>
+                <span className="pa-hero-sub pa-hero-sub-dim">outstanding payments</span>
+              </div>
+            </div>
+
+            <div className="pa-chart dt-rise">
+              <svg className="pa-chart-svg" viewBox="0 0 1076 240" preserveAspectRatio="none" aria-label="collected rent chart">
+                <defs>
+                  <linearGradient id="proprevfill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stopColor={ACCENT} stopOpacity="0.34" />
+                    <stop offset="1" stopColor={ACCENT} stopOpacity="0.02" />
+                  </linearGradient>
+                </defs>
+                <path d={overview.areaD} fill="url(#proprevfill)" />
+                <path d={overview.lineD} fill="none" stroke="#8CBBFF" strokeWidth="3" strokeLinecap="round" />
+              </svg>
+              {overview.peakValue > 0 && (
+                <div className="pa-chip" style={{ left: overview.dotLeft }}>
+                  {moneyWhole(overview.peakValue)}
+                </div>
+              )}
+            </div>
+            {overview.peakValue > 0 && (
+              <div
+                className="pa-dot"
+                style={{ left: overview.floatingDotLeft }}
+              />
+            )}
+          </>
+        )}
+
+        {/* ── GENERATED REPORT ── */}
+        {report && reportResult && (
+          <div className="pa-report">
+            <div className="pa-rep-head">
+              <button type="button" className="pa-back" onClick={() => setReport(null)}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M11 6l-6 6 6 6" /></svg>
+                <span>analytics</span>
+              </button>
+              <span className="pa-rep-title">{reportResult.title}</span>
+              <span className="pa-rep-filter">{((PROPERTY_REPORT_BY_ID[report].periodFiltered ? fPeriod : "Current snapshot") + " · " + fProperty + " · " + fExtra).toLowerCase()}</span>
+            </div>
+
+            <div className="pa-rep-body">
+              <div className="pa-rep-left">
+                <span className="pa-rep-hero">{reportResult.heroV}</span>
+                <span className="pa-rep-hero-l">{reportResult.heroL}</span>
+                {reportResult.h2V && (
+                  <div className="pa-rep-h2">
+                    <span className="pa-rep-h2-v">{reportResult.h2V}</span>
+                    <span className="pa-rep-h2-l">{reportResult.h2L}</span>
+                  </div>
+                )}
+
+                {reportResult.chart === "donut" && reportResult.segs.length > 0 && (
+                  <div className="pa-donut-row">
+                    <div className="pa-donut" style={{ background: donutBg(reportResult.segs) }}>
+                      <div className="pa-donut-hole" />
+                    </div>
+                    <div className="pa-legend">
+                      {reportResult.segs.map((sg, i) => (
+                        <div key={sg.label} className="pa-legend-row">
+                          <span className="pa-legend-dot" style={{ background: DONUT_COLORS[i % DONUT_COLORS.length] }} />
+                          <span className="pa-legend-label">{sg.label}</span>
+                          <span className="pa-legend-val">{sg.val}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {reportResult.chart === "bars" && reportResult.bars.length > 0 && (
+                  <div className="pa-bars">
+                    {reportResult.bars.map((b, i) => (
+                      <div key={`${b.label}-${i}`} className="pa-bar-col">
+                        <div className="pa-bar" style={{ height: `${Math.max(2, Math.round(b.v * 138))}px` }} />
+                        <span className="pa-bar-label">{b.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="pa-rep-right">
+                <span className="pa-rep-detail-title">{reportResult.detailTitle}</span>
+                <div className="pa-rep-rows">
+                  {reportResult.rows.length === 0 ? (
+                    <div className="pa-rep-empty">nothing to report yet</div>
+                  ) : (
+                    reportResult.rows.map((row, i) => (
+                      <div key={`${row.name}-${i}`} className="pa-rep-row">
+                        <span className="pa-rep-row-l">
+                          <span className="pa-rep-row-name">{row.name}</span>
+                          {row.sub && <span className="pa-rep-row-sub">{row.sub}</span>}
+                        </span>
+                        <span className="pa-rep-row-r">
+                          <span className="pa-rep-row-val">{row.val}</span>
+                          {row.sub2 && <span className="pa-rep-row-sub2">{row.sub2}</span>}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── SHEET ── */}
+        <div
+          className="pa-sheet"
+          data-tutorial-id="pa-history"
+          style={{
+            transform: `translateY(${sheetY}px)`,
+            transition: dragging ? "none" : "transform .5s cubic-bezier(.22,.9,.3,1)",
+          }}
+        >
+          <div
+            className="pa-grab"
+            role="button"
+            tabIndex={0}
+            aria-label={sheetOpen ? "collapse payment history" : "expand payment history"}
+            aria-expanded={sheetOpen}
+            onPointerDown={onSheetDown}
+            onPointerMove={onSheetMove}
+            onPointerUp={onSheetUp}
+            onPointerCancel={onSheetUp}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setSheetOpen((o) => !o);
+              }
+            }}
+          >
+            <span className="pa-grab-bar" />
+          </div>
+
+          <div className="pa-sheet-head">
+            <span className="pa-sheet-title">{sheetTitle}</span>
+            <div className="pa-sheet-actions">
+              {sheetMode === "history" && (
+                <>
+                  <button type="button" className="pa-btn-reports" data-tutorial-id="pa-reports" onClick={openReports}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={DEEP_BLUE} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="7" rx="1.5" /><rect x="4" y="13" width="7" height="7" rx="1.5" /><rect x="13" y="13" width="7" height="7" rx="1.5" /></svg>
+                    <span>Reports</span>
+                  </button>
+                  <button type="button" className="pa-btn-white" onClick={() => setExportOpen(true)}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={INK} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4v10M8 10l4 4 4-4" /><path d="M5 19h14" /></svg>
+                    <span>Export</span>
+                  </button>
+                </>
+              )}
+              {sheetMode === "tiles" && (
+                <button type="button" className="pa-btn-white" onClick={() => setSheetMode("history")}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={INK} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M11 6l-6 6 6 6" /></svg>
+                  <span>Payment History</span>
+                </button>
+              )}
+              {sheetMode === "filters" && (
+                <button type="button" className="pa-btn-white" onClick={() => setSheetMode("tiles")}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={INK} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M11 6l-6 6 6 6" /></svg>
+                  <span>All Reports</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="pa-sheet-body">
+            {sheetMode === "history" &&
+              (invoicesQuery.isLoading || tenantsQuery.isLoading ? (
+                <div className="pa-sheet-empty">loading payments…</div>
+              ) : historyGroups.length === 0 ? (
+                <div className="pa-sheet-empty">no payments in this period</div>
+              ) : (
+                historyGroups.map((group) => (
+                  <div key={group.label}>
+                    <div className="pa-group-label">{group.label}</div>
+                    {group.rows.map((invoice) => {
+                      const tenant = tenantById.get(invoice.tenantProfileId);
+                      const name =
+                        invoice.tenantName?.trim() ||
+                        tenantName(tenant) ||
+                        "Rent payment";
+                      const address =
+                        invoice.propertyAddress?.trim() ||
+                        tenant?.propertyAddress?.trim() ||
+                        "property address unavailable";
+                      const splitStatus =
+                        invoice.splitCount && invoice.splitCount > 1
+                          ? " · " + String(invoice.splitPaidCount ?? 0) + " of " + String(invoice.splitCount) + " shares paid"
+                          : "";
+                      return (
+                        <div key={invoice.id} className="pa-tx-row">
+                          <span className="pa-tx-initials">{initials(name)}</span>
+                          <span className="pa-tx-mid">
+                            <span className="pa-tx-name">{name}</span>
+                            <span className="pa-tx-sub">{address}</span>
+                          </span>
+                          <span className="pa-tx-right">
+                            <span className="pa-tx-amt">
+                              {money(isPaid(invoice) ? invoiceAmount(invoice) : invoiceOwing(invoice))}
+                            </span>
+                            <span className="pa-tx-status">
+                              {STATUS_LABEL[invoice.status] ?? invoice.status.replace(/_/g, " ")}
+                              {splitStatus}
+                            </span>
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))
+              ))}
+
+            {sheetMode === "tiles" && (
+              <div className="pa-tiles-wrap">
+                <div className="pa-tiles-hint">Pick a report to generate — filters come next.</div>
+                <div className="pa-tiles">
+                  {PROPERTY_DESKTOP_REPORTS.map((r) => (
+                    <button key={r.id} type="button" className="pa-tile" onClick={() => pickTile(r.id)}>
+                      <span className="pa-tile-ico">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={DEEP_BLUE} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={r.icon} /></svg>
+                      </span>
+                      <span className="pa-tile-text">
+                        <span className="pa-tile-title">{r.title}</span>
+                        <span className="pa-tile-desc">{r.desc}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {sheetMode === "filters" && (
+              <div className="pa-filters">
+                {PROPERTY_REPORT_BY_ID[pendReport].periodFiltered ? (
+                  <div className="pa-filter-group">
+                    <span className="pa-filter-label">PERIOD</span>
+                    <div className="pa-filter-chips">
+                      {PROPERTY_PERIOD_CHIPS.map((period) => (
+                        <button key={period} type="button" className="pa-fchip" style={lightChip(period === fPeriod)} onClick={() => setFPeriod(period)}>
+                          {period}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="pa-filter-group">
+                    <span className="pa-filter-label">SNAPSHOT</span>
+                    <div className="pa-snapshot-note">This report is a snapshot of your current data.</div>
+                  </div>
+                )}
+
+                <div className="pa-filter-group">
+                  <span className="pa-filter-label">PROPERTY</span>
+                  <div className="pa-filter-chips">
+                    {propertyOptions.map((v) => (
+                      <button key={v} type="button" className="pa-fchip" style={lightChip(v === fProperty)} onClick={() => setFProperty(v)}>
+                        {v}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pa-filter-group">
+                  <span className="pa-filter-label">{PROPERTY_REPORT_BY_ID[pendReport].extraLabel}</span>
+                  <div className="pa-filter-chips">
+                    {PROPERTY_REPORT_BY_ID[pendReport].extra.map((v) => (
+                      <button key={v} type="button" className="pa-fchip" style={lightChip(v === fExtra)} onClick={() => setFExtra(v)}>
+                        {v}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pa-generate-row">
+                  <button type="button" className="pa-generate" onClick={generate}>Generate Report</button>
+                  <span className="pa-generate-note">
+                    the top section becomes your report — jump back with the analytics button
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {exportOpen && (
+        <ReportModal
+          title="Property Reports"
+          options={PROPERTY_REPORT_OPTIONS}
+          onClose={() => setExportOpen(false)}
+          onGenerate={async (id, format, args) => {
+            const { runPropertyReport } = await import(
+              "@/lib/report-pdf/reports/property"
+            );
+            await runPropertyReport(id, format, exportData, args.range);
+          }}
+        />
+      )}
+    </DesktopPageScaffold>
+  );
+}
+
+const PA_CSS = `
+.pa-body { position:relative; height:100%; box-sizing:border-box; padding:26px 52px 0; overflow:hidden; }
+
+/* ── overview ── */
+.pa-overview-head { position:relative; z-index:3; display:flex; align-items:center; justify-content:space-between; }
+.pa-scope-wrap { position:relative; }
+.pa-scope { display:inline-flex; align-items:center; gap:9px; padding:10px 20px; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); background:transparent; font-weight:400; font-size:13.5px; color:#7FB2FF; cursor:pointer; transition:background .18s ease; }
+.pa-scope:hover { background:rgba(94,158,255,0.08); }
+.pa-scope-menu { position:absolute; left:0; top:48px; width:280px; box-sizing:border-box; padding:8px; border-radius:16px; border:1px solid rgba(94,158,255,0.3); background:#0F1747; box-shadow:0 18px 45px rgba(0,5,28,0.5); display:flex; flex-direction:column; gap:3px; }
+.pa-scope-option { width:100%; padding:10px 12px; border-radius:10px; background:transparent; color:#9DBCFF; text-align:left; font-weight:600; font-size:12.5px; cursor:pointer; }
+.pa-scope-option:hover, .pa-scope-option[aria-selected=true] { background:rgba(94,158,255,0.16); color:#FFFFFF; }
+.pa-hero-row { position:relative; z-index:1; margin-top:22px; display:flex; align-items:flex-start; justify-content:space-between; }
+/* The hero figures continue the head's cascade (scope 0, ranges 1), so the four
+   hero lines run steps 2–5 and the chart lands on 6. */
+.pa-hero-col { display:flex; flex-direction:column; gap:6px; --dt-d:56ms; }
+.pa-hero-amt-row { display:flex; align-items:flex-start; gap:18px; }
+.pa-hero { font-family:Outfit,sans-serif; font-weight:700; font-size:63px; line-height:0.92; letter-spacing:-0.015em; color:#5E9EFF; font-variant-numeric:tabular-nums; }
+.pa-hero-pill { margin-top:10px; padding:7px 14px; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); font-weight:700; font-size:14px; color:#7FB2FF; white-space:nowrap; }
+.pa-hero-sub { font-weight:600; font-size:14px; color:#4A86F0; }
+.pa-hero-out { margin-top:26px; font-family:Outfit,sans-serif; font-weight:700; font-size:47px; line-height:0.92; letter-spacing:-0.015em; color:#5E9EFF; opacity:0.61; font-variant-numeric:tabular-nums; }
+.pa-hero-sub-dim { font-weight:300; opacity:0.61; }
+.pa-segs { display:flex; align-items:center; padding:4px; border-radius:9999px; background:#0F1747; }
+.pa-seg { padding:8px 0; width:70px; border-radius:9999px; font-size:12px; cursor:pointer; transition:background .18s ease, color .18s ease; }
+
+.pa-chart { position:relative; margin-top:44px; height:266px; --dt-i:6; }
+.pa-chart-svg { display:block; position:absolute; left:-86px; top:-47px; width:1214px; height:221px; }
+.pa-dot { position:absolute; top:185px; width:14px; height:14px; border-radius:50%; background:#FFFFFF; box-shadow:0 0 0 4px rgba(255,255,255,0.18); transform:translate(-50%,-50%); transition:left .3s ease; }
+.pa-chip { position:absolute; top:174px; transform:translateX(-50%); padding:7px 14px; border-radius:10px; background:#66A9FF; font-weight:700; font-size:13.5px; color:#000F3F; white-space:nowrap; transition:left .3s ease; }
+
+/* ── generated report ── */
+.pa-report { animation:reportIn .55s cubic-bezier(.22,.9,.3,1) both; display:flex; flex-direction:column; height:408px; }
+.pa-rep-head { display:flex; align-items:center; gap:14px; }
+.pa-back { display:inline-flex; align-items:center; gap:8px; padding:9px 18px; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); background:transparent; font-weight:600; font-size:12.5px; color:${ACCENT_SOFT}; cursor:pointer; transition:background .15s ease; }
+.pa-back:hover { background:rgba(94,158,255,0.08); }
+.pa-rep-title { font-family:'Outfit',sans-serif; font-weight:700; font-size:24px; color:${TEXT_SOFT}; }
+.pa-rep-filter { padding:7px 14px; border-radius:9999px; background:#0F1747; font-weight:600; font-size:11.5px; color:${ACCENT_SOFT}; }
+.pa-rep-body { display:flex; gap:56px; margin-top:24px; flex:1; min-height:0; }
+.pa-rep-left { flex:0 0 400px; display:flex; flex-direction:column; }
+.pa-rep-hero { font-family:'Outfit',sans-serif; font-weight:700; font-size:62px; line-height:0.95; letter-spacing:-0.015em; color:${ACCENT}; }
+.pa-rep-hero-l { margin-top:9px; font-weight:300; font-size:14px; color:${NAV_DIM}; }
+.pa-rep-h2 { margin-top:14px; display:flex; align-items:baseline; gap:10px; }
+.pa-rep-h2-v { font-family:'Outfit',sans-serif; font-weight:700; font-size:27px; color:${ACCENT}; opacity:0.61; }
+.pa-rep-h2-l { font-weight:600; font-size:12.5px; color:${NAV_DIM}; opacity:0.61; }
+.pa-donut-row { margin-top:26px; display:flex; align-items:center; gap:26px; }
+.pa-donut { width:162px; height:162px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
+.pa-donut-hole { width:96px; height:96px; border-radius:50%; background:${NAVY}; }
+.pa-legend { display:flex; flex-direction:column; gap:9px; min-width:0; }
+.pa-legend-row { display:flex; align-items:center; gap:9px; }
+.pa-legend-dot { width:9px; height:9px; border-radius:3px; flex:0 0 auto; }
+.pa-legend-label { font-weight:600; font-size:12px; color:rgba(244,246,255,0.7); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:150px; }
+.pa-legend-val { font-weight:700; font-size:12px; color:${TEXT_SOFT}; }
+.pa-bars { margin-top:26px; display:flex; align-items:flex-end; gap:12px; height:162px; }
+.pa-bar-col { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:8px; height:100%; }
+.pa-bar { width:100%; max-width:44px; border-radius:8px; background:${ACCENT}; animation:tileIn .45s cubic-bezier(.22,.9,.3,1) both; }
+.pa-bar-label { font-weight:700; font-size:11.5px; color:${ACCENT_SOFT}; }
+.pa-rep-right { flex:1; display:flex; flex-direction:column; min-width:0; }
+.pa-rep-detail-title { font-weight:700; font-size:11px; letter-spacing:0.18em; color:${NAV_DIM}; }
+.pa-rep-rows { margin-top:4px; display:flex; flex-direction:column; overflow-y:auto; flex:1; scrollbar-width:none; }
+.pa-rep-rows::-webkit-scrollbar { display:none; }
+.pa-rep-row { display:flex; align-items:center; gap:16px; padding:13px 0; border-bottom:1px solid rgba(94,158,255,0.14); }
+.pa-rep-row-l { display:flex; flex-direction:column; gap:2px; flex:1; min-width:0; }
+.pa-rep-row-name { font-weight:600; font-size:14px; color:${TEXT_SOFT}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pa-rep-row-sub { font-weight:500; font-size:11.5px; color:rgba(244,246,255,0.45); }
+.pa-rep-row-r { display:flex; flex-direction:column; align-items:flex-end; gap:2px; flex:0 0 auto; }
+.pa-rep-row-val { font-family:'Outfit',sans-serif; font-weight:700; font-size:15px; color:${ACCENT}; }
+.pa-rep-row-sub2 { font-weight:500; font-size:11px; color:rgba(244,246,255,0.4); }
+.pa-rep-empty { padding:20px 0; font-weight:300; font-size:12.5px; color:rgba(191,209,255,0.5); }
+
+/* ── payment-history sheet ── */
+.pa-sheet { position:absolute; left:0; right:0; bottom:0; height:${SHEET_H}px; border-radius:30px 30px 0 0; background:${SHEET_BG}; box-shadow:0 -18px 50px rgba(3,6,20,0.5); z-index:10; display:flex; flex-direction:column; box-sizing:border-box; }
+.pa-grab { flex:0 0 auto; display:flex; align-items:center; justify-content:center; padding:16px 0 8px; cursor:grab; touch-action:none; }
+.pa-grab:active { cursor:grabbing; }
+.pa-grab-bar { width:66px; height:6px; border-radius:3px; background:#C7CBD8; }
+.pa-sheet-head { flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:10px 46px 18px; }
+.pa-sheet-title { font-weight:700; font-size:24px; color:${INK}; }
+.pa-sheet-actions { display:flex; align-items:center; gap:10px; }
+.pa-btn-reports { display:inline-flex; align-items:center; gap:9px; padding:11px 22px; border-radius:9999px; background:transparent; border:1.5px solid ${DEEP_BLUE}; font-weight:700; font-size:14px; color:${DEEP_BLUE}; cursor:pointer; transition:background .15s ease; }
+.pa-btn-reports:hover { background:rgba(29,72,200,0.06); }
+.pa-btn-white { display:inline-flex; align-items:center; gap:9px; padding:11px 22px; border-radius:9999px; background:#fff; border:1px solid #E2E5EE; font-weight:700; font-size:14px; color:${INK}; cursor:pointer; transition:background .15s ease; }
+.pa-btn-white:hover:not(:disabled) { background:#FAFBFD; }
+.pa-btn-white:disabled { opacity:0.55; cursor:default; }
+.pa-btn-sm { padding:8px 16px; font-size:12.5px; }
+.pa-btn-danger { color:#C0343C; border-color:#F0C9CC; }
+.pa-sheet-body { flex:1 1 auto; overflow-y:auto; padding:0 46px 26px; }
+.pa-sheet-empty { padding:28px 0; font-weight:600; font-size:13px; color:${SHEET_DIM}; }
+
+.pa-group-label { margin-top:24px; font-weight:700; font-size:12px; letter-spacing:0.16em; color:${SHEET_LABEL}; }
+.pa-sheet-body > div:first-child > .pa-group-label { margin-top:0; }
+.pa-tx-row { width:100%; display:flex; align-items:center; gap:20px; padding:16px 0; border-bottom:1px solid #E6E8F0; background:transparent; cursor:default; text-align:left; }
+.pa-tx-initials { width:42px; font-weight:700; font-size:13.5px; color:${SHEET_INK}; flex:0 0 auto; text-transform:uppercase; }
+.pa-tx-mid { display:flex; flex-direction:column; gap:3px; flex:1; min-width:0; }
+.pa-tx-name { font-weight:700; font-size:15.5px; color:${INK}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pa-tx-sub { font-weight:500; font-size:12.5px; color:${SHEET_DIM}; }
+.pa-tx-right { display:flex; flex-direction:column; align-items:flex-end; gap:3px; flex:0 0 auto; }
+.pa-tx-amt { font-weight:700; font-size:15.5px; color:${INK}; font-variant-numeric:tabular-nums; }
+.pa-tx-status { font-weight:500; font-size:11.5px; color:${SHEET_LABEL}; }
+.pa-tiles-wrap { animation:tileIn .4s cubic-bezier(.22,.9,.3,1) both; }
+.pa-tiles-hint { font-weight:600; font-size:13px; color:${SHEET_DIM}; }
+.pa-tiles { margin-top:16px; display:grid; grid-template-columns:repeat(5,1fr); gap:10px; }
+.pa-tile { display:flex; flex-direction:column; align-items:flex-start; gap:11px; padding:16px; border-radius:14px; background:${SHEET_BG}; border:0; cursor:pointer; text-align:left; transition:background .15s ease; }
+.pa-tile:hover { background:#E9EDF6; }
+.pa-tile-ico { width:34px; height:34px; border-radius:10px; background:#FFFFFF; box-shadow:0 1px 2px rgba(10,17,40,0.08); display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
+.pa-tile-text { display:flex; flex-direction:column; gap:3px; }
+.pa-tile-title { font-weight:700; font-size:13.5px; color:${SHEET_INK}; }
+.pa-tile-desc { font-weight:500; font-size:11px; line-height:1.35; color:${SHEET_DIM}; }
+
+.pa-filters { animation:tileIn .4s cubic-bezier(.22,.9,.3,1) both; display:flex; flex-direction:column; gap:22px; }
+.pa-filter-group { display:flex; flex-direction:column; gap:10px; }
+.pa-filter-label { font-weight:700; font-size:11px; letter-spacing:0.16em; color:${SHEET_LABEL}; }
+.pa-filter-chips { display:flex; flex-wrap:wrap; gap:8px; }
+.pa-fchip { padding:10px 18px; border-radius:9999px; font-size:12.5px; cursor:pointer; transition:background .15s ease, color .15s ease; }
+.pa-snapshot-note { width:max-content; max-width:440px; padding:12px 14px; border-radius:12px; background:#FFFFFF; color:${SHEET_DIM}; font-weight:500; font-size:12.5px; }
+.pa-generate-row { display:flex; align-items:center; gap:14px; margin-top:4px; }
+.pa-generate { height:52px; padding:0 34px; border-radius:9999px; background:${DEEP_BLUE}; color:#fff; font-weight:700; font-size:14.5px; cursor:pointer; transition:opacity .15s ease; }
+.pa-generate:hover:not(:disabled) { opacity:0.9; }
+.pa-generate:disabled { opacity:0.6; cursor:default; }
+.pa-generate-sm { height:42px; padding:0 20px; font-size:13px; }
+.pa-generate-note { font-weight:500; font-size:12px; color:#9AA0B4; }
+`;

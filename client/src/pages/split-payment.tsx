@@ -1,37 +1,32 @@
-import { useState, useEffect, type CSSProperties } from "react";
-import { useParams, useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { sseClient } from "@/lib/sse-client";
-import { Minus, Plus, Loader2, CheckCircle } from "lucide-react";
-import "@/styles/checkout.css";
-import {
-  CHECKOUT_THEME as CT,
-  pageStyle,
-  cardStyle,
-  labelStyle,
-  amountStyle,
-  subtitleStyle,
-  outlineBtnStyle,
-  footerLinkStyle,
-  chipStyle,
-} from "@/lib/checkout-theme";
-import { TaptWordmark } from "@/components/checkout/tapt-wordmark";
-import { useTokenPagePrivacy } from "@/hooks/use-token-page-privacy";
+import { useEffect, useState } from 'react';
+import { useLocation, useParams } from 'wouter';
+import { useQuery } from '@tanstack/react-query';
+import { apiRequest, queryClient } from '@/lib/queryClient';
+import { sseClient } from '@/lib/sse-client';
+import '@/styles/checkout.css';
+import { useTokenPagePrivacy } from '@/hooks/use-token-page-privacy';
 import {
   checkoutResolveEndpoint,
   currentTokenPaymentAmount,
   tokenPaymentPath,
   tokenSplitEndpoint,
   type CheckoutRouteKind,
-} from "@/lib/payment-addressing";
+} from '@/lib/payment-addressing';
+import SplitPaymentView, {
+  type SplitPaymentSelection,
+} from '@/features/checkout/SplitPaymentView';
 
-export default function SplitPayment({ sourceKind = "retail-legacy" }: {
-  sourceKind?: Extract<CheckoutRouteKind, "retail-legacy" | "retail-token">;
+export default function SplitPayment({
+  sourceKind = 'retail-legacy',
+}: {
+  sourceKind?: Extract<CheckoutRouteKind, 'retail-legacy' | 'retail-token'>;
 }) {
-  const { transactionId, token = "" } = useParams<{ transactionId?: string; token?: string }>();
+  const { transactionId, token = '' } = useParams<{
+    transactionId?: string;
+    token?: string;
+  }>();
   const [, setLocation] = useLocation();
-  const isTokenSource = sourceKind === "retail-token";
+  const isTokenSource = sourceKind === 'retail-token';
   const txnId = transactionId ? parseInt(transactionId) : 0;
   useTokenPagePrivacy(isTokenSource);
 
@@ -39,26 +34,30 @@ export default function SplitPayment({ sourceKind = "retail-legacy" }: {
   const [currentTransaction, setCurrentTransaction] = useState<any>(null);
   const [splitError, setSplitError] = useState<string | null>(null);
 
-  // First-person state
-  const [splitCount, setSplitCount] = useState(2);
-  const [editMode, setEditMode] = useState(false);
-  const [editValue, setEditValue] = useState("");
-  const [confirmedCustom, setConfirmedCustom] = useState<string | null>(null); // null = use equal split
-
-  const { data: transaction, isLoading, refetch: refetchTransaction } = useQuery({
-    queryKey: isTokenSource ? ["token-payment", token] : ["/api/transactions", txnId],
+  const {
+    data: transaction,
+    isLoading,
+    refetch: refetchTransaction,
+  } = useQuery({
+    queryKey: isTokenSource
+      ? ['token-payment', token]
+      : ['/api/transactions', txnId],
     queryFn: async () => {
       const endpoint = isTokenSource
-        ? checkoutResolveEndpoint({ kind: "retail-token", token })
-        : checkoutResolveEndpoint({ kind: "retail-legacy", transactionId: txnId });
-      const response = await fetch(endpoint, isTokenSource
-        ? { headers: { "Cache-Control": "no-cache" } }
-        : undefined);
+        ? checkoutResolveEndpoint({ kind: 'retail-token', token })
+        : checkoutResolveEndpoint({
+            kind: 'retail-legacy',
+            transactionId: txnId,
+          });
+      const response = await fetch(
+        endpoint,
+        isTokenSource ? { headers: { 'Cache-Control': 'no-cache' } } : undefined
+      );
       const body = await response.json().catch(() => ({}));
       if (isTokenSource && response.status === 410 && body?.payment) {
         return { ...body.payment, closed: true };
       }
-      if (!response.ok) throw new Error("Transaction not found");
+      if (!response.ok) throw new Error('Transaction not found');
       return body;
     },
     enabled: isTokenSource ? !!token : !!txnId,
@@ -67,10 +66,10 @@ export default function SplitPayment({ sourceKind = "retail-legacy" }: {
   });
 
   const { data: merchant } = useQuery({
-    queryKey: ["/api/merchants", transaction?.merchantId],
+    queryKey: ['/api/merchants', transaction?.merchantId],
     queryFn: async () => {
       const response = await fetch(`/api/merchants/${transaction.merchantId}`);
-      if (!response.ok) throw new Error("Merchant not found");
+      if (!response.ok) throw new Error('Merchant not found');
       return response.json();
     },
     enabled: !isTokenSource && !!transaction?.merchantId,
@@ -86,12 +85,15 @@ export default function SplitPayment({ sourceKind = "retail-legacy" }: {
     const handleUpdate = (message: any) => {
       if (message.transaction?.id === txnId) {
         setCurrentTransaction(message.transaction);
-        queryClient.setQueryData(["/api/transactions", txnId], message.transaction);
+        queryClient.setQueryData(
+          ['/api/transactions', txnId],
+          message.transaction
+        );
       }
     };
-    sseClient.subscribe("transaction_updated", handleUpdate);
+    sseClient.subscribe('transaction_updated', handleUpdate);
     return () => {
-      sseClient.unsubscribe("transaction_updated", handleUpdate);
+      sseClient.unsubscribe('transaction_updated', handleUpdate);
       sseClient.disconnect();
     };
   }, [isTokenSource, transaction?.merchantId, transaction?.taptStoneId, txnId]);
@@ -100,83 +102,69 @@ export default function SplitPayment({ sourceKind = "retail-legacy" }: {
   const totalAmount = txn ? parseFloat(txn.price) : 0;
   const isSplitSetup = txn?.isSplit === true;
   const completedSplits = txn?.completedSplits || 0;
-  const totalSplits = txn?.totalSplits || splitCount;
-  const allDone = ["completed", "partially_refunded", "refunded"].includes(txn?.status);
-  const tokenInProgress = isTokenSource && txn?.status === "processing";
-  const tokenClosed = isTokenSource && (txn?.closed || ["failed", "cancelled"].includes(txn?.status));
-  const nextPersonIndex = completedSplits + 1;
+  const transactionTotalSplits = txn?.totalSplits;
+  const allDone = ['completed', 'partially_refunded', 'refunded'].includes(
+    txn?.status
+  );
+  const tokenInProgress = isTokenSource && txn?.status === 'processing';
+  const tokenClosed =
+    isTokenSource &&
+    (txn?.closed || ['failed', 'cancelled'].includes(txn?.status));
 
-  // Equal share based on split count
-  const equalShare = isTokenSource
-    ? (Math.floor(Math.round(totalAmount * 100) / (isSplitSetup ? totalSplits : splitCount)) / 100).toFixed(2)
-    : (totalAmount / (isSplitSetup ? totalSplits : splitCount)).toFixed(2);
-
-  // Subsequent payers: remaining amount and their share
-  const totalPaid = isSplitSetup && txn?.splitAmount
-    ? parseFloat(txn.splitAmount) * completedSplits
-    : 0;
+  const totalPaid =
+    isSplitSetup && txn?.splitAmount
+      ? parseFloat(txn.splitAmount) * completedSplits
+      : 0;
   const remaining = totalAmount - totalPaid;
+  const configuredSplitAmount = parseFloat(txn?.splitAmount || '0');
   const subsequentShare = isSplitSetup
-    ? (isTokenSource
-        ? currentTokenPaymentAmount(txn)
-        : (parseFloat(txn?.splitAmount || "0") || parseFloat(equalShare)).toFixed(2))
-    : equalShare;
+    ? isTokenSource
+      ? currentTokenPaymentAmount(txn)
+      : configuredSplitAmount
+        ? configuredSplitAmount.toFixed(2)
+        : undefined
+    : undefined;
 
-  // What's shown as the large static amount
-  const displayAmount = isSplitSetup
-    ? subsequentShare
-    : (confirmedCustom ?? equalShare);
-
-  // Edit step: for first person in edit mode, step by equalShare; for subsequent payers, step by their share
-  const editStep = parseFloat(isSplitSetup ? subsequentShare : equalShare);
-  const maxEditAmount = isSplitSetup ? remaining : totalAmount;
-
-  const parsedEdit = parseFloat(editValue) || 0;
-  const isEditValid = parsedEdit > 0 && parsedEdit <= maxEditAmount + 0.01;
-
-  // Subsequent payer edit state
-  const [subEditMode, setSubEditMode] = useState(false);
-  const [subEditValue, setSubEditValue] = useState("");
-  const [subConfirmed, setSubConfirmed] = useState<string | null>(null);
-  const subDisplay = subConfirmed ?? subsequentShare;
-  const parsedSubEdit = parseFloat(subEditValue) || 0;
-  const isSubEditValid = parsedSubEdit > 0 && parsedSubEdit <= remaining + 0.01;
-
-  const handlePay = async () => {
+  const handlePay = async ({ amount, splitCount }: SplitPaymentSelection) => {
     if (!txn) return;
-    if (isTokenSource && txn.status !== "pending") return;
+    if (isTokenSource && txn.status !== 'pending') return;
     setSplitError(null);
     setIsProcessing(true);
     try {
-      let payAmt: number;
       if (!isSplitSetup) {
-        const response = await apiRequest("POST", isTokenSource
-          ? tokenSplitEndpoint(token)
-          : `/api/transactions/${txnId}/split`, {
-          totalSplits: splitCount,
-        });
+        const response = await apiRequest(
+          'POST',
+          isTokenSource
+            ? tokenSplitEndpoint(token)
+            : `/api/transactions/${txnId}/split`,
+          {
+            totalSplits: splitCount,
+          }
+        );
         const data = await response.json();
         if (!isTokenSource && data.transaction) {
           setCurrentTransaction(data.transaction);
-          queryClient.setQueryData(["/api/transactions", txnId], data.transaction);
+          queryClient.setQueryData(
+            ['/api/transactions', txnId],
+            data.transaction
+          );
         } else if (isTokenSource) {
           await refetchTransaction();
         }
-        payAmt = parseFloat(displayAmount);
-      } else {
-        payAmt = parseFloat(subDisplay);
       }
 
       if (isTokenSource) {
-        const base = tokenPaymentPath(token, "checkout");
-        setLocation(base);
+        setLocation(tokenPaymentPath(token, 'checkout'));
         return;
       }
 
       const payRes = await fetch(`/api/transactions/${txnId}/pay`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ merchantId: txn.merchantId, amount: payAmt.toFixed(2) }),
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          merchantId: txn.merchantId,
+          amount: amount.toFixed(2),
+        }),
       });
       if (payRes.ok) {
         const payData = await payRes.json();
@@ -185,296 +173,65 @@ export default function SplitPayment({ sourceKind = "retail-legacy" }: {
           return;
         }
       }
-      // Fallback if HPP URL unavailable
-      setLocation(`/checkout/${txnId}?amount=${payAmt.toFixed(2)}`);
-    } catch (err) {
-      console.error("Split payment error:", err);
+      setLocation(`/checkout/${txnId}?amount=${amount.toFixed(2)}`);
+    } catch (error) {
+      console.error('Split payment error:', error);
       setSplitError("Couldn't set up the split. Please try again.");
       setIsProcessing(false);
     }
   };
 
+  const handlePayFull = async () => {
+    if (!txn) return;
+    if (isTokenSource) {
+      setLocation(tokenPaymentPath(token, 'checkout'));
+      return;
+    }
+    try {
+      const payRes = await fetch(`/api/transactions/${txnId}/pay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ merchantId: txn.merchantId }),
+      });
+      if (payRes.ok) {
+        const payData = await payRes.json();
+        if (payData.hppUrl) {
+          window.location.href = payData.hppUrl;
+          return;
+        }
+      }
+    } catch {}
+    setLocation(`/checkout/${txnId}`);
+  };
+
   const customLogoUrl: string | null = isTokenSource
-    ? txn?.merchant?.customLogoUrl ?? null
-    : merchant?.customLogoUrl ?? null;
-
-  if (isLoading) {
-    return (
-      <div style={{ ...pageStyle, alignItems: "center" }}>
-        <Loader2 size={40} color={CT.INK} style={{ animation: "spin 1s linear infinite" }} />
-        <style>{spinKeyframes}</style>
-      </div>
-    );
-  }
-
-  if (!txn) {
-    return (
-      <div style={pageStyle}>
-        <div style={{ width: "100%", maxWidth: 380 }}>
-          <div style={{ ...cardStyle, minHeight: 420, justifyContent: "center" }}>
-            <div style={{ position: "absolute", top: 44, left: 0, right: 0, display: "flex", justifyContent: "center" }}>
-              <TaptWordmark customLogoUrl={customLogoUrl} />
-            </div>
-            <p style={{ color: CT.SKY, fontSize: 18, fontWeight: 700 }}>Transaction not found</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const progressBars = (count: number, done: number) => (
-    <div style={{ display: "flex", gap: 6, width: "100%", marginTop: 20 }}>
-      {Array.from({ length: count }).map((_, i) => (
-        <div key={i} style={{ flex: 1, height: 6, borderRadius: 999, background: i < done ? CT.SKY : "rgba(88,171,255,0.25)" }} />
-      ))}
-    </div>
-  );
+    ? (txn?.merchant?.customLogoUrl ?? null)
+    : (merchant?.customLogoUrl ?? null);
 
   return (
-    <div style={pageStyle}>
-      <div style={{ width: "100%", maxWidth: 380 }}>
-        <div style={{ ...cardStyle, minHeight: 560, justifyContent: "flex-start" }}>
-          <TaptWordmark customLogoUrl={customLogoUrl} />
-
-          {/* ── Closed token link ── */}
-          {tokenClosed && (
-            <>
-              <div style={{ flex: 1 }} />
-              <p style={{ color: CT.SKY, fontSize: 20, fontWeight: 700 }}>Payment closed</p>
-              <p style={{ color: CT.SKY_DIM, fontSize: 13, marginTop: 8 }}>This payment can no longer be completed.</p>
-              <div style={{ flex: 1 }} />
-            </>
-          )}
-
-          {/* ── All paid ── */}
-          {allDone && !tokenClosed && (
-            <>
-              <div style={{ flex: 1 }} />
-              <div style={{ textAlign: "center" }}>
-                <CheckCircle size={64} color={CT.SKY} style={{ margin: "0 auto 16px" }} />
-                <p style={{ color: CT.SKY, fontSize: 22, fontWeight: 700, marginBottom: 4 }}>All done!</p>
-                <p style={{ color: CT.SKY_DIM, fontSize: 14 }}>All {totalSplits} payments complete</p>
-                <p style={{ ...amountStyle, fontSize: 44, margin: "16px 0 2px" }}>${totalAmount.toFixed(2)}</p>
-                <p style={{ color: CT.SKY_DIM, fontSize: 13 }}>total paid</p>
-              </div>
-              <div style={{ flex: 1 }} />
-              <button style={{ ...outlineBtnStyle, marginTop: 8 }} onClick={() => setLocation(
-                "/",
-              )}>done</button>
-            </>
-          )}
-
-          {/* ── Redirecting ── */}
-          {!allDone && !tokenClosed && (isProcessing || tokenInProgress) && (
-            <>
-              <div style={{ flex: 1 }} />
-              <Loader2 size={32} color={CT.SKY} style={{ animation: "spin 1s linear infinite" }} />
-              <p style={{ color: CT.SKY, fontSize: 15, fontWeight: 600, marginTop: 14 }}>
-                {tokenInProgress ? "Payment in progress…" : "Taking you to payment…"}
-              </p>
-              <div style={{ flex: 1 }} />
-            </>
-          )}
-
-          {/* ── First person ── */}
-          {!allDone && !tokenClosed && !isProcessing && !tokenInProgress && !isSplitSetup && (
-            <>
-              <div style={{ flex: 1, minHeight: 12 }} />
-              <div style={{ ...chipStyle, marginBottom: 14 }}>Person 1 of {splitCount}</div>
-              <p style={labelStyle}>{txn.itemName}</p>
-              <p style={{ ...amountStyle, fontSize: 56 }}>${totalAmount.toFixed(2)}</p>
-
-              {/* Split-count stepper */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 22, marginTop: 6 }}>
-                <button
-                  onClick={() => { setSplitCount(c => Math.max(2, c - 1)); setConfirmedCustom(null); }}
-                  disabled={splitCount <= 2}
-                  style={stepperStyle(splitCount <= 2)}
-                  aria-label="Fewer people"
-                >
-                  <Minus size={20} />
-                </button>
-                <span style={{ color: CT.SKY_DIM, fontSize: 14, width: 80, textAlign: "center" }}>{splitCount} people</span>
-                <button
-                  onClick={() => { setSplitCount(c => Math.min(10, c + 1)); setConfirmedCustom(null); }}
-                  disabled={splitCount >= 10}
-                  style={stepperStyle(splitCount >= 10)}
-                  aria-label="More people"
-                >
-                  <Plus size={20} />
-                </button>
-              </div>
-
-              {!editMode && (
-                <>
-                  <p style={{ color: CT.SKY_DIM, fontSize: 14, marginTop: 12 }}>
-                    {confirmedCustom
-                      ? <>your amount: <span style={{ color: CT.SKY, fontWeight: 700 }}>${confirmedCustom}</span></>
-                      : <>each pays <span style={{ color: CT.SKY, fontWeight: 700 }}>${equalShare}</span></>}
-                  </p>
-                  {!isTokenSource && (
-                    <button
-                      onClick={() => { setEditValue(confirmedCustom ?? totalAmount.toFixed(2)); setEditMode(true); }}
-                      style={footerLinkStyle}
-                    >
-                      {confirmedCustom ? "change amount" : "enter different amount"}
-                    </button>
-                  )}
-                </>
-              )}
-
-              {editMode && (
-                <div style={{ marginTop: 10, width: "100%", textAlign: "center" }}>
-                  <input
-                    type="number" inputMode="decimal" step="0.01" min="0.01"
-                    value={editValue}
-                    onChange={(e) => setEditValue(e.target.value)}
-                    autoFocus
-                    style={amountInputStyle}
-                  />
-                  {editValue && !isEditValid && (
-                    <p style={{ color: CT.RED, fontSize: 12, marginTop: 6 }}>Enter an amount between $0.01 and ${maxEditAmount.toFixed(2)}</p>
-                  )}
-                  <button onClick={() => { setConfirmedCustom(null); setEditMode(false); }} style={footerLinkStyle}>use equal split</button>
-                </div>
-              )}
-
-              {progressBars(splitCount, 0)}
-              <p style={{ color: CT.SKY_DIM, fontSize: 12, marginTop: 8 }}>0 of {splitCount} paid</p>
-
-              <div style={{ flex: 1, minHeight: 16 }} />
-              {splitError && <p style={{ color: CT.RED, fontSize: 13, marginBottom: 10, textAlign: "center" }}>{splitError}</p>}
-              {editMode ? (
-                <button
-                  style={{ ...outlineBtnStyle, opacity: isEditValid ? 1 : 0.5 }}
-                  disabled={!isEditValid}
-                  onClick={() => { if (isEditValid) { setConfirmedCustom(parseFloat(editValue).toFixed(2)); setEditMode(false); } }}
-                >
-                  confirm
-                </button>
-              ) : (
-                <button style={outlineBtnStyle} onClick={handlePay} data-testid="button-pay-split">pay ${displayAmount}</button>
-              )}
-
-              {!editMode && (
-                <button
-                  onClick={async () => {
-                    if (isTokenSource) {
-                      setLocation(tokenPaymentPath(token, "checkout"));
-                      return;
-                    }
-                    try {
-                      const payRes = await fetch(`/api/transactions/${txnId}/pay`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ merchantId: txn.merchantId }),
-                      });
-                      if (payRes.ok) {
-                        const payData = await payRes.json();
-                        if (payData.hppUrl) { window.location.href = payData.hppUrl; return; }
-                      }
-                    } catch {}
-                    setLocation(`/checkout/${txnId}`);
-                  }}
-                  style={footerLinkStyle}
-                >
-                  pay full amount instead
-                </button>
-              )}
-            </>
-          )}
-
-          {/* ── Subsequent payers ── */}
-          {!allDone && !tokenClosed && !isProcessing && !tokenInProgress && isSplitSetup && (
-            <>
-              <div style={{ flex: 1, minHeight: 12 }} />
-              <div style={{ ...chipStyle, marginBottom: 14 }}>Person {nextPersonIndex} of {totalSplits}</div>
-              <p style={labelStyle}>{txn.itemName}</p>
-
-              {!subEditMode && (
-                <>
-                  <p style={{ ...amountStyle, fontSize: 56 }}>${subDisplay}</p>
-                  {!isTokenSource && (
-                    <button
-                      onClick={() => { setSubEditValue(subConfirmed ?? remaining.toFixed(2)); setSubEditMode(true); }}
-                      style={footerLinkStyle}
-                    >
-                      {subConfirmed ? "change amount" : "enter different amount"}
-                    </button>
-                  )}
-                </>
-              )}
-
-              {subEditMode && (
-                <div style={{ marginTop: 10, width: "100%", textAlign: "center" }}>
-                  <input
-                    type="number" inputMode="decimal" step="0.01" min="0.01" max={remaining}
-                    value={subEditValue}
-                    onChange={(e) => setSubEditValue(e.target.value)}
-                    autoFocus
-                    style={amountInputStyle}
-                  />
-                  {subEditValue && !isSubEditValid && (
-                    <p style={{ color: CT.RED, fontSize: 12, marginTop: 6 }}>Enter an amount between $0.01 and ${remaining.toFixed(2)}</p>
-                  )}
-                  <button onClick={() => { setSubConfirmed(null); setSubEditMode(false); }} style={footerLinkStyle}>use equal split</button>
-                </div>
-              )}
-
-              {progressBars(totalSplits, completedSplits)}
-              <p style={{ color: CT.SKY_DIM, fontSize: 12, marginTop: 8 }}>{completedSplits} of {totalSplits} paid</p>
-
-              <div style={{ flex: 1, minHeight: 16 }} />
-              {splitError && <p style={{ color: CT.RED, fontSize: 13, marginBottom: 10, textAlign: "center" }}>{splitError}</p>}
-              {subEditMode ? (
-                <button
-                  style={{ ...outlineBtnStyle, opacity: isSubEditValid ? 1 : 0.5 }}
-                  disabled={!isSubEditValid}
-                  onClick={() => { if (isSubEditValid) { setSubConfirmed(parseFloat(subEditValue).toFixed(2)); setSubEditMode(false); } }}
-                >
-                  confirm
-                </button>
-              ) : (
-                <button style={outlineBtnStyle} onClick={handlePay} data-testid="button-pay-split">pay ${subDisplay}</button>
-              )}
-            </>
-          )}
-        </div>
-
-        <p style={{ marginTop: 14, textAlign: "center", fontSize: 11, color: "#9aa0b5", letterSpacing: "0.03em" }}>
-          Secured by <strong style={{ color: CT.INK, fontWeight: 600 }}>Windcave</strong> · PCI DSS Compliant
-        </p>
-      </div>
-      <style>{spinKeyframes}</style>
-    </div>
+    <SplitPaymentView
+      model={{
+        customLogoUrl,
+        itemName: txn?.itemName,
+        totalAmount,
+        splitSetup: isSplitSetup,
+        completedSplits,
+        totalSplits: transactionTotalSplits,
+        subsequentShare,
+        remainingAmount: remaining,
+        allDone,
+        closed: tokenClosed,
+        processing: isProcessing,
+        paymentInProgress: tokenInProgress,
+        allowCustomAmount: !isTokenSource,
+        truncateEqualShares: isTokenSource,
+        error: splitError,
+        loading: isLoading,
+        notFound: !isLoading && !txn,
+      }}
+      onPay={handlePay}
+      onPayFull={handlePayFull}
+      onDone={() => setLocation('/')}
+    />
   );
 }
-
-const spinKeyframes = `@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`;
-
-const stepperStyle = (disabled: boolean): CSSProperties => ({
-  width: 48,
-  height: 48,
-  borderRadius: 999,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  border: `1.5px solid ${CT.SKY}`,
-  background: "transparent",
-  color: CT.SKY,
-  cursor: disabled ? "not-allowed" : "pointer",
-  opacity: disabled ? 0.35 : 1,
-});
-
-const amountInputStyle: CSSProperties = {
-  width: 170,
-  textAlign: "center",
-  fontSize: 32,
-  fontWeight: 700,
-  background: "#FFFFFF",
-  border: "1.5px solid rgba(4,13,109,0.18)",
-  borderRadius: 14,
-  padding: "10px 12px",
-  color: CT.INK,
-  outline: "none",
-};

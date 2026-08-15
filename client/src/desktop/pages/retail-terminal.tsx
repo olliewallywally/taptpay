@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getCurrentMerchantId } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
@@ -170,6 +170,23 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
   const [filter, setFilter] = useState<StackFilter>("all");
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  /* Active stack expansion (§6.3). Escape collapses and returns focus to the
+     control that opened it, so keyboard users are never stranded in the list. */
+  const [stackExpanded, setStackExpanded] = useState(false);
+  const stackToggleRef = useRef<HTMLButtonElement>(null);
+  const rowsRef = useRef<HTMLDivElement>(null);
+  /* Scroll offset per filter, so switching chips and coming back does not
+     dump the merchant at the top of a list they had scrolled through. */
+  const filterScroll = useRef<Record<string, number>>({});
+  /* Board picker: `boardsOn` is the disclosure — off means the sale gets a
+     private per-payment link (the old "no board" choice), on reveals the
+     picker. `draftName` is shared by the rename and create rows, which are
+     mutually exclusive. */
+  const [boardsOn, setBoardsOn] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [creatingBoard, setCreatingBoard] = useState(false);
+  const [draftName, setDraftName] = useState("");
 
   const authFetch = async (path: string) => {
     const token = localStorage.getItem("authToken");
@@ -263,9 +280,14 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
     },
   });
 
-  const createBoardMutation = useMutation<Stone, Error>({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/merchants/${merchantId}/tapt-stones`, {});
+  const createBoardMutation = useMutation<Stone, Error, string | undefined>({
+    mutationFn: async (name) => {
+      const trimmed = name?.trim();
+      const res = await apiRequest(
+        "POST",
+        `/api/merchants/${merchantId}/tapt-stones`,
+        trimmed ? { name: trimmed } : {},
+      );
       return res.json();
     },
     onMutate: () => setBoardError(null),
@@ -276,6 +298,10 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
         void stonesQuery.refetch();
         return;
       }
+      setCreatingBoard(false);
+      setDraftName("");
+      setBoardsOn(true);
+      setPickerOpen(false);
       queryClient.setQueryData<Stone[]>(
         ["/api/merchants", merchantId, "tapt-stones"],
         (current = []) =>
@@ -300,6 +326,39 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
         description: message,
         variant: "destructive",
       });
+    },
+  });
+
+  const renameBoardMutation = useMutation<Stone, Error, { id: number; name: string }>({
+    mutationFn: async ({ id, name }) => {
+      const res = await apiRequest(
+        "PUT",
+        `/api/merchants/${merchantId}/tapt-stones/${id}`,
+        { name: name.trim() },
+      );
+      return res.json();
+    },
+    onMutate: () => setBoardError(null),
+    onSuccess: (updated, { id, name }) => {
+      /* The server echoes the row back, but fall back to the local name so the
+         list still updates if the response shape ever changes. */
+      queryClient.setQueryData<Stone[]>(
+        ["/api/merchants", merchantId, "tapt-stones"],
+        (current = []) =>
+          current.map((stone) =>
+            stone.id === id ? { ...stone, ...updated, name: updated?.name ?? name.trim() } : stone,
+          ),
+      );
+      setEditingId(null);
+      setDraftName("");
+      void queryClient.invalidateQueries({
+        queryKey: ["/api/merchants", merchantId, "tapt-stones"],
+      });
+    },
+    onError: (error) => {
+      const message = apiErrorDetails(error).message || "Couldn't rename that board";
+      setBoardError(message);
+      toast({ title: "Couldn't rename board", description: message, variant: "destructive" });
     },
   });
 
@@ -364,6 +423,102 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
       ? undefined
       : stones.find((stone) => stone.id === currentSaleBoardId);
   const atBoardLimit = stones.length >= 10;
+  const boardLabel = (stone: Stone) => stone.name || `board ${stone.stoneNumber}`;
+
+  /* ── board picker ── */
+  /* Enter commits by blurring the field rather than submitting directly, so the
+     keyboard and click-away paths share one commit and can't fire it twice.
+     Escape sets this flag so the blur it triggers discards instead. */
+  useEffect(() => {
+    if (!stackExpanded) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      setStackExpanded(false);
+      stackToggleRef.current?.focus();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [stackExpanded]);
+
+  useEffect(() => {
+    const el = rowsRef.current;
+    if (!el) return;
+    el.scrollTop = filterScroll.current[filter] ?? 0;
+  }, [filter]);
+
+  const abandonEditRef = useRef(false);
+  const closePickerEdits = () => {
+    setEditingId(null);
+    setCreatingBoard(false);
+    setDraftName("");
+  };
+  const editKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      e.currentTarget.blur();
+    } else if (e.key === "Escape") {
+      abandonEditRef.current = true;
+      e.currentTarget.blur();
+    }
+  };
+  const editBlur = (commit: () => void) => {
+    if (abandonEditRef.current) {
+      abandonEditRef.current = false;
+      closePickerEdits();
+      return;
+    }
+    commit();
+  };
+
+  /* Turning the disclosure off returns the sale to a private per-payment link,
+     so the destination has to reset with it — otherwise a hidden board would
+     keep being charged. */
+  const toggleBoards = () => {
+    setBoardsOn((on) => {
+      if (on) {
+        setPickerOpen(false);
+        closePickerEdits();
+        setDestination({ kind: "no-board" });
+        setBoardError(null);
+        return false;
+      }
+      /* Engaging boards only reveals the picker button — opening the list is a
+         separate, deliberate click. */
+      return true;
+    });
+  };
+
+  const selectBoard = (id: number) => {
+    setDestination({ kind: "board", boardId: id });
+    setPickerOpen(false);
+    closePickerEdits();
+  };
+
+  const beginRename = (stone: Stone) => {
+    setCreatingBoard(false);
+    setEditingId(stone.id);
+    setDraftName(boardLabel(stone));
+  };
+
+  const commitRename = (id: number) => {
+    const name = draftName.trim();
+    if (!name) {
+      closePickerEdits();
+      return;
+    }
+    const existing = stones.find((stone) => stone.id === id);
+    if (existing && boardLabel(existing) === name) {
+      closePickerEdits();
+      return;
+    }
+    renameBoardMutation.mutate({ id, name });
+  };
+
+  const commitCreate = () => {
+    if (createBoardMutation.isPending) return;
+    createBoardMutation.mutate(draftName.trim() || undefined);
+  };
 
   /* ── actions ── */
   const send = (withSplit: boolean) => {
@@ -515,21 +670,43 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
           <span className="rt-hero rt-hero-dim">{txQuery.isLoading ? "—" : txnsToday}</span>
           <span className="rt-hero-sub rt-hero-sub-dim">transactions today</span>
 
-          <div className="rt-stack" data-tutorial-id="retail-terminal-live-payments">
+          {/* The shell is pinned: header/search/chips hold the same canvas y in
+              every filter, data and error state, and only the row viewport
+              changes size. Expanding moves the whole shell up to y93. */}
+          <div
+            className="rt-stack"
+            data-tutorial-id="retail-terminal-live-payments"
+            data-expanded={stackExpanded ? "true" : "false"}
+          >
             <div className="rt-stack-head">
-              <span className="rt-stack-title">
-                <span>active stack</span>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m6 14 6-6 6 6" /></svg>
-              </span>
-              <div className="rt-stack-search">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={ACCENT} strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="6.5" /><path d="m20 20-3.8-3.8" /></svg>
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="search sales"
-                  aria-label="search active stack"
-                />
-              </div>
+              <button
+                type="button"
+                ref={stackToggleRef}
+                className="rt-stack-toggle"
+                aria-expanded={stackExpanded}
+                aria-label={stackExpanded ? "collapse active stack" : "expand active stack"}
+                onClick={() => setStackExpanded((open) => !open)}
+              >
+                <span className="rt-stack-title">active stack</span>
+                <svg
+                  className="rt-stack-caret"
+                  width="10" height="10" viewBox="0 0 24 24" fill="none"
+                  stroke={ACCENT_SOFT} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="m6 14 6-6 6 6" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="rt-stack-search">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={ACCENT} strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="6.5" /><path d="m20 20-3.8-3.8" /></svg>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="search sales"
+                aria-label="search active stack"
+              />
             </div>
 
             <div className="rt-chips">
@@ -540,7 +717,13 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
               ))}
             </div>
 
-            <div className="rt-rows">
+            <div
+              className="rt-rows"
+              ref={rowsRef}
+              onScroll={(e) => {
+                filterScroll.current[filter] = e.currentTarget.scrollTop;
+              }}
+            >
               {txQuery.isLoading ? (
                 <div className="rt-empty">loading…</div>
               ) : stackRows.length === 0 ? (
@@ -554,36 +737,37 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
                      recoverable from transaction history. Only board rows have
                      a durable link that can safely be shown again. */
                   const rowLink = stone?.paymentUrl?.trim() || "";
+                  const rowInner = (
+                    <>
+                      <span className="rt-avatar">{initials(r.itemName || "sale")}</span>
+                      <span className="rt-row-mid">
+                        <span className="rt-row-name">{r.itemName || "sale"}</span>
+                        <span className="rt-row-status">
+                          <span className="rt-dot" style={{ background: r.meta.dot }} />
+                          {r.meta.label}
+                          {r.isSplit ? ` · ${r.completedSplits ?? 0}/${r.totalSplits ?? 1} split` : ""}
+                        </span>
+                      </span>
+                      <span className="rt-row-amt">{money2(num(r.price))}</span>
+                    </>
+                  );
                   return (
                     <div key={r.id} className="rt-row-wrap">
-                      <div
-                        className={live ? "rt-row rt-row-live" : "rt-row"}
-                        role={live ? "button" : undefined}
-                        tabIndex={live ? 0 : undefined}
-                        aria-expanded={live ? open : undefined}
-                        onClick={live ? () => setExpandedId(open ? null : r.id) : undefined}
-                        onKeyDown={
-                          live
-                            ? (e) => {
-                                if (e.key === "Enter" || e.key === " ") {
-                                  e.preventDefault();
-                                  setExpandedId(open ? null : r.id);
-                                }
-                              }
-                            : undefined
-                        }
-                      >
-                        <span className="rt-avatar">{initials(r.itemName || "sale")}</span>
-                        <span className="rt-row-mid">
-                          <span className="rt-row-name">{r.itemName || "sale"}</span>
-                          <span className="rt-row-status">
-                            <span className="rt-dot" style={{ background: r.meta.dot }} />
-                            {r.meta.label}
-                            {r.isSplit ? ` · ${r.completedSplits ?? 0}/${r.totalSplits ?? 1} split` : ""}
-                          </span>
-                        </span>
-                        <span className="rt-row-amt">{money2(num(r.price))}</span>
-                      </div>
+                      {/* The row-open control is a native button, never a
+                          div[role=button]; its action buttons are siblings, so
+                          an action can never also trigger the row. */}
+                      {live ? (
+                        <button
+                          type="button"
+                          className="rt-row rt-row-live"
+                          aria-expanded={open}
+                          onClick={() => setExpandedId(open ? null : r.id)}
+                        >
+                          {rowInner}
+                        </button>
+                      ) : (
+                        <div className="rt-row">{rowInner}</div>
+                      )}
                       {live && open && (
                         <div className="rt-row-actions">
                           {rowLink ? (
@@ -617,7 +801,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
               not a containing block, so transforming it would re-anchor the
               absolutely-positioned rail mid-animation */}
           <div
-            className="rt-rail dt-rise"
+            className="rt-rail terminal-rail dt-rise"
             data-tutorial-id="retail-terminal-tools"
             style={{ "--dt-i": 6 } as CSSProperties}
           >
@@ -631,57 +815,165 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
 
         {/* ── RIGHT PANEL ── */}
         {/* last entry step; `.rt-mode` keeps its own tileIn for mode switching */}
-        <div className="rt-panel dt-rise" style={{ "--dt-i": 7 } as CSSProperties}>
+        <div className="rt-panel terminal-panel dt-rise" style={{ "--dt-i": 7 } as CSSProperties}>
           {mode === "send" && (
             <>
-              <div className="rt-mode rt-send-top">
+              {/* Zone A — the amount figure, on the spine at canvas x713/y155. */}
+              <div className="rt-mode terminal-zone-a">
                 <div className="rt-amt-row" data-tutorial-id="retail-terminal-amount">
                   <span className="rt-amt">{money2(amount)}</span>
                   <button type="button" className="rt-edit" onClick={openKeypad}>edit&gt;</button>
                 </div>
+              </div>
+
+              {/* Zone B — item, destination/board and split. Owns its own
+                  overflow so a long item name or a large board list scrolls
+                  inside 460px instead of pushing into Zone C. */}
+              <div className="rt-mode terminal-zone-b">
                 <div className="rt-destination-label" id="rt-destination-label">PAYMENT DESTINATION</div>
-                <div className="rt-destinations" data-tutorial-id="retail-terminal-destination" role="radiogroup" aria-labelledby="rt-destination-label">
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={destination.kind === "no-board"}
-                    className="rt-via-chip"
-                    style={chipStyle(destination.kind === "no-board", 1.5)}
-                    onClick={() => setDestination({ kind: "no-board" })}
-                  >
-                    no board
-                  </button>
-                  {stones.map((stone) => (
+                <div className="rt-boards" data-tutorial-id="retail-terminal-destination">
+                  <div className="rt-boards-row">
                     <button
-                      key={stone.id}
                       type="button"
-                      role="radio"
-                      aria-checked={destination.kind === "board" && destination.boardId === stone.id}
-                      aria-label={`${stone.name || `board ${stone.stoneNumber}`}, board ${stone.stoneNumber}`}
-                      className="rt-board-chip"
-                      style={chipStyle(destination.kind === "board" && destination.boardId === stone.id, 1)}
-                      onClick={() => setDestination({ kind: "board", boardId: stone.id })}
+                      className={`rt-wire rt-boards-toggle${boardsOn ? " on" : ""}`}
+                      aria-pressed={boardsOn}
+                      onClick={toggleBoards}
                     >
-                      {stone.name || `board ${stone.stoneNumber}`}
+                      payment boards
                     </button>
-                  ))}
-                </div>
-                <div className="rt-board-tools">
-                  <button
-                    type="button"
-                    className="rt-new-board"
-                    aria-label="create new board"
-                    aria-busy={createBoardMutation.isPending}
-                    aria-describedby={
-                      stonesQuery.isLoading || stonesQuery.isError || boardError || atBoardLimit
-                        ? "rt-board-status"
-                        : undefined
-                    }
-                    disabled={createBoardMutation.isPending || atBoardLimit}
-                    onClick={() => createBoardMutation.mutate()}
-                  >
-                    {createBoardMutation.isPending ? "creating board…" : "+ New board"}
-                  </button>
+
+                    {/* Pops in beside the toggle once boards are engaged. */}
+                    {boardsOn && (
+                      <button
+                        type="button"
+                        className="rt-wire rt-picker-btn rt-sidepop"
+                        aria-haspopup="true"
+                        aria-expanded={pickerOpen}
+                        aria-controls="rt-board-list"
+                        /* The visible label becomes the chosen board; the
+                           accessible name keeps the control's purpose in front
+                           of it so it never reads as a bare noun. */
+                        aria-label={
+                          selectedBoard ? `selected board: ${boardLabel(selectedBoard)}` : "select board"
+                        }
+                        onClick={() => {
+                          setPickerOpen((open) => !open);
+                          closePickerEdits();
+                        }}
+                      >
+                        <span className="rt-picker-label">
+                          {selectedBoard ? boardLabel(selectedBoard) : "select board"}
+                        </span>
+                        <svg
+                          className={`rt-caret${pickerOpen ? " open" : ""}`}
+                          width="11" height="11" viewBox="0 0 24 24" fill="none"
+                          stroke="currentColor" strokeWidth="2.4"
+                          strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+                        >
+                          <path d="m6 9 6 6 6-6" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+
+                  {boardsOn && (
+                    <div className={`rt-drop${pickerOpen ? " open" : ""}`}>
+                      <div className="rt-drop-inner">
+                        <div
+                          id="rt-board-list"
+                          className="rt-drop-list"
+                          role="radiogroup"
+                          aria-label="payment boards"
+                        >
+                          {stones.map((stone) => (
+                            <div className="rt-drop-row" key={stone.id}>
+                              {editingId === stone.id ? (
+                                <input
+                                  className="rt-drop-input"
+                                  autoFocus
+                                  value={draftName}
+                                  aria-label={`rename ${boardLabel(stone)}`}
+                                  maxLength={60}
+                                  onChange={(e) => setDraftName(e.target.value)}
+                                  onBlur={() => editBlur(() => commitRename(stone.id))}
+                                  onKeyDown={editKeyDown}
+                                />
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={
+                                      destination.kind === "board" && destination.boardId === stone.id
+                                    }
+                                    aria-label={`${boardLabel(stone)}, board ${stone.stoneNumber}`}
+                                    className="rt-drop-pick"
+                                    onClick={() => selectBoard(stone.id)}
+                                  >
+                                    {boardLabel(stone)}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="rt-drop-edit"
+                                    aria-label={`rename ${boardLabel(stone)}`}
+                                    onClick={() => beginRename(stone)}
+                                  >
+                                    <svg
+                                      width="13" height="13" viewBox="0 0 24 24" fill="none"
+                                      stroke="currentColor" strokeWidth="2"
+                                      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+                                    >
+                                      <path d="M12 20h9" />
+                                      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                                    </svg>
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          ))}
+
+                          <div className="rt-drop-sep" role="presentation" />
+
+                          <div className="rt-drop-row">
+                            {creatingBoard ? (
+                              <input
+                                className="rt-drop-input"
+                                autoFocus
+                                value={draftName}
+                                placeholder="board name"
+                                aria-label="new board name"
+                                maxLength={60}
+                                onChange={(e) => setDraftName(e.target.value)}
+                                onBlur={() => editBlur(commitCreate)}
+                                onKeyDown={editKeyDown}
+                              />
+                            ) : (
+                              <button
+                                type="button"
+                                className="rt-drop-create"
+                                aria-label="create new board"
+                                aria-busy={createBoardMutation.isPending}
+                                aria-describedby={
+                                  stonesQuery.isLoading || stonesQuery.isError || boardError || atBoardLimit
+                                    ? "rt-board-status"
+                                    : undefined
+                                }
+                                disabled={createBoardMutation.isPending || atBoardLimit}
+                                onClick={() => {
+                                  setEditingId(null);
+                                  setDraftName("");
+                                  setCreatingBoard(true);
+                                }}
+                              >
+                                {createBoardMutation.isPending ? "creating board…" : "+ create board"}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {(stonesQuery.isLoading || stonesQuery.isError || boardError || atBoardLimit) && (
                     <span
                       id="rt-board-status"
@@ -700,9 +992,6 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
                 </div>
                 <div className="rt-item-name">{itemName || "new sale"}</div>
                 <div className="rt-item-hint">tap send to share payment</div>
-              </div>
-
-              <div className="rt-send-lower">
                 <div className="rt-field">
                   <span className="rt-field-label">ITEM NAME</span>
                   <input
@@ -730,6 +1019,11 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
                     <span className="rt-knob" style={{ transform: splitOn ? "translateX(19px)" : "translateX(0)" }} />
                   </button>
                 </div>
+              </div>
+
+              {/* Zone C — the primary action, pinned at canvas x783/y748 so no
+                  amount of Zone B content can push it off the canvas. */}
+              <div className="rt-mode terminal-zone-c">
                 <button
                   type="button"
                   className="rt-send-btn"
@@ -745,7 +1039,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
                 {(createMutation.isPending || saleError) && (
                   <span
                     id="rt-sale-status"
-                    className={saleError ? "rt-inline-error" : "rt-inline-status"}
+                    className={`rt-cta-status ${saleError ? "rt-inline-error" : "rt-inline-status"}`}
                     role={saleError ? "alert" : "status"}
                     aria-live="polite"
                   >
@@ -817,14 +1111,20 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
           )}
 
           {mode === "split" && (
-            <div className="rt-mode rt-split">
-              <div className="rt-amt-row">
-                <span className="rt-amt">{money2(amount)}</span>
-                <span className="rt-split-lead">split the bill</span>
+            <>
+              {/* Zone A — the amount being split. */}
+              <div className="rt-mode terminal-zone-a">
+                <div className="rt-amt-row">
+                  <span className="rt-amt">{money2(amount)}</span>
+                  <span className="rt-split-lead">split the bill</span>
+                </div>
               </div>
-              <div className="rt-item-name">{itemName || "new sale"}</div>
-              <div className="rt-item-hint">customer chooses how many ways to split</div>
-              <div className="rt-split-body">
+
+              {/* Zone B — the customer-side split preview. */}
+              <div className="rt-mode terminal-zone-b">
+                <div className="rt-item-name">{itemName || "new sale"}</div>
+                <div className="rt-item-hint">customer chooses how many ways to split</div>
+                <div className="rt-split-body">
                 <div className="rt-split-chips">
                   {SPLIT_WAYS.map((n) => (
                     <button key={n} type="button" className="rt-split-chip" style={chipStyle(n === splitN, 1.5)} onClick={() => setSplitN(n)}>
@@ -837,6 +1137,11 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
                   <span className="rt-split-each-amt">{money2(splitEach)}</span>
                 </div>
                 <span className="rt-fee">equal split · customer can enter a different amount on their phone</span>
+                </div>
+              </div>
+
+              {/* Zone C — Confirm. */}
+              <div className="rt-mode terminal-zone-c">
                 <button
                   type="button"
                   className="rt-send-btn rt-send-btn-split"
@@ -851,7 +1156,7 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
                 {(createMutation.isPending || saleError) && (
                   <span
                     id="rt-sale-status"
-                    className={saleError ? "rt-inline-error" : "rt-inline-status"}
+                    className={`rt-cta-status ${saleError ? "rt-inline-error" : "rt-inline-status"}`}
                     role={saleError ? "alert" : "status"}
                     aria-live="polite"
                   >
@@ -859,16 +1164,26 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
                   </span>
                 )}
               </div>
-            </div>
+            </>
           )}
 
           {mode === "share" && (
-            <div className="rt-mode rt-share">
+            <>
+              {/* Zone A — the created amount. §4.2 puts the figure on the spine
+                  for the current-sale result, not buried in the subtitle. */}
+              <div className="rt-mode terminal-zone-a">
+                <div className="rt-amt-row">
+                  <span className="rt-amt">{money2(currentSale ? currentSale.amount : amount)}</span>
+                </div>
+              </div>
+
+              {/* Zone B — the in-memory share credential, or the board result. */}
+              <div className="rt-mode terminal-zone-b rt-share">
               <div className="rt-share-head">Share payment link</div>
               {currentSale ? (
                 <>
                   <div className="rt-share-sub">
-                    {currentSale.item + " · " + money2(currentSale.amount) + " — anyone with this private link can pay"}
+                    {currentSale.item + " — anyone with this private link can pay"}
                   </div>
                   <div className="rt-share-body" aria-live="polite">
                     <div className="rt-share-link">
@@ -899,9 +1214,6 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
                         ? "private no-board link"
                         : `board ${currentSaleBoard?.stoneNumber ?? currentSaleBoardId} link`}
                     </div>
-                    <button type="button" className="rt-new-sale" onClick={() => openComposeMode("send")}>
-                      start new sale
-                    </button>
                   </div>
                 </>
               ) : (
@@ -911,12 +1223,18 @@ export default function DesktopRetailTerminal(props: DesktopRoutePageProps) {
                   ) : (
                     <p role="status">No current sale link. Start a sale to generate a private payment link.</p>
                   )}
-                  <button type="button" className="rt-new-sale" onClick={() => openComposeMode("send")}>
-                    start new sale
-                  </button>
                 </div>
               )}
-            </div>
+              </div>
+
+              {/* Zone C — Start new sale, in the same place as every other
+                  mode's primary action. */}
+              <div className="rt-mode terminal-zone-c">
+                <button type="button" className="rt-new-sale" onClick={() => openComposeMode("send")}>
+                  start new sale
+                </button>
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -928,7 +1246,10 @@ const RT_CSS = `
 .rt-body { position:relative; display:flex; height:100%; box-sizing:border-box; padding:26px 46px 0 52px; }
 
 /* ── left column ── */
-.rt-left { flex:0 0 420px; display:flex; flex-direction:column; }
+/* Positioned so the stack shell can be pinned against it. The column's top
+   edge is canvas y93 and its bottom is canvas y880, which is what every stack
+   offset below is measured from. */
+.rt-left { position:relative; flex:0 0 420px; display:flex; flex-direction:column; }
 .rt-scope { display:inline-flex; align-items:center; gap:9px; padding:10px 20px; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); font-weight:400; font-size:13.5px; color:${ACCENT_SOFT}; cursor:pointer; transition:background .18s ease; }
 .rt-scope:hover { background:rgba(94,158,255,0.08); }
 .rt-hero-row { margin-top:22px; display:flex; align-items:flex-start; gap:14px; }
@@ -938,14 +1259,37 @@ const RT_CSS = `
 .rt-hero-dim { margin-top:36px; font-size:56px; opacity:0.61; }
 .rt-hero-sub-dim { margin-top:12px; opacity:0.61; }
 
-.rt-stack { margin-top:auto; padding-bottom:24px; }
-.rt-stack-head { display:flex; align-items:center; justify-content:space-between; }
+/* ── active stack: a fixed shell, not a bottom-anchored block ──
+   margin-top:auto made the header sit at canvas y488 with seven rows and
+   y720 with one — a 232px jump on a data change. The shell is now pinned and
+   only .rt-rows changes size.
+
+     collapsed   header y488  search y532  chips y566  rows end y856
+     expanded    header y93   search y137  chips y171  rows end y856
+
+   Both states share the same internal offsets (0 / 44 / 78 from the shell top),
+   so expanding only moves top. 395px = y488 - y93; 24px bottom = y880 - y856. */
+.rt-stack { position:absolute; left:0; right:0; top:395px; bottom:24px; display:flex; flex-direction:column; min-height:0; }
+.rt-stack[data-expanded="true"] { top:0; }
+.rt-stack-toggle { display:inline-flex; align-items:center; gap:6px; padding:0; background:transparent; cursor:pointer; }
+.rt-stack-caret { transition:transform var(--m-dur-ui) var(--m-ease-out); }
+.rt-stack[data-expanded="true"] .rt-stack-caret { transform:rotate(180deg); }
+
+/* When the stack takes the column, the figures above it step out of the way. */
+.rt-left:has(.rt-stack[data-expanded="true"]) .rt-scope,
+.rt-left:has(.rt-stack[data-expanded="true"]) .rt-hero-row,
+.rt-left:has(.rt-stack[data-expanded="true"]) .rt-hero-sub,
+.rt-left:has(.rt-stack[data-expanded="true"]) .rt-hero-dim,
+.rt-left:has(.rt-stack[data-expanded="true"]) .rt-hero-sub-dim { visibility:hidden; }
+.rt-stack-head { flex:0 0 44px; height:44px; display:flex; align-items:center; justify-content:space-between; }
 .rt-stack-title { display:inline-flex; align-items:center; gap:6px; font-weight:300; font-size:12px; color:${ACCENT_SOFT}; }
-.rt-stack-search { display:flex; align-items:center; gap:8px; width:180px; height:32px; padding:0 14px; box-sizing:border-box; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); }
+.rt-stack-search { flex:0 0 32px; display:flex; align-items:center; gap:8px; width:180px; height:32px; padding:0 14px; box-sizing:border-box; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); }
 .rt-stack-search input { flex:1; min-width:0; border:none; background:transparent; outline:none; color:#fff; font-family:'Outfit',sans-serif; font-weight:500; font-size:11px; }
-.rt-chips { margin-top:12px; display:flex; gap:8px; }
+/* 44 + 32 + 2 = 78px below the shell top → canvas y566 collapsed, y171 expanded. */
+.rt-chips { flex:0 0 auto; margin-top:2px; display:flex; gap:8px; }
 .rt-chip { padding:6px 13px; border-radius:9999px; font-size:11px; cursor:pointer; transition:background .15s ease, color .15s ease; white-space:nowrap; }
-.rt-rows { margin-top:8px; display:flex; flex-direction:column; max-height:290px; overflow-y:auto; scrollbar-width:none; }
+/* The only part of the shell that resizes. */
+.rt-rows { flex:1; min-height:0; margin-top:8px; display:flex; flex-direction:column; overflow-y:auto; scrollbar-width:none; }
 .rt-rows::-webkit-scrollbar { display:none; }
 .rt-row { display:flex; align-items:center; gap:13px; padding:9px 0; }
 .rt-row-live { cursor:pointer; }
@@ -956,7 +1300,7 @@ const RT_CSS = `
 .rt-row-status { display:flex; align-items:center; gap:5px; font-weight:500; font-size:10.5px; color:rgba(244,246,255,0.5); }
 .rt-dot { width:5px; height:5px; border-radius:50%; flex:0 0 auto; }
 .rt-row-amt { font-weight:800; font-size:14.5px; color:#fff; font-variant-numeric:tabular-nums; }
-.rt-row-actions { display:flex; gap:8px; padding:0 0 10px 53px; animation:tileIn .22s ease both; }
+.rt-row-actions { display:flex; gap:8px; padding:0 0 10px 53px; animation:tileIn var(--m-dur-ui) var(--m-ease-out) both; }
 .rt-row-act { padding:6px 14px; border-radius:9999px; border:1px solid rgba(94,158,255,0.5); background:transparent; font-weight:600; font-size:11px; color:${ACCENT_SOFT}; cursor:pointer; transition:background .15s ease; }
 .rt-row-act:hover:not(:disabled) { background:rgba(94,158,255,0.1); }
 .rt-row-act:disabled { opacity:0.5; cursor:default; }
@@ -966,30 +1310,111 @@ const RT_CSS = `
 .rt-empty { padding:20px 0; font-weight:300; font-size:12.5px; color:rgba(191,209,255,0.5); }
 
 /* ── centre rail (design places it absolutely at x=550) ── */
-.rt-rail-slot { flex:0 0 76px; margin:175px 40px 0 44px; }
-.rt-rail { position:absolute; left:550px; width:80px; box-sizing:border-box; border:1.5px solid rgba(94,158,255,0.7); border-radius:32px; padding:30px 0; display:flex; flex-direction:column; align-items:center; gap:40px; }
+/* The slot only reserves the rail's horizontal share of the row; the rail's
+   own position is explicit (see .terminal-rail), never derived from here. */
+.rt-rail-slot { flex:0 0 76px; margin:0 40px 0 44px; }
+/* Geometry lives in .terminal-rail; this keeps only the skin. */
+.rt-rail { border:1.5px solid rgba(94,158,255,0.7); border-radius:32px; }
 .rt-rail-btn { width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:background .18s ease; }
 .rt-rail-btn:hover { background:rgba(94,158,255,0.14); }
 .rt-rail-big { width:54px; height:54px; background:${ACTIVE}; box-shadow:0 8px 20px rgba(102,169,255,0.35); }
 .rt-rail-big:hover { background:${ACTIVE}; opacity:0.9; }
 
 /* ── right panel ── */
-.rt-panel { flex:1; min-width:0; padding-left:36px; box-sizing:border-box; position:relative; }
-.rt-mode { animation:tileIn .35s cubic-bezier(.22,.9,.3,1) both; }
+/* Geometry lives in .terminal-panel; every child is zone-positioned. */
+.rt-panel { }
+.rt-mode { animation:tileIn var(--m-dur-ui) var(--m-ease-out) both; }
 
 /* send: design pins the two blocks at screen y=154 / y=512 (panel origin = y 92) */
-.rt-send-top { position:absolute; top:62px; width:445px; }
-.rt-send-lower { position:absolute; top:420px; width:445px; display:flex; flex-direction:column; gap:14px; max-width:430px; }
+/* .rt-send-top / .rt-send-lower are retired: send's content now lives in the
+   shared Zone A/B/C wrappers instead of two independently positioned blocks. */
+.terminal-zone-b > .rt-field,
+.terminal-zone-b > .rt-split-toggle { margin-top:14px; }
 .rt-amt-row { display:flex; align-items:baseline; gap:12px; }
 .rt-amt { font-family:'Outfit',sans-serif; font-weight:700; font-size:66px; line-height:0.95; color:${KP_INK}; font-variant-numeric:tabular-nums; }
 .rt-edit { font-weight:300; font-size:12px; color:${ACCENT_SOFT}; cursor:pointer; background:transparent; }
 .rt-destination-label { margin-top:18px; font-weight:700; font-size:9px; letter-spacing:0.16em; color:rgba(244,246,255,0.45); }
-.rt-destinations { margin-top:8px; display:flex; flex-wrap:wrap; gap:8px; }
-.rt-via-chip { padding:9px 22px; border-radius:9999px; font-size:12.5px; cursor:pointer; transition:background .15s ease, color .15s ease; text-transform:lowercase; }
-.rt-board-chip { padding:6px 14px; border-radius:9999px; font-size:11px; cursor:pointer; transition:background .15s ease, color .15s ease; text-transform:lowercase; }
-.rt-board-tools { margin-top:9px; display:flex; align-items:center; gap:10px; min-height:24px; }
-.rt-new-board { padding:5px 11px; border-radius:9999px; border:1px solid rgba(94,158,255,0.5); background:transparent; font-weight:700; font-size:10.5px; color:${ACCENT_SOFT}; cursor:pointer; }
-.rt-new-board:disabled { opacity:0.52; cursor:default; }
+/* ── payment board picker ──────────────────────────────────────────────────
+   Progressive disclosure, all in the wireframe idiom: an outlined pill that
+   goes solid when engaged, a second pill that pops in beside it, and an
+   outlined dropdown that expands to its own height. Nothing overshoots except
+   the side-pop, which is a deliberate accent. */
+.rt-boards { margin-top:8px; display:flex; flex-direction:column; align-items:flex-start; gap:8px; }
+.rt-boards-row { display:flex; align-items:center; gap:8px; }
+
+/* The wireframe base. Text is deliberately lighter than the app's other pills
+   so an un-engaged control reads as available rather than as active. */
+.rt-wire {
+  padding:9px 20px; border-radius:9999px; font-size:12.5px; text-transform:lowercase;
+  border:1px solid rgba(94,158,255,0.5); background:transparent;
+  color:rgba(127,178,255,0.68); font-weight:500; cursor:pointer; white-space:nowrap;
+  transition:background .18s var(--m-ease-out), color .18s var(--m-ease-out), border-color .18s var(--m-ease-out);
+}
+.rt-wire:hover { border-color:rgba(94,158,255,0.85); color:${ACCENT_SOFT}; }
+.rt-boards-toggle.on {
+  background:${ACTIVE}; border-color:transparent; color:${NAVY}; font-weight:700;
+}
+.rt-boards-toggle.on:hover { background:${ACTIVE}; color:${NAVY}; }
+
+@keyframes rtSidePop { from { opacity:0; transform:translateX(-10px); } to { opacity:1; transform:none; } }
+.rt-sidepop { animation:rtSidePop var(--m-dur-ui) var(--m-ease-pop) both; }
+
+.rt-picker-btn { display:inline-flex; align-items:center; gap:9px; max-width:220px; }
+.rt-picker-label { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.rt-caret { flex:0 0 auto; transition:transform .2s var(--m-ease-out); }
+.rt-caret.open { transform:rotate(180deg); }
+
+/* grid-template-rows 0fr→1fr expands to the content's own height, so the panel
+   never needs a magic max-height that would clip a long list. */
+.rt-drop {
+  display:grid; grid-template-rows:0fr; opacity:0; width:248px;
+  transition:grid-template-rows .24s var(--m-ease-out), opacity .16s var(--m-ease-out);
+}
+.rt-drop.open { grid-template-rows:1fr; opacity:1; }
+.rt-drop-inner { overflow:hidden; min-height:0; }
+.rt-drop-list {
+  border:1px solid rgba(94,158,255,0.5); border-radius:16px; padding:5px;
+  display:flex; flex-direction:column; gap:1px;
+  max-height:236px; overflow-y:auto; scrollbar-width:none;
+}
+.rt-drop-list::-webkit-scrollbar { display:none; }
+.rt-drop-row { display:flex; align-items:center; gap:3px; }
+.rt-drop-pick {
+  flex:1; min-width:0; text-align:left; padding:8px 12px; border-radius:11px;
+  border:none; background:transparent; color:rgba(127,178,255,0.68);
+  font-weight:500; font-size:12px; cursor:pointer; text-transform:lowercase;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  transition:background .15s var(--m-ease-out), color .15s var(--m-ease-out);
+}
+.rt-drop-pick:hover { background:rgba(94,158,255,0.1); color:${ACCENT_SOFT}; }
+.rt-drop-pick[aria-checked="true"] { background:rgba(94,158,255,0.16); color:#EAF2FF; font-weight:700; }
+.rt-drop-edit {
+  flex:0 0 auto; width:26px; height:26px; border-radius:8px; border:none;
+  background:transparent; color:rgba(127,178,255,0.5);
+  display:grid; place-items:center; cursor:pointer;
+  transition:background .15s var(--m-ease-out), color .15s var(--m-ease-out);
+}
+.rt-drop-edit:hover { background:rgba(94,158,255,0.12); color:${ACCENT_SOFT}; }
+.rt-drop-input {
+  flex:1; min-width:0; padding:7px 11px; border-radius:11px; font-size:12px;
+  border:1px solid rgba(94,158,255,0.5); background:transparent;
+  color:#EAF2FF; font-family:inherit; outline:none;
+}
+.rt-drop-input::placeholder { color:rgba(127,178,255,0.45); }
+.rt-drop-sep { height:1px; background:rgba(94,158,255,0.22); margin:4px 8px; flex:0 0 auto; }
+.rt-drop-create {
+  flex:1; text-align:left; padding:8px 12px; border-radius:11px; border:none;
+  background:transparent; color:rgba(127,178,255,0.68); font-weight:600;
+  font-size:12px; cursor:pointer; text-transform:lowercase;
+  transition:background .15s var(--m-ease-out), color .15s var(--m-ease-out);
+}
+.rt-drop-create:hover:not(:disabled) { background:rgba(94,158,255,0.1); color:${ACCENT_SOFT}; }
+.rt-drop-create:disabled { opacity:0.5; cursor:default; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rt-sidepop { animation:none; }
+  .rt-drop { transition:none; }
+}
 .rt-board-hint, .rt-inline-status { font-weight:500; font-size:10.5px; color:rgba(244,246,255,0.48); }
 .rt-inline-error { font-weight:600; font-size:10.5px; color:${RED}; }
 .rt-item-name { margin-top:16px; font-weight:300; font-size:16px; color:${TEXT_SOFT}; text-transform:lowercase; }
@@ -1004,10 +1429,14 @@ const RT_CSS = `
 .rt-switch { position:relative; width:48px; height:29px; border-radius:9999px; cursor:pointer; transition:background .18s ease; flex:0 0 auto; }
 .rt-knob { position:absolute; top:4px; left:4px; width:21px; height:21px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(10,17,40,0.25); transition:transform .18s ease; }
 .rt-fee { font-weight:500; font-size:11px; color:rgba(244,246,255,0.4); }
-.rt-send-btn { margin:44px auto 0; width:200px; height:46px; border-radius:9999px; border:1.5px solid rgba(94,158,255,0.7); background:transparent; font-weight:300; font-size:13.5px; color:${TEXT_SOFT}; cursor:pointer; transition:background .15s ease, border-color .2s ease, color .2s ease; }
+.rt-send-btn { margin:0; width:100%; height:100%; border-radius:9999px; border:1.5px solid rgba(94,158,255,0.7); background:transparent; font-weight:300; font-size:13.5px; color:${TEXT_SOFT}; cursor:pointer; transition:background .15s ease, border-color .2s ease, color .2s ease; }
 .rt-send-btn:hover:not(:disabled) { background:rgba(94,158,255,0.08); }
 .rt-send-btn:disabled { opacity:0.55; cursor:default; }
-.rt-send-btn-split { margin:20px auto 0; font-weight:700; }
+.rt-send-btn-split { margin:0; font-weight:700; }
+/* Zone C fills with whichever primary action the mode owns. */
+.terminal-zone-c > .rt-new-sale { width:100%; height:100%; align-self:auto; padding:0; }
+/* Sits under the CTA without adding to Zone C's fixed 46px box. */
+.rt-cta-status { position:absolute; left:0; top:calc(100% + 8px); width:100%; text-align:center; }
 
 /* keypad */
 .rt-kp-head { display:flex; align-items:center; justify-content:space-between; }
@@ -1034,19 +1463,19 @@ const RT_CSS = `
 .rt-tile-price { position:absolute; top:14px; right:14px; font-family:'Outfit',sans-serif; font-weight:800; font-size:13.5px; color:${DEEP_BLUE}; }
 
 /* split */
-.rt-split { margin-top:170px; }
+
 .rt-split-lead { font-weight:600; font-size:15px; color:rgba(198,207,226,0.8); }
-.rt-split-body { margin-top:48px; margin-left:52px; display:flex; flex-direction:column; gap:18px; max-width:340px; }
+.rt-split-body { margin-top:24px; display:flex; flex-direction:column; gap:18px; }
 .rt-split-chips { display:flex; gap:10px; }
 .rt-split-chip { flex:1; height:44px; border-radius:9999px; font-size:12.5px; cursor:pointer; transition:background .15s ease, color .15s ease; }
 .rt-split-each { display:flex; align-items:center; justify-content:space-between; height:54px; padding:0 20px; box-sizing:border-box; border-radius:12px; border:1.5px solid rgba(94,158,255,0.55); font-weight:600; font-size:13px; color:rgba(244,246,255,0.6); }
 .rt-split-each-amt { font-family:'Outfit',sans-serif; font-weight:800; font-size:20px; color:${TEXT_SOFT}; }
 
 /* share */
-.rt-share { margin-top:100px; }
+
 .rt-share-head { font-weight:300; font-size:15px; color:${KP_INK}; }
 .rt-share-sub { margin-top:4px; font-weight:500; font-size:12px; color:rgba(244,246,255,0.45); }
-.rt-share-body { margin-top:28px; display:flex; flex-direction:column; gap:14px; max-width:440px; }
+.rt-share-body { margin-top:28px; display:flex; flex-direction:column; gap:14px; }
 .rt-share-link { display:flex; align-items:center; gap:12px; height:54px; padding:0 20px; box-sizing:border-box; border-radius:12px; border:1.5px solid rgba(94,158,255,0.55); }
 .rt-share-url { flex:1; min-width:0; font-weight:600; font-size:13px; color:${TEXT_SOFT}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .rt-share-copy { font-weight:700; font-size:12px; color:${ACCENT_SOFT}; cursor:pointer; flex:0 0 auto; background:transparent; }
@@ -1055,6 +1484,6 @@ const RT_CSS = `
 .rt-share-act:hover { background:rgba(94,158,255,0.08); }
 .rt-current-destination { font-weight:600; font-size:11px; color:rgba(244,246,255,0.48); text-transform:lowercase; }
 .rt-new-sale { align-self:flex-start; padding:8px 17px; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); background:transparent; font-weight:700; font-size:11.5px; color:${ACCENT_SOFT}; cursor:pointer; }
-.rt-share-empty-state { margin-top:28px; display:flex; flex-direction:column; align-items:flex-start; gap:18px; max-width:440px; padding:22px; border-radius:14px; border:1px solid rgba(94,158,255,0.35); font-weight:500; font-size:12.5px; color:rgba(244,246,255,0.62); }
+.rt-share-empty-state { margin-top:28px; display:flex; flex-direction:column; align-items:flex-start; gap:18px; padding:22px; border-radius:14px; border:1px solid rgba(94,158,255,0.35); font-weight:500; font-size:12.5px; color:rgba(244,246,255,0.62); }
 .rt-share-empty-state p { margin:0; }
 `;

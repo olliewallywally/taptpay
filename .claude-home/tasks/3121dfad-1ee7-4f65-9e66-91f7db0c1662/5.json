@@ -1,9 +1,0 @@
-{
-  "id": "5",
-  "subject": "Stage 5: restyle split-payment.tsx (behavior frozen)",
-  "description": "Tailwind hex/class swap to navy/sky design per split mockup; wordmark component; handlers/SSE/share math untouched.",
-  "activeForm": "Restyling split payment page",
-  "status": "pending",
-  "blocks": [],
-  "blockedBy": []
-}

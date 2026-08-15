@@ -1,0 +1,257 @@
+/* Crop the app shots to the 13" frame and emit the side-by-side review page. */
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { PNG } from "/home/runner/workspace/node_modules/pngjs/lib/png.js";
+
+/* The frame's box inside the 1440x900 shots, from verify-desktop-p0. */
+const CROP = { x: 220, y: 77, w: 1000, h: 746 };
+const DESIGN_DIR = "/home/runner/workspace/docs/design/desktop-app/screens";
+const MINE = "/tmp/claude-1000/-home-runner-workspace/5abb4202-8c03-4cd6-8a70-0593a874ca18/scratchpad/sbs";
+
+const PAIRS = [
+  ["Retail", "Home", "dt--retail-home", "/tmp/taptpay-desktop-4a/desktop-1-home-week.png", "/dashboard", null],
+  ["Retail", "Stock", "dt--retail-stock", "/tmp/taptpay-desktop-4b/desktop-1-stock.png", "/stock", null],
+  ["Retail", "Terminal", "dt--retail-terminal", "/tmp/taptpay-desktop-4c/desktop-1-send.png", "/terminal", null],
+  ["Retail", "Analytics", "dt--retail-analytics", "/tmp/taptpay-desktop-4d/desktop-1-overview-week.png", "/transactions", null],
+  ["Retail", "Settings", "dt--retail-settings", "/tmp/taptpay-desktop-4e/desktop-1-business.png", "/settings", null],
+  ["Property", "Home", "dt--home", "/tmp/taptpay-desktop-2a/desktop-1-home-week.png", "/property", null],
+  ["Property", "Clients", "dt--clients", "/tmp/taptpay-desktop-2b/desktop-1-directory.png", "/property/tenants", null],
+  ["Property", "Terminal", "dt--terminal", "/tmp/taptpay-desktop-2c/desktop-1-request-empty.png", "/property/terminal", null],
+  ["Property", "Analytics", "dt--analytics", "/tmp/taptpay-desktop-2d/desktop-1-overview-year.png", "/property/analytics", null],
+  ["Property", "Settings", "dt--settings", "/tmp/taptpay-desktop-2e/desktop-1-settings-property.png", "/settings", null],
+  ["Trades", "Home", "dt--trades-home", "/tmp/taptpay-desktop-3a/desktop-1-default.png", "/trades", null],
+  ["Trades", "Clients", "dt--trades-clients", "/tmp/taptpay-desktop-3b/desktop-1-directory.png", "/trades/clients", null],
+  ["Trades", "Terminal", "dt--trades-terminal", "/tmp/taptpay-desktop-3c/desktop-1-invoice-empty.png", "/trades/terminal", null],
+  ["Trades", "Analytics", "dt--trades-analytics", "/tmp/taptpay-desktop-3d/desktop-1-overview-year.png", "/trades/analytics", null],
+  ["Trades", "Settings", "dt--trades-settings", `${MINE}/app--dt--trades-settings.png`, "/settings",
+    "shot-trades-settings.mjs throws on its own strict-mode locator, so this plate is a direct capture of the logical canvas."],
+];
+
+const cropToDataUri = (file) => {
+  const png = PNG.sync.read(readFileSync(file));
+  /* The direct capture is already exactly the canvas — nothing to crop. */
+  if (png.width <= CROP.w + 4) return `data:image/png;base64,${readFileSync(file).toString("base64")}`;
+  const out = new PNG({ width: CROP.w, height: CROP.h });
+  PNG.bitblt(png, out, CROP.x, CROP.y, CROP.w, CROP.h, 0, 0);
+  return `data:image/png;base64,${PNG.sync.write(out).toString("base64")}`;
+};
+
+const asDataUri = (file) => `data:image/png;base64,${readFileSync(file).toString("base64")}`;
+
+const rows = [];
+for (const [vertical, screen, design, appShot, route, caveat] of PAIRS) {
+  const designFile = `${DESIGN_DIR}/${design}.png`;
+  if (!existsSync(designFile)) throw new Error(`missing design ${designFile}`);
+  if (!existsSync(appShot)) throw new Error(`missing app shot ${appShot}`);
+  rows.push({ vertical, screen, route, caveat, design: asDataUri(designFile), app: cropToDataUri(appShot) });
+  console.log(`paired ${vertical}/${screen}`);
+}
+
+const plate = (r, i) => `
+<section class="plate" id="s${i}">
+  <header class="plate-head">
+    <h2><span class="tag t-${r.vertical.toLowerCase()}">${r.vertical}</span><span class="scr">${r.screen}</span></h2>
+    <code class="route">${r.route}</code>
+    <div class="modes" role="group" aria-label="${r.vertical} ${r.screen} comparison mode">
+      <button type="button" class="mode on" data-mode="split" aria-pressed="true">Side by side</button>
+      <button type="button" class="mode" data-mode="wipe" aria-pressed="false">Wipe</button>
+    </div>
+  </header>
+  ${r.caveat ? `<p class="caveat">${r.caveat}</p>` : ""}
+  <div class="stage" data-mode="split" style="--wipe:50">
+    <figure class="pane design">
+      <figcaption>Design</figcaption>
+      <img loading="lazy" alt="${r.vertical} ${r.screen}, design source" src="${r.design}">
+    </figure>
+    <figure class="pane built">
+      <figcaption>Built</figcaption>
+      <img loading="lazy" alt="${r.vertical} ${r.screen}, built app" src="${r.app}">
+    </figure>
+    <div class="seam" aria-hidden="true"></div>
+    <label class="wipe-ctl">
+      <span class="sr">Wipe position for ${r.vertical} ${r.screen}</span>
+      <input type="range" min="0" max="100" value="50" step="0.5">
+    </label>
+  </div>
+</section>`;
+
+const html = `<title>Desktop app — design vs build</title>
+<style>
+  :root {
+    --ground: #f2f4f9;
+    --panel: #ffffff;
+    --ink: #0b1330;
+    --soft: #5a6486;
+    --line: #dce1ed;
+    --line-strong: #c3cbde;
+    --accent: #2f5be0;
+    --retail: #2f5be0;
+    --property: #0e8f8a;
+    --trades: #c4711a;
+    --plate-bg: #050b1d;
+    --sans: ui-sans-serif, "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #070c1b;
+      --panel: #0e1528;
+      --ink: #e8edf9;
+      --soft: #939db9;
+      --line: #1e2740;
+      --line-strong: #2c3654;
+      --accent: #7b9dff;
+      --retail: #7b9dff;
+      --property: #35c9c3;
+      --trades: #eda555;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #070c1b;
+    --panel: #0e1528;
+    --ink: #e8edf9;
+    --soft: #939db9;
+    --line: #1e2740;
+    --line-strong: #2c3654;
+    --accent: #7b9dff;
+    --retail: #7b9dff;
+    --property: #35c9c3;
+    --trades: #eda555;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.55;
+    padding: 44px 22px 96px;
+  }
+  .sr {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+  }
+  .wrap { max-width: 1460px; margin: 0 auto; display: flex; flex-direction: column; gap: 30px; }
+
+  .masthead { display: flex; flex-direction: column; gap: 10px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--soft); margin: 0;
+  }
+  h1 { font-size: clamp(24px, 3.4vw, 33px); line-height: 1.12; margin: 0; letter-spacing: -0.02em; text-wrap: balance; }
+  .lede { margin: 0; color: var(--soft); max-width: 68ch; }
+
+  .brief {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 16px 20px; display: flex; flex-direction: column; gap: 9px; max-width: 92ch;
+  }
+  .brief h2 {
+    margin: 0; font-size: 11px; font-family: var(--mono); letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--soft);
+  }
+  .brief p { margin: 0; color: var(--soft); }
+  .brief strong { color: var(--ink); font-weight: 620; }
+
+  .plate { display: flex; flex-direction: column; gap: 12px; }
+  .plate-head {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding-bottom: 9px; border-bottom: 1px solid var(--line);
+  }
+  .plate-head h2 { margin: 0; font-size: 16px; font-weight: 600; display: flex; align-items: baseline; gap: 9px; }
+  .tag {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.13em;
+    text-transform: uppercase; font-weight: 700;
+  }
+  .t-retail { color: var(--retail); }
+  .t-property { color: var(--property); }
+  .t-trades { color: var(--trades); }
+  .scr { letter-spacing: -0.01em; }
+  .route { font-family: var(--mono); font-size: 12px; color: var(--soft); }
+  .modes { margin-left: auto; display: flex; gap: 4px; }
+  .mode {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em;
+    padding: 5px 11px; border-radius: 999px; cursor: pointer;
+    background: transparent; color: var(--soft);
+    border: 1px solid var(--line-strong);
+  }
+  .mode:hover { color: var(--ink); }
+  .mode.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .mode:focus-visible, input[type="range"]:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+  .caveat { margin: 0; font-size: 13px; color: var(--soft); font-family: var(--mono); }
+
+  .stage { position: relative; display: grid; gap: 16px; }
+  .stage[data-mode="split"] { grid-template-columns: 1fr 1fr; }
+  @media (max-width: 900px) { .stage[data-mode="split"] { grid-template-columns: 1fr; } }
+
+  .pane { margin: 0; display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+  figcaption {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.13em;
+    text-transform: uppercase; color: var(--soft);
+  }
+  .pane img {
+    display: block; width: 100%; max-width: 100%; border-radius: 9px;
+    border: 1px solid var(--line-strong); background: var(--plate-bg);
+  }
+
+  /* Wipe: both panes share one grid cell; the built pane is clipped from the
+     seam rightwards, so left of the seam is design and right of it is build. */
+  .stage[data-mode="wipe"] { grid-template-columns: 1fr; }
+  .stage[data-mode="wipe"] .pane { grid-area: 1 / 1; }
+  .stage[data-mode="wipe"] figcaption { display: none; }
+  .stage[data-mode="wipe"] .built img { clip-path: inset(0 0 0 calc(var(--wipe) * 1%)); }
+  .stage[data-mode="wipe"] .seam {
+    display: block; position: absolute; top: 0; bottom: 0;
+    left: calc(var(--wipe) * 1%); width: 1px; background: var(--accent);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35); pointer-events: none;
+  }
+  .seam { display: none; }
+  .wipe-ctl { display: none; }
+  .stage[data-mode="wipe"] .wipe-ctl { display: block; margin-top: 2px; }
+  .stage[data-mode="wipe"] .wipe-ctl input { width: 100%; accent-color: var(--accent); }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <p class="eyebrow">Tablet / desktop merchant app &middot; feat/tablet-desktop-app</p>
+    <h1>Design vs build, all 15 screens</h1>
+    <p class="lede">Three verticals &times; five screens, design source against the built app. This is the last open item on the transitions work.</p>
+  </header>
+
+  <div class="brief">
+    <h2>How to read these</h2>
+    <p><strong>The panes are directly comparable.</strong> Both are the same 1180&times;880 logical canvas at an identical aspect ratio, so differences in position, spacing and scale are real &mdash; not artefacts of how they were captured. Use <strong>Wipe</strong> to drag a seam across the two and catch drift that side-by-side hides.</p>
+    <p><strong>Content differs on purpose.</strong> The built shots use each screen's own fixture data, so the records are realistic where the design repeats one placeholder row. Judge layout, spacing, type scale and colour &mdash; not the wording or the number of rows.</p>
+  </div>
+
+  ${rows.map(plate).join("\n")}
+</div>
+
+<script>
+  for (const stage of document.querySelectorAll(".stage")) {
+    const range = stage.querySelector('input[type="range"]');
+    range.addEventListener("input", () => stage.style.setProperty("--wipe", range.value));
+  }
+  for (const head of document.querySelectorAll(".plate-head")) {
+    const stage = head.parentElement.querySelector(".stage");
+    for (const btn of head.querySelectorAll(".mode")) {
+      btn.addEventListener("click", () => {
+        stage.dataset.mode = btn.dataset.mode;
+        for (const other of head.querySelectorAll(".mode")) {
+          const on = other === btn;
+          other.classList.toggle("on", on);
+          other.setAttribute("aria-pressed", String(on));
+        }
+      });
+    }
+  }
+</script>`;
+
+const outFile =
+  "/tmp/claude-1000/-home-runner-workspace/5abb4202-8c03-4cd6-8a70-0593a874ca18/scratchpad/desktop-sbs.html";
+writeFileSync(outFile, html);
+console.log(`\nwrote page, ${(Buffer.byteLength(html) / 1024 / 1024).toFixed(2)} MB`);

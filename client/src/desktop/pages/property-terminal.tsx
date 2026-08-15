@@ -764,7 +764,7 @@ const PT_CSS = `
 
 /* ── right panel ── */
 .pt-panel { flex:1; min-width:0; padding-left:36px; box-sizing:border-box; position:relative; --dt-i:7; }
-.pt-mode { animation:tileIn .35s cubic-bezier(.22,.9,.3,1) both; }
+.pt-mode { animation:tileIn var(--m-dur-ui) var(--m-ease-out) both; }
 .pt-mode-head { font-weight:300; font-size:15px; color:${KP_INK}; }
 .pt-mode-sub { margin-top:4px; font-weight:500; font-size:12px; color:rgba(244,246,255,0.45); max-width:430px; }
 

@@ -1,10 +1,7 @@
 // @ts-nocheck — ported verbatim from the July 2026 prototype export; inline
 // styles use string values (fontWeight:"500", rows:"3", …) for 1:1 fidelity.
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import './landing.css';
-import { PLANS, formatPlanPrice } from "@shared/plans";
-import { DeferredLandingPhone, INDUSTRY_PHONE, isIndustryKey, type IndustryKey } from './DeferredLandingPhone';
-import { LandingCoinField } from './landing-phone/LandingCoinField';
 
 export interface LandingPageProps {
   /** hero coin density (0.4–2) */
@@ -22,40 +19,21 @@ export interface LandingPageProps {
  * Mount once as a full page (e.g. a wouter route).
  */
 export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', reducedMotion = false }: LandingPageProps) {
-  // The Industries tabs and the "try it live" button are plain DOM buttons owned
-  // by landingRuntime, which rewrites all the copy around them. React only needs
-  // to know which one is selected so the phone can show that vertical's
-  // workflow, so it listens to them rather than taking them over.
-  const [industry, setIndustry] = useState<IndustryKey>(defaultIndustry);
-  const [industryLive, setIndustryLive] = useState(false);
-
   useEffect(() => {
-    const tabs = Array.from(document.querySelectorAll('[data-ind]'));
-    const pick = (e: Event) => {
-      const key = (e.currentTarget as HTMLElement).getAttribute('data-ind');
-      if (isIndustryKey(key)) setIndustry(key);
-    };
-    tabs.forEach((t) => t.addEventListener('click', pick));
-
-    const liveBtns = Array.from(document.querySelectorAll('.tp-phone-live'));
-    const toggleLive = () => setIndustryLive((v) => !v);
-    liveBtns.forEach((b) => b.addEventListener('click', toggleLive));
-
-    return () => {
-      tabs.forEach((t) => t.removeEventListener('click', pick));
-      liveBtns.forEach((b) => b.removeEventListener('click', toggleLive));
-    };
-  }, []);
-
-  useEffect(() => {
+    // The runtime pulls in three.js (~1.2 MB min), so it's loaded on demand:
+    // the static markup paints immediately and the scroll/3D rig attaches a
+    // beat later. Keeping it out of the entry chunk means app users who never
+    // see the landing page never download three.js.
     let cancelled = false;
-    let runtime = null;
     import('./landingRuntime').then(({ LandingRuntime }) => {
       if (cancelled) return;
-      runtime = new LandingRuntime({ coinDensity, defaultIndustry, reducedMotion });
-      runtime.init();
+      const rt = new LandingRuntime({ coinDensity, defaultIndustry, reducedMotion });
+      rt.init();
     });
-    return () => { cancelled = true; runtime?.destroy(); };
+    // Prototype parity: the runtime registers window-level listeners and rAF
+    // loops once and does not tear down — mount this page once per app load.
+    // The cancelled flag only guards the unmount-before-load race.
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -139,7 +117,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
         {' '}
         <div style={{ position: "absolute", bottom: "-25vh", left: "-18vw", width: "55vw", height: "55vw", borderRadius: "50%", background: "radial-gradient(circle,rgba(94,157,255,0.16) 0%,rgba(94,157,255,0) 65%)", pointerEvents: "none" }} />
         {' '}
-        <LandingCoinField density={coinDensity} reducedMotion={reducedMotion} />
+        <canvas id="tp-coins" style={{ position: "fixed", inset: "0", width: "100%", height: "100%", display: "block", pointerEvents: "none", zIndex: "0" }} />
         {' '}
         <div id="tp-hero-content" style={{ position: "relative", zIndex: "4", padding: "0 clamp(20px,7vw,9vw)", maxWidth: "1100px", willChange: "transform,opacity" }}>
           {' '}
@@ -174,7 +152,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
             </a>
             {' '}
             <a href="#tp-pricing" className="tp-anchor" style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "8px", padding: "15px 10px", color: "rgba(244,241,232,0.62)", fontFamily: "'Outfit'", fontWeight: "500", fontSize: "15px", cursor: "pointer" }}>
-              {`pricing: from ${formatPlanPrice(PLANS.solo.priceCents)} a month · no transaction fees `}
+              {"pricing: 10¢ retail · 0.3% everything else "}
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M5 12h14M13 6l6 6-6 6" />
               </svg>
@@ -237,21 +215,23 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
                 {' '}
                 <div id="tp-cine-turn" style={{ willChange: "transform" }}>
                   {' '}
-                  <div id="tp3" style={{ position: "relative", width: "clamp(190px,29vh,306px)", aspectRatio: "473/969", borderRadius: "13%/6.1%", background: "transparent", boxShadow: "0 42px 90px rgba(0,0,0,.48)" }}>
+                  <div id="tp3" style={{ position: "relative", width: "clamp(190px,29vh,306px)", aspectRatio: "473/969" }}>
                     {' '}
                     <div style={{ position: "absolute", left: "50%", top: "103%", width: "130%", height: "24%", transform: "translate(-50%,-50%)", background: "radial-gradient(ellipse 50% 50% at 50% 50%,rgba(1,3,34,0.6) 0%,rgba(1,3,34,0) 70%)", pointerEvents: "none" }} />
+                    {' '}
+                    <canvas id="tp3-gl" style={{ position: "absolute", left: "50%", top: "50%", width: "230%", height: "124%", transform: "translate(-50%,-50%)", pointerEvents: "none" }} />
                     {' '}
                     <div id="tp3-css" style={{ position: "absolute", inset: "0", perspective: "1100px", perspectiveOrigin: "50% 50%" }}>
                       {' '}
                       <div id="tp3-spin" style={{ position: "absolute", inset: "0", transformStyle: "preserve-3d", willChange: "transform" }}>
                         {' '}
-                        <div id="tp3-face" style={{ position: "absolute", inset: "0", backfaceVisibility: "hidden", background: "transparent url('/assets/shell-front.webp') center/100% 100% no-repeat" }}>
+                        <div id="tp3-face" style={{ position: "absolute", inset: "0", backfaceVisibility: "hidden" }}>
                           {' '}
                           <div style={{ position: "absolute", left: "2.75%", right: "2.54%", top: "0.83%", bottom: "0.83%", borderRadius: "13%/6.1%", background: "#050508" }} />
                           {' '}
                           <div className="tp-phone-scale" style={{ position: "absolute", left: "4.4%", right: "4.2%", top: "1.75%", bottom: "1.75%", borderRadius: "11%/5.2%", overflow: "hidden", background: "#fff" }}>
                             {' '}
-                            <DeferredLandingPhone variant="cinematic" bare reducedMotion={reducedMotion} storySelector="#tp-story-wrap" className="tp-app-frame" style={{ pointerEvents: "none", display: "block" }} />
+                            <iframe id="tp-cine-frame" className="tp-app-frame" data-late-src="app/embed.html?mode=property&route=/property" title="taptpay live app" style={{ width: "390px", height: "844px", border: "none", transformOrigin: "top left", pointerEvents: "none", display: "block", background: "#fff" }} />
                             {' '}
                           </div>
                           {' '}
@@ -268,16 +248,6 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
                           </div>
                           {' '}
                         </div>
-                        {' '}
-                        <div id="tp3-edge-left" aria-hidden style={{ position: "absolute", left: "-5.5%", top: "5%", width: "11%", height: "90%", borderRadius: "40% 0 0 40%", background: "linear-gradient(90deg,#07104a,#162a83 45%,#080b19)", transform: "rotateY(-90deg)", transformOrigin: "100% 50%", backfaceVisibility: "hidden" }} />
-                        {' '}
-                        <div id="tp3-edge-right" aria-hidden style={{ position: "absolute", right: "-5.5%", top: "5%", width: "11%", height: "90%", borderRadius: "0 40% 40% 0", background: "linear-gradient(90deg,#080b19,#162a83 55%,#07104a)", transform: "rotateY(90deg)", transformOrigin: "0 50%", backfaceVisibility: "hidden" }} />
-                        {' '}
-                        <div id="tp3-edge-top" aria-hidden style={{ position: "absolute", left: "5%", top: "-5.5%", width: "90%", height: "11%", borderRadius: "40% 40% 0 0", background: "linear-gradient(180deg,#07104a,#162a83 55%,#080b19)", transform: "rotateX(90deg)", transformOrigin: "50% 100%", backfaceVisibility: "hidden" }} />
-                        {' '}
-                        <div id="tp3-edge-bottom" aria-hidden style={{ position: "absolute", left: "5%", bottom: "-5.5%", width: "90%", height: "11%", borderRadius: "0 0 40% 40%", background: "linear-gradient(180deg,#080b19,#162a83 45%,#07104a)", transform: "rotateX(-90deg)", transformOrigin: "50% 0", backfaceVisibility: "hidden" }} />
-                        {' '}
-                        <div id="tp3-back" aria-hidden style={{ position: "absolute", inset: "1% 2.6%", borderRadius: "13%/6.1%", backfaceVisibility: "hidden", transform: "rotateY(180deg)", background: "#080b19 url('/assets/shell-back.webp') center/cover no-repeat", boxShadow: "inset 0 0 0 2px rgba(160,183,230,.45)" }} />
                         {' '}
                       </div>
                       {' '}
@@ -408,7 +378,7 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
           {' '}
         </div>
         {' '}
-              <div className="tp-rev" style={{ position: "relative", zIndex: "2", marginTop: "44px", display: "inline-flex", padding: "5px", borderRadius: "9999px", background: "rgba(244,241,232,0.05)", border: "1px solid rgba(244,241,232,0.12)", gap: "8px", flexWrap: "wrap" }}>
+        <div className="tp-rev" style={{ position: "relative", zIndex: "2", marginTop: "44px", display: "inline-flex", padding: "5px", borderRadius: "9999px", background: "rgba(244,241,232,0.05)", border: "1px solid rgba(244,241,232,0.12)", gap: "5px", flexWrap: "wrap" }}>
           {' '}
           <button id="tp-tab-property" className="tp-tab" data-ind="property" style={{ padding: "13px 26px", borderRadius: "9999px", border: "none", background: "#5E9DFF", color: "#040D6D", fontFamily: "'Outfit'", fontWeight: "600", fontSize: "14px", cursor: "pointer", transition: "background .3s ease,color .3s ease" }}>{"property"}</button>
           {' '}
@@ -431,8 +401,8 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
             <div style={{ marginTop: "30px", display: "flex", gap: "clamp(18px,3vw,44px)", flexWrap: "wrap" }}>
               {' '}
               <div>
-                <div id="tp-ind-s1v" style={{ fontFamily: "'Outfit'", fontWeight: "700", fontSize: "clamp(26px,2.6vw,38px)", color: "#5E9DFF" }}>{"$0"}</div>
-                <div id="tp-ind-s1l" style={{ marginTop: "4px", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.5)" }}>{"TaptPay platform fee"}</div>
+                <div id="tp-ind-s1v" style={{ fontFamily: "'Outfit'", fontWeight: "700", fontSize: "clamp(26px,2.6vw,38px)", color: "#5E9DFF" }}>{"0.3%"}</div>
+                <div id="tp-ind-s1l" style={{ marginTop: "4px", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.5)" }}>{"platform fee"}</div>
               </div>
               {' '}
               <div>
@@ -459,16 +429,16 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
                 {' '}
                 <div className="tp-tilt-inner" style={{ transformStyle: "preserve-3d", transition: "transform .25s ease" }}>
                   {' '}
-                  <div className="tp-phone" style={{ position: "relative", width: "255px", aspectRatio: "473/969", borderRadius: "13%/6.1%", background: "#0b0b14", padding: "clamp(6px,0.9vh,9px)", boxShadow: "0 40px 70px rgba(0,0,0,0.45), inset 0 0 0 2px rgba(120,140,220,0.35)" }}>
+                  <div className="tp-phone" style={{ position: "relative", width: "255px", aspectRatio: "390/844", borderRadius: "clamp(32px,4.2vh,46px)", background: "#0b0b14", padding: "clamp(6px,0.9vh,9px)", boxShadow: "0 40px 70px rgba(0,0,0,0.45), inset 0 0 0 2px rgba(120,140,220,0.35)", top: "-114px", height: "545px" }}>
                     {' '}
                     <div className="tp-phone-scale" style={{ position: "absolute", inset: "clamp(6px,0.9vh,9px)", borderRadius: "clamp(26px,3.4vh,38px)", overflow: "hidden", background: "#fff" }}>
                       {' '}
-                      <DeferredLandingPhone variant="industries" bare reducedMotion={reducedMotion} interactive={industryLive} scene={INDUSTRY_PHONE[industry].scene} steps={INDUSTRY_PHONE[industry].steps} className="tp-app-frame" style={{ pointerEvents: industryLive ? "auto" : "none", display: "block" }} />
+                      <iframe id="tp-ind-frame" className="tp-app-frame" data-defer-src="app/embed.html?mode=property&route=/property" title="taptpay live app" style={{ width: "390px", height: "844px", border: "none", transformOrigin: "top left", pointerEvents: "none", display: "block", background: "#fff" }} />
                       {' '}
                     </div>
                     {' '}
                   </div>
-                  <button className="tp-phone-live" type="button" style={{ marginTop: "4px", padding: "11px 22px", borderRadius: "9999px", border: "1.5px solid #5E9DFF", background: "transparent", color: "#5E9DFF", fontFamily: "'Outfit'", fontWeight: "500", fontSize: "14px", cursor: "pointer", transition: "background .25s ease,color .25s ease", position: "static" }}>{"try it live"}</button>
+                  <button className="tp-phone-live" type="button" style={{ padding: "11px 22px", borderRadius: "9999px", border: "1.5px solid #5E9DFF", background: "transparent", color: "#5E9DFF", fontFamily: "'Outfit'", fontWeight: "500", fontSize: "14px", cursor: "pointer", transition: "background .25s ease,color .25s ease", position: "absolute", top: "472px", left: "80px" }}>{"try it live"}</button>
                   {' '}
                 </div>
                 {' '}
@@ -510,37 +480,37 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
           {' '}
           <div className="tp-rev" style={{ flex: "1 1 400px", minWidth: "300px", padding: "clamp(30px,3.4vw,48px)", borderRadius: "28px", background: "rgba(94,157,255,0.07)", border: "1px solid rgba(94,157,255,0.28)" }}>
             {' '}
-            <div style={{ fontFamily: "'Outfit'", fontWeight: "500", fontSize: "13px", letterSpacing: "0.26em", textTransform: "uppercase", color: "rgba(244,241,232,0.5)" }}>{"every transaction"}</div>
+            <div style={{ fontFamily: "'Outfit'", fontWeight: "500", fontSize: "13px", letterSpacing: "0.26em", textTransform: "uppercase", color: "rgba(244,241,232,0.5)" }}>{"retail & hospitality"}</div>
             {' '}
             <div style={{ marginTop: "18px", display: "flex", alignItems: "baseline", gap: "12px" }}>
               {' '}
-              <span style={{ fontFamily: "'Outfit'", fontWeight: "300", fontSize: "clamp(88px,9vw,150px)", lineHeight: "0.9", letterSpacing: "-0.04em", color: "#F4F1E8" }}>{"$0"}</span>
+              <span style={{ fontFamily: "'Outfit'", fontWeight: "300", fontSize: "clamp(88px,9vw,150px)", lineHeight: "0.9", letterSpacing: "-0.04em", color: "#F4F1E8" }}>{"10¢"}</span>
               {' '}
             </div>
             {' '}
-            <div style={{ marginTop: "14px", fontFamily: "'Outfit'", fontWeight: "500", fontSize: "clamp(16px,1.4vw,20px)", color: "#5E9DFF" }}>{"no transaction fee. not a cent. not a percentage."}</div>
+            <div style={{ marginTop: "14px", fontFamily: "'Outfit'", fontWeight: "500", fontSize: "clamp(16px,1.4vw,20px)", color: "#5E9DFF" }}>{"per transaction. flat. not a percentage."}</div>
             {' '}
-            <p style={{ margin: "18px 0 0", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "clamp(14px,1.15vw,16px)", lineHeight: "1.6", color: "rgba(244,241,232,0.6)" }}>{"taptpay adds nothing per sale — no flat fee and no percentage. keypad, stock, splits and analytics included."}</p>
+            <p style={{ margin: "18px 0 0", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "clamp(14px,1.15vw,16px)", lineHeight: "1.6", color: "rgba(244,241,232,0.6)" }}>{"a $500 saturday costs you 10¢ a tap — not $25 in percentages. keypad, stock, splits and analytics included."}</p>
             {' '}
           </div>
           {' '}
           <div className="tp-rev" style={{ flex: "1 1 400px", minWidth: "300px", padding: "clamp(30px,3.4vw,48px)", borderRadius: "28px", background: "rgba(94,157,255,0.07)", border: "1px solid rgba(94,157,255,0.28)" }}>
             {' '}
-            <div style={{ fontFamily: "'Outfit'", fontWeight: "500", fontSize: "13px", letterSpacing: "0.26em", textTransform: "uppercase", color: "rgba(244,241,232,0.5)" }}>{"every vertical"}</div>
+            <div style={{ fontFamily: "'Outfit'", fontWeight: "500", fontSize: "13px", letterSpacing: "0.26em", textTransform: "uppercase", color: "rgba(244,241,232,0.5)" }}>{"property & trades"}</div>
             {' '}
             <div style={{ marginTop: "18px", display: "flex", alignItems: "baseline", gap: "12px" }}>
               {' '}
               <span style={{ fontFamily: "'Outfit'", fontWeight: "300", fontSize: "clamp(88px,9vw,150px)", lineHeight: "0.9", letterSpacing: "-0.04em", color: "#F4F1E8" }}>
-                {"3"}
-                <span style={{ fontSize: "0.5em", color: "#5E9DFF" }}>{"-in-1"}</span>
+                {"0.3"}
+                <span style={{ fontSize: "0.5em", color: "#5E9DFF" }}>{"%"}</span>
               </span>
               {' '}
             </div>
             {' '}
-            <div style={{ marginTop: "14px", fontFamily: "'Outfit'", fontWeight: "500", fontSize: "clamp(16px,1.4vw,20px)", color: "#5E9DFF" }}>{"retail, property and trades. one subscription."}</div>
+            <div style={{ marginTop: "14px", fontFamily: "'Outfit'", fontWeight: "500", fontSize: "clamp(16px,1.4vw,20px)", color: "#5E9DFF" }}>{"platform fee. that's the whole bill."}</div>
             {' '}
             <p style={{ margin: "18px 0 0", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "clamp(14px,1.15vw,16px)", lineHeight: "1.6", color: "rgba(244,241,232,0.6)" }}>
-              {"collecting $2,400 rent costs nothing extra — while rent platforms and job apps charge subscriptions "}
+              {"collecting $2,400 rent costs $7.20 — while rent platforms and job apps charge subscriptions "}
               <span style={{ fontStyle: "italic" }}>{"plus"}</span>
               {" card fees for less."}
             </p>
@@ -553,49 +523,49 @@ export function LandingPage({ coinDensity = 1.4, defaultIndustry = 'property', r
         {' '}
         <div className="tp-rev" style={{ marginTop: "54px", maxWidth: "1150px" }}>
           {' '}
-          <div style={{ fontFamily: "'Outfit'", fontWeight: "500", fontSize: "13px", letterSpacing: "0.26em", textTransform: "uppercase", color: "rgba(244,241,232,0.5)" }}>{"one simple subscription"}</div>
+          <div style={{ fontFamily: "'Outfit'", fontWeight: "500", fontSize: "13px", letterSpacing: "0.26em", textTransform: "uppercase", color: "rgba(244,241,232,0.5)" }}>{"plus one simple subscription"}</div>
           {' '}
           <div style={{ marginTop: "22px", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: "16px" }}>
             {' '}
             <div style={{ padding: "26px", borderRadius: "22px", background: "rgba(244,241,232,0.04)", border: "1px solid rgba(244,241,232,0.12)" }}>
               {' '}
-              <div style={{ fontFamily: "'Outfit'", fontWeight: "600", fontSize: "15px", color: "#F4F1E8" }}>{PLANS.solo.name.toLowerCase()}</div>
+              <div style={{ fontFamily: "'Outfit'", fontWeight: "600", fontSize: "15px", color: "#F4F1E8" }}>{"solo"}</div>
               {' '}
               <div style={{ marginTop: "14px", display: "flex", alignItems: "baseline", gap: "4px" }}>
-                <span style={{ fontFamily: "'Outfit'", fontWeight: "300", fontSize: "40px", letterSpacing: "-0.02em", color: "#F4F1E8" }}>{formatPlanPrice(PLANS.solo.priceCents)}</span>
+                <span style={{ fontFamily: "'Outfit'", fontWeight: "300", fontSize: "40px", letterSpacing: "-0.02em", color: "#F4F1E8" }}>{"$7.99"}</span>
                 <span style={{ fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.5)" }}>{"/mo"}</span>
               </div>
               {' '}
-              <div style={{ marginTop: "10px", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.55)" }}>{PLANS.solo.blurb}</div>
+              <div style={{ marginTop: "10px", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.55)" }}>{"1 login · the full stack"}</div>
               {' '}
             </div>
             {' '}
             <div style={{ padding: "26px", borderRadius: "22px", background: "rgba(94,157,255,0.08)", border: "1px solid rgba(94,157,255,0.35)" }}>
               {' '}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontFamily: "'Outfit'", fontWeight: "600", fontSize: "15px", color: "#F4F1E8" }}>{PLANS.team.name.toLowerCase()}</span>
-                {PLANS.team.popular && <span style={{ padding: "5px 12px", borderRadius: "9999px", background: "rgba(94,157,255,0.16)", fontFamily: "'Outfit'", fontWeight: "600", fontSize: "10px", letterSpacing: "0.12em", textTransform: "uppercase", color: "#5E9DFF" }}>{"most popular"}</span>}
+                <span style={{ fontFamily: "'Outfit'", fontWeight: "600", fontSize: "15px", color: "#F4F1E8" }}>{"team"}</span>
+                <span style={{ padding: "5px 12px", borderRadius: "9999px", background: "rgba(94,157,255,0.16)", fontFamily: "'Outfit'", fontWeight: "600", fontSize: "10px", letterSpacing: "0.12em", textTransform: "uppercase", color: "#5E9DFF" }}>{"most popular"}</span>
               </div>
               {' '}
               <div style={{ marginTop: "14px", display: "flex", alignItems: "baseline", gap: "4px" }}>
-                <span style={{ fontFamily: "'Outfit'", fontWeight: "300", fontSize: "40px", letterSpacing: "-0.02em", color: "#F4F1E8" }}>{formatPlanPrice(PLANS.team.priceCents)}</span>
+                <span style={{ fontFamily: "'Outfit'", fontWeight: "300", fontSize: "40px", letterSpacing: "-0.02em", color: "#F4F1E8" }}>{"$8.99"}</span>
                 <span style={{ fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.5)" }}>{"/mo"}</span>
               </div>
               {' '}
-              <div style={{ marginTop: "10px", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.55)" }}>{PLANS.team.blurb}</div>
+              <div style={{ marginTop: "10px", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.55)" }}>{"5 logins · one dollar more"}</div>
               {' '}
             </div>
             {' '}
             <div style={{ padding: "26px", borderRadius: "22px", background: "rgba(244,241,232,0.04)", border: "1px solid rgba(244,241,232,0.12)" }}>
               {' '}
-              <div style={{ fontFamily: "'Outfit'", fontWeight: "600", fontSize: "15px", color: "#F4F1E8" }}>{PLANS.crew.name.toLowerCase()}</div>
+              <div style={{ fontFamily: "'Outfit'", fontWeight: "600", fontSize: "15px", color: "#F4F1E8" }}>{"crew"}</div>
               {' '}
               <div style={{ marginTop: "14px", display: "flex", alignItems: "baseline", gap: "4px" }}>
-                <span style={{ fontFamily: "'Outfit'", fontWeight: "300", fontSize: "40px", letterSpacing: "-0.02em", color: "#F4F1E8" }}>{formatPlanPrice(PLANS.crew.priceCents)}</span>
+                <span style={{ fontFamily: "'Outfit'", fontWeight: "300", fontSize: "40px", letterSpacing: "-0.02em", color: "#F4F1E8" }}>{"$12.99"}</span>
                 <span style={{ fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.5)" }}>{"/mo"}</span>
               </div>
               {' '}
-              <div style={{ marginTop: "10px", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.55)" }}>{PLANS.crew.blurb}</div>
+              <div style={{ marginTop: "10px", fontFamily: "'Outfit'", fontWeight: "400", fontSize: "13px", color: "rgba(244,241,232,0.55)" }}>{"10 logins · whole crew covered"}</div>
               {' '}
             </div>
             {' '}

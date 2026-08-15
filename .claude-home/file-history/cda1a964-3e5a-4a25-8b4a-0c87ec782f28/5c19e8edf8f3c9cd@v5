@@ -1,0 +1,118 @@
+---
+name: desktop-transitions-work
+description: "Desktop/tablet page transitions: committed as 666b898; what's done, what's left, and the two acceptance probes"
+metadata: 
+  node_type: memory
+  type: project
+  originSessionId: 1277f62f-974f-465e-81f9-9b0584158a19
+  modified: 2026-08-08T11:17:08.684Z
+---
+
+Oliver's requirements: **no flash/reloads on any page change**; the **top bar
+must never move** except the page-selector bubble; **every component on every
+page** gets a **bounce pop-in with a cascading stagger**.
+
+There was never a standalone transitions plan doc — the motion spec is §7
+(`:201`) + P6 (`:230`) of `docs/PLAN-2026-07-24-tablet-desktop-app.md`.
+
+## Done — committed 666b898 on `feat/tablet-desktop-app` (2026-08-08, 21 files)
+
+Two root causes, both fixed:
+1. Every page rendered its own `DesktopFrame > ScaledCanvas > DesktopShell` via
+   `DesktopPageScaffold`, **and** `PageTransition` (`page-transition.tsx:22-24`)
+   keys a `motion.div` on the location with `mode="wait"` — so every hop tore the
+   chrome down and burned 220ms blank first. `ScaledCanvas` starts at `scale 0` /
+   `visibility:hidden` until its layout effect runs, so each remount blanked the
+   frame. Fix: `DesktopChrome` mounted once above the router, driven by the pure
+   `desktopChromeForLocation()` map in `desktop-theme.ts`. Desktop app routes
+   bypass `PageTransition`; mobile + public routes keep it unchanged.
+2. Nav items had `padding: 0` and the active one `padding: 8px 22px` plus
+   `font-weight: 700` under `justify-content: space-between`, so every label
+   shifted on each page change. Fix: items always carry the active padding and
+   reserve the bold width via a hidden `::after` sharing the grid cell; a
+   separate `.tapt-desktop-nav-bubble` slides to the active item.
+
+Cascade primitives live in `desktop.css`: `@keyframes desktopBounceIn`,
+`.dt-rise` (explicit `--dt-i` step / `--dt-d` offset) and `.dt-cascade`
+(auto-indexes direct children 0..9). Delay = `--dt-i * 52ms + --dt-d`. A
+reduced-motion block disables them and forces `opacity: 1` — required, because
+they hide at `opacity: 0` and rely on the animation to reveal.
+
+**Measured**, both 1440×900 and 1194×834: chrome remounts **21/21 → 0/21**,
+loader flashes **14/21 → 1/21**; wordmark/nav-label drift **0.00px** over 10 hops.
+
+Two acceptance probes (dev server on :5000, single instance —
+[[dev-server-single-instance]], [[playwright-nix-chromium]]):
+- `scripts/desktop-shots/probe-transitions.mjs` — chrome survival + loader flash.
+- `scripts/desktop-shots/probe-topbar.mjs` — top-bar drift + bubble tracking.
+
+## Round 2 — committed as a7d15a3, fully verified (2026-08-08)
+
+666b898 **broke its own P0 gate**: it static-imported `DesktopChrome` +
+`desktopChromeForLocation` into `App.tsx`, so a 390×844 phone downloaded six
+desktop modules (`DesktopChrome/DesktopFrame/DesktopShell/ScaledCanvas/
+desktop-theme/desktop.css`). Measured by A/B — `verify-desktop-p0.mjs` **fails
+with exit 1 at HEAD**. Do not build on 666b898 without these working-tree edits.
+
+Fix (a7d15a3 on `feat/tablet-desktop-app`, 6 files, not pushed):
+- Route map moved out to **`client/src/lib/desktop-chrome-route.ts`** so the
+  router can match a location without importing desktop UI; `desktop-theme.ts`
+  re-exports it so desktop callers are unchanged.
+- `DesktopChrome` is now `lazy()`, wrapped in an outer `Suspense` that only ever
+  resolves on cold load — once mounted, navigation never suspends there, so the
+  frame still cannot blink.
+- `DesktopPageFallback` moved **into `App.tsx`** on purpose: importing it from
+  `@/desktop/DesktopChrome` would drag the desktop chunk into the entry bundle.
+- Tutorial spotlight froze around a mid-bounce rect (a transform on an ancestor
+  is invisible to `ResizeObserver` and outlives the 360ms settle timer) — fixed
+  with capture-phase `animationend`/`transitionend` re-measure in `tutorial.tsx`.
+- `verify-desktop-p0.mjs` gained `waitForAnimationsToSettle()` (skips infinite
+  spinner animations, 4s bound) so geometry is asserted on settled layout.
+
+All green: `tsc --noEmit` silent · `npx jest` **49/49 suites, 504/504 tests** ·
+`npm run build` clean · `verify-desktop-p0.mjs` exit 0 with
+**`phoneDesktopSourceModuleCount: 0`**. Production bundle splits
+`DesktopChrome-*.js` (5 kB) + `DesktopChrome-*.css` (8 kB); the entry chunk has
+zero hits for `tapt-desktop-frame`/`ScaledCanvas`/`desktopBounceIn`.
+
+## Still owed
+
+- Visual side-by-side pass vs `docs/design/desktop-app/Taptpay Desktop.dc.html`.
+- The §6 handoff list of deliberate design deviations still has to be raised with
+  Oliver as one list (per `CLAUDE.md`) — including the four omissions below.
+- **`probe-transitions.mjs` exits 1 on a healthy tree — do not panic.** Its
+  detector (`:49`) logs `suspense-loader` for *any* added node matching
+  `.animate-spin`, never checking full-screen-ness or chrome presence, then
+  prints the misleading label "full-screen flash"; `bad = remounts + loaders`, so
+  the one hit forces exit 1. It catches `/board-builder`'s own content spinners
+  (`board-builder.tsx:601,629,661`). It provably cannot be the route loader:
+  `PageLoader` (`App.tsx:172`) is the only full-screen spinner and is wired to
+  the **mobile/public** `Suspense` (`:407`), while desktop routes use the empty
+  `DesktopPageFallback` (`:378,380`). Same hop reports `chrome: kept` / `blank
+  0.0ms`. Narrowing the matcher would make this usable as a gate.
+- 4 console `403 (Forbidden)` page errors on both desktop and tablet runs — not
+  transitions-related, not examined, do not affect exit code.
+- Mobile at 390×844 verified by the P0 phone leg (bottom nav renders, no frame,
+  no desktop modules, no page errors) — not a pixel diff, but not regressed.
+
+## Deliberate omissions the agents flagged (raise with Oliver, do not silently fix)
+
+- Drag sheets (`.ra-sheet`, `.pa-sheet`, `.ta-sheet`) are **excluded** from the
+  cascade: they carry a live inline `transform: translateY(...)`, and a
+  `both`-filled keyframe would pin them at `translateY(0)` and break the drag.
+  Their contents cascade instead, so the sheet shell itself does not pop in.
+- `.pa-dot` (chart peak marker) excluded — centred by `transform: translate(-50%,-50%)`.
+- Rails are animated on `.rt-rail`/`.pt-rail`/`.tt-rail` themselves, never their
+  slots: a transform on the slot makes it the containing block for the
+  `position:absolute` rail and moves it.
+- Property/trades analytics overviews sit inside `{!report && …}`, so returning
+  from a generated report now replays the cascade. Accepted, easily gated.
+
+## Pre-existing bug found, NOT fixed
+
+`trades-terminal.tsx:1224,1226,1227,1228,1229` — **six** empty CSS declarations
+(`color:;` ×5, `background:;` ×1) across five rules: `.tt-quick-recipient > input`,
+`.tt-quick-channel button` (+ `[aria-pressed="true"]`, which has both), and
+`.tt-quick-success` (+ its button). Look like dropped template interpolations;
+browsers discard them, so those quick-invoice controls fall back to inherited
+colours.

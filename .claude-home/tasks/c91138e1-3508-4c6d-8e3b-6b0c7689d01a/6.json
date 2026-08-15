@@ -1,0 +1,9 @@
+{
+  "id": "6",
+  "subject": "Step 8 — browser verification sweep",
+  "description": "Run verify-landing-phone-autoplay, audit-landing-overlaps, shot-trades-terminal, verify-desktop-p0 against the live dev server with nix chromium. Confirm each exits non-zero on failure before trusting it as a gate. Plus the Settings tutorial restart and desktopTarget anchors by hand.",
+  "activeForm": "Running the browser verification sweep",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

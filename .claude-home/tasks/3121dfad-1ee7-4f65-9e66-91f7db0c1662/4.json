@@ -1,9 +1,0 @@
-{
-  "id": "4",
-  "subject": "Stage 4: trades quote mode — 3-step animated flow in checkout",
-  "description": "Route /trades/quote/:token → Checkout quoteMode; delete quote-response.tsx; step state machine (view quote → confirm+QR → pay) with framer-motion; acceptedInvoiceToken swap + history.replaceState; revisit/declined/expired states; extend mock-api.ts with quote endpoints.",
-  "activeForm": "Building trades 3-step quote flow",
-  "status": "pending",
-  "blocks": [],
-  "blockedBy": []
-}

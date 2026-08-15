@@ -1,0 +1,24 @@
+fix(desktop): keep the persistent chrome out of the phone bundle
+
+666b898 mounted DesktopChrome once above the router, but reaching it from
+App.tsx meant a static import — so every phone downloaded DesktopChrome,
+DesktopFrame, DesktopShell, ScaledCanvas, desktop-theme and desktop.css.
+verify-desktop-p0 fails at that commit; it passes here with
+phoneDesktopSourceModuleCount: 0.
+
+- move the location → chrome map to client/src/lib/desktop-chrome-route.ts so
+  the router can match a route without importing any desktop UI; desktop-theme
+  re-exports it, so desktop callers are unchanged
+- load DesktopChrome lazily behind a Suspense boundary that only resolves on
+  cold load, so navigation still never suspends and the frame cannot blink
+- define DesktopPageFallback in App.tsx: importing it from the desktop folder
+  would pull the chunk it exists to avoid back into the entry bundle
+- re-measure the tutorial spotlight on animationend/transitionend, since a
+  transform on an ancestor is invisible to ResizeObserver and outlives the
+  settle timer, freezing the highlight around a mid-bounce rect
+- wait for animations to settle in verify-desktop-p0 before asserting geometry
+
+tsc clean, jest 504/504, npm run build clean, verify-desktop-p0 green at both
+1440x900 and 1194x834.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>

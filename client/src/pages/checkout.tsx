@@ -1,24 +1,11 @@
-import { useState, useEffect, useMemo, useRef, type CSSProperties, Component, type ReactNode } from "react";
+import { useState, useEffect, useMemo, useRef, Component, type ReactNode } from "react";
 import { useParams, useLocation, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { motion, AnimatePresence } from "framer-motion";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, CheckCircle, XCircle } from "lucide-react";
-import googlePayLogo from "@assets/Google_Pay_Logo.svg_1773556576322.png";
+import { XCircle } from "lucide-react";
 import "@/styles/checkout.css";
-import {
-  CHECKOUT_THEME as CT,
-  money,
-  pageStyle,
-  cardStyle,
-  labelStyle,
-  amountStyle,
-  subtitleStyle,
-  outlineBtnStyle,
-  iconBtnStyle,
-  footerLinkStyle,
-} from "@/lib/checkout-theme";
-import { TaptWordmark } from "@/components/checkout/tapt-wordmark";
+import { money } from "@/lib/checkout-theme";
+import { CheckoutView } from "@/features/checkout/CheckoutView";
 import { useTokenPagePrivacy } from "@/hooks/use-token-page-privacy";
 import {
   checkoutCompletionEndpoint,
@@ -1279,231 +1266,145 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
         ? (invoiceData.frequency ? `${invoiceData.frequency} rent payment` : "rent payment")
         : (invoiceData?.chargeType ?? null);
 
-  // Shared shell for terminal states (error / paid / success) — plain render
-  // helper, not a component, so it carries no mount semantics.
-  const renderTerminal = (children: ReactNode) => (
-    <div style={pageStyle}>
-      <div style={{ width: "100%", maxWidth: 380 }}>
-        <div style={{ ...cardStyle, minHeight: 420, justifyContent: "center" }}>
-          <div style={{ position: "absolute", top: 44, left: 0, right: 0, display: "flex", justifyContent: "center" }}>
-            <TaptWordmark customLogoUrl={customLogoUrl} />
-          </div>
-          {children}
-        </div>
-      </div>
-    </div>
-  );
+  const openInvoiceDocument = () => {
+    if (isInvoice && invoiceData?.kind === "charge" && invoiceData?.documentUrl) {
+      window.open(invoiceData.documentUrl, "_blank", "noopener,noreferrer");
+    }
+  };
 
-  // ── Trades quote mode: animated 3-step flow before any payment exists ──
-  // Renders inside the same navy card so acceptance flows straight into the
-  // payment layout. Owns the phase from quote-load through acceptance; once the
-  // minted invoice has resolved it falls through to the shared payment render.
+  const openExternalBrowser = () => {
+    const currentUrl = window.location.href;
+    if (inAppEnv.isAndroid) {
+      window.location.href = "intent://" + currentUrl.replace(/^https?:\/\//, "") + "#Intent;scheme=https;package=com.android.chrome;end";
+      return;
+    }
+    if (inAppEnv.isIOS) {
+      window.open(currentUrl, "_blank", "noopener,noreferrer");
+    }
+  };
+
+  const copyPaymentLink = () => {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+      setLinkCopied(true);
+      if (linkCopiedTimerRef.current) clearTimeout(linkCopiedTimerRef.current);
+      linkCopiedTimerRef.current = setTimeout(() => setLinkCopied(false), 2500);
+    });
+  };
+
+  // Trades quote mode owns the phase from quote resolution through acceptance.
+  // The accepted invoice token then falls through to this same payment adapter.
   const inQuotePhase = quoteMode && !acceptedInvoiceToken;
   const inAcceptLoading = quoteMode && !!acceptedInvoiceToken
     && !invoiceError && !invoiceData?.alreadyPaid && (txLoading || !transaction);
   if (inQuotePhase || inAcceptLoading) {
-    // Terminal quote states.
-    if (quoteError) return renderTerminal(
-      <div style={{ textAlign: "center" }}>
-        <XCircle size={48} color={CT.RED} style={{ margin: "0 auto 16px" }} />
-        <p style={{ color: CT.SKY, fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Quote unavailable</p>
-        <p style={{ color: CT.SKY_DIM, fontSize: 13 }}>{(quoteError as Error).message || "This quote link doesn't exist or has expired."}</p>
-      </div>
-    );
+    if (quoteError) {
+      return (
+        <CheckoutView
+          kind="terminal"
+          state="quote-unavailable"
+          customLogoUrl={customLogoUrl}
+          detail={(quoteError as Error).message || "This quote link doesn't exist or has expired."}
+        />
+      );
+    }
+
     const status = quoteDeclined ? "declined" : quote?.status;
-    if (status === "declined" || status === "expired") return renderTerminal(
-      <div style={{ textAlign: "center" }}>
-        <XCircle size={48} color={CT.RED} style={{ margin: "0 auto 16px" }} />
-        <p style={{ color: CT.SKY, fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Quote {status}</p>
-        <p style={{ color: CT.SKY_DIM, fontSize: 13 }}>
-          {status === "declined" ? "You've declined this quote. Contact the business if you'd like to revisit it." : "This quote has expired. Contact the business for an updated one."}
-        </p>
-      </div>
-    );
+    if (status === "declined" || status === "expired") {
+      return (
+        <CheckoutView
+          kind="terminal"
+          state={status === "declined" ? "quote-declined" : "quote-expired"}
+          customLogoUrl={customLogoUrl}
+        />
+      );
+    }
 
     const loadingQuote = inQuotePhase && (quoteLoading || !quote);
     const title = quote?.lineItems?.[0]?.description || "Quote";
     const quoteAmount = money(quote?.totalCents ?? 0);
     const quoteSubtitle = quote?.depositEnabled
-      ? (quote.depositType === "percent" ? `${quote.depositValue}% deposit required` : "deposit required")
+      ? (quote.depositType === "percent" ? quote.depositValue + "% deposit required" : "deposit required")
       : "quote total";
 
     return (
-      <div style={pageStyle}>
-        <div style={{ width: "100%", maxWidth: 380 }}>
-          <div style={{ ...cardStyle, minHeight: 520, justifyContent: "flex-start" }}>
-            <TaptWordmark customLogoUrl={customLogoUrl} />
-
-            {loadingQuote ? (
-              <>
-                <div style={{ flex: 1 }} />
-                <Loader2 size={32} color={CT.SKY} style={{ animation: "spin 1s linear infinite" }} />
-                <div style={{ flex: 1 }} />
-              </>
-            ) : (
-              <>
-                <div style={{ flex: 1, minHeight: 20 }} />
-                <p style={labelStyle}>{title}</p>
-                <p style={amountStyle}>{quoteAmount}</p>
-                <p style={subtitleStyle}>{quoteSubtitle}</p>
-                <div style={{ flex: 1, minHeight: 24 }} />
-
-                {inAcceptLoading ? (
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "14px 0", color: CT.SKY }}>
-                    <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} />
-                    <span style={{ fontSize: 14, fontWeight: 600 }}>Confirming…</span>
-                  </div>
-                ) : (
-                  <>
-                    <motion.div layout style={{ display: "flex", gap: 12, width: "100%" }}>
-                      <motion.button
-                        layout
-                        onClick={() => { if (quoteStep === "view") { openQuotePdf(); setQuoteStep("confirm"); } else respondToQuote(true); }}
-                        disabled={quoteResponding}
-                        style={{ ...outlineBtnStyle, flex: 1, opacity: quoteResponding ? 0.6 : 1 }}
-                      >
-                        {quoteResponding ? "…" : quoteStep === "view" ? "view quote" : "confirm"}
-                      </motion.button>
-                      <AnimatePresence>
-                        {quoteStep === "confirm" && (
-                          <motion.button
-                            key="qr"
-                            layout
-                            initial={{ opacity: 0, scale: 0.6 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.6 }}
-                            transition={{ duration: 0.25 }}
-                            onClick={openQuotePdf}
-                            aria-label="View quote PDF"
-                            style={iconBtnStyle}
-                          >
-                            <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
-                              <rect x="3" y="14" width="7" height="7" rx="1" /><path d="M14 14h3v3M20 14v.01M14 20h.01M17 20h.01M20 17v3" />
-                            </svg>
-                          </motion.button>
-                        )}
-                      </AnimatePresence>
-                    </motion.div>
-
-                    <button
-                      onClick={() => respondToQuote(false)}
-                      disabled={quoteResponding}
-                      style={{ ...footerLinkStyle, marginTop: 12 }}
-                    >
-                      decline quote
-                    </button>
-                    {quoteRespondError && (
-                      <p style={{ color: CT.RED, fontSize: 12, marginTop: 4, textAlign: "center" }}>{quoteRespondError}</p>
-                    )}
-                  </>
-                )}
-              </>
-            )}
-          </div>
-
-          <p style={{ marginTop: 14, textAlign: "center", fontSize: 11, color: "#9aa0b5", letterSpacing: "0.03em" }}>
-            Secured by <strong style={{ color: CT.INK, fontWeight: 600 }}>Windcave</strong> · PCI DSS Compliant
-          </p>
-        </div>
-        <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
-      </div>
+      <CheckoutView
+        kind="quote"
+        customLogoUrl={customLogoUrl}
+        loading={loadingQuote}
+        accepting={inAcceptLoading}
+        responding={quoteResponding}
+        step={quoteStep}
+        title={title}
+        amount={quoteAmount}
+        subtitle={quoteSubtitle}
+        error={quoteRespondError}
+        onPrimary={() => {
+          if (quoteStep === "view") {
+            openQuotePdf();
+            setQuoteStep("confirm");
+          } else {
+            respondToQuote(true);
+          }
+        }}
+        onViewQuote={openQuotePdf}
+        onDecline={() => respondToQuote(false)}
+      />
     );
   }
 
-  // Invoice link is invalid / voided / errored.
   if (isInvoice && invoiceError) {
-    const voided = (invoiceError as Error).message === "voided";
-    return renderTerminal(
-      <div style={{ textAlign: "center" }}>
-        <XCircle size={48} color={CT.RED} style={{ margin: "0 auto 16px" }} />
-        <p style={{ color: CT.SKY, fontSize: 18, fontWeight: 700, marginBottom: 8 }}>{voided ? "Link cancelled" : "Link not found"}</p>
-        <p style={{ color: CT.SKY_DIM, fontSize: 13 }}>{voided ? "This payment link has been cancelled." : "This payment link doesn't exist or has expired."}</p>
-      </div>
+    return (
+      <CheckoutView
+        kind="terminal"
+        state={(invoiceError as Error).message === "voided" ? "link-cancelled" : "link-not-found"}
+        customLogoUrl={customLogoUrl}
+      />
     );
   }
 
-  // Invoice already settled — show a branded confirmation instead of a pay form.
   if (isInvoice && invoiceData?.alreadyPaid) {
-    return renderTerminal(
-      <div style={{ textAlign: "center" }}>
-        <CheckCircle size={64} color={CT.SKY} style={{ margin: "0 auto 16px" }} />
-        <p style={{ color: CT.SKY, fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Already paid</p>
-        <p style={{ color: CT.SKY_DIM, fontSize: 14 }}>This has already been paid. Thank you!</p>
-      </div>
-    );
+    return <CheckoutView kind="terminal" state="already-paid" customLogoUrl={customLogoUrl} />;
   }
 
   if (isRetailToken && tokenPaymentError) {
-    return renderTerminal(
-      <div style={{ textAlign: "center" }}>
-        <XCircle size={48} color={CT.RED} style={{ margin: "0 auto 16px" }} />
-        <p style={{ color: CT.SKY, fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Payment link not found</p>
-        <p style={{ color: CT.SKY_DIM, fontSize: 13 }}>This payment link doesn't exist or has expired.</p>
-      </div>
-    );
+    return <CheckoutView kind="terminal" state="payment-link-not-found" customLogoUrl={customLogoUrl} />;
   }
 
   if (isRetailToken && (tokenPayment?.closed || ["failed", "cancelled"].includes(tokenPayment?.status))) {
-    return renderTerminal(
-      <div style={{ textAlign: "center" }}>
-        <XCircle size={48} color={CT.RED} style={{ margin: "0 auto 16px" }} />
-        <p style={{ color: CT.SKY, fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Payment link closed</p>
-        <p style={{ color: CT.SKY_DIM, fontSize: 13 }}>This payment can no longer be completed.</p>
-      </div>
-    );
+    return <CheckoutView kind="terminal" state="payment-link-closed" customLogoUrl={customLogoUrl} />;
   }
 
   if (isRetailToken && tokenPayment?.status === "processing" && !tokenHasLocalAttempt) {
-    return renderTerminal(
-      <div style={{ textAlign: "center" }}>
-        <Loader2 size={42} color={CT.SKY} style={{ margin: "0 auto 16px", animation: "spin 1s linear infinite" }} />
-        <p style={{ color: CT.SKY, fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Payment in progress</p>
-        <p style={{ color: CT.SKY_DIM, fontSize: 13 }}>We're waiting for the current payment attempt to finish.</p>
-      </div>
-    );
+    return <CheckoutView kind="terminal" state="payment-in-progress" customLogoUrl={customLogoUrl} />;
   }
 
   if (isRetailToken && ["completed", "partially_refunded", "refunded"].includes(tokenPayment?.status)) {
-    return renderTerminal(
-      <div style={{ textAlign: "center" }}>
-        <CheckCircle size={64} color={CT.SKY} style={{ margin: "0 auto 16px" }} />
-        <p style={{ color: CT.SKY, fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Payment confirmed</p>
-        <p style={{ color: CT.SKY_DIM, fontSize: 14 }}>
-          {tokenPayment?.isSplit ? "Open the original link to see the split status." : "Opening your receipt…"}
-        </p>
-      </div>
+    return (
+      <CheckoutView
+        kind="terminal"
+        state="payment-confirmed"
+        customLogoUrl={customLogoUrl}
+        splitPayment={!!tokenPayment?.isSplit}
+      />
     );
   }
 
-  // Quote mode has already handled its own phases above; this retail/invoice
-  // "invalid link" fallback must not fire for it.
   if (!quoteMode && (!payId || (!txLoading && !transaction))) {
-    return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F4F4F4" }}>
-        <div style={{ background: "#fff", borderRadius: 24, padding: 32, textAlign: "center" }}>
-          <h2 style={{ color: "#e53e3e", fontWeight: 700, marginBottom: 8 }}>Invalid payment link</h2>
-          <p style={{ color: "#666" }}>Please scan the merchant's QR code again.</p>
-        </div>
-      </div>
-    );
+    return <CheckoutView kind="invalid" />;
   }
 
   if (txLoading || !transaction) {
-    return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F4F4F4" }}>
-        <Loader2 size={40} color={CT.INK} style={{ animation: "spin 1s linear infinite" }} />
-      </div>
-    );
+    return <CheckoutView kind="loading" />;
   }
 
   if (payState === "success") {
-    return renderTerminal(
-      <div style={{ textAlign: "center" }}>
-        <CheckCircle size={64} color={CT.SKY} style={{ margin: "0 auto 16px" }} />
-        <p style={{ color: CT.SKY, fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Payment Successful!</p>
-        <p style={{ color: CT.SKY_DIM, fontSize: 14 }}>{isInvoice ? "Thank you — your payment is confirmed." : "Thank you — redirecting…"}</p>
-      </div>
+    return (
+      <CheckoutView
+        kind="terminal"
+        state="payment-success"
+        customLogoUrl={customLogoUrl}
+        invoicePayment={isInvoice}
+      />
     );
   }
 
@@ -1511,427 +1412,49 @@ function CheckoutInner({ sourceKind }: { sourceKind: CheckoutRouteKind }) {
   const isError = payState === "error";
 
   return (
-    <div style={pageStyle}>
-      <div style={{ width: "100%", maxWidth: 380 }}>
-
-        {/* ── Navy card ── */}
-        <div style={{ ...cardStyle, minHeight: 600 }}>
-
-          {/* Wordmark / merchant logo */}
-          <TaptWordmark customLogoUrl={customLogoUrl} />
-
-          {/* Error overlay — shown in place of normal content on failure */}
-          {isError ? (
-            <>
-              <div style={{ flex: 1 }} />
-              <div style={{ textAlign: "center" }}>
-                <XCircle size={48} color={CT.RED} style={{ margin: "0 auto 16px" }} />
-                <p style={{ color: CT.SKY, fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Payment failed</p>
-                <p style={{ color: CT.SKY_DIM, fontSize: 13 }}>{errorMsg || "Something went wrong."}</p>
-              </div>
-              <div style={{ flex: 1 }} />
-            </>
-          ) : (
-            <>
-              <div style={{ flex: 1, minHeight: 20 }} />
-
-              {/* Item name + Amount + context line */}
-              <p style={labelStyle}>{splitActive ? `${itemName} · your share` : itemName}</p>
-              <p style={amountStyle}>{amountDisplay}</p>
-              {subtitle && <p style={subtitleStyle}>{subtitle}</p>}
-
-              {/* View-invoice link — shown for one-off charges (not rent) that carry an
-                  attached document. Opens in a new tab so the payer can read, download
-                  or share it via their browser/OS. */}
-              {isInvoice && invoiceData?.kind === "charge" && invoiceData?.documentUrl && (
-                <a
-                  href={invoiceData.documentUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={viewInvoiceLinkStyle}
-                >
-                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 13h6M9 16.5h6"/></svg>
-                  View invoice
-                </a>
-              )}
-
-              {/* ── Invoice split-bill (rent/charges only) ── */}
-              {isInvoice && invoiceData?.splitEnabled && (
-                <div style={{ marginTop: 20, width: "100%" }}>
-                  {/* Progress once a split is under way */}
-                  {splitActive && (
-                    <div style={{ background: "rgba(88,171,255,0.12)", borderRadius: 16, padding: "12px 14px", marginBottom: 12 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                        <span style={{ color: CT.SKY, fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>Split {splitCount} ways</span>
-                        <span style={{ color: CT.SKY_DIM, fontSize: 12 }}>{splitPaid} of {splitCount} paid</span>
-                      </div>
-                      <div style={{ display: "flex", gap: 4 }}>
-                        {Array.from({ length: splitCount }).map((_, i) => (
-                          <div key={i} style={{ flex: 1, height: 6, borderRadius: 999, background: i < splitPaid ? CT.SKY : "rgba(88,171,255,0.25)" }} />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Chooser: pick how many people are splitting */}
-                  {!splitActive && splitChoosing && (
-                    <div style={{ background: "rgba(88,171,255,0.12)", borderRadius: 16, padding: "14px" }}>
-                      <p style={{ color: CT.SKY, fontSize: 13, fontWeight: 600, marginBottom: 10, textAlign: "center" }}>How many of you are splitting?</p>
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 6 }}>
-                        {[2, 3, 4, 5, 6].map(n => (
-                          <button key={n} onClick={() => setupSplit(n)} disabled={splitBusy}
-                            style={{ padding: "12px 0", borderRadius: 12, border: `1.5px solid ${CT.SKY}`, background: "transparent", color: CT.SKY, fontWeight: 800, fontSize: 16, cursor: splitBusy ? "wait" : "pointer" }}>
-                            {n}
-                          </button>
-                        ))}
-                      </div>
-                      <button onClick={() => setSplitChoosing(false)} style={{ marginTop: 10, width: "100%", background: "none", border: "none", color: CT.SKY_DIM, fontSize: 12, cursor: "pointer" }}>cancel</button>
-                    </div>
-                  )}
-
-                  {/* Offer to split (before a split has started) */}
-                  {!splitActive && !splitChoosing && (
-                    <button onClick={() => setSplitChoosing(true)} disabled={isProcessing}
-                      style={{ width: "100%", padding: "12px 0", borderRadius: 14, border: "1.5px solid rgba(88,171,255,0.6)", background: "transparent", color: CT.SKY, fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
-                      Split the bill
-                    </button>
-                  )}
-
-                  {/* Payer email — so each split payer gets their own GST receipt */}
-                  {splitActive && (
-                    <input type="email" value={payerEmail} onChange={e => setPayerEmail(e.target.value)}
-                      placeholder="your email (for your receipt)"
-                      style={{ width: "100%", boxSizing: "border-box", marginTop: 12, padding: "12px 14px", borderRadius: 12, border: "1.5px solid rgba(88,171,255,0.35)", background: "rgba(88,171,255,0.12)", color: CT.SKY, fontSize: 14, outline: "none" }} />
-                  )}
-                </div>
-              )}
-
-              <div style={{ flex: 1, minHeight: 24 }} />
-
-              {/* In-app browser warning — shown instead of wallet buttons */}
-              {inAppEnv.isInApp ? (
-                <div style={{
-                  background: "rgba(88,171,255,0.12)",
-                  border: "1px solid rgba(88,171,255,0.3)",
-                  borderRadius: 16,
-                  padding: "16px 18px",
-                  marginTop: 8,
-                  textAlign: "center",
-                  width: "100%",
-                  boxSizing: "border-box",
-                }}>
-                  <p style={{ color: CT.SKY, fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                    {inAppEnv.isIOS ? "Apple Pay not available" : "Google Pay & Apple Pay not available"}
-                  </p>
-                  <p style={{ color: CT.SKY_DIM, fontSize: 12, marginBottom: 14, lineHeight: 1.5 }}>
-                    {inAppEnv.isIOS
-                      ? "This page is open in an in-app browser. Open it in Safari to use Apple Pay, or pay by card below."
-                      : "This page is open in an in-app browser. Open it in Chrome to use wallet payments, or pay by card below."}
-                  </p>
-                  {inAppEnv.isAndroid && (
-                    <a
-                      href={`intent://${window.location.href.replace(/^https?:\/\//, "")}#Intent;scheme=https;package=com.android.chrome;end`}
-                      style={{
-                        display: "block",
-                        background: CT.SKY,
-                        color: CT.INK,
-                        borderRadius: 10,
-                        padding: "10px 0",
-                        fontSize: 13,
-                        fontWeight: 700,
-                        textDecoration: "none",
-                        marginBottom: 8,
-                      }}
-                    >
-                      Open in Chrome
-                    </a>
-                  )}
-                  {inAppEnv.isIOS && (
-                    <a
-                      href={window.location.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        display: "block",
-                        background: CT.SKY,
-                        color: CT.INK,
-                        borderRadius: 10,
-                        padding: "10px 0",
-                        fontSize: 13,
-                        fontWeight: 700,
-                        textDecoration: "none",
-                        marginBottom: 8,
-                      }}
-                    >
-                      Open in Safari
-                    </a>
-                  )}
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(window.location.href).then(() => {
-                        setLinkCopied(true);
-                        if (linkCopiedTimerRef.current) clearTimeout(linkCopiedTimerRef.current);
-                        linkCopiedTimerRef.current = setTimeout(() => setLinkCopied(false), 2500);
-                      });
-                    }}
-                    style={{
-                      background: "rgba(88,171,255,0.2)",
-                      color: CT.SKY,
-                      border: "none",
-                      borderRadius: 10,
-                      padding: "10px 0",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      width: "100%",
-                      cursor: "pointer",
-                    }}
-                  >
-                    {linkCopied ? "Link copied!" : "Copy payment link"}
-                  </button>
-                </div>
-              ) : (
-                <>
-                  {/* Apple Pay — native button (Safari/Apple devices only) */}
-                  {applePayAvailable && (
-                    isProcessing ? (
-                      <button disabled style={applePayBtnStyle} aria-label="Processing">
-                        <Loader2 size={20} color="#fff" style={{ animation: "spin 1s linear infinite" }} />
-                      </button>
-                    ) : (
-                      <button
-                        onClick={handleApplePay}
-                        className="apple-pay-btn"
-                        aria-label="Pay with Apple Pay"
-                      />
-                    )
-                  )}
-
-                  {/* Google Pay — official branded button (Android/Chrome only) */}
-                  {googlePayAvailable && (
-                    <button
-                      onClick={handleGooglePay}
-                      disabled={isProcessing}
-                      style={googlePayBtnStyle}
-                      aria-label="Pay with Google Pay"
-                    >
-                      {isProcessing ? (
-                        <Loader2 size={20} color="#fff" style={{ animation: "spin 1s linear infinite" }} />
-                      ) : (
-                        <img src={googlePayLogo} alt="Google Pay" style={{ height: 24, objectFit: "contain" }} />
-                      )}
-                    </button>
-                  )}
-                </>
-              )}
-            </>
-          )}
-
-          {/* ── Card-entry footer — always rendered so hosted fields stay mounted ── */}
-          {isError ? (
-            /* Error state: "Try again" replaces the card-entry affordance */
-            <button onClick={handleRetry} style={{ ...outlineBtnStyle, marginTop: 8 }}>Try again</button>
-          ) : (
-            <>
-              <button
-                onClick={() => !isProcessing && setCardOpen((o) => !o)}
-                style={footerLinkStyle}
-                aria-expanded={cardOpen}
-              >
-                enter credit card{" "}
-                <svg
-                  width="13" height="13" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                  style={{ transform: cardOpen ? "rotate(180deg)" : "none", transition: "transform 0.25s ease", display: "inline", verticalAlign: "-2px" }}
-                >
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </button>
-
-              {/* ── Expandable card form (Hosted Fields) — sky-blue panel ── */}
-              <div style={{
-                background: CT.PANEL,
-                borderRadius: cardOpen ? 24 : 0,
-                padding: cardOpen ? "16px 18px 18px" : "0 18px",
-                width: "100%",
-                boxSizing: "border-box",
-                marginTop: cardOpen ? 10 : 0,
-                maxHeight: cardOpen ? 500 : 0,
-                overflow: "hidden",
-                transition: "max-height 0.4s ease, padding 0.4s ease, margin 0.4s ease",
-              }}>
-                {/* Loading state while hosted fields initialise */}
-                {cardOpen && !hfReady && (
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "24px 0", color: CT.INK }}>
-                    <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} />
-                    <span style={{ fontSize: 13, fontWeight: 500 }}>Loading payment form…</span>
-                  </div>
-                )}
-
-                {/* Card fields — only visible once hosted fields are ready */}
-                <div style={{ display: hfReady ? "block" : "none" }}>
-                  {/* Card Number */}
-                  <div style={{ marginBottom: 10 }}>
-                    <label style={formLabelStyle}>Card Number</label>
-                    <div id="hf-number" style={hfContainerStyle} />
-                  </div>
-
-                  {/* Expiry + CVV row */}
-                  <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-                    <div style={{ flex: 1 }}>
-                      <label style={formLabelStyle}>Expiry</label>
-                      <div id="hf-expiry" style={hfContainerStyle} />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <label style={formLabelStyle}>CVC</label>
-                      <div id="hf-cvv" style={hfContainerStyle} />
-                    </div>
-                  </div>
-
-                  {/* Cardholder Name */}
-                  <div style={{ marginBottom: 10 }}>
-                    <label style={formLabelStyle}>Cardholder Name</label>
-                    <div id="hf-name" style={hfContainerStyle} />
-                  </div>
-
-                  {/* Pay button */}
-                  <button
-                    onClick={handleCardPay}
-                    disabled={isProcessing}
-                    style={payBtnStyle}
-                  >
-                    {isProcessing ? (
-                      <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                        <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} />
-                        Processing…
-                      </span>
-                    ) : (
-                      `Pay ${amountDisplay}`
-                    )}
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-
-        </div>
-
-        {/* Cancel link — sits cleanly below the card stack. Hidden for invoices,
-            which are opened directly from a link with no prior page to return to. */}
-        {!isInvoice && (
-          <div style={{ textAlign: "center", marginTop: 20 }}>
-            <button
-              onClick={handleCancel}
-              disabled={isProcessing}
-              style={{
-                background: "none",
-                border: "none",
-                color: "#8899bb",
-                fontSize: 13,
-                fontWeight: 500,
-                cursor: isProcessing ? "default" : "pointer",
-                opacity: isProcessing ? 0.4 : 1,
-                padding: "4px 0",
-                textDecoration: "underline",
-                textUnderlineOffset: 3,
-              }}
-            >
-              Cancel payment
-            </button>
-          </div>
-        )}
-
-        {/* Secured by line */}
-        <p style={{ marginTop: 14, textAlign: "center", fontSize: 11, color: "#9aa0b5", letterSpacing: "0.03em" }}>
-          Secured by <strong style={{ color: CT.INK, fontWeight: 600 }}>Windcave</strong> · PCI DSS Compliant
-        </p>
-
-      </div>
-
-      <style>{`
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-      `}</style>
-    </div>
+    <CheckoutView
+      kind="payment"
+      customLogoUrl={customLogoUrl}
+      itemName={itemName}
+      amount={amountDisplay}
+      subtitle={subtitle}
+      isInvoice={isInvoice}
+      invoiceDocumentAvailable={!!(isInvoice && invoiceData?.kind === "charge" && invoiceData?.documentUrl)}
+      splitEnabled={!!invoiceData?.splitEnabled}
+      splitActive={splitActive}
+      splitChoosing={splitChoosing}
+      splitBusy={splitBusy}
+      splitCount={splitCount}
+      splitPaid={splitPaid}
+      payerEmail={payerEmail}
+      inAppBrowser={inAppEnv.isInApp}
+      inAppIOS={inAppEnv.isIOS}
+      inAppAndroid={inAppEnv.isAndroid}
+      linkCopied={linkCopied}
+      applePayAvailable={applePayAvailable}
+      googlePayAvailable={googlePayAvailable}
+      cardOpen={cardOpen}
+      cardReady={hfReady}
+      status={isError ? "error" : isProcessing ? "processing" : "idle"}
+      errorMessage={errorMsg}
+      onViewInvoice={openInvoiceDocument}
+      onStartSplit={() => setSplitChoosing(true)}
+      onCancelSplit={() => setSplitChoosing(false)}
+      onChooseSplit={setupSplit}
+      onPayerEmailChange={setPayerEmail}
+      onOpenExternalBrowser={openExternalBrowser}
+      onCopyLink={copyPaymentLink}
+      onApplePay={handleApplePay}
+      onGooglePay={handleGooglePay}
+      onToggleCard={() => {
+        if (!isProcessing) setCardOpen((open) => !open);
+      }}
+      onCardPay={handleCardPay}
+      onRetry={handleRetry}
+      onCancel={handleCancel}
+    />
   );
 }
-
-/* ── Page-local style constants (shared shell styles live in checkout-theme.ts) ── */
-
-const viewInvoiceLinkStyle: CSSProperties = {
-  display: "flex",
-  justifyContent: "center",
-  alignItems: "center",
-  gap: 6,
-  margin: "10px auto 0",
-  width: "fit-content",
-  color: CT.SKY,
-  fontSize: 13.5,
-  fontWeight: 600,
-  textDecoration: "underline",
-  textUnderlineOffset: 3,
-  cursor: "pointer",
-};
-
-const applePayBtnStyle: CSSProperties = {
-  width: "100%",
-  background: "#000000",
-  color: "#fff",
-  border: "none",
-  borderRadius: 14,
-  height: 52,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  cursor: "not-allowed",
-  marginBottom: 10,
-};
-
-const googlePayBtnStyle: CSSProperties = {
-  width: "100%",
-  background: "#000000",
-  border: "none",
-  borderRadius: 14,
-  height: 52,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  cursor: "pointer",
-  marginBottom: 10,
-};
-
-const formLabelStyle: CSSProperties = {
-  display: "block",
-  fontSize: 11,
-  fontWeight: 700,
-  color: CT.INK,
-  letterSpacing: "0.06em",
-  textTransform: "uppercase",
-  marginBottom: 5,
-};
-
-const hfContainerStyle: CSSProperties = {
-  width: "100%",
-  background: "#FFFFFF",
-  border: "1.5px solid rgba(4,13,109,0.18)",
-  borderRadius: 12,
-  height: 46,
-  overflow: "hidden",
-  boxSizing: "border-box",
-};
-
-const payBtnStyle: CSSProperties = {
-  width: "100%",
-  marginTop: 14,
-  background: CT.INK,
-  color: "#fff",
-  border: "none",
-  borderRadius: 14,
-  padding: 14,
-  fontSize: 15,
-  fontWeight: 700,
-  cursor: "pointer",
-  letterSpacing: "-0.1px",
-  boxShadow: "0 6px 20px rgba(4,13,109,0.3)",
-};
 
 export default function Checkout({ sourceKind = "retail-legacy" }: { sourceKind?: CheckoutRouteKind }) {
   return (

@@ -29,8 +29,10 @@ let boards: BoardFixture[];
 let saleBodies: Record<string, unknown>[];
 let boardBodies: Record<string, unknown>[];
 let boardGetCount: number;
+let renameBodies: Record<string, unknown>[];
 let saleHandler: Handler;
 let boardHandler: Handler;
+let renameHandler: Handler;
 
 const jsonResponse = (body: unknown, status = 200): Response =>
   ({
@@ -81,6 +83,18 @@ function installFetchMock() {
       const body = JSON.parse(String(init?.body ?? "{}"));
       boardBodies.push(body);
       return boardHandler(body);
+    }
+    const renameMatch = url.match(/^\/api\/merchants\/77\/tapt-stones\/(\d+)$/);
+    if (method === "PUT" && renameMatch) {
+      const id = Number(renameMatch[1]);
+      const body = JSON.parse(String(init?.body ?? "{}"));
+      renameBodies.push({ id, ...body });
+      /* Persist into the fixture, as the real server does — the component
+         invalidates after a rename, so a non-persisting mock would refetch the
+         old name and mask a working update. */
+      const target = boards.find((board) => board.id === id);
+      if (target && typeof body.name === "string") target.name = body.name;
+      return renameHandler(body);
     }
     throw new Error(`Unhandled test request: ${method} ${url}`);
   });
@@ -138,6 +152,7 @@ beforeEach(() => {
   ];
   saleBodies = [];
   boardBodies = [];
+  renameBodies = [];
   boardGetCount = 0;
   saleHandler = () =>
     jsonResponse({
@@ -146,16 +161,26 @@ beforeEach(() => {
       qrCodeUrl: "https://private.example/sale-1/qr",
     });
   boardHandler = () => jsonResponse({});
+  renameHandler = (body) => jsonResponse(body);
   installFetchMock();
 });
+
+/* The picker is progressive disclosure: engaging boards reveals the picker
+   button, and opening the list is a second, deliberate click. */
+async function openBoardPicker(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button", { name: "payment boards" }));
+  await user.click(screen.getByRole("button", { name: "select board" }));
+}
 
 describe("desktop retail terminal payment destinations", () => {
   it("defaults to no board and sends per-payment mode without a selected board", async () => {
     const { user } = renderTerminal();
-    const group = screen.getByRole("radiogroup", { name: "PAYMENT DESTINATION" });
-    expect(group).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "no board" })).toHaveAttribute("aria-checked", "true");
-    await screen.findByRole("radio", { name: "Counter board, board 1" });
+    /* Boards start disengaged: neither the picker nor the list exists, so there
+       is no board the sale could silently fall back to. */
+    const toggle = screen.getByRole("button", { name: "payment boards" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByRole("button", { name: "select board" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup", { name: "payment boards" })).not.toBeInTheDocument();
 
     await enterFiveDollarSale(user, "No-board coffee");
     await user.click(screen.getByRole("button", { name: "send payment" }));
@@ -235,11 +260,15 @@ describe("desktop retail terminal payment destinations", () => {
         qrCodeUrl: "https://response.example/board-22-sale/qr",
       });
     const { user } = renderTerminal();
+    await openBoardPicker(user);
     const windowBoard = await screen.findByRole("radio", { name: "Window board, board 2" });
 
     windowBoard.focus();
     await user.keyboard(" ");
-    expect(windowBoard).toHaveAttribute("aria-checked", "true");
+    /* Choosing closes the list and the picker button takes the board's name. */
+    expect(
+      screen.getByRole("button", { name: "selected board: Window board" }),
+    ).toHaveAttribute("aria-expanded", "false");
     await enterFiveDollarSale(user, "Window sale");
     await user.click(screen.getByRole("button", { name: "send payment" }));
 
@@ -254,7 +283,9 @@ describe("desktop retail terminal payment destinations", () => {
   it("creates a board, updates the live list and auto-selects the returned board", async () => {
     const created = {
       id: 33,
-      name: "Stone 3",
+      /* The server honours the name sent on create, so the row comes back
+         named — not as the auto "Stone 3" fallback. */
+      name: "Patio board",
       stoneNumber: 3,
       paymentUrl: "https://board.example/33",
       qrCodeUrl: "https://board.example/33/qr",
@@ -262,13 +293,15 @@ describe("desktop retail terminal payment destinations", () => {
     const pending = deferred<Response>();
     boardHandler = () => pending.promise;
     const { user } = renderTerminal();
+    await openBoardPicker(user);
     await screen.findByRole("radio", { name: "Counter board, board 1" });
 
-    const createButton = screen.getByRole("button", { name: "create new board" });
-    await user.click(createButton);
-    expect(createButton).toBeDisabled();
-    expect(createButton).toHaveAttribute("aria-busy", "true");
-    expect(boardBodies).toEqual([{}]);
+    await user.click(screen.getByRole("button", { name: "create new board" }));
+    const nameField = screen.getByRole("textbox", { name: "new board name" });
+    await user.type(nameField, "Patio board{Enter}");
+    /* The name rides along on the create call — no follow-up rename. */
+    expect(boardBodies).toEqual([{ name: "Patio board" }]);
+    expect(renameBodies).toEqual([]);
 
     boards.push(created);
     await act(async () => {
@@ -276,8 +309,40 @@ describe("desktop retail terminal payment destinations", () => {
       await pending.promise;
     });
 
-    const createdRadio = await screen.findByRole("radio", { name: "Stone 3, board 3" });
-    expect(createdRadio).toHaveAttribute("aria-checked", "true");
+    /* Creating selects the new board and closes the list, so its name is what
+       the picker button now shows. */
+    expect(
+      await screen.findByRole("button", { name: "selected board: Patio board" }),
+    ).toBeInTheDocument();
+  });
+
+  it("renames a board in place and keeps the picker label in step", async () => {
+    const { user } = renderTerminal();
+    await openBoardPicker(user);
+    await user.click(await screen.findByRole("radio", { name: "Counter board, board 1" }));
+    await user.click(screen.getByRole("button", { name: "selected board: Counter board" }));
+
+    await user.click(screen.getByRole("button", { name: "rename Counter board" }));
+    const field = screen.getByRole("textbox", { name: "rename Counter board" });
+    await user.clear(field);
+    await user.type(field, "Front counter{Enter}");
+
+    await waitFor(() => expect(renameBodies).toEqual([{ id: 11, name: "Front counter" }]));
+    expect(
+      await screen.findByRole("button", { name: "selected board: Front counter" }),
+    ).toBeInTheDocument();
+  });
+
+  it("discards a rename on Escape without calling the server", async () => {
+    const { user } = renderTerminal();
+    await openBoardPicker(user);
+    await user.click(screen.getByRole("button", { name: "rename Counter board" }));
+    const field = await screen.findByRole("textbox", { name: "rename Counter board" });
+    await user.clear(field);
+    await user.type(field, "Abandoned{Escape}");
+
+    expect(renameBodies).toEqual([]);
+    expect(await screen.findByRole("radio", { name: "Counter board, board 1" })).toBeInTheDocument();
   });
 
   it("refreshes after a 409 and surfaces the exact server message", async () => {
@@ -287,10 +352,12 @@ describe("desktop retail terminal payment destinations", () => {
         409,
       );
     const { user } = renderTerminal();
+    await openBoardPicker(user);
     await screen.findByRole("radio", { name: "Counter board, board 1" });
     const readsBefore = boardGetCount;
 
     await user.click(screen.getByRole("button", { name: "create new board" }));
+    await user.type(screen.getByRole("textbox", { name: "new board name" }), "Clash{Enter}");
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "A tapt stone with that number already exists",
@@ -304,7 +371,8 @@ describe("desktop retail terminal payment destinations", () => {
       name: `Board ${index + 1}`,
       stoneNumber: index + 1,
     }));
-    renderTerminal();
+    const { user } = renderTerminal();
+    await openBoardPicker(user);
     await screen.findByRole("radio", { name: "Board 10, board 10" });
 
     expect(screen.getByRole("button", { name: "create new board" })).toBeDisabled();
