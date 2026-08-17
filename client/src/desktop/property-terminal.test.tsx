@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom";
 import DesktopPropertyTerminal from "./pages/property-terminal";
@@ -24,6 +24,16 @@ const TENANTS = [
     email: "mia@example.com",
     phone: "0222222222",
   },
+  {
+    id: "t2",
+    firstName: "Tane",
+    lastName: "Walker",
+    propertyAddress: "88 Harbour View",
+    status: "active",
+    preferredChannel: "email",
+    email: "tane@example.com",
+    phone: "0223333333",
+  },
 ];
 
 const INVOICES = [
@@ -38,9 +48,34 @@ const INVOICES = [
     createdAt: "2026-08-01T00:00:00.000Z",
     dueAt: "2026-08-08T00:00:00.000Z",
   },
+  {
+    id: "i2",
+    tenantProfileId: "t2",
+    tenantName: "Tane Walker",
+    amountCents: 24_000,
+    owingCents: 24_000,
+    status: "dispatched",
+    kind: "charge",
+    chargeType: "utilities",
+    description: "Water / utilities",
+    createdAt: "2026-08-02T00:00:00.000Z",
+    dueAt: "2026-08-09T00:00:00.000Z",
+  },
+  {
+    id: "i3",
+    tenantProfileId: "t2",
+    tenantName: "Tane Walker",
+    amountCents: 30_000,
+    owingCents: 0,
+    status: "paid",
+    kind: "rent",
+    createdAt: "2026-07-20T00:00:00.000Z",
+    dueAt: "2026-07-27T00:00:00.000Z",
+  },
 ];
 
 let invoicePosts: Record<string, unknown>[];
+let rowActionCalls: string[];
 
 const jsonResponse = (body: unknown, status = 200): Response =>
   ({
@@ -62,6 +97,13 @@ function installFetchMock() {
       const body = JSON.parse(String(init?.body ?? "{}"));
       invoicePosts.push(body);
       return jsonResponse({ id: `new-${invoicePosts.length}` });
+    }
+    const rowAction = url.match(
+      /^\/api\/property\/invoices\/([\w-]+)\/(resend|void|mark-paid-external)$/,
+    );
+    if (method === "POST" && rowAction) {
+      rowActionCalls.push(`${rowAction[2]}:${rowAction[1]}`);
+      return jsonResponse({ id: rowAction[1] });
     }
     throw new Error(`Unhandled test request: ${method} ${url}`);
   });
@@ -87,7 +129,9 @@ function renderTerminal() {
    what every send path below starts from. */
 async function pickTenant(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: "select tenant" }));
-  await user.click(await screen.findByRole("button", { name: /Mia Chen/ }));
+  /* Scoped to the picker: the request list carries the same tenant's name. */
+  const cards = document.querySelector(".pt-tenant-cards") as HTMLElement;
+  await user.click(await within(cards).findByRole("button", { name: /Mia Chen/ }));
 }
 
 /* The rail button and the panel's own send button share an accessible name;
@@ -102,6 +146,7 @@ const panelAmount = () => document.querySelector(".pt-amt")?.textContent;
 beforeEach(() => {
   jest.clearAllMocks();
   invoicePosts = [];
+  rowActionCalls = [];
   installFetchMock();
 });
 
@@ -170,6 +215,76 @@ describe("desktop property terminal — send flow", () => {
     expect(await screen.findByRole("textbox", { name: "bill description" })).toHaveValue(
       "Water / utilities",
     );
+  });
+});
+
+describe("desktop property terminal — row actions", () => {
+  /* The row's accessible name carries its status, so two invoices for the same
+     tenant stay distinguishable. */
+  const openRowMenu = async (user: ReturnType<typeof userEvent.setup>, label: string) =>
+    user.click(await screen.findByRole("button", { name: `actions for ${label}` }));
+
+  it("resends a charge's link", async () => {
+    const { user } = renderTerminal();
+    await openRowMenu(user, "Tane Walker, sent · utilities");
+    await user.click(screen.getByRole("menuitem", { name: "resend link" }));
+
+    await waitFor(() => expect(rowActionCalls).toEqual(["resend:i2"]));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("preloads the request panel for a rent row instead of resending blind", async () => {
+    const { user } = renderTerminal();
+    await openRowMenu(user, "Mia Chen, sent");
+    await user.click(screen.getByRole("menuitem", { name: "edit amount & resend" }));
+
+    expect(rowActionCalls).toEqual([]);
+    expect(panelAmount()).toBe("$800.00");
+    expect(screen.getByText("5 Bellbird Rise")).toBeInTheDocument();
+  });
+
+  it("marks a row received from the popover", async () => {
+    const { user } = renderTerminal();
+    await openRowMenu(user, "Mia Chen, sent");
+    await user.click(screen.getByRole("menuitem", { name: "mark received" }));
+
+    await waitFor(() => expect(rowActionCalls).toEqual(["mark-paid-external:i1"]));
+  });
+
+  it("cancels in two steps, in-surface", async () => {
+    const { user } = renderTerminal();
+    await openRowMenu(user, "Mia Chen, sent");
+    await user.click(screen.getByRole("menuitem", { name: "cancel invoice" }));
+
+    /* The first click only asks — nothing has been sent yet. */
+    expect(rowActionCalls).toEqual([]);
+    expect(screen.getByText(/can't be undone/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("menuitem", { name: "back" }));
+    expect(screen.getByRole("menuitem", { name: "cancel invoice" })).toBeInTheDocument();
+    expect(rowActionCalls).toEqual([]);
+
+    await user.click(screen.getByRole("menuitem", { name: "cancel invoice" }));
+    await user.click(screen.getByRole("menuitem", { name: "yes, cancel it" }));
+    await waitFor(() => expect(rowActionCalls).toEqual(["void:i1"]));
+  });
+
+  it("offers no actions on a settled invoice", async () => {
+    const { user } = renderTerminal();
+    await openRowMenu(user, "Tane Walker, paid");
+
+    expect(screen.getByText("this invoice is already settled")).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "cancel invoice" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "mark received" })).not.toBeInTheDocument();
+  });
+
+  it("closes when the same row is clicked again", async () => {
+    const { user } = renderTerminal();
+    await openRowMenu(user, "Mia Chen, sent");
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+
+    await openRowMenu(user, "Mia Chen, sent");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 });
 

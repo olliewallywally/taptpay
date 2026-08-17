@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { usePropertyInvoices, usePropertyTenants, PROPERTY_KEYS } from "@/lib/property-data";
 import { propHeaders } from "@/lib/property-api";
@@ -77,6 +77,9 @@ const initialsOf = (t: any) =>
 const fullNameOf = (t: any) => `${t?.firstName ?? ""} ${t?.lastName ?? ""}`.trim() || "tenant";
 const whole = (cents: number) => "$" + Math.round(cents / 100).toLocaleString("en-NZ");
 
+/* Breathing room between the row popover's foot and the canvas floor. */
+const PT_ROW_MENU_GAP = 8;
+
 const STATUS_DOT: Record<string, string> = {
   overdue: AMBER,
   sent: ACCENT,
@@ -100,6 +103,13 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
   const [filter, setFilter] = useState<PropertyStackFilter>("all");
   const [reqFlash, setReqFlash] = useState(false);
   const [billFlash, setBillFlash] = useState(false);
+  /* The row action popover: which invoice, where it sits in `.pt-stack`, and
+     whether the destructive branch has been asked for. */
+  const [rowMenu, setRowMenu] = useState<{ id: string; top: number } | null>(null);
+  const [confirmVoid, setConfirmVoid] = useState(false);
+  const rowsRef = useRef<HTMLDivElement | null>(null);
+  const stackRef = useRef<HTMLDivElement | null>(null);
+  const rowMenuRef = useRef<HTMLDivElement | null>(null);
 
   const tenantsQuery = usePropertyTenants();
   const invoicesQuery = usePropertyInvoices();
@@ -255,6 +265,97 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
     onError: () => toast({ title: "Failed to mark as paid", variant: "destructive" }),
   });
 
+  /* Both row-action mutations call notifyIfBillingCardRequired: the endpoints sit
+     behind requireBillingCard, and a silent 402 on a resend is invisible
+     otherwise. The phone omits this; the desktop send paths already do it. */
+  const resendOne = useMutation({
+    mutationFn: async (invoiceId: string) => {
+      const res = await fetch(`/api/property/invoices/${invoiceId}/resend`, {
+        method: "POST",
+        headers: propHeaders(),
+      });
+      if (!res.ok) {
+        notifyIfBillingCardRequired(res);
+        throw new Error("Failed to resend");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: PROPERTY_KEYS.invoices as any });
+      toast({ title: "Link resent" });
+    },
+    onError: () => toast({ title: "Could not resend link", variant: "destructive" }),
+  });
+
+  const voidInvoice = useMutation({
+    mutationFn: async (invoiceId: string) => {
+      const res = await fetch(`/api/property/invoices/${invoiceId}/void`, {
+        method: "POST",
+        headers: propHeaders(),
+      });
+      if (!res.ok) {
+        notifyIfBillingCardRequired(res);
+        const message = await res
+          .json()
+          .then((d: any) => d.message)
+          .catch(() => "Failed to cancel");
+        throw new Error(message);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: PROPERTY_KEYS.invoices as any });
+      toast({ title: "Invoice cancelled" });
+    },
+    onError: (e: any) =>
+      toast({ title: e?.message || "Could not cancel invoice", variant: "destructive" }),
+  });
+
+  /* ── row action popover ── */
+  const closeRowMenu = () => {
+    setRowMenu(null);
+    setConfirmVoid(false);
+  };
+
+  /* `.pt-rows` scrolls, so the popover cannot live inside it. It renders as a
+     child of `.pt-stack` — the row's offsetParent once that is relative — and
+     `offsetTop` is pre-scale, so it needs no division by the canvas scale. */
+  const toggleRowMenu = (id: string, el: HTMLElement) => {
+    if (rowMenu?.id === id) return closeRowMenu();
+    setConfirmVoid(false);
+    setRowMenu({ id, top: el.offsetTop - (rowsRef.current?.scrollTop ?? 0) });
+  };
+
+  /* The two-step cancel makes the popover taller after it has opened, so its
+     foot is re-clamped from the measured height rather than an estimate —
+     nothing may cross the canvas floor. */
+  useLayoutEffect(() => {
+    const menu = rowMenuRef.current;
+    const stack = stackRef.current;
+    if (!menu || !stack || !rowMenu) return;
+    const ceiling = Math.max(0, stack.clientHeight - menu.offsetHeight - PT_ROW_MENU_GAP);
+    const clamped = Math.max(0, Math.min(rowMenu.top, ceiling));
+    if (clamped !== rowMenu.top) {
+      setRowMenu((m) => (m && m.id === rowMenu.id ? { ...m, top: clamped } : m));
+    }
+  }, [rowMenu, confirmVoid]);
+
+  const menuInvoice = rowMenu
+    ? (invoices.find((i: any) => i.id === rowMenu.id) ?? null)
+    : null;
+  const menuRow = rowMenu ? (model.rows.find((r) => r.id === rowMenu.id) ?? null) : null;
+  const menuBusy = resendOne.isPending || voidInvoice.isPending || markPaid.isPending;
+
+  /* "edit amount & resend" — the desktop equivalent of the phone's
+     openEditResend: preload the request panel rather than resending blind. */
+  const editAndResend = () => {
+    if (!menuInvoice) return;
+    setTenantId(menuInvoice.tenantProfileId);
+    setAmountCents(menuInvoice.amountCents ?? 0);
+    closeRowMenu();
+    setMode("request");
+  };
+
   /* ── actions ── */
   const requireTenant = () => {
     if (!tenant) {
@@ -374,7 +475,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
           </span>
           <span className="pt-hero-sub pt-hero-sub-dim">outstanding expenses</span>
 
-          <div className="pt-stack">
+          <div className="pt-stack" ref={stackRef}>
             <div className="pt-stack-head">
               <span className="pt-stack-title">
                 <span>rent request</span>
@@ -399,14 +500,22 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
               ))}
             </div>
 
-            <div className="pt-rows">
+            <div className="pt-rows" ref={rowsRef}>
               {invoicesQuery.isLoading ? (
                 <div className="pt-empty">loading…</div>
               ) : stackRows.length === 0 ? (
                 <div className="pt-empty">no requests here</div>
               ) : (
                 stackRows.map((r) => (
-                  <div key={r.id} className="pt-row">
+                  <button
+                    key={r.id}
+                    type="button"
+                    className="pt-row"
+                    aria-haspopup="menu"
+                    aria-expanded={rowMenu?.id === r.id}
+                    aria-label={`actions for ${r.name}, ${r.label}`}
+                    onClick={(e) => toggleRowMenu(r.id, e.currentTarget)}
+                  >
                     <span className="pt-avatar">{r.initials}</span>
                     <span className="pt-row-mid">
                       <span className="pt-row-name">{r.name}</span>
@@ -422,10 +531,108 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                       </span>
                     </span>
                     <span className="pt-row-amt">{fmtNZD(r.amountCents)}</span>
-                  </div>
+                  </button>
                 ))
               )}
             </div>
+
+            {rowMenu && menuRow && (
+              <div
+                ref={rowMenuRef}
+                className="pt-row-menu"
+                role="menu"
+                aria-label={`actions for ${menuRow.name}`}
+                style={{ top: rowMenu.top }}
+                onKeyDown={(e) => e.key === "Escape" && closeRowMenu()}
+              >
+                <div className="pt-row-menu-head">
+                  {menuRow.name} · {fmtNZD(menuRow.amountCents)}
+                </div>
+                {menuRow.bucket === "paid" ? (
+                  <div className="pt-row-menu-note">
+                    this {menuInvoice?.kind === "charge" ? "charge" : "invoice"} is already
+                    settled
+                  </div>
+                ) : confirmVoid ? (
+                  <>
+                    <div className="pt-row-menu-warn">
+                      {"cancel this invoice? the tenant can no longer pay it, and this can't be undone."}
+                    </div>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="pt-row-opt pt-row-opt-danger"
+                      disabled={menuBusy}
+                      onClick={() => {
+                        voidInvoice.mutate(menuRow.id);
+                        closeRowMenu();
+                      }}
+                    >
+                      yes, cancel it
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="pt-row-opt"
+                      onClick={() => setConfirmVoid(false)}
+                    >
+                      back
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {menuInvoice?.kind === "charge" ? (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="pt-row-opt"
+                        disabled={menuBusy}
+                        onClick={() => {
+                          resendOne.mutate(menuRow.id);
+                          closeRowMenu();
+                        }}
+                      >
+                        resend link
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="pt-row-opt"
+                        disabled={menuBusy}
+                        onClick={editAndResend}
+                      >
+                        edit amount &amp; resend
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="pt-row-opt"
+                      disabled={menuBusy}
+                      onClick={() => {
+                        markPaid.mutate(menuRow.id);
+                        closeRowMenu();
+                      }}
+                    >
+                      mark received
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="pt-row-opt pt-row-opt-danger"
+                      disabled={menuBusy}
+                      onClick={() => setConfirmVoid(true)}
+                    >
+                      cancel invoice
+                    </button>
+                  </>
+                )}
+                <button type="button" role="menuitem" className="pt-row-opt" onClick={closeRowMenu}>
+                  close
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -721,7 +928,8 @@ const PT_CSS = `
 .pt-hero-dim { margin-top:36px; font-size:56px; opacity:0.61; }
 .pt-hero-sub-dim { margin-top:12px; opacity:0.61; }
 
-.pt-stack { margin-top:auto; padding-bottom:24px; }
+/* relative: the row popover anchors to this box, and rows measure against it. */
+.pt-stack { position:relative; margin-top:auto; padding-bottom:24px; }
 .pt-stack-head { display:flex; align-items:center; justify-content:space-between; }
 .pt-stack-title { display:inline-flex; align-items:center; gap:6px; font-weight:300; font-size:12px; color:${ACCENT_SOFT}; }
 .pt-stack-search { display:flex; align-items:center; gap:8px; width:180px; height:32px; padding:0 14px; box-sizing:border-box; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); }
@@ -730,7 +938,21 @@ const PT_CSS = `
 .pt-chip { padding:6px 13px; border-radius:9999px; font-size:11px; cursor:pointer; transition:background .15s ease, color .15s ease; white-space:nowrap; }
 .pt-rows { margin-top:8px; display:flex; flex-direction:column; max-height:232px; overflow-y:auto; scrollbar-width:none; }
 .pt-rows::-webkit-scrollbar { display:none; }
-.pt-row { display:flex; align-items:center; gap:13px; padding:9px 0; }
+.pt-row { width:100%; display:flex; align-items:center; gap:13px; padding:9px 0; text-align:left; cursor:pointer; border-radius:10px; transition:background .15s ease; }
+.pt-row:hover { background:rgba(94,158,255,0.08); }
+
+/* Row actions. Reuses property home's .ph-scope-menu panel verbatim so the two
+   screens' popovers are the same object; no position:fixed inside the scaled
+   canvas, and no window.confirm over the simulated frame. */
+.pt-row-menu { position:absolute; left:0; z-index:6; width:246px; padding:6px; box-sizing:border-box; border-radius:14px; background:#0B1436; border:1px solid rgba(94,158,255,0.3); box-shadow:0 18px 40px rgba(0,4,24,0.5); display:flex; flex-direction:column; gap:2px; }
+.pt-row-menu-head { padding:9px 12px 7px; font-weight:700; font-size:11.5px; color:${TEXT_SOFT}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pt-row-menu-note { padding:2px 12px 10px; font-weight:500; font-size:12px; color:rgba(244,246,255,0.5); }
+.pt-row-menu-warn { padding:2px 12px 10px; font-weight:600; font-size:12px; line-height:1.45; color:${RED}; }
+.pt-row-opt { min-height:40px; padding:10px 12px; border-radius:9px; background:transparent; font-weight:500; font-size:12.5px; color:${TEXT_SOFT}; text-align:left; cursor:pointer; transition:background .15s ease; }
+.pt-row-opt:hover:not(:disabled) { background:rgba(94,158,255,0.14); }
+.pt-row-opt:disabled { opacity:0.55; cursor:default; }
+.pt-row-opt-danger { color:${RED}; }
+.pt-row-opt-danger:hover:not(:disabled) { background:rgba(240,101,108,0.14); }
 .pt-avatar { width:40px; height:40px; border-radius:50%; border:1.5px solid rgba(94,158,255,0.8); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:11px; color:#fff; flex:0 0 auto; box-sizing:border-box; }
 .pt-row-mid { display:flex; flex-direction:column; gap:2px; flex:1; min-width:0; }
 .pt-row-name { font-weight:700; font-size:13px; color:${TEXT_SOFT}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }

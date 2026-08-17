@@ -118,7 +118,8 @@ async function shoot(browser, label, ctxOpts) {
   /* pick a tenant — seeds the amount from their next unpaid invoice */
   await page.getByRole("button", { name: "select tenant" }).click();
   await shot("2-tenant-picker");
-  await page.getByRole("button", { name: /Mia Chen/ }).click();
+  /* Scoped to the picker — the request list's rows carry the same name. */
+  await page.locator(".pt-tenant-cards").getByRole("button", { name: /Mia Chen/ }).click();
   await shot("3-request-seeded");
 
   /* recurring frequency */
@@ -142,6 +143,14 @@ async function shoot(browser, label, ctxOpts) {
   /* mark as paid */
   await page.getByRole("button", { name: "mark as paid" }).click();
   await shot("8-mark-paid");
+
+  /* row actions: the anchored popover and its in-surface cancel confirmation */
+  await page.getByRole("button", { name: "actions for Mia Chen, overdue" }).click();
+  await shot("9-row-menu");
+  await page.getByRole("menuitem", { name: "cancel invoice" }).click();
+  await shot("10-row-menu-cancel");
+  await page.getByRole("menuitem", { name: "back" }).click();
+  await page.getByRole("menuitem", { name: "close" }).click();
 
   await context.close();
   return errors;
