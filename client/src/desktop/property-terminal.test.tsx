@@ -103,6 +103,10 @@ let invoicePosts: Record<string, unknown>[];
 let rowActionCalls: string[];
 let docUploads: string[];
 let docUploadHandler: (file: File) => Response;
+let schedules: Record<string, unknown>[];
+let scheduleCalls: string[];
+let reminderSettings: Record<string, unknown>;
+let reminderPuts: Record<string, unknown>[];
 
 const jsonResponse = (body: unknown, status = 200): Response =>
   ({
@@ -120,6 +124,28 @@ function installFetchMock() {
 
     if (method === "GET" && url === "/api/property/tenants") return jsonResponse(TENANTS);
     if (method === "GET" && url === "/api/property/invoices") return jsonResponse(INVOICES);
+    if (method === "GET" && url === "/api/property/schedules") return jsonResponse(schedules);
+    if (method === "GET" && url === "/api/property/reminder-settings") {
+      return jsonResponse(reminderSettings);
+    }
+    if (method === "PUT" && url === "/api/property/reminder-settings") {
+      const patch = JSON.parse(String(init?.body ?? "{}"));
+      reminderPuts.push(patch);
+      /* Persist, as the server does — the component writes the response back
+         into the cache, so a non-persisting mock would mask a working save. */
+      reminderSettings = { ...reminderSettings, ...patch };
+      return jsonResponse(reminderSettings);
+    }
+    const scheduleRoute = url.match(/^\/api\/property\/schedules\/([\w-]+)$/);
+    if (scheduleRoute && (method === "PUT" || method === "DELETE")) {
+      const body = method === "PUT" ? JSON.parse(String(init?.body ?? "{}")) : {};
+      scheduleCalls.push(
+        method === "PUT"
+          ? `status:${scheduleRoute[1]}:${body.status}`
+          : `delete:${scheduleRoute[1]}`,
+      );
+      return jsonResponse({ id: scheduleRoute[1] });
+    }
     if (method === "POST" && url === "/api/property/invoices") {
       const body = JSON.parse(String(init?.body ?? "{}"));
       invoicePosts.push(body);
@@ -187,6 +213,32 @@ beforeEach(() => {
   invoicePosts = [];
   rowActionCalls = [];
   docUploads = [];
+  schedules = [
+    {
+      id: "s1",
+      tenantProfileId: "t1",
+      amountCents: 80_000,
+      frequency: "weekly",
+      status: "active",
+      nextRunDate: "2026-08-22T00:00:00.000Z",
+    },
+    {
+      id: "s2",
+      tenantProfileId: "t2",
+      amountCents: 52_000,
+      frequency: "monthly",
+      status: "paused",
+      nextRunDate: "2026-09-01T00:00:00.000Z",
+    },
+  ];
+  scheduleCalls = [];
+  reminderSettings = {
+    rentReminderEnabled: true,
+    rentReminderDelayDays: 3,
+    rentReminderIntervalDays: 3,
+    rentReminderMaxCount: 3,
+  };
+  reminderPuts = [];
   docUploadHandler = (file) =>
     jsonResponse({ documentUrl: `https://docs.example/${file.name}`, documentName: file.name });
   enterWith("");
@@ -473,6 +525,127 @@ describe("desktop property terminal — split", () => {
     expect(
       screen.getByRole("button", { name: "actions for Ruby Nolan, sent" }),
     ).toHaveTextContent("$300.00");
+  });
+});
+
+describe("desktop property terminal — automation", () => {
+  const openAutomation = (user: ReturnType<typeof userEvent.setup>) =>
+    user.click(screen.getByRole("button", { name: "automation" }));
+
+  /* Scoped to the schedules list: the request list carries the same names, and
+     "cancel" is also a row-popover item. */
+  const scheduleList = () => within(document.querySelector(".pt-auto-list") as HTMLElement);
+
+  it("lists live schedules with their state and next run", async () => {
+    const { user } = renderTerminal();
+    await openAutomation(user);
+
+    const list = scheduleList();
+    expect(await list.findByText("Mia Chen")).toBeInTheDocument();
+    expect(list.getByText(/\$800\.00 · weekly · next 22 Aug/)).toBeInTheDocument();
+    expect(list.getByText("active")).toBeInTheDocument();
+    expect(list.getByText("paused")).toBeInTheDocument();
+  });
+
+  it("hides terminated schedules and shows the empty state when there are none", async () => {
+    schedules = [{ ...schedules[0], status: "terminated" }];
+    const { user } = renderTerminal();
+    await openAutomation(user);
+
+    expect(await screen.findByText(/no schedules yet/)).toBeInTheDocument();
+  });
+
+  it("pauses and resumes a schedule", async () => {
+    const { user } = renderTerminal();
+    await openAutomation(user);
+    const list = scheduleList();
+    await list.findByText("Mia Chen");
+
+    await user.click(list.getByRole("button", { name: "pause" }));
+    await waitFor(() => expect(scheduleCalls).toEqual(["status:s1:paused"]));
+
+    await user.click(list.getByRole("button", { name: "resume" }));
+    await waitFor(() =>
+      expect(scheduleCalls).toEqual(["status:s1:paused", "status:s2:active"]),
+    );
+  });
+
+  it("cancels a schedule in two steps, in-surface", async () => {
+    const { user } = renderTerminal();
+    await openAutomation(user);
+    const list = scheduleList();
+    await list.findByText("Mia Chen");
+
+    await user.click(list.getAllByRole("button", { name: "cancel" })[0]);
+    expect(scheduleCalls).toEqual([]);
+
+    await user.click(list.getByRole("button", { name: "back" }));
+    expect(scheduleCalls).toEqual([]);
+
+    await user.click(list.getAllByRole("button", { name: "cancel" })[0]);
+    await user.click(list.getByRole("button", { name: "confirm" }));
+    await waitFor(() => expect(scheduleCalls).toEqual(["delete:s1"]));
+  });
+
+  it("saves the reminder cadence and reflects it immediately", async () => {
+    const { user } = renderTerminal();
+    await openAutomation(user);
+
+    const remindAfter = await screen.findByRole("group", { name: "remind after" });
+    expect(within(remindAfter).getByRole("button", { name: "3d" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    await user.click(within(remindAfter).getByRole("button", { name: "7d" }));
+    expect(within(remindAfter).getByRole("button", { name: "7d" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await waitFor(() => expect(reminderPuts).toEqual([{ rentReminderDelayDays: 7 }]));
+    expect(screen.getByText(/after 7 days, then every 3 days/)).toBeInTheDocument();
+  });
+
+  it("reads an uncapped max as ∞ in the summary", async () => {
+    const { user } = renderTerminal();
+    await openAutomation(user);
+
+    const maxRow = await screen.findByRole("group", { name: "max reminders" });
+    await user.click(within(maxRow).getByRole("button", { name: "∞" }));
+
+    await waitFor(() => expect(reminderPuts).toEqual([{ rentReminderMaxCount: 0 }]));
+    expect(screen.getByText(/then every 3 days\.$/)).toBeInTheDocument();
+  });
+
+  it("collapses the cadence when reminders are switched off", async () => {
+    const { user } = renderTerminal();
+    await openAutomation(user);
+
+    const toggle = await screen.findByRole("switch", { name: "overdue reminders" });
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+
+    await user.click(toggle);
+    await waitFor(() => expect(reminderPuts).toEqual([{ rentReminderEnabled: false }]));
+    expect(screen.queryByRole("group", { name: "remind after" })).not.toBeInTheDocument();
+  });
+
+  it("rolls the toggle back when the save fails", async () => {
+    const { user } = renderTerminal();
+    await openAutomation(user);
+    const toggle = await screen.findByRole("switch", { name: "overdue reminders" });
+
+    fetchMock.mockImplementationOnce(async () => jsonResponse({ message: "nope" }, 500));
+    await user.click(toggle);
+
+    await waitFor(() =>
+      expect(screen.getByRole("switch", { name: "overdue reminders" })).toHaveAttribute(
+        "aria-checked",
+        "true",
+      ),
+    );
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Could not save reminders" }),
+    );
   });
 });
 

@@ -85,6 +85,8 @@ async function installMocks(page) {
   await page.route("**/api/property/tenants", (r) => json(r, TENANTS));
   await page.route("**/api/property/invoices", (r) => json(r, INVOICES));
   await page.route("**/api/property/schedules", (r) => json(r, SCHEDULES));
+  await page.route("**/api/property/reminder-settings", (r) =>
+    json(r, { rentReminderEnabled: true, rentReminderDelayDays: 3, rentReminderIntervalDays: 3, rentReminderMaxCount: 3 }));
   await page.route(`**/api/merchants/${MERCHANT_ID}/**`, (r) => json(r, []));
   await page.route(`**/api/merchants/${MERCHANT_ID}`, (r) =>
     json(r, { id: MERCHANT_ID, businessName: "Wallace Property", status: "active" }));
@@ -166,11 +168,16 @@ async function shoot(browser, label, ctxOpts) {
 
   /* row actions: the anchored popover and its in-surface cancel confirmation */
   await page.getByRole("button", { name: "actions for Mia Chen, overdue" }).click();
-  await shot("9-row-menu");
+  await shot("9a-row-menu");
   await page.getByRole("menuitem", { name: "cancel invoice" }).click();
-  await shot("10-row-menu-cancel");
+  await shot("9b-row-menu-cancel");
   await page.getByRole("menuitem", { name: "back" }).click();
   await page.getByRole("menuitem", { name: "close" }).click();
+
+  /* automation: reminder cadence + the recurring rent schedules */
+  await page.getByRole("button", { name: "automation" }).click();
+  await shot("10-automation");
+  await checkFoot(".pt-auto", "automation panel");
 
   /* deep link: the home's "send reminder" quick action */
   await page.goto(`${BASE_URL}/property/terminal?mode=reminder`, { waitUntil: "networkidle" });

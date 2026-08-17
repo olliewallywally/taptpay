@@ -1,7 +1,12 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { usePropertyInvoices, usePropertyTenants, PROPERTY_KEYS } from "@/lib/property-data";
-import { propHeaders } from "@/lib/property-api";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  usePropertyInvoices,
+  usePropertySchedules,
+  usePropertyTenants,
+  PROPERTY_KEYS,
+} from "@/lib/property-data";
+import { propFetch, propHeaders } from "@/lib/property-api";
 import { notifyIfBillingCardRequired } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { fmtNZD } from "@/lib/report-utils";
@@ -37,7 +42,31 @@ const GREEN = "#35D07F";
 const RED = "#F0656C";
 const AMBER = "#F0A34E";
 
-type Mode = "tenant" | "request" | "keypad" | "bill" | "paid";
+type Mode = "tenant" | "request" | "keypad" | "bill" | "paid" | "auto";
+
+/* Reminder cadence — the same option sets the phone offers (`View:690-737`).
+   0 max reminders means "no cap". */
+const REMIND_AFTER_DAYS = [1, 3, 7];
+const REMIND_EVERY_DAYS = [1, 3, 7];
+const REMIND_MAX_COUNTS = [1, 3, 5, 0];
+const REMINDER_DEFAULTS = {
+  rentReminderEnabled: true,
+  rentReminderDelayDays: 3,
+  rentReminderIntervalDays: 3,
+  rentReminderMaxCount: 3,
+};
+
+const REMINDER_KEY = ["/api/property/reminder-settings"] as const;
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+const shortDate = (value?: string | null) => {
+  if (!value) return "—";
+  const d = new Date(value);
+  return Number.isNaN(d.getTime())
+    ? "—"
+    : d.toLocaleDateString("en-NZ", { day: "numeric", month: "short" });
+};
 
 /* Charge types and frequency handling mirror property-terminal.tsx exactly. */
 const CHARGE_TYPES = [
@@ -147,12 +176,22 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
      whether the destructive branch has been asked for. */
   const [rowMenu, setRowMenu] = useState<{ id: string; top: number } | null>(null);
   const [confirmVoid, setConfirmVoid] = useState(false);
+  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
   const rowsRef = useRef<HTMLDivElement | null>(null);
   const stackRef = useRef<HTMLDivElement | null>(null);
   const rowMenuRef = useRef<HTMLDivElement | null>(null);
 
   const tenantsQuery = usePropertyTenants();
   const invoicesQuery = usePropertyInvoices();
+  /* The shared hook, not a second query — one cache entry per PROPERTY_KEYS. */
+  const schedulesQuery = usePropertySchedules();
+  const reminderQuery = useQuery<any>({
+    queryKey: REMINDER_KEY,
+    queryFn: () =>
+      propFetch("/api/property/reminder-settings").then((r) => (r.ok ? r.json() : null)),
+    staleTime: 60_000,
+    retry: false,
+  });
   const tenants = (tenantsQuery.data ?? []).filter((t: any) => t.status !== "archived");
   const invoices = invoicesQuery.data ?? [];
 
@@ -406,6 +445,74 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
     closeRowMenu();
     setMode("request");
   };
+
+  /* ── automation ── */
+  const reminders = { ...REMINDER_DEFAULTS, ...(reminderQuery.data ?? {}) };
+  const liveSchedules = (schedulesQuery.data ?? []).filter(
+    (s: any) => s.status !== "terminated",
+  );
+  const tenantById = new Map(tenants.map((t: any) => [t.id, t]));
+
+  /* Optimistic with rollback, exactly as the phone does (`controller:182-202`):
+     a cadence chip that waits for the server feels broken. */
+  const updateReminders = useMutation({
+    mutationFn: async (patch: Record<string, unknown>) => {
+      const res = await fetch("/api/property/reminder-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...propHeaders() },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      return res.json();
+    },
+    onMutate: async (patch) => {
+      await queryClient.cancelQueries({ queryKey: REMINDER_KEY as any });
+      const prev = queryClient.getQueryData(REMINDER_KEY as any);
+      queryClient.setQueryData(REMINDER_KEY as any, (old: any) => ({
+        ...(old ?? REMINDER_DEFAULTS),
+        ...patch,
+      }));
+      return { prev };
+    },
+    onError: (_e, _patch, ctx: any) => {
+      if (ctx?.prev !== undefined) queryClient.setQueryData(REMINDER_KEY as any, ctx.prev);
+      toast({ title: "Could not save reminders", variant: "destructive" });
+    },
+    onSuccess: (data) => queryClient.setQueryData(REMINDER_KEY as any, data),
+  });
+
+  const setScheduleStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: "active" | "paused" }) => {
+      const res = await fetch(`/api/property/schedules/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...propHeaders() },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error("Failed to update schedule");
+      return res.json();
+    },
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: PROPERTY_KEYS.schedules as any }),
+    onError: () => toast({ title: "Could not update the schedule", variant: "destructive" }),
+  });
+
+  const cancelSchedule = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/property/schedules/${id}`, {
+        method: "DELETE",
+        headers: propHeaders(),
+      });
+      if (!res.ok) throw new Error("Failed to cancel schedule");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: PROPERTY_KEYS.schedules as any });
+      toast({ title: "Automation cancelled" });
+    },
+    onError: () => toast({ title: "Could not cancel the schedule", variant: "destructive" }),
+  });
+
+  const scheduleBusy = setScheduleStatus.isPending || cancelSchedule.isPending;
 
   /* ── attached invoice document ── */
   const clearDoc = () => {
@@ -777,6 +884,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
             {railBtn("keypad", true, (<path d="M12 5v14M5 12h14" />), "keypad")}
             {railBtn("bill", false, (<><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" /><path d="M9.5 8h5M9.5 12h5" /></>), "send bill")}
             {railBtn("paid", false, (<><rect x="4" y="4" width="16" height="16" rx="3" /><path d="m9 12 2.2 2.2L15.5 10" /></>), "mark as paid")}
+            {railBtn("auto", false, (<><path d="M20 11a8 8 0 0 0-13.7-5.6L3 8.5" /><path d="M3 4v4.5h4.5" /><path d="M4 13a8 8 0 0 0 13.7 5.6L21 15.5" /><path d="M21 20v-4.5h-4.5" /></>), "automation")}
           </div>
         </div>
 
@@ -1062,6 +1170,196 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
             </div>
           )}
 
+          {mode === "auto" && (
+            <div className="pt-mode pt-auto">
+              <div className="pt-mode-head">Automation</div>
+              <div className="pt-mode-sub">
+                chase overdue rent on a cadence, and see every recurring request you have
+                running
+              </div>
+
+              {/* Deliberately in the page's blue language, not the phone's amber
+                  card: amber means "overdue" here, so an amber panel would read
+                  as an alert rather than a setting. */}
+              <div className="pt-auto-block">
+                <div className="pt-auto-head">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 11a8 8 0 0 0-13.7-5.6L3 8.5" /><path d="M3 4v4.5h4.5" /><path d="M4 13a8 8 0 0 0 13.7 5.6L21 15.5" /><path d="M21 20v-4.5h-4.5" /></svg>
+                  <span className="pt-auto-head-mid">
+                    <span className="pt-auto-title">overdue reminders</span>
+                    <span className="pt-auto-cap">auto-resend the link until paid</span>
+                  </span>
+                  <button
+                    type="button"
+                    className="pt-switch"
+                    role="switch"
+                    aria-checked={reminders.rentReminderEnabled}
+                    aria-label="overdue reminders"
+                    disabled={reminderQuery.isLoading}
+                    style={{
+                      background: reminders.rentReminderEnabled
+                        ? ACTIVE
+                        : "rgba(94,158,255,0.25)",
+                    }}
+                    onClick={() =>
+                      updateReminders.mutate({
+                        rentReminderEnabled: !reminders.rentReminderEnabled,
+                      })
+                    }
+                  >
+                    <span
+                      className="pt-switch-knob"
+                      style={{
+                        transform: reminders.rentReminderEnabled ? "translateX(17px)" : "none",
+                      }}
+                    />
+                  </button>
+                </div>
+
+                {reminders.rentReminderEnabled && (
+                  <>
+                    {(
+                      [
+                        {
+                          label: "REMIND AFTER",
+                          field: "rentReminderDelayDays",
+                          value: reminders.rentReminderDelayDays,
+                          options: REMIND_AFTER_DAYS,
+                          format: (o: number) => `${o}d`,
+                        },
+                        {
+                          label: "REPEAT EVERY",
+                          field: "rentReminderIntervalDays",
+                          value: reminders.rentReminderIntervalDays,
+                          options: REMIND_EVERY_DAYS,
+                          format: (o: number) => `${o}d`,
+                        },
+                        {
+                          label: "MAX REMINDERS",
+                          field: "rentReminderMaxCount",
+                          value: reminders.rentReminderMaxCount,
+                          options: REMIND_MAX_COUNTS,
+                          format: (o: number) => (o === 0 ? "∞" : String(o)),
+                        },
+                      ] as const
+                    ).map((row) => (
+                      <div key={row.field}>
+                        <div className="pt-auto-label">{row.label}</div>
+                        <div className="pt-auto-chips" role="group" aria-label={row.label.toLowerCase()}>
+                          {row.options.map((o) => (
+                            <button
+                              key={o}
+                              type="button"
+                              className="pt-auto-chip"
+                              aria-pressed={row.value === o}
+                              style={chip(row.value === o, 1.5)}
+                              onClick={() => updateReminders.mutate({ [row.field]: o })}
+                            >
+                              {row.format(o)}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    <div className="pt-auto-summary">
+                      once overdue, we send the payment link after{" "}
+                      {plural(reminders.rentReminderDelayDays, "day")}, then every{" "}
+                      {plural(reminders.rentReminderIntervalDays, "day")}
+                      {reminders.rentReminderMaxCount > 0
+                        ? ` (up to ${reminders.rentReminderMaxCount}×)`
+                        : ""}
+                      .
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="pt-auto-label">RECURRING RENT</div>
+              <div className="pt-auto-list">
+                {schedulesQuery.isLoading ? (
+                  <div className="pt-empty">loading…</div>
+                ) : liveSchedules.length === 0 ? (
+                  <div className="pt-empty">
+                    no schedules yet — choose a repeat frequency when sending a rent request
+                  </div>
+                ) : (
+                  liveSchedules.map((s: any) => {
+                    const t = tenantById.get(s.tenantProfileId);
+                    const paused = s.status === "paused";
+                    return (
+                      <div key={s.id} className="pt-paid-row">
+                        <span className="pt-avatar">{initialsOf(t)}</span>
+                        <span className="pt-paid-mid">
+                          <span className="pt-row-name">{fullNameOf(t)}</span>
+                          <span className="pt-row-status">
+                            {fmtNZD(s.amountCents ?? 0)} · {s.frequency} · next{" "}
+                            {shortDate(s.nextRunDate)}
+                          </span>
+                        </span>
+                        <span
+                          className="pt-state-pill"
+                          style={{
+                            background: paused
+                              ? "rgba(240,163,78,0.14)"
+                              : "rgba(53,208,127,0.14)",
+                            color: paused ? AMBER : GREEN,
+                          }}
+                        >
+                          {paused ? "paused" : "active"}
+                        </span>
+                        {confirmCancelId === s.id ? (
+                          <span className="pt-auto-actions">
+                            <button
+                              type="button"
+                              className="pt-auto-btn pt-auto-btn-danger"
+                              disabled={scheduleBusy}
+                              onClick={() => {
+                                cancelSchedule.mutate(s.id);
+                                setConfirmCancelId(null);
+                              }}
+                            >
+                              confirm
+                            </button>
+                            <button
+                              type="button"
+                              className="pt-auto-btn"
+                              onClick={() => setConfirmCancelId(null)}
+                            >
+                              back
+                            </button>
+                          </span>
+                        ) : (
+                          <span className="pt-auto-actions">
+                            <button
+                              type="button"
+                              className="pt-auto-btn"
+                              disabled={scheduleBusy}
+                              onClick={() =>
+                                setScheduleStatus.mutate({
+                                  id: s.id,
+                                  status: paused ? "active" : "paused",
+                                })
+                              }
+                            >
+                              {paused ? "resume" : "pause"}
+                            </button>
+                            <button
+                              type="button"
+                              className="pt-auto-btn pt-auto-btn-danger"
+                              disabled={scheduleBusy}
+                              onClick={() => setConfirmCancelId(s.id)}
+                            >
+                              cancel
+                            </button>
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+
           {mode === "paid" && (
             <div className="pt-mode pt-paid">
               <div className="pt-mode-head">Mark as paid</div>
@@ -1159,7 +1457,9 @@ const PT_CSS = `
 
 /* ── rail (design pins it at x=550) ── */
 .pt-rail-slot { flex:0 0 76px; margin:175px 40px 0 44px; }
-.pt-rail { position:absolute; left:550px; width:80px; box-sizing:border-box; border:1.5px solid rgba(94,158,255,0.7); border-radius:32px; padding:30px 0; display:flex; flex-direction:column; align-items:center; gap:40px; --dt-i:6; }
+/* gap 40 → 32 when the sixth button landed: at 40 the rail ran to y=748 and
+   read bottom-heavy; at 32 it grows by a button rather than a button + a gap. */
+.pt-rail { position:absolute; left:550px; width:80px; box-sizing:border-box; border:1.5px solid rgba(94,158,255,0.7); border-radius:32px; padding:30px 0; display:flex; flex-direction:column; align-items:center; gap:32px; --dt-i:6; }
 .pt-rail-btn { width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:background .18s ease; }
 .pt-rail-btn:hover { background:rgba(94,158,255,0.14); }
 .pt-rail-big { width:54px; height:54px; background:${ACTIVE}; box-shadow:0 8px 20px rgba(102,169,255,0.35); }
@@ -1246,6 +1546,27 @@ const PT_CSS = `
 .pt-bill-doc-name { flex:1; min-width:0; color:${TEXT_SOFT}; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .pt-bill-doc-remove { flex:0 0 auto; font-weight:300; font-size:12px; color:${ACCENT_SOFT}; background:transparent; cursor:pointer; }
 .pt-bill-send { display:block; margin:28px auto 0; }
+
+/* automation */
+.pt-auto { margin-top:40px; width:446px; }
+.pt-auto-block { margin-top:22px; padding:16px 18px; box-sizing:border-box; border-radius:16px; border:1px solid rgba(94,158,255,0.3); background:rgba(94,158,255,0.06); }
+.pt-auto-head { display:flex; align-items:center; gap:12px; }
+.pt-auto-head-mid { display:flex; flex-direction:column; gap:1px; flex:1; min-width:0; }
+.pt-auto-title { font-weight:700; font-size:13.5px; color:${TEXT_SOFT}; }
+.pt-auto-cap { font-weight:500; font-size:11px; color:rgba(244,246,255,0.5); }
+.pt-auto-label { margin-top:16px; font-weight:700; font-size:10px; letter-spacing:0.18em; color:rgba(244,246,255,0.45); }
+.pt-auto-chips { margin-top:8px; display:flex; gap:8px; }
+.pt-auto-chip { flex:1; height:40px; border-radius:9999px; font-size:12.5px; cursor:pointer; transition:background .15s ease, color .15s ease; }
+.pt-auto-summary { margin-top:14px; font-weight:500; font-size:11.5px; line-height:1.5; color:rgba(244,246,255,0.45); }
+.pt-auto-list { margin-top:10px; display:flex; flex-direction:column; max-height:236px; overflow-y:auto; scrollbar-width:none; }
+.pt-auto-list::-webkit-scrollbar { display:none; }
+.pt-state-pill { flex:0 0 auto; padding:3px 9px; border-radius:9999px; font-weight:700; font-size:9.5px; letter-spacing:0.06em; text-transform:uppercase; }
+.pt-auto-actions { flex:0 0 auto; display:flex; gap:6px; }
+.pt-auto-btn { height:40px; padding:0 12px; border-radius:9999px; border:1px solid rgba(94,158,255,0.5); background:transparent; color:${ACCENT_SOFT}; font-weight:600; font-size:11.5px; cursor:pointer; transition:background .15s ease; }
+.pt-auto-btn:hover:not(:disabled) { background:rgba(94,158,255,0.12); }
+.pt-auto-btn:disabled { opacity:0.5; cursor:default; }
+.pt-auto-btn-danger { border-color:rgba(240,101,108,0.5); color:${RED}; }
+.pt-auto-btn-danger:hover:not(:disabled) { background:rgba(240,101,108,0.12); }
 
 /* mark paid */
 .pt-paid { margin-top:100px; }
