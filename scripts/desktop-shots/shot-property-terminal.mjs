@@ -152,6 +152,11 @@ async function shoot(browser, label, ctxOpts) {
   await page.getByRole("menuitem", { name: "back" }).click();
   await page.getByRole("menuitem", { name: "close" }).click();
 
+  /* deep link: the home's "send reminder" quick action */
+  await page.goto(`${BASE_URL}/property/terminal?mode=reminder`, { waitUntil: "networkidle" });
+  await page.getByTestId("desktop-frame").waitFor({ state: "visible" });
+  await shot("11-reminder-deeplink");
+
   await context.close();
   return errors;
 }

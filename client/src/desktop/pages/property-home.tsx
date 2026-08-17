@@ -576,7 +576,7 @@ export default function DesktopPropertyHome(props: DesktopRoutePageProps) {
 
         {/* quick actions */}
         <div className="ph-actions">
-          <button type="button" className="ph-action ph-action-primary" data-tutorial-id="property-home-rent" aria-label="set up rent payment" onClick={go("/property/terminal")}>
+          <button type="button" className="ph-action ph-action-primary" data-tutorial-id="property-home-rent" aria-label="set up rent payment" onClick={go("/property/terminal?mode=rent")}>
             <span className="ph-action-glow" />
             <svg className="ph-action-ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={NAVY} strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
             <span className="ph-action-label" style={{ color: NAVY }}>set up<br />rent payment</span>

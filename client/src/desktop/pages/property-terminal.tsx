@@ -80,6 +80,27 @@ const whole = (cents: number) => "$" + Math.round(cents / 100).toLocaleString("e
 /* Breathing room between the row popover's foot and the canvas floor. */
 const PT_ROW_MENU_GAP = 8;
 
+/* Deep links, read once at mount the way property-clients (`?client=`) and
+   trades-terminal (`?quick=1`) do. The phone's 800ms replaceState strip is not
+   ported: that hack exists because its route transition can discard the first
+   mount, and 2b/3b already accept that a refresh re-applies the link. */
+function entryParams() {
+  if (typeof window === "undefined") return new URLSearchParams();
+  return new URLSearchParams(window.location.search);
+}
+
+function entryMode(params: URLSearchParams): Mode {
+  return params.get("mode") === "expense" ? "bill" : "request";
+}
+
+function entryFilter(params: URLSearchParams): PropertyStackFilter {
+  if (params.get("mode") === "reminder") return "overdue";
+  const stack = params.get("stack");
+  return (PROPERTY_STACK_FILTERS as readonly string[]).includes(stack ?? "")
+    ? (stack as PropertyStackFilter)
+    : "all";
+}
+
 const STATUS_DOT: Record<string, string> = {
   overdue: AMBER,
   sent: ACCENT,
@@ -91,8 +112,11 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const [mode, setMode] = useState<Mode>("request");
-  const [tenantId, setTenantId] = useState<string | null>(null);
+  const [mode, setMode] = useState<Mode>(() => entryMode(entryParams()));
+  const [tenantId, setTenantId] = useState<string | null>(
+    () => entryParams().get("client"),
+  );
+  const [remindMode] = useState(() => entryParams().get("mode") === "reminder");
   const [amountCents, setAmountCents] = useState(0);
   const [kpVal, setKpVal] = useState("");
   const [frequency, setFrequency] = useState<Frequency>("once");
@@ -100,7 +124,9 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
   const [description, setDescription] = useState(INITIAL_DESCRIPTION);
   const [search, setSearch] = useState("");
   const [tenantSearch, setTenantSearch] = useState("");
-  const [filter, setFilter] = useState<PropertyStackFilter>("all");
+  const [filter, setFilter] = useState<PropertyStackFilter>(() =>
+    entryFilter(entryParams()),
+  );
   const [reqFlash, setReqFlash] = useState(false);
   const [billFlash, setBillFlash] = useState(false);
   /* The row action popover: which invoice, where it sits in `.pt-stack`, and
@@ -346,6 +372,10 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
   const menuRow = rowMenu ? (model.rows.find((r) => r.id === rowMenu.id) ?? null) : null;
   const menuBusy = resendOne.isPending || voidInvoice.isPending || markPaid.isPending;
 
+  /* The phone's exact rule for showing the inline remind affordance. */
+  const showRemind = remindMode || filter === "overdue";
+  const remindBusyId = resendOne.isPending ? (resendOne.variables as string) : null;
+
   /* "edit amount & resend" — the desktop equivalent of the phone's
      openEditResend: preload the request panel rather than resending blind. */
   const editAndResend = () => {
@@ -507,8 +537,8 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                 <div className="pt-empty">no requests here</div>
               ) : (
                 stackRows.map((r) => (
+                  <div key={r.id} className="pt-row-wrap">
                   <button
-                    key={r.id}
                     type="button"
                     className="pt-row"
                     aria-haspopup="menu"
@@ -532,6 +562,18 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                     </span>
                     <span className="pt-row-amt">{fmtNZD(r.amountCents)}</span>
                   </button>
+                  {showRemind && r.bucket === "overdue" && (
+                    <button
+                      type="button"
+                      className="pt-remind"
+                      aria-label={`remind ${r.name}`}
+                      disabled={remindBusyId === r.id}
+                      onClick={() => resendOne.mutate(r.id)}
+                    >
+                      {remindBusyId === r.id ? "…" : "remind"}
+                    </button>
+                  )}
+                  </div>
                 ))
               )}
             </div>
@@ -938,8 +980,11 @@ const PT_CSS = `
 .pt-chip { padding:6px 13px; border-radius:9999px; font-size:11px; cursor:pointer; transition:background .15s ease, color .15s ease; white-space:nowrap; }
 .pt-rows { margin-top:8px; display:flex; flex-direction:column; max-height:232px; overflow-y:auto; scrollbar-width:none; }
 .pt-rows::-webkit-scrollbar { display:none; }
-.pt-row { width:100%; display:flex; align-items:center; gap:13px; padding:9px 0; text-align:left; cursor:pointer; border-radius:10px; transition:background .15s ease; }
+.pt-row-wrap { display:flex; align-items:center; gap:10px; }
+.pt-row { flex:1; min-width:0; display:flex; align-items:center; gap:13px; padding:9px 0; text-align:left; cursor:pointer; border-radius:10px; transition:background .15s ease; }
 .pt-row:hover { background:rgba(94,158,255,0.08); }
+.pt-remind { flex:0 0 auto; height:28px; padding:0 14px; border-radius:9999px; background:${ACTIVE}; color:${NAVY}; font-weight:700; font-size:11px; cursor:pointer; transition:opacity .2s ease; }
+.pt-remind:disabled { opacity:0.5; cursor:default; }
 
 /* Row actions. Reuses property home's .ph-scope-menu panel verbatim so the two
    screens' popovers are the same object; no position:fixed inside the scaled

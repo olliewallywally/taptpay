@@ -62,6 +62,17 @@ const INVOICES = [
     dueAt: "2026-08-09T00:00:00.000Z",
   },
   {
+    id: "i4",
+    tenantProfileId: "t2",
+    tenantName: "Tane Walker",
+    amountCents: 52_000,
+    owingCents: 52_000,
+    status: "overdue",
+    kind: "rent",
+    createdAt: "2026-07-25T00:00:00.000Z",
+    dueAt: "2026-08-01T00:00:00.000Z",
+  },
+  {
     id: "i3",
     tenantProfileId: "t2",
     tenantName: "Tane Walker",
@@ -143,10 +154,17 @@ const panelSendButton = (name: string) => screen.getAllByRole("button", { name }
    the panel's own hero figure rather than on the page text. */
 const panelAmount = () => document.querySelector(".pt-amt")?.textContent;
 
+/* The page reads its deep link from window.location at mount, the same way
+   property-clients and trades-terminal do. */
+function enterWith(query: string) {
+  window.history.replaceState({}, "", `/property/terminal${query}`);
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   invoicePosts = [];
   rowActionCalls = [];
+  enterWith("");
   installFetchMock();
 });
 
@@ -285,6 +303,54 @@ describe("desktop property terminal — row actions", () => {
 
     await openRowMenu(user, "Mia Chen, sent");
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+});
+
+describe("desktop property terminal — deep links", () => {
+  it("opens the bill panel for ?mode=expense", async () => {
+    enterWith("?mode=expense");
+    renderTerminal();
+    expect(
+      await screen.findByRole("textbox", { name: "bill description" }),
+    ).toBeInTheDocument();
+  });
+
+  it("filters to overdue and reveals remind for ?mode=reminder", async () => {
+    enterWith("?mode=reminder");
+    const { user } = renderTerminal();
+
+    const remind = await screen.findByRole("button", { name: "remind Tane Walker" });
+    /* Only the overdue row gets one, and the list is filtered to overdue. */
+    expect(screen.getAllByRole("button", { name: /^remind / })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: /actions for Mia Chen/ })).not.toBeInTheDocument();
+
+    await user.click(remind);
+    await waitFor(() => expect(rowActionCalls).toEqual(["resend:i4"]));
+  });
+
+  it("applies ?stack= to the request list without revealing remind", async () => {
+    enterWith("?stack=paid");
+    renderTerminal();
+
+    expect(
+      await screen.findByRole("button", { name: "actions for Tane Walker, paid" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /actions for Mia Chen/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^remind / })).not.toBeInTheDocument();
+  });
+
+  it("preselects a tenant from ?client=", async () => {
+    enterWith("?client=t2");
+    renderTerminal();
+    expect(await screen.findByText("88 Harbour View")).toBeInTheDocument();
+  });
+
+  it("ignores an unknown stack value", async () => {
+    enterWith("?stack=nonsense");
+    renderTerminal();
+    expect(
+      await screen.findByRole("button", { name: "actions for Mia Chen, sent" }),
+    ).toBeInTheDocument();
   });
 });
 
