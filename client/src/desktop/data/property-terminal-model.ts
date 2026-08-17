@@ -26,6 +26,9 @@ export interface PropertyTerminalInvoice {
   chargeType?: string | null;
   amountCents?: number | null;
   owingCents?: number | null;
+  splitEnabled?: boolean | null;
+  splitCount?: number | null;
+  splitPaidCount?: number | null;
   tenantName?: string | null;
   createdAt?: string | null;
   dueAt?: string | null;
@@ -46,7 +49,12 @@ export interface PropertyTerminalRow {
      reach it, but it has not actually been sent — the label and the dot say so. */
   awaiting: boolean;
   label: string;
+  /* What the row displays: what is still owed on a part-paid split, the full
+     amount otherwise — the phone's rule (`View:281-285`). */
   amountCents: number;
+  fullAmountCents: number;
+  split: { paid: number; count: number } | null;
+  partPaid: boolean;
 }
 
 export interface PropertyTerminalModel {
@@ -59,6 +67,11 @@ export interface PropertyTerminalModel {
    `owingCents`; it equals `amountCents` for everything else. */
 export const propertyOwingCents = (i: PropertyTerminalInvoice) =>
   i.owingCents ?? i.amountCents ?? 0;
+
+export const propertySplitOf = (i: PropertyTerminalInvoice) =>
+  i.splitEnabled && (i.splitCount ?? 0) > 1
+    ? { paid: i.splitPaidCount ?? 0, count: i.splitCount as number }
+    : null;
 
 export const isPropertyLive = (i: PropertyTerminalInvoice) =>
   (PROPERTY_LIVE_STATUSES as readonly string[]).includes(i.status);
@@ -126,6 +139,9 @@ export function buildPropertyTerminalModel(
       const bucket = propertyBucketOf(i.status);
       const awaiting = i.status === "pending_dispatch";
       const name = nameFor(i, byId);
+      const split = propertySplitOf(i);
+      const partPaid = !!split && split.paid > 0 && bucket !== "paid";
+      const full = i.amountCents ?? 0;
       return {
         id: i.id,
         name,
@@ -133,7 +149,10 @@ export function buildPropertyTerminalModel(
         bucket,
         awaiting,
         label: labelFor(i, bucket, awaiting),
-        amountCents: propertyOwingCents(i),
+        amountCents: partPaid ? propertyOwingCents(i) : full,
+        fullAmountCents: full,
+        split,
+        partPaid,
       };
     });
 

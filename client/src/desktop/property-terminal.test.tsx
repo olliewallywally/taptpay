@@ -73,6 +73,20 @@ const INVOICES = [
     dueAt: "2026-08-01T00:00:00.000Z",
   },
   {
+    id: "i5",
+    tenantProfileId: "t3",
+    tenantName: "Ruby Nolan",
+    amountCents: 60_000,
+    owingCents: 30_000,
+    splitEnabled: true,
+    splitCount: 4,
+    splitPaidCount: 2,
+    status: "dispatched",
+    kind: "rent",
+    createdAt: "2026-07-28T00:00:00.000Z",
+    dueAt: "2026-08-04T00:00:00.000Z",
+  },
+  {
     id: "i3",
     tenantProfileId: "t2",
     tenantName: "Tane Walker",
@@ -409,6 +423,56 @@ describe("desktop property terminal — bill due date and attachment", () => {
       ),
     );
     expect(screen.getByLabelText("attach invoice")).toBeInTheDocument();
+  });
+});
+
+describe("desktop property terminal — split", () => {
+  it("sends splitEnabled from the rent request and resets it afterwards", async () => {
+    const { user } = renderTerminal();
+    await pickTenant(user);
+
+    const toggle = screen.getByRole("switch", { name: "split this bill" });
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+
+    await user.click(screen.getByRole("button", { name: "send rent request" }));
+    await waitFor(() => expect(invoicePosts).toHaveLength(1));
+    expect(invoicePosts[0]).toMatchObject({ splitEnabled: true });
+    expect(screen.getByRole("switch", { name: "split this bill" })).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
+  });
+
+  it("sends splitEnabled from the bill", async () => {
+    const { user } = renderTerminal();
+    await pickTenant(user);
+    await user.click(railButton("send bill"));
+    await user.click(screen.getByRole("switch", { name: "split this bill" }));
+
+    await user.click(panelSendButton("send bill"));
+    await waitFor(() => expect(invoicePosts).toHaveLength(1));
+    expect(invoicePosts[0]).toMatchObject({ kind: "charge", splitEnabled: true });
+  });
+
+  it("defaults to off, so an untouched send is not split", async () => {
+    const { user } = renderTerminal();
+    await pickTenant(user);
+    await user.click(screen.getByRole("button", { name: "send rent request" }));
+
+    await waitFor(() => expect(invoicePosts).toHaveLength(1));
+    expect(invoicePosts[0]).toMatchObject({ splitEnabled: false });
+  });
+
+  it("shows split progress and what is left on a part-paid row", async () => {
+    renderTerminal();
+    expect(await screen.findByText("2/4 split")).toBeInTheDocument();
+    expect(screen.getByText("left of $600.00")).toBeInTheDocument();
+    /* The row's own figure is what is still owed, not the full value. */
+    expect(
+      screen.getByRole("button", { name: "actions for Ruby Nolan, sent" }),
+    ).toHaveTextContent("$300.00");
   });
 });
 

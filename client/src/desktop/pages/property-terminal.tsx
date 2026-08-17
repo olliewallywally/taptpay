@@ -132,6 +132,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
   const [chargeType, setChargeType] = useState(INITIAL_CHARGE_TYPE);
   const [description, setDescription] = useState(INITIAL_DESCRIPTION);
   const [dueDays, setDueDays] = useState(INITIAL_DUE_DAYS);
+  const [splitEnabled, setSplitEnabled] = useState(false);
   const [docUrl, setDocUrl] = useState<string | null>(null);
   const [docName, setDocName] = useState("");
   const [uploadingDoc, setUploadingDoc] = useState(false);
@@ -201,7 +202,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
           amountCents,
           deliveryChannel: channel,
           dueAt: due.toISOString(),
-          splitEnabled: false,
+          splitEnabled,
         }),
       });
       if (!res.ok) {
@@ -241,6 +242,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
       setReqFlash(true);
       setTimeout(() => setReqFlash(false), 1600);
       setFrequency("once");
+      setSplitEnabled(false);
       /* Zeroing the amount is what stops a second click issuing a second
          invoice. The tenant stays selected — that is the useful desktop state,
          and the 1.6s "sent ✓" flash covers the transition. */
@@ -261,7 +263,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
           amountCents,
           deliveryChannel: channel,
           dueAt: due.toISOString(),
-          splitEnabled: false,
+          splitEnabled,
           kind: "charge",
           chargeType,
           description,
@@ -286,6 +288,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
       setChargeType(INITIAL_CHARGE_TYPE);
       setDescription(INITIAL_DESCRIPTION);
       setDueDays(INITIAL_DUE_DAYS);
+      setSplitEnabled(false);
       clearDoc();
     },
     onError: (e: any) =>
@@ -523,6 +526,26 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
     );
   };
 
+  /* The one genuinely new component in this pass — worth defining rather than
+     substituting a chip because Phase 7's reminder settings reuse it. */
+  const switchRow = (label: string, on: boolean, onToggle: () => void) => (
+    <div className="pt-field-row">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="8" r="3.2" /><circle cx="16" cy="16" r="3.2" /><path d="M18.5 5.5 5.5 18.5" /></svg>
+      <span className="pt-field-soft">{label}</span>
+      <button
+        type="button"
+        className="pt-switch"
+        role="switch"
+        aria-checked={on}
+        aria-label={label}
+        style={{ background: on ? ACTIVE : "rgba(94,158,255,0.25)" }}
+        onClick={onToggle}
+      >
+        <span className="pt-switch-knob" style={{ transform: on ? "translateX(17px)" : "none" }} />
+      </button>
+    </div>
+  );
+
   const chip = (on: boolean, borderWidth = 1) => ({
     border: on
       ? `${borderWidth}px solid transparent`
@@ -616,9 +639,19 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                           }}
                         />
                         {r.label}
+                        {r.split && (
+                          <span className="pt-split-badge">
+                            {r.split.paid}/{r.split.count} split
+                          </span>
+                        )}
                       </span>
                     </span>
-                    <span className="pt-row-amt">{fmtNZD(r.amountCents)}</span>
+                    <span className="pt-row-right">
+                      <span className="pt-row-amt">{fmtNZD(r.amountCents)}</span>
+                      {r.partPaid && (
+                        <span className="pt-row-cap">left of {fmtNZD(r.fullAmountCents)}</span>
+                      )}
+                    </span>
                   </button>
                   {showRemind && r.bucket === "overdue" && (
                     <button
@@ -777,6 +810,10 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                     <span className="pt-send-to">{channelContact || "no contact on file"}</span>
                   </span>
                 </div>
+
+                {switchRow("split this bill", splitEnabled, () =>
+                  setSplitEnabled((v) => !v),
+                )}
 
                 <div className="pt-freq-chips">
                   {FREQUENCIES.map((f) => (
@@ -975,6 +1012,12 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                 ))}
               </div>
 
+              <div className="pt-bill-split">
+                {switchRow("split this bill", splitEnabled, () =>
+                  setSplitEnabled((v) => !v),
+                )}
+              </div>
+
               <div className="pt-bill-label">SUPPORTING INVOICE</div>
               {docUrl ? (
                 <div className="pt-bill-attach pt-bill-attached">
@@ -1108,6 +1151,10 @@ const PT_CSS = `
 .pt-row-status { display:flex; align-items:center; gap:5px; font-weight:500; font-size:10.5px; color:rgba(244,246,255,0.5); }
 .pt-dot { width:5px; height:5px; border-radius:50%; opacity:0.85; flex:0 0 auto; }
 .pt-row-amt { font-weight:800; font-size:14.5px; color:#fff; font-variant-numeric:tabular-nums; }
+/* Stacks the amount over its caption the way .pt-tc-right already does. */
+.pt-row-right { display:flex; flex-direction:column; align-items:flex-end; gap:1px; flex:0 0 auto; }
+.pt-row-cap { font-weight:500; font-size:9.5px; color:rgba(244,246,255,0.5); }
+.pt-split-badge { flex:0 0 auto; padding:1px 6px; border-radius:6px; background:rgba(53,208,127,0.12); color:${GREEN}; font-weight:700; font-size:9.5px; }
 .pt-empty { padding:20px 0; font-weight:300; font-size:12.5px; color:rgba(191,209,255,0.5); }
 
 /* ── rail (design pins it at x=550) ── */
@@ -1141,9 +1188,13 @@ const PT_CSS = `
 .pt-send-via { display:flex; flex-direction:column; gap:1px; min-width:0; }
 .pt-send-cap { font-weight:600; font-size:8.5px; letter-spacing:0.08em; color:rgba(244,246,255,0.45); }
 .pt-send-to { font-weight:600; font-size:13px; color:${TEXT_SOFT}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pt-switch { margin-left:auto; flex:0 0 auto; width:42px; height:25px; border-radius:9999px; padding:3px; box-sizing:border-box; display:flex; align-items:center; cursor:pointer; transition:background .18s ease; }
+.pt-switch-knob { width:19px; height:19px; border-radius:50%; background:#fff; transition:transform .18s ease; }
 .pt-freq-chips { display:flex; gap:10px; margin-top:6px; }
 .pt-freq-chip { flex:1; height:44px; border-radius:9999px; font-size:12.5px; cursor:pointer; transition:background .15s ease, color .15s ease; }
-.pt-send-btn { margin:44px auto 0; width:200px; height:46px; border-radius:9999px; border:1.5px solid rgba(94,158,255,0.7); background:transparent; font-weight:300; font-size:13.5px; color:${TEXT_SOFT}; cursor:pointer; transition:background .15s ease, border-color .2s ease, color .2s ease; }
+/* 44px before the split row was added; 32 keeps the request panel's foot clear
+   of the 813px canvas floor. */
+.pt-send-btn { margin:32px auto 0; width:200px; height:46px; border-radius:9999px; border:1.5px solid rgba(94,158,255,0.7); background:transparent; font-weight:300; font-size:13.5px; color:${TEXT_SOFT}; cursor:pointer; transition:background .15s ease, border-color .2s ease, color .2s ease; }
 .pt-send-btn:hover:not(:disabled) { background:rgba(94,158,255,0.08); }
 .pt-send-btn:disabled { opacity:0.55; cursor:default; }
 
@@ -1186,6 +1237,7 @@ const PT_CSS = `
 /* Same object as .pt-freq-chips on the request screen, so the two chip rows read
    identically across the two panels. */
 .pt-bill-due { display:flex; gap:10px; margin-top:12px; width:430px; }
+.pt-bill-split { margin-top:20px; width:430px; }
 .pt-bill-attach { margin-top:12px; display:flex; align-items:center; gap:12px; width:430px; height:50px; padding:0 18px; box-sizing:border-box; border-radius:12px; border:1.5px dashed rgba(94,158,255,0.4); color:${ACCENT_SOFT}; font-weight:600; font-size:12.5px; cursor:pointer; transition:background .15s ease, border-color .15s ease; }
 .pt-bill-attach:hover { background:rgba(94,158,255,0.07); }
 .pt-bill-attach input { display:none; }

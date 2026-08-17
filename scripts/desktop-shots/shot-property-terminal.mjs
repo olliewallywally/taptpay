@@ -134,21 +134,29 @@ async function shoot(browser, label, ctxOpts) {
   await shot("5-keypad");
   await page.getByRole("button", { name: "confirm amount" }).click();
 
+  /* Nothing in a panel may cross the 813px canvas floor — 3c's compose block
+     failed exactly here. Measured pre-scale, from the canvas top. */
+  const footOf = (selector) =>
+    page.evaluate((sel) => {
+      const el = document.querySelector(sel);
+      const main = document.querySelector(".tapt-desktop-main");
+      if (!el || !main) return null;
+      const m = main.getBoundingClientRect();
+      return Math.round((el.getBoundingClientRect().bottom - m.top) / (m.height / 813));
+    }, selector);
+  const checkFoot = async (selector, what) => {
+    const foot = await footOf(selector);
+    if (foot === null) errors.push(`${label}: ${what} not found for the height check`);
+    else if (foot > 813) errors.push(`${label}: ${what} ends at ${foot}px, past the 813px floor`);
+    else console.log(`  ${label}: ${what} ends at ${foot}px of 813`);
+  };
+
+  await checkFoot(".pt-req-lower", "request panel");
+
   /* bill mode */
   await page.getByRole("button", { name: "send bill" }).first().click();
   await shot("6-bill");
-  /* The bill panel is the tallest one; nothing in it may cross the 813px
-     canvas floor. 3c's compose block failed exactly here. */
-  const billFoot = await page.evaluate(() => {
-    const bill = document.querySelector(".pt-bill");
-    const main = document.querySelector(".tapt-desktop-main");
-    if (!bill || !main) return null;
-    const m = main.getBoundingClientRect();
-    const scale = m.height / 813;
-    return Math.round((bill.getBoundingClientRect().bottom - m.top) / scale);
-  });
-  if (billFoot === null) errors.push(`${label}: bill panel not found for the height check`);
-  else if (billFoot > 813) errors.push(`${label}: bill panel ends at ${billFoot}px, past the 813px floor`);
+  await checkFoot(".pt-bill", "bill panel");
   await page.getByRole("button", { name: "late fee" }).click();
   await shot("7-bill-late-fee");
 

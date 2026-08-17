@@ -57,20 +57,72 @@ describe("propertyBucketOf", () => {
 describe("buildPropertyTerminalModel — outstanding figures", () => {
   it("counts only what a split invoice still owes", () => {
     const model = buildPropertyTerminalModel(
-      [invoice("i1", { amountCents: 40_000, owingCents: 10_000 })],
+      [
+        invoice("i1", {
+          amountCents: 40_000,
+          owingCents: 10_000,
+          splitEnabled: true,
+          splitCount: 4,
+          splitPaidCount: 3,
+        }),
+      ],
       TENANTS,
     );
     expect(model.outstandingRent).toBe(10_000);
-    expect(rowFor(model, "i1").amountCents).toBe(10_000);
+    const row = rowFor(model, "i1");
+    expect(row.amountCents).toBe(10_000);
+    expect(row.fullAmountCents).toBe(40_000);
+    expect(row.split).toEqual({ paid: 3, count: 4 });
+    expect(row.partPaid).toBe(true);
   });
 
   it("drops a split whose shares are all paid, because its status settles", () => {
     const model = buildPropertyTerminalModel(
-      [invoice("i1", { status: "paid", amountCents: 40_000, owingCents: 0 })],
+      [
+        invoice("i1", {
+          status: "paid",
+          amountCents: 40_000,
+          owingCents: 0,
+          splitEnabled: true,
+          splitCount: 4,
+          splitPaidCount: 4,
+        }),
+      ],
       TENANTS,
     );
     expect(model.outstandingRent).toBe(0);
-    expect(rowFor(model, "i1").bucket).toBe("paid");
+    const row = rowFor(model, "i1");
+    expect(row.bucket).toBe("paid");
+    /* A settled split shows what it was worth, not the $0 left on it. */
+    expect(row.amountCents).toBe(40_000);
+    expect(row.partPaid).toBe(false);
+  });
+
+  it("leaves an untouched split showing its full value", () => {
+    const model = buildPropertyTerminalModel(
+      [
+        invoice("i1", {
+          amountCents: 40_000,
+          owingCents: 40_000,
+          splitEnabled: true,
+          splitCount: 4,
+          splitPaidCount: 0,
+        }),
+      ],
+      TENANTS,
+    );
+    const row = rowFor(model, "i1");
+    expect(row.amountCents).toBe(40_000);
+    expect(row.partPaid).toBe(false);
+    expect(row.split).toEqual({ paid: 0, count: 4 });
+  });
+
+  it("ignores a split flag with a count of one", () => {
+    const model = buildPropertyTerminalModel(
+      [invoice("i1", { splitEnabled: true, splitCount: 1, splitPaidCount: 0 })],
+      TENANTS,
+    );
+    expect(rowFor(model, "i1").split).toBeNull();
   });
 
   it("splits rent from expenses, defaulting a missing kind to rent", () => {
