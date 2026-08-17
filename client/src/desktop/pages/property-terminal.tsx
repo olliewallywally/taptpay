@@ -55,6 +55,15 @@ const INITIAL_CHARGE_TYPE = "utilities";
 const INITIAL_DESCRIPTION =
   CHARGE_TYPES.find((c) => c.id === INITIAL_CHARGE_TYPE)!.preset;
 
+/* Matching the phone's DUE_OPTIONS (`View:70-74`). */
+const DUE_OPTIONS = [
+  { days: 0, label: "on receipt" },
+  { days: 7, label: "in 7 days" },
+  { days: 14, label: "in 14 days" },
+];
+const INITIAL_DUE_DAYS = 7;
+const MAX_DOC_BYTES = 20 * 1024 * 1024;
+
 const FREQUENCIES = ["once", "weekly", "fortnightly", "monthly"] as const;
 type Frequency = (typeof FREQUENCIES)[number];
 const FREQ_LABEL: Record<Frequency, string> = {
@@ -122,6 +131,10 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
   const [frequency, setFrequency] = useState<Frequency>("once");
   const [chargeType, setChargeType] = useState(INITIAL_CHARGE_TYPE);
   const [description, setDescription] = useState(INITIAL_DESCRIPTION);
+  const [dueDays, setDueDays] = useState(INITIAL_DUE_DAYS);
+  const [docUrl, setDocUrl] = useState<string | null>(null);
+  const [docName, setDocName] = useState("");
+  const [uploadingDoc, setUploadingDoc] = useState(false);
   const [search, setSearch] = useState("");
   const [tenantSearch, setTenantSearch] = useState("");
   const [filter, setFilter] = useState<PropertyStackFilter>(() =>
@@ -238,6 +251,8 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
 
   const sendBill = useMutation({
     mutationFn: async () => {
+      const due = new Date();
+      due.setDate(due.getDate() + dueDays);
       const res = await fetch("/api/property/invoices", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...propHeaders() },
@@ -245,11 +260,12 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
           tenantProfileId: tenantId,
           amountCents,
           deliveryChannel: channel,
-          dueAt: new Date().toISOString(),
+          dueAt: due.toISOString(),
           splitEnabled: false,
           kind: "charge",
           chargeType,
           description,
+          ...(docUrl ? { documentUrl: docUrl, documentName: docName } : null),
         }),
       });
       if (!res.ok) {
@@ -269,6 +285,8 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
       setAmountCents(0);
       setChargeType(INITIAL_CHARGE_TYPE);
       setDescription(INITIAL_DESCRIPTION);
+      setDueDays(INITIAL_DUE_DAYS);
+      clearDoc();
     },
     onError: (e: any) =>
       toast({ title: e?.message || "Failed to send bill", variant: "destructive" }),
@@ -384,6 +402,46 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
     setAmountCents(menuInvoice.amountCents ?? 0);
     closeRowMenu();
     setMode("request");
+  };
+
+  /* ── attached invoice document ── */
+  const clearDoc = () => {
+    setDocUrl(null);
+    setDocName("");
+  };
+
+  /* Uploads on pick, so the merchant sees the attachment land before sending.
+     The 20MB guard is the phone's (`controller:380`). */
+  const uploadDoc = async (file: File) => {
+    if (file.size > MAX_DOC_BYTES) {
+      toast({ title: "File must be under 20MB", variant: "destructive" });
+      return;
+    }
+    setUploadingDoc(true);
+    try {
+      const body = new FormData();
+      body.append("document", file);
+      const res = await fetch("/api/property/invoices/document", {
+        method: "POST",
+        headers: propHeaders(),
+        body,
+      });
+      if (!res.ok) {
+        notifyIfBillingCardRequired(res);
+        const message = await res
+          .json()
+          .then((d: any) => d.message)
+          .catch(() => "Upload failed");
+        throw new Error(message);
+      }
+      const { documentUrl, documentName } = await res.json();
+      setDocUrl(documentUrl);
+      setDocName(documentName || file.name);
+    } catch (e: any) {
+      toast({ title: e?.message || "Failed to upload document", variant: "destructive" });
+    } finally {
+      setUploadingDoc(false);
+    }
   };
 
   /* ── actions ── */
@@ -902,6 +960,52 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                 aria-label="bill description"
               />
 
+              <div className="pt-bill-label">DUE</div>
+              <div className="pt-bill-due">
+                {DUE_OPTIONS.map((d) => (
+                  <button
+                    key={d.days}
+                    type="button"
+                    className="pt-freq-chip"
+                    style={chip(d.days === dueDays, 1.5)}
+                    onClick={() => setDueDays(d.days)}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="pt-bill-label">SUPPORTING INVOICE</div>
+              {docUrl ? (
+                <div className="pt-bill-attach pt-bill-attached">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /></svg>
+                  <span className="pt-bill-doc-name">{docName}</span>
+                  <button type="button" className="pt-bill-doc-remove" onClick={clearDoc}>
+                    remove
+                  </button>
+                </div>
+              ) : (
+                <label
+                  className="pt-bill-attach"
+                  style={uploadingDoc ? { opacity: 0.6 } : undefined}
+                >
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 17V5" /><path d="m6.5 10.5 5.5-5.5 5.5 5.5" /><path d="M5 19h14" /></svg>
+                  <span>{uploadingDoc ? "uploading…" : "attach invoice (PDF/image)"}</span>
+                  <input
+                    type="file"
+                    accept="application/pdf,image/*"
+                    aria-label="attach invoice"
+                    disabled={uploadingDoc}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      /* Clear the input so re-picking the same file re-fires. */
+                      e.target.value = "";
+                      if (file) void uploadDoc(file);
+                    }}
+                  />
+                </label>
+              )}
+
               <button
                 type="button"
                 className="pt-send-btn pt-bill-send"
@@ -1069,16 +1173,27 @@ const PT_CSS = `
 .pt-kp-key { width:80px; height:80px; border-radius:50%; font-size:34px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; font-family:'Outfit',sans-serif; box-sizing:border-box; transition:opacity .12s ease; }
 .pt-kp-key:hover { opacity:0.88; }
 
-/* bill */
-.pt-bill { margin-top:56px; }
+/* bill — margins tightened from 56/30 to buy back the 40px the due chips and
+   the attach row need inside the 787px panel. */
+.pt-bill { margin-top:40px; }
 .pt-bill-amt { font-family:'Outfit',sans-serif; font-weight:700; font-size:54px; line-height:0.95; color:${KP_INK}; font-variant-numeric:tabular-nums; }
 .pt-bill-name { margin-top:12px; font-weight:300; font-size:15px; color:${TEXT_SOFT}; }
 .pt-bill-sub { margin-top:3px; font-weight:500; font-size:12.5px; color:rgba(244,246,255,0.5); }
-.pt-bill-label { margin-top:30px; font-weight:700; font-size:10px; letter-spacing:0.18em; color:rgba(244,246,255,0.45); }
+.pt-bill-label { margin-top:24px; font-weight:700; font-size:10px; letter-spacing:0.18em; color:rgba(244,246,255,0.45); }
 .pt-bill-chips { margin-top:12px; display:flex; flex-wrap:wrap; gap:10px; max-width:430px; }
 .pt-bill-chip { padding:11px 20px; border-radius:9999px; font-size:12.5px; cursor:pointer; transition:background .15s ease, color .15s ease; }
 .pt-bill-input { margin-top:12px; width:430px; height:50px; box-sizing:border-box; border-radius:9999px; border:none; outline:none; background:#fff; padding:0 22px; color:${INK}; font-family:'Outfit',sans-serif; font-weight:600; font-size:14px; }
-.pt-bill-send { display:block; margin:34px auto 0; }
+/* Same object as .pt-freq-chips on the request screen, so the two chip rows read
+   identically across the two panels. */
+.pt-bill-due { display:flex; gap:10px; margin-top:12px; width:430px; }
+.pt-bill-attach { margin-top:12px; display:flex; align-items:center; gap:12px; width:430px; height:50px; padding:0 18px; box-sizing:border-box; border-radius:12px; border:1.5px dashed rgba(94,158,255,0.4); color:${ACCENT_SOFT}; font-weight:600; font-size:12.5px; cursor:pointer; transition:background .15s ease, border-color .15s ease; }
+.pt-bill-attach:hover { background:rgba(94,158,255,0.07); }
+.pt-bill-attach input { display:none; }
+.pt-bill-attached { border-style:solid; border-color:rgba(94,158,255,0.55); cursor:default; }
+.pt-bill-attached:hover { background:transparent; }
+.pt-bill-doc-name { flex:1; min-width:0; color:${TEXT_SOFT}; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pt-bill-doc-remove { flex:0 0 auto; font-weight:300; font-size:12px; color:${ACCENT_SOFT}; background:transparent; cursor:pointer; }
+.pt-bill-send { display:block; margin:28px auto 0; }
 
 /* mark paid */
 .pt-paid { margin-top:100px; }

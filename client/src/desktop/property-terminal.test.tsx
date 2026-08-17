@@ -87,6 +87,8 @@ const INVOICES = [
 
 let invoicePosts: Record<string, unknown>[];
 let rowActionCalls: string[];
+let docUploads: string[];
+let docUploadHandler: (file: File) => Response;
 
 const jsonResponse = (body: unknown, status = 200): Response =>
   ({
@@ -108,6 +110,12 @@ function installFetchMock() {
       const body = JSON.parse(String(init?.body ?? "{}"));
       invoicePosts.push(body);
       return jsonResponse({ id: `new-${invoicePosts.length}` });
+    }
+    if (method === "POST" && url === "/api/property/invoices/document") {
+      const body = init?.body as FormData;
+      const file = body.get("document") as File;
+      docUploads.push(file.name);
+      return docUploadHandler(file);
     }
     const rowAction = url.match(
       /^\/api\/property\/invoices\/([\w-]+)\/(resend|void|mark-paid-external)$/,
@@ -164,6 +172,9 @@ beforeEach(() => {
   jest.clearAllMocks();
   invoicePosts = [];
   rowActionCalls = [];
+  docUploads = [];
+  docUploadHandler = (file) =>
+    jsonResponse({ documentUrl: `https://docs.example/${file.name}`, documentName: file.name });
   enterWith("");
   installFetchMock();
 });
@@ -303,6 +314,101 @@ describe("desktop property terminal — row actions", () => {
 
     await openRowMenu(user, "Mia Chen, sent");
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+});
+
+describe("desktop property terminal — bill due date and attachment", () => {
+  const daysFromNow = (iso: string) =>
+    Math.round((new Date(iso).getTime() - Date.now()) / 86_400_000) || 0;
+
+  it("defaults to due in 7 days and honours the chosen chip", async () => {
+    const { user } = renderTerminal();
+    await pickTenant(user);
+    await user.click(railButton("send bill"));
+
+    await user.click(panelSendButton("send bill"));
+    await waitFor(() => expect(invoicePosts).toHaveLength(1));
+    expect(daysFromNow(invoicePosts[0].dueAt as string)).toBe(7);
+
+    await user.click(screen.getByRole("button", { name: "on receipt" }));
+    await user.click(screen.getByRole("button", { name: "keypad" }));
+    for (const key of ["5", "0"]) await user.click(screen.getByRole("button", { name: key }));
+    await user.click(screen.getByRole("button", { name: "confirm amount" }));
+    await user.click(railButton("send bill"));
+    /* A send resets the choice, so it has to be re-picked. */
+    await user.click(screen.getByRole("button", { name: "on receipt" }));
+    await user.click(panelSendButton("send bill"));
+
+    await waitFor(() => expect(invoicePosts).toHaveLength(2));
+    expect(daysFromNow(invoicePosts[1].dueAt as string)).toBe(0);
+  });
+
+  it("uploads an attachment on pick and sends it with the bill", async () => {
+    const { user } = renderTerminal();
+    await pickTenant(user);
+    await user.click(railButton("send bill"));
+
+    const file = new File(["%PDF-1.4"], "power-bill.pdf", { type: "application/pdf" });
+    await user.upload(screen.getByLabelText("attach invoice"), file);
+
+    await waitFor(() => expect(docUploads).toEqual(["power-bill.pdf"]));
+    expect(await screen.findByText("power-bill.pdf")).toBeInTheDocument();
+
+    await user.click(panelSendButton("send bill"));
+    await waitFor(() => expect(invoicePosts).toHaveLength(1));
+    expect(invoicePosts[0]).toMatchObject({
+      documentUrl: "https://docs.example/power-bill.pdf",
+      documentName: "power-bill.pdf",
+    });
+  });
+
+  it("drops the attachment when it is removed, and after a send", async () => {
+    const { user } = renderTerminal();
+    await pickTenant(user);
+    await user.click(railButton("send bill"));
+
+    const file = new File(["%PDF-1.4"], "water.pdf", { type: "application/pdf" });
+    await user.upload(screen.getByLabelText("attach invoice"), file);
+    await screen.findByText("water.pdf");
+
+    await user.click(screen.getByRole("button", { name: "remove" }));
+    expect(screen.getByLabelText("attach invoice")).toBeInTheDocument();
+
+    await user.click(panelSendButton("send bill"));
+    await waitFor(() => expect(invoicePosts).toHaveLength(1));
+    expect(invoicePosts[0]).not.toHaveProperty("documentUrl");
+  });
+
+  it("refuses a file over 20MB without calling the server", async () => {
+    const { user } = renderTerminal();
+    await pickTenant(user);
+    await user.click(railButton("send bill"));
+
+    const big = new File(["x"], "huge.pdf", { type: "application/pdf" });
+    Object.defineProperty(big, "size", { value: 21 * 1024 * 1024 });
+    await user.upload(screen.getByLabelText("attach invoice"), big);
+
+    expect(docUploads).toEqual([]);
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "File must be under 20MB" }),
+    );
+  });
+
+  it("surfaces an upload failure and keeps the attach row", async () => {
+    docUploadHandler = () => jsonResponse({ message: "Unsupported file type" }, 415);
+    const { user } = renderTerminal();
+    await pickTenant(user);
+    await user.click(railButton("send bill"));
+
+    const file = new File(["x"], "notes.pdf", { type: "application/pdf" });
+    await user.upload(screen.getByLabelText("attach invoice"), file);
+
+    await waitFor(() =>
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "Unsupported file type" }),
+      ),
+    );
+    expect(screen.getByLabelText("attach invoice")).toBeInTheDocument();
   });
 });
 
