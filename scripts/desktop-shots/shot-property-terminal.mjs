@@ -165,6 +165,10 @@ async function shoot(browser, label, ctxOpts) {
   /* mark as paid */
   await page.getByRole("button", { name: "mark as paid" }).click();
   await shot("8-mark-paid");
+  /* the row expands in place for an optional external reference */
+  await page.getByRole("button", { name: "mark Mia Chen paid" }).first().click();
+  await shot("8b-mark-paid-reference");
+  await page.getByRole("button", { name: "cancel" }).click();
 
   /* row actions: the anchored popover and its in-surface cancel confirmation */
   await page.getByRole("button", { name: "actions for Mia Chen, overdue" }).click();

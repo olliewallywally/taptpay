@@ -177,6 +177,8 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
   const [rowMenu, setRowMenu] = useState<{ id: string; top: number } | null>(null);
   const [confirmVoid, setConfirmVoid] = useState(false);
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
+  const [refRowId, setRefRowId] = useState<string | null>(null);
+  const [refValue, setRefValue] = useState("");
   const rowsRef = useRef<HTMLDivElement | null>(null);
   const stackRef = useRef<HTMLDivElement | null>(null);
   const rowMenuRef = useRef<HTMLDivElement | null>(null);
@@ -335,11 +337,19 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
   });
 
   const markPaid = useMutation({
-    mutationFn: async (invoiceId: string) => {
+    mutationFn: async ({
+      invoiceId,
+      reference,
+    }: {
+      invoiceId: string;
+      reference?: string;
+    }) => {
       const res = await fetch(`/api/property/invoices/${invoiceId}/mark-paid-external`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...propHeaders() },
-        body: JSON.stringify({ externalPaymentReference: null }),
+        /* The column exists and the phone captures it; the desktop used to
+           hard-code null. Blank still sends null. */
+        body: JSON.stringify({ externalPaymentReference: reference?.trim() || null }),
       });
       if (!res.ok) throw new Error("Failed to mark");
       return res.json();
@@ -513,6 +523,20 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
   });
 
   const scheduleBusy = setScheduleStatus.isPending || cancelSchedule.isPending;
+
+  /* ── mark-paid, with an optional external reference ── */
+  const openRefRow = (id: string) => {
+    setRefRowId((open) => (open === id ? null : id));
+    setRefValue("");
+  };
+  const closeRefRow = () => {
+    setRefRowId(null);
+    setRefValue("");
+  };
+  const confirmRefRow = (id: string) => {
+    markPaid.mutate({ invoiceId: id, reference: refValue });
+    closeRefRow();
+  };
 
   /* ── attached invoice document ── */
   const clearDoc = () => {
@@ -851,7 +875,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                       className="pt-row-opt"
                       disabled={menuBusy}
                       onClick={() => {
-                        markPaid.mutate(menuRow.id);
+                        markPaid.mutate({ invoiceId: menuRow.id });
                         closeRowMenu();
                       }}
                     >
@@ -1373,21 +1397,53 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                   model.rows
                     .filter((r) => r.bucket !== "paid")
                     .map((r) => (
-                      <div key={r.id} className="pt-paid-row">
-                        <span className="pt-paid-mid">
-                          <span className="pt-row-name">{r.name}</span>
-                          <span className="pt-row-status">{r.label}</span>
-                        </span>
-                        <span className="pt-row-amt">{fmtNZD(r.amountCents)}</span>
-                        <button
-                          type="button"
-                          className="pt-paid-btn"
-                          aria-label={`mark ${r.name} paid`}
-                          disabled={markPaid.isPending}
-                          onClick={() => markPaid.mutate(r.id)}
-                        >
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={GREEN} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5L19 8" /></svg>
-                        </button>
+                      <div key={r.id} className="pt-paid-cell">
+                        <div className="pt-paid-row">
+                          <span className="pt-paid-mid">
+                            <span className="pt-row-name">{r.name}</span>
+                            <span className="pt-row-status">{r.label}</span>
+                          </span>
+                          <span className="pt-row-amt">{fmtNZD(r.amountCents)}</span>
+                          <button
+                            type="button"
+                            className="pt-paid-btn"
+                            aria-label={`mark ${r.name} paid`}
+                            aria-expanded={refRowId === r.id}
+                            disabled={markPaid.isPending}
+                            onClick={() => openRefRow(r.id)}
+                          >
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={GREEN} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5L19 8" /></svg>
+                          </button>
+                        </div>
+                        {/* Expands in place — the flat list stays flat, and only
+                            one row is ever open. */}
+                        {refRowId === r.id && (
+                          <div className="pt-paid-ref">
+                            <input
+                              className="pt-paid-ref-input"
+                              value={refValue}
+                              autoFocus
+                              placeholder="reference (optional)"
+                              aria-label={`payment reference for ${r.name}`}
+                              onChange={(e) => setRefValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Escape") closeRefRow();
+                                if (e.key === "Enter") confirmRefRow(r.id);
+                              }}
+                            />
+                            <button
+                              type="button"
+                              className="pt-auto-btn"
+                              disabled={markPaid.isPending}
+                              onClick={() => confirmRefRow(r.id)}
+                            >
+                              confirm
+                            </button>
+                            <button type="button" className="pt-auto-btn" onClick={closeRefRow}>
+                              cancel
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))
                 )}
@@ -1572,7 +1628,12 @@ const PT_CSS = `
 .pt-paid { margin-top:100px; }
 .pt-paid-rows { margin-top:22px; display:flex; flex-direction:column; width:440px; max-height:380px; overflow-y:auto; scrollbar-width:none; }
 .pt-paid-rows::-webkit-scrollbar { display:none; }
+.pt-paid-cell { display:flex; flex-direction:column; border-bottom:1px solid rgba(94,158,255,0.14); }
+.pt-paid-cell .pt-paid-row { border-bottom:none; }
 .pt-paid-row { display:flex; align-items:center; gap:14px; padding:11px 0; border-bottom:1px solid rgba(94,158,255,0.14); }
+.pt-paid-ref { display:flex; align-items:center; gap:8px; padding:0 0 11px; }
+/* .pt-bill-input's treatment at a smaller size. */
+.pt-paid-ref-input { flex:1; min-width:0; height:36px; box-sizing:border-box; border-radius:9999px; border:none; outline:none; background:#fff; padding:0 16px; color:${INK}; font-family:'Outfit',sans-serif; font-weight:600; font-size:12.5px; }
 .pt-paid-mid { display:flex; flex-direction:column; gap:2px; flex:1; min-width:0; }
 .pt-paid-btn { width:34px; height:34px; border-radius:50%; border:1.5px solid rgba(53,208,127,0.5); display:flex; align-items:center; justify-content:center; background:transparent; cursor:pointer; flex:0 0 auto; transition:background .15s ease; }
 .pt-paid-btn:hover:not(:disabled) { background:rgba(53,208,127,0.12); }

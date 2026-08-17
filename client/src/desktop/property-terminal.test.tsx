@@ -101,6 +101,7 @@ const INVOICES = [
 
 let invoicePosts: Record<string, unknown>[];
 let rowActionCalls: string[];
+let markPaidBodies: Record<string, unknown>[];
 let docUploads: string[];
 let docUploadHandler: (file: File) => Response;
 let schedules: Record<string, unknown>[];
@@ -162,6 +163,9 @@ function installFetchMock() {
     );
     if (method === "POST" && rowAction) {
       rowActionCalls.push(`${rowAction[2]}:${rowAction[1]}`);
+      if (rowAction[2] === "mark-paid-external") {
+        markPaidBodies.push(JSON.parse(String(init?.body ?? "{}")));
+      }
       return jsonResponse({ id: rowAction[1] });
     }
     throw new Error(`Unhandled test request: ${method} ${url}`);
@@ -212,6 +216,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   invoicePosts = [];
   rowActionCalls = [];
+  markPaidBodies = [];
   docUploads = [];
   schedules = [
     {
@@ -525,6 +530,70 @@ describe("desktop property terminal — split", () => {
     expect(
       screen.getByRole("button", { name: "actions for Ruby Nolan, sent" }),
     ).toHaveTextContent("$300.00");
+  });
+});
+
+describe("desktop property terminal — external payment reference", () => {
+  const openMarkPaid = (user: ReturnType<typeof userEvent.setup>) =>
+    user.click(screen.getByRole("button", { name: "mark as paid" }));
+
+  it("records the reference typed into the expanded row", async () => {
+    const { user } = renderTerminal();
+    await openMarkPaid(user);
+
+    await user.click(await screen.findByRole("button", { name: "mark Mia Chen paid" }));
+    await user.type(
+      screen.getByRole("textbox", { name: "payment reference for Mia Chen" }),
+      "ANZ 4471",
+    );
+    await user.click(screen.getByRole("button", { name: "confirm" }));
+
+    await waitFor(() => expect(rowActionCalls).toEqual(["mark-paid-external:i1"]));
+    expect(markPaidBodies[0]).toEqual({ externalPaymentReference: "ANZ 4471" });
+    expect(
+      screen.queryByRole("textbox", { name: "payment reference for Mia Chen" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("sends null when the reference is left blank", async () => {
+    const { user } = renderTerminal();
+    await openMarkPaid(user);
+
+    await user.click(await screen.findByRole("button", { name: "mark Mia Chen paid" }));
+    await user.click(screen.getByRole("button", { name: "confirm" }));
+
+    await waitFor(() => expect(rowActionCalls).toHaveLength(1));
+    expect(markPaidBodies[0]).toEqual({ externalPaymentReference: null });
+  });
+
+  it("keeps one row open at a time and does not mark on expand", async () => {
+    const { user } = renderTerminal();
+    await openMarkPaid(user);
+
+    await user.click(await screen.findByRole("button", { name: "mark Mia Chen paid" }));
+    expect(rowActionCalls).toEqual([]);
+
+    await user.click(screen.getAllByRole("button", { name: /^mark Tane Walker paid$/ })[0]);
+    expect(
+      screen.queryByRole("textbox", { name: "payment reference for Mia Chen" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByRole("textbox", { name: /^payment reference for/ })).toHaveLength(1);
+  });
+
+  it("collapses on Escape without marking", async () => {
+    const { user } = renderTerminal();
+    await openMarkPaid(user);
+
+    await user.click(await screen.findByRole("button", { name: "mark Mia Chen paid" }));
+    await user.type(
+      screen.getByRole("textbox", { name: "payment reference for Mia Chen" }),
+      "typo{Escape}",
+    );
+
+    expect(rowActionCalls).toEqual([]);
+    expect(
+      screen.queryByRole("textbox", { name: "payment reference for Mia Chen" }),
+    ).not.toBeInTheDocument();
   });
 });
 
