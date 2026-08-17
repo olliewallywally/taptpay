@@ -25,7 +25,9 @@ const TENANTS = [
   { id: "t4", firstName: "Ruby", lastName: "Nolan", propertyAddress: "12 Kauri Road", status: "active", phone: "0224444444", email: "ruby@example.com" },
 ];
 
-const INVOICES = [
+/* Statuses are the schema's own (`shared/schema.ts:1018`) — there is no "sent"
+   or "failed" row in production. */
+const RAW_INVOICES = [
   /* collected this week */
   { id: "i1", tenantProfileId: "t1", amountCents: 65000, status: "paid", dueAt: at(6), paidAt: at(6), createdAt: at(8), kind: "rent" },
   { id: "i2", tenantProfileId: "t2", amountCents: 80000, status: "paid", dueAt: at(5), paidAt: at(5), createdAt: at(7), kind: "rent" },
@@ -35,11 +37,30 @@ const INVOICES = [
   /* attention needed */
   { id: "i6", tenantProfileId: "t2", amountCents: 80000, status: "overdue", dueAt: at(4), createdAt: at(11), kind: "rent" },
   { id: "i7", tenantProfileId: "t3", amountCents: 52000, status: "overdue", dueAt: at(9), createdAt: at(16), kind: "rent" },
-  { id: "i8", tenantProfileId: "t4", amountCents: 24000, status: "failed", dueAt: at(2), createdAt: at(4), kind: "charge", description: "water bill" },
+  { id: "i8", tenantProfileId: "t4", amountCents: 24000, status: "dispatch_failed", dueAt: at(2), createdAt: at(4), kind: "charge", chargeType: "utilities", description: "water bill" },
   /* due in the next week */
-  { id: "i9", tenantProfileId: "t1", amountCents: 65000, status: "sent", dueAt: ahead(2), createdAt: at(1), kind: "rent" },
-  { id: "i10", tenantProfileId: "t2", amountCents: 80000, status: "sent", dueAt: ahead(5), createdAt: at(1), kind: "rent" },
+  { id: "i9", tenantProfileId: "t1", amountCents: 65000, status: "dispatched", dueAt: ahead(2), createdAt: at(1), kind: "rent" },
+  { id: "i10", tenantProfileId: "t2", amountCents: 80000, status: "dispatched", dueAt: ahead(5), createdAt: at(1), kind: "rent" },
+  /* a 4-way split with 3 shares paid: $150 of $600 is still owed */
+  { id: "i11", tenantProfileId: "t3", amountCents: 60000, status: "dispatched", dueAt: ahead(4), createdAt: at(2), kind: "rent", splitEnabled: true, splitCount: 4, splitPaidCount: 3 },
+  /* queued but not yet dispatched — reads "awaiting send", not "sent" */
+  { id: "i12", tenantProfileId: "t4", amountCents: 61000, status: "pending_dispatch", dueAt: ahead(6), createdAt: at(0), kind: "rent" },
 ];
+
+/* Mirrors the enrichment `GET /api/property/invoices` performs
+   (`server/routes.ts:7433-7445`), so the fixtures exercise the same fields. */
+const INVOICES = RAW_INVOICES.map((inv) => {
+  const t = TENANTS.find((x) => x.id === inv.tenantProfileId);
+  const isSplit = inv.splitEnabled && inv.splitCount > 1;
+  const base = isSplit ? Math.floor(inv.amountCents / inv.splitCount) : 0;
+  return {
+    ...inv,
+    tenantName: t ? `${t.firstName} ${t.lastName}` : "—",
+    propertyAddress: t ? t.propertyAddress : "—",
+    owingCents: isSplit ? inv.amountCents - (inv.splitPaidCount || 0) * base : inv.amountCents,
+    sharesLeft: isSplit ? inv.splitCount - (inv.splitPaidCount || 0) : null,
+  };
+});
 
 const SCHEDULES = [
   { id: "s1", tenantProfileId: "t1", amountCents: 65000, frequency: "weekly", status: "active", nextRunDate: ahead(2) },

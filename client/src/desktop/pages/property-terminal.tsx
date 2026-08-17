@@ -17,6 +17,11 @@ import {
   formatDesktopKeypadMoney,
   type DesktopKeypadKey,
 } from "../desktop-keypad";
+import {
+  PROPERTY_STACK_FILTERS,
+  buildPropertyTerminalModel,
+  type PropertyStackFilter,
+} from "../data/property-terminal-model";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -52,9 +57,6 @@ const FREQ_LABEL: Record<Frequency, string> = {
   monthly: "per month",
 };
 
-const STACK_FILTERS = ["all", "overdue", "sent", "paid", "failed"] as const;
-type StackFilter = (typeof STACK_FILTERS)[number];
-
 function addInterval(from: Date, frequency: string): Date {
   const d = new Date(from);
   if (frequency === "weekly") d.setDate(d.getDate() + 7);
@@ -67,14 +69,6 @@ const initialsOf = (t: any) =>
   `${t?.firstName?.[0] ?? ""}${t?.lastName?.[0] ?? ""}`.toUpperCase() || "?";
 const fullNameOf = (t: any) => `${t?.firstName ?? ""} ${t?.lastName ?? ""}`.trim() || "tenant";
 const whole = (cents: number) => "$" + Math.round(cents / 100).toLocaleString("en-NZ");
-
-/* The design's list buckets, mapped onto real invoice statuses. */
-function bucketOf(status: string): Exclude<StackFilter, "all"> {
-  if (status === "paid" || status === "paid_external") return "paid";
-  if (status === "overdue") return "overdue";
-  if (status === "dispatch_failed" || status === "failed") return "failed";
-  return "sent";
-}
 
 const STATUS_DOT: Record<string, string> = {
   overdue: AMBER,
@@ -96,7 +90,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
   const [description, setDescription] = useState("Water / utilities");
   const [search, setSearch] = useState("");
   const [tenantSearch, setTenantSearch] = useState("");
-  const [filter, setFilter] = useState<StackFilter>("all");
+  const [filter, setFilter] = useState<PropertyStackFilter>("all");
   const [reqFlash, setReqFlash] = useState(false);
   const [billFlash, setBillFlash] = useState(false);
 
@@ -110,48 +104,10 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
   const channelContact = channel === "email" ? tenant?.email : tenant?.phone;
 
   /* ── left column figures + request list ── */
-  const model = useMemo(() => {
-    const live = invoices.filter((i: any) => i.status !== "voided");
-    const unpaid = live.filter((i: any) => i.status !== "paid" && i.status !== "paid_external");
-    const outstandingRent = unpaid
-      .filter((i: any) => (i.kind ?? "rent") === "rent")
-      .reduce((s: number, i: any) => s + (i.amountCents ?? 0), 0);
-    const outstandingExpenses = unpaid
-      .filter((i: any) => i.kind === "charge")
-      .reduce((s: number, i: any) => s + (i.amountCents ?? 0), 0);
-
-    const byId = new Map(tenants.map((t: any) => [t.id, t]));
-    const rows = [...live]
-      .sort(
-        (a: any, b: any) =>
-          new Date(b.createdAt ?? b.dueAt).getTime() - new Date(a.createdAt ?? a.dueAt).getTime(),
-      )
-      .map((i: any) => {
-        const t = byId.get(i.tenantProfileId);
-        const bucket = bucketOf(i.status);
-        return {
-          id: i.id as string,
-          name: t ? fullNameOf(t) : "tenant",
-          initials: t ? initialsOf(t) : "?",
-          bucket,
-          status:
-            bucket === "paid"
-              ? i.status === "paid_external"
-                ? "paid · marked"
-                : "paid"
-              : bucket === "overdue"
-                ? "overdue"
-                : bucket === "failed"
-                  ? "delivery failed"
-                  : (i.kind ?? "rent") === "charge"
-                    ? `sent · ${i.chargeType ?? "charge"}`
-                    : "sent",
-          amt: fmtNZD(i.amountCents ?? 0),
-        };
-      });
-
-    return { outstandingRent, outstandingExpenses, rows };
-  }, [invoices, tenants]);
+  const model = useMemo(
+    () => buildPropertyTerminalModel(invoices, tenants),
+    [invoices, tenants],
+  );
 
   const q = search.trim().toLowerCase();
   const stackRows = model.rows
@@ -420,7 +376,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
             </div>
 
             <div className="pt-chips">
-              {STACK_FILTERS.map((f) => (
+              {PROPERTY_STACK_FILTERS.map((f) => (
                 <button key={f} type="button" className="pt-chip" style={chip(f === filter)} onClick={() => setFilter(f)}>
                   {f}
                 </button>
@@ -439,11 +395,17 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                     <span className="pt-row-mid">
                       <span className="pt-row-name">{r.name}</span>
                       <span className="pt-row-status">
-                        <span className="pt-dot" style={{ background: STATUS_DOT[r.bucket] }} />
-                        {r.status}
+                        <span
+                          className="pt-dot"
+                          style={{
+                            background: STATUS_DOT[r.bucket],
+                            ...(r.awaiting ? { opacity: 0.5 } : null),
+                          }}
+                        />
+                        {r.label}
                       </span>
                     </span>
-                    <span className="pt-row-amt">{r.amt}</span>
+                    <span className="pt-row-amt">{fmtNZD(r.amountCents)}</span>
                   </div>
                 ))
               )}
@@ -697,9 +659,9 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                       <div key={r.id} className="pt-paid-row">
                         <span className="pt-paid-mid">
                           <span className="pt-row-name">{r.name}</span>
-                          <span className="pt-row-status">{r.status}</span>
+                          <span className="pt-row-status">{r.label}</span>
                         </span>
-                        <span className="pt-row-amt">{r.amt}</span>
+                        <span className="pt-row-amt">{fmtNZD(r.amountCents)}</span>
                         <button
                           type="button"
                           className="pt-paid-btn"
