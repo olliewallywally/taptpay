@@ -97,7 +97,11 @@ async function shoot(browser, label, ctxOpts) {
   const page = await context.newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(`${label}: ${e.message}`));
-  page.on("console", (m) => m.type() === "error" && errors.push(`${label} console: ${m.text()}`));
+  page.on("console", (m) => {
+    if (m.type() !== "error") return;
+    const at = m.location()?.url;
+    errors.push(`${label} console: ${m.text()}${at ? ` (${at})` : ""}`);
+  });
   await installMocks(page);
 
   await page.goto(`${BASE_URL}/property/terminal`, { waitUntil: "networkidle" });
@@ -123,6 +127,8 @@ async function shoot(browser, label, ctxOpts) {
 
   /* keypad */
   await page.getByRole("button", { name: "keypad" }).click();
+  /* An empty keypad cannot be confirmed — the tick dims rather than sending $0. */
+  await shot("5-keypad-empty");
   for (const k of ["7", "5", "0"]) await page.getByRole("button", { name: k, exact: true }).click();
   await shot("5-keypad");
   await page.getByRole("button", { name: "confirm amount" }).click();

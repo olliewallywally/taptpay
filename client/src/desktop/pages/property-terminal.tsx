@@ -48,6 +48,13 @@ const CHARGE_TYPES = [
   { id: "other", label: "other", preset: "" },
 ];
 
+/* A chip may replace the description only while it still holds a preset — a
+   description the merchant typed is theirs (the phone's rule, `View:580-584`). */
+const CHARGE_PRESETS = CHARGE_TYPES.map((c) => c.preset).filter(Boolean);
+const INITIAL_CHARGE_TYPE = "utilities";
+const INITIAL_DESCRIPTION =
+  CHARGE_TYPES.find((c) => c.id === INITIAL_CHARGE_TYPE)!.preset;
+
 const FREQUENCIES = ["once", "weekly", "fortnightly", "monthly"] as const;
 type Frequency = (typeof FREQUENCIES)[number];
 const FREQ_LABEL: Record<Frequency, string> = {
@@ -86,8 +93,8 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
   const [amountCents, setAmountCents] = useState(0);
   const [kpVal, setKpVal] = useState("");
   const [frequency, setFrequency] = useState<Frequency>("once");
-  const [chargeType, setChargeType] = useState("utilities");
-  const [description, setDescription] = useState("Water / utilities");
+  const [chargeType, setChargeType] = useState(INITIAL_CHARGE_TYPE);
+  const [description, setDescription] = useState(INITIAL_DESCRIPTION);
   const [search, setSearch] = useState("");
   const [tenantSearch, setTenantSearch] = useState("");
   const [filter, setFilter] = useState<PropertyStackFilter>("all");
@@ -185,6 +192,10 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
       setReqFlash(true);
       setTimeout(() => setReqFlash(false), 1600);
       setFrequency("once");
+      /* Zeroing the amount is what stops a second click issuing a second
+         invoice. The tenant stays selected — that is the useful desktop state,
+         and the 1.6s "sent ✓" flash covers the transition. */
+      setAmountCents(0);
     },
     onError: (e: any) => toast({ title: e?.message || "Failed to send", variant: "destructive" }),
   });
@@ -219,6 +230,9 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
       queryClient.invalidateQueries({ queryKey: PROPERTY_KEYS.invoices as any });
       setBillFlash(true);
       setTimeout(() => setBillFlash(false), 1600);
+      setAmountCents(0);
+      setChargeType(INITIAL_CHARGE_TYPE);
+      setDescription(INITIAL_DESCRIPTION);
     },
     onError: (e: any) =>
       toast({ title: e?.message || "Failed to send bill", variant: "destructive" }),
@@ -285,6 +299,8 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
 
   const pressKey = (key: DesktopKeypadKey) =>
     setKpVal((value) => desktopKeypadReducer(value, key));
+
+  const kpCents = desktopKeypadCents(kpVal);
 
   const openKeypad = () => {
     setKpVal("");
@@ -550,8 +566,13 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                   type="button"
                   className="pt-kp-circle"
                   aria-label="confirm amount"
+                  aria-disabled={kpCents <= 0}
+                  style={kpCents <= 0 ? { opacity: 0.45, cursor: "default" } : undefined}
                   onClick={() => {
-                    setAmountCents(desktopKeypadCents(kpVal));
+                    /* Confirming an empty keypad used to set the amount to $0
+                       and drop the merchant back into the request panel. */
+                    if (kpCents <= 0) return;
+                    setAmountCents(kpCents);
                     setKpVal("");
                     setMode("request");
                   }}
@@ -612,7 +633,9 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                       }}
                       onClick={() => {
                         setChargeType(c.id);
-                        setDescription(c.preset);
+                        setDescription((d) =>
+                          !d.trim() || CHARGE_PRESETS.includes(d) ? c.preset : d,
+                        );
                       }}
                     >
                       {c.label}
