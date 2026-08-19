@@ -13,6 +13,7 @@
     "test:server": "jest --selectProjects server --runInBand",
     "test:server:postgres": "node --test scripts/postgres-verifier-safety.test.mjs && node scripts/verify-server-postgres.mjs",
     "test:server:postgres:safety": "node --test scripts/postgres-verifier-safety.test.mjs",
+    "verify:mobile": "node scripts/verify-mobile-responsive.mjs",
     "db:push": "drizzle-kit push",
     "db:migrate": "tsx server/migrate.ts",
     "db:migrate:status": "tsx server/migrate.ts --status",

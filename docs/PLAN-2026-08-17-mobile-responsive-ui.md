@@ -28,7 +28,7 @@ re-checked against the code or in a browser before being accepted.
 | Phase 4's grid targeted `.tp-screen`, which owns all seven terminal screens | **confirmed** — and the count was low: there are **31** (§6.6.1) | §6.4, home-only class |
 | The 320×568 budget omitted its own chrome-gutter row | **confirmed** | §4.3 budget table |
 | No landscape story at all | **confirmed gap** | §4.2, MD5 |
-| A fourth unscoped terminal stylesheet at `pages/trades/trades-terminal.tsx:520` | **confirmed**, worse than v1's RC-6 | §3 RC-6 |
+| A fourth unscoped terminal stylesheet at `pages/trades/trades-terminal.tsx:520` | **confirmed** — but v2's reading of *what that file is* was wrong, corrected 2026-08-19 (§1 MD7) | §3 RC-6 |
 | The tutorial targets `.tp-subbar` / `.tp-amount` directly | **confirmed** | §3 RC-6, §6.2 |
 | No CI workflow, no package script runs either verifier | **confirmed** | §7.5 |
 | The dock is a sibling of the router | **confirmed** (`App.tsx:1002-1004`) | companion §3.1 |
@@ -113,21 +113,40 @@ browser tab; it just need not meet the three-row contract.
   fixes the second but lets users zoom the terminal, which needs a look. Out of scope for
   this plan unless you want it in.
 
-**MD7 — The fourth trades terminal.** `client/src/pages/trades/trades-terminal.tsx` is a
-618-line second implementation of the trades terminal, live at `/trades/quote`, with its own
-screen state machine, its own `.tp-layer` shell and no `.tp-screen` elements at all — while
-exporting the `TP_TERM_CSS` whose global collision is RC-6. `features/terminal/trades/
-TradesTerminalView.tsx` is the one this plan and the companion both target.
+**MD7 — The fourth trades stylesheet.** ~~The fourth trades terminal.~~ **Settled from the
+code 2026-08-19; the question as posed rested on a wrong premise and no longer needs an
+answer.** Corrected below — see also §3 RC-6 and §5.1.
 
-- **Retire it** *(recommended, if `/trades/quote` is reachable only as a legacy route)* — it
-  removes the collision at its source and one of the four stylesheets outright.
-- **Bring it under the contract** — classify its screens, scope its CSS, and carry it through
-  every phase. Roughly a third more work in §5 and §7 for a screen that duplicates one already
-  being fixed.
+`client/src/pages/trades/trades-terminal.tsx` is **not** a second implementation of the trades
+terminal. It is the trades **controller**, and it is mounted at **`/trades/terminal`**
+(`App.tsx:932-935`) — the primary trades terminal for every phone merchant — not at
+`/trades/quote`. `TradesTerminal()` at `:155` renders `<TradesTerminalView>`, the shared feature
+view this plan and the companion both target, at `:459`. That is the same controller/view split
+retail uses, and `client/src/__tests__/trades-terminal-view-boundary.test.tsx:149-150` enforces
+it: the controller must import from `@/features/terminal/trades/TradesTerminalView` and render
+it. Its "zero `.tp-screen` elements" is therefore the expected shape of a controller, not a gap
+— the screens live in the view it delegates to.
 
-I could not settle this from the code: it is mounted and therefore reachable, but nothing
-indicates whether it is still the intended route. *(Changes §5.1, §6.6.1, the golden set in
-§7.1.)* **This is the one decision that changes the size of the job.**
+`/trades/quote` (`App.tsx:937-940`) renders `TradesQuoteBuilder`, a different and much smaller
+file: `pages/trades/quote-builder.tsx` is an 11-line direct-link fallback that imports
+`QuoteScreen` and `TP_TERM_CSS` from the controller and renders the one screen.
+
+What the controller does still carry is the residue of an **unfinished extraction**, and that
+is the real work:
+
+1. **`QuoteScreen`** (`:34-154`) — one screen never moved into `features/terminal/trades/`,
+   passed back into the view as the `quoteView` prop at `:480`.
+2. **`TP_TERM_CSS`** (`:520+`) — and **the controller never injects it.** The only injector in
+   the app is `quote-builder.tsx`, so RC-6's fourth unscoped stylesheet is live on exactly one
+   route, `/trades/quote`, not across the trades vertical.
+
+**"Retire it" was never available** — it is the live phone route with a test guarding it. And
+"bring it under the contract" overstated the cost: the extraction is already ~90% done. The
+work is to **finish it** — move `QuoteScreen` into `features/terminal/trades/`, verify
+`TP_TERM_CSS` against the already-scoped `trades-terminal-view.css` and delete it, and repoint
+`quote-builder.tsx` at the feature module. *(Changes §5.1 and §3 RC-6; no change to §6.6.1's
+count or the §7.1 golden set.)* **It is a scoped refactor inside phase 2, not a decision that
+resizes the job.**
 
 ---
 
@@ -298,13 +317,21 @@ in landscape, and nothing uses them.
 |---|---|---|
 | `RetailTerminalViewCore.jsx:1451` `TP_CSS` | **no** | baseline |
 | `PropertyTerminalView.tsx:1339` `TP_TERM_CSS` | **no** | `scale(0.85)`, `padding: 0 22px`, indicator `z-index: 2` |
-| `pages/trades/trades-terminal.tsx:520` `TP_TERM_CSS` | **no** | same divergences; mounted on its own route by `pages/trades/quote-builder.tsx:5` (`/trades/quote`) |
+| `pages/trades/trades-terminal.tsx:520` `TP_TERM_CSS` | **no** | same divergences. **Injected by `quote-builder.tsx` only** — the controller that exports it never does — so it is live on `/trades/quote` alone, not on `/trades/terminal` |
 | `features/terminal/trades/trades-terminal-view.css` | yes | scoped under `.trades-terminal-view` |
 
 Measured on `/property/terminal`: two `<style>` tags defining `.tp-subbar` live at once, and
 the bar renders `241×48` under `matrix(0.85, …)` instead of `316×56`. Whichever tag is later
 in the DOM wins. The `z-index: 2` variant paints the navy bubble **over** the label rather
 than behind it.
+
+**The fourth stylesheet is a duplicate, not a fork** *(established 2026-08-19)*. Every class
+name in `TP_TERM_CSS` also exists in the already-scoped `trades-terminal-view.css`, with none
+unique to it; 39 of its 66 selectors are byte-identical after colour-constant substitution. The
+remaining 27 could not be diffed mechanically — they split on `${NAVY}`-style template
+interpolations — so they need a read by eye before the deletion, not a diff. Deleting it and
+repointing `quote-builder.tsx` at the feature module removes one of the four sources outright
+(§1 MD7).
 
 **Scoping is coupled to the tutorial.** `client/src/features/tutorial/tutorial-registry.ts`
 targets `.tp-amount` and `.tp-subbar` **directly** as spotlight anchors, with `.tp-viewport`
@@ -777,12 +804,16 @@ Three classes, three topologies, one owner each:
    every other feature screen. It is still `.tp-feature`: the *topology* matches, only the
    colours swap. Do not let a colour check reclassify it.
 3. **`PendingTerminal` is a second home screen**, not a feature screen (§6.4).
-4. **There is a fourth trades terminal that uses none of these classes.**
-   `client/src/pages/trades/trades-terminal.tsx` is a 618-line parallel implementation with its
-   own screen state machine, mounted at `/trades/quote`; it shells its screens on `.tp-layer`,
-   has **zero** `.tp-screen` elements, and exports the `TP_TERM_CSS` that RC-6 shows colliding
-   globally. It would silently receive none of this work while still shipping the stylesheet
-   that breaks the others. See MD7.
+4. **`pages/trades/trades-terminal.tsx` needs no classification — it is the controller.**
+   *(Corrected 2026-08-19; this item previously described it as a 618-line parallel
+   implementation mounted at `/trades/quote`. Both claims were wrong — see §1 MD7.)* It is
+   mounted at `/trades/terminal` and renders `<TradesTerminalView>`, whose screens are already
+   in the §6.6.1 inventory, so it receives this work through the view. Two items do belong to
+   this phase: **`QuoteScreen`** (`:34-154`), the one screen still living in the page, which
+   moves into `features/terminal/trades/` and is then classified with the rest; and
+   **`TP_TERM_CSS`** (`:520+`), which is deleted in favour of the scoped
+   `trades-terminal-view.css` with `quote-builder.tsx` repointed at the feature module (§3
+   RC-6). Neither changes the count in §6.6.1.
 
 Adding a class is additive — no rename — so the tutorial anchors (`.tp-amount`, `.tp-subbar`,
 RC-6) are untouched by this step.
@@ -835,8 +866,9 @@ management (`--update-snapshots`), actual/expected/diff triplets on failure,
 
 Roughly **65 files, ~8–10MB** — v2 estimated 43 against a screen count that turned out to be
 "seven" for what is really 31 (§6.6.1). If that is too much repo weight, drop the DPR-2 tier
-and rely on geometry assertions for fidelity at the cost of catching subpixel drift; MD7
-answered "retire" also removes a route's worth.
+and rely on geometry assertions for fidelity at the cost of catching subpixel drift. *(v2.1
+also offered MD7-answered-"retire" as a saving here. MD7 is settled and retirement was never
+available, so the golden set does not shrink — see §1 MD7.)*
 
 Store under `tests/golden/mobile/`. **A golden change is a design change** — it needs Oliver's
 approval in the PR, never a blind `--update-snapshots`.
@@ -956,7 +988,7 @@ forms compute 15.03px (length-valued base unit), 15.99px (per-token clamp) and 1
 
 | Phase | Content | Gate before commit |
 |---|---|---|
-| 0 | Confirm the §2.1 references are authoritative; settle MD1, MD2, MD5, MD7 | Oliver signs off |
+| 0 | Confirm the §2.1 references are authoritative; settle MD1, MD2, MD5 (**MD7 settled from the code 2026-08-19 — see §1**) | Oliver signs off |
 | 1 | Land §7.2 with a recorded baseline JSON; add `verify:mobile` + a workflow | command exists and runs; baseline committed |
 | 2 | Scope all four stylesheets (§5.1); land the tutorial-anchor assertions with them | §7.4 clean; anchors resolve on all three verticals |
 | **2b** | **Apply the screen-class contract (§6.6.1) — one of three classes on all 31 `.tp-screen` elements, plus the §7.4 count guard.** Additive only, no behaviour change | 10 / 12 / 9 per file; no bare-`.tp-screen` layout rule; both plans' grids inert until their own phase |
@@ -983,7 +1015,7 @@ does not settle:
 | MD1 adaptation strategy | everything from 6 | the whole of §6 is the wrong shape — this is the one true blocker |
 | MD2 smallest phone | 6, 8, 9 | assume 320×568; a 360 floor only relaxes clamps, so the work is not wasted |
 | MD5 landscape | 1 (the gate's orientation clauses) | assume portrait-locked; the gate records landscape as advisory |
-| MD7 fourth trades terminal | 2, 2b, 3 | **do not assume.** It changes the file list of three phases and the size of the golden set |
+| ~~MD7 fourth trades terminal~~ | ~~2, 2b, 3~~ | **Settled 2026-08-19, no longer blocking.** The premise was wrong; the file list and golden set are unchanged, and the real work is a scoped refactor inside phase 2 (§1 MD7) |
 | MD3 blast radius | 4, 5 | assume one sweeping commit |
 | MD4 money formatting | 9 | assume ungrouped — the fitter is width-invariant (§6.1), so answering it later is a one-line `fmt()` change |
 | MD6 fonts | 3 | goldens will flake until self-hosted or route-pinned; capture anyway, re-approve after |
