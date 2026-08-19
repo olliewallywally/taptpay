@@ -183,10 +183,18 @@ async function shoot(browser, label, ctxOpts) {
   await shot("10-automation");
   await checkFoot(".pt-auto", "automation panel");
 
+  /* scope: the chip now filters the portfolio */
+  await page.getByRole("button", { name: "all properties scope" }).click();
+  await shot("11-scope-menu");
+  await page.getByRole("option", { name: "12 Kauri Road" }).click();
+  await shot("12-scoped");
+  await page.getByRole("button", { name: "12 Kauri Road scope" }).click();
+  await page.getByRole("option", { name: "all properties" }).click();
+
   /* deep link: the home's "send reminder" quick action */
   await page.goto(`${BASE_URL}/property/terminal?mode=reminder`, { waitUntil: "networkidle" });
   await page.getByTestId("desktop-frame").waitFor({ state: "visible" });
-  await shot("11-reminder-deeplink");
+  await shot("13-reminder-deeplink");
 
   await context.close();
   return errors;

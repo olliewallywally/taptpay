@@ -533,6 +533,69 @@ describe("desktop property terminal — split", () => {
   });
 });
 
+describe("desktop property terminal — scope chip", () => {
+  const heroes = () =>
+    Array.from(document.querySelectorAll(".pt-hero")).map((el) => el.textContent);
+
+  it("scopes both heroes and the request list to the chosen property", async () => {
+    const { user } = renderTerminal();
+    await screen.findByRole("button", { name: "actions for Mia Chen, sent" });
+    /* $800 rent + $520 overdue + $600 split, and the $240 charge. */
+    expect(heroes()).toEqual(["$1,620", "$240"]);
+
+    await user.click(screen.getByRole("button", { name: "all properties scope" }));
+    await user.click(screen.getByRole("option", { name: "88 Harbour View" }));
+
+    expect(heroes()).toEqual(["$520", "$240"]);
+    expect(
+      screen.queryByRole("button", { name: "actions for Mia Chen, sent" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "actions for Tane Walker, overdue" }),
+    ).toBeInTheDocument();
+  });
+
+  it("offers only addresses that an active tenant lives at, and restores all", async () => {
+    const { user } = renderTerminal();
+    await user.click(screen.getByRole("button", { name: "all properties scope" }));
+
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
+      "all properties",
+      "5 Bellbird Rise",
+      "88 Harbour View",
+    ]);
+
+    await user.click(screen.getByRole("option", { name: "5 Bellbird Rise" }));
+    expect(screen.getByRole("button", { name: "5 Bellbird Rise scope" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "5 Bellbird Rise scope" }));
+    await user.click(screen.getByRole("option", { name: "all properties" }));
+    expect(heroes()).toEqual(["$1,620", "$240"]);
+  });
+
+  it("scopes the mark-paid list too", async () => {
+    const { user } = renderTerminal();
+    await user.click(screen.getByRole("button", { name: "all properties scope" }));
+    await user.click(screen.getByRole("option", { name: "5 Bellbird Rise" }));
+    await user.click(screen.getByRole("button", { name: "mark as paid" }));
+
+    expect(await screen.findByRole("button", { name: "mark Mia Chen paid" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^mark Tane Walker paid$/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("leaves the tenant picker unscoped, so any tenant can still be billed", async () => {
+    const { user } = renderTerminal();
+    await user.click(screen.getByRole("button", { name: "all properties scope" }));
+    await user.click(screen.getByRole("option", { name: "5 Bellbird Rise" }));
+    await user.click(screen.getByRole("button", { name: "select tenant" }));
+
+    const cards = within(document.querySelector(".pt-tenant-cards") as HTMLElement);
+    expect(await cards.findByRole("button", { name: /Tane Walker/ })).toBeInTheDocument();
+  });
+});
+
 describe("desktop property terminal — external payment reference", () => {
   const openMarkPaid = (user: ReturnType<typeof userEvent.setup>) =>
     user.click(screen.getByRole("button", { name: "mark as paid" }));

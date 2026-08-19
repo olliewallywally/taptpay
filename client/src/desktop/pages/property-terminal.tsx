@@ -167,6 +167,8 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [search, setSearch] = useState("");
   const [tenantSearch, setTenantSearch] = useState("");
+  const [propFilter, setPropFilter] = useState<string | null>(null);
+  const [scopeOpen, setScopeOpen] = useState(false);
   const [filter, setFilter] = useState<PropertyStackFilter>(() =>
     entryFilter(entryParams()),
   );
@@ -201,10 +203,30 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
   const channel = (tenant?.preferredChannel ?? "email") as string;
   const channelContact = channel === "email" ? tenant?.email : tenant?.phone;
 
+  /* Addresses come from active tenants only, so an archived-only property
+     cannot be selected (the defect recorded against property home). */
+  const addresses = useMemo(
+    () =>
+      Array.from(
+        new Set(tenants.map((t: any) => t.propertyAddress).filter(Boolean)),
+      ) as string[],
+    [tenants],
+  );
+
+  /* Scope drives the figures and both lists. The tenant picker deliberately
+     does not follow it — you may need to bill a tenant outside the scope. */
+  const scopedInvoices = useMemo(() => {
+    if (!propFilter) return invoices;
+    const ids = new Set(
+      tenants.filter((t: any) => t.propertyAddress === propFilter).map((t: any) => t.id),
+    );
+    return invoices.filter((i: any) => ids.has(i.tenantProfileId));
+  }, [invoices, tenants, propFilter]);
+
   /* ── left column figures + request list ── */
   const model = useMemo(
-    () => buildPropertyTerminalModel(invoices, tenants),
-    [invoices, tenants],
+    () => buildPropertyTerminalModel(scopedInvoices, tenants),
+    [scopedInvoices, tenants],
   );
 
   const q = search.trim().toLowerCase();
@@ -406,6 +428,14 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
     onError: (e: any) =>
       toast({ title: e?.message || "Could not cancel invoice", variant: "destructive" }),
   });
+
+  const pickScope = (address: string | null) => {
+    setPropFilter(address);
+    setScopeOpen(false);
+    /* The open popover is anchored to a row that may be about to disappear. */
+    closeRowMenu();
+    closeRefRow();
+  };
 
   /* ── row action popover ── */
   const closeRowMenu = () => {
@@ -699,11 +729,43 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
       <div className="pt-body">
         {/* ── LEFT ── */}
         <div className="pt-left dt-cascade">
-          <div>
-            <button type="button" className="pt-scope" aria-label="all properties scope" aria-haspopup="listbox">
-              <span>all properties</span>
+          <div className="pt-scope-wrap">
+            <button
+              type="button"
+              className="pt-scope"
+              aria-label={`${propFilter ?? "all properties"} scope`}
+              aria-haspopup="listbox"
+              aria-expanded={scopeOpen}
+              onClick={() => setScopeOpen((o) => !o)}
+            >
+              <span>{propFilter ?? "all properties"}</span>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
             </button>
+            {scopeOpen && (
+              <div className="pt-scope-menu" role="listbox">
+                <button
+                  type="button"
+                  className="pt-scope-opt"
+                  role="option"
+                  aria-selected={propFilter === null}
+                  onClick={() => pickScope(null)}
+                >
+                  all properties
+                </button>
+                {addresses.map((a) => (
+                  <button
+                    key={a}
+                    type="button"
+                    className="pt-scope-opt"
+                    role="option"
+                    aria-selected={propFilter === a}
+                    onClick={() => pickScope(a)}
+                  >
+                    {a}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="pt-hero-row">
@@ -1463,6 +1525,13 @@ const PT_CSS = `
 /* Page-entry cascade: the left column's six blocks run steps 0–5, then the
    rail (6) and the right panel (7) complete the sweep left-to-right. */
 .pt-left { flex:0 0 420px; display:flex; flex-direction:column; }
+/* Ported from property home's .ph-scope-* so the two screens' scope controls
+   are the same object. The wrapper is the cascade step itself, as it is there. */
+.pt-scope-wrap { position:relative; align-self:flex-start; z-index:5; }
+.pt-scope-menu { position:absolute; top:calc(100% + 6px); left:0; z-index:6; min-width:220px; max-height:260px; overflow-y:auto; padding:6px; border-radius:14px; background:#0B1436; border:1px solid rgba(94,158,255,0.3); box-shadow:0 18px 40px rgba(0,4,24,0.5); display:flex; flex-direction:column; gap:2px; }
+.pt-scope-opt { padding:11px 12px; border-radius:9px; background:transparent; font-weight:500; font-size:12.5px; color:${TEXT_SOFT}; text-align:left; cursor:pointer; transition:background .15s ease; }
+.pt-scope-opt:hover { background:rgba(94,158,255,0.14); }
+.pt-scope-opt[aria-selected="true"] { background:rgba(94,158,255,0.22); }
 .pt-scope { display:inline-flex; align-items:center; gap:9px; padding:10px 20px; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); background:transparent; font-weight:400; font-size:13.5px; color:${ACCENT_SOFT}; cursor:pointer; transition:background .18s ease; }
 .pt-scope:hover { background:rgba(94,158,255,0.08); }
 .pt-hero-row { margin-top:22px; display:flex; align-items:flex-start; gap:14px; }
