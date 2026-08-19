@@ -587,12 +587,30 @@ touch, not by argument.
 
 | Phase | Content | Gate (all in `scripts/verify-terminal-dock.mjs`, §4) |
 |---|---|---|
-| A | `--dock-h` measured on `document.documentElement` by `TerminalDockView`; all 27 feature screens + `.tp-plain` consume it | §4.3 clause 8, and §4.2 clause 2 across **27 screens × 6 sizes** |
+| A | ✅ **done** (`12414f2`, `2d3b24c`) — `--dock-h` measured on `document.documentElement` by `TerminalDockView`; feature screens consume it | §4.3 clause 8, and §4.2 clause 2 across **27 screens × 6 sizes** |
 | B | `.tp-screen.tp-feature` grid + `min-height: 0` + `container-type: size` + `.tp-panel-body` scroll region; delete the six hand-tuned paddings | §4.2 clauses 1, 3, 5, 6, 7 |
 | C | Fluid keypad/tile sizing from `--kp-size` (§1.3) | §4.2 clause 4 — 4 rows at 320×568 through 430×932, **reported not blocking** under DK1 |
 | D | Dock `collapsed` control prop; terminal collapses it on feature screens | `--dock-h` reports 64 on a feature screen, 78 on home |
 | E | Pointer-tracked swipe: shrink the hit area, drop `onTouchStart`/`onMouseMove`, add the `aria-expanded` keyboard path | all nine clauses of §4.3 |
 | F | Two-layer goo morph, filter only during transition, reduced-motion path | all seven clauses of §4.4, then the real-device pass in §5 |
+
+**Phase A outcome, 2026-08-19.** `scripts/verify-terminal-dock.mjs` exists and gates
+clauses §4.3/8 and §4.2/2 across six portrait phones and 11 of the 27 screens (retail's
+keypad/details/share, plus both subbar sets). Findings went **24 → 6** on retail alone, then
+**21 → 17** once property and trades were driven.
+
+- **390×844, 412×915 and 430×932 are clean** across all three verticals. The 50–78px of
+  content permanently behind the dock — §1.1's second column, "the bug that survives on
+  every device" — is gone wherever the layout has room.
+- **320×568, 360×640 and 375×667 still fail (17).** All of them are §1.1's `min-height: auto`
+  refusal: the panel is already at its min-content height, so a bottom reservation has
+  nowhere to go. Numbers are equal or better than baseline everywhere — nothing regressed —
+  and **Phase B's `min-height: 0` is what unlocks them.**
+- Driving the other two verticals found what retail could not: trades' quote screen put
+  *create quote* 54px inside the dock band on **all six** phones, small and large alike.
+  §4.2 clause 8's "measure them, don't assume" earned its place.
+- Panels already reserving 100–110px were left alone — they clear the dock and pass the
+  gate. Still underived; Phase B deletes every one of these literals.
 
 **Sequencing constraints.**
 
