@@ -212,6 +212,18 @@ function JobsHome({ invoices, outstanding, go, onRowTap }: any) {
 }
 
 /* ═══ SCREEN: ChooseClient ═══ */
+/* Phase A of docs/PLAN-2026-08-17-terminal-panels-and-dock.md. Feature panels
+   reserve the dock's measured footprint (--dock-h, published on
+   document.documentElement by TerminalDockView) instead of a hand-tuned bottom
+   padding. The 0px fallback keeps a dockless mount unchanged.
+
+   Only the panels whose bottom padding is under the dock's 78px get this. The
+   ones already sitting at 100px clear it with room to spare and the gate passes
+   them; adding another 78px there would reserve 178px of dead space. Those
+   literals are still underived, and Phase B deletes all of them with the 50/50
+   split. */
+const dockPad = (base: string) => `calc(${base} + var(--dock-h, 0px))`;
+
 function ChooseClient({ clients, invoices, go, onSelect, onQuickInvoice }: any) {
   const [q, setQ] = useState('');
   const term = q.trim().toLowerCase();
@@ -235,7 +247,7 @@ function ChooseClient({ clients, invoices, go, onSelect, onQuickInvoice }: any) 
         <div style={{ height: 52 }} />
       </div>
       {/* Bottom — INK */}
-      <div className="stagger" style={{ flex: 1, background: NAVY, padding: '52px 22px 0', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <div className="stagger" style={{ flex: 1, background: NAVY, padding: `52px 22px ${dockPad('0px')}`, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.08)', borderRadius: 999, padding: '0 18px', height: 44, marginBottom: 14, flexShrink: 0 }}>
           <Ic.Search sz={16} c="rgba(244,244,244,0.6)" />
           <input
@@ -310,7 +322,7 @@ function AmountKeypad({ go, selectedClient, onCommit, backTo = 'invoice' }: any)
         </div>
         <div style={{ height: 52 }} />
       </div>
-      <div className="stagger" style={{ flex: 1, background: NAVY, padding: '38px 28px 28px', display: 'flex', flexDirection: 'column' }}>
+      <div className="stagger" style={{ flex: 1, background: NAVY, padding: `38px 28px ${dockPad('28px')}`, display: 'flex', flexDirection: 'column' }}>
         <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, alignItems: 'center', justifyItems: 'center' }}>
           {['1','2','3','4','5','6','7','8','9'].map(d => (
             <button key={d} className="tp-kp" data-demo-id={`trades-key-${d}`} onClick={() => press(d)}>{d}</button>
@@ -725,7 +737,7 @@ export function QuoteView({
         </div>
       </div>
 
-      <div className="stagger" style={{ flex: 1, background: NAVY, padding: '26px 22px 0', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <div className="stagger" style={{ flex: 1, background: NAVY, padding: `26px 22px ${dockPad('0px')}`, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {created ? (
           <>
             <div className="tp-thin-scroll" style={{ flex: 1, overflowY: 'auto', paddingBottom: 16 }}>

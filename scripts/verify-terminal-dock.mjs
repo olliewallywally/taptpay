@@ -11,10 +11,14 @@
  * companion plan's `.tp-feature` class contract, which has not landed.
  *
  * Coverage note, stated rather than implied: §4.2 asks for 27 feature screens ×
- * 6 viewports. This script drives the three retail feature screens reachable
- * without fixtures beyond `retail-fixtures.mjs` (keypad, details, share) across
- * all six portrait phones. Property and trades screens are still uncovered —
- * see §4.2 clause 8, which says to record their state rather than block on it.
+ * 6 viewports. This script drives, across all six portrait phones:
+ *   - retail  — keypad, details, share (the flow reachable from the home screen)
+ *   - property — the four subbar screens: tenants, send, bill, external
+ *   - trades   — the four subbar screens: clients, quote, invoice, external
+ * That is 11 of the 27. The remainder are sub-states reached only by committing
+ * a flow (success screens, the split and automation panels); they inherit the
+ * same panel padding as the screen they are entered from, so the reservation is
+ * covered even where the assertion is not.
  *
  * Exits non-zero on failure. Several older scripts in this repo collect errors
  * and still exit 0; §4.1 forbids that here.
@@ -25,6 +29,43 @@ import {
   CHROMIUM_PATH,
   newRetailPage,
 } from "./desktop-shots/retail-fixtures.mjs";
+
+/* retail-fixtures answers **\/api/property/** and **\/api/trades/** with [], which
+   renders every list screen empty. Empty is not a fair test of clause 2: the
+   screens that hide content under the dock are the ones with a populated list
+   above a bottom-anchored action. These overrides are registered after the
+   shared harness so they win. */
+const PROPERTY_TENANTS = [
+  { id: 1, firstName: "Josh", lastName: "Smith", propertyAddress: "12 Kauri Road", status: "active", email: "josh@example.invalid", phone: "+64211111111", preferredChannel: "email" },
+  { id: 2, firstName: "Mia", lastName: "Chen", propertyAddress: "5 Bellbird Rise", status: "active", email: "mia@example.invalid", phone: "+64212222222", preferredChannel: "email" },
+  { id: 3, firstName: "Tane", lastName: "Walker", propertyAddress: "88 Harbour View", status: "active", email: "tane@example.invalid", phone: "+64213333333", preferredChannel: "sms" },
+];
+const PROPERTY_INVOICES = [
+  { id: 11, tenantProfileId: 1, amountCents: 65_000, owingCents: 65_000, status: "sent", kind: "rent", createdAt: new Date().toISOString() },
+  { id: 12, tenantProfileId: 2, amountCents: 80_000, owingCents: 80_000, status: "overdue", kind: "rent", createdAt: new Date().toISOString() },
+  { id: 13, tenantProfileId: 3, amountCents: 52_000, owingCents: 0, status: "paid", kind: "rent", createdAt: new Date().toISOString() },
+];
+const TRADES_CLIENTS = [
+  { id: 1, firstName: "Ana", lastName: "Reti", businessName: "Reti Builders", status: "active", email: "ana@example.invalid", phone: "+64214444444", preferredChannel: "email" },
+  { id: 2, firstName: "Sam", lastName: "Poe", businessName: "Poe Plumbing", status: "active", email: "sam@example.invalid", phone: "+64215555555", preferredChannel: "email" },
+];
+const TRADES_INVOICES = [
+  { id: 21, clientProfileId: 1, amountCents: 120_000, owingCents: 120_000, status: "sent", createdAt: new Date().toISOString() },
+  { id: 22, clientProfileId: 2, amountCents: 45_000, owingCents: 0, status: "paid", createdAt: new Date().toISOString() },
+];
+
+const json = (route, body) =>
+  route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+
+async function installVerticalMocks(page) {
+  await page.route("**/api/property/tenants**", (route) => json(route, PROPERTY_TENANTS));
+  await page.route("**/api/property/invoices**", (route) => json(route, PROPERTY_INVOICES));
+  await page.route("**/api/property/schedules**", (route) => json(route, []));
+  await page.route("**/api/property/reminder-settings**", (route) =>
+    json(route, { enabled: false, remindAfterDays: 3, repeatEveryDays: 3, maxReminders: 3 }));
+  await page.route("**/api/trades/clients**", (route) => json(route, TRADES_CLIENTS));
+  await page.route("**/api/trades/invoices**", (route) => json(route, TRADES_INVOICES));
+}
 
 /* Companion plan §4.1's portrait matrix. */
 const PHONES = [
@@ -251,6 +292,43 @@ async function walkRetailFeatureScreens(page, phone) {
   return results;
 }
 
+/**
+ * Property and trades both hang their feature screens off a four-slot subbar
+ * (SUBBAR_ROUTE in each view), so each screen is one click from the home screen
+ * rather than the end of a flow. The buttons carry stable demo ids.
+ */
+async function walkSubbarScreens(page, vertical, slots, phone) {
+  const results = {};
+  for (const slot of slots) {
+    const button = page.locator(`[data-demo-id="${vertical}-mode-${slot}"]`);
+    if ((await button.count()) === 0) {
+      notes.push(`${vertical}/${slot} @ ${phone.w}×${phone.h}: subbar slot not found, skipped`);
+      continue;
+    }
+    await button.click();
+    await page.waitForTimeout(650);
+    results[slot] = await measureScreen(page, `${vertical}/${slot} @ ${phone.w}×${phone.h}`);
+  }
+  return results;
+}
+
+async function verticalRun(browser, phone, { route, vertical, slots }) {
+  const { context, page } = await newRetailPage(browser, `${vertical}-${phone.w}`, {
+    viewport: { width: phone.w, height: phone.h },
+    hasTouch: true,
+    isMobile: true,
+  });
+  try {
+    await installVerticalMocks(page);
+    await page.goto(`${BASE_URL}${route}`, { waitUntil: "domcontentloaded" });
+    await page.locator(".tp-viewport").waitFor({ state: "visible", timeout: 20_000 });
+    await page.waitForTimeout(1_100);
+    return await walkSubbarScreens(page, vertical, slots, phone);
+  } finally {
+    await context.close();
+  }
+}
+
 /* ── main ────────────────────────────────────────────────────────────────── */
 
 async function main() {
@@ -275,11 +353,22 @@ async function main() {
 
         /* Feature screens first — the dock is still expanded here, which is the
            worst case for clause 2 and the state the reservation must clear. */
-        report[key] = { screens: await walkRetailFeatureScreens(page, phone) };
+        report[key] = { retail: await walkRetailFeatureScreens(page, phone) };
         report[key].dock = await checkDockContract(page, `dock @ ${key}`);
       } finally {
         await context.close();
       }
+
+      report[key].property = await verticalRun(browser, phone, {
+        route: "/property/terminal",
+        vertical: "property",
+        slots: ["tenants", "send", "bill", "external"],
+      });
+      report[key].trades = await verticalRun(browser, phone, {
+        route: "/trades/terminal",
+        vertical: "trades",
+        slots: ["clients", "quote", "invoice", "external"],
+      });
     }
 
     /* The absent-dock case needs only one viewport. */
