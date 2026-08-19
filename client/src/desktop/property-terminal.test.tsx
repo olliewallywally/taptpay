@@ -34,6 +34,19 @@ const TENANTS = [
     email: "tane@example.com",
     phone: "0223333333",
   },
+  /* Archived, and still owing (`i5`). The page filters archived tenants out of
+     the picker and the address list, but their debt must stay in the figures —
+     including inside the scope for the property they owe it at. */
+  {
+    id: "t3",
+    firstName: "Ruby",
+    lastName: "Nolan",
+    propertyAddress: "5 Bellbird Rise",
+    status: "archived",
+    preferredChannel: "email",
+    email: "ruby@example.com",
+    phone: "0224444444",
+  },
 ];
 
 const INVOICES = [
@@ -41,6 +54,7 @@ const INVOICES = [
     id: "i1",
     tenantProfileId: "t1",
     tenantName: "Mia Chen",
+    propertyAddress: "5 Bellbird Rise",
     amountCents: 80_000,
     owingCents: 80_000,
     status: "dispatched",
@@ -52,6 +66,7 @@ const INVOICES = [
     id: "i2",
     tenantProfileId: "t2",
     tenantName: "Tane Walker",
+    propertyAddress: "88 Harbour View",
     amountCents: 24_000,
     owingCents: 24_000,
     status: "dispatched",
@@ -65,6 +80,7 @@ const INVOICES = [
     id: "i4",
     tenantProfileId: "t2",
     tenantName: "Tane Walker",
+    propertyAddress: "88 Harbour View",
     amountCents: 52_000,
     owingCents: 52_000,
     status: "overdue",
@@ -76,6 +92,7 @@ const INVOICES = [
     id: "i5",
     tenantProfileId: "t3",
     tenantName: "Ruby Nolan",
+    propertyAddress: "5 Bellbird Rise",
     amountCents: 60_000,
     owingCents: 30_000,
     splitEnabled: true,
@@ -90,6 +107,7 @@ const INVOICES = [
     id: "i3",
     tenantProfileId: "t2",
     tenantName: "Tane Walker",
+    propertyAddress: "88 Harbour View",
     amountCents: 30_000,
     owingCents: 0,
     status: "paid",
@@ -571,6 +589,26 @@ describe("desktop property terminal — scope chip", () => {
     await user.click(screen.getByRole("button", { name: "5 Bellbird Rise scope" }));
     await user.click(screen.getByRole("option", { name: "all properties" }));
     expect(heroes()).toEqual(["$1,620", "$240"]);
+  });
+
+  /* The scope must match the invoice's own `propertyAddress` — the server sends it
+     on every row (`routes.ts:7433-7441`) and looks the tenant up regardless of
+     archived status. Joining through active tenants instead drops the archived
+     Ruby Nolan's $300 from every scope while still counting it in "all
+     properties", so the per-property figures stop summing to the portfolio. */
+  it("keeps an archived tenant's debt inside the scope for their property", async () => {
+    const { user } = renderTerminal();
+    await screen.findByRole("button", { name: "actions for Mia Chen, sent" });
+    expect(heroes()).toEqual(["$1,620", "$240"]);
+
+    await user.click(screen.getByRole("button", { name: "all properties scope" }));
+    await user.click(screen.getByRole("option", { name: "5 Bellbird Rise" }));
+
+    /* Mia's $800 plus Ruby's $300 still owing on the part-paid split. */
+    expect(heroes()).toEqual(["$1,100", "$0"]);
+    expect(
+      screen.getByRole("button", { name: "actions for Ruby Nolan, sent" }),
+    ).toBeInTheDocument();
   });
 
   it("scopes the mark-paid list too", async () => {

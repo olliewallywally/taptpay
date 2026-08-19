@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   usePropertyInvoices,
@@ -27,6 +27,7 @@ import {
   buildPropertyTerminalModel,
   type PropertyStackFilter,
 } from "../data/property-terminal-model";
+import { filterByProperty } from "@/lib/property-dashboard-data";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -214,14 +215,28 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
   );
 
   /* Scope drives the figures and both lists. The tenant picker deliberately
-     does not follow it — you may need to bill a tenant outside the scope. */
-  const scopedInvoices = useMemo(() => {
-    if (!propFilter) return invoices;
-    const ids = new Set(
-      tenants.filter((t: any) => t.propertyAddress === propFilter).map((t: any) => t.id),
-    );
-    return invoices.filter((i: any) => ids.has(i.tenantProfileId));
-  }, [invoices, tenants, propFilter]);
+     does not follow it — you may need to bill a tenant outside the scope.
+
+     Shared with property home rather than re-derived: `filterByProperty` matches
+     the invoice's own `propertyAddress` (the server sends it on every row,
+     `routes.ts:7433-7441`) and only falls back to the tenant's. Joining through
+     active tenants instead would drop an archived tenant's unpaid invoice from
+     every scope while still counting it in "all properties", so the per-property
+     figures would not sum to the portfolio — and the two screens' identical-looking
+     chips would report different money for the same address. */
+  const scopedInvoices = useMemo(
+    () => filterByProperty(invoices, tenants, propFilter).invoices,
+    [invoices, tenants, propFilter],
+  );
+
+  /* An address only exists while an active tenant lives there. If the last one is
+     archived while that property is scoped, the chip would keep naming a property
+     the menu no longer offers and every list would read empty. */
+  useEffect(() => {
+    if (propFilter && tenants.length > 0 && !addresses.includes(propFilter)) {
+      setPropFilter(null);
+    }
+  }, [addresses, propFilter, tenants.length]);
 
   /* ── left column figures + request list ── */
   const model = useMemo(
@@ -1529,10 +1544,10 @@ const PT_CSS = `
    are the same object. The wrapper is the cascade step itself, as it is there. */
 .pt-scope-wrap { position:relative; align-self:flex-start; z-index:5; }
 .pt-scope-menu { position:absolute; top:calc(100% + 6px); left:0; z-index:6; min-width:220px; max-height:260px; overflow-y:auto; padding:6px; border-radius:14px; background:#0B1436; border:1px solid rgba(94,158,255,0.3); box-shadow:0 18px 40px rgba(0,4,24,0.5); display:flex; flex-direction:column; gap:2px; }
-.pt-scope-opt { padding:11px 12px; border-radius:9px; background:transparent; font-weight:500; font-size:12.5px; color:${TEXT_SOFT}; text-align:left; cursor:pointer; transition:background .15s ease; }
+.pt-scope-opt { padding:11px 12px; border-radius:9px; background:transparent; font-weight:500; font-size:12.5px; color:${TEXT_SOFT}; text-align:left; cursor:pointer; transition:background .15s ease; text-transform:lowercase; }
 .pt-scope-opt:hover { background:rgba(94,158,255,0.14); }
 .pt-scope-opt[aria-selected="true"] { background:rgba(94,158,255,0.22); }
-.pt-scope { display:inline-flex; align-items:center; gap:9px; padding:10px 20px; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); background:transparent; font-weight:400; font-size:13.5px; color:${ACCENT_SOFT}; cursor:pointer; transition:background .18s ease; }
+.pt-scope { display:inline-flex; align-items:center; gap:9px; padding:10px 20px; border-radius:9999px; border:1px solid rgba(94,158,255,0.55); background:transparent; font-weight:400; font-size:13.5px; color:${ACCENT_SOFT}; cursor:pointer; transition:background .18s ease; text-transform:lowercase; }
 .pt-scope:hover { background:rgba(94,158,255,0.08); }
 .pt-hero-row { margin-top:22px; display:flex; align-items:flex-start; gap:14px; }
 .pt-hero { font-family:'Outfit',sans-serif; font-weight:700; font-size:84px; line-height:0.92; letter-spacing:-0.015em; color:${ACCENT}; font-variant-numeric:tabular-nums; }
