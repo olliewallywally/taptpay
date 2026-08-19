@@ -132,8 +132,68 @@ async function checkDockContract(page, label) {
     );
   }
 
-  /* Collapsed: wait out the idle timer and re-read. */
-  await page.waitForTimeout(COLLAPSE_AFTER_MS + 900);
+  /* Clause 8's second half: "updates within one frame of a state change".
+     Sampling once at a guessed instant is worthless — the collapse runs on a
+     back-out curve that covers most of its distance in the first few frames, so
+     a single late sample reads the resting value and the assertion passes
+     without testing anything. Instead: install a rAF sampler and let it watch
+     the whole idle-timer window, then look at what it caught.
+
+     A token written once on transitionend produces exactly two distinct values
+     and fails the intermediate check below. */
+  const trace = await page.evaluate(async (windowMs) => {
+    const nav = document.querySelector('nav[data-demo-id="terminal-dock"]');
+    if (!nav) return null;
+    const samples = [];
+    const started = performance.now();
+    await new Promise((resolve) => {
+      const tick = () => {
+        const raw = getComputedStyle(document.documentElement)
+          .getPropertyValue("--dock-h")
+          .trim();
+        samples.push({
+          token: raw ? Number.parseFloat(raw) : null,
+          box: nav.getBoundingClientRect().height,
+        });
+        if (performance.now() - started > windowMs) resolve();
+        else requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    return samples;
+  }, COLLAPSE_AFTER_MS + 1_500);
+
+  let mid = { px: null, rect: null };
+  if (!trace || trace.length === 0) {
+    fail(`${label}: could not sample --dock-h across the collapse (§4.3 clause 8)`);
+  } else {
+    /* (a) the token never lags the box it is supposed to report */
+    const lagging = trace.filter(
+      (s) => s.token !== null && Math.abs(s.token - s.box) > 1.5,
+    );
+    if (lagging.length) {
+      const worst = lagging.reduce((a, b) =>
+        Math.abs(b.token - b.box) > Math.abs(a.token - a.box) ? b : a);
+      fail(
+        `${label}: --dock-h lagged the dock box in ${lagging.length}/${trace.length} frames — worst ${worst.token}px vs ${worst.box}px (§4.3 clause 8)`,
+      );
+    }
+
+    /* (b) it moved through the transition rather than jumping at the end */
+    const between = trace.filter(
+      (s) => s.token !== null && s.token > DOCK_COLLAPSED + 1 && s.token < DOCK_EXPANDED - 1,
+    );
+    if (between.length === 0) {
+      fail(
+        `${label}: --dock-h only ever held ${DOCK_EXPANDED}px and ${DOCK_COLLAPSED}px across ${trace.length} frames — it is written at the end of the transition, not tracked through it (§4.3 clause 8)`,
+      );
+    } else {
+      mid = { px: between[Math.floor(between.length / 2)].token, rect: between[Math.floor(between.length / 2)].box };
+    }
+  }
+
+  /* The sampler above already spanned the idle window and the transition. */
+  await page.waitForTimeout(300);
   const collapsed = await readDockH(page);
   const collapsedRect = await navRect(page);
 
@@ -153,6 +213,7 @@ async function checkDockContract(page, label) {
   return {
     expanded: expanded.raw || "(unset)",
     expandedRect: rect ? Math.round(rect.height) : null,
+    tracked: mid.px === null ? "no intermediate frames seen" : `${Math.round(mid.px)}px mid-transition, box ${Math.round(mid.rect)}px`,
     collapsed: collapsed.raw || "(unset)",
     collapsedRect: collapsedRect ? Math.round(collapsedRect.height) : null,
   };
@@ -354,7 +415,6 @@ async function main() {
         /* Feature screens first — the dock is still expanded here, which is the
            worst case for clause 2 and the state the reservation must clear. */
         report[key] = { retail: await walkRetailFeatureScreens(page, phone) };
-        report[key].dock = await checkDockContract(page, `dock @ ${key}`);
       } finally {
         await context.close();
       }
@@ -369,6 +429,27 @@ async function main() {
         vertical: "trades",
         slots: ["clients", "quote", "invoice", "external"],
       });
+    }
+
+    /* The dock contract gets its own page. It has to observe the dock from its
+       expanded resting state and then watch a full idle-timer window, and the
+       idle timer starts at mount — sharing a page with the screen walk would
+       race it, which is how the first version of this check ended up sampling
+       after the transition had already finished.
+
+       One viewport is enough: navWidth varies with the screen, the dock's
+       height does not. */
+    const contract = await newRetailPage(browser, "dock-contract", {
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+      isMobile: true,
+    });
+    try {
+      await contract.page.goto(`${BASE_URL}/terminal`, { waitUntil: "domcontentloaded" });
+      await contract.page.locator(".tp-viewport").waitFor({ state: "visible" });
+      report.dock = await checkDockContract(contract.page, "dock @ 390x844");
+    } finally {
+      await contract.context.close();
     }
 
     /* The absent-dock case needs only one viewport. */
