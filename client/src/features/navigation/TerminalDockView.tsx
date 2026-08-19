@@ -74,6 +74,7 @@ const initialNavWidth = () => typeof window === "undefined" ? 320 : Math.min(320
 export function TerminalDockView({ mode, activeId, onPick, placement = "fixed", collapseAfterMs = 4_000 }: TerminalDockViewProps) {
   const items = TERMINAL_DOCK_ITEMS[mode];
   const activeIdx = items.findIndex((item) => item.id === activeId);
+  const navRef = useRef<HTMLElement>(null);
   const dockRef = useRef<HTMLDivElement>(null);
   const btnRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const mounted = useRef(false);
@@ -88,6 +89,45 @@ export function TerminalDockView({ mode, activeId, onPick, placement = "fixed", 
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
+
+  /* Phase A of docs/PLAN-2026-08-17-terminal-panels-and-dock.md: publish the
+     dock's real footprint so every screen reserves the same number instead of
+     the six hand-tuned literals in §1.2.
+
+     It goes on `document.documentElement` deliberately. App.tsx renders
+     <Router /> and <BottomNavigation /> as siblings, so a terminal-scoped
+     write is invisible to the dock and a dock-scoped one is invisible to the
+     terminal — the variable would silently resolve to its initial value on
+     exactly the screens that need it.
+
+     Only the fixed placement publishes. The landing page's phone demo mounts
+     this dock with placement="absolute" inside a scaled mock; its height is not
+     the real chrome and must not become the app's reservation (§4.3 clause 9). */
+  useEffect(() => {
+    if (placement !== "fixed") return;
+    const nav = navRef.current;
+    if (!nav || typeof document === "undefined") return;
+    const root = document.documentElement;
+
+    const publish = () => {
+      const { height } = nav.getBoundingClientRect();
+      root.style.setProperty("--dock-h", `${Math.round(height * 100) / 100}px`);
+    };
+    publish();
+
+    /* The wrapper's height is transitioned, so this fires per frame during a
+       collapse and the token tracks it rather than jumping at the end. */
+    const observer =
+      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(publish);
+    observer?.observe(nav);
+
+    return () => {
+      observer?.disconnect();
+      /* Cleared, not left stale: a screen rendered with no dock must not go on
+         reserving space for one. */
+      root.style.removeProperty("--dock-h");
+    };
+  }, [placement]);
 
   const calcLeft = (idx: number) => {
     const button = btnRefs.current[Math.max(0, idx)];
@@ -127,7 +167,7 @@ export function TerminalDockView({ mode, activeId, onPick, placement = "fixed", 
     : { dock: DOCK_BG, active: BLUE, dim: BLUE_DIM };
 
   return (
-    <nav aria-label="Merchant navigation" data-demo-id="terminal-dock" data-terminal-dock-mode={mode} style={{ position: placement, bottom: 0, left: 0, right: 0, display: "flex", justifyContent: "center", paddingBottom: "max(20px, env(safe-area-inset-bottom, 20px))", zIndex: 60, pointerEvents: "none" }}>
+    <nav ref={navRef} aria-label="Merchant navigation" data-demo-id="terminal-dock" data-terminal-dock-mode={mode} style={{ position: placement, bottom: 0, left: 0, right: 0, display: "flex", justifyContent: "center", paddingBottom: "max(20px, env(safe-area-inset-bottom, 20px))", zIndex: 60, pointerEvents: "none" }}>
       <div onTouchStart={resetIdle} onMouseMove={resetIdle} onClick={collapsed ? resetIdle : undefined} style={{ position: "relative", width: navWidth, height: collapsed ? 44 : 58, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "auto", transition: "height 0.5s cubic-bezier(0.34,1.56,0.64,1)", overflow: "visible" }}>
         <div aria-hidden="true" style={{ position: "absolute", bottom: 10, left: "50%", transform: "translateX(-50%)", width: collapsed ? 56 : 0, height: collapsed ? 4 : 0, background: palette.dock, borderRadius: 999, opacity: collapsed ? 1 : 0, transition: "width 0.45s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s ease", pointerEvents: "none" }} />
         <div ref={dockRef} style={{ position: "relative", width: 280, height: 48, background: palette.dock, borderRadius: 24, display: "flex", alignItems: "center", justifyContent: "space-around", padding: "0 16px", overflow: "visible", opacity: collapsed ? 0 : 1, transform: collapsed ? "scale(0.85)" : "scale(1)", transition: "opacity 0.3s ease, transform 0.45s cubic-bezier(0.34,1.56,0.64,1)", pointerEvents: collapsed ? "none" : "auto" }}>

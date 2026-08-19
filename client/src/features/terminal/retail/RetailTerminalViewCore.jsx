@@ -79,6 +79,17 @@ const SUBBAR_ITEMS = [
   { id: 'cash',  label: 'cash',  Icon: Ic.Coins },
 ];
 
+/* Phase A of docs/PLAN-2026-08-17-terminal-panels-and-dock.md. Every feature
+   screen's navy panel reserves the dock's measured footprint instead of one of
+   the six hand-tuned bottom paddings in §1.2. --dock-h is published on
+   document.documentElement by TerminalDockView; the 0px fallback means a screen
+   rendered without a dock (the landing demo's iframe mount) is unchanged.
+
+   The hand-tuned values survive here on purpose — Phase B deletes them along
+   with the 50/50 split, and doing it now would restructure the screens ahead of
+   the grid that replaces them. */
+const dockPad = (base) => `calc(${base} + var(--dock-h, 0px))`;
+
 function SubBar({ activeIdx = -1, onPick, compact = false }) {
   const trackRef   = useRef(null);
   const btnRefs    = useRef([]);
@@ -392,7 +403,7 @@ function Keypad({ state, go, onCommit }) {
         </div>
         <div style={{ height: 52 }} />
       </div>
-      <div className="stagger" style={{ flex: 1, background: NAVY, padding: '38px 28px 28px', display: 'flex', flexDirection: 'column' }}>
+      <div className="stagger" style={{ flex: 1, background: NAVY, padding: `38px 28px ${dockPad('28px')}`, display: 'flex', flexDirection: 'column' }}>
         <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, alignItems: 'center', justifyItems: 'center' }}>
           {['1','2','3','4','5','6','7','8','9'].map(d => (
             <button key={d} className="tp-kp" data-demo-id={`retail-key-${d}`} onClick={() => press(d)}>{d}</button>
@@ -431,7 +442,7 @@ function SplitPayment({ state, go, onCommitSplit }) {
         </div>
         <div style={{ height: 52 }} />
       </div>
-      <div className="stagger" style={{ flex: 1, background: NAVY, color: BLUE, padding: '56px 28px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <div className="stagger" style={{ flex: 1, background: NAVY, color: BLUE, padding: `56px 28px ${dockPad('28px')}`, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <div style={{ fontWeight: 700, fontSize: 22 }}>split bill</div>
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 36 }}>
           <button className="tp-stepper" data-demo-id="retail-split-decrease" aria-label="decrease split" onClick={() => setParts(p => Math.max(2, p - 1))}><Ic.Minus /></button>
@@ -476,7 +487,7 @@ function ChooseStock({ state, go, onCommitStock }) {
         </div>
         <div style={{ height: 52 }} />
       </div>
-      <div className="stagger" style={{ flex: 1, background: NAVY, padding: '52px 22px 0', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <div className="stagger" style={{ flex: 1, background: NAVY, padding: `52px 22px ${dockPad('0px')}`, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <div style={{ color: BLUE, fontWeight: 500, fontSize: 18, textAlign: 'center', flexShrink: 0 }}>choose from stock</div>
         <div
           ref={scrollRef}
@@ -530,7 +541,7 @@ function EnterDetails({ state, go, onCommitDetails, initialAmount = 0 }) {
         </div>
         <div style={{ height: 52 }} />
       </div>
-      <div className="stagger" style={{ flex: 1, background: NAVY, padding: '40px 28px 28px', display: 'flex', flexDirection: 'column' }}>
+      <div className="stagger" style={{ flex: 1, background: NAVY, padding: `40px 28px ${dockPad('28px')}`, display: 'flex', flexDirection: 'column' }}>
         <div style={{ color: BLUE, fontWeight: 500, fontSize: 18, textAlign: 'center' }}>enter transaction details</div>
         <div style={{ marginTop: 22, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <input className="tp-field" data-demo-id="retail-item-name" placeholder="item name"   value={name}   onChange={e => setName(e.target.value)} />
@@ -571,7 +582,7 @@ function CashEntry({ go, onCommitCash }) {
         </div>
         <div style={{ height: 52 }} />
       </div>
-      <div className="stagger" style={{ flex: 1, background: NAVY, padding: '40px 28px 28px', display: 'flex', flexDirection: 'column' }}>
+      <div className="stagger" style={{ flex: 1, background: NAVY, padding: `40px 28px ${dockPad('28px')}`, display: 'flex', flexDirection: 'column' }}>
         <div style={{ color: BLUE, fontWeight: 500, fontSize: 18, textAlign: 'center' }}>cash payment</div>
         <div style={{ marginTop: 22, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <input className="tp-field" data-demo-id="retail-cash-item-name" placeholder="item name"   value={name}   onChange={e => setName(e.target.value)} />
@@ -618,7 +629,7 @@ function SharePayment({ state, go, toast, onShare, onExpandQR, onConfirmPayment,
         </div>
         <div style={{ height: 52 }} />
       </div>
-      <div className="stagger" style={{ flex: 1, background: NAVY, padding: '52px 28px 22px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <div className="stagger" style={{ flex: 1, background: NAVY, padding: `52px 28px ${dockPad('22px')}`, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <div style={{ position: 'relative' }}>
           <div className="tp-qr-card">
             <Ic.QRBig sz={150} />
@@ -664,7 +675,7 @@ function CashSuccess({ state, go, setState, toast, onShare }) {
         </div>
         <div style={{ height: 52 }} />
       </div>
-      <div className="stagger" style={{ flex: 1, background: NAVY, padding: '52px 28px 22px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <div className="stagger" style={{ flex: 1, background: NAVY, padding: `52px 28px ${dockPad('22px')}`, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <div style={{ color: BLUE, fontWeight: 900, fontSize: 46, letterSpacing: '-0.04em' }}>success</div>
         <div className="tp-success-check tp-pulse" style={{ marginTop: 10 }}><Ic.Check sz={40} sw={3.2} /></div>
         <div style={{ flex: 1 }} />
