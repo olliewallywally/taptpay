@@ -124,9 +124,11 @@ async function shoot(browser, label, ctxOpts) {
   await page.locator(".pt-tenant-cards").getByRole("button", { name: /Mia Chen/ }).click();
   await shot("3-request-seeded");
 
-  /* recurring frequency */
+  /* recurring frequency — inside the repeat & reminders dropdown now */
+  await page.getByRole("button", { name: "automation" }).click();
   await page.getByRole("button", { name: "weekly", exact: true }).click();
   await shot("4-request-weekly");
+  await page.getByRole("button", { name: "automation" }).click();
 
   /* keypad */
   await page.getByRole("button", { name: "keypad" }).click();
@@ -178,10 +180,14 @@ async function shoot(browser, label, ctxOpts) {
   await page.getByRole("menuitem", { name: "back" }).click();
   await page.getByRole("menuitem", { name: "close" }).click();
 
-  /* automation: reminder cadence + the recurring rent schedules */
+  /* automation: a disclosure on the rent request tab now, not a rail mode —
+     so the tab has to be the active one before the toggle exists */
+  await page.getByRole("button", { name: "rent request" }).click();
   await page.getByRole("button", { name: "automation" }).click();
   await shot("10-automation");
-  await checkFoot(".pt-auto", "automation panel");
+  await checkFoot(".pt-auto-panel", "automation panel");
+  /* the send button has to survive the panel opening under it */
+  await checkFoot(".pt-req-lower", "request panel, automation open");
 
   /* scope: the chip now filters the portfolio */
   await page.getByRole("button", { name: "all properties scope" }).click();

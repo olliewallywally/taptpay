@@ -717,6 +717,31 @@ describe("desktop property terminal — automation", () => {
     expect(list.getByText("paused")).toBeInTheDocument();
   });
 
+  /* Automation is a disclosure inside the rent request's repeat control, not a
+     rail mode of its own. Without this the rail button could come back and every
+     other test in this block would still pass, since the accessible name is the
+     same either way. */
+  it("lives on the rent request tab and is collapsed until asked for", async () => {
+    const { user } = renderTerminal();
+    await screen.findByRole("button", { name: "send rent request" });
+
+    const toggle = screen.getByRole("button", { name: "automation" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(document.querySelector(".pt-auto-panel")).toBeNull();
+    /* The rail's five modes, with no automation among them. */
+    expect(
+      within(document.querySelector(".pt-rail") as HTMLElement)
+        .getAllByRole("button")
+        .map((b) => b.getAttribute("aria-label")),
+    ).toEqual(["select tenant", "rent request", "keypad", "send bill", "mark as paid"]);
+
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    /* Still on the rent tab — the send button never went away. */
+    expect(screen.getByRole("button", { name: "send rent request" })).toBeInTheDocument();
+    expect(document.querySelector(".pt-auto-panel")).not.toBeNull();
+  });
+
   it("hides terminated schedules and shows the empty state when there are none", async () => {
     schedules = [{ ...schedules[0], status: "terminated" }];
     const { user } = renderTerminal();

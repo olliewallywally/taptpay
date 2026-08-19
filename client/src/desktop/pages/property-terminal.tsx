@@ -43,7 +43,9 @@ const GREEN = "#35D07F";
 const RED = "#F0656C";
 const AMBER = "#F0A34E";
 
-type Mode = "tenant" | "request" | "keypad" | "bill" | "paid" | "auto";
+/* No "auto" mode: automation lives inside the rent request's own repeat control,
+   which is where the frequency is already chosen. */
+type Mode = "tenant" | "request" | "keypad" | "bill" | "paid";
 
 /* Reminder cadence — the same option sets the phone offers (`View:690-737`).
    0 max reminders means "no cap". */
@@ -180,6 +182,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
   const [rowMenu, setRowMenu] = useState<{ id: string; top: number } | null>(null);
   const [confirmVoid, setConfirmVoid] = useState(false);
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
+  const [autoOpen, setAutoOpen] = useState(false);
   const [refRowId, setRefRowId] = useState<string | null>(null);
   const [refValue, setRefValue] = useState("");
   const rowsRef = useRef<HTMLDivElement | null>(null);
@@ -738,6 +741,191 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
       : "send rent request";
   const billLabel = billFlash ? "bill sent ✓" : sendBill.isPending ? "sending…" : "send bill";
 
+  /* Collapsed line: the chosen frequency, then enough of the automation state to
+     tell whether anything is running without opening the panel. */
+  const autoSummary = `${FREQ_LABEL[frequency]} · ${
+    reminders.rentReminderEnabled ? "reminders on" : "reminders off"
+  }${liveSchedules.length > 0 ? ` · ${liveSchedules.length} running` : ""}`;
+
+  /* Lifted out of the JSX because it sits inside the rent request's repeat
+     control, several levels deep, and the panel is long. */
+  const automationPanel = (
+    <>
+      {/* Deliberately in the page's blue language, not the phone's amber
+          card: amber means "overdue" here, so an amber panel would read
+          as an alert rather than a setting. */}
+      <div className="pt-auto-block">
+        <div className="pt-auto-head">
+          <span className="pt-auto-head-mid">
+            <span className="pt-auto-title">overdue reminders</span>
+            <span className="pt-auto-cap">auto-resend the link until paid</span>
+          </span>
+          <button
+            type="button"
+            className="pt-switch"
+            role="switch"
+            aria-checked={reminders.rentReminderEnabled}
+            aria-label="overdue reminders"
+            disabled={reminderQuery.isLoading}
+            style={{
+              background: reminders.rentReminderEnabled
+                ? ACTIVE
+                : "rgba(94,158,255,0.25)",
+            }}
+            onClick={() =>
+              updateReminders.mutate({
+                rentReminderEnabled: !reminders.rentReminderEnabled,
+              })
+            }
+          >
+            <span
+              className="pt-switch-knob"
+              style={{
+                transform: reminders.rentReminderEnabled ? "translateX(17px)" : "none",
+              }}
+            />
+          </button>
+        </div>
+
+        {reminders.rentReminderEnabled && (
+          <>
+            {(
+              [
+                {
+                  label: "REMIND AFTER",
+                  field: "rentReminderDelayDays",
+                  value: reminders.rentReminderDelayDays,
+                  options: REMIND_AFTER_DAYS,
+                  format: (o: number) => `${o}d`,
+                },
+                {
+                  label: "REPEAT EVERY",
+                  field: "rentReminderIntervalDays",
+                  value: reminders.rentReminderIntervalDays,
+                  options: REMIND_EVERY_DAYS,
+                  format: (o: number) => `${o}d`,
+                },
+                {
+                  label: "MAX REMINDERS",
+                  field: "rentReminderMaxCount",
+                  value: reminders.rentReminderMaxCount,
+                  options: REMIND_MAX_COUNTS,
+                  format: (o: number) => (o === 0 ? "∞" : String(o)),
+                },
+              ] as const
+            ).map((row) => (
+              <div key={row.field}>
+                <div className="pt-auto-label">{row.label}</div>
+                <div className="pt-auto-chips" role="group" aria-label={row.label.toLowerCase()}>
+                  {row.options.map((o) => (
+                    <button
+                      key={o}
+                      type="button"
+                      className="pt-auto-chip"
+                      aria-pressed={row.value === o}
+                      style={chip(row.value === o, 1.5)}
+                      onClick={() => updateReminders.mutate({ [row.field]: o })}
+                    >
+                      {row.format(o)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <div className="pt-auto-summary">
+              once overdue, we send the payment link after{" "}
+              {plural(reminders.rentReminderDelayDays, "day")}, then every{" "}
+              {plural(reminders.rentReminderIntervalDays, "day")}
+              {reminders.rentReminderMaxCount > 0
+                ? ` (up to ${reminders.rentReminderMaxCount}×)`
+                : ""}
+              .
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="pt-auto-label">RECURRING RENT</div>
+      <div className="pt-auto-list">
+        {schedulesQuery.isLoading ? (
+          <div className="pt-empty">loading…</div>
+        ) : liveSchedules.length === 0 ? (
+          <div className="pt-empty">
+            no schedules yet — choose a repeat frequency above
+          </div>
+        ) : (
+          liveSchedules.map((s: any) => {
+            const t = tenantById.get(s.tenantProfileId);
+            const paused = s.status === "paused";
+            return (
+              <div key={s.id} className="pt-paid-row">
+                <span className="pt-avatar">{initialsOf(t)}</span>
+                <span className="pt-paid-mid">
+                  <span className="pt-row-name">{fullNameOf(t)}</span>
+                  <span className="pt-row-status">
+                    {fmtNZD(s.amountCents ?? 0)} · {s.frequency} · next{" "}
+                    {shortDate(s.nextRunDate)}
+                  </span>
+                </span>
+                {/* State reads from the word and its weight, not from a colour —
+                    the screen has one palette and it is blue. */}
+                <span className={`pt-state-pill${paused ? " pt-state-pill-off" : ""}`}>
+                  {paused ? "paused" : "active"}
+                </span>
+                {confirmCancelId === s.id ? (
+                  <span className="pt-auto-actions">
+                    <button
+                      type="button"
+                      className="pt-auto-btn pt-auto-btn-strong"
+                      disabled={scheduleBusy}
+                      onClick={() => {
+                        cancelSchedule.mutate(s.id);
+                        setConfirmCancelId(null);
+                      }}
+                    >
+                      confirm
+                    </button>
+                    <button
+                      type="button"
+                      className="pt-auto-btn"
+                      onClick={() => setConfirmCancelId(null)}
+                    >
+                      back
+                    </button>
+                  </span>
+                ) : (
+                  <span className="pt-auto-actions">
+                    <button
+                      type="button"
+                      className="pt-auto-btn"
+                      disabled={scheduleBusy}
+                      onClick={() =>
+                        setScheduleStatus.mutate({
+                          id: s.id,
+                          status: paused ? "active" : "paused",
+                        })
+                      }
+                    >
+                      {paused ? "resume" : "pause"}
+                    </button>
+                    <button
+                      type="button"
+                      className="pt-auto-btn"
+                      disabled={scheduleBusy}
+                      onClick={() => setConfirmCancelId(s.id)}
+                    >
+                      cancel
+                    </button>
+                  </span>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+    </>
+  );
+
   return (
     <DesktopPageScaffold {...props} vertical="property" page="terminal" showScope={false}>
       <style>{PT_CSS}</style>
@@ -985,7 +1173,6 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
             {railBtn("keypad", true, (<path d="M12 5v14M5 12h14" />), "keypad")}
             {railBtn("bill", false, (<><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" /><path d="M9.5 8h5M9.5 12h5" /></>), "send bill")}
             {railBtn("paid", false, (<><rect x="4" y="4" width="16" height="16" rx="3" /><path d="m9 12 2.2 2.2L15.5 10" /></>), "mark as paid")}
-            {railBtn("auto", false, (<><path d="M20 11a8 8 0 0 0-13.7-5.6L3 8.5" /><path d="M3 4v4.5h4.5" /><path d="M4 13a8 8 0 0 0 13.7 5.6L21 15.5" /><path d="M21 20v-4.5h-4.5" /></>), "automation")}
           </div>
         </div>
 
@@ -1024,12 +1211,55 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                   setSplitEnabled((v) => !v),
                 )}
 
-                <div className="pt-freq-chips">
-                  {FREQUENCIES.map((f) => (
-                    <button key={f} type="button" className="pt-freq-chip" style={chip(f === frequency, 1.5)} onClick={() => setFrequency(f)}>
-                      {f}
-                    </button>
-                  ))}
+                {/* The frequency chips are the automation area, so automation
+                    expands out of them rather than living in its own rail mode:
+                    the repeat cadence and the reminder cadence are one decision.
+                    It opens upward as an overlay — the panel below is already
+                    within ~20px of the 813px floor, so anything that pushes
+                    layout would put the send button off-screen. */}
+                <div className="pt-auto-wrap">
+                  <button
+                    type="button"
+                    className="pt-auto-toggle"
+                    aria-expanded={autoOpen}
+                    aria-label="automation"
+                    onClick={() => setAutoOpen((o) => !o)}
+                  >
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 11a8 8 0 0 0-13.7-5.6L3 8.5" /><path d="M3 4v4.5h4.5" /><path d="M4 13a8 8 0 0 0 13.7 5.6L21 15.5" /><path d="M21 20v-4.5h-4.5" /></svg>
+                    <span className="pt-auto-head-mid">
+                      <span className="pt-auto-title">repeat &amp; reminders</span>
+                      <span className="pt-auto-cap">{autoSummary}</span>
+                    </span>
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke={ACCENT_SOFT}
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      style={{
+                        transform: autoOpen ? "rotate(180deg)" : "none",
+                        transition: "transform .18s ease",
+                      }}
+                    >
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </button>
+                  {autoOpen && (
+                    <div className="pt-auto-panel">
+                      <div className="pt-auto-label pt-auto-label-first">REPEAT</div>
+                      <div className="pt-freq-chips">
+                        {FREQUENCIES.map((f) => (
+                          <button key={f} type="button" className="pt-freq-chip" style={chip(f === frequency, 1.5)} onClick={() => setFrequency(f)}>
+                            {f}
+                          </button>
+                        ))}
+                      </div>
+                      {automationPanel}
+                    </div>
+                  )}
                 </div>
 
                 <button
@@ -1271,196 +1501,6 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
             </div>
           )}
 
-          {mode === "auto" && (
-            <div className="pt-mode pt-auto">
-              <div className="pt-mode-head">Automation</div>
-              <div className="pt-mode-sub">
-                chase overdue rent on a cadence, and see every recurring request you have
-                running
-              </div>
-
-              {/* Deliberately in the page's blue language, not the phone's amber
-                  card: amber means "overdue" here, so an amber panel would read
-                  as an alert rather than a setting. */}
-              <div className="pt-auto-block">
-                <div className="pt-auto-head">
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={ACCENT_SOFT} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 11a8 8 0 0 0-13.7-5.6L3 8.5" /><path d="M3 4v4.5h4.5" /><path d="M4 13a8 8 0 0 0 13.7 5.6L21 15.5" /><path d="M21 20v-4.5h-4.5" /></svg>
-                  <span className="pt-auto-head-mid">
-                    <span className="pt-auto-title">overdue reminders</span>
-                    <span className="pt-auto-cap">auto-resend the link until paid</span>
-                  </span>
-                  <button
-                    type="button"
-                    className="pt-switch"
-                    role="switch"
-                    aria-checked={reminders.rentReminderEnabled}
-                    aria-label="overdue reminders"
-                    disabled={reminderQuery.isLoading}
-                    style={{
-                      background: reminders.rentReminderEnabled
-                        ? ACTIVE
-                        : "rgba(94,158,255,0.25)",
-                    }}
-                    onClick={() =>
-                      updateReminders.mutate({
-                        rentReminderEnabled: !reminders.rentReminderEnabled,
-                      })
-                    }
-                  >
-                    <span
-                      className="pt-switch-knob"
-                      style={{
-                        transform: reminders.rentReminderEnabled ? "translateX(17px)" : "none",
-                      }}
-                    />
-                  </button>
-                </div>
-
-                {reminders.rentReminderEnabled && (
-                  <>
-                    {(
-                      [
-                        {
-                          label: "REMIND AFTER",
-                          field: "rentReminderDelayDays",
-                          value: reminders.rentReminderDelayDays,
-                          options: REMIND_AFTER_DAYS,
-                          format: (o: number) => `${o}d`,
-                        },
-                        {
-                          label: "REPEAT EVERY",
-                          field: "rentReminderIntervalDays",
-                          value: reminders.rentReminderIntervalDays,
-                          options: REMIND_EVERY_DAYS,
-                          format: (o: number) => `${o}d`,
-                        },
-                        {
-                          label: "MAX REMINDERS",
-                          field: "rentReminderMaxCount",
-                          value: reminders.rentReminderMaxCount,
-                          options: REMIND_MAX_COUNTS,
-                          format: (o: number) => (o === 0 ? "∞" : String(o)),
-                        },
-                      ] as const
-                    ).map((row) => (
-                      <div key={row.field}>
-                        <div className="pt-auto-label">{row.label}</div>
-                        <div className="pt-auto-chips" role="group" aria-label={row.label.toLowerCase()}>
-                          {row.options.map((o) => (
-                            <button
-                              key={o}
-                              type="button"
-                              className="pt-auto-chip"
-                              aria-pressed={row.value === o}
-                              style={chip(row.value === o, 1.5)}
-                              onClick={() => updateReminders.mutate({ [row.field]: o })}
-                            >
-                              {row.format(o)}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                    <div className="pt-auto-summary">
-                      once overdue, we send the payment link after{" "}
-                      {plural(reminders.rentReminderDelayDays, "day")}, then every{" "}
-                      {plural(reminders.rentReminderIntervalDays, "day")}
-                      {reminders.rentReminderMaxCount > 0
-                        ? ` (up to ${reminders.rentReminderMaxCount}×)`
-                        : ""}
-                      .
-                    </div>
-                  </>
-                )}
-              </div>
-
-              <div className="pt-auto-label">RECURRING RENT</div>
-              <div className="pt-auto-list">
-                {schedulesQuery.isLoading ? (
-                  <div className="pt-empty">loading…</div>
-                ) : liveSchedules.length === 0 ? (
-                  <div className="pt-empty">
-                    no schedules yet — choose a repeat frequency when sending a rent request
-                  </div>
-                ) : (
-                  liveSchedules.map((s: any) => {
-                    const t = tenantById.get(s.tenantProfileId);
-                    const paused = s.status === "paused";
-                    return (
-                      <div key={s.id} className="pt-paid-row">
-                        <span className="pt-avatar">{initialsOf(t)}</span>
-                        <span className="pt-paid-mid">
-                          <span className="pt-row-name">{fullNameOf(t)}</span>
-                          <span className="pt-row-status">
-                            {fmtNZD(s.amountCents ?? 0)} · {s.frequency} · next{" "}
-                            {shortDate(s.nextRunDate)}
-                          </span>
-                        </span>
-                        <span
-                          className="pt-state-pill"
-                          style={{
-                            background: paused
-                              ? "rgba(240,163,78,0.14)"
-                              : "rgba(53,208,127,0.14)",
-                            color: paused ? AMBER : GREEN,
-                          }}
-                        >
-                          {paused ? "paused" : "active"}
-                        </span>
-                        {confirmCancelId === s.id ? (
-                          <span className="pt-auto-actions">
-                            <button
-                              type="button"
-                              className="pt-auto-btn pt-auto-btn-danger"
-                              disabled={scheduleBusy}
-                              onClick={() => {
-                                cancelSchedule.mutate(s.id);
-                                setConfirmCancelId(null);
-                              }}
-                            >
-                              confirm
-                            </button>
-                            <button
-                              type="button"
-                              className="pt-auto-btn"
-                              onClick={() => setConfirmCancelId(null)}
-                            >
-                              back
-                            </button>
-                          </span>
-                        ) : (
-                          <span className="pt-auto-actions">
-                            <button
-                              type="button"
-                              className="pt-auto-btn"
-                              disabled={scheduleBusy}
-                              onClick={() =>
-                                setScheduleStatus.mutate({
-                                  id: s.id,
-                                  status: paused ? "active" : "paused",
-                                })
-                              }
-                            >
-                              {paused ? "resume" : "pause"}
-                            </button>
-                            <button
-                              type="button"
-                              className="pt-auto-btn pt-auto-btn-danger"
-                              disabled={scheduleBusy}
-                              onClick={() => setConfirmCancelId(s.id)}
-                            >
-                              cancel
-                            </button>
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          )}
-
           {mode === "paid" && (
             <div className="pt-mode pt-paid">
               <div className="pt-mode-head">Mark as paid</div>
@@ -1687,26 +1727,36 @@ const PT_CSS = `
 .pt-bill-doc-remove { flex:0 0 auto; font-weight:300; font-size:12px; color:${ACCENT_SOFT}; background:transparent; cursor:pointer; }
 .pt-bill-send { display:block; margin:28px auto 0; }
 
-/* automation */
-.pt-auto { margin-top:40px; width:446px; }
-.pt-auto-block { margin-top:22px; padding:16px 18px; box-sizing:border-box; border-radius:16px; border:1px solid rgba(94,158,255,0.3); background:rgba(94,158,255,0.06); }
+/* automation — a disclosure inside the rent request's repeat control */
+.pt-auto-wrap { position:relative; margin-top:10px; }
+.pt-auto-toggle { width:100%; box-sizing:border-box; display:flex; align-items:center; gap:12px; padding:8px 16px; border-radius:14px; border:1px solid rgba(94,158,255,0.3); background:rgba(94,158,255,0.06); text-align:left; cursor:pointer; transition:background .15s ease; }
+.pt-auto-toggle:hover { background:rgba(94,158,255,0.12); }
+/* Opens upward and out of flow, like .pt-scope-menu: it sits low in a panel that
+   already reaches ~790px of an 813px floor, so pushing layout would take the send
+   button off-screen. One scroll area inside it, never two. */
+.pt-auto-panel { position:absolute; bottom:calc(100% + 8px); left:0; right:0; z-index:6; max-height:474px; overflow-y:auto; scrollbar-width:none; padding:14px 16px; box-sizing:border-box; border-radius:16px; background:#0B1436; border:1px solid rgba(94,158,255,0.3); box-shadow:0 18px 40px rgba(0,4,24,0.5); }
+.pt-auto-panel::-webkit-scrollbar { display:none; }
+.pt-auto-label-first { margin-top:0; }
+.pt-auto-block { margin-top:16px; padding:16px 18px; box-sizing:border-box; border-radius:16px; border:1px solid rgba(94,158,255,0.3); background:rgba(94,158,255,0.06); }
 .pt-auto-head { display:flex; align-items:center; gap:12px; }
 .pt-auto-head-mid { display:flex; flex-direction:column; gap:1px; flex:1; min-width:0; }
 .pt-auto-title { font-weight:700; font-size:13.5px; color:${TEXT_SOFT}; }
 .pt-auto-cap { font-weight:500; font-size:11px; color:rgba(244,246,255,0.5); }
-.pt-auto-label { margin-top:16px; font-weight:700; font-size:10px; letter-spacing:0.18em; color:rgba(244,246,255,0.45); }
-.pt-auto-chips { margin-top:8px; display:flex; gap:8px; }
-.pt-auto-chip { flex:1; height:40px; border-radius:9999px; font-size:12.5px; cursor:pointer; transition:background .15s ease, color .15s ease; }
-.pt-auto-summary { margin-top:14px; font-weight:500; font-size:11.5px; line-height:1.5; color:rgba(244,246,255,0.45); }
-.pt-auto-list { margin-top:10px; display:flex; flex-direction:column; max-height:236px; overflow-y:auto; scrollbar-width:none; }
-.pt-auto-list::-webkit-scrollbar { display:none; }
-.pt-state-pill { flex:0 0 auto; padding:3px 9px; border-radius:9999px; font-weight:700; font-size:9.5px; letter-spacing:0.06em; text-transform:uppercase; }
+.pt-auto-label { margin-top:12px; font-weight:700; font-size:10px; letter-spacing:0.18em; color:rgba(244,246,255,0.45); }
+.pt-auto-chips { margin-top:7px; display:flex; gap:8px; }
+.pt-auto-chip { flex:1; height:36px; border-radius:9999px; font-size:12.5px; cursor:pointer; transition:background .15s ease, color .15s ease; }
+.pt-auto-summary { margin-top:12px; font-weight:500; font-size:11.5px; line-height:1.5; color:rgba(244,246,255,0.45); }
+.pt-auto-list { margin-top:10px; display:flex; flex-direction:column; }
+/* Running vs paused reads from weight and opacity in the one blue palette. */
+.pt-state-pill { flex:0 0 auto; padding:3px 9px; border-radius:9999px; font-weight:700; font-size:9.5px; letter-spacing:0.06em; text-transform:uppercase; background:rgba(94,158,255,0.18); color:${ACCENT_SOFT}; }
+.pt-state-pill-off { background:rgba(94,158,255,0.07); color:rgba(244,246,255,0.4); }
 .pt-auto-actions { flex:0 0 auto; display:flex; gap:6px; }
 .pt-auto-btn { height:40px; padding:0 12px; border-radius:9999px; border:1px solid rgba(94,158,255,0.5); background:transparent; color:${ACCENT_SOFT}; font-weight:600; font-size:11.5px; cursor:pointer; transition:background .15s ease; }
 .pt-auto-btn:hover:not(:disabled) { background:rgba(94,158,255,0.12); }
 .pt-auto-btn:disabled { opacity:0.5; cursor:default; }
-.pt-auto-btn-danger { border-color:rgba(240,101,108,0.5); color:${RED}; }
-.pt-auto-btn-danger:hover:not(:disabled) { background:rgba(240,101,108,0.12); }
+/* The destructive confirm carries weight through a filled chip, not a red one. */
+.pt-auto-btn-strong { border-color:transparent; background:${ACTIVE}; color:${NAVY}; font-weight:700; }
+.pt-auto-btn-strong:hover:not(:disabled) { background:${ACTIVE}; opacity:0.85; }
 
 /* mark paid */
 .pt-paid { margin-top:100px; }
