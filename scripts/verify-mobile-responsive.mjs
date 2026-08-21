@@ -13,7 +13,8 @@
  *
  *   COUNTERS   things that should trend to zero: horizontal overflow, elements
  *              crossing the viewport edge, clipped text, controls the 44px rule
- *              has inflated, `.tp-*` stylesheet collisions, indicator drift.
+ *              has inflated, unscoped `.tp-*` rules, duplicated `tp-*`
+ *              keyframes, indicator drift.
  *              The gate fails if any counter is HIGHER than baseline.
  *   RATCHETS   things that should trend up or hold: visibleStackRows. The gate
  *              fails if any ratchet is LOWER than baseline.
@@ -230,11 +231,38 @@ async function measure(page, allowlist) {
       }
     }
 
-    /* ── RC-6: how many stylesheets define the same `.tp-*` rule ─────────── */
-    let tpStyleSheets = 0;
-    for (const el of document.querySelectorAll("style")) {
-      if (/\.tp-subbar\s*\{/.test(el.textContent ?? "")) tpStyleSheets++;
+    /* ── RC-6: the collisions themselves, not a count of stylesheets ───────
+       Phase 1 counted <style> tags whose text matched /\.tp-subbar\s*\{/. That
+       was a proxy, and phase 2 proved it measures the wrong thing twice over:
+
+         · `.retail-terminal-view .tp-subbar {` CONTAINS `.tp-subbar {`, so
+           scoping a sheet — the fix — pushed the number up rather than down;
+         · it reads <style> text, so it cannot see an imported stylesheet, and
+           it cannot see a @keyframes collision at all. Two more unscoped
+           <style> literals (the property and trades action sheets, each
+           redefining tp-fade and tp-sheetup) survived the plan's whole RC-6
+           inventory because they declare no `.tp-` selector.
+
+       What actually collides is a rule any vertical's element can match — a
+       bare `.tp-` selector — and a keyframe name defined twice, since keyframe
+       names are global and the last definition parsed wins. Both are counted
+       from the CSSOM, which sees every sheet however it arrived. */
+    let tpUnscopedRules = 0;
+    let tpDuplicateKeyframes = 0;
+    const kfSeen = new Map();
+    for (const sheet of document.styleSheets) {
+      let rules;
+      try { rules = sheet.cssRules; } catch { continue; } /* cross-origin */
+      for (const rule of rules) {
+        if (rule.type === CSSRule.KEYFRAMES_RULE) {
+          if (/^tp-/.test(rule.name)) kfSeen.set(rule.name, (kfSeen.get(rule.name) ?? 0) + 1);
+          continue;
+        }
+        const sel = rule.selectorText;
+        if (sel && sel.split(",").some((part) => /^\s*\.tp-/.test(part))) tpUnscopedRules++;
+      }
     }
+    for (const n of kfSeen.values()) if (n > 1) tpDuplicateKeyframes += n - 1;
 
     return {
       docOverflow,
@@ -248,7 +276,8 @@ async function measure(page, allowlist) {
       tapInflated,
       tapCentreMiss,
       inflatedSamples,
-      tpStyleSheets,
+      tpUnscopedRules,
+      tpDuplicateKeyframes,
     };
   }, allowlist);
 }
@@ -306,7 +335,7 @@ async function runCell(browser, vertical, vp, safeArea) {
    ───────────────────────────────────────────────────────────────────────── */
 const COUNTERS = [
   "docOverflow", "edgeCrosserCount", "clippedTextCount",
-  "tapInflated", "tapCentreMiss", "tpStyleSheets",
+  "tapInflated", "tapCentreMiss", "tpUnscopedRules", "tpDuplicateKeyframes",
 ];
 const RATCHETS = ["components.visibleStackRows"];
 
@@ -419,7 +448,8 @@ function summarise(current) {
     `clipped text ${tot("clippedTextCount")}`,
     `44px-inflated controls ${tot("tapInflated")}`,
     `tap centre misses ${tot("tapCentreMiss")}`,
-    `.tp-* stylesheet collisions ${cells.reduce((n, [, m]) => Math.max(n, m.tpStyleSheets ?? 0), 0)} max`,
+    `unscoped .tp-* rules ${cells.reduce((n, [, m]) => Math.max(n, m.tpUnscopedRules ?? 0), 0)} max`,
+    `duplicate tp-* keyframes ${cells.reduce((n, [, m]) => Math.max(n, m.tpDuplicateKeyframes ?? 0), 0)} max`,
   ].join("\n  "));
 
   const ref = cells.filter(([c]) => c.includes(`@${REFERENCE}`) && !c.includes("safearea"));

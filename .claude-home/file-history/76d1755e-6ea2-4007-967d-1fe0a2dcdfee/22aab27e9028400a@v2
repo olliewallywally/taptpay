@@ -1,0 +1,237 @@
+#!/usr/bin/env python3
+"""Wrap a converted plan in the spec-sheet shell."""
+import json, sys, re, html
+
+SHELL = """<title>{title}</title>
+<style>
+:root {{
+  --ground:#F7F8FB; --surface:#FFFFFF; --raise:#F1F4FA;
+  --ink:#101733; --ink-soft:#545C7A; --ink-faint:#7C85A3;
+  --rule:#DFE3EE; --rule-firm:#C6CDDF;
+  --accent:#2E5FC0; --accent-soft:#EAF0FC; --accent-line:#B7CBEE;
+  --flag:#A8451C; --flag-soft:#FBEFE9; --flag-line:#E8C4B1;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}}
+@media (prefers-color-scheme: dark) {{
+  :root:not([data-theme="light"]) {{
+    --ground:#080D20; --surface:#0E1533; --raise:#141C3D;
+    --ink:#E7EBF6; --ink-soft:#98A1BF; --ink-faint:#6E7799;
+    --rule:#232C51; --rule-firm:#333E6B;
+    --accent:#7FB2FF; --accent-soft:#15224A; --accent-line:#2C3E75;
+    --flag:#E8A183; --flag-soft:#2A1A14; --flag-line:#4E3225;
+  }}
+}}
+:root[data-theme="dark"] {{
+  --ground:#080D20; --surface:#0E1533; --raise:#141C3D;
+  --ink:#E7EBF6; --ink-soft:#98A1BF; --ink-faint:#6E7799;
+  --rule:#232C51; --rule-firm:#333E6B;
+  --accent:#7FB2FF; --accent-soft:#15224A; --accent-line:#2C3E75;
+  --flag:#E8A183; --flag-soft:#2A1A14; --flag-line:#4E3225;
+}}
+
+* {{ box-sizing:border-box; }}
+body {{
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:var(--sans); font-size:16px; line-height:1.62;
+  -webkit-font-smoothing:antialiased;
+}}
+
+.masthead {{
+  border-bottom:1px solid var(--rule); background:var(--surface);
+  padding:44px 28px 26px;
+}}
+.masthead-in {{ max-width:1180px; margin:0 auto; }}
+.eyebrow {{
+  font-family:var(--mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--accent); margin:0 0 14px;
+}}
+h1 {{
+  font-family:var(--mono); font-size:clamp(23px,3.4vw,34px); line-height:1.2;
+  font-weight:600; letter-spacing:-.015em; margin:0 0 20px; max-width:22ch;
+  text-wrap:balance;
+}}
+.status {{ display:flex; flex-wrap:wrap; gap:0; border:1px solid var(--rule); border-radius:3px; overflow:hidden; }}
+.status div {{ padding:10px 16px; border-right:1px solid var(--rule); flex:1 1 190px; min-width:0; }}
+.status div:last-child {{ border-right:0; }}
+.status dt {{
+  font-family:var(--mono); font-size:10px; letter-spacing:.13em; text-transform:uppercase;
+  color:var(--ink-faint); margin:0 0 3px;
+}}
+.status dd {{ margin:0; font-size:13.5px; color:var(--ink-soft); line-height:1.45; }}
+.status dd strong {{ color:var(--ink); font-weight:600; }}
+
+.frame {{ max-width:1180px; margin:0 auto; display:grid; grid-template-columns:236px minmax(0,1fr); gap:52px; padding:40px 28px 96px; }}
+@media (max-width:940px) {{ .frame {{ grid-template-columns:minmax(0,1fr); gap:0; }} .rail {{ display:none; }} }}
+
+.rail {{ position:sticky; top:24px; align-self:start; max-height:calc(100vh - 48px); overflow-y:auto; }}
+.rail p {{
+  font-family:var(--mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--ink-faint); margin:0 0 12px; padding-bottom:10px; border-bottom:1px solid var(--rule);
+}}
+.rail a {{
+  display:block; font-family:var(--mono); font-size:12px; line-height:1.4;
+  color:var(--ink-soft); text-decoration:none; padding:5px 0 5px 10px;
+  border-left:2px solid transparent;
+}}
+.rail a.lv3 {{ padding-left:22px; font-size:11.5px; color:var(--ink-faint); }}
+.rail a:hover {{ color:var(--accent); border-left-color:var(--accent-line); }}
+.rail a:focus-visible {{ outline:2px solid var(--accent); outline-offset:2px; }}
+
+main {{ min-width:0; }}
+main > :first-child {{ margin-top:0; }}
+h2 {{
+  font-family:var(--mono); font-size:19px; font-weight:600; letter-spacing:-.01em;
+  margin:56px 0 18px; padding-top:20px; border-top:1px solid var(--rule-firm);
+  scroll-margin-top:20px; text-wrap:balance;
+}}
+h3 {{
+  font-family:var(--mono); font-size:15px; font-weight:600; color:var(--ink);
+  margin:34px 0 12px; scroll-margin-top:20px; text-wrap:balance;
+}}
+h4 {{ font-family:var(--mono); font-size:13.5px; font-weight:600; margin:26px 0 10px; }}
+p {{ margin:0 0 15px; max-width:74ch; }}
+ul, ol {{ margin:0 0 16px; padding-left:22px; max-width:74ch; }}
+li {{ margin:0 0 7px; }}
+li::marker {{ color:var(--ink-faint); font-family:var(--mono); font-size:.9em; }}
+a {{ color:var(--accent); text-underline-offset:2px; }}
+strong {{ font-weight:650; color:var(--ink); }}
+hr {{ border:0; height:1px; background:var(--rule); margin:34px 0; }}
+
+code {{
+  font-family:var(--mono); font-size:.855em; background:var(--raise);
+  padding:1.5px 5px; border-radius:3px; color:var(--ink);
+  overflow-wrap:break-word;
+}}
+pre.code {{
+  font-family:var(--mono); font-size:12.5px; line-height:1.6;
+  background:var(--surface); border:1px solid var(--rule); border-left:2px solid var(--accent-line);
+  border-radius:3px; padding:16px 18px; margin:0 0 18px; overflow-x:auto;
+}}
+pre.code code {{ background:none; padding:0; font-size:inherit; }}
+
+.tablewrap {{ overflow-x:auto; margin:0 0 20px; border:1px solid var(--rule); border-radius:3px; }}
+table {{ border-collapse:collapse; width:100%; font-size:13.5px; font-variant-numeric:tabular-nums; }}
+th {{
+  font-family:var(--mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase;
+  text-align:left; color:var(--ink-faint); font-weight:600;
+  padding:10px 14px; background:var(--raise); border-bottom:1px solid var(--rule-firm);
+  white-space:nowrap;
+}}
+td {{ padding:10px 14px; border-bottom:1px solid var(--rule); color:var(--ink-soft); vertical-align:top; line-height:1.5; }}
+tbody tr:last-child td {{ border-bottom:0; }}
+td strong {{ color:var(--ink); }}
+td code {{ background:none; padding:0; color:var(--ink); }}
+
+blockquote {{
+  margin:0 0 20px; padding:16px 20px; background:var(--flag-soft);
+  border:1px solid var(--flag-line); border-left:2px solid var(--flag); border-radius:3px;
+}}
+blockquote > :last-child {{ margin-bottom:0; }}
+blockquote strong {{ color:var(--flag); }}
+blockquote code {{ background:rgba(0,0,0,.05); }}
+:root[data-theme="dark"] blockquote code,
+:root:not([data-theme="light"]) blockquote code {{ background:rgba(255,255,255,.07); }}
+blockquote .tablewrap, blockquote pre.code {{ background:var(--surface); }}
+
+.foot {{
+  max-width:1180px; margin:0 auto; padding:0 28px 64px;
+  font-family:var(--mono); font-size:11.5px; color:var(--ink-faint); line-height:1.7;
+}}
+
+.demo {{ margin:0 0 22px; padding:22px 22px 18px; background:var(--surface);
+  border:1px solid var(--rule); border-radius:3px; }}
+.goo-stage {{ height:96px; border-radius:3px; background:var(--raise);
+  display:flex; align-items:center; justify-content:center; overflow:hidden; }}
+.goo-dock {{ position:relative; width:280px; height:58px; }}
+.goo-layer-a {{ position:absolute; inset:0; }}
+.goo-layer-a.morphing {{ filter:url(#dockGoo); }}
+.blob {{ position:absolute; top:50%; left:50%; background:var(--accent); border-radius:999px;
+  width:var(--w); height:var(--h); transform:translate(-50%,-50%) translateX(var(--x));
+  transition:width .46s cubic-bezier(.65,0,.35,1), height .46s cubic-bezier(.65,0,.35,1),
+             transform .46s cubic-bezier(.65,0,.35,1); }}
+.goo-dock[data-state="open"]   .blob {{ --x:calc((var(--i) - 2) * 56px); --w:62px; --h:48px; }}
+.goo-dock[data-state="closed"] .blob {{ --x:calc((var(--i) - 2) * 5px);  --w:26px; --h:4px; }}
+.blob.bar {{ border-radius:24px; }}
+.goo-dock[data-state="open"]   .blob.bar {{ --x:0px; --w:280px; --h:48px; }}
+.goo-dock[data-state="closed"] .blob.bar {{ --x:0px; --w:56px;  --h:4px; }}
+.goo-layer-b {{ position:absolute; inset:0; display:flex; align-items:center;
+  justify-content:space-around; padding:0 16px; }}
+.goo-icon {{ color:var(--accent-soft); display:flex; opacity:1; transform:scale(1);
+  transition:opacity .17s ease .2s, transform .3s cubic-bezier(.34,1.3,.64,1) .16s; }}
+:root[data-theme="dark"] .goo-icon, :root:not([data-theme="light"]) .goo-icon {{ color:var(--ground); }}
+.goo-dock[data-state="closed"] .goo-icon {{ opacity:0; transform:scale(.62); transition-delay:0s; }}
+.goo-icon.active {{ color:#FFFFFF; }}
+.goo-controls {{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-top:15px; }}
+.goo-btn {{ font-family:var(--mono); font-size:12px; letter-spacing:.04em; background:var(--accent);
+  color:#FFFFFF; border:none; border-radius:3px; padding:8px 14px; cursor:pointer; }}
+:root[data-theme="dark"] .goo-btn, :root:not([data-theme="light"]) .goo-btn {{ color:var(--ground); }}
+.goo-btn.ghost {{ background:transparent; color:var(--accent); border:1px solid var(--rule-firm); }}
+.goo-btn:focus-visible {{ outline:2px solid var(--accent); outline-offset:2px; }}
+.goo-state {{ font-family:var(--mono); font-size:11.5px; color:var(--ink-faint); }}
+figcaption {{ font-family:var(--mono); font-size:11.5px; color:var(--ink-faint);
+  margin-top:13px; line-height:1.6; max-width:70ch; }}
+@media (prefers-reduced-motion:reduce) {{
+  .blob, .goo-icon {{ transition-duration:.01ms !important; }}
+  .goo-layer-a.morphing {{ filter:none; }}
+}}
+
+@media (prefers-reduced-motion:reduce) {{ * {{ animation:none !important; transition:none !important; }} }}
+</style>
+
+<div class="masthead"><div class="masthead-in">
+  <p class="eyebrow">{eyebrow}</p>
+  <h1>{h1}</h1>
+  <dl class="status">{status}</dl>
+</div></div>
+
+<div class="frame">
+  <nav class="rail"><p>Contents</p>{toc}</nav>
+  <main>{body}</main>
+</div>
+
+<div class="foot">{foot}</div>
+"""
+
+
+def build(src_json, out_html, title, eyebrow, h1, status, foot):
+    d = json.load(open(src_json))
+    toc = ''.join(
+        f'<a class="lv{lv}" href="#{sid}">{txt}</a>'
+        for lv, txt, sid in d['toc']
+    )
+    st = ''.join(f'<div><dt>{k}</dt><dd>{v}</dd></div>' for k, v in status)
+    open(out_html, 'w').write(SHELL.format(
+        title=title, eyebrow=eyebrow, h1=h1, status=st, toc=toc, body=d['body'], foot=foot))
+    print(f'{out_html}: {len(open(out_html).read())} bytes')
+
+
+S = '/tmp/claude-1000/-home-runner-workspace/76d1755e-6ea2-4007-967d-1fe0a2dcdfee/scratchpad'
+
+build(
+    f'{S}/mobile.json', f'{S}/mobile-ui-plan.html',
+    title='The 44-Pixel Rule',
+    eyebrow='Build contract · v2.1 · feat/tablet-desktop-app',
+    h1='Making the phone app hold its design at every size',
+    status=[
+        ('Status', '<strong>Execution-ready.</strong> No code changed yet'),
+        ('Primary cause', 'A blanket <strong>44px</strong> button minimum below 640px'),
+        ('Awaiting', '<strong>MD1–MD7</strong> — MD1 and MD7 block phase&nbsp;0'),
+        ('Companion', 'Terminal panels &amp; dock — shares phases 6 and 2b'),
+    ],
+    foot='docs/PLAN-2026-08-17-mobile-responsive-ui.md · v2 revised after external review, '
+         'v2.1 completed 2026-08-18 · every measurement taken in Chromium 125 against the dev server')
+
+build(
+    f'{S}/dock.json', f'{S}/panels-and-dock.html',
+    title='The Blue Box and the Dock',
+    eyebrow='Build contract · v2 · feat/tablet-desktop-app',
+    h1='Fill the panel, earn the swipe, ooze the morph',
+    status=[
+        ('Status', '<strong>Execution-ready.</strong> No code changed yet'),
+        ('Worst defect', '<strong>50–78px</strong> of every feature screen sits behind the dock'),
+        ('Awaiting', '<strong>DK1–DK4</strong> — DK2 reopened by the design'),
+        ('Companion', 'Mobile responsive UI — supplies the token layer'),
+    ],
+    foot='docs/PLAN-2026-08-17-terminal-panels-and-dock.md · v2 completed 2026-08-18 · '
+         'measurements and the goo prototype taken in Chromium 125 against the live app')

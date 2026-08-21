@@ -533,6 +533,15 @@ regions that the grid has already sized.
 }
 
 /* ── C. Region-local, from the region's own realised height ──────────────── */
+/* ⚠ SUPERSEDED — see docs/SPEC-2026-08-20-dock-implementation.md §1.2 and §5.
+   Both --amount-max and --kp-size are declared here ON the container, and an
+   element is never its own size-query container: 100cqh resolves against the
+   next container up, which is .tp-viewport (inline-size only), so it falls back
+   to the small viewport. Measured in Chromium 125: 568px on the container,
+   277px on a descendant. They also subtract padding that 100cqh, being the
+   content box, has already excluded. The spec moves --kp-size to .tp-panel-body
+   and drops the padding term; --amount-max needs the same treatment when §6.5
+   is built. */
 .tp-hero  { container-type: size; --amount-max: max(36px, min(88px, 22.56cqi, 31cqh)); }
 .tp-panel { container-type: size;
             --kp-size: min(76px, calc((100cqh - 3 * var(--sp-3) - 2 * var(--sp-6)) / 4)); }

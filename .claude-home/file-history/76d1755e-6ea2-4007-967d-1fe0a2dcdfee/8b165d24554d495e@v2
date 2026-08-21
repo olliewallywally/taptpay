@@ -1,0 +1,1002 @@
+# Plan — mobile responsive UI (v2.1)
+
+Date: 2026-08-17 · **v2 revised after external review; v2.1 completed 2026-08-18**
+Status: **execution-ready.** Every token is defined and calibrated, every terminal screen is
+inventoried, and the companion boundary is settled. No code changed yet.
+Scope: the phone merchant app. Tablet/desktop (`client/src/desktop/**`) is a strict
+no-regression boundary — the primary root cause cannot reach it.
+
+Companion: `docs/PLAN-2026-08-17-terminal-panels-and-dock.md` owns the terminal *feature*
+screens and the nav dock. The boundary is stated in §6.6, and both plans are bound by the
+**screen-class contract** in §6.6.1.
+
+**Decision namespacing.** This plan's decisions are **MD1–MD7** (§1); the companion's are
+**DK1–DK4**. v2 referred to both as "D*n*", which collided — MD2 is the smallest phone, DK2
+is dock-on-feature-screens. Cross-references below use the prefixed form.
+
+---
+
+## 0. What changed in v2
+
+v1 was reviewed before implementation and blocked. That was correct — two findings were
+verified defects in the plan itself, and several more were real gaps. Every claim below was
+re-checked against the code or in a browser before being accepted.
+
+| Finding | Verdict | Landed in |
+|---|---|---|
+| The `--u` sizing token is invalid CSS; consumers compute to `0px` | **confirmed in Chromium 125** | §6.1 rewritten |
+| Phase 4's grid targeted `.tp-screen`, which owns all seven terminal screens | **confirmed** — and the count was low: there are **31** (§6.6.1) | §6.4, home-only class |
+| The 320×568 budget omitted its own chrome-gutter row | **confirmed** | §4.3 budget table |
+| No landscape story at all | **confirmed gap** | §4.2, MD5 |
+| A fourth unscoped terminal stylesheet at `pages/trades/trades-terminal.tsx:520` | **confirmed**, worse than v1's RC-6 | §3 RC-6 |
+| The tutorial targets `.tp-subbar` / `.tp-amount` directly | **confirmed** | §3 RC-6, §6.2 |
+| No CI workflow, no package script runs either verifier | **confirmed** | §7.5 |
+| The dock is a sibling of the router | **confirmed** (`App.tsx:1002-1004`) | companion §3.1 |
+| Geometry gates cannot prove design fidelity | **confirmed** | §7 rewritten |
+| The `100vh` static check contradicted the plan's own fallback chain | **confirmed** | §7.4 |
+| Greps miss CSS-in-JS, where most of this app's CSS lives | **confirmed** | §7.4 |
+| Blast radius reaches auth, onboarding, landing, customer checkout | **partly** — v1 said Phase 1 was app-wide, but the control inventory was terminal-only and `/pay/:id` was under-flagged. A new "merchant shell" is not needed to fix that | §5, phase 3 |
+| Phase 0 lands a permanently red CI | **overstated** — there is no CI. Adopted anyway as baseline-JSON | §7.6 |
+| `user-scalable=no` contradicts the accessibility claim | **pre-existing, not caused here.** The fair correction: px type does not honour OS text scaling; `rem` would | MD6 |
+
+Found while checking those claims, and larger than several of them:
+
+- **There is an authoritative phone design in the repo** (§2.1). It settles three things
+  this plan had been treating as open questions.
+- `client/src/index.css` carries **seven** media blocks, not the one v1 named — including a
+  second `max-width: 640px` at :590, a `max-width: 374px` at :736, and
+  `@media (max-width: 768px) { * { max-width: 100vw } }` at :710, a universal-selector rule
+  constraining every element on phones *and* tablets.
+- **Fonts load from a third-party CDN** (`index.css:1` and `index.html:211`). That is a
+  golden-stability hazard and a render-blocking third-party request on a payments app (MD6).
+
+### 0.1 What v2.1 finished
+
+v2 was a complete diagnosis with an incomplete build contract. Four things would have stopped
+an implementer on day one, all found by auditing the plan against the code rather than
+re-reading it:
+
+| Gap in v2 | Fixed in |
+|---|---|
+| **Twelve of the twenty-one tokens the two plans use were never defined** — `--hero-min`, `--hero-pref`, `--panel-min`, `--panel-top`, `--chrome-gutter`, `--dock-h`, `--stack-hdr-h`, `--amount-max`, `--amount-k`, `--ease-bar`, `--active-col`, `--kp-size`. The plan whose headline defect was *a token that silently computed to 0px* shipped a half-defined token layer | §6.1, complete table |
+| **Two defined tokens do not reproduce their own design value at 390**, breaking §6.1's stated calibration rule: `--bar-h` gives 37.99 against an authored 39, `--row-h` gives 64.0 against a measured 69 | §6.1, recalibrated |
+| **The vertical budget has no height-driven tokens at all.** §6.4's grid rows are heights; every token in v2 was width-driven `cqi`. A hero sized off width is wrong on every short screen | §6.1, the `svh`/`cqh` half |
+| **The screen inventory was wrong, and the two plans contradicted each other on `.tp-screen`** — v2 said "all seven terminal screens" and listed eight line numbers; retail has **ten**, property **twelve**. Meanwhile the companion put a two-region grid on bare `.tp-screen`, which is the exact mistake v2 caught in v1, mirrored | §6.4, §6.6.1 |
+
+Also corrected: the §6.6 boundary cross-reference in the header pointed at a §5.4 that does
+not exist, and both plans numbered their decisions `D1…`, so "D2" meant two different things.
+
+---
+
+## 1. Decisions needed from Oliver
+
+The plan assumes the recommended answer throughout and is written so a different answer
+changes only the section named.
+
+**MD1 — Adaptation strategy.** **Fluid / intrinsic layout** *(recommended)* — length-valued
+tokens, container queries, measured chrome gutters. Everything reflows and type stays a
+readable physical size on every device. The alternative is the uniform scaled canvas the
+desktop app uses (`client/src/desktop/ScaledCanvas`): cheap and pixel-perfect, but text goes
+physically tiny at 320px and tap targets scale below the minimum. Right for simulating a
+laptop on a tablet; wrong for a real phone. *(Changes §6.)*
+
+**MD2 — Smallest supported phone.** **320×568** *(assumed)* — iPhone SE 1st gen, older
+Android, and any iPhone in Display Zoom. This is the size where the budget in §4.3 gets
+thin. If 360×640 is the real floor, every clamp minimum relaxes. *(Changes §4, §6.1.)*
+
+**MD3 — Blast radius of the RC-1 fix.** **One sweeping commit plus the gate**
+*(recommended)* — a half-applied fix leaves two inconsistent button systems live at once.
+It changes 5–13 buttons on every mobile page, including `/login`, onboarding, the landing
+page and the customer payment page. *(Changes §5 phases 3–4.)*
+
+**MD4 — Money formatting.** `fmt()` produces `$99999.99` with no thousands separator. Should
+it be `$99,999.99`? Current maximum is 7 digits. Purely a presentation call — §6.1 shows the
+fitter renders a constant width regardless of character count, so grouping shrinks the digits
+slightly and cannot overflow. *(Changes `fmt()` and the §7.2 content-extreme fixtures only.)*
+
+**MD5 — Landscape.** Three visible stack rows is impossible at 568×320 (§4.2). The PWA
+manifest is portrait-locked (`client/public/manifest.json:7`); the native iOS shell is
+**not** (`ios/App/App/Info.plist:38-39`). **Lock the native shell to portrait to match**
+*(recommended)* — a one-line change, and a POS terminal in landscape is not a real use case.
+The alternative is gating the three-row contract on a measured portrait-height threshold and
+letting the stack scroll below it. Either way the layout must not *break* in a landscape
+browser tab; it just need not meet the three-row contract.
+
+**MD6 — Fonts and text scaling.** Two coupled questions, both pre-existing:
+- **Self-host Outfit and Inter?** *(recommended)* They load from `fonts.googleapis.com` at
+  `index.css:1` and `index.html:211`. Self-hosting removes a render-blocking third-party
+  request from a payments app, removes a third-party data leak, and is a precondition for
+  stable goldens (§7.2).
+- **Honour OS text scaling?** Today every font size is `px`, so Dynamic Type and Android
+  font scale do nothing, and `user-scalable=no` (`index.html:5`) blocks pinch zoom — a WCAG
+  1.4.4 failure. Moving the type ramp to `rem` fixes the first. Removing `user-scalable=no`
+  fixes the second but lets users zoom the terminal, which needs a look. Out of scope for
+  this plan unless you want it in.
+
+**MD7 — The fourth trades terminal.** `client/src/pages/trades/trades-terminal.tsx` is a
+618-line second implementation of the trades terminal, live at `/trades/quote`, with its own
+screen state machine, its own `.tp-layer` shell and no `.tp-screen` elements at all — while
+exporting the `TP_TERM_CSS` whose global collision is RC-6. `features/terminal/trades/
+TradesTerminalView.tsx` is the one this plan and the companion both target.
+
+- **Retire it** *(recommended, if `/trades/quote` is reachable only as a legacy route)* — it
+  removes the collision at its source and one of the four stylesheets outright.
+- **Bring it under the contract** — classify its screens, scope its CSS, and carry it through
+  every phase. Roughly a third more work in §5 and §7 for a screen that duplicates one already
+  being fixed.
+
+I could not settle this from the code: it is mounted and therefore reachable, but nothing
+indicates whether it is still the intended route. *(Changes §5.1, §6.6.1, the golden set in
+§7.1.)* **This is the one decision that changes the size of the job.**
+
+---
+
+## 2. The design contract
+
+Geometry gates can pass while colour, type, spacing and composition drift. Before any code
+moves, the contract has to say what may adapt and what may not.
+
+### 2.1 The authoritative references
+
+`docs/designs/motion-tablet-desktop/uploads/` holds three **phone** terminal designs, despite
+the folder name:
+
+| File | Vertical | Native size |
+|---|---|---|
+| `retail terminal.png` | retail | 1125×2436 = **375×812 @3x** |
+| `PM terminal.png` | property | 1125×2436 = 375×812 @3x |
+| `Bills terminal.png` | trades | 1125×2436 = 375×812 @3x |
+
+**Confirm these are authoritative before they are used as a gate.** They already settle three
+things this plan had open:
+
+- the action bar is thin and **the send button is exactly its height** — the reported issue 5,
+  by design;
+- the active stack shows **three rows** in the visible area — the reported issue 2, by design;
+- **there is no dock in the design at all** — which reopens DK2 of the companion plan, and
+  raises whether the dock belongs on terminal home either.
+
+Note the designs are drawn at **375×812**, not the 390×844 this plan uses as its reference
+viewport. Keep 390×844 as the capture size (it is the more common modern device) and use the
+design only for human approval — see §7.1.
+
+### 2.2 Immutable — may not change at any size
+
+Vertical order of regions; which region is which colour; component anatomy (an action bar is
+a pill of icon buttons with one sliding indicator and a send button at its right); the
+interaction model; every label; every accent colour and its role.
+
+### 2.3 Adaptable — the only things a size may change
+
+Type size within its clamp range; spacing and gaps within their clamp ranges; the number of
+list rows visible before scrolling, subject to §4.3's floors; whether a region scrolls
+internally; the hero's proportion of the screen, subject to §4.3.
+
+Anything not on this list is a design change and needs Oliver, not a developer.
+
+---
+
+## 3. Root causes
+
+### RC-1 — A blanket 44px minimum on every button below 640px  ⟵ *primary*
+
+`client/src/index.css:362-368`:
+
+```css
+@media (max-width: 640px) {
+  button, [role="button"], input[type="submit"], input[type="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+```
+
+`min-height` beats `height`, so no component can set a smaller box. Measured on iPhone 14:
+
+| Element | Author intent | Renders | Δ |
+|---|---|---|---|
+| `.tp-subbar-btn` | `height: 27px` | **44px** | +17 |
+| `.tp-subbar-ind` (a `<div>` — unaffected) | 27px | 27px | — |
+| `.tp-subbar` (bar shell) | 39px | **56px** | +17 |
+| `.tp-psubbar` (its row, a `<div>`) | 37px | 37px | — |
+| `.tp-send` | `height: 37px` | **44px** | +7 |
+| `.tp-pill` "split bill" | ~30px | **44px** | +14 |
+| `.tp-pill` paywave / boards | ~26px | **44px** | +18 |
+| `.tp-stack-hdr` | 24px | **44px** | +20 |
+| `.tp-stepper` (quantity) | 32×32 | **44×44** | +12 |
+
+So the action bar is a 56px lozenge inside a 37px row, holding a 27px highlight bubble behind
+a label centred in a 44px box. **A/B proof:** disabling only those two declarations at runtime
+takes the stack header from **44px → 24px** with nothing else changed.
+
+It is a `max-width` query, so tablet and desktop never see it, and every probe in
+`scripts/desktop-shots/` runs at ≥1194px. The bug is invisible to the existing suite by
+construction.
+
+**The whole 640px block, and six more, need auditing.** `index.css` has seven media blocks:
+
+| Line | Query | What it does |
+|---|---|---|
+| 360 | `max-width: 640px` | the 44px rule, plus `label { color: white !important }`, `input { background/border/color !important }`, `table … { background: transparent !important }` |
+| 476 | `641–1024px` | tablet overrides |
+| 590 | `max-width: 640px` | a second block — `.glow-green-button` |
+| 710 | `max-width: 768px` | **`* { max-width: 100vw }`** — a universal selector on phones *and* tablets — plus a duplicate `input { font-size: 16px !important }` |
+| 736 | `max-width: 374px` | Tailwind utility overrides (`.space-y-4`, `.p-4`, …) with `!important` — a **second phone breakpoint** |
+| 986, 1099 | `prefers-reduced-motion` | the existing reduced-motion precedent |
+
+### RC-2 — The highlight bubble is half-measured, half-hardcoded, never re-measured
+
+`RetailTerminalViewCore.jsx:89-109`. `measure()` returns `{ x, w }` only; `top: 5px` and
+`height: 27px` live in CSS, so the bubble is *guaranteed* wrong the moment a button's real
+height differs from 27 — which RC-1 makes permanent. The effect also depends on `[activeIdx]`
+alone with no `ResizeObserver`: resizing 390→320 leaves the bubble **14.5px off its button**,
+permanently. On a phone that fires on rotation, on the keyboard opening, and on the iOS URL
+bar collapsing. `TerminalDockView.tsx:98-118` has the same pattern, surviving only because
+its track is a fixed 280px.
+
+### RC-3 — Layout is absolute-pixel choreography around floating chrome
+
+`RetailTerminalViewCore.jsx:318-374`:
+
+```jsx
+<div style={{ height: '50%', padding: '100px 28px 28px' }}>   {/* hero  */}
+<div style={{ flex: 1,      padding: '154px 22px 90px'  }}>   {/* stack */}
+```
+
+`154px` guesses the FAB + action bar's footprint; `90px` guesses the dock's. Nothing measures
+either, and the dock collapses 78→44px after four seconds of idle while the padding never
+reacts. There are **28** `height: '50%'` panels across the three terminal views.
+
+Measured (row 69px, header 44px, card border 2px — three rows needs **245px**):
+
+| Device | lower panel | content box (−244 padding) | rows fully visible |
+|---|---|---|---|
+| 320×568 | 284 | **40** | **0** |
+| 375×667 | 333 | **89** | **0** |
+| 390×844 | 422 | 178 | **1** |
+| 393×851 | 425 | 181 | **1** |
+| 344×882 | 441 | 197 | 2 |
+| 412×915 | 457 | 213 | 2 |
+| 430×932 | 466 | 222 | 2 |
+
+Never 3, on any phone. The stack header also lives *inside* the scroll container, so it eats
+first-paint budget then scrolls away.
+
+### RC-4 — No fluid type, no intrinsic sizing, anywhere
+
+| | retail | property | trades |
+|---|---|---|---|
+| `fontSize: <number>` literals | 66 | 104 | 58 |
+| `height: '50%'` panels | 9 | 11 | 8 |
+| `clamp()` / `min()` / `max()` / `cq*` | **0** | **0** | **0** |
+
+Plus 194 hardcoded `px` in the retail CSS. The amount is `fontSize: 88` at ten call sites.
+`$99999.99` measures **430px**:
+
+| Device | available | overflow |
+|---|---|---|
+| 320×568 | 264px | **+166** |
+| 375×667 | 319px | **+111** |
+| 390×844 | 334px | **+96** |
+| 430×932 | 374px | **+56** |
+
+It clips on the largest phone made. At 320 the wrap pushes the hero to `y: -162` and the
+split-bill pill to `y: -78` — both entirely above the top of the screen.
+
+### RC-5 — Wrong viewport unit, no safe areas
+
+The retail terminal uses `height: 100vh`; every other mobile surface uses `100svh`. On iOS
+Safari `100vh` is the *large* viewport, so with the URL bar showing the terminal runs
+60–100px past the visible area. `viewport-fit=cover` is set (`index.html:5`) but the terminal
+uses no `env(safe-area-inset-*)` at all — the notch is cleared with a hardcoded
+`padding-top: 100px` and the home indicator not at all. **Left and right insets matter too**
+in landscape, and nothing uses them.
+
+### RC-6 — Four unscoped copies of the same `.tp-*` stylesheet, one of them load-bearing for the tutorial
+
+| Source | Scoped? | Divergences |
+|---|---|---|
+| `RetailTerminalViewCore.jsx:1451` `TP_CSS` | **no** | baseline |
+| `PropertyTerminalView.tsx:1339` `TP_TERM_CSS` | **no** | `scale(0.85)`, `padding: 0 22px`, indicator `z-index: 2` |
+| `pages/trades/trades-terminal.tsx:520` `TP_TERM_CSS` | **no** | same divergences; mounted on its own route by `pages/trades/quote-builder.tsx:5` (`/trades/quote`) |
+| `features/terminal/trades/trades-terminal-view.css` | yes | scoped under `.trades-terminal-view` |
+
+Measured on `/property/terminal`: two `<style>` tags defining `.tp-subbar` live at once, and
+the bar renders `241×48` under `matrix(0.85, …)` instead of `316×56`. Whichever tag is later
+in the DOM wins. The `z-index: 2` variant paints the navy bubble **over** the label rather
+than behind it.
+
+**Scoping is coupled to the tutorial.** `client/src/features/tutorial/tutorial-registry.ts`
+targets `.tp-amount` and `.tp-subbar` **directly** as spotlight anchors, with `.tp-viewport`
+as fallback. A rename would not fail loudly — it would quietly spotlight the whole screen.
+Any rename lands with the registry in the same commit, and
+`client/src/__tests__/tutorial-registry.test.ts` must assert the anchors still resolve on all
+three verticals.
+
+### RC-7 — There is no gate, and no place to put one
+
+`scripts/verify-mobile-retail-regression.mjs` runs **one** viewport (390×844) and asserts the
+*outer* box is 390×844 with no horizontal scroll, plus API-contract checks. It passes today,
+against every screenshot in §8. It never measures an internal component, never changes size,
+never rotates, never simulates a safe area.
+
+And there is nowhere to hook a better one: **no `.github/workflows`, and `package.json` runs
+neither browser verifier.** Every `shot-*.mjs` writes to `/tmp/taptpay-desktop-*`, which is
+ephemeral and never compared. There is no `pixelmatch`, no `odiff`, no
+`jest-image-snapshot`, no `__snapshots__` — **nothing in this repo compares two images.**
+The desktop project's "compare with the design PNG" has always been a human eyeballing step.
+
+---
+
+## 4. The support envelope
+
+### 4.1 Device matrix
+
+| Class | Sizes | Contract |
+|---|---|---|
+| Portrait phone | 320×568, 360×640, 375×667, 390×844, 412×915, 430×932 | full contract, including three stack rows |
+| Portrait, reference | **390×844** | the golden capture size |
+| Landscape phone | 568×320, 844×390 | must not break; three-row contract waived (MD5) |
+| Above 430 wide, short | e.g. 700×600 | `use-device-class.ts:12` classes any shortest side < 700 as mobile, so the phone UI can render at 700px wide. `.tp-viewport`'s `max-width: 430px` centres it; assert that, don't leave it undefined |
+
+### 4.2 Landscape is out of the three-row envelope
+
+At 568×320 the dock, chrome gutter and three rows alone total ~325px against a 320px screen —
+impossible before the hero exists. See MD5.
+
+### 4.3 The 320×568 budget, corrected
+
+v1's sum omitted its own chrome-gutter row. Corrected, with every term at its clamp floor:
+
+| Row | at 390×844 | at 320×568, floors only | at 320×568, **as the tokens resolve** |
+|---|---|---|---|
+| hero (status-bar clearance + amount + pills + item line) | 284 | 184 | **191** (`--hero-pref`) |
+| chrome gutter (FAB 70 → 59, plus breathing room) | 106 | 70 | **70** (measured) |
+| stack (header + gap + 3 rows + border) | 245 | 196 | **202** (`--stack-min`) |
+| dock + safe-bottom | 78 | 70 | **70** |
+| **total** | 713 / 844 | 520 / 568 | **533 / 568** |
+
+**35px of slack** — thinner than v2's 48, because §6.1 recalibrated `--row-h` from a mistaken
+64px to the authored 69px, which lifts the 320 row from 54 to 56.6 and the hero from its
+184px floor to the 191px the height token actually yields. It still fits, and it is now the
+number the code will produce rather than the number the plan hoped for. The justification is
+unchanged and stronger: at today's fixed 88px amount, 69px rows and 70px FAB the same sum is
+**633px and does not fit**.
+
+Two consequences:
+
+- The 320 hero lands at ~184px, capping the amount at roughly a 52px font. A visible
+  departure from the design's 88px at that size — legitimate adaptation under §2.3, but it
+  must be checked against the reference, not just the arithmetic.
+- If more headroom is wanted, a compact row variant below ~600px of height (status word → dot
+  + chip) buys ~30px. A design call — flag it, don't invent it.
+
+**Ordering rule for short screens: the stack floor is non-negotiable; the hero contracts
+first**, and the amount's clamp ceiling is tied to the hero's realised height.
+
+---
+
+## 5. Phase 1–3 — scope, inventory, then remove the blanket rule
+
+v1 put CSS scoping last. It goes first: every phase between the old positions would have been
+built on top of nondeterministic cross-vertical overrides.
+
+### 5.1 Scope all four stylesheets (before anything else)
+
+Scope `TP_CSS` under `.retail-terminal-view`, both `TP_TERM_CSS` copies under
+`.property-terminal-view` / `.trades-terminal-view`, exactly as the trades *feature* CSS
+already is. Move them out of template literals into real `.css` files so Vite dedupes them,
+they become cacheable, and they stop being re-parsed on every mount. Land the tutorial-anchor
+assertions in the same commit (RC-6).
+
+Then extract the shared primitives — bar, amount, stack row, pill, field, CTA, dot — into one
+`terminal-primitives.css` driven by §6.1's tokens, so the next fix lands once instead of four
+times.
+
+> The handoff (`HANDOFF-2026-07-28` §6) records that Oliver **accepted** duplication of the
+> desktop *home-screen furniture*. That ruling was about desktop home screens; it does not
+> cover four unscoped global stylesheets colliding on the phone, which is a correctness bug.
+> Raise it if in doubt — do not silently reverse a ruling.
+
+### 5.2 Inventory every control the 44px rule inflates
+
+App-wide, not terminal-only. The rule fires on **every** route below 640px, which includes
+`/login`, `/signup`, onboarding, the landing page, and — the one v1 under-flagged —
+`/pay/:merchantId`, the customer-facing payment page.
+
+Produce a checked-in inventory: every control whose rendered box is currently pinned to 44px,
+its intended size, and whether it needs the `.tap-target` treatment. Record public-route
+smoke results before touching anything.
+
+### 5.3 Remove RC-1, keep touch accessibility
+
+The 44px rule exists for a real reason (Apple HIG; WCAG 2.2 SC 2.5.8 requires 24×24 CSS px).
+Give the hit area back **without touching the layout box**:
+
+```css
+.tap-target { position: relative; }
+.tap-target::after {
+  content: "";
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width:  max(100%, 44px);
+  height: max(100%, 44px);
+}
+```
+
+A pseudo-element is part of its originating element for hit-testing, so the tap region grows
+while the painted box and every sibling's position stay as designed.
+
+**Three traps the gate must cover**, raised in review:
+
+1. **Overlap.** Two adjacent 27px controls 8px apart both grow to 44px and their hit areas
+   collide; the later one in paint order wins. Assert that every control's *centre* hit-tests
+   to itself, and that no two `.tap-target` hit areas overlap by more than a threshold.
+2. **Clipping.** An ancestor with `overflow: hidden` clips the pseudo-element's hit area,
+   silently defeating it. Assert the effective hit area, not the CSS.
+3. **Keep `input … { font-size: 16px }`** (`index.css:371-379`) — it prevents the iOS focus
+   zoom — but split it out so it no longer carries `min-height`.
+
+Then audit all seven media blocks (§3 RC-1). Each `!important` override is either still
+needed by a specific legacy page — move it behind a class on that page's root — or dead.
+
+---
+
+## 6. Phase 4–8 — the responsive foundation and the three components
+
+### 6.1 The token layer
+
+> **This is where v1 was broken.** It used `--u: clamp(0.84, calc(100cqi / 390), 1.10)` as a
+> unitless ratio. `100cqi / 390` is a *length*, and `clamp()` cannot mix a length with
+> unitless numbers. Verified in the repo's Chromium 125: `calc(4px * var(--u))` computes to
+> **`0px`** — silently, with no error. CSS cannot divide a length by a length, so a
+> viewport-derived unitless ratio is not expressible at all. Tokens are therefore
+> **length-valued**, each with its own clamp.
+
+**The layer has two halves, and v2 only had one.** Horizontal rhythm and type scale with the
+*container's width* (`cqi`). The vertical budget — hero, panel, keypad — cannot: a hero sized
+off width is 233px on a 320×**568** phone, where the whole screen is 568. Heights scale with
+*viewport height* (`svh`) at the top level, and with the *region's own height* (`cqh`) inside
+regions that the grid has already sized.
+
+```css
+/* ── A. Width-driven: rhythm, controls, type ─────────────────────────────── */
+.tp-viewport {
+  container-type: inline-size;      /* size off our own 430px-capped box, not the window */
+
+  /* Each token is a length with its own clamp. The middle term is calibrated so the
+     390px reference viewport reproduces today's authored value exactly; the floor holds
+     at 320 and the ceiling stops growth past 430.
+     Verified: 4.1cqi at a 390px container = 15.99px. */
+  --sp-1: clamp( 3px, 1.03cqi,  4.4px);     /*  4px @390 */
+  --sp-2: clamp( 7px, 2.05cqi,  8.8px);     /*  8px      */
+  --sp-3: clamp(10px, 3.08cqi, 13.2px);     /* 12px      */
+  --sp-4: clamp(13px, 4.10cqi, 17.6px);     /* 16px      */
+  --sp-6: clamp(20px, 6.15cqi, 26.4px);     /* 24px      */
+  --sp-7: clamp(23px, 7.18cqi, 30.8px);     /* 28px      */
+
+  --bar-h:       clamp(32px, 10.00cqi, 43px);     /* action bar: the ONLY height source */
+  --row-h:       clamp(54px, 17.69cqi, 70.4px);   /* one active-stack row */
+  --stack-hdr-h: var(--sp-6);                     /* 24px @390 — the same 4N step */
+
+  --amount-max: clamp(36px, 22.56cqi, 88px);      /* width-only ceiling; hero overrides */
+  --amount-k:   1.50;                             /* fitter constant, derived below */
+
+  --ease-bar: var(--m-ease-pop);    /* index.css:72 — do NOT invent a new curve */
+  --dur-bar:  var(--m-dur-ui);      /* index.css:75, 200ms */
+
+  --safe-top:    env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left:   env(safe-area-inset-left, 0px);
+  --safe-right:  env(safe-area-inset-right, 0px);
+
+  height: 100vh;      /* fallback order matters */
+  height: 100svh;
+  height: 100dvh;
+}
+
+/* ── B. Height-driven: the vertical budget ───────────────────────────────── */
+.tp-viewport {
+  --hero-min:  184px;                             /* §4.3 floor */
+  --hero-pref: clamp(184px, 33.65svh, 316px);     /* 284px @844 */
+
+  --stack-min: calc(3 * var(--row-h) + var(--stack-hdr-h) + var(--sp-3) + 2px);
+  --panel-min: calc(4 * 44px + 3 * var(--sp-3) + 2 * var(--sp-6));   /* legibility floor */
+}
+
+/* ── C. Region-local, from the region's own realised height ──────────────── */
+.tp-hero  { container-type: size; --amount-max: max(36px, min(88px, 22.56cqi, 31cqh)); }
+.tp-panel { container-type: size;
+            --kp-size: min(76px, calc((100cqh - 3 * var(--sp-3) - 2 * var(--sp-6)) / 4)); }
+
+/* ── D. JS-written. Every one needs a fallback in its var() ──────────────── */
+/*  --dock-h        px   documentElement, companion-owned. init 0px
+    --chrome-gutter px   .tp-viewport, this plan. init clamp(70px, 27.2cqi, 117px)
+    --panel-top     px   .tp-panel, companion-owned. init var(--sp-6)
+    --amount-chars  <number>  .tp-amount, this plan. read as var(--amount-chars, 6)
+    --active-col    <integer> .tp-bar,    this plan. read as var(--active-col, 1)      */
+```
+
+**Calibration — every token at the three sizes that matter.** The rule is "reproduce the
+authored value at 390"; v2 broke it twice.
+
+| Token | 320 | 390 | 430 | authored today | note |
+|---|---|---|---|---|---|
+| `--sp-1 … --sp-7` | 3.3 / 7 / 10 / 13.1 / 20 / 23 | 4 / 8 / 12 / 16 / 24 / 28 | 4.4 / 8.8 / 13.2 / 17.6 / 26.4 / 30.8 | 4·N | ✓ |
+| `--bar-h` | 32.0 | **39.0** | 43.0 | **39** (`.tp-subbar` = 27 btn + 2×5 pad + 2×1 border) | **v2 gave 37.99.** 10cqi is exact at both ends: 10×3.2 = the 32px floor, 10×4.3 = the 43px cap |
+| `--row-h` | 56.6 | **69.0** | 70.4 | **69** (measured, §8.1) | **v2 gave 64.0.** Ceiling binds from ~398px wide |
+| `--stack-hdr-h` | 20.0 | 24.0 | 26.4 | 24 (`.tp-stack-hdr`) | equals `--sp-6` exactly — and equals §4.3's budget row |
+| `--stack-min` | 201.8 | **245.0** | 252.8 | — | reproduces §4.3's 245 to the pixel, which is the check that the row and header tokens are right |
+| `--hero-pref` | 191.1 @568 | **284.0** @844 | 313.6 @932 | 284 (`height: 50%` of 568… on a 844 phone) | height-driven; floor binds below 547px tall |
+| `--panel-min` | 246.0 | 260.0 | 268.4 | — | 4 keys at the 44px tap minimum. Below this the panel scrolls (DK1) |
+| `--kp-size` | 60.7 | **76.0** | 76.0 | 76 | capped at the design size, never larger |
+| `--amount-max` | 59.3 (hero) | **88.0** | 88.0 | 88 | hero form takes `min(width, height)`; §4.3 estimated ~52 at 320, the real answer is 59 |
+
+`--sp-1`'s ceiling binds only from 427px wide and `--bar-h`'s only above 430, which the
+`max-width: 430px` cap makes unreachable. They stay as guards in case that cap moves.
+
+**Two derivations worth checking rather than trusting.**
+
+*`--kp-size` self-solves.* Companion §1.3 concluded "at 320×568 the key must drop 76 → ~40px".
+That was computed against the *old* 50/50 split with an expanded dock. Under this grid with
+the dock collapsed (DK2), the panel at 320×568 gets `568 − 191 − 64 = 313px`, so
+`(312.9 − 3×10 − 2×20) / 4 = 60.7px`. Four rows fit at every size in §4.1 with no special case,
+and the key never exceeds its design size. The formula *is* the guarantee — there is no
+arithmetic left to get wrong.
+
+*`--amount-k = 1.50`.* Outfit 900's digit advance measures ≈ `0.543em` (from §8.3: nine
+characters at 88px = 430px). `font-size = 100cqi / chars × k`, so at 390 with `$99999.99`:
+`390/9 × 1.5 = 65px`, rendering 318px against the 334px available — a 16px margin. With MD4
+grouping (ten characters) it gives 58.5px — **and the same 318px**.
+
+That is not a coincidence, and it is worth relying on: rendered width is
+`chars × 0.543 × (100cqi / chars × k)` = `0.543 × 100cqi × k`, in which the character count
+cancels. The fitter produces a constant 318px at 390 whatever the amount, varying only the font
+size, so **MD4 cannot cause an overflow** — grouping only makes the digits smaller. The `0.543`
+constant is an average over `$99999.99`, whose only narrow glyph is the `.`; commas are
+narrower than digits, so a grouped string renders *under* the estimate. Recalibrate `k` only if
+the typeface changes.
+
+**Circularity trap.** `--panel-min` must never be expressed in terms of `--kp-size`: the panel's
+height would depend on the key size, which depends on the panel's height. It is written against
+the constant `44px` for exactly this reason. The same applies to `--hero-min` and `--amount-max`.
+
+**`container-type: size` requires a definite height** — contents may not size the region. That
+holds here because the grid rows in §6.4 and companion §3.1 size both regions, and `.tp-screen`
+itself is `inset: 0` inside a `100dvh` viewport. It also makes each region a containing block
+for fixed-position descendants; nothing inside the hero or panel uses `position: fixed` today
+(the dock is a sibling of the router, not a descendant — §6.4), and the gate asserts it stays
+that way.
+
+Container queries (`cqi`, `cqh`, `container-type`) are Baseline since Safari 16 / Chrome 105,
+and `svh` / `dvh` since Safari 15.4 / Chrome 108. Neither needs build support — Vite 5 and
+Tailwind 3.4 pass them through untouched. Using `cqi` rather than `vw` is what keeps the same
+components correct inside the landing page's phone demo and on a tablet, not only in a
+full-window phone; `svh` is deliberately *not* containerised, because the vertical budget is
+against the real viewport whatever box the terminal is drawn in.
+
+If a single driving ratio ever proves necessary, the only legal form is an
+`@property { syntax: "<number>" }` custom property written from JS by a `ResizeObserver` —
+verified working (`calc(4px * var(--r) * 4)` → 14.4px at `--r: 0.9`). Don't reach for it
+first; per-token clamps need no JS and no registration.
+
+**Gate this, don't trust it.** The v1 defect was silent — a token computing to `0px` with no
+error — so the token layer gets the most explicit gate in the plan. At 320×568, 390×844 and
+430×932, assert:
+
+1. **Every token in the calibration table resolves to its stated value**, ±0.5px. Not "non-zero"
+   — the actual number. A token that silently loses its middle term still passes a non-zero
+   check by falling back to its floor.
+2. **Every JS-written token has resolved to a real value after mount**, and its `var()` fallback
+   is present in the stylesheet. `--amount-chars` is the dangerous one: an empty value makes the
+   whole `font-size` declaration invalid at computed-value time, and the amount silently
+   inherits its parent's size instead of failing.
+3. **`--dock-h` resolves on a terminal screen** — it is set on `document.documentElement` by a
+   component that is a *sibling* of the router, and a scoped variable would resolve to its
+   initial `0px` on exactly the screens that need it.
+4. **The two derived floors hold**: `--stack-min` ≥ 3 rows + header + gap, and `--kp-size` × 4 +
+   gaps + padding ≤ the panel's realised height. These are the two places where a token error
+   turns into the original bug rather than a wrong number.
+
+### 6.2 Rules that replace the current habits
+
+| Instead of | Use |
+|---|---|
+| `fontSize: 88` | `font-size` from the clamped type ramp |
+| `padding: '154px 22px 90px'` | grid rows + measured gutters (§6.4) |
+| `height: '50%'` | `grid-template-rows` with `minmax()` |
+| `height: 100vh` | the `svh`/`dvh` chain above |
+| hardcoded notch clearance | `var(--safe-top)` / `--safe-bottom` / `--safe-left` / `--safe-right` |
+| a hardcoded `height` on a flex child | a token, plus `min-height: 0` on the scroll parent |
+
+Every fixed dimension gets a clamp whose floor works at 320×568 (MD2).
+
+**Software keyboard ownership.** The terminal is a `position: fixed`, `100dvh` shell, so iOS
+does **not** reflow it when the keyboard opens — a focused field or its commit button can end
+up underneath. Screens with text inputs (`EnterDetails`, `CashEntry`, and the equivalents in
+property and trades) must subscribe to `window.visualViewport` and either shrink the panel to
+`visualViewport.height` or scroll the focused field into the remaining space. Gated in §7.3.
+
+### 6.3 The action bar (issues 4 and 5)
+
+Extract one `SegmentedBar` used by all three verticals — this also removes four divergent
+copies of the same bug.
+
+**Make the bubble unable to diverge, rather than measuring it more carefully.** Put the
+buttons and the indicator in the same CSS grid and let the grid place it:
+
+```css
+.tp-bar     { display: grid; grid-auto-flow: column; align-items: stretch;
+              height: var(--bar-h); padding: var(--sp-1); }
+.tp-bar-ind { grid-row: 1; grid-column: var(--active-col, 1);
+              transition: transform var(--dur-bar) var(--ease-bar); }
+.tp-bar-btn { grid-row: 1; height: 100%; }   /* stretch — never a fixed px height */
+```
+
+> **The timing is a correction, not a transcription.** Today the bar animates over `0.45s` on
+> `cubic-bezier(0.34, 1.56, 0.64, 1)` — a **56% overshoot**, and v2 of this plan copied the
+> `.45s` forward. That curve is precisely what
+> `docs/PLAN-2026-08-15-motion-toning.md` removed from the tablet/desktop app; its mobile steps
+> (1–4, 6) are still pending, so mobile still carries it. `--dur-bar` / `--ease-bar` resolve to
+> that plan's `--m-dur-ui` (200ms) and `--m-ease-pop` (~2.5% overshoot), so this work lands the
+> motion fix for the action bar as a side effect instead of fighting it later. Anything else in
+> the terminal still on a `y > 1.1` curve belongs to that plan, not this one.
+
+The indicator shares the row track with the buttons, so its height *is* the button height,
+whatever RC-1-shaped rule appears next. Keep JS measurement only for the sliding transform,
+and add a `ResizeObserver` on the track and each button plus a `document.fonts.ready`
+re-measure (label widths change when Outfit loads). Same treatment for `TerminalDockView`.
+
+**Invariants the gate enforces:**
+
+1. `bar.height === var(--bar-h)`, independent of button count, labels, or compact state.
+2. `indicator.height === activeButton.height`, and the active label's box is fully inside the
+   indicator's box (top and bottom gap both ≥ 0).
+3. `sendButton.height === bar.height` and `splitPill.height === bar.height`.
+4. `bar.scrollWidth <= bar.clientWidth` — never clipped.
+5. The whole row fits inside the viewport with a gutter at 320px.
+6. After a viewport change, (2) still holds — the RC-2 regression test.
+
+**Morphing.** The compact ⇄ expanded transition currently animates `padding` while the label
+pops in at full width, which is what reads as breaking. Animate the label's track
+(`grid-template-columns: … 0fr → 1fr`) so the width change is continuous, and share
+`--ease-bar` between the indicator and the width so they arrive together.
+
+**Split-bill pill** takes `var(--bar-h)` — the same token as the bar, so "exactly the height
+of the action bar" is enforced by construction, not by two numbers that happen to match.
+
+### 6.4 Terminal home layout (issue 2)
+
+> **v1 put this grid on `.tp-screen`.** That class is not the home screen — it is the shell for
+> **every** terminal screen, and there are more of them than v2 counted: **ten** in retail,
+> **twelve** in property, plus the trades pair. v2 said "all seven" and listed eight line
+> numbers. The full inventory and the class contract that fixes this for both plans is §6.6.1.
+>
+> Two of the misses matter here. `PendingTerminal` (`RetailTerminalViewCore.jsx:346`) is a
+> **second home screen** — byte-identical geometry to `MainTerminal`, `height: '50%'` with the
+> same `padding: '100px 28px 28px'` — so it must carry `.tp-home` too, or the state a merchant
+> sits in while a payment is pending keeps the broken layout the other one just lost. And
+> `DockPlaceholder` (`:887`) has no two-region split at all, so it must carry neither this grid
+> nor the companion's.
+
+```css
+.tp-screen.tp-home {              /* home only — never bare .tp-screen */
+  display: grid;
+  grid-template-rows:
+    minmax(var(--hero-min), var(--hero-pref))   /* hero  */
+    var(--chrome-gutter)                        /* the floating FAB / bar band */
+    minmax(var(--stack-min), 1fr);              /* stack */
+  padding-bottom: calc(var(--dock-h) + var(--safe-bottom) + var(--sp-3));
+}
+```
+
+- `--chrome-gutter` is **measured** from the overlay that is actually visible (FAB when shown,
+  otherwise the bar) by a `ResizeObserver`. Never a stale `154px` again.
+- `--dock-h` is measured from `TerminalDockView` — and per the companion plan §3.1 it must be
+  written to `document.documentElement`, because `App.tsx:1002-1004` renders the router and
+  the dock as *siblings*.
+- `--stack-min: calc(3 * var(--row-h) + var(--stack-hdr-h) + 2px)` makes **"at least three
+  rows" a CSS invariant**, not an outcome.
+- Move `.tp-stack-hdr` **out** of `.tp-stack-scroll` so it pins and the three rows are three
+  *content* rows.
+
+Budget at 390×844 — the stack needs 245px and has 178px, so 67px comes back: header out of the
+scroll (+24), gutter 154 → ~110 (+44), bottom padding 90 → measured ~86 (+4), hero 422 → ~400
+(+22). At 320×568 see §4.3.
+
+### 6.5 The money display (issue 3)
+
+Two layers.
+
+**Normal case, no JS** — `white-space: nowrap` plus a width-aware size:
+
+```css
+.tp-amount {
+  white-space: nowrap;
+  font-size: min(
+    var(--amount-max),                                    /* the 88px design ceiling */
+    calc(100cqi / var(--amount-chars) * var(--amount-k))   /* fit to the character count */
+  );
+}
+```
+
+React sets `--amount-chars` from the formatted string's length. Deterministic, no measurement,
+no reflow loop, trivially assertable. `--amount-k` is one constant calibrated against the
+Outfit 900 advance width; §6.1 shows the fitted width does not depend on the character count,
+so MD4 changes the rendered size but never the fit.
+
+**Fallback for the long case / late font load** — a `useFitText` hook comparing `scrollWidth`
+to `clientWidth` on `[text, boxWidth, fontsReady]`, writing a `--fit` scale with a floor
+(~0.55 of base). Below the floor, compact the presentation rather than shrinking into
+illegibility.
+
+Applies to **all ten** `.tp-amount` call sites in retail plus the property and trades
+equivalents. `.tp-screen` and `.tp-layer` stay `overflow: hidden`, so the gate must assert the
+amount's box is inside its parent rather than trusting the clip.
+
+### 6.6 Boundary with the companion plan
+
+| Owner | Touches |
+|---|---|
+| This plan | `.tp-screen.tp-home`, the token layer (§6.1, both halves), `SegmentedBar`, `.tp-amount`, the four stylesheets, the 44px rule, all non-terminal routes |
+| Companion | `.tp-screen.tp-feature`, `--dock-h`, `--panel-top`, dock collapse, the swipe gesture, the goo morph |
+| Neither, alone | bare `.tp-screen` — only `min-height: 0` and scroll containment, agreed across both |
+
+#### 6.6.1 The screen-class contract
+
+**v2 and the companion contradicted each other here, and the contradiction was invisible
+because each plan only read its own half.** This plan scopes its grid to `.tp-screen.tp-home`
+and states that bare `.tp-screen` is off-limits to both. The companion's §3.1 then puts a
+two-region grid on **bare `.tp-screen`** — which is the same mistake v2 caught in v1, mirrored:
+one plan's grid would land on the other's screens, and on several that fit neither shape.
+
+There are **31** `.tp-screen` elements, not seven:
+
+| File | Count | `.tp-home` | `.tp-feature` | `.tp-plain` |
+|---|---|---|---|---|
+| `features/terminal/retail/RetailTerminalViewCore.jsx` | 10 | `MainTerminal` :322, `PendingTerminal` :346 | `Keypad` :386, `SplitPayment` :423, `ChooseStock` :471, `EnterDetails` :525, `CashEntry` :566, `SharePayment` :610, `CashSuccess` :658 | `DockPlaceholder` :887 |
+| `features/terminal/property/PropertyTerminalView.tsx` | 12 | `RequestsHome` :216 | `ChooseTenant` :352, `RentAmount` :414, `SendRentLink` :448 **and** :469, `ChargeBill` :557 **and** :587, `AutomateScreen` :747, `MarkExternal` :821 **and** :846, `BatchAndAutoScreen` :950, `SentSuccess` :1057 | — |
+| `features/terminal/trades/TradesTerminalView.tsx` | 9 | `JobsHome` :171 | `ChooseClient` :228, `AmountKeypad` :300, `QuickInvoice` :333 **and** :357, `MarkExternal` :454 **and** :477, `SentSuccess` :544, quote :717 | — |
+
+Three classes, three topologies, one owner each:
+
+- **`.tp-home`** — hero + chrome gutter + stack. Three rows. Owned by this plan (§6.4).
+- **`.tp-feature`** — hero + panel, the panel taking the remainder. Owned by the companion (§3.1).
+- **`.tp-plain`** — one region, full bleed. `DockPlaceholder` only. Gets `min-height: 0`,
+  scroll containment and the dock's bottom reservation, and **no grid from either plan**.
+
+**Four traps this table exists to prevent:**
+
+1. **Five components return `.tp-screen` from two different branches** — property's
+   `SendRentLink`, `ChargeBill`, `MarkExternal` and trades' `QuickInvoice`, `MarkExternal` each
+   have an early-return variant. Class one branch, miss the other, and the screen is correct
+   until a merchant hits the state that renders the other. Assert the count per file, not per
+   component.
+2. **`CashSuccess` is palette-inverted** — off-white top region on a navy screen, the reverse of
+   every other feature screen. It is still `.tp-feature`: the *topology* matches, only the
+   colours swap. Do not let a colour check reclassify it.
+3. **`PendingTerminal` is a second home screen**, not a feature screen (§6.4).
+4. **There is a fourth trades terminal that uses none of these classes.**
+   `client/src/pages/trades/trades-terminal.tsx` is a 618-line parallel implementation with its
+   own screen state machine, mounted at `/trades/quote`; it shells its screens on `.tp-layer`,
+   has **zero** `.tp-screen` elements, and exports the `TP_TERM_CSS` that RC-6 shows colliding
+   globally. It would silently receive none of this work while still shipping the stylesheet
+   that breaks the others. See MD7.
+
+Adding a class is additive — no rename — so the tutorial anchors (`.tp-amount`, `.tp-subbar`,
+RC-6) are untouched by this step.
+
+**Ownership rule.** Neither plan may write a rule whose selector is bare `.tp-screen` beyond
+`min-height: 0` and scroll containment. If a rule needs to apply to all 31, it goes in
+`terminal-primitives.css` (§5.1) with both plans' agreement, and the static guard in §7.4 gains
+a clause forbidding new bare-`.tp-screen` layout declarations.
+
+---
+
+## 7. Verification
+
+The part that matters most. Without it the symptoms return the next time someone adds a global
+rule — and there is currently nowhere for it to live (RC-7).
+
+### 7.1 Goldens are approved app screenshots, not design files
+
+A distinction v1 blurred:
+
+- **A design reference** is the mockup — `retail terminal.png`, 1125×2436, drawn at 375×812
+  inside a phone bezel on a white field. It cannot be pixel-diffed: wrong viewport, wrong DPR,
+  and most of its pixels are bezel. It is what a **human** approves against.
+- **A golden** is an app screenshot captured at a fixed viewport and DPR, approved once by a
+  human against the design, then committed so CI can diff future runs.
+
+**Use `@playwright/test`, not a hand-rolled differ.** `playwright ^1.60.0` is already a
+dependency but `@playwright/test` is not; adding it brings `toHaveScreenshot()` with baseline
+management (`--update-snapshots`), actual/expected/diff triplets on failure,
+`maxDiffPixelRatio` thresholds, `animations: "disabled"`, and `caret: "hide"` — all of which a
+`pixelmatch` implementation would have to reproduce.
+
+**Determinism checklist** — a golden suite is worthless if it flakes:
+
+| Hazard | Handling |
+|---|---|
+| **Fonts from a CDN** (`index.css:1`, `index.html:211`) | Self-host (MD6), or `page.route` the font requests to a pinned local copy. Then `await document.fonts.ready` before every capture. Network-dependent fonts *will* flake, and Google serves different binaries by UA |
+| Relative timestamps | `page.clock.setFixedTime()` — Playwright 1.60 supports it. `retail-fixtures.mjs:8` currently uses live `Date.now()` |
+| Animations mid-flight | `animations: "disabled"`, plus wait for the cascade to settle |
+| Timezone | `timezoneId: "Pacific/Auckland"` — already set in the fixture |
+| Scrollbars | force overlay scrollbars or hide them in the capture stylesheet |
+
+**The golden set**, sized to keep the repo sane:
+
+| Tier | Viewport | DPR | Screens | ~Files |
+|---|---|---|---|---|
+| Fidelity | 390×844 | 2 | the three with an authoritative design (retail / property / trades terminal home) | 3 |
+| Fidelity | 390×844 | 1 | every other mobile screen and state — 28 remaining terminal screens (§6.6.1) plus ~9 non-terminal mobile routes | ~37 |
+| Layout | 320×568, 360×640, 375×667, 412×915, 430×932 | 1 | the five with hard numeric contracts — terminal home, keypad, share, stock, dashboard | 25 |
+
+Roughly **65 files, ~8–10MB** — v2 estimated 43 against a screen count that turned out to be
+"seven" for what is really 31 (§6.6.1). If that is too much repo weight, drop the DPR-2 tier
+and rely on geometry assertions for fidelity at the cost of catching subpixel drift; MD7
+answered "retire" also removes a route's worth.
+
+Store under `tests/golden/mobile/`. **A golden change is a design change** — it needs Oliver's
+approval in the PR, never a blind `--update-snapshots`.
+
+### 7.2 `scripts/verify-mobile-responsive.mjs` — the geometry gate
+
+For each viewport in §4.1, each mobile route, both orientations:
+
+1. `document.scrollWidth === clientWidth`.
+2. No visible element's box crosses the viewport edge, with an explicit allowlist for
+   deliberately-clipped elements (the collapsed `.tp-send-slot`).
+3. No text node clipped: `scrollWidth <= clientWidth + 2` for every leaf with text.
+4. **Component contracts** — §6.3's six invariants, plus `visibleStackRows >= 3` and the
+   amount's box inside its parent at the MD4 maximum.
+5. **Token computed-style assertions** (§6.1) — the check that catches the v1 defect.
+6. **Re-measure after `setViewportSize`** — the RC-2 drift test.
+7. **Tap-area assertions** (§5.3) — every control's centre hit-tests to itself; no two
+   `.tap-target` areas overlap beyond threshold; no ancestor clips them.
+8. Run once with a simulated safe-area inset and once with the dock collapsed.
+
+Model it on `scripts/desktop-shots/probe-terminal-geometry.mjs`, which already proves the
+"measure, don't look" pattern. Reuse `retail-fixtures.mjs`. **Exit non-zero on failure** —
+several existing scripts collect errors and still exit 0.
+
+### 7.3 State and environment gates
+
+- **Software keyboard** — focus each text field and assert the field and its commit control
+  stay inside `window.visualViewport`.
+- **Content extremes** — longest item name, the MD4 maximum amount, a 12-way split, an empty
+  stack, a 20-row stack.
+- **Breakpoint boundaries** — 373 / 374 / 375 (the `max-width: 374px` block), 639 / 640 / 641,
+  767 / 768 / 769.
+- **Engines** — Chromium is the CI gate; **WebKit and Android Chrome are manual checkpoints**
+  on real hardware, folded into the iOS gate already pending in `HANDOFF-2026-07-28` §7.2.
+  Playwright's WebKit is not Safari and will not surface the `100vh` or filter behaviours that
+  matter.
+
+### 7.4 Static guards
+
+Use **stylelint plus an AST rule**, not grep: most of this app's CSS lives in template
+literals and inline `style={{}}` objects, which a grep over `**/*.css` cannot see.
+
+- No `min-height` / `min-width` on a bare *element* selector inside a media query. The rule
+  that would have blocked RC-1 at review.
+- No new `fontSize: <number>` literals or `height: '50%'` under
+  `client/src/features/terminal/**`.
+- No unscoped `.tp-` selector in a `<style>` template literal — including
+  `pages/trades/trades-terminal.tsx`, which v1 missed.
+- **No layout declaration on a bare `.tp-screen` selector** beyond `min-height: 0` and overflow
+  (§6.6.1). This is the rule that keeps the two plans from colliding, and it is the only guard
+  that would have caught the contradiction between them.
+- **Every `.tp-screen` element carries exactly one of `.tp-home` / `.tp-feature` / `.tp-plain`**,
+  asserted as a count per file — 10 / 12 / 9 — so the five two-branch components (§6.6.1 trap 1)
+  cannot be half-classified.
+- **Not** a blanket `100vh` ban — §6.1 deliberately uses it as the first step of a fallback
+  chain, and v1's grep contradicted its own plan. The correct rule: flag a `100vh` with no
+  `svh`/`dvh` successor in the same block.
+
+### 7.5 Somewhere for it to live
+
+There is no CI and no script to wire into. Create:
+
+- `npm run verify:mobile` → the geometry gate
+- `npm run test:golden` → the `@playwright/test` suite
+- `.github/workflows/verify.yml` running `check`, `test`, `verify:mobile`, `test:golden` and
+  `verify-desktop-p0` — or the gates stay advisory forever.
+
+### 7.6 Baseline, not red CI
+
+Phase 1 records `verify-mobile-responsive.baseline.json` and the gate asserts **"no worse than
+baseline"**, tightening as each phase lands. Do not ship a permanently failing command.
+
+---
+
+## 8. Evidence
+
+Dev server on :5000 (single instance — memory `dev-server-single-instance`), nix Chromium at
+`/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium` (memory
+`playwright-nix-chromium`), auth and API via `scripts/desktop-shots/retail-fixtures.mjs` with
+`hasTouch: true, isMobile: true`.
+
+**8.1 Stack rows** — 0 at 320×568 and 375×667; 1 at 390×844 and 393×851; 2 at 344×882,
+412×915, 430×932. Row height 69px.
+
+**8.2 Action bar, iPhone 14** — `.tp-subbar-btn` computed `44px` (CSS: 27); `.tp-subbar-ind`
+`27px`; `.tp-subbar` box `316×56`; `.tp-psubbar` `37px` → overflows its own row by **19px**;
+`.tp-send` `44px` in a `37px` slot. With "split" active,
+`labelInsideInd = { topGap: 12.4, bottomGap: -4.6 }` — the label's bottom edge is **4.6px
+below** the bubble.
+
+**8.3 Amount** — `$99999.99` at 88px measures **430px** against 264 / 319 / 334 / 374px
+available. At 320 the hero lands at `y: -162` and the split pill at `y: -78`.
+
+**8.4 RC-1 A/B** — removing only `min-height`/`min-width` from the 640px block at runtime:
+`.tp-stack-hdr` 44px → **24px**, its button 44×44 → **24×32**. Nothing else changed.
+
+**8.5 RC-2 drift** — with "split" active, resizing 390 → 320: bubble centre vs active button
+centre goes from **1px** to **14.5px** and stays.
+
+**8.6 RC-6 collision** — on `/property/terminal`, two `<style>` tags define `.tp-subbar`;
+computed transform `matrix(0.85, 0, 0, 0.85, 0, 0)`; indicator `z-index: 2` (over the label)
+instead of retail's `0` (behind it).
+
+**8.7 App-wide inflation** — buttons pinned to exactly 44px per route: `/terminal` 13,
+`/property/terminal` 12, `/property` 10, `/trades` 10, `/dashboard` 9, `/stock` 9,
+`/transactions` 9, `/settings` 9, `/trades/terminal` 5. Identical at 320, 390 and 430 — not a
+small-screen edge case, every phone.
+
+**8.8 The v1 token defect** — in Chromium 125, `.a { --u: clamp(0.84, calc(100cqi / 390),
+1.10); padding-left: calc(4px * var(--u)) }` computes `padding-left: 0px`. The corrected
+forms compute 15.03px (length-valued base unit), 15.99px (per-token clamp) and 14.4px
+(`@property`-registered number).
+
+---
+
+## 9. Execution order
+
+| Phase | Content | Gate before commit |
+|---|---|---|
+| 0 | Confirm the §2.1 references are authoritative; settle MD1, MD2, MD5, MD7 | Oliver signs off |
+| 1 | Land §7.2 with a recorded baseline JSON; add `verify:mobile` + a workflow | command exists and runs; baseline committed |
+| 2 | Scope all four stylesheets (§5.1); land the tutorial-anchor assertions with them | §7.4 clean; anchors resolve on all three verticals |
+| **2b** | **Apply the screen-class contract (§6.6.1) — one of three classes on all 31 `.tp-screen` elements, plus the §7.4 count guard.** Additive only, no behaviour change | 10 / 12 / 9 per file; no bare-`.tp-screen` layout rule; both plans' grids inert until their own phase |
+| 3 | Add `@playwright/test`, pin the fonts, capture and approve the golden set (§7.1) | Oliver approves every golden against the design |
+| 4 | Inventory every control the 44px rule inflates, app-wide (§5.2) | inventory reviewed; public-route smoke recorded |
+| 5 | Remove RC-1, add `.tap-target`, audit all seven media blocks (§5.3) | §7.2 + goldens + tap-area assertions + public-route smoke |
+| 6 | Token layer, `svh`/`dvh`, four-sided safe areas, keyboard ownership (§6.1–6.2) | token computed-style assertions; §7.2 clauses 1–3 |
+| 7 | `SegmentedBar` + grid indicator + observers (§6.3) | the six invariants |
+| 8 | Home-only grid + measured gutters (§6.4) | `visibleStackRows >= 3` on all six portrait sizes |
+| 9 | Amount fitting (§6.5) | amount inside its parent at the MD4 maximum, all six sizes |
+| 10 | Extend to non-terminal merchant routes | goldens per route |
+
+**Stop conditions.** 5 cannot start before 4 (removing the rule without the inventory ships
+broken tap targets on the customer payment page). 7 cannot start before 5 (the invariants
+cannot hold while RC-1 is live). 8 cannot start before 6 (the grid needs the tokens). 3 should
+precede 5, or there is no fidelity baseline to regress against. **2b must precede 8 and the
+companion's B** — both grids need their selector to exist. 9 and 10 are independent.
+
+**Which decision blocks which phase.** Nothing after phase 0 waits on a decision that phase 0
+does not settle:
+
+| Decision | Blocks | If unanswered |
+|---|---|---|
+| MD1 adaptation strategy | everything from 6 | the whole of §6 is the wrong shape — this is the one true blocker |
+| MD2 smallest phone | 6, 8, 9 | assume 320×568; a 360 floor only relaxes clamps, so the work is not wasted |
+| MD5 landscape | 1 (the gate's orientation clauses) | assume portrait-locked; the gate records landscape as advisory |
+| MD7 fourth trades terminal | 2, 2b, 3 | **do not assume.** It changes the file list of three phases and the size of the golden set |
+| MD3 blast radius | 4, 5 | assume one sweeping commit |
+| MD4 money formatting | 9 | assume ungrouped — the fitter is width-invariant (§6.1), so answering it later is a one-line `fmt()` change |
+| MD6 fonts | 3 | goldens will flake until self-hosted or route-pinned; capture anyway, re-approve after |
+
+**Interleaving with the companion.** The two plans share phases rather than running in
+sequence. The combined order is:
+
+`0 → 1 → 2 → 2b → 3 → 4 → 5 → 6 → [7 ‖ A] → [8 ‖ B] → [9 ‖ C] → [D → E → F] → 10`
+
+Phase 6 is the join: the companion's A (`--dock-h`) can land any time from the start, but its
+B, C and this plan's 8 all consume the §6.1 token layer, so nothing in either plan's layout
+work begins before 6 is green. D, E and F are dock-only and independent of this plan entirely.
+
+**Regression boundaries that stay green throughout:** the tablet/desktop app
+(`scripts/desktop-shots/*`, `scripts/verify-desktop-p0.mjs`), the landing phone demo, the
+tutorial registry, and the public customer routes.

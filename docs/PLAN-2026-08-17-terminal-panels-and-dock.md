@@ -5,6 +5,16 @@ Status: **execution-ready, decisions settled.** Screen inventory corrected, the 
 boundary settled, the verification section written. DK1-DK4 all answered by Oliver on
 2026-08-19 (see §7). No code changed yet.
 
+> **If you are implementing this, read `docs/SPEC-2026-08-20-dock-implementation.md` first.**
+> This plan is the *why* — the measurements, the evidence, the settled decisions, and the list of
+> what may not change. It stays authoritative for all of that. But it was written against a mental
+> model of the code rather than the code, and **eight of its instructions cannot be followed
+> literally**: `.tp-panel`/`.tp-panel-body`/`.tp-hero` do not exist, `--kp-size` is defined twice
+> and on the wrong element, there are 26 feature screens and not 27, the 50/50 split is 28 inline
+> literals, `--panel-top` measures a bar that is not over the panel, and Phase D has no channel
+> between the terminal and the dock. The spec carries the corrections (its §1), the exact code,
+> and the gate clauses for phases B–F. **Where the two disagree, the spec wins.**
+
 Companion to `docs/PLAN-2026-08-17-mobile-responsive-ui.md` (v2.1). That plan owns the terminal
 *home* screen, the token layer and the app-wide 44px rule; this one owns the terminal
 **feature** screens and the bottom nav dock. Both are bound by the **screen-class contract** in

@@ -1,0 +1,121 @@
+import { readdirSync, readFileSync } from "fs";
+import { join } from "path";
+
+/* The §7.4 static guard for RC-6 of docs/PLAN-2026-08-17-mobile-responsive-ui.md.
+ *
+ * The phone terminal shipped the same `.tp-*` stylesheet four times — three of
+ * them unscoped `<style>` template literals inside components — so which sheet
+ * won depended on which terminal happened to be mounted last. Measured on
+ * /property/terminal, two <style> tags defined `.tp-subbar` at once and the
+ * action bar rendered at 241x48 instead of its authored 316x56.
+ *
+ * Phase 2 moved all three into real, scoped `.css` files and deleted the
+ * fourth. This guard is what stops the next one appearing. A grep over
+ * `**\/*.css` cannot see it — most of this app's CSS lives in template literals
+ * and inline style objects, which is exactly how the problem got in.
+ */
+
+const SRC = join(__dirname, "..");
+
+const VERTICAL_SHEETS = [
+  { css: "features/terminal/retail/retail-terminal-view.css", root: ".retail-terminal-view" },
+  { css: "features/terminal/property/property-terminal-view.css", root: ".property-terminal-view" },
+  { css: "features/terminal/trades/trades-terminal-view.css", root: ".trades-terminal-view" },
+];
+
+const SHARED_KEYFRAMES = "features/terminal/terminal-keyframes.css";
+
+function walk(dir: string, test: RegExp): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name === "node_modules") continue;
+      out.push(...walk(full, test));
+    } else if (test.test(entry.name)) {
+      out.push(full);
+    }
+  }
+  return out;
+}
+
+/** Selector text of every rule in a flat stylesheet, `@keyframes` excluded. */
+function selectorsOf(css: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let inKeyframes = false;
+
+  for (const line of css.split("\n")) {
+    const opens = (line.match(/\{/g) ?? []).length;
+    const closes = (line.match(/\}/g) ?? []).length;
+
+    if (depth === 0 && /^\s*@keyframes\b/.test(line)) inKeyframes = opens > closes;
+    else if (depth === 0 && line.includes("{") && !inKeyframes) {
+      const selector = line.slice(0, line.indexOf("{")).replace(/\/\*.*?\*\//g, "").trim();
+      if (selector) out.push(...selector.split(",").map((part) => part.trim()).filter(Boolean));
+    }
+
+    depth += opens - closes;
+    if (depth === 0) inKeyframes = false;
+  }
+  return out;
+}
+
+describe("terminal CSS scoping (RC-6)", () => {
+  it("declares no `.tp-` rule outside a vertical root in any vertical stylesheet", () => {
+    const unscoped: string[] = [];
+
+    for (const sheet of VERTICAL_SHEETS) {
+      const css = readFileSync(join(SRC, sheet.css), "utf8");
+      for (const selector of selectorsOf(css)) {
+        if (!selector.startsWith(sheet.root)) unscoped.push(`${sheet.css}: ${selector}`);
+      }
+    }
+
+    expect(unscoped).toEqual([]);
+  });
+
+  it("ships no `<style>` template literal that declares a bare `.tp-` selector", () => {
+    const offenders: string[] = [];
+
+    for (const file of walk(SRC, /\.(?:tsx|jsx|ts|js)$/)) {
+      if (file.includes("__tests__")) continue;
+      const source = readFileSync(file, "utf8");
+      if (!/<style[\s>]/.test(source)) continue;
+
+      // Anything that reaches a <style> tag is a candidate: the literal is
+      // usually a module constant referenced by name, not written inline.
+      for (const literal of source.match(/`[^`]*`/g) ?? []) {
+        if (!/\.tp-/.test(literal)) continue;
+        for (const selector of selectorsOf(literal.slice(1, -1))) {
+          if (/^\.tp-/.test(selector)) {
+            offenders.push(`${file.slice(SRC.length + 1)}: ${selector}`);
+          }
+        }
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("defines each shared keyframe exactly once, in the shared sheet", () => {
+    const shared = readFileSync(join(SRC, SHARED_KEYFRAMES), "utf8");
+    const names = (shared.match(/@keyframes\s+([\w-]+)/g) ?? []).map((k) => k.split(/\s+/)[1]);
+
+    expect(names.length).toBeGreaterThan(0);
+    expect(new Set(names).size).toBe(names.length);
+
+    // A descendant selector cannot scope a keyframe — the name is global and the
+    // last definition parsed wins — so a second copy anywhere is a live
+    // collision that scoping does not fix.
+    const duplicates: string[] = [];
+    for (const file of walk(SRC, /\.(?:css|tsx|jsx|ts|js)$/)) {
+      if (file.endsWith(SHARED_KEYFRAMES) || file.includes("__tests__")) continue;
+      for (const found of readFileSync(file, "utf8").match(/@keyframes\s+(tp-[\w-]+)/g) ?? []) {
+        duplicates.push(`${file.slice(SRC.length + 1)}: ${found}`);
+      }
+    }
+
+    expect(duplicates).toEqual([]);
+  });
+});

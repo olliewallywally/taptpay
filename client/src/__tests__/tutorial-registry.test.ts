@@ -36,6 +36,36 @@ const DESKTOP_TUTORIAL_SOURCES: Partial<Record<TutorialPageKey, string>> = {
 };
 
 
+// The three phone terminals anchor their spotlights on `.tp-*` classes and
+// aria-labels rather than data-tutorial-id attributes, and nothing checked them.
+// That matters because the failure is silent: an anchor that stops matching
+// falls back to `.tp-viewport` and spotlights the entire screen instead of the
+// feature, which looks like a design choice rather than a bug. Phase 2 of
+// docs/PLAN-2026-08-17-mobile-responsive-ui.md moved every one of those classes
+// into a scoped stylesheet (RC-6), so from here on a rename is a real risk.
+const MOBILE_TUTORIAL_SOURCES: Partial<Record<TutorialPageKey, string>> = {
+  "retail-terminal": "features/terminal/retail/RetailTerminalViewCore.jsx",
+  "property-terminal": "features/terminal/property/PropertyTerminalView.tsx",
+  "trades-terminal": "features/terminal/trades/TradesTerminalView.tsx",
+};
+
+// Each vertical's chrome is scoped under this class. A `.tp-*` anchor that is
+// not defined under it is unstyled at runtime even though it still resolves.
+const VERTICAL_SCOPE: Partial<Record<TutorialPageKey, { root: string; css: string }>> = {
+  "retail-terminal": {
+    root: ".retail-terminal-view",
+    css: "features/terminal/retail/retail-terminal-view.css",
+  },
+  "property-terminal": {
+    root: ".property-terminal-view",
+    css: "features/terminal/property/property-terminal-view.css",
+  },
+  "trades-terminal": {
+    root: ".trades-terminal-view",
+    css: "features/terminal/trades/trades-terminal-view.css",
+  },
+};
+
 const DESKTOP_LEGACY_TUTORIAL_SOURCES: Partial<Record<TutorialPageKey, string>> = {
   "retail-nfc": "pages/nfc-payment.tsx",
   "payment-board-builder": "pages/board-builder.tsx",
@@ -166,6 +196,63 @@ describe("merchant tutorial registry", () => {
         expect(source).toContain(`aria-label="${ariaAnchor![1]}"`);
       }
     }
+  });
+
+  it("anchors every phone-terminal spotlight on a class the view still renders", () => {
+    const unresolved: string[] = [];
+
+    for (const [pageKey, relativeSource] of Object.entries(MOBILE_TUTORIAL_SOURCES) as Array<[TutorialPageKey, string]>) {
+      const source = readFileSync(join(__dirname, "..", relativeSource), "utf8");
+
+      for (const step of tutorialStepsForDevice(pageKey, "mobile")) {
+        for (const selector of [step.target, step.fallbackTarget].filter(Boolean) as string[]) {
+          const cssClass = selector.match(/^\.([\w-]+)$/);
+          if (cssClass) {
+            // Matches className="tp-subbar", className={`tp-subbar ...`} and
+            // the `tp-subbar${cond ? ...}` template forms the views all use.
+            if (!new RegExp(`\\b${cssClass[1]}\\b`).test(source)) {
+              unresolved.push(`${pageKey}: ${selector} not rendered by ${relativeSource}`);
+            }
+            continue;
+          }
+
+          const aria = selector.match(/^\[aria-label="([^"]+)"\]$/);
+          expect({ pageKey, selector, recognised: !!aria }).toEqual({ pageKey, selector, recognised: true });
+          if (aria && !source.includes(`aria-label="${aria[1]}"`)) {
+            unresolved.push(`${pageKey}: ${selector} not rendered by ${relativeSource}`);
+          }
+        }
+      }
+    }
+
+    expect(unresolved).toEqual([]);
+  });
+
+  it("keeps every phone-terminal anchor styled inside its own vertical's scope", () => {
+    const unscoped: string[] = [];
+
+    for (const [pageKey, scope] of Object.entries(VERTICAL_SCOPE) as Array<[TutorialPageKey, { root: string; css: string }]>) {
+      // RC-6: these sheets were global `<style>` literals, so whichever terminal
+      // was mounted last decided how the anchors looked. terminal-css-scoping
+      // holds the whole-sheet guard; this only asks that the anchors themselves
+      // are styled inside their own vertical.
+      const css = readFileSync(join(__dirname, "..", scope.css), "utf8");
+
+      for (const step of tutorialStepsForDevice(pageKey, "mobile")) {
+        for (const selector of [step.target, step.fallbackTarget].filter(Boolean) as string[]) {
+          const cssClass = selector.match(/^\.([\w-]+)$/);
+          if (!cssClass) continue;
+          const scoped = new RegExp(
+            `\\${scope.root}[\\s.][^{,]*\\.${cssClass[1]}\\b|\\${scope.root}\\.${cssClass[1]}\\b`,
+          );
+          if (!scoped.test(css)) {
+            unscoped.push(`${pageKey}: ${selector} has no rule under ${scope.root}`);
+          }
+        }
+      }
+    }
+
+    expect(unscoped).toEqual([]);
   });
 
   it("contains the shared Settings restart page", () => {

@@ -1,0 +1,39 @@
+/* Does `.tp-send-slot.show` resolve on each vertical? The scoped trades
+   stylesheet appears to be missing that rule, which would leave the trades
+   send button permanently at max-width:0 / opacity:0. */
+import { chromium } from "playwright";
+import { BASE_URL, CHROMIUM_PATH, VERTICALS, newMobilePage } from "/home/runner/workspace/scripts/mobile-fixtures.mjs";
+
+const browser = await chromium.launch({ executablePath: CHROMIUM_PATH, args: ["--no-sandbox"] });
+for (const v of ["retail", "property", "trades"]) {
+  const { context, page } = await newMobilePage(browser, v, { width: 390, height: 844 });
+  try {
+    await page.goto(`${BASE_URL}${VERTICALS[v].route}`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+    await page.waitForSelector(".tp-viewport", { timeout: 15_000 });
+    await page.waitForTimeout(1200);
+    const r = await page.evaluate(() => {
+      const el = document.querySelector(".tp-send-slot");
+      if (!el) return { found: false };
+      const had = el.classList.contains("show");
+      el.classList.add("show");
+      const s = getComputedStyle(el);
+      const out = { found: true, hadShow: had, maxWidth: s.maxWidth, opacity: s.opacity, width: el.getBoundingClientRect().width };
+      if (!had) el.classList.remove("show");
+      let sheets = 0, unscoped = 0;
+      for (const st of document.querySelectorAll("style")) {
+        const t = st.textContent ?? "";
+        if (/\.tp-subbar\s*\{/.test(t)) { sheets++; unscoped++; }
+        else if (/\.tp-subbar\b/.test(t)) sheets++;
+      }
+      out.sheetsMentioningSubbar = sheets;
+      out.unscopedSubbarSheets = unscoped;
+      return out;
+    });
+    console.log(v.padEnd(9), JSON.stringify(r));
+  } catch (e) {
+    console.log(v.padEnd(9), "ERROR", e.message.split("\n")[0]);
+  } finally {
+    await context.close();
+  }
+}
+await browser.close();

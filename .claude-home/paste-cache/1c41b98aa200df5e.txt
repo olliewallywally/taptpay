@@ -1,0 +1,160 @@
+Verdict: don’t approve this plan for implementation yet. Claude’s
+  diagnosis is strong—the global 44px rule, fixed terminal geometry,
+  stale indicator measurement, viewport units, and CSS collisions are
+  genuine—but the proposed solution does not yet guarantee “same design,
+  responsive on every phone.”
+
+  ## Blocking findings
+
+  1. The core sizing token is invalid CSS.
+
+  docs/PLAN-2026-08-17-mobile-responsive-ui.md:299 mixes unitless numbers
+  with a length. I verified in the repository’s Chromium 125:
+  declarations consuming it fall back instead of producing the intended
+  dimensions. The responsive foundation therefore cannot work as written.
+  Use dimensionally valid per-token clamps with px/vw fallbacks and
+  computed-style tests.
+
+  2. The size/orientation contract is physically impossible.
+
+  At 320×568, the proposed hero, chrome band, three rows/header, dock,
+  and spacing need over 620px before safe areas. The plan’s claim that it
+  fits omits its own chrome row and bottom spacing (docs/PLAN-2026-08-17-
+  mobile-responsive-ui.md:413). At 568×320 landscape, three rows plus the
+  hero already exceed the entire screen.
+
+  Because the layout must not change, my recommendation is:
+
+  - Preserve the same topology and permit vertical/internal scrolling on
+    short landscape screens.
+
+  - Require three initially visible rows only above a measured portrait-
+    height threshold.
+
+  - If three rows must remain visible in landscape, that requires a
+    separately approved compact or two-column layout.
+
+  3. The proposed grid targets every terminal screen, not just the home
+     screen.
+
+  Phase 4 changes generic .tp-screen into a three-row home grid (docs/
+  PLAN-2026-08-17-mobile-responsive-ui.md:384). That class also owns
+  keypad, split, stock, details, share, cash and success screens—for
+  example the keypad’s two-panel layout at client/src/features/terminal/
+  retail/RetailTerminalViewCore.jsx:386. This would break those screens.
+  It needs an explicit home-only class, followed by responsive contracts
+  for every other terminal state.
+
+  4. The plan says “app-wide,” but only remediates terminals.
+
+  The shared tokens live on .tp-viewport, while dashboard, settings,
+  analytics, stock, directories, profiles, quote builder, recurring
+  schedules and /stack use separate shells. The bottom dock is also a
+  sibling of the router, so terminal-root variables cannot reach it
+  (client/src/App.tsx:980).
+
+  Meanwhile, deleting the global rule changes auth, onboarding, landing
+  and customer checkout too. The plan needs:
+
+  - A scoped merchant-phone shell around routed content and navigation.
+  - A complete in-scope route/state inventory.
+  - Explicit smoke protection for auth and public routes.
+  - A decision for phone-class widths above 430px, because the device
+    gate treats any shortest side below 700px as mobile (client/src/
+    hooks/use-device-class.ts:12).
+
+  5. CSS isolation is too late and incomplete.
+
+  Scoping is delayed until Phase 6, leaving all earlier work exposed to
+  nondeterministic overrides. The plan also misses a fourth unscoped
+  terminal stylesheet used by /trades/quote: client/src/pages/trades/
+  trades-terminal.tsx:520 and client/src/pages/trades/quote-
+  builder.tsx:5.
+
+  Scope or modularize all terminal styles first. Moving them into
+  separate CSS files alone does not prevent collisions. Preserve each
+  vertical’s colors, scale, geometry and tutorial anchors—the tutorial
+  currently targets .tp-subbar directly (client/src/features/tutorial/
+  tutorial-registry.ts:58).
+
+  6. Design fidelity is not enforceable.
+
+  “Full visual sweep” is not a gate. Geometry checks can pass while
+  colors, typography, spacing, shapes or layout composition drift. The
+  plan must define:
+
+  - One approved canonical phone design per vertical/state.
+  - Exact immutable topology: order, alignment, color regions, component
+    anatomy and interactions.
+
+  - Permitted adaptation only: bounded sizes, gaps, typography and
+    scrolling.
+
+  - 390×844 golden screenshot comparisons plus approved edge-size
+    references.
+
+  There are candidate phone references such as docs/designs/motion-
+  tablet-desktop/uploads/retail terminal.png, docs/designs/motion-tablet-
+  desktop/uploads/PM terminal.png and docs/designs/motion-tablet-desktop/
+  uploads/Bills terminal.png, but the plan must explicitly identify which
+  are authoritative.
+
+  7. Important phone realities remain uncovered.
+
+  The plan needs explicit coverage for:
+
+  - Left/right safe areas in landscape, not only top/bottom.
+  - Software keyboards and visualViewport, ensuring focused fields and
+    commit/cancel controls remain visible.
+
+  - iOS Safari/WebKit, Android Chrome, installed PWA and native-shell
+    behavior.
+
+  - 200% text/zoom. Pinch zoom is currently disabled in client/
+    index.html:5, contradicting the plan’s accessibility claim.
+
+  - Late or failed font loading.
+  - Hit-area overlap and clipping from the proposed invisible ::after
+    targets.
+
+
+  There is no checked-in CI workflow or package script running either
+  browser verifier (package.json:6). Evidence currently lives in an
+  ephemeral scratchpad, and Phase 0 proposes landing a deliberately
+  failing gate. The static checks also conflict with the proposed 100vh
+  fallback and will miss CSS-in-JS cases.
+
+  Use durable probes, fixtures, JSON results and goldens; add a real
+  mandatory command; use AST/stylelint rules instead of grep; and test
+  breakpoint boundaries such as 373/374/375 because another global mobile
+  override exists at client/src/index.css:710.
+
+  ## Recommended execution order
+
+  1. Define the immutable mobile design contract, support envelope and
+     landscape behavior.
+
+  2. Check in reproducible failing measurements and approved goldens
+     without making CI permanently red.
+
+  3. Introduce a merchant-only phone shell.
+  4. Scope all terminal/global mobile CSS, including /trades/quote.
+  5. Remove the blanket overrides only after a complete control/tap-
+     target inventory.
+
+  6. Add valid width- and height-aware tokens, four-sided safe areas and
+     keyboard ownership.
+
+  7. Refactor the segmented bar and home layout with vertical-specific
+     variants.
+
+  8. Audit every terminal sub-screen, then every non-terminal merchant
+     route.
+
+  9. Add visual, geometry, content-extreme, zoom, keyboard, WebKit/
+     Android and viewport-fuzz gates to an actual required pipeline.
+
+  Tablet/desktop should remain strictly a no-regression check. No files
+  were changed.
+
+─ Worked for 21m 39s ───

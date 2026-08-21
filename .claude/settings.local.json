@@ -315,7 +315,9 @@
       "Bash(awk -F'|' '{printf \"%-6s %-7s %s\\\\n\", $1, toupper\\($2\\), $3}')",
       "Bash(echo \"── tsc exit: $? ──\")",
       "Bash(echo \"── exit $? ──\")",
-      "Bash(echo \"── tsc exit $? ──\")"
+      "Bash(echo \"── tsc exit $? ──\")",
+      "Bash(awk 'NR>=300 && NR<=900' client/src/features/terminal/retail/RetailTerminalViewCore.jsx)",
+      "Bash(echo \"tsc: $?\")"
     ]
   }
 }

@@ -1,0 +1,41 @@
+---
+name: mobile-44px-rule
+description: Mobile UI breakage root cause — a blanket min-height/min-width 44px on all buttons under 640px; plan at docs/PLAN-2026-08-17-mobile-responsive-ui.md
+metadata: 
+  node_type: memory
+  type: project
+  originSessionId: 77407836-b974-40ea-96f0-bff2e237e95e
+  modified: 2026-08-17T11:10:02.798Z
+---
+
+Investigated 2026-08-17 on `feat/tablet-desktop-app`. Oliver reported five mobile UI
+bugs; four share one cause: `client/src/index.css:360-368` applies
+`min-height: 44px; min-width: 44px` to every `button`/`[role=button]` inside
+`@media (max-width: 640px)`. `min-height` beats `height`, so every component that sets
+its own height is inflated **on phones only** — `.tp-subbar-btn` 27→44, `.tp-send` 37→44,
+`.tp-pill` 30→44, `.tp-stack-hdr` 24→44. The action-bar highlight (`.tp-subbar-ind`) is a
+`<div>`, stays 27px, so the label's bottom sits 4.6px below the bubble.
+
+**Why no test caught it:** the query is `max-width: 640px`, and every probe in
+`scripts/desktop-shots/` runs at ≥1194px. `scripts/verify-mobile-retail-regression.mjs`
+is the only mobile gate — one viewport (390×844), outer-box assertions only, and it
+passes against the broken UI.
+
+Other causes found: the highlight measures x/width only with no ResizeObserver (14.5px
+drift after resize); `height: '50%'` + hardcoded `padding: '154px 22px 90px'` caps the
+active stack at 0–2 rows on every phone; zero `clamp()` in 4,500 lines of terminal UI so
+`$99999.99` (430px at the hardcoded 88px) clips on every device; retail uses `100vh`
+while the rest of the app uses `100svh`; retail and property both inject **unscoped**
+`.tp-*` global stylesheets with different values (property adds `scale(0.85)` and puts
+the bubble's `z-index` above the label) — that's the intermittency.
+
+Full plan, phases and gates: `docs/PLAN-2026-08-17-mobile-responsive-ui.md`.
+Artifact: https://claude.ai/code/artifact/081ea87a-1585-48fc-8746-fedd260e1875
+
+**Why:** the fix order matters — the action-bar invariants cannot hold while the 44px
+rule is live, so Phase 1 precedes everything, and the gate goes in first (failing).
+
+**How to apply:** before touching mobile CSS, check whether a global rule in that
+`@media (max-width: 640px)` block (lines 360–473, also `label`/`input`/`table`
+`!important` overrides) is already fighting the component. Related: [[ui-consistency-plan-2026-07-12]],
+[[motion-toning-plan]].

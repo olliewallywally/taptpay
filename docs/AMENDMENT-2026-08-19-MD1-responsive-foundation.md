@@ -148,7 +148,11 @@ The design is already drawn on a 4px grid, so N is a clean number in almost ever
 --btn-h:       calc(6.75  * var(--u));   /* 27 — .tp-subbar-btn */
 --row-h:       calc(17.25 * var(--u));   /* 69 — one active-stack row */
 --stack-hdr-h: calc(6     * var(--u));   /* 24 */
---kp-size:     calc(19    * var(--u));   /* 76 — keypad key, still min()-capped by --panel-h */
+--kp-max:      calc(19    * var(--u));   /* 76 — the keypad key's DESIGN size.
+                                           Renamed from --kp-size, and --panel-h never existed:
+                                           see SPEC-2026-08-20-dock-implementation.md §1.2/§5.
+                                           --kp-size is the container-capped value and is
+                                           declared on .tp-panel-body, not here. */
 --fab-size:    calc(17.5  * var(--u));   /* 70 */
 --amount-max:  calc(22    * var(--u));   /* 88 — ceiling only; §3.4 and §4.3 constrain it further */
 ```

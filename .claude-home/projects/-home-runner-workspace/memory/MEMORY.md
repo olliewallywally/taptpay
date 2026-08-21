@@ -24,3 +24,7 @@
 - [Full app review 2026-08-15](review-2026-08-15-full-app.md) — 9 findings, none caught by CI; C2 blocks the deploy (billing gate vs migration 0014) and awaits Oliver's call
 - [Crash recovery from transcripts](crash-recovery-from-transcripts.md) — recover a crashed session's findings from its .jsonl instead of redoing them; persist long-task findings to disk as you go
 - [Motion toning plan](motion-toning-plan.md) — "violent" transitions = one back-out curve (78×) compounding with bounce keyframes; plan written 2026-08-15, no code changed yet, Property first
+- [Mobile 44px rule](mobile-44px-rule.md) — mobile UI breakage: a blanket button min-height under 640px; MD1 amended 2026-08-19 to a single-unit fluid foundation + 9 new gaps; MD7 settled (its premise was wrong) so MD1 is the last blocker
+- [probe-transitions cannot exit 0](probe-transitions-cannot-exit-zero.md) — it gates on third-party network errors (the Replit dev banner, ORB-blocked); read its summary line, not its exit code
+- [No new status colours](no-new-status-colours.md) — never add red/green to merchant UI, not even as status, unless Oliver asks
+- [Peer sessions: don't narrate](dont-report-peer-sessions.md) — only raise another Claude session when it actually blocks the work

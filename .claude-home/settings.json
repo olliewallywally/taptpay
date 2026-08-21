@@ -8,6 +8,7 @@
     "skill-creator@claude-plugins-official": true,
     "figma@claude-plugins-official": true
   },
+  "effortLevel": "xhigh",
   "tui": "fullscreen",
   "theme": "dark"
 }
