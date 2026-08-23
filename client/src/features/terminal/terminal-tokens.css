@@ -113,14 +113,27 @@
   display: flex;
   flex-direction: column;
   padding-top: var(--panel-top);
-  padding-left: var(--sp-7);
-  padding-right: var(--sp-7);
   padding-bottom: calc(var(--dock-h, 0px) + var(--safe-bottom) + var(--sp-3));
+  /* The INLINE padding lives on .tp-panel-body, not here, and that is
+     load-bearing rather than tidy. --u is `1.0256cqi` of the terminal
+     viewport, and cq units re-resolve at every use site: written inside a
+     nested size container they measure THAT container's content box. Give
+     this panel 28px of side padding and its content box is 334px at a 390
+     phone, so --u resolves to 3.42px here instead of 3.98 — and every token
+     derived from it, --kp-max included, comes out 14% small. Measured: the
+     keypad key capped at 65.1px instead of its 76px design size, on every
+     phone in the matrix. Keeping the panel's content box the full width of
+     the viewport keeps one unit meaning one length everywhere, which is the
+     whole of amendment A1 §3.1. The BLOCK padding stays — 100cqh is what
+     --kp-size reads, and it has to exclude the dock reservation.
+     Gated: verify-terminal-dock.mjs §9.B1's unit-uniformity clause. */
 }
 
 .tp-panel-body {
   flex: 1;
   min-height: 0;
+  padding-left: var(--sp-7);
+  padding-right: var(--sp-7);
   overflow-y: auto;               /* DK1: scrolling is a first-class outcome */
   overscroll-behavior: contain;   /* a flick must not chain to the page */
 }
