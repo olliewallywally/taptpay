@@ -1,0 +1,4482 @@
+{
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "capturedAt": "2026-08-23T03:54:08.070Z",
+  "routes": {
+    "retail terminal": {
+      "rc1Rules": [
+        {
+          "selector": "button, [role=\"button\"], input[type=\"submit\"], input[type=\"button\"]",
+          "minHeight": "44px",
+          "minWidth": "44px",
+          "keepsFontSize": null
+        },
+        {
+          "selector": "input[type=\"text\"], input[type=\"email\"], input[type=\"password\"], input[type=\"number\"], textarea, select",
+          "minHeight": "44px",
+          "minWidth": "",
+          "keepsFontSize": "16px"
+        }
+      ],
+      "controls": [
+        {
+          "tag": "button",
+          "classes": [
+            "tp-pill",
+            "outline"
+          ],
+          "label": "",
+          "text": "paywave",
+          "shipped": {
+            "w": 96,
+            "h": 44
+          },
+          "authored": {
+            "w": 96,
+            "h": 26
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 18
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "tp-pill",
+            "outline"
+          ],
+          "label": "",
+          "text": "boards",
+          "shipped": {
+            "w": 83.2,
+            "h": 44
+          },
+          "authored": {
+            "w": 83.2,
+            "h": 26
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 18
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [],
+          "label": "expand active stack",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 32,
+            "h": 24
+          },
+          "inflatedBy": {
+            "w": 12,
+            "h": 20
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": {
+            "by": "div.tp-stack-scroll",
+            "overflow": "auto",
+            "scrollable": true
+          }
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "tp-fab"
+          ],
+          "label": "add item",
+          "text": "",
+          "shipped": {
+            "w": 70,
+            "h": 70
+          },
+          "authored": {
+            "w": 70,
+            "h": 70
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "tp-subbar-btn"
+          ],
+          "label": "stock",
+          "text": "",
+          "shipped": {
+            "w": 70,
+            "h": 44
+          },
+          "authored": {
+            "w": 70,
+            "h": 27
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 17
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "tp-subbar-btn"
+          ],
+          "label": "split",
+          "text": "",
+          "shipped": {
+            "w": 70,
+            "h": 44
+          },
+          "authored": {
+            "w": 70,
+            "h": 27
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 17
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "tp-subbar-btn"
+          ],
+          "label": "share",
+          "text": "",
+          "shipped": {
+            "w": 70,
+            "h": 44
+          },
+          "authored": {
+            "w": 70,
+            "h": 27
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 17
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "tp-subbar-btn"
+          ],
+          "label": "cash",
+          "text": "",
+          "shipped": {
+            "w": 70,
+            "h": 44
+          },
+          "authored": {
+            "w": 70,
+            "h": 27
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 17
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "tp-send"
+          ],
+          "label": "send",
+          "text": "",
+          "shipped": {
+            "w": 69.2,
+            "h": 44
+          },
+          "authored": {
+            "w": 69.2,
+            "h": 37
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 7
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": {
+            "by": "div.tp-send-slot",
+            "overflow": "hidden",
+            "scrollable": false
+          }
+        },
+        {
+          "tag": "button",
+          "classes": [],
+          "label": "",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 36,
+            "h": 36
+          },
+          "inflatedBy": {
+            "w": 8,
+            "h": 8
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "show navigation",
+          "text": "",
+          "shipped": {
+            "w": 120,
+            "h": 44
+          },
+          "authored": {
+            "w": 120,
+            "h": 36
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 8
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": {
+            "by": "body",
+            "overflow": "hidden auto",
+            "scrollable": false
+          }
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "home",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 38,
+            "h": 38
+          },
+          "inflatedBy": {
+            "w": 6,
+            "h": 6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": {
+            "by": "body",
+            "overflow": "hidden auto",
+            "scrollable": false
+          }
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "stock",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 38,
+            "h": 38
+          },
+          "inflatedBy": {
+            "w": 6,
+            "h": 6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": {
+            "by": "body",
+            "overflow": "hidden auto",
+            "scrollable": false
+          }
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "terminal",
+          "text": "",
+          "shipped": {
+            "w": 50.6,
+            "h": 50.6
+          },
+          "authored": {
+            "w": 43.7,
+            "h": 43.7
+          },
+          "inflatedBy": {
+            "w": 6.9,
+            "h": 6.9
+          },
+          "inflated": true,
+          "pinnedAt44": false,
+          "needsTapTarget": true,
+          "clippedBy": {
+            "by": "body",
+            "overflow": "hidden auto",
+            "scrollable": false
+          }
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "analytics",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 38,
+            "h": 38
+          },
+          "inflatedBy": {
+            "w": 6,
+            "h": 6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": {
+            "by": "body",
+            "overflow": "hidden auto",
+            "scrollable": false
+          }
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "settings",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 38,
+            "h": 38
+          },
+          "inflatedBy": {
+            "w": 6,
+            "h": 6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": {
+            "by": "body",
+            "overflow": "hidden auto",
+            "scrollable": false
+          }
+        }
+      ],
+      "overlaps": [
+        {
+          "a": "show navigation",
+          "b": "terminal",
+          "area": 1452
+        },
+        {
+          "a": "show navigation",
+          "b": "analytics",
+          "area": 1070
+        },
+        {
+          "a": "show navigation",
+          "b": "stock",
+          "area": 1069
+        }
+      ],
+      "counts": {
+        "total": 16,
+        "inflated": 15,
+        "pinnedAt44": 14,
+        "needsTapTarget": 15,
+        "clipped": 7,
+        "clippedScrollable": 1
+      }
+    },
+    "property terminal": {
+      "rc1Rules": [
+        {
+          "selector": "button, [role=\"button\"], input[type=\"submit\"], input[type=\"button\"]",
+          "minHeight": "44px",
+          "minWidth": "44px",
+          "keepsFontSize": null
+        },
+        {
+          "selector": "input[type=\"text\"], input[type=\"email\"], input[type=\"password\"], input[type=\"number\"], textarea, select",
+          "minHeight": "44px",
+          "minWidth": "",
+          "keepsFontSize": "16px"
+        }
+      ],
+      "controls": [
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "",
+          "text": "rent requests",
+          "shipped": {
+            "w": 103.4,
+            "h": 44
+          },
+          "authored": {
+            "w": 103.4,
+            "h": 22.4
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 21.6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "",
+          "text": "all",
+          "shipped": {
+            "w": 51.3,
+            "h": 44
+          },
+          "authored": {
+            "w": 51.3,
+            "h": 31.6
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 12.4
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": {
+            "by": "div",
+            "overflow": "auto",
+            "scrollable": true
+          }
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "",
+          "text": "overdue",
+          "shipped": {
+            "w": 87.1,
+            "h": 44
+          },
+          "authored": {
+            "w": 87.1,
+            "h": 31.6
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 12.4
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": {
+            "by": "div",
+            "overflow": "auto",
+            "scrollable": true
+          }
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "",
+          "text": "sent",
+          "shipped": {
+            "w": 59.8,
+            "h": 44
+          },
+          "authored": {
+            "w": 59.8,
+            "h": 31.6
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 12.4
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": {
+            "by": "div",
+            "overflow": "auto",
+            "scrollable": true
+          }
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "",
+          "text": "paid",
+          "shipped": {
+            "w": 56.8,
+            "h": 44
+          },
+          "authored": {
+            "w": 56.8,
+            "h": 31.6
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 12.4
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": {
+            "by": "div",
+            "overflow": "auto",
+            "scrollable": true
+          }
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "",
+          "text": "failed",
+          "shipped": {
+            "w": 69.6,
+            "h": 44
+          },
+          "authored": {
+            "w": 69.6,
+            "h": 31.6
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 12.4
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": {
+            "by": "div",
+            "overflow": "auto",
+            "scrollable": true
+          }
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "tp-fab"
+          ],
+          "label": "new rent request",
+          "text": "",
+          "shipped": {
+            "w": 70,
+            "h": 70
+          },
+          "authored": {
+            "w": 70,
+            "h": 70
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [],
+          "label": "",
+          "text": "split bill",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 70.2,
+            "h": 33
+          },
+          "inflatedBy": {
+            "w": -26.2,
+            "h": 11
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": {
+            "by": "div.tp-split-slot",
+            "overflow": "hidden",
+            "scrollable": false
+          }
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "tp-subbar-btn"
+          ],
+          "label": "tenants",
+          "text": "",
+          "shipped": {
+            "w": 52.7,
+            "h": 37.4
+          },
+          "authored": {
+            "w": 52.7,
+            "h": 23
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 14.4
+          },
+          "inflated": true,
+          "pinnedAt44": false,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "tp-subbar-btn"
+          ],
+          "label": "send",
+          "text": "",
+          "shipped": {
+            "w": 52.7,
+            "h": 37.4
+          },
+          "authored": {
+            "w": 52.7,
+            "h": 23
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 14.4
+          },
+          "inflated": true,
+          "pinnedAt44": false,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "tp-subbar-btn"
+          ],
+          "label": "bill",
+          "text": "",
+          "shipped": {
+            "w": 52.7,
+            "h": 37.4
+          },
+          "authored": {
+            "w": 52.7,
+            "h": 23
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 14.4
+          },
+          "inflated": true,
+          "pinnedAt44": false,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "tp-subbar-btn"
+          ],
+          "label": "external",
+          "text": "",
+          "shipped": {
+            "w": 52.7,
+            "h": 37.4
+          },
+          "authored": {
+            "w": 52.7,
+            "h": 23
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 14.4
+          },
+          "inflated": true,
+          "pinnedAt44": false,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "tp-send"
+          ],
+          "label": "send",
+          "text": "",
+          "shipped": {
+            "w": 69.2,
+            "h": 44
+          },
+          "authored": {
+            "w": 69.2,
+            "h": 37
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 7
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": {
+            "by": "div.tp-send-slot",
+            "overflow": "hidden",
+            "scrollable": false
+          }
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "show navigation",
+          "text": "",
+          "shipped": {
+            "w": 120,
+            "h": 44
+          },
+          "authored": {
+            "w": 120,
+            "h": 36
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 8
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "home",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 38,
+            "h": 38
+          },
+          "inflatedBy": {
+            "w": 6,
+            "h": 6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "tenants",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 38,
+            "h": 38
+          },
+          "inflatedBy": {
+            "w": 6,
+            "h": 6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "terminal",
+          "text": "",
+          "shipped": {
+            "w": 50.6,
+            "h": 50.6
+          },
+          "authored": {
+            "w": 43.7,
+            "h": 43.7
+          },
+          "inflatedBy": {
+            "w": 6.9,
+            "h": 6.9
+          },
+          "inflated": true,
+          "pinnedAt44": false,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "analytics",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 38,
+            "h": 38
+          },
+          "inflatedBy": {
+            "w": 6,
+            "h": 6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "settings",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 38,
+            "h": 38
+          },
+          "inflatedBy": {
+            "w": 6,
+            "h": 6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        }
+      ],
+      "overlaps": [
+        {
+          "a": "show navigation",
+          "b": "terminal",
+          "area": 1452
+        },
+        {
+          "a": "show navigation",
+          "b": "analytics",
+          "area": 1070
+        },
+        {
+          "a": "show navigation",
+          "b": "tenants",
+          "area": 1069
+        },
+        {
+          "a": "rent requests",
+          "b": "all",
+          "area": 411
+        },
+        {
+          "a": "rent requests",
+          "b": "overdue",
+          "area": 369
+        },
+        {
+          "a": "split bill",
+          "b": "tenants",
+          "area": 339
+        }
+      ],
+      "counts": {
+        "total": 19,
+        "inflated": 18,
+        "pinnedAt44": 13,
+        "needsTapTarget": 18,
+        "clipped": 2,
+        "clippedScrollable": 5
+      }
+    },
+    "trades terminal": {
+      "rc1Rules": [
+        {
+          "selector": "button, [role=\"button\"], input[type=\"submit\"], input[type=\"button\"]",
+          "minHeight": "44px",
+          "minWidth": "44px",
+          "keepsFontSize": null
+        },
+        {
+          "selector": "input[type=\"text\"], input[type=\"email\"], input[type=\"password\"], input[type=\"number\"], textarea, select",
+          "minHeight": "44px",
+          "minWidth": "",
+          "keepsFontSize": "16px"
+        }
+      ],
+      "controls": [
+        {
+          "tag": "button",
+          "classes": [
+            "tp-fab"
+          ],
+          "label": "new invoice",
+          "text": "",
+          "shipped": {
+            "w": 70,
+            "h": 70
+          },
+          "authored": {
+            "w": 70,
+            "h": 70
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "tp-subbar-btn"
+          ],
+          "label": "clients",
+          "text": "",
+          "shipped": {
+            "w": 52.7,
+            "h": 37.4
+          },
+          "authored": {
+            "w": 52.7,
+            "h": 22.9
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 14.5
+          },
+          "inflated": true,
+          "pinnedAt44": false,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "tp-subbar-btn"
+          ],
+          "label": "quote",
+          "text": "",
+          "shipped": {
+            "w": 52.7,
+            "h": 37.4
+          },
+          "authored": {
+            "w": 52.7,
+            "h": 22.9
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 14.5
+          },
+          "inflated": true,
+          "pinnedAt44": false,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "tp-subbar-btn"
+          ],
+          "label": "invoice",
+          "text": "",
+          "shipped": {
+            "w": 52.7,
+            "h": 37.4
+          },
+          "authored": {
+            "w": 52.7,
+            "h": 22.9
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 14.5
+          },
+          "inflated": true,
+          "pinnedAt44": false,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "tp-subbar-btn"
+          ],
+          "label": "external",
+          "text": "",
+          "shipped": {
+            "w": 52.7,
+            "h": 37.4
+          },
+          "authored": {
+            "w": 52.7,
+            "h": 22.9
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 14.5
+          },
+          "inflated": true,
+          "pinnedAt44": false,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "tp-send"
+          ],
+          "label": "send",
+          "text": "",
+          "shipped": {
+            "w": 69.2,
+            "h": 44
+          },
+          "authored": {
+            "w": 69.2,
+            "h": 37
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 7
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": {
+            "by": "div.tp-send-slot",
+            "overflow": "hidden",
+            "scrollable": false
+          }
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "show navigation",
+          "text": "",
+          "shipped": {
+            "w": 120,
+            "h": 44
+          },
+          "authored": {
+            "w": 120,
+            "h": 36
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 8
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "home",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 38,
+            "h": 38
+          },
+          "inflatedBy": {
+            "w": 6,
+            "h": 6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "clients",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 38,
+            "h": 38
+          },
+          "inflatedBy": {
+            "w": 6,
+            "h": 6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "terminal",
+          "text": "",
+          "shipped": {
+            "w": 50.6,
+            "h": 50.6
+          },
+          "authored": {
+            "w": 43.7,
+            "h": 43.7
+          },
+          "inflatedBy": {
+            "w": 6.9,
+            "h": 6.9
+          },
+          "inflated": true,
+          "pinnedAt44": false,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "analytics",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 38,
+            "h": 38
+          },
+          "inflatedBy": {
+            "w": 6,
+            "h": 6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "settings",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 38,
+            "h": 38
+          },
+          "inflatedBy": {
+            "w": 6,
+            "h": 6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        }
+      ],
+      "overlaps": [
+        {
+          "a": "show navigation",
+          "b": "terminal",
+          "area": 1452
+        },
+        {
+          "a": "show navigation",
+          "b": "analytics",
+          "area": 1070
+        },
+        {
+          "a": "show navigation",
+          "b": "clients",
+          "area": 1069
+        }
+      ],
+      "counts": {
+        "total": 12,
+        "inflated": 11,
+        "pinnedAt44": 6,
+        "needsTapTarget": 11,
+        "clipped": 1,
+        "clippedScrollable": 0
+      }
+    },
+    "dashboard": {
+      "rc1Rules": [
+        {
+          "selector": "button, [role=\"button\"], input[type=\"submit\"], input[type=\"button\"]",
+          "minHeight": "44px",
+          "minWidth": "44px",
+          "keepsFontSize": null
+        },
+        {
+          "selector": "input[type=\"text\"], input[type=\"email\"], input[type=\"password\"], input[type=\"number\"], textarea, select",
+          "minHeight": "44px",
+          "minWidth": "",
+          "keepsFontSize": "16px"
+        }
+      ],
+      "controls": [
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "Export reports",
+          "text": "",
+          "shipped": {
+            "w": 86.3,
+            "h": 44
+          },
+          "authored": {
+            "w": 86.3,
+            "h": 38
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [
+            "rd-tap"
+          ],
+          "label": "",
+          "text": "day",
+          "shipped": {
+            "w": 73.5,
+            "h": 44
+          },
+          "authored": {
+            "w": 73.5,
+            "h": 33.2
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 10.8
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [
+            "rd-tap"
+          ],
+          "label": "",
+          "text": "week",
+          "shipped": {
+            "w": 73.5,
+            "h": 44
+          },
+          "authored": {
+            "w": 73.5,
+            "h": 33.2
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 10.8
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [
+            "rd-tap"
+          ],
+          "label": "",
+          "text": "month",
+          "shipped": {
+            "w": 73.5,
+            "h": 44
+          },
+          "authored": {
+            "w": 73.5,
+            "h": 33.2
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 10.8
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [
+            "rd-tap"
+          ],
+          "label": "",
+          "text": "year",
+          "shipped": {
+            "w": 73.5,
+            "h": 44
+          },
+          "authored": {
+            "w": 73.5,
+            "h": 33.2
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 10.8
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [
+            "rd-card",
+            "rd-tap"
+          ],
+          "label": "",
+          "text": "sales5",
+          "shipped": {
+            "w": 154.4,
+            "h": 127.6
+          },
+          "authored": {
+            "w": 154.4,
+            "h": 127.6
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [
+            "rd-card",
+            "rd-tap"
+          ],
+          "label": "",
+          "text": "active1",
+          "shipped": {
+            "w": 177.6,
+            "h": 127.6
+          },
+          "authored": {
+            "w": 177.6,
+            "h": 127.6
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [
+            "rd-card",
+            "rd-tap"
+          ],
+          "label": "new sale",
+          "text": "",
+          "shipped": {
+            "w": 123.8,
+            "h": 93.2
+          },
+          "authored": {
+            "w": 123.8,
+            "h": 93.2
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [
+            "rd-card",
+            "rd-tap"
+          ],
+          "label": "manage stock",
+          "text": "",
+          "shipped": {
+            "w": 99.1,
+            "h": 93.2
+          },
+          "authored": {
+            "w": 99.1,
+            "h": 93.2
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [
+            "rd-card",
+            "rd-tap"
+          ],
+          "label": "view sales",
+          "text": "",
+          "shipped": {
+            "w": 99.1,
+            "h": 93.2
+          },
+          "authored": {
+            "w": 99.1,
+            "h": 93.2
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "show navigation",
+          "text": "",
+          "shipped": {
+            "w": 120,
+            "h": 44
+          },
+          "authored": {
+            "w": 120,
+            "h": 36
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 8
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "home",
+          "text": "",
+          "shipped": {
+            "w": 50.6,
+            "h": 50.6
+          },
+          "authored": {
+            "w": 43.7,
+            "h": 43.7
+          },
+          "inflatedBy": {
+            "w": 6.9,
+            "h": 6.9
+          },
+          "inflated": true,
+          "pinnedAt44": false,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "stock",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 38,
+            "h": 38
+          },
+          "inflatedBy": {
+            "w": 6,
+            "h": 6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "terminal",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 38,
+            "h": 38
+          },
+          "inflatedBy": {
+            "w": 6,
+            "h": 6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "analytics",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 38,
+            "h": 38
+          },
+          "inflatedBy": {
+            "w": 6,
+            "h": 6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "settings",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 38,
+            "h": 38
+          },
+          "inflatedBy": {
+            "w": 6,
+            "h": 6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        }
+      ],
+      "overlaps": [
+        {
+          "a": "manage stock",
+          "b": "show navigation",
+          "area": 1923
+        },
+        {
+          "a": "show navigation",
+          "b": "terminal",
+          "area": 1452
+        },
+        {
+          "a": "new sale",
+          "b": "home",
+          "area": 1355
+        },
+        {
+          "a": "manage stock",
+          "b": "terminal",
+          "area": 1355
+        },
+        {
+          "a": "view sales",
+          "b": "settings",
+          "area": 1355
+        },
+        {
+          "a": "show navigation",
+          "b": "analytics",
+          "area": 1070
+        },
+        {
+          "a": "show navigation",
+          "b": "stock",
+          "area": 1069
+        },
+        {
+          "a": "manage stock",
+          "b": "analytics",
+          "area": 1058
+        },
+        {
+          "a": "new sale",
+          "b": "stock",
+          "area": 691
+        },
+        {
+          "a": "manage stock",
+          "b": "stock",
+          "area": 294
+        },
+        {
+          "a": "new sale",
+          "b": "show navigation",
+          "area": 214
+        }
+      ],
+      "counts": {
+        "total": 16,
+        "inflated": 11,
+        "pinnedAt44": 10,
+        "needsTapTarget": 11,
+        "clipped": 0,
+        "clippedScrollable": 0
+      }
+    },
+    "transactions": {
+      "rc1Rules": [
+        {
+          "selector": "button, [role=\"button\"], input[type=\"submit\"], input[type=\"button\"]",
+          "minHeight": "44px",
+          "minWidth": "44px",
+          "keepsFontSize": null
+        },
+        {
+          "selector": "input[type=\"text\"], input[type=\"email\"], input[type=\"password\"], input[type=\"number\"], textarea, select",
+          "minHeight": "44px",
+          "minWidth": "",
+          "keepsFontSize": "16px"
+        }
+      ],
+      "controls": [
+        {
+          "tag": "button",
+          "classes": [],
+          "label": "",
+          "text": "day",
+          "shipped": {
+            "w": 84,
+            "h": 44
+          },
+          "authored": {
+            "w": 84,
+            "h": 36.8
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 7.2
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [],
+          "label": "",
+          "text": "week",
+          "shipped": {
+            "w": 84,
+            "h": 44
+          },
+          "authored": {
+            "w": 84,
+            "h": 36.8
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 7.2
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [],
+          "label": "",
+          "text": "month",
+          "shipped": {
+            "w": 84,
+            "h": 44
+          },
+          "authored": {
+            "w": 84,
+            "h": 36.8
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 7.2
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [],
+          "label": "",
+          "text": "year",
+          "shipped": {
+            "w": 84,
+            "h": 44
+          },
+          "authored": {
+            "w": 84,
+            "h": 36.8
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 7.2
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [],
+          "label": "",
+          "text": "export →",
+          "shipped": {
+            "w": 47.1,
+            "h": 44
+          },
+          "authored": {
+            "w": 47.1,
+            "h": 19.2
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 24.8
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "show navigation",
+          "text": "",
+          "shipped": {
+            "w": 120,
+            "h": 44
+          },
+          "authored": {
+            "w": 120,
+            "h": 36
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 8
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "home",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 38,
+            "h": 38
+          },
+          "inflatedBy": {
+            "w": 6,
+            "h": 6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "stock",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 38,
+            "h": 38
+          },
+          "inflatedBy": {
+            "w": 6,
+            "h": 6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "terminal",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 38,
+            "h": 38
+          },
+          "inflatedBy": {
+            "w": 6,
+            "h": 6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "analytics",
+          "text": "",
+          "shipped": {
+            "w": 50.6,
+            "h": 50.6
+          },
+          "authored": {
+            "w": 43.7,
+            "h": 43.7
+          },
+          "inflatedBy": {
+            "w": 6.9,
+            "h": 6.9
+          },
+          "inflated": true,
+          "pinnedAt44": false,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "settings",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 38,
+            "h": 38
+          },
+          "inflatedBy": {
+            "w": 6,
+            "h": 6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        }
+      ],
+      "overlaps": [
+        {
+          "a": "show navigation",
+          "b": "terminal",
+          "area": 1452
+        },
+        {
+          "a": "show navigation",
+          "b": "analytics",
+          "area": 1070
+        },
+        {
+          "a": "show navigation",
+          "b": "stock",
+          "area": 1069
+        }
+      ],
+      "counts": {
+        "total": 11,
+        "inflated": 11,
+        "pinnedAt44": 10,
+        "needsTapTarget": 11,
+        "clipped": 0,
+        "clippedScrollable": 0
+      }
+    },
+    "stock": {
+      "rc1Rules": [
+        {
+          "selector": "button, [role=\"button\"], input[type=\"submit\"], input[type=\"button\"]",
+          "minHeight": "44px",
+          "minWidth": "44px",
+          "keepsFontSize": null
+        },
+        {
+          "selector": "input[type=\"text\"], input[type=\"email\"], input[type=\"password\"], input[type=\"number\"], textarea, select",
+          "minHeight": "44px",
+          "minWidth": "",
+          "keepsFontSize": "16px"
+        }
+      ],
+      "controls": [
+        {
+          "tag": "input[type=text]",
+          "classes": [
+            "w-full",
+            "bg-gray-50",
+            "border"
+          ],
+          "label": "",
+          "text": "",
+          "shipped": {
+            "w": 302,
+            "h": 48.4
+          },
+          "authored": {
+            "w": 302,
+            "h": 48.4
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [],
+          "label": "",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 44,
+            "h": 44
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": true,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "flex",
+            "items-center",
+            "gap-1"
+          ],
+          "label": "",
+          "text": "A–Z",
+          "shipped": {
+            "w": 57.6,
+            "h": 44
+          },
+          "authored": {
+            "w": 57.6,
+            "h": 28.8
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 15.2
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "flex",
+            "items-center",
+            "gap-1"
+          ],
+          "label": "",
+          "text": "Z–A",
+          "shipped": {
+            "w": 59.6,
+            "h": 44
+          },
+          "authored": {
+            "w": 59.6,
+            "h": 30.8
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 13.2
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "flex",
+            "items-center",
+            "gap-1"
+          ],
+          "label": "",
+          "text": "Price ↑",
+          "shipped": {
+            "w": 74.2,
+            "h": 44
+          },
+          "authored": {
+            "w": 74.2,
+            "h": 30.8
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 13.2
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "flex",
+            "items-center",
+            "gap-1"
+          ],
+          "label": "",
+          "text": "Price ↓",
+          "shipped": {
+            "w": 74.2,
+            "h": 44
+          },
+          "authored": {
+            "w": 74.2,
+            "h": 30.8
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 13.2
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "group",
+            "relative",
+            "flex"
+          ],
+          "label": "",
+          "text": "🍳big brunch$24.00",
+          "shipped": {
+            "w": 173,
+            "h": 122
+          },
+          "authored": {
+            "w": 173,
+            "h": 122
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "group",
+            "relative",
+            "flex"
+          ],
+          "label": "",
+          "text": "☕flat white$5.50",
+          "shipped": {
+            "w": 173,
+            "h": 122
+          },
+          "authored": {
+            "w": 173,
+            "h": 122
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "group",
+            "relative",
+            "flex"
+          ],
+          "label": "",
+          "text": "☕latte$6.00",
+          "shipped": {
+            "w": 173,
+            "h": 122
+          },
+          "authored": {
+            "w": 173,
+            "h": 122
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "group",
+            "relative",
+            "flex"
+          ],
+          "label": "",
+          "text": "🧁muffin$6.00",
+          "shipped": {
+            "w": 173,
+            "h": 122
+          },
+          "authored": {
+            "w": 173,
+            "h": 122
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "group",
+            "relative",
+            "flex"
+          ],
+          "label": "",
+          "text": "🥪toastie$9.00",
+          "shipped": {
+            "w": 173,
+            "h": 122
+          },
+          "authored": {
+            "w": 173,
+            "h": 122
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "show navigation",
+          "text": "",
+          "shipped": {
+            "w": 120,
+            "h": 44
+          },
+          "authored": {
+            "w": 120,
+            "h": 36
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 8
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "home",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 38,
+            "h": 38
+          },
+          "inflatedBy": {
+            "w": 6,
+            "h": 6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "stock",
+          "text": "",
+          "shipped": {
+            "w": 50.6,
+            "h": 50.6
+          },
+          "authored": {
+            "w": 43.7,
+            "h": 43.7
+          },
+          "inflatedBy": {
+            "w": 6.9,
+            "h": 6.9
+          },
+          "inflated": true,
+          "pinnedAt44": false,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "terminal",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 38,
+            "h": 38
+          },
+          "inflatedBy": {
+            "w": 6,
+            "h": 6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "analytics",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 38,
+            "h": 38
+          },
+          "inflatedBy": {
+            "w": 6,
+            "h": 6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "settings",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 38,
+            "h": 38
+          },
+          "inflatedBy": {
+            "w": 6,
+            "h": 6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        }
+      ],
+      "overlaps": [
+        {
+          "a": "show navigation",
+          "b": "terminal",
+          "area": 1452
+        },
+        {
+          "a": "show navigation",
+          "b": "analytics",
+          "area": 1070
+        },
+        {
+          "a": "show navigation",
+          "b": "stock",
+          "area": 1069
+        }
+      ],
+      "counts": {
+        "total": 17,
+        "inflated": 10,
+        "pinnedAt44": 10,
+        "needsTapTarget": 10,
+        "clipped": 0,
+        "clippedScrollable": 0
+      }
+    },
+    "settings": {
+      "rc1Rules": [
+        {
+          "selector": "button, [role=\"button\"], input[type=\"submit\"], input[type=\"button\"]",
+          "minHeight": "44px",
+          "minWidth": "44px",
+          "keepsFontSize": null
+        },
+        {
+          "selector": "input[type=\"text\"], input[type=\"email\"], input[type=\"password\"], input[type=\"number\"], textarea, select",
+          "minHeight": "44px",
+          "minWidth": "",
+          "keepsFontSize": "16px"
+        }
+      ],
+      "controls": [
+        {
+          "tag": "button",
+          "classes": [
+            "pt-bounce",
+            "w-full",
+            "bg-white"
+          ],
+          "label": "",
+          "text": "Payment Board BuilderDesign ",
+          "shipped": {
+            "w": 354,
+            "h": 100.4
+          },
+          "authored": {
+            "w": 354,
+            "h": 100.4
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "w-full",
+            "flex",
+            "items-center"
+          ],
+          "label": "",
+          "text": "Business Details",
+          "shipped": {
+            "w": 354,
+            "h": 70
+          },
+          "authored": {
+            "w": 354,
+            "h": 70
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "input[type=email]",
+          "classes": [
+            "flex",
+            "h-10",
+            "w-full"
+          ],
+          "label": "",
+          "text": "",
+          "shipped": {
+            "w": 314,
+            "h": 44
+          },
+          "authored": {
+            "w": 314,
+            "h": 40
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 4
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": {
+            "by": "div",
+            "overflow": "hidden",
+            "scrollable": false
+          }
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [
+            "peer",
+            "inline-flex",
+            "h-6"
+          ],
+          "label": "",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 44,
+            "h": 24
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 20
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": {
+            "by": "div",
+            "overflow": "hidden",
+            "scrollable": false
+          }
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [
+            "wlb"
+          ],
+          "label": "",
+          "text": "Save Business Details",
+          "shipped": {
+            "w": 314,
+            "h": 48.4
+          },
+          "authored": {
+            "w": 314,
+            "h": 48.4
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": {
+            "by": "div",
+            "overflow": "hidden",
+            "scrollable": false
+          }
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "w-full",
+            "flex",
+            "items-center"
+          ],
+          "label": "",
+          "text": "Dashboard Preferences",
+          "shipped": {
+            "w": 354,
+            "h": 70
+          },
+          "authored": {
+            "w": 354,
+            "h": 70
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "input[type=number]",
+          "classes": [
+            "flex",
+            "h-10",
+            "w-full"
+          ],
+          "label": "",
+          "text": "",
+          "shipped": {
+            "w": 231.5,
+            "h": 44
+          },
+          "authored": {
+            "w": 231.5,
+            "h": 40
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 4
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": {
+            "by": "div",
+            "overflow": "hidden",
+            "scrollable": false
+          }
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [
+            "wlb"
+          ],
+          "label": "",
+          "text": "Save",
+          "shipped": {
+            "w": 70.5,
+            "h": 44
+          },
+          "authored": {
+            "w": 70.5,
+            "h": 42.8
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 1.2
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": {
+            "by": "div",
+            "overflow": "hidden",
+            "scrollable": false
+          }
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "w-full",
+            "flex",
+            "items-center"
+          ],
+          "label": "",
+          "text": "Subscription & Billing",
+          "shipped": {
+            "w": 354,
+            "h": 70
+          },
+          "authored": {
+            "w": 354,
+            "h": 70
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [
+            "text-left",
+            "p-3",
+            "rounded-xl"
+          ],
+          "label": "",
+          "text": "Solo$7.99/mo1 login · the fu",
+          "shipped": {
+            "w": 314,
+            "h": 112.4
+          },
+          "authored": {
+            "w": 314,
+            "h": 112.4
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": {
+            "by": "div",
+            "overflow": "hidden",
+            "scrollable": false
+          }
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [
+            "text-left",
+            "p-3",
+            "rounded-xl"
+          ],
+          "label": "",
+          "text": "Team$8.99/mo5 logins · one d",
+          "shipped": {
+            "w": 314,
+            "h": 92.4
+          },
+          "authored": {
+            "w": 314,
+            "h": 92.4
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": {
+            "by": "div",
+            "overflow": "hidden",
+            "scrollable": false
+          }
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [
+            "text-left",
+            "p-3",
+            "rounded-xl"
+          ],
+          "label": "",
+          "text": "Crew$12.99/mo10 logins · who",
+          "shipped": {
+            "w": 314,
+            "h": 92.4
+          },
+          "authored": {
+            "w": 314,
+            "h": 92.4
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": {
+            "by": "div",
+            "overflow": "hidden",
+            "scrollable": false
+          }
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "inline-flex",
+            "items-center",
+            "justify-center"
+          ],
+          "label": "",
+          "text": "Replace",
+          "shipped": {
+            "w": 68.2,
+            "h": 44
+          },
+          "authored": {
+            "w": 68.2,
+            "h": 36
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 8
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": {
+            "by": "div",
+            "overflow": "hidden",
+            "scrollable": false
+          }
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "inline-flex",
+            "items-center",
+            "justify-center"
+          ],
+          "label": "",
+          "text": "Remove",
+          "shipped": {
+            "w": 68.3,
+            "h": 44
+          },
+          "authored": {
+            "w": 68.3,
+            "h": 36
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 8
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": {
+            "by": "div",
+            "overflow": "hidden",
+            "scrollable": false
+          }
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "inline-flex",
+            "items-center",
+            "justify-center"
+          ],
+          "label": "",
+          "text": "Cancel subscription",
+          "shipped": {
+            "w": 314,
+            "h": 44
+          },
+          "authored": {
+            "w": 314,
+            "h": 40
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 4
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": {
+            "by": "div",
+            "overflow": "hidden",
+            "scrollable": false
+          }
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "w-full",
+            "flex",
+            "items-center"
+          ],
+          "label": "",
+          "text": "Account",
+          "shipped": {
+            "w": 354,
+            "h": 70
+          },
+          "authored": {
+            "w": 354,
+            "h": 70
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "w-full",
+            "flex",
+            "items-center"
+          ],
+          "label": "",
+          "text": "Transaction Notifications",
+          "shipped": {
+            "w": 354,
+            "h": 70
+          },
+          "authored": {
+            "w": 354,
+            "h": 70
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "w-full",
+            "flex",
+            "items-center"
+          ],
+          "label": "",
+          "text": "Tutorial & Help",
+          "shipped": {
+            "w": 354,
+            "h": 70
+          },
+          "authored": {
+            "w": 354,
+            "h": 70
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [
+            "whitespace-nowrap",
+            "text-sm",
+            "ring-offset-background"
+          ],
+          "label": "",
+          "text": "Start Tutorials",
+          "shipped": {
+            "w": 314,
+            "h": 48
+          },
+          "authored": {
+            "w": 314,
+            "h": 48
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": {
+            "by": "div",
+            "overflow": "hidden",
+            "scrollable": false
+          }
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "inline-flex",
+            "items-center",
+            "justify-center"
+          ],
+          "label": "",
+          "text": "Customer Payment Page",
+          "shipped": {
+            "w": 354,
+            "h": 48
+          },
+          "authored": {
+            "w": 354,
+            "h": 48
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [],
+          "label": "",
+          "text": "Retailterminal · sales",
+          "shipped": {
+            "w": 112.7,
+            "h": 65.8
+          },
+          "authored": {
+            "w": 122.5,
+            "h": 65.8
+          },
+          "inflatedBy": {
+            "w": -9.8,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [],
+          "label": "",
+          "text": "Propertytenants · rent",
+          "shipped": {
+            "w": 112.7,
+            "h": 65.8
+          },
+          "authored": {
+            "w": 115.8,
+            "h": 65.8
+          },
+          "inflatedBy": {
+            "w": -3.1,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [],
+          "label": "",
+          "text": "Tradesquotes · jobs",
+          "shipped": {
+            "w": 112.7,
+            "h": 65.8
+          },
+          "authored": {
+            "w": 112.9,
+            "h": 65.8
+          },
+          "inflatedBy": {
+            "w": -0.2,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "whitespace-nowrap",
+            "font-medium",
+            "ring-offset-background"
+          ],
+          "label": "",
+          "text": "Log Out",
+          "shipped": {
+            "w": 354,
+            "h": 48
+          },
+          "authored": {
+            "w": 354,
+            "h": 48
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "show navigation",
+          "text": "",
+          "shipped": {
+            "w": 120,
+            "h": 44
+          },
+          "authored": {
+            "w": 120,
+            "h": 36
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 8
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "home",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 38,
+            "h": 38
+          },
+          "inflatedBy": {
+            "w": 6,
+            "h": 6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "stock",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 38,
+            "h": 38
+          },
+          "inflatedBy": {
+            "w": 6,
+            "h": 6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "terminal",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 38,
+            "h": 38
+          },
+          "inflatedBy": {
+            "w": 6,
+            "h": 6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "analytics",
+          "text": "",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 38,
+            "h": 38
+          },
+          "inflatedBy": {
+            "w": 6,
+            "h": 6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "settings",
+          "text": "",
+          "shipped": {
+            "w": 50.6,
+            "h": 50.6
+          },
+          "authored": {
+            "w": 43.7,
+            "h": 43.7
+          },
+          "inflatedBy": {
+            "w": 6.9,
+            "h": 6.9
+          },
+          "inflated": true,
+          "pinnedAt44": false,
+          "needsTapTarget": true,
+          "clippedBy": null
+        }
+      ],
+      "overlaps": [
+        {
+          "a": "Solo$7.99/mo1 login · the fu",
+          "b": "Customer Payment Page",
+          "area": 15072
+        },
+        {
+          "a": "Crew$12.99/mo10 logins · who",
+          "b": "Start Tutorials",
+          "area": 14073
+        },
+        {
+          "a": "input[type=email]",
+          "b": "Solo$7.99/mo1 login · the fu",
+          "area": 12174
+        },
+        {
+          "a": "Solo$7.99/mo1 login · the fu",
+          "b": "Tutorial & Help",
+          "area": 9304
+        },
+        {
+          "a": "Start Tutorials",
+          "b": "Log Out",
+          "area": 6854
+        },
+        {
+          "a": "Team$8.99/mo5 logins · one d",
+          "b": "Propertytenants · rent",
+          "area": 6373
+        },
+        {
+          "a": "input[type=email]",
+          "b": "Customer Payment Page",
+          "area": 6280
+        },
+        {
+          "a": "Crew$12.99/mo10 logins · who",
+          "b": "Log Out",
+          "area": 5855
+        },
+        {
+          "a": "Team$8.99/mo5 logins · one d",
+          "b": "Retailterminal · sales",
+          "area": 5640
+        },
+        {
+          "a": "Team$8.99/mo5 logins · one d",
+          "b": "Log Out",
+          "area": 5452
+        },
+        {
+          "a": "Save Business Details",
+          "b": "Crew$12.99/mo10 logins · who",
+          "area": 5326
+        },
+        {
+          "a": "Solo$7.99/mo1 login · the fu",
+          "b": "show navigation",
+          "area": 5280
+        }
+      ],
+      "counts": {
+        "total": 30,
+        "inflated": 13,
+        "pinnedAt44": 12,
+        "needsTapTarget": 13,
+        "clipped": 12,
+        "clippedScrollable": 0
+      }
+    },
+    "onboarding": {
+      "rc1Rules": [
+        {
+          "selector": "button, [role=\"button\"], input[type=\"submit\"], input[type=\"button\"]",
+          "minHeight": "44px",
+          "minWidth": "44px",
+          "keepsFontSize": null
+        },
+        {
+          "selector": "input[type=\"text\"], input[type=\"email\"], input[type=\"password\"], input[type=\"number\"], textarea, select",
+          "minHeight": "44px",
+          "minWidth": "",
+          "keepsFontSize": "16px"
+        }
+      ],
+      "controls": [
+        {
+          "tag": "input[type=text]",
+          "classes": [
+            "mt-1",
+            "flex",
+            "h-10"
+          ],
+          "label": "",
+          "text": "",
+          "shipped": {
+            "w": 316,
+            "h": 44
+          },
+          "authored": {
+            "w": 316,
+            "h": 40
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 4
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "input[type=text]",
+          "classes": [
+            "mt-1",
+            "flex",
+            "h-10"
+          ],
+          "label": "",
+          "text": "",
+          "shipped": {
+            "w": 150,
+            "h": 44
+          },
+          "authored": {
+            "w": 150,
+            "h": 40
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 4
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "input[type=text]",
+          "classes": [
+            "mt-1",
+            "flex",
+            "h-10"
+          ],
+          "label": "",
+          "text": "",
+          "shipped": {
+            "w": 150,
+            "h": 44
+          },
+          "authored": {
+            "w": 150,
+            "h": 40
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 4
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "textarea",
+          "classes": [
+            "mt-1",
+            "flex",
+            "w-full"
+          ],
+          "label": "",
+          "text": "",
+          "shipped": {
+            "w": 316,
+            "h": 80
+          },
+          "authored": {
+            "w": 316,
+            "h": 80
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "select",
+          "classes": [
+            "mt-1",
+            "flex",
+            "h-10"
+          ],
+          "label": "",
+          "text": "Select rangeUnder $50,000$50",
+          "shipped": {
+            "w": 150,
+            "h": 44
+          },
+          "authored": {
+            "w": 150,
+            "h": 40
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 4
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=submit]",
+          "classes": [
+            "inline-flex",
+            "items-center",
+            "justify-center"
+          ],
+          "label": "",
+          "text": "Submit Business Details",
+          "shipped": {
+            "w": 358,
+            "h": 48
+          },
+          "authored": {
+            "w": 358,
+            "h": 48
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        }
+      ],
+      "overlaps": [],
+      "counts": {
+        "total": 6,
+        "inflated": 4,
+        "pinnedAt44": 4,
+        "needsTapTarget": 4,
+        "clipped": 0,
+        "clippedScrollable": 0
+      }
+    },
+    "landing": {
+      "rc1Rules": [
+        {
+          "selector": "button, [role=\"button\"], input[type=\"submit\"], input[type=\"button\"]",
+          "minHeight": "44px",
+          "minWidth": "44px",
+          "keepsFontSize": null
+        },
+        {
+          "selector": "input[type=\"text\"], input[type=\"email\"], input[type=\"password\"], input[type=\"number\"], textarea, select",
+          "minHeight": "44px",
+          "minWidth": "",
+          "keepsFontSize": "16px"
+        }
+      ],
+      "controls": [
+        {
+          "tag": "button",
+          "classes": [],
+          "label": "menu",
+          "text": "",
+          "shipped": {
+            "w": 46,
+            "h": 46
+          },
+          "authored": {
+            "w": 46,
+            "h": 46
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [],
+          "label": "close menu",
+          "text": "",
+          "shipped": {
+            "w": 50,
+            "h": 50
+          },
+          "authored": {
+            "w": 50,
+            "h": 50
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "tp-tab"
+          ],
+          "label": "",
+          "text": "property",
+          "shipped": {
+            "w": 106.9,
+            "h": 48.4
+          },
+          "authored": {
+            "w": 106.9,
+            "h": 48.4
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "tp-tab"
+          ],
+          "label": "",
+          "text": "trades",
+          "shipped": {
+            "w": 92.2,
+            "h": 48.4
+          },
+          "authored": {
+            "w": 92.2,
+            "h": 48.4
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "tp-tab"
+          ],
+          "label": "",
+          "text": "retail",
+          "shipped": {
+            "w": 84.2,
+            "h": 48.4
+          },
+          "authored": {
+            "w": 84.2,
+            "h": 48.4
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [],
+          "label": "",
+          "text": "see it live",
+          "shipped": {
+            "w": 44,
+            "h": 128
+          },
+          "authored": {
+            "w": 42.2,
+            "h": 128
+          },
+          "inflatedBy": {
+            "w": 1.8,
+            "h": 0
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": {
+            "by": "section",
+            "overflow": "hidden",
+            "scrollable": false
+          }
+        },
+        {
+          "tag": "input[type=text]",
+          "classes": [],
+          "label": "",
+          "text": "",
+          "shipped": {
+            "w": 194,
+            "h": 55.6
+          },
+          "authored": {
+            "w": 194,
+            "h": 55.6
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": {
+            "by": "div",
+            "overflow": "hidden",
+            "scrollable": false
+          }
+        },
+        {
+          "tag": "input[type=email]",
+          "classes": [],
+          "label": "",
+          "text": "",
+          "shipped": {
+            "w": 194,
+            "h": 55.6
+          },
+          "authored": {
+            "w": 194,
+            "h": 55.6
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": {
+            "by": "div",
+            "overflow": "hidden",
+            "scrollable": false
+          }
+        },
+        {
+          "tag": "textarea",
+          "classes": [],
+          "label": "",
+          "text": "",
+          "shipped": {
+            "w": 194,
+            "h": 106.8
+          },
+          "authored": {
+            "w": 194,
+            "h": 106.8
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": {
+            "by": "div",
+            "overflow": "hidden",
+            "scrollable": false
+          }
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [
+            "tp-wire"
+          ],
+          "label": "",
+          "text": "send message",
+          "shipped": {
+            "w": 194,
+            "h": 56
+          },
+          "authored": {
+            "w": 194,
+            "h": 56
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": {
+            "by": "div",
+            "overflow": "hidden",
+            "scrollable": false
+          }
+        }
+      ],
+      "overlaps": [
+        {
+          "a": "menu",
+          "b": "close menu",
+          "area": 2116
+        }
+      ],
+      "counts": {
+        "total": 10,
+        "inflated": 1,
+        "pinnedAt44": 1,
+        "needsTapTarget": 1,
+        "clipped": 5,
+        "clippedScrollable": 0
+      }
+    },
+    "login": {
+      "rc1Rules": [
+        {
+          "selector": "button, [role=\"button\"], input[type=\"submit\"], input[type=\"button\"]",
+          "minHeight": "44px",
+          "minWidth": "44px",
+          "keepsFontSize": null
+        },
+        {
+          "selector": "input[type=\"text\"], input[type=\"email\"], input[type=\"password\"], input[type=\"number\"], textarea, select",
+          "minHeight": "44px",
+          "minWidth": "",
+          "keepsFontSize": "16px"
+        }
+      ],
+      "controls": [
+        {
+          "tag": "button",
+          "classes": [
+            "flex",
+            "items-center",
+            "gap-1.5"
+          ],
+          "label": "",
+          "text": "Back",
+          "shipped": {
+            "w": 54.4,
+            "h": 44
+          },
+          "authored": {
+            "w": 54.4,
+            "h": 19.6
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 24.4
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [
+            "px-4",
+            "py-1",
+            "rounded-full"
+          ],
+          "label": "",
+          "text": "Merchant",
+          "shipped": {
+            "w": 86,
+            "h": 44
+          },
+          "authored": {
+            "w": 86,
+            "h": 24.8
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 19.2
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [
+            "px-4",
+            "py-1",
+            "rounded-full"
+          ],
+          "label": "",
+          "text": "Admin",
+          "shipped": {
+            "w": 66.4,
+            "h": 44
+          },
+          "authored": {
+            "w": 66.4,
+            "h": 24.8
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 19.2
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "input[type=email]",
+          "classes": [
+            "w-full",
+            "bg-transparent",
+            "border-2"
+          ],
+          "label": "",
+          "text": "",
+          "shipped": {
+            "w": 272,
+            "h": 59.6
+          },
+          "authored": {
+            "w": 272,
+            "h": 59.6
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "input[type=password]",
+          "classes": [
+            "w-full",
+            "bg-transparent",
+            "border-2"
+          ],
+          "label": "",
+          "text": "",
+          "shipped": {
+            "w": 272,
+            "h": 59.6
+          },
+          "authored": {
+            "w": 272,
+            "h": 59.6
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=submit]",
+          "classes": [
+            "w-full",
+            "bg-[#00E5CC]",
+            "text-[#0055FF]"
+          ],
+          "label": "",
+          "text": "login",
+          "shipped": {
+            "w": 272,
+            "h": 57.6
+          },
+          "authored": {
+            "w": 272,
+            "h": 57.6
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "w-full",
+            "bg-white",
+            "text-[#0055FF]"
+          ],
+          "label": "",
+          "text": "Google",
+          "shipped": {
+            "w": 272,
+            "h": 49.6
+          },
+          "authored": {
+            "w": 272,
+            "h": 49.6
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [
+            "w-full",
+            "bg-[#00E5CC]",
+            "text-[#0055FF]"
+          ],
+          "label": "",
+          "text": "Create account",
+          "shipped": {
+            "w": 272,
+            "h": 49.6
+          },
+          "authored": {
+            "w": 272,
+            "h": 49.6
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        }
+      ],
+      "overlaps": [],
+      "counts": {
+        "total": 8,
+        "inflated": 3,
+        "pinnedAt44": 3,
+        "needsTapTarget": 3,
+        "clipped": 0,
+        "clippedScrollable": 0
+      }
+    },
+    "signup": {
+      "rc1Rules": [
+        {
+          "selector": "button, [role=\"button\"], input[type=\"submit\"], input[type=\"button\"]",
+          "minHeight": "44px",
+          "minWidth": "44px",
+          "keepsFontSize": null
+        },
+        {
+          "selector": "input[type=\"text\"], input[type=\"email\"], input[type=\"password\"], input[type=\"number\"], textarea, select",
+          "minHeight": "44px",
+          "minWidth": "",
+          "keepsFontSize": "16px"
+        }
+      ],
+      "controls": [
+        {
+          "tag": "button",
+          "classes": [
+            "signup-page-back"
+          ],
+          "label": "",
+          "text": "Back",
+          "shipped": {
+            "w": 51.7,
+            "h": 44
+          },
+          "authored": {
+            "w": 51.7,
+            "h": 21
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 23
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button",
+          "classes": [],
+          "label": "",
+          "text": "Sign in",
+          "shipped": {
+            "w": 44,
+            "h": 44
+          },
+          "authored": {
+            "w": 33.2,
+            "h": 18.4
+          },
+          "inflatedBy": {
+            "w": 10.8,
+            "h": 25.6
+          },
+          "inflated": true,
+          "pinnedAt44": true,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [
+            "step-indicator",
+            "active"
+          ],
+          "label": "Contact, current step",
+          "text": "",
+          "shipped": {
+            "w": 41.6,
+            "h": 52.2
+          },
+          "authored": {
+            "w": 41.6,
+            "h": 52.2
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [
+            "step-indicator",
+            "inactive"
+          ],
+          "label": "Business",
+          "text": "",
+          "shipped": {
+            "w": 41.6,
+            "h": 52.2
+          },
+          "authored": {
+            "w": 41.6,
+            "h": 52.2
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [
+            "step-indicator",
+            "inactive"
+          ],
+          "label": "KYC & security",
+          "text": "",
+          "shipped": {
+            "w": 61.8,
+            "h": 52.2
+          },
+          "authored": {
+            "w": 61.8,
+            "h": 52.2
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [
+            "step-indicator",
+            "inactive"
+          ],
+          "label": "Plan",
+          "text": "",
+          "shipped": {
+            "w": 41.6,
+            "h": 52.2
+          },
+          "authored": {
+            "w": 41.6,
+            "h": 52.2
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [
+            "step-indicator",
+            "inactive"
+          ],
+          "label": "Verify",
+          "text": "",
+          "shipped": {
+            "w": 41.6,
+            "h": 52.2
+          },
+          "authored": {
+            "w": 41.6,
+            "h": 52.2
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": true,
+          "clippedBy": null
+        },
+        {
+          "tag": "input[type=text]",
+          "classes": [],
+          "label": "",
+          "text": "",
+          "shipped": {
+            "w": 324,
+            "h": 53.2
+          },
+          "authored": {
+            "w": 324,
+            "h": 53.2
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "input[type=email]",
+          "classes": [],
+          "label": "",
+          "text": "",
+          "shipped": {
+            "w": 324,
+            "h": 53.2
+          },
+          "authored": {
+            "w": 324,
+            "h": 53.2
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        },
+        {
+          "tag": "button[type=button]",
+          "classes": [
+            "next-button"
+          ],
+          "label": "",
+          "text": "Next step",
+          "shipped": {
+            "w": 136,
+            "h": 48
+          },
+          "authored": {
+            "w": 136,
+            "h": 48
+          },
+          "inflatedBy": {
+            "w": 0,
+            "h": 0
+          },
+          "inflated": false,
+          "pinnedAt44": false,
+          "needsTapTarget": false,
+          "clippedBy": null
+        }
+      ],
+      "overlaps": [],
+      "counts": {
+        "total": 10,
+        "inflated": 2,
+        "pinnedAt44": 2,
+        "needsTapTarget": 6,
+        "clipped": 0,
+        "clippedScrollable": 0
+      }
+    },
+    "customer payment": {
+      "rc1Rules": [
+        {
+          "selector": "button, [role=\"button\"], input[type=\"submit\"], input[type=\"button\"]",
+          "minHeight": "44px",
+          "minWidth": "44px",
+          "keepsFontSize": null
+        },
+        {
+          "selector": "input[type=\"text\"], input[type=\"email\"], input[type=\"password\"], input[type=\"number\"], textarea, select",
+          "minHeight": "44px",
+          "minWidth": "",
+          "keepsFontSize": "16px"
+        }
+      ],
+      "controls": [],
+      "overlaps": [],
+      "counts": {
+        "total": 0,
+        "inflated": 0,
+        "pinnedAt44": 0,
+        "needsTapTarget": 0,
+        "clipped": 0,
+        "clippedScrollable": 0
+      }
+    }
+  },
+  "smoke": [
+    {
+      "label": "retail terminal",
+      "path": "/terminal",
+      "ms": 3042,
+      "title": "TaptPay – Low Cost EFTPOS & POS System NZ | Digital Point of Sale",
+      "bodyText": 463,
+      "hasRoot": true,
+      "authed": true,
+      "errors": 2
+    },
+    {
+      "label": "property terminal",
+      "path": "/property/terminal",
+      "ms": 2196,
+      "title": "TaptPay – Low Cost EFTPOS & POS System NZ | Digital Point of Sale",
+      "bodyText": 429,
+      "hasRoot": true,
+      "authed": true,
+      "errors": 2
+    },
+    {
+      "label": "trades terminal",
+      "path": "/trades/terminal",
+      "ms": 1916,
+      "title": "TaptPay – Low Cost EFTPOS & POS System NZ | Digital Point of Sale",
+      "bodyText": 145,
+      "hasRoot": true,
+      "authed": true,
+      "errors": 2
+    },
+    {
+      "label": "dashboard",
+      "path": "/dashboard",
+      "ms": 1904,
+      "title": "TaptPay – Low Cost EFTPOS & POS System NZ | Digital Point of Sale",
+      "bodyText": 130,
+      "hasRoot": true,
+      "authed": true,
+      "errors": 2
+    },
+    {
+      "label": "transactions",
+      "path": "/transactions",
+      "ms": 1843,
+      "title": "TaptPay – Low Cost EFTPOS & POS System NZ | Digital Point of Sale",
+      "bodyText": 463,
+      "hasRoot": true,
+      "authed": true,
+      "errors": 3
+    },
+    {
+      "label": "stock",
+      "path": "/stock",
+      "ms": 1889,
+      "title": "TaptPay – Low Cost EFTPOS & POS System NZ | Digital Point of Sale",
+      "bodyText": 146,
+      "hasRoot": true,
+      "authed": true,
+      "errors": 2
+    },
+    {
+      "label": "settings",
+      "path": "/settings",
+      "ms": 1911,
+      "title": "TaptPay – Low Cost EFTPOS & POS System NZ | Digital Point of Sale",
+      "bodyText": 1690,
+      "hasRoot": true,
+      "authed": true,
+      "errors": 2
+    },
+    {
+      "label": "onboarding",
+      "path": "/onboarding",
+      "ms": 1952,
+      "title": "TaptPay – Low Cost EFTPOS & POS System NZ | Digital Point of Sale",
+      "bodyText": 790,
+      "hasRoot": true,
+      "authed": true,
+      "errors": 2
+    },
+    {
+      "label": "landing",
+      "path": "/",
+      "ms": 2038,
+      "title": "TaptPay – Low Cost EFTPOS & POS System NZ | Digital Point of Sale",
+      "bodyText": 2062,
+      "hasRoot": true,
+      "authed": false,
+      "errors": 0
+    },
+    {
+      "label": "login",
+      "path": "/login",
+      "ms": 1838,
+      "title": "Login - TapTpay Payment Terminal",
+      "bodyText": 84,
+      "hasRoot": true,
+      "authed": false,
+      "errors": 0
+    },
+    {
+      "label": "signup",
+      "path": "/signup",
+      "ms": 1805,
+      "title": "TaptPay – Low Cost EFTPOS & POS System NZ | Digital Point of Sale",
+      "bodyText": 222,
+      "hasRoot": true,
+      "authed": false,
+      "errors": 0
+    },
+    {
+      "label": "customer payment",
+      "path": "/pay/999999",
+      "ms": 1922,
+      "title": "TaptPay – Low Cost EFTPOS & POS System NZ | Digital Point of Sale",
+      "bodyText": 66,
+      "hasRoot": true,
+      "authed": false,
+      "errors": 0
+    }
+  ]
+}
