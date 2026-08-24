@@ -147,7 +147,7 @@ function SubBar({ activeIdx = -1, onPick, compact = false, hideLabel = false }: 
           const ic = active ? BLUE : 'rgba(4,13,109,0.55)';
           return (
             <button key={id} ref={(el: any) => (btnRefs.current[i] = el)}
-              className={`tp-subbar-btn${active ? ' active' : ''}`}
+              className={`tp-subbar-btn tap-target${active ? ' active' : ''}`}
               data-demo-id={`property-mode-${id}`}
               onClick={() => onPick?.(i)} aria-label={label}>
               <Icon sz={18} c={ic} />
@@ -162,7 +162,7 @@ function SubBar({ activeIdx = -1, onPick, compact = false, hideLabel = false }: 
 
 function SendBtn({ onClick }: any) {
   return (
-    <button className="tp-send" onClick={onClick} aria-label="send">
+    <button className="tp-send tap-target" onClick={onClick} aria-label="send">
       <span className="tp-send-circle"><Ic.Arrow /></span>
       <span className="tp-send-label">send</span>
     </button>
@@ -232,7 +232,7 @@ function RequestsHome({ invoices, tenants, outstanding, outstandingExpenses = 0,
       {/* Bottom — OFFW. Rises to the top of the page as the hero leaves. */}
       <div className="stagger tp-feed-body" style={{ flex: 1, background: OFFW, padding: feedOpen ? '64px 22px 100px' : '154px 22px 100px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 9 }}>
-          <button type="button" onClick={() => onToggleFeed?.()} aria-expanded={feedOpen}
+          <button className="tap-target" type="button" onClick={() => onToggleFeed?.()} aria-expanded={feedOpen}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'Outfit, system-ui', WebkitTapHighlightColor: 'transparent' }}>
             <span className="tp-stack-title">rent requests</span>
             <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={NAVY} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"
@@ -244,7 +244,7 @@ function RequestsHome({ invoices, tenants, outstanding, outstandingExpenses = 0,
         {/* Status filter chips — deep-linkable from the dashboard */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 9, overflowX: 'auto', scrollbarWidth: 'none' as any, WebkitOverflowScrolling: 'touch' }}>
           {(['all', 'overdue', 'sent', 'paid', 'failed'] as const).map(f => (
-            <button key={f} type="button" onClick={() => onFilter?.(f)}
+            <button className="tap-target" key={f} type="button" onClick={() => onFilter?.(f)}
               style={{ flexShrink: 0, padding: '6px 14px', borderRadius: 999, border: `1.5px solid ${filter === f ? NAVY : 'rgba(4,13,109,0.25)'}`, cursor: 'pointer', fontFamily: 'Outfit, system-ui', fontWeight: 700, fontSize: 11, letterSpacing: '0.04em', textTransform: 'uppercase', background: filter === f ? NAVY : 'transparent', color: filter === f ? BLUE : 'rgba(4,13,109,0.45)', transition: 'all 0.2s ease', WebkitTapHighlightColor: 'transparent' }}>
               {f}
             </button>
@@ -314,6 +314,7 @@ function RequestsHome({ invoices, tenants, outstanding, outstandingExpenses = 0,
 function SplitPill({ on, onToggle }: any) {
   return (
     <button
+      className="tap-target"
       onClick={onToggle}
       aria-pressed={on}
       style={{
@@ -1387,4 +1388,3 @@ export function PropertyTerminalView(props: PropertyTerminalViewProps) {
    Lives in ./property-terminal-view.css, scoped under `.property-terminal-view`.
    It was an unscoped `<style>{TP_TERM_CSS}</style>` here until phase 2 of
    docs/PLAN-2026-08-17-mobile-responsive-ui.md §5.1 — see that file's header. */
-

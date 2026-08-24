@@ -286,6 +286,7 @@ export function ExportButton({ onClick, tone = "onLight", color, style }: {
   const hue = color ?? (dark ? "#58ABFF" : "#040D6D");
   return (
     <button
+      className="tap-target"
       type="button"
       onClick={onClick}
       aria-label="Export reports"

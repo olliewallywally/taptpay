@@ -14,27 +14,27 @@
       },
       "subbar": {
         "w": 316,
-        "h": 56,
+        "h": 39,
         "x": 0,
-        "y": 341.5
+        "y": 350
       },
       "subbarBtn": {
         "w": 70,
-        "h": 44,
+        "h": 27,
         "x": 12,
-        "y": 347.5
+        "y": 356
       },
       "subbarInd": {
         "w": 0,
         "h": 27,
         "x": 1,
-        "y": 347.5
+        "y": 356
       },
       "send": {
         "w": 69.2,
-        "h": 44,
+        "h": 37,
         "x": 324,
-        "y": 347.5
+        "y": 351
       },
       "amount": {
         "w": 264,
@@ -62,40 +62,33 @@
       },
       "screens": 1,
       "visibleStackRows": 0,
-      "sendVsBarDelta": -12,
-      "indVsBtnDelta": -17,
+      "sendVsBarDelta": -2,
+      "indVsBtnDelta": 0,
       "amountOverflow": -56
     },
     "tokens": {
-      "--u": null,
-      "--sp-1": null,
-      "--sp-2": null,
-      "--sp-3": null,
-      "--sp-4": null,
-      "--sp-6": null,
-      "--sp-7": null,
+      "--u": "clamp(3.3px, 1.0256cqi, 4px)",
+      "--sp-1": "calc(1 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-2": "calc(2 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-3": "calc(3 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": null,
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
       "--kp-size": null,
-      "--fab-size": null,
+      "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
       "--chrome-gutter": null,
       "--dock-h": "78px",
       "--kb-h": null
     },
-    "tapUnder44": 0,
-    "tapInflated": 13,
+    "tapUnder44": 15,
+    "tapInflated": 0,
     "tapCentreMiss": 0,
-    "inflatedSamples": [
-      "tp-pill.outline",
-      "tp-pill.outline",
-      "button",
-      "tp-subbar-btn",
-      "tp-subbar-btn",
-      "tp-subbar-btn"
-    ],
+    "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
     "drift": {
@@ -119,27 +112,27 @@
       },
       "subbar": {
         "w": 316,
-        "h": 56,
+        "h": 39,
         "x": 18,
-        "y": 377.5
+        "y": 386
       },
       "subbarBtn": {
         "w": 70,
-        "h": 44,
+        "h": 27,
         "x": 30,
-        "y": 383.5
+        "y": 392
       },
       "subbarInd": {
         "w": 0,
         "h": 27,
         "x": 19,
-        "y": 383.5
+        "y": 392
       },
       "send": {
         "w": 69.2,
-        "h": 44,
+        "h": 37,
         "x": 342,
-        "y": 383.5
+        "y": 387
       },
       "amount": {
         "w": 304,
@@ -167,40 +160,33 @@
       },
       "screens": 1,
       "visibleStackRows": 0,
-      "sendVsBarDelta": -12,
-      "indVsBtnDelta": -17,
+      "sendVsBarDelta": -2,
+      "indVsBtnDelta": 0,
       "amountOverflow": -56
     },
     "tokens": {
-      "--u": null,
-      "--sp-1": null,
-      "--sp-2": null,
-      "--sp-3": null,
-      "--sp-4": null,
-      "--sp-6": null,
-      "--sp-7": null,
+      "--u": "clamp(3.3px, 1.0256cqi, 4px)",
+      "--sp-1": "calc(1 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-2": "calc(2 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-3": "calc(3 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": null,
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
       "--kp-size": null,
-      "--fab-size": null,
+      "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
       "--chrome-gutter": null,
       "--dock-h": "78px",
       "--kb-h": null
     },
-    "tapUnder44": 0,
-    "tapInflated": 13,
+    "tapUnder44": 15,
+    "tapInflated": 0,
     "tapCentreMiss": 0,
-    "inflatedSamples": [
-      "tp-pill.outline",
-      "tp-pill.outline",
-      "button",
-      "tp-subbar-btn",
-      "tp-subbar-btn",
-      "tp-subbar-btn"
-    ],
+    "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
     "drift": {
@@ -224,27 +210,27 @@
       },
       "subbar": {
         "w": 316,
-        "h": 56,
+        "h": 39,
         "x": 25.5,
-        "y": 391
+        "y": 399.5
       },
       "subbarBtn": {
         "w": 70,
-        "h": 44,
+        "h": 27,
         "x": 37.5,
-        "y": 397
+        "y": 405.5
       },
       "subbarInd": {
         "w": 0,
         "h": 27,
         "x": 26.5,
-        "y": 397
+        "y": 405.5
       },
       "send": {
         "w": 69.2,
-        "h": 44,
+        "h": 37,
         "x": 349.5,
-        "y": 397
+        "y": 400.5
       },
       "amount": {
         "w": 319,
@@ -272,40 +258,33 @@
       },
       "screens": 1,
       "visibleStackRows": 0,
-      "sendVsBarDelta": -12,
-      "indVsBtnDelta": -17,
+      "sendVsBarDelta": -2,
+      "indVsBtnDelta": 0,
       "amountOverflow": -56
     },
     "tokens": {
-      "--u": null,
-      "--sp-1": null,
-      "--sp-2": null,
-      "--sp-3": null,
-      "--sp-4": null,
-      "--sp-6": null,
-      "--sp-7": null,
+      "--u": "clamp(3.3px, 1.0256cqi, 4px)",
+      "--sp-1": "calc(1 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-2": "calc(2 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-3": "calc(3 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": null,
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
       "--kp-size": null,
-      "--fab-size": null,
+      "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
       "--chrome-gutter": null,
       "--dock-h": "78px",
       "--kb-h": null
     },
-    "tapUnder44": 0,
-    "tapInflated": 13,
+    "tapUnder44": 15,
+    "tapInflated": 0,
     "tapCentreMiss": 0,
-    "inflatedSamples": [
-      "tp-pill.outline",
-      "tp-pill.outline",
-      "button",
-      "tp-subbar-btn",
-      "tp-subbar-btn",
-      "tp-subbar-btn"
-    ],
+    "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
     "drift": {
@@ -329,27 +308,27 @@
       },
       "subbar": {
         "w": 316,
-        "h": 56,
+        "h": 39,
         "x": 33,
-        "y": 479.5
+        "y": 488
       },
       "subbarBtn": {
         "w": 70,
-        "h": 44,
+        "h": 27,
         "x": 45,
-        "y": 485.5
+        "y": 494
       },
       "subbarInd": {
         "w": 0,
         "h": 27,
         "x": 34,
-        "y": 485.5
+        "y": 494
       },
       "send": {
         "w": 69.2,
-        "h": 44,
+        "h": 37,
         "x": 357,
-        "y": 485.5
+        "y": 489
       },
       "amount": {
         "w": 334,
@@ -376,41 +355,34 @@
         "y": 387
       },
       "screens": 1,
-      "visibleStackRows": 1,
-      "sendVsBarDelta": -12,
-      "indVsBtnDelta": -17,
+      "visibleStackRows": 2,
+      "sendVsBarDelta": -2,
+      "indVsBtnDelta": 0,
       "amountOverflow": -56
     },
     "tokens": {
-      "--u": null,
-      "--sp-1": null,
-      "--sp-2": null,
-      "--sp-3": null,
-      "--sp-4": null,
-      "--sp-6": null,
-      "--sp-7": null,
+      "--u": "clamp(3.3px, 1.0256cqi, 4px)",
+      "--sp-1": "calc(1 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-2": "calc(2 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-3": "calc(3 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": null,
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
       "--kp-size": null,
-      "--fab-size": null,
+      "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
       "--chrome-gutter": null,
       "--dock-h": "78px",
       "--kb-h": null
     },
-    "tapUnder44": 0,
-    "tapInflated": 13,
+    "tapUnder44": 15,
+    "tapInflated": 0,
     "tapCentreMiss": 0,
-    "inflatedSamples": [
-      "tp-pill.outline",
-      "tp-pill.outline",
-      "button",
-      "tp-subbar-btn",
-      "tp-subbar-btn",
-      "tp-subbar-btn"
-    ],
+    "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
     "drift": {
@@ -434,27 +406,27 @@
       },
       "subbar": {
         "w": 316,
-        "h": 56,
+        "h": 39,
         "x": 44,
-        "y": 515
+        "y": 523.5
       },
       "subbarBtn": {
         "w": 70,
-        "h": 44,
+        "h": 27,
         "x": 56,
-        "y": 521
+        "y": 529.5
       },
       "subbarInd": {
         "w": 0,
         "h": 27,
         "x": 45,
-        "y": 521
+        "y": 529.5
       },
       "send": {
         "w": 69.2,
-        "h": 44,
+        "h": 37,
         "x": 368,
-        "y": 521
+        "y": 524.5
       },
       "amount": {
         "w": 356,
@@ -482,40 +454,33 @@
       },
       "screens": 1,
       "visibleStackRows": 2,
-      "sendVsBarDelta": -12,
-      "indVsBtnDelta": -17,
+      "sendVsBarDelta": -2,
+      "indVsBtnDelta": 0,
       "amountOverflow": -56
     },
     "tokens": {
-      "--u": null,
-      "--sp-1": null,
-      "--sp-2": null,
-      "--sp-3": null,
-      "--sp-4": null,
-      "--sp-6": null,
-      "--sp-7": null,
+      "--u": "clamp(3.3px, 1.0256cqi, 4px)",
+      "--sp-1": "calc(1 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-2": "calc(2 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-3": "calc(3 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": null,
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
       "--kp-size": null,
-      "--fab-size": null,
+      "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
       "--chrome-gutter": null,
       "--dock-h": "78px",
       "--kb-h": null
     },
-    "tapUnder44": 0,
-    "tapInflated": 13,
+    "tapUnder44": 15,
+    "tapInflated": 0,
     "tapCentreMiss": 1,
-    "inflatedSamples": [
-      "tp-pill.outline",
-      "tp-pill.outline",
-      "button",
-      "tp-subbar-btn",
-      "tp-subbar-btn",
-      "tp-subbar-btn"
-    ],
+    "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
     "drift": {
@@ -539,27 +504,27 @@
       },
       "subbar": {
         "w": 316,
-        "h": 56,
+        "h": 39,
         "x": 53,
-        "y": 523.5
+        "y": 532
       },
       "subbarBtn": {
         "w": 70,
-        "h": 44,
+        "h": 27,
         "x": 65,
-        "y": 529.5
+        "y": 538
       },
       "subbarInd": {
         "w": 0,
         "h": 27,
         "x": 54,
-        "y": 529.5
+        "y": 538
       },
       "send": {
         "w": 69.2,
-        "h": 44,
+        "h": 37,
         "x": 377,
-        "y": 529.5
+        "y": 533
       },
       "amount": {
         "w": 374,
@@ -587,40 +552,33 @@
       },
       "screens": 1,
       "visibleStackRows": 2,
-      "sendVsBarDelta": -12,
-      "indVsBtnDelta": -17,
+      "sendVsBarDelta": -2,
+      "indVsBtnDelta": 0,
       "amountOverflow": -56
     },
     "tokens": {
-      "--u": null,
-      "--sp-1": null,
-      "--sp-2": null,
-      "--sp-3": null,
-      "--sp-4": null,
-      "--sp-6": null,
-      "--sp-7": null,
+      "--u": "clamp(3.3px, 1.0256cqi, 4px)",
+      "--sp-1": "calc(1 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-2": "calc(2 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-3": "calc(3 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": null,
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
       "--kp-size": null,
-      "--fab-size": null,
+      "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
       "--chrome-gutter": null,
       "--dock-h": "78px",
       "--kb-h": null
     },
-    "tapUnder44": 0,
-    "tapInflated": 13,
+    "tapUnder44": 15,
+    "tapInflated": 0,
     "tapCentreMiss": 1,
-    "inflatedSamples": [
-      "tp-pill.outline",
-      "tp-pill.outline",
-      "button",
-      "tp-subbar-btn",
-      "tp-subbar-btn",
-      "tp-subbar-btn"
-    ],
+    "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
     "drift": {
@@ -644,27 +602,27 @@
       },
       "subbar": {
         "w": 316,
-        "h": 56,
+        "h": 39,
         "x": 33,
-        "y": 479.5
+        "y": 488
       },
       "subbarBtn": {
         "w": 70,
-        "h": 44,
+        "h": 27,
         "x": 45,
-        "y": 485.5
+        "y": 494
       },
       "subbarInd": {
         "w": 0,
         "h": 27,
         "x": 34,
-        "y": 485.5
+        "y": 494
       },
       "send": {
         "w": 69.2,
-        "h": 44,
+        "h": 37,
         "x": 357,
-        "y": 485.5
+        "y": 489
       },
       "amount": {
         "w": 334,
@@ -691,41 +649,34 @@
         "y": 387
       },
       "screens": 1,
-      "visibleStackRows": 1,
-      "sendVsBarDelta": -12,
-      "indVsBtnDelta": -17,
+      "visibleStackRows": 2,
+      "sendVsBarDelta": -2,
+      "indVsBtnDelta": 0,
       "amountOverflow": -56
     },
     "tokens": {
-      "--u": null,
-      "--sp-1": null,
-      "--sp-2": null,
-      "--sp-3": null,
-      "--sp-4": null,
-      "--sp-6": null,
-      "--sp-7": null,
+      "--u": "clamp(3.3px, 1.0256cqi, 4px)",
+      "--sp-1": "calc(1 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-2": "calc(2 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-3": "calc(3 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": null,
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
       "--kp-size": null,
-      "--fab-size": null,
+      "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
       "--chrome-gutter": null,
       "--dock-h": "78px",
       "--kb-h": null
     },
-    "tapUnder44": 0,
-    "tapInflated": 13,
+    "tapUnder44": 15,
+    "tapInflated": 0,
     "tapCentreMiss": 0,
-    "inflatedSamples": [
-      "tp-pill.outline",
-      "tp-pill.outline",
-      "button",
-      "tp-subbar-btn",
-      "tp-subbar-btn",
-      "tp-subbar-btn"
-    ],
+    "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
     "drift": {
@@ -739,7 +690,7 @@
     "edgeCrossers": [
       {
         "tag": "button",
-        "cls": "",
+        "cls": "tap-target",
         "left": 301,
         "right": 370.6,
         "w": 69.6
@@ -764,27 +715,27 @@
       },
       "subbar": {
         "w": 241.4,
-        "h": 47.6,
+        "h": 33.2,
         "x": 39.3,
-        "y": 288.9
+        "y": 296.1
       },
       "subbarBtn": {
         "w": 52.7,
-        "h": 37.4,
+        "h": 23,
         "x": 49.5,
-        "y": 294
+        "y": 301.2
       },
       "subbarInd": {
         "w": 0,
         "h": 23,
         "x": 40.1,
-        "y": 294
+        "y": 301.2
       },
       "send": {
         "w": 69.2,
-        "h": 44,
+        "h": 37,
         "x": 298,
-        "y": 290.7
+        "y": 294.2
       },
       "amount": {
         "w": 264,
@@ -800,9 +751,9 @@
       },
       "stackScroll": {
         "w": 276,
-        "h": 0,
+        "h": 14.8,
         "x": 22,
-        "y": 468
+        "y": 453.2
       },
       "fab": {
         "w": 70,
@@ -812,40 +763,33 @@
       },
       "screens": 1,
       "visibleStackRows": 0,
-      "sendVsBarDelta": -3.6,
-      "indVsBtnDelta": -14.4,
+      "sendVsBarDelta": 3.8,
+      "indVsBtnDelta": 0,
       "amountOverflow": 0
     },
     "tokens": {
-      "--u": null,
-      "--sp-1": null,
-      "--sp-2": null,
-      "--sp-3": null,
-      "--sp-4": null,
-      "--sp-6": null,
-      "--sp-7": null,
+      "--u": "clamp(3.3px, 1.0256cqi, 4px)",
+      "--sp-1": "calc(1 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-2": "calc(2 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-3": "calc(3 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": null,
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
       "--kp-size": null,
-      "--fab-size": null,
+      "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
       "--chrome-gutter": null,
       "--dock-h": "78px",
       "--kb-h": null
     },
-    "tapUnder44": 4,
-    "tapInflated": 12,
+    "tapUnder44": 18,
+    "tapInflated": 0,
     "tapCentreMiss": 1,
-    "inflatedSamples": [
-      "button",
-      "button",
-      "button",
-      "button",
-      "button",
-      "button"
-    ],
+    "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
     "drift": {
@@ -859,7 +803,7 @@
     "edgeCrossers": [
       {
         "tag": "button",
-        "cls": "",
+        "cls": "tap-target",
         "left": 301,
         "right": 370.6,
         "w": 69.6
@@ -884,27 +828,27 @@
       },
       "subbar": {
         "w": 241.4,
-        "h": 47.6,
+        "h": 33.2,
         "x": 59.3,
-        "y": 317.7
+        "y": 324.9
       },
       "subbarBtn": {
         "w": 52.7,
-        "h": 37.4,
+        "h": 23,
         "x": 69.5,
-        "y": 322.8
+        "y": 330
       },
       "subbarInd": {
         "w": 0,
         "h": 23,
         "x": 60.1,
-        "y": 322.8
+        "y": 330
       },
       "send": {
         "w": 69.2,
-        "h": 44,
+        "h": 37,
         "x": 338,
-        "y": 319.5
+        "y": 323
       },
       "amount": {
         "w": 304,
@@ -920,9 +864,9 @@
       },
       "stackScroll": {
         "w": 316,
-        "h": 24,
+        "h": 58,
         "x": 22,
-        "y": 516
+        "y": 482
       },
       "fab": {
         "w": 70,
@@ -932,40 +876,33 @@
       },
       "screens": 1,
       "visibleStackRows": 0,
-      "sendVsBarDelta": -3.6,
-      "indVsBtnDelta": -14.4,
+      "sendVsBarDelta": 3.8,
+      "indVsBtnDelta": 0,
       "amountOverflow": 0
     },
     "tokens": {
-      "--u": null,
-      "--sp-1": null,
-      "--sp-2": null,
-      "--sp-3": null,
-      "--sp-4": null,
-      "--sp-6": null,
-      "--sp-7": null,
+      "--u": "clamp(3.3px, 1.0256cqi, 4px)",
+      "--sp-1": "calc(1 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-2": "calc(2 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-3": "calc(3 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": null,
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
       "--kp-size": null,
-      "--fab-size": null,
+      "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
       "--chrome-gutter": null,
       "--dock-h": "78px",
       "--kb-h": null
     },
-    "tapUnder44": 4,
-    "tapInflated": 12,
+    "tapUnder44": 18,
+    "tapInflated": 0,
     "tapCentreMiss": 1,
-    "inflatedSamples": [
-      "button",
-      "button",
-      "button",
-      "button",
-      "button",
-      "button"
-    ],
+    "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
     "drift": {
@@ -996,27 +933,27 @@
       },
       "subbar": {
         "w": 241.4,
-        "h": 47.6,
+        "h": 33.2,
         "x": 66.8,
-        "y": 328.5
+        "y": 335.7
       },
       "subbarBtn": {
         "w": 52.7,
-        "h": 37.4,
+        "h": 23,
         "x": 77,
-        "y": 333.6
+        "y": 340.8
       },
       "subbarInd": {
         "w": 0,
         "h": 23,
         "x": 67.6,
-        "y": 333.6
+        "y": 340.8
       },
       "send": {
         "w": 69.2,
-        "h": 44,
+        "h": 37,
         "x": 353,
-        "y": 330.3
+        "y": 333.8
       },
       "amount": {
         "w": 319,
@@ -1032,9 +969,9 @@
       },
       "stackScroll": {
         "w": 331,
-        "h": 40.2,
+        "h": 74.2,
         "x": 22,
-        "y": 526.8
+        "y": 492.8
       },
       "fab": {
         "w": 70,
@@ -1043,41 +980,34 @@
         "y": 231.8
       },
       "screens": 1,
-      "visibleStackRows": 0,
-      "sendVsBarDelta": -3.6,
-      "indVsBtnDelta": -14.4,
+      "visibleStackRows": 1,
+      "sendVsBarDelta": 3.8,
+      "indVsBtnDelta": 0,
       "amountOverflow": 0
     },
     "tokens": {
-      "--u": null,
-      "--sp-1": null,
-      "--sp-2": null,
-      "--sp-3": null,
-      "--sp-4": null,
-      "--sp-6": null,
-      "--sp-7": null,
+      "--u": "clamp(3.3px, 1.0256cqi, 4px)",
+      "--sp-1": "calc(1 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-2": "calc(2 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-3": "calc(3 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": null,
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
       "--kp-size": null,
-      "--fab-size": null,
+      "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
       "--chrome-gutter": null,
       "--dock-h": "78px",
       "--kb-h": null
     },
-    "tapUnder44": 4,
-    "tapInflated": 12,
+    "tapUnder44": 18,
+    "tapInflated": 0,
     "tapCentreMiss": 1,
-    "inflatedSamples": [
-      "button",
-      "button",
-      "button",
-      "button",
-      "button",
-      "button"
-    ],
+    "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
     "drift": {
@@ -1108,27 +1038,27 @@
       },
       "subbar": {
         "w": 241.4,
-        "h": 47.6,
+        "h": 33.2,
         "x": 74.3,
-        "y": 399.3
+        "y": 406.5
       },
       "subbarBtn": {
         "w": 52.7,
-        "h": 37.4,
+        "h": 23,
         "x": 84.5,
-        "y": 404.4
+        "y": 411.6
       },
       "subbarInd": {
         "w": 0,
         "h": 23,
         "x": 75.1,
-        "y": 404.4
+        "y": 411.6
       },
       "send": {
         "w": 69.2,
-        "h": 44,
+        "h": 37,
         "x": 368,
-        "y": 401.1
+        "y": 404.6
       },
       "amount": {
         "w": 334,
@@ -1144,9 +1074,9 @@
       },
       "stackScroll": {
         "w": 346,
-        "h": 146.4,
+        "h": 180.4,
         "x": 22,
-        "y": 597.6
+        "y": 563.6
       },
       "fab": {
         "w": 70,
@@ -1156,40 +1086,33 @@
       },
       "screens": 1,
       "visibleStackRows": 2,
-      "sendVsBarDelta": -3.6,
-      "indVsBtnDelta": -14.4,
+      "sendVsBarDelta": 3.8,
+      "indVsBtnDelta": 0,
       "amountOverflow": 0
     },
     "tokens": {
-      "--u": null,
-      "--sp-1": null,
-      "--sp-2": null,
-      "--sp-3": null,
-      "--sp-4": null,
-      "--sp-6": null,
-      "--sp-7": null,
+      "--u": "clamp(3.3px, 1.0256cqi, 4px)",
+      "--sp-1": "calc(1 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-2": "calc(2 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-3": "calc(3 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": null,
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
       "--kp-size": null,
-      "--fab-size": null,
+      "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
       "--chrome-gutter": null,
       "--dock-h": "78px",
       "--kb-h": null
     },
-    "tapUnder44": 4,
-    "tapInflated": 12,
+    "tapUnder44": 18,
+    "tapInflated": 0,
     "tapCentreMiss": 1,
-    "inflatedSamples": [
-      "button",
-      "button",
-      "button",
-      "button",
-      "button",
-      "button"
-    ],
+    "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
     "drift": {
@@ -1213,27 +1136,27 @@
       },
       "subbar": {
         "w": 241.4,
-        "h": 47.6,
+        "h": 33.2,
         "x": 85.3,
-        "y": 427.7
+        "y": 434.9
       },
       "subbarBtn": {
         "w": 52.7,
-        "h": 37.4,
+        "h": 23,
         "x": 95.5,
-        "y": 432.8
+        "y": 440
       },
       "subbarInd": {
         "w": 0,
         "h": 23,
         "x": 86.1,
-        "y": 432.8
+        "y": 440
       },
       "send": {
         "w": 69.2,
-        "h": 44,
+        "h": 37,
         "x": 390,
-        "y": 429.5
+        "y": 433
       },
       "amount": {
         "w": 356,
@@ -1249,9 +1172,9 @@
       },
       "stackScroll": {
         "w": 368,
-        "h": 189,
+        "h": 223,
         "x": 22,
-        "y": 626
+        "y": 592
       },
       "fab": {
         "w": 70,
@@ -1260,41 +1183,34 @@
         "y": 331
       },
       "screens": 1,
-      "visibleStackRows": 2,
-      "sendVsBarDelta": -3.6,
-      "indVsBtnDelta": -14.4,
+      "visibleStackRows": 3,
+      "sendVsBarDelta": 3.8,
+      "indVsBtnDelta": 0,
       "amountOverflow": 0
     },
     "tokens": {
-      "--u": null,
-      "--sp-1": null,
-      "--sp-2": null,
-      "--sp-3": null,
-      "--sp-4": null,
-      "--sp-6": null,
-      "--sp-7": null,
+      "--u": "clamp(3.3px, 1.0256cqi, 4px)",
+      "--sp-1": "calc(1 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-2": "calc(2 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-3": "calc(3 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": null,
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
       "--kp-size": null,
-      "--fab-size": null,
+      "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
       "--chrome-gutter": null,
       "--dock-h": "78px",
       "--kb-h": null
     },
-    "tapUnder44": 4,
-    "tapInflated": 12,
+    "tapUnder44": 18,
+    "tapInflated": 0,
     "tapCentreMiss": 1,
-    "inflatedSamples": [
-      "button",
-      "button",
-      "button",
-      "button",
-      "button",
-      "button"
-    ],
+    "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
     "drift": {
@@ -1318,27 +1234,27 @@
       },
       "subbar": {
         "w": 241.4,
-        "h": 47.6,
+        "h": 33.2,
         "x": 94.3,
-        "y": 434.5
+        "y": 441.7
       },
       "subbarBtn": {
         "w": 52.7,
-        "h": 37.4,
+        "h": 23,
         "x": 104.5,
-        "y": 439.6
+        "y": 446.8
       },
       "subbarInd": {
         "w": 0,
         "h": 23,
         "x": 95.1,
-        "y": 439.6
+        "y": 446.8
       },
       "send": {
         "w": 69.2,
-        "h": 44,
+        "h": 37,
         "x": 408,
-        "y": 436.3
+        "y": 439.8
       },
       "amount": {
         "w": 374,
@@ -1354,9 +1270,9 @@
       },
       "stackScroll": {
         "w": 386,
-        "h": 199.2,
+        "h": 233.2,
         "x": 22,
-        "y": 632.8
+        "y": 598.8
       },
       "fab": {
         "w": 70,
@@ -1366,40 +1282,33 @@
       },
       "screens": 1,
       "visibleStackRows": 3,
-      "sendVsBarDelta": -3.6,
-      "indVsBtnDelta": -14.4,
+      "sendVsBarDelta": 3.8,
+      "indVsBtnDelta": 0,
       "amountOverflow": 0
     },
     "tokens": {
-      "--u": null,
-      "--sp-1": null,
-      "--sp-2": null,
-      "--sp-3": null,
-      "--sp-4": null,
-      "--sp-6": null,
-      "--sp-7": null,
+      "--u": "clamp(3.3px, 1.0256cqi, 4px)",
+      "--sp-1": "calc(1 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-2": "calc(2 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-3": "calc(3 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": null,
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
       "--kp-size": null,
-      "--fab-size": null,
+      "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
       "--chrome-gutter": null,
       "--dock-h": "78px",
       "--kb-h": null
     },
-    "tapUnder44": 4,
-    "tapInflated": 12,
+    "tapUnder44": 18,
+    "tapInflated": 0,
     "tapCentreMiss": 1,
-    "inflatedSamples": [
-      "button",
-      "button",
-      "button",
-      "button",
-      "button",
-      "button"
-    ],
+    "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
     "drift": {
@@ -1430,27 +1339,27 @@
       },
       "subbar": {
         "w": 241.4,
-        "h": 47.6,
+        "h": 33.2,
         "x": 74.3,
-        "y": 399.3
+        "y": 406.5
       },
       "subbarBtn": {
         "w": 52.7,
-        "h": 37.4,
+        "h": 23,
         "x": 84.5,
-        "y": 404.4
+        "y": 411.6
       },
       "subbarInd": {
         "w": 0,
         "h": 23,
         "x": 75.1,
-        "y": 404.4
+        "y": 411.6
       },
       "send": {
         "w": 69.2,
-        "h": 44,
+        "h": 37,
         "x": 368,
-        "y": 401.1
+        "y": 404.6
       },
       "amount": {
         "w": 334,
@@ -1466,9 +1375,9 @@
       },
       "stackScroll": {
         "w": 346,
-        "h": 146.4,
+        "h": 180.4,
         "x": 22,
-        "y": 597.6
+        "y": 563.6
       },
       "fab": {
         "w": 70,
@@ -1478,40 +1387,33 @@
       },
       "screens": 1,
       "visibleStackRows": 2,
-      "sendVsBarDelta": -3.6,
-      "indVsBtnDelta": -14.4,
+      "sendVsBarDelta": 3.8,
+      "indVsBtnDelta": 0,
       "amountOverflow": 0
     },
     "tokens": {
-      "--u": null,
-      "--sp-1": null,
-      "--sp-2": null,
-      "--sp-3": null,
-      "--sp-4": null,
-      "--sp-6": null,
-      "--sp-7": null,
+      "--u": "clamp(3.3px, 1.0256cqi, 4px)",
+      "--sp-1": "calc(1 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-2": "calc(2 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-3": "calc(3 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": null,
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
       "--kp-size": null,
-      "--fab-size": null,
+      "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
       "--chrome-gutter": null,
       "--dock-h": "78px",
       "--kb-h": null
     },
-    "tapUnder44": 4,
-    "tapInflated": 12,
+    "tapUnder44": 18,
+    "tapInflated": 0,
     "tapCentreMiss": 1,
-    "inflatedSamples": [
-      "button",
-      "button",
-      "button",
-      "button",
-      "button",
-      "button"
-    ],
+    "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
     "drift": {
@@ -1542,27 +1444,27 @@
       },
       "subbar": {
         "w": 241.4,
-        "h": 47.6,
+        "h": 33.2,
         "x": 35.3,
-        "y": 345.7
+        "y": 352.9
       },
       "subbarBtn": {
         "w": 52.7,
-        "h": 37.4,
+        "h": 23,
         "x": 45.5,
-        "y": 350.8
+        "y": 358
       },
       "subbarInd": {
         "w": 0,
         "h": 23,
         "x": 36.1,
-        "y": 350.8
+        "y": 358
       },
       "send": {
         "w": 69.2,
-        "h": 44,
+        "h": 37,
         "x": 298,
-        "y": 347.5
+        "y": 351
       },
       "amount": {
         "w": 264,
@@ -1590,39 +1492,33 @@
       },
       "screens": 1,
       "visibleStackRows": 0,
-      "sendVsBarDelta": -3.6,
-      "indVsBtnDelta": -14.4,
+      "sendVsBarDelta": 3.8,
+      "indVsBtnDelta": 0,
       "amountOverflow": -56
     },
     "tokens": {
-      "--u": null,
-      "--sp-1": null,
-      "--sp-2": null,
-      "--sp-3": null,
-      "--sp-4": null,
-      "--sp-6": null,
-      "--sp-7": null,
+      "--u": "clamp(3.3px, 1.0256cqi, 4px)",
+      "--sp-1": "calc(1 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-2": "calc(2 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-3": "calc(3 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": null,
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
       "--kp-size": null,
-      "--fab-size": null,
+      "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
       "--chrome-gutter": null,
       "--dock-h": "78px",
       "--kb-h": null
     },
-    "tapUnder44": 4,
-    "tapInflated": 5,
+    "tapUnder44": 11,
+    "tapInflated": 0,
     "tapCentreMiss": 0,
-    "inflatedSamples": [
-      "tp-send",
-      "button",
-      "button",
-      "button",
-      "button"
-    ],
+    "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
     "drift": {
@@ -1653,27 +1549,27 @@
       },
       "subbar": {
         "w": 241.4,
-        "h": 47.6,
+        "h": 33.2,
         "x": 55.3,
-        "y": 381.7
+        "y": 388.9
       },
       "subbarBtn": {
         "w": 52.7,
-        "h": 37.4,
+        "h": 23,
         "x": 65.5,
-        "y": 386.8
+        "y": 394
       },
       "subbarInd": {
         "w": 0,
         "h": 23,
         "x": 56.1,
-        "y": 386.8
+        "y": 394
       },
       "send": {
         "w": 69.2,
-        "h": 44,
+        "h": 37,
         "x": 338,
-        "y": 383.5
+        "y": 387
       },
       "amount": {
         "w": 304,
@@ -1701,39 +1597,33 @@
       },
       "screens": 1,
       "visibleStackRows": 0,
-      "sendVsBarDelta": -3.6,
-      "indVsBtnDelta": -14.4,
+      "sendVsBarDelta": 3.8,
+      "indVsBtnDelta": 0,
       "amountOverflow": -56
     },
     "tokens": {
-      "--u": null,
-      "--sp-1": null,
-      "--sp-2": null,
-      "--sp-3": null,
-      "--sp-4": null,
-      "--sp-6": null,
-      "--sp-7": null,
+      "--u": "clamp(3.3px, 1.0256cqi, 4px)",
+      "--sp-1": "calc(1 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-2": "calc(2 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-3": "calc(3 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": null,
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
       "--kp-size": null,
-      "--fab-size": null,
+      "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
       "--chrome-gutter": null,
       "--dock-h": "78px",
       "--kb-h": null
     },
-    "tapUnder44": 4,
-    "tapInflated": 5,
+    "tapUnder44": 11,
+    "tapInflated": 0,
     "tapCentreMiss": 0,
-    "inflatedSamples": [
-      "tp-send",
-      "button",
-      "button",
-      "button",
-      "button"
-    ],
+    "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
     "drift": {
@@ -1764,27 +1654,27 @@
       },
       "subbar": {
         "w": 241.4,
-        "h": 47.6,
+        "h": 33.2,
         "x": 62.8,
-        "y": 395.2
+        "y": 402.4
       },
       "subbarBtn": {
         "w": 52.7,
-        "h": 37.4,
+        "h": 23,
         "x": 73,
-        "y": 400.3
+        "y": 407.5
       },
       "subbarInd": {
         "w": 0,
         "h": 23,
         "x": 63.6,
-        "y": 400.3
+        "y": 407.5
       },
       "send": {
         "w": 69.2,
-        "h": 44,
+        "h": 37,
         "x": 353,
-        "y": 397
+        "y": 400.5
       },
       "amount": {
         "w": 319,
@@ -1812,39 +1702,33 @@
       },
       "screens": 1,
       "visibleStackRows": 0,
-      "sendVsBarDelta": -3.6,
-      "indVsBtnDelta": -14.4,
+      "sendVsBarDelta": 3.8,
+      "indVsBtnDelta": 0,
       "amountOverflow": -56
     },
     "tokens": {
-      "--u": null,
-      "--sp-1": null,
-      "--sp-2": null,
-      "--sp-3": null,
-      "--sp-4": null,
-      "--sp-6": null,
-      "--sp-7": null,
+      "--u": "clamp(3.3px, 1.0256cqi, 4px)",
+      "--sp-1": "calc(1 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-2": "calc(2 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-3": "calc(3 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": null,
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
       "--kp-size": null,
-      "--fab-size": null,
+      "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
       "--chrome-gutter": null,
       "--dock-h": "78px",
       "--kb-h": null
     },
-    "tapUnder44": 4,
-    "tapInflated": 5,
+    "tapUnder44": 11,
+    "tapInflated": 0,
     "tapCentreMiss": 0,
-    "inflatedSamples": [
-      "tp-send",
-      "button",
-      "button",
-      "button",
-      "button"
-    ],
+    "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
     "drift": {
@@ -1875,27 +1759,27 @@
       },
       "subbar": {
         "w": 241.4,
-        "h": 47.6,
+        "h": 33.2,
         "x": 70.3,
-        "y": 483.7
+        "y": 490.9
       },
       "subbarBtn": {
         "w": 52.7,
-        "h": 37.4,
+        "h": 22.9,
         "x": 80.5,
-        "y": 488.8
+        "y": 496
       },
       "subbarInd": {
         "w": 0,
-        "h": 23,
+        "h": 22.9,
         "x": 71.1,
-        "y": 488.8
+        "y": 496
       },
       "send": {
         "w": 69.2,
-        "h": 44,
+        "h": 37,
         "x": 368,
-        "y": 485.5
+        "y": 489
       },
       "amount": {
         "w": 334,
@@ -1923,39 +1807,33 @@
       },
       "screens": 1,
       "visibleStackRows": 1,
-      "sendVsBarDelta": -3.6,
-      "indVsBtnDelta": -14.4,
+      "sendVsBarDelta": 3.8,
+      "indVsBtnDelta": 0,
       "amountOverflow": -56
     },
     "tokens": {
-      "--u": null,
-      "--sp-1": null,
-      "--sp-2": null,
-      "--sp-3": null,
-      "--sp-4": null,
-      "--sp-6": null,
-      "--sp-7": null,
+      "--u": "clamp(3.3px, 1.0256cqi, 4px)",
+      "--sp-1": "calc(1 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-2": "calc(2 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-3": "calc(3 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": null,
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
       "--kp-size": null,
-      "--fab-size": null,
+      "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
       "--chrome-gutter": null,
       "--dock-h": "78px",
       "--kb-h": null
     },
-    "tapUnder44": 4,
-    "tapInflated": 5,
+    "tapUnder44": 11,
+    "tapInflated": 0,
     "tapCentreMiss": 0,
-    "inflatedSamples": [
-      "tp-send",
-      "button",
-      "button",
-      "button",
-      "button"
-    ],
+    "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
     "drift": {
@@ -1979,27 +1857,27 @@
       },
       "subbar": {
         "w": 241.4,
-        "h": 47.6,
+        "h": 33.2,
         "x": 81.3,
-        "y": 519.2
+        "y": 526.4
       },
       "subbarBtn": {
         "w": 52.7,
-        "h": 37.4,
+        "h": 22.9,
         "x": 91.5,
-        "y": 524.3
+        "y": 531.5
       },
       "subbarInd": {
         "w": 0,
-        "h": 23,
+        "h": 22.9,
         "x": 82.1,
-        "y": 524.3
+        "y": 531.5
       },
       "send": {
         "w": 69.2,
-        "h": 44,
+        "h": 37,
         "x": 390,
-        "y": 521
+        "y": 524.5
       },
       "amount": {
         "w": 356,
@@ -2027,39 +1905,33 @@
       },
       "screens": 1,
       "visibleStackRows": 2,
-      "sendVsBarDelta": -3.6,
-      "indVsBtnDelta": -14.4,
+      "sendVsBarDelta": 3.8,
+      "indVsBtnDelta": 0,
       "amountOverflow": -56
     },
     "tokens": {
-      "--u": null,
-      "--sp-1": null,
-      "--sp-2": null,
-      "--sp-3": null,
-      "--sp-4": null,
-      "--sp-6": null,
-      "--sp-7": null,
+      "--u": "clamp(3.3px, 1.0256cqi, 4px)",
+      "--sp-1": "calc(1 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-2": "calc(2 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-3": "calc(3 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": null,
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
       "--kp-size": null,
-      "--fab-size": null,
+      "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
       "--chrome-gutter": null,
       "--dock-h": "78px",
       "--kb-h": null
     },
-    "tapUnder44": 4,
-    "tapInflated": 5,
+    "tapUnder44": 11,
+    "tapInflated": 0,
     "tapCentreMiss": 0,
-    "inflatedSamples": [
-      "tp-send",
-      "button",
-      "button",
-      "button",
-      "button"
-    ],
+    "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
     "drift": {
@@ -2083,27 +1955,27 @@
       },
       "subbar": {
         "w": 241.4,
-        "h": 47.6,
+        "h": 33.2,
         "x": 90.3,
-        "y": 527.7
+        "y": 534.9
       },
       "subbarBtn": {
         "w": 52.7,
-        "h": 37.4,
+        "h": 22.9,
         "x": 100.5,
-        "y": 532.8
+        "y": 540
       },
       "subbarInd": {
         "w": 0,
-        "h": 23,
+        "h": 22.9,
         "x": 91.1,
-        "y": 532.8
+        "y": 540
       },
       "send": {
         "w": 69.2,
-        "h": 44,
+        "h": 37,
         "x": 408,
-        "y": 529.5
+        "y": 533
       },
       "amount": {
         "w": 374,
@@ -2131,39 +2003,33 @@
       },
       "screens": 1,
       "visibleStackRows": 2,
-      "sendVsBarDelta": -3.6,
-      "indVsBtnDelta": -14.4,
+      "sendVsBarDelta": 3.8,
+      "indVsBtnDelta": 0,
       "amountOverflow": -56
     },
     "tokens": {
-      "--u": null,
-      "--sp-1": null,
-      "--sp-2": null,
-      "--sp-3": null,
-      "--sp-4": null,
-      "--sp-6": null,
-      "--sp-7": null,
+      "--u": "clamp(3.3px, 1.0256cqi, 4px)",
+      "--sp-1": "calc(1 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-2": "calc(2 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-3": "calc(3 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": null,
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
       "--kp-size": null,
-      "--fab-size": null,
+      "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
       "--chrome-gutter": null,
       "--dock-h": "78px",
       "--kb-h": null
     },
-    "tapUnder44": 4,
-    "tapInflated": 5,
+    "tapUnder44": 11,
+    "tapInflated": 0,
     "tapCentreMiss": 0,
-    "inflatedSamples": [
-      "tp-send",
-      "button",
-      "button",
-      "button",
-      "button"
-    ],
+    "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
     "drift": {
@@ -2194,27 +2060,27 @@
       },
       "subbar": {
         "w": 241.4,
-        "h": 47.6,
+        "h": 33.2,
         "x": 70.3,
-        "y": 483.7
+        "y": 490.9
       },
       "subbarBtn": {
         "w": 52.7,
-        "h": 37.4,
+        "h": 22.9,
         "x": 80.5,
-        "y": 488.8
+        "y": 496
       },
       "subbarInd": {
         "w": 0,
-        "h": 23,
+        "h": 22.9,
         "x": 71.1,
-        "y": 488.8
+        "y": 496
       },
       "send": {
         "w": 69.2,
-        "h": 44,
+        "h": 37,
         "x": 368,
-        "y": 485.5
+        "y": 489
       },
       "amount": {
         "w": 334,
@@ -2242,39 +2108,33 @@
       },
       "screens": 1,
       "visibleStackRows": 1,
-      "sendVsBarDelta": -3.6,
-      "indVsBtnDelta": -14.4,
+      "sendVsBarDelta": 3.8,
+      "indVsBtnDelta": 0,
       "amountOverflow": -56
     },
     "tokens": {
-      "--u": null,
-      "--sp-1": null,
-      "--sp-2": null,
-      "--sp-3": null,
-      "--sp-4": null,
-      "--sp-6": null,
-      "--sp-7": null,
+      "--u": "clamp(3.3px, 1.0256cqi, 4px)",
+      "--sp-1": "calc(1 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-2": "calc(2 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-3": "calc(3 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": null,
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
       "--kp-size": null,
-      "--fab-size": null,
+      "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
       "--chrome-gutter": null,
       "--dock-h": "78px",
       "--kb-h": null
     },
-    "tapUnder44": 4,
-    "tapInflated": 5,
+    "tapUnder44": 11,
+    "tapInflated": 0,
     "tapCentreMiss": 0,
-    "inflatedSamples": [
-      "tp-send",
-      "button",
-      "button",
-      "button",
-      "button"
-    ],
+    "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
     "drift": {

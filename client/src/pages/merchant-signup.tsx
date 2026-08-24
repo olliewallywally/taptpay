@@ -230,11 +230,11 @@ export default function MerchantSignup() {
 
   return (
     <main className="signup-page">
-      <button className="signup-page-back" onClick={() => setLocation("/")}><ArrowLeft /> Back</button>
+      <button className="signup-page-back tap-target" onClick={() => setLocation("/")}><ArrowLeft /> Back</button>
       <div className="signup-shell">
         <div className="signup-brand-row">
           <img src={logoImage} alt="TaptPay" />
-          <p>Already have an account? <button onClick={() => setLocation("/login")}>Sign in</button></p>
+          <p>Already have an account? <button className="tap-target" onClick={() => setLocation("/login")}>Sign in</button></p>
         </div>
 
         <Stepper

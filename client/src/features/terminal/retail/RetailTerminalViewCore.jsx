@@ -122,7 +122,7 @@ function SubBar({ activeIdx = -1, onPick, compact = false }) {
           const ic = active ? BLUE : 'rgba(4,13,109,0.55)';
           return (
             <button key={id} ref={el => (btnRefs.current[i] = el)}
-              className={`tp-subbar-btn${active ? ' active' : ''}`}
+              className={`tp-subbar-btn tap-target${active ? ' active' : ''}`}
               onClick={() => onPick?.(i)} aria-label={label} data-demo-id={`retail-mode-${id}`}>
               <Icon sz={20} c={ic} />
               {active && <span className="tp-subbar-label">{label}</span>}
@@ -136,7 +136,7 @@ function SubBar({ activeIdx = -1, onPick, compact = false }) {
 
 function SendBtn({ onClick }) {
   return (
-    <button className="tp-send" onClick={onClick} aria-label="send" data-demo-id="retail-create-sale">
+    <button className="tp-send tap-target" onClick={onClick} aria-label="send" data-demo-id="retail-create-sale">
       <span className="tp-send-circle"><Ic.Arrow /></span>
       <span className="tp-send-label">send</span>
     </button>
@@ -223,7 +223,7 @@ function ActiveStack({ items, status = 'awaiting payment', onItemClick, onExpand
     <div>
       <div className="tp-stack-hdr">
         <div className="tp-stack-title">active stack</div>
-        <button onClick={onExpand} data-demo-id="retail-stack-expand" aria-label="expand active stack" style={{ color: BLUE, display: 'flex', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}><Ic.ChevR /></button>
+        <button className="tap-target" onClick={onExpand} data-demo-id="retail-stack-expand" aria-label="expand active stack" style={{ color: BLUE, display: 'flex', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}><Ic.ChevR /></button>
       </div>
       <div className="tp-stack-card">
         {items.length === 0 ? (
@@ -329,9 +329,9 @@ function MainTerminal({ state, go, paywaveOn, togglePaywave, onItemClick, showPa
         <div className="tp-amount" style={{ fontSize: 88, color: BLUE }}>{fmt(total)}</div>
         <div style={{ display: 'flex', gap: 8, marginTop: 22 }}>
           {showPaywave && (
-            <button className={`tp-pill${paywaveOn ? ' solid' : ' outline'}`} onClick={togglePaywave} data-demo-id="retail-paywave">paywave</button>
+            <button className={`tp-pill tap-target${paywaveOn ? ' solid' : ' outline'}`} onClick={togglePaywave} data-demo-id="retail-paywave">paywave</button>
           )}
-          <button className="tp-pill outline" style={{ marginLeft: 10 }} onClick={() => go('boards')} data-demo-id="retail-boards">boards</button>
+          <button className="tp-pill outline tap-target" style={{ marginLeft: 10 }} onClick={() => go('boards')} data-demo-id="retail-boards">boards</button>
         </div>
         <div style={{ marginTop: 33, color: BLUE, fontWeight: 500, fontSize: 18 }}>{line || 'no items yet'}</div>
       </div>
@@ -360,9 +360,9 @@ function PendingTerminal({ state, go, paywaveOn, togglePaywave, onItemClick, sho
         <div className="tp-amount" style={{ fontSize: 88, color: BLUE }}>{fmt(total)}</div>
         <div style={{ display: 'flex', gap: 8, marginTop: 22 }}>
           {showPaywave && (
-            <button className={`tp-pill${paywaveOn ? ' solid' : ' outline'}`} onClick={togglePaywave} data-demo-id="retail-paywave">paywave</button>
+            <button className={`tp-pill tap-target${paywaveOn ? ' solid' : ' outline'}`} onClick={togglePaywave} data-demo-id="retail-paywave">paywave</button>
           )}
-          <button className="tp-pill outline" style={{ marginLeft: 10 }} onClick={() => go('boards')} data-demo-id="retail-boards">boards</button>
+          <button className="tp-pill outline tap-target" style={{ marginLeft: 10 }} onClick={() => go('boards')} data-demo-id="retail-boards">boards</button>
         </div>
         <div style={{ marginTop: 33, fontWeight: 500, fontSize: 18, color: BLUE, lineHeight: 1.25 }}>
           {pending?.name || '—'}
@@ -1482,4 +1482,3 @@ export default function RetailTerminalViewCore({
    Lives in ./retail-terminal-view.css, scoped under `.retail-terminal-view`.
    It was an unscoped `<style>{TP_CSS}</style>` here until phase 2 of
    docs/PLAN-2026-08-17-mobile-responsive-ui.md §5.1 — see that file's header. */
-

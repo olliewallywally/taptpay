@@ -365,6 +365,7 @@ export function TerminalDockView({ mode, activeId, onPick, placement = "fixed", 
     <nav ref={navRef} aria-label="Merchant navigation" data-demo-id="terminal-dock" data-terminal-dock-mode={mode} style={{ position: placement, bottom: 0, left: 0, right: 0, display: "flex", justifyContent: "center", paddingBottom: "max(20px, env(safe-area-inset-bottom, 20px))", zIndex: 60, pointerEvents: "none" }}>
       <div style={{ position: "relative", width: navWidth, height: 58 - 14 * visualT, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "auto", transition: dragCurve ?? "height 0.5s var(--m-ease-out)", overflow: "visible" }}>
         <button
+          className="tap-target"
           ref={handleRef}
           type="button"
           aria-expanded={!collapsed}
@@ -398,7 +399,7 @@ export function TerminalDockView({ mode, activeId, onPick, placement = "fixed", 
           <div aria-hidden="true" style={{ position: "absolute", left: indLeft, top: -5, width: 65, height: 58, background: palette.dock, borderRadius: 29, boxShadow: "0 4px 20px rgba(0,0,0,0.45)", pointerEvents: "none", willChange: "left", transition: animating ? "left 0.45s cubic-bezier(0.34,1.56,0.64,1)" : "none", zIndex: 0 }} />
           {items.map(({ id, path, Icon }, index) => {
             const isActive = index === activeIdx;
-            return <button key={id} ref={(element) => { btnRefs.current[index] = element; }} type="button" onClick={() => onPick({ id, path })} aria-label={id} aria-current={isActive ? "page" : undefined} data-demo-id={`dock-${id}`} style={{ position: "relative", zIndex: 1, background: "none", border: "none", padding: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transform: isActive ? "scale(1.15)" : "scale(1)", transition: "transform 0.25s ease", WebkitTapHighlightColor: "transparent" }}><Icon c={isActive ? palette.active : palette.dim} /></button>;
+            return <button className="tap-target" key={id} ref={(element) => { btnRefs.current[index] = element; }} type="button" onClick={() => onPick({ id, path })} aria-label={id} aria-current={isActive ? "page" : undefined} data-demo-id={`dock-${id}`} style={{ position: "relative", zIndex: 1, background: "none", border: "none", padding: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transform: isActive ? "scale(1.15)" : "scale(1)", transition: "transform 0.25s ease", WebkitTapHighlightColor: "transparent" }}><Icon c={isActive ? palette.active : palette.dim} /></button>;
           })}
         </div>
 

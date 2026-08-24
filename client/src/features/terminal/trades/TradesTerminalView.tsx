@@ -102,7 +102,7 @@ function SubBar({ activeIdx = -1, onPick, compact = false, hideLabel = false }: 
           const ic = active ? BLUE : 'rgba(244,244,244,0.55)';
           return (
             <button key={id} ref={(el: any) => (btnRefs.current[i] = el)}
-              className={`tp-subbar-btn${active ? ' active' : ''}`}
+              className={`tp-subbar-btn tap-target${active ? ' active' : ''}`}
               data-demo-id={`trades-mode-${id}`}
               onClick={() => onPick?.(i)} aria-label={label}>
               <Icon sz={18} c={ic} />
@@ -117,7 +117,7 @@ function SubBar({ activeIdx = -1, onPick, compact = false, hideLabel = false }: 
 
 function SendBtn({ onClick }: any) {
   return (
-    <button className="tp-send" onClick={onClick} aria-label="send">
+    <button className="tp-send tap-target" onClick={onClick} aria-label="send">
       <span className="tp-send-circle"><Ic.Arrow /></span>
       <span className="tp-send-label">send</span>
     </button>
