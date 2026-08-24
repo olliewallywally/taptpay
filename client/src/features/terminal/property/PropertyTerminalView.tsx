@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { WireframeLiquidButton } from "@/components/wireframe-liquid-button";
 import { setDockCollapse } from "@/features/navigation/dock-collapse-store";
+import { SegmentedBar } from "../SegmentedBar";
 
 import "../terminal-keyframes.css";
 import "../terminal-tokens.css";
@@ -102,62 +103,9 @@ function fmtDate(d: any): string {
 }
 
 function SubBar({ activeIdx = -1, onPick, compact = false, hideLabel = false }: any) {
-  const trackRef  = useRef<HTMLDivElement>(null);
-  const btnRefs   = useRef<(HTMLElement | null)[]>([]);
-  const mounted   = useRef(false);
-  const [ind, setInd]       = useState({ x: 0, w: 0, on: false });
-  const [animate, setAnim]  = useState(false);
-
-  const measure = (i: number) => {
-    const el = btnRefs.current[i];
-    if (!el) return { x: 0, w: 0 };
-    // Use offsetLeft/offsetWidth, not getBoundingClientRect: the indicator lives
-    // inside .tp-subbar's `transform: scale(0.85)`, so its inline left/width are in
-    // the track's PRE-scale local space. getBoundingClientRect returns post-scale
-    // screen pixels, which would mis-position the pill (error grows toward the right).
-    // offsetLeft/offsetWidth are relative to the offsetParent (.tp-subbar) and unscaled.
-    return { x: el.offsetLeft, w: el.offsetWidth };
-  };
-
-  useEffect(() => {
-    const tick = () => {
-      if (activeIdx < 0) { setInd(p => ({ ...p, on: false })); }
-      else { const m = measure(activeIdx); setInd({ x: m.x, w: m.w, on: true }); }
-    };
-    if (!mounted.current) {
-      // Triple-RAF on first mount: wait for subbar layout + label render before measuring
-      requestAnimationFrame(() => requestAnimationFrame(() => { tick(); mounted.current = true; }));
-    } else {
-      setAnim(true);
-      // Triple-RAF on update: label renders in same commit, layout settles in 3 frames
-      requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(tick)));
-      const t = setTimeout(() => setAnim(false), 520);
-      return () => clearTimeout(t);
-    }
-  }, [activeIdx]);
-
-  return (
-    <div className="tp-subbar-wrap">
-      <div className={`tp-subbar${compact ? ' compact' : ''}`} ref={trackRef}>
-        <div className={`tp-subbar-ind${animate ? ' animate' : ''}${ind.on ? ' on' : ''}`} style={{ left: ind.x, width: ind.w }} />
-        {SUBBAR_ITEMS.map(({ id, label, Icon }, i) => {
-          const active = activeIdx === i;
-          // Active icon: light blue — visible against the navy indicator that sits above the button.
-          // Inactive icon: dimmed navy — visible against the light-blue subbar background.
-          const ic = active ? BLUE : 'rgba(4,13,109,0.55)';
-          return (
-            <button key={id} ref={(el: any) => (btnRefs.current[i] = el)}
-              className={`tp-subbar-btn tap-target${active ? ' active' : ''}`}
-              data-demo-id={`property-mode-${id}`}
-              onClick={() => onPick?.(i)} aria-label={label}>
-              <Icon sz={18} c={ic} />
-              {active && !hideLabel && <span className="tp-subbar-label">{label}</span>}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
+  return <SegmentedBar items={SUBBAR_ITEMS} activeIdx={activeIdx} onPick={onPick}
+    compact={compact} hideLabel={hideLabel} activeColor={BLUE}
+    inactiveColor="rgba(4,13,109,0.55)" demoIdPrefix="property-mode" />;
 }
 
 function SendBtn({ onClick }: any) {
@@ -310,7 +258,7 @@ function RequestsHome({ invoices, tenants, outstanding, outstandingExpenses = 0,
   );
 }
 
-/* ═══ Split-bill pill — narrow, no icon, same height (37px) as the action bar ═══ */
+/* ═══ Split-bill pill — narrow, no icon, token-locked to the action bar ═══ */
 function SplitPill({ on, onToggle }: any) {
   return (
     <button
@@ -319,9 +267,7 @@ function SplitPill({ on, onToggle }: any) {
       aria-pressed={on}
       style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        // Locked to match the action bar's rendered height (≈39px box × 0.85 scale).
-        // Keep these in sync if the .tp-subbar scale ever changes.
-        height: 33, padding: '0 13px',
+        height: 'var(--bar-h)', padding: '0 13px',
         borderRadius: 999,
         border: `1.5px solid ${on ? NAVY : 'rgba(4,13,109,0.28)'}`,
         background: on ? NAVY : 'transparent',

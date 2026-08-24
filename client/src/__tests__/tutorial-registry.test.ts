@@ -200,9 +200,16 @@ describe("merchant tutorial registry", () => {
 
   it("anchors every phone-terminal spotlight on a class the view still renders", () => {
     const unresolved: string[] = [];
+    const segmentedBarSource = readFileSync(
+      join(__dirname, "..", "features/terminal/SegmentedBar.tsx"),
+      "utf8",
+    );
 
     for (const [pageKey, relativeSource] of Object.entries(MOBILE_TUTORIAL_SOURCES) as Array<[TutorialPageKey, string]>) {
       const source = readFileSync(join(__dirname, "..", relativeSource), "utf8");
+      const renderedSource = source.includes("SegmentedBar")
+        ? `${source}\n${segmentedBarSource}`
+        : source;
 
       for (const step of tutorialStepsForDevice(pageKey, "mobile")) {
         for (const selector of [step.target, step.fallbackTarget].filter(Boolean) as string[]) {
@@ -210,7 +217,7 @@ describe("merchant tutorial registry", () => {
           if (cssClass) {
             // Matches className="tp-subbar", className={`tp-subbar ...`} and
             // the `tp-subbar${cond ? ...}` template forms the views all use.
-            if (!new RegExp(`\\b${cssClass[1]}\\b`).test(source)) {
+            if (!new RegExp(`\\b${cssClass[1]}\\b`).test(renderedSource)) {
               unresolved.push(`${pageKey}: ${selector} not rendered by ${relativeSource}`);
             }
             continue;
@@ -218,7 +225,7 @@ describe("merchant tutorial registry", () => {
 
           const aria = selector.match(/^\[aria-label="([^"]+)"\]$/);
           expect({ pageKey, selector, recognised: !!aria }).toEqual({ pageKey, selector, recognised: true });
-          if (aria && !source.includes(`aria-label="${aria[1]}"`)) {
+          if (aria && !renderedSource.includes(`aria-label="${aria[1]}"`)) {
             unresolved.push(`${pageKey}: ${selector} not rendered by ${relativeSource}`);
           }
         }

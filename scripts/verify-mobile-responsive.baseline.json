@@ -13,27 +13,36 @@
         "y": 0
       },
       "subbar": {
-        "w": 316,
-        "h": 39,
-        "x": 0,
-        "y": 350
+        "w": 281.3,
+        "h": 32.2,
+        "x": 15.4,
+        "y": 353.4
       },
       "subbarBtn": {
-        "w": 70,
-        "h": 27,
-        "x": 12,
-        "y": 356
+        "w": 62.3,
+        "h": 23.6,
+        "x": 25.4,
+        "y": 357.7
       },
+      "activeSubbarBtn": null,
       "subbarInd": {
-        "w": 0,
-        "h": 27,
-        "x": 1,
-        "y": 356
+        "w": 62.3,
+        "h": 23.6,
+        "x": 25.4,
+        "y": 357.7
       },
+      "activeLabel": null,
       "send": {
         "w": 69.2,
+        "h": 32.2,
+        "x": 304.6,
+        "y": 353.4
+      },
+      "splitPill": null,
+      "actionRow": {
+        "w": 289.3,
         "h": 37,
-        "x": 324,
+        "x": 15.4,
         "y": 351
       },
       "amount": {
@@ -62,8 +71,16 @@
       },
       "screens": 1,
       "visibleStackRows": 0,
-      "sendVsBarDelta": -2,
-      "indVsBtnDelta": 0,
+      "sendVsBarDelta": 0,
+      "indVsBtnDelta": null,
+      "barScrollOverflow": 0,
+      "barScrollFitViolation": 0,
+      "sendHeightViolation": 0,
+      "splitHeightViolation": 0,
+      "indicatorHeightViolation": 0,
+      "indicatorWidthViolation": 0,
+      "indicatorLabelContainmentViolation": 0,
+      "rowViewportFitViolation": 0,
       "amountOverflow": -56
     },
     "tokens": {
@@ -74,7 +91,7 @@
       "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--bar-h": null,
+      "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
@@ -93,7 +110,9 @@
     "tpDuplicateKeyframes": 0,
     "drift": {
       "dx": 0,
-      "dw": 0
+      "dw": 0,
+      "resizedAlignment": null,
+      "restoredAlignment": null
     },
     "pageErrors": 2
   },
@@ -111,27 +130,36 @@
         "y": 0
       },
       "subbar": {
-        "w": 316,
-        "h": 39,
-        "x": 18,
-        "y": 386
+        "w": 300.7,
+        "h": 36,
+        "x": 25.7,
+        "y": 387.5
       },
       "subbarBtn": {
-        "w": 70,
-        "h": 27,
-        "x": 30,
-        "y": 392
+        "w": 66.6,
+        "h": 26.6,
+        "x": 36.8,
+        "y": 392.2
       },
+      "activeSubbarBtn": null,
       "subbarInd": {
-        "w": 0,
-        "h": 27,
-        "x": 19,
-        "y": 392
+        "w": 66.6,
+        "h": 26.6,
+        "x": 36.8,
+        "y": 392.2
       },
+      "activeLabel": null,
       "send": {
         "w": 69.2,
+        "h": 36,
+        "x": 334.3,
+        "y": 387.5
+      },
+      "splitPill": null,
+      "actionRow": {
+        "w": 308.7,
         "h": 37,
-        "x": 342,
+        "x": 25.7,
         "y": 387
       },
       "amount": {
@@ -160,8 +188,16 @@
       },
       "screens": 1,
       "visibleStackRows": 0,
-      "sendVsBarDelta": -2,
-      "indVsBtnDelta": 0,
+      "sendVsBarDelta": 0,
+      "indVsBtnDelta": null,
+      "barScrollOverflow": 0,
+      "barScrollFitViolation": 0,
+      "sendHeightViolation": 0,
+      "splitHeightViolation": 0,
+      "indicatorHeightViolation": 0,
+      "indicatorWidthViolation": 0,
+      "indicatorLabelContainmentViolation": 0,
+      "rowViewportFitViolation": 0,
       "amountOverflow": -56
     },
     "tokens": {
@@ -172,7 +208,7 @@
       "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--bar-h": null,
+      "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
@@ -191,7 +227,9 @@
     "tpDuplicateKeyframes": 0,
     "drift": {
       "dx": 0,
-      "dw": 0
+      "dw": 0,
+      "resizedAlignment": null,
+      "restoredAlignment": null
     },
     "pageErrors": 2
   },
@@ -209,27 +247,36 @@
         "y": 0
       },
       "subbar": {
-        "w": 316,
-        "h": 39,
-        "x": 25.5,
-        "y": 399.5
+        "w": 308.3,
+        "h": 37.5,
+        "x": 29.4,
+        "y": 400.3
       },
       "subbarBtn": {
-        "w": 70,
-        "h": 27,
-        "x": 37.5,
-        "y": 405.5
+        "w": 68.3,
+        "h": 27.8,
+        "x": 40.9,
+        "y": 405.1
       },
+      "activeSubbarBtn": null,
       "subbarInd": {
-        "w": 0,
-        "h": 27,
-        "x": 26.5,
-        "y": 405.5
+        "w": 68.3,
+        "h": 27.8,
+        "x": 40.9,
+        "y": 405.1
       },
+      "activeLabel": null,
       "send": {
         "w": 69.2,
+        "h": 37.5,
+        "x": 345.6,
+        "y": 400.3
+      },
+      "splitPill": null,
+      "actionRow": {
+        "w": 316.3,
         "h": 37,
-        "x": 349.5,
+        "x": 29.4,
         "y": 400.5
       },
       "amount": {
@@ -258,8 +305,16 @@
       },
       "screens": 1,
       "visibleStackRows": 0,
-      "sendVsBarDelta": -2,
-      "indVsBtnDelta": 0,
+      "sendVsBarDelta": 0,
+      "indVsBtnDelta": null,
+      "barScrollOverflow": 0,
+      "barScrollFitViolation": 0,
+      "sendHeightViolation": 0,
+      "splitHeightViolation": 0,
+      "indicatorHeightViolation": 0,
+      "indicatorWidthViolation": 0,
+      "indicatorLabelContainmentViolation": 0,
+      "rowViewportFitViolation": 0,
       "amountOverflow": -56
     },
     "tokens": {
@@ -270,7 +325,7 @@
       "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--bar-h": null,
+      "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
@@ -289,7 +344,9 @@
     "tpDuplicateKeyframes": 0,
     "drift": {
       "dx": 0,
-      "dw": 0
+      "dw": 0,
+      "resizedAlignment": null,
+      "restoredAlignment": null
     },
     "pageErrors": 2
   },
@@ -307,27 +364,36 @@
         "y": 0
       },
       "subbar": {
-        "w": 316,
+        "w": 315.8,
         "h": 39,
-        "x": 33,
+        "x": 33.1,
         "y": 488
       },
       "subbarBtn": {
         "w": 70,
-        "h": 27,
-        "x": 45,
-        "y": 494
+        "h": 29,
+        "x": 45.1,
+        "y": 493
       },
+      "activeSubbarBtn": null,
       "subbarInd": {
-        "w": 0,
-        "h": 27,
-        "x": 34,
-        "y": 494
+        "w": 70,
+        "h": 29,
+        "x": 45.1,
+        "y": 493
       },
+      "activeLabel": null,
       "send": {
         "w": 69.2,
+        "h": 39,
+        "x": 356.9,
+        "y": 488
+      },
+      "splitPill": null,
+      "actionRow": {
+        "w": 323.8,
         "h": 37,
-        "x": 357,
+        "x": 33.1,
         "y": 489
       },
       "amount": {
@@ -356,8 +422,16 @@
       },
       "screens": 1,
       "visibleStackRows": 2,
-      "sendVsBarDelta": -2,
-      "indVsBtnDelta": 0,
+      "sendVsBarDelta": 0,
+      "indVsBtnDelta": null,
+      "barScrollOverflow": 0,
+      "barScrollFitViolation": 0,
+      "sendHeightViolation": 0,
+      "splitHeightViolation": 0,
+      "indicatorHeightViolation": 0,
+      "indicatorWidthViolation": 0,
+      "indicatorLabelContainmentViolation": 0,
+      "rowViewportFitViolation": 0,
       "amountOverflow": -56
     },
     "tokens": {
@@ -368,7 +442,7 @@
       "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--bar-h": null,
+      "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
@@ -387,7 +461,9 @@
     "tpDuplicateKeyframes": 0,
     "drift": {
       "dx": 0,
-      "dw": 0
+      "dw": 0,
+      "resizedAlignment": null,
+      "restoredAlignment": null
     },
     "pageErrors": 2
   },
@@ -412,20 +488,29 @@
       },
       "subbarBtn": {
         "w": 70,
-        "h": 27,
+        "h": 29,
         "x": 56,
-        "y": 529.5
+        "y": 528.5
       },
+      "activeSubbarBtn": null,
       "subbarInd": {
-        "w": 0,
-        "h": 27,
-        "x": 45,
-        "y": 529.5
+        "w": 70,
+        "h": 29,
+        "x": 56,
+        "y": 528.5
       },
+      "activeLabel": null,
       "send": {
         "w": 69.2,
-        "h": 37,
+        "h": 39,
         "x": 368,
+        "y": 523.5
+      },
+      "splitPill": null,
+      "actionRow": {
+        "w": 324,
+        "h": 37,
+        "x": 44,
         "y": 524.5
       },
       "amount": {
@@ -454,8 +539,16 @@
       },
       "screens": 1,
       "visibleStackRows": 2,
-      "sendVsBarDelta": -2,
-      "indVsBtnDelta": 0,
+      "sendVsBarDelta": 0,
+      "indVsBtnDelta": null,
+      "barScrollOverflow": 0,
+      "barScrollFitViolation": 0,
+      "sendHeightViolation": 0,
+      "splitHeightViolation": 0,
+      "indicatorHeightViolation": 0,
+      "indicatorWidthViolation": 0,
+      "indicatorLabelContainmentViolation": 0,
+      "rowViewportFitViolation": 0,
       "amountOverflow": -56
     },
     "tokens": {
@@ -466,7 +559,7 @@
       "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--bar-h": null,
+      "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
@@ -485,7 +578,9 @@
     "tpDuplicateKeyframes": 0,
     "drift": {
       "dx": 0,
-      "dw": 0
+      "dw": 0,
+      "resizedAlignment": null,
+      "restoredAlignment": null
     },
     "pageErrors": 2
   },
@@ -510,20 +605,29 @@
       },
       "subbarBtn": {
         "w": 70,
-        "h": 27,
+        "h": 29,
         "x": 65,
-        "y": 538
+        "y": 537
       },
+      "activeSubbarBtn": null,
       "subbarInd": {
-        "w": 0,
-        "h": 27,
-        "x": 54,
-        "y": 538
+        "w": 70,
+        "h": 29,
+        "x": 65,
+        "y": 537
       },
+      "activeLabel": null,
       "send": {
         "w": 69.2,
-        "h": 37,
+        "h": 39,
         "x": 377,
+        "y": 532
+      },
+      "splitPill": null,
+      "actionRow": {
+        "w": 324,
+        "h": 37,
+        "x": 53,
         "y": 533
       },
       "amount": {
@@ -552,8 +656,16 @@
       },
       "screens": 1,
       "visibleStackRows": 2,
-      "sendVsBarDelta": -2,
-      "indVsBtnDelta": 0,
+      "sendVsBarDelta": 0,
+      "indVsBtnDelta": null,
+      "barScrollOverflow": 0,
+      "barScrollFitViolation": 0,
+      "sendHeightViolation": 0,
+      "splitHeightViolation": 0,
+      "indicatorHeightViolation": 0,
+      "indicatorWidthViolation": 0,
+      "indicatorLabelContainmentViolation": 0,
+      "rowViewportFitViolation": 0,
       "amountOverflow": -56
     },
     "tokens": {
@@ -564,7 +676,7 @@
       "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--bar-h": null,
+      "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
@@ -583,7 +695,9 @@
     "tpDuplicateKeyframes": 0,
     "drift": {
       "dx": 0,
-      "dw": 0
+      "dw": 0,
+      "resizedAlignment": null,
+      "restoredAlignment": null
     },
     "pageErrors": 2
   },
@@ -601,27 +715,36 @@
         "y": 0
       },
       "subbar": {
-        "w": 316,
+        "w": 315.8,
         "h": 39,
-        "x": 33,
+        "x": 33.1,
         "y": 488
       },
       "subbarBtn": {
         "w": 70,
-        "h": 27,
-        "x": 45,
-        "y": 494
+        "h": 29,
+        "x": 45.1,
+        "y": 493
       },
+      "activeSubbarBtn": null,
       "subbarInd": {
-        "w": 0,
-        "h": 27,
-        "x": 34,
-        "y": 494
+        "w": 70,
+        "h": 29,
+        "x": 45.1,
+        "y": 493
       },
+      "activeLabel": null,
       "send": {
         "w": 69.2,
+        "h": 39,
+        "x": 356.9,
+        "y": 488
+      },
+      "splitPill": null,
+      "actionRow": {
+        "w": 323.8,
         "h": 37,
-        "x": 357,
+        "x": 33.1,
         "y": 489
       },
       "amount": {
@@ -650,8 +773,16 @@
       },
       "screens": 1,
       "visibleStackRows": 2,
-      "sendVsBarDelta": -2,
-      "indVsBtnDelta": 0,
+      "sendVsBarDelta": 0,
+      "indVsBtnDelta": null,
+      "barScrollOverflow": 0,
+      "barScrollFitViolation": 0,
+      "sendHeightViolation": 0,
+      "splitHeightViolation": 0,
+      "indicatorHeightViolation": 0,
+      "indicatorWidthViolation": 0,
+      "indicatorLabelContainmentViolation": 0,
+      "rowViewportFitViolation": 0,
       "amountOverflow": -56
     },
     "tokens": {
@@ -662,7 +793,7 @@
       "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--bar-h": null,
+      "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
@@ -681,7 +812,9 @@
     "tpDuplicateKeyframes": 0,
     "drift": {
       "dx": 0,
-      "dw": 0
+      "dw": 0,
+      "resizedAlignment": null,
+      "restoredAlignment": null
     },
     "pageErrors": 3
   },
@@ -714,27 +847,36 @@
         "y": 0
       },
       "subbar": {
-        "w": 241.4,
-        "h": 33.2,
-        "x": 39.3,
-        "y": 296.1
+        "w": 273.3,
+        "h": 32.2,
+        "x": 23.4,
+        "y": 296.6
       },
       "subbarBtn": {
-        "w": 52.7,
-        "h": 23,
-        "x": 49.5,
-        "y": 301.2
+        "w": 60.3,
+        "h": 23.6,
+        "x": 33.4,
+        "y": 300.9
       },
+      "activeSubbarBtn": null,
       "subbarInd": {
-        "w": 0,
-        "h": 23,
-        "x": 40.1,
-        "y": 301.2
+        "w": 60.3,
+        "h": 23.6,
+        "x": 33.4,
+        "y": 300.9
       },
+      "activeLabel": null,
       "send": {
         "w": 69.2,
-        "h": 37,
+        "h": 32.2,
         "x": 298,
+        "y": 296.6
+      },
+      "splitPill": null,
+      "actionRow": {
+        "w": 320,
+        "h": 37,
+        "x": 0,
         "y": 294.2
       },
       "amount": {
@@ -763,8 +905,16 @@
       },
       "screens": 1,
       "visibleStackRows": 0,
-      "sendVsBarDelta": 3.8,
-      "indVsBtnDelta": 0,
+      "sendVsBarDelta": 0,
+      "indVsBtnDelta": null,
+      "barScrollOverflow": 0,
+      "barScrollFitViolation": 0,
+      "sendHeightViolation": 0,
+      "splitHeightViolation": 0,
+      "indicatorHeightViolation": 0,
+      "indicatorWidthViolation": 0,
+      "indicatorLabelContainmentViolation": 0,
+      "rowViewportFitViolation": 0,
       "amountOverflow": 0
     },
     "tokens": {
@@ -775,7 +925,7 @@
       "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--bar-h": null,
+      "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
@@ -794,7 +944,9 @@
     "tpDuplicateKeyframes": 0,
     "drift": {
       "dx": 0,
-      "dw": 0
+      "dw": 0,
+      "resizedAlignment": null,
+      "restoredAlignment": null
     },
     "pageErrors": 2
   },
@@ -827,27 +979,36 @@
         "y": 0
       },
       "subbar": {
-        "w": 241.4,
-        "h": 33.2,
-        "x": 59.3,
-        "y": 324.9
+        "w": 292.7,
+        "h": 36,
+        "x": 33.7,
+        "y": 323.5
       },
       "subbarBtn": {
-        "w": 52.7,
-        "h": 23,
-        "x": 69.5,
-        "y": 330
+        "w": 64.6,
+        "h": 26.6,
+        "x": 44.8,
+        "y": 328.2
       },
+      "activeSubbarBtn": null,
       "subbarInd": {
-        "w": 0,
-        "h": 23,
-        "x": 60.1,
-        "y": 330
+        "w": 64.6,
+        "h": 26.6,
+        "x": 44.8,
+        "y": 328.2
       },
+      "activeLabel": null,
       "send": {
         "w": 69.2,
-        "h": 37,
+        "h": 36,
         "x": 338,
+        "y": 323.5
+      },
+      "splitPill": null,
+      "actionRow": {
+        "w": 360,
+        "h": 37,
+        "x": 0,
         "y": 323
       },
       "amount": {
@@ -876,8 +1037,16 @@
       },
       "screens": 1,
       "visibleStackRows": 0,
-      "sendVsBarDelta": 3.8,
-      "indVsBtnDelta": 0,
+      "sendVsBarDelta": 0,
+      "indVsBtnDelta": null,
+      "barScrollOverflow": 0,
+      "barScrollFitViolation": 0,
+      "sendHeightViolation": 0,
+      "splitHeightViolation": 0,
+      "indicatorHeightViolation": 0,
+      "indicatorWidthViolation": 0,
+      "indicatorLabelContainmentViolation": 0,
+      "rowViewportFitViolation": 0,
       "amountOverflow": 0
     },
     "tokens": {
@@ -888,7 +1057,7 @@
       "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--bar-h": null,
+      "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
@@ -907,7 +1076,9 @@
     "tpDuplicateKeyframes": 0,
     "drift": {
       "dx": 0,
-      "dw": 0
+      "dw": 0,
+      "resizedAlignment": null,
+      "restoredAlignment": null
     },
     "pageErrors": 2
   },
@@ -932,27 +1103,36 @@
         "y": 0
       },
       "subbar": {
-        "w": 241.4,
-        "h": 33.2,
-        "x": 66.8,
-        "y": 335.7
+        "w": 300.3,
+        "h": 37.5,
+        "x": 37.4,
+        "y": 333.6
       },
       "subbarBtn": {
-        "w": 52.7,
-        "h": 23,
-        "x": 77,
-        "y": 340.8
+        "w": 66.3,
+        "h": 27.8,
+        "x": 48.9,
+        "y": 338.4
       },
+      "activeSubbarBtn": null,
       "subbarInd": {
-        "w": 0,
-        "h": 23,
-        "x": 67.6,
-        "y": 340.8
+        "w": 66.3,
+        "h": 27.8,
+        "x": 48.9,
+        "y": 338.4
       },
+      "activeLabel": null,
       "send": {
         "w": 69.2,
-        "h": 37,
+        "h": 37.5,
         "x": 353,
+        "y": 333.6
+      },
+      "splitPill": null,
+      "actionRow": {
+        "w": 375,
+        "h": 37,
+        "x": 0,
         "y": 333.8
       },
       "amount": {
@@ -981,8 +1161,16 @@
       },
       "screens": 1,
       "visibleStackRows": 1,
-      "sendVsBarDelta": 3.8,
-      "indVsBtnDelta": 0,
+      "sendVsBarDelta": 0,
+      "indVsBtnDelta": null,
+      "barScrollOverflow": 0,
+      "barScrollFitViolation": 0,
+      "sendHeightViolation": 0,
+      "splitHeightViolation": 0,
+      "indicatorHeightViolation": 0,
+      "indicatorWidthViolation": 0,
+      "indicatorLabelContainmentViolation": 0,
+      "rowViewportFitViolation": 0,
       "amountOverflow": 0
     },
     "tokens": {
@@ -993,7 +1181,7 @@
       "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--bar-h": null,
+      "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
@@ -1012,7 +1200,9 @@
     "tpDuplicateKeyframes": 0,
     "drift": {
       "dx": 0,
-      "dw": 0
+      "dw": 0,
+      "resizedAlignment": null,
+      "restoredAlignment": null
     },
     "pageErrors": 2
   },
@@ -1037,27 +1227,36 @@
         "y": 0
       },
       "subbar": {
-        "w": 241.4,
-        "h": 33.2,
-        "x": 74.3,
-        "y": 406.5
+        "w": 307.8,
+        "h": 39,
+        "x": 41.1,
+        "y": 403.6
       },
       "subbarBtn": {
-        "w": 52.7,
-        "h": 23,
-        "x": 84.5,
-        "y": 411.6
+        "w": 68,
+        "h": 29,
+        "x": 53.1,
+        "y": 408.6
       },
+      "activeSubbarBtn": null,
       "subbarInd": {
-        "w": 0,
-        "h": 23,
-        "x": 75.1,
-        "y": 411.6
+        "w": 68,
+        "h": 29,
+        "x": 53.1,
+        "y": 408.6
       },
+      "activeLabel": null,
       "send": {
         "w": 69.2,
-        "h": 37,
+        "h": 39,
         "x": 368,
+        "y": 403.6
+      },
+      "splitPill": null,
+      "actionRow": {
+        "w": 390,
+        "h": 37,
+        "x": 0,
         "y": 404.6
       },
       "amount": {
@@ -1086,8 +1285,16 @@
       },
       "screens": 1,
       "visibleStackRows": 2,
-      "sendVsBarDelta": 3.8,
-      "indVsBtnDelta": 0,
+      "sendVsBarDelta": 0,
+      "indVsBtnDelta": null,
+      "barScrollOverflow": 0,
+      "barScrollFitViolation": 0,
+      "sendHeightViolation": 0,
+      "splitHeightViolation": 0,
+      "indicatorHeightViolation": 0,
+      "indicatorWidthViolation": 0,
+      "indicatorLabelContainmentViolation": 0,
+      "rowViewportFitViolation": 0,
       "amountOverflow": 0
     },
     "tokens": {
@@ -1098,7 +1305,7 @@
       "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--bar-h": null,
+      "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
@@ -1117,7 +1324,9 @@
     "tpDuplicateKeyframes": 0,
     "drift": {
       "dx": 0,
-      "dw": 0
+      "dw": 0,
+      "resizedAlignment": null,
+      "restoredAlignment": null
     },
     "pageErrors": 2
   },
@@ -1135,27 +1344,36 @@
         "y": 0
       },
       "subbar": {
-        "w": 241.4,
-        "h": 33.2,
-        "x": 85.3,
-        "y": 434.9
+        "w": 308,
+        "h": 39,
+        "x": 52,
+        "y": 432
       },
       "subbarBtn": {
-        "w": 52.7,
-        "h": 23,
-        "x": 95.5,
-        "y": 440
+        "w": 68,
+        "h": 29,
+        "x": 64,
+        "y": 437
       },
+      "activeSubbarBtn": null,
       "subbarInd": {
-        "w": 0,
-        "h": 23,
-        "x": 86.1,
-        "y": 440
+        "w": 68,
+        "h": 29,
+        "x": 64,
+        "y": 437
       },
+      "activeLabel": null,
       "send": {
         "w": 69.2,
-        "h": 37,
+        "h": 39,
         "x": 390,
+        "y": 432
+      },
+      "splitPill": null,
+      "actionRow": {
+        "w": 412,
+        "h": 37,
+        "x": 0,
         "y": 433
       },
       "amount": {
@@ -1184,8 +1402,16 @@
       },
       "screens": 1,
       "visibleStackRows": 3,
-      "sendVsBarDelta": 3.8,
-      "indVsBtnDelta": 0,
+      "sendVsBarDelta": 0,
+      "indVsBtnDelta": null,
+      "barScrollOverflow": 0,
+      "barScrollFitViolation": 0,
+      "sendHeightViolation": 0,
+      "splitHeightViolation": 0,
+      "indicatorHeightViolation": 0,
+      "indicatorWidthViolation": 0,
+      "indicatorLabelContainmentViolation": 0,
+      "rowViewportFitViolation": 0,
       "amountOverflow": 0
     },
     "tokens": {
@@ -1196,7 +1422,7 @@
       "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--bar-h": null,
+      "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
@@ -1215,7 +1441,9 @@
     "tpDuplicateKeyframes": 0,
     "drift": {
       "dx": 0,
-      "dw": 0
+      "dw": 0,
+      "resizedAlignment": null,
+      "restoredAlignment": null
     },
     "pageErrors": 2
   },
@@ -1233,27 +1461,36 @@
         "y": 0
       },
       "subbar": {
-        "w": 241.4,
-        "h": 33.2,
-        "x": 94.3,
-        "y": 441.7
+        "w": 308,
+        "h": 39,
+        "x": 61,
+        "y": 438.8
       },
       "subbarBtn": {
-        "w": 52.7,
-        "h": 23,
-        "x": 104.5,
-        "y": 446.8
+        "w": 68,
+        "h": 29,
+        "x": 73,
+        "y": 443.8
       },
+      "activeSubbarBtn": null,
       "subbarInd": {
-        "w": 0,
-        "h": 23,
-        "x": 95.1,
-        "y": 446.8
+        "w": 68,
+        "h": 29,
+        "x": 73,
+        "y": 443.8
       },
+      "activeLabel": null,
       "send": {
         "w": 69.2,
-        "h": 37,
+        "h": 39,
         "x": 408,
+        "y": 438.8
+      },
+      "splitPill": null,
+      "actionRow": {
+        "w": 430,
+        "h": 37,
+        "x": 0,
         "y": 439.8
       },
       "amount": {
@@ -1282,8 +1519,16 @@
       },
       "screens": 1,
       "visibleStackRows": 3,
-      "sendVsBarDelta": 3.8,
-      "indVsBtnDelta": 0,
+      "sendVsBarDelta": 0,
+      "indVsBtnDelta": null,
+      "barScrollOverflow": 0,
+      "barScrollFitViolation": 0,
+      "sendHeightViolation": 0,
+      "splitHeightViolation": 0,
+      "indicatorHeightViolation": 0,
+      "indicatorWidthViolation": 0,
+      "indicatorLabelContainmentViolation": 0,
+      "rowViewportFitViolation": 0,
       "amountOverflow": 0
     },
     "tokens": {
@@ -1294,7 +1539,7 @@
       "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--bar-h": null,
+      "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
@@ -1313,7 +1558,9 @@
     "tpDuplicateKeyframes": 0,
     "drift": {
       "dx": 0,
-      "dw": 0
+      "dw": 0,
+      "resizedAlignment": null,
+      "restoredAlignment": null
     },
     "pageErrors": 2
   },
@@ -1338,27 +1585,36 @@
         "y": 0
       },
       "subbar": {
-        "w": 241.4,
-        "h": 33.2,
-        "x": 74.3,
-        "y": 406.5
+        "w": 307.8,
+        "h": 39,
+        "x": 41.1,
+        "y": 403.6
       },
       "subbarBtn": {
-        "w": 52.7,
-        "h": 23,
-        "x": 84.5,
-        "y": 411.6
+        "w": 68,
+        "h": 29,
+        "x": 53.1,
+        "y": 408.6
       },
+      "activeSubbarBtn": null,
       "subbarInd": {
-        "w": 0,
-        "h": 23,
-        "x": 75.1,
-        "y": 411.6
+        "w": 68,
+        "h": 29,
+        "x": 53.1,
+        "y": 408.6
       },
+      "activeLabel": null,
       "send": {
         "w": 69.2,
-        "h": 37,
+        "h": 39,
         "x": 368,
+        "y": 403.6
+      },
+      "splitPill": null,
+      "actionRow": {
+        "w": 390,
+        "h": 37,
+        "x": 0,
         "y": 404.6
       },
       "amount": {
@@ -1387,8 +1643,16 @@
       },
       "screens": 1,
       "visibleStackRows": 2,
-      "sendVsBarDelta": 3.8,
-      "indVsBtnDelta": 0,
+      "sendVsBarDelta": 0,
+      "indVsBtnDelta": null,
+      "barScrollOverflow": 0,
+      "barScrollFitViolation": 0,
+      "sendHeightViolation": 0,
+      "splitHeightViolation": 0,
+      "indicatorHeightViolation": 0,
+      "indicatorWidthViolation": 0,
+      "indicatorLabelContainmentViolation": 0,
+      "rowViewportFitViolation": 0,
       "amountOverflow": 0
     },
     "tokens": {
@@ -1399,7 +1663,7 @@
       "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--bar-h": null,
+      "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
@@ -1418,7 +1682,9 @@
     "tpDuplicateKeyframes": 0,
     "drift": {
       "dx": 0,
-      "dw": 0
+      "dw": 0,
+      "resizedAlignment": null,
+      "restoredAlignment": null
     },
     "pageErrors": 3
   },
@@ -1443,27 +1709,36 @@
         "y": 0
       },
       "subbar": {
-        "w": 241.4,
-        "h": 33.2,
-        "x": 35.3,
-        "y": 352.9
+        "w": 273.3,
+        "h": 32.2,
+        "x": 19.4,
+        "y": 353.4
       },
       "subbarBtn": {
-        "w": 52.7,
-        "h": 23,
-        "x": 45.5,
-        "y": 358
+        "w": 60.3,
+        "h": 23.6,
+        "x": 29.4,
+        "y": 357.7
       },
+      "activeSubbarBtn": null,
       "subbarInd": {
-        "w": 0,
-        "h": 23,
-        "x": 36.1,
-        "y": 358
+        "w": 60.3,
+        "h": 23.6,
+        "x": 29.4,
+        "y": 357.7
       },
+      "activeLabel": null,
       "send": {
         "w": 69.2,
-        "h": 37,
+        "h": 32.2,
         "x": 298,
+        "y": 353.4
+      },
+      "splitPill": null,
+      "actionRow": {
+        "w": 320,
+        "h": 37,
+        "x": 0,
         "y": 351
       },
       "amount": {
@@ -1492,8 +1767,16 @@
       },
       "screens": 1,
       "visibleStackRows": 0,
-      "sendVsBarDelta": 3.8,
-      "indVsBtnDelta": 0,
+      "sendVsBarDelta": 0,
+      "indVsBtnDelta": null,
+      "barScrollOverflow": 0,
+      "barScrollFitViolation": 0,
+      "sendHeightViolation": 0,
+      "splitHeightViolation": 0,
+      "indicatorHeightViolation": 0,
+      "indicatorWidthViolation": 0,
+      "indicatorLabelContainmentViolation": 0,
+      "rowViewportFitViolation": 0,
       "amountOverflow": -56
     },
     "tokens": {
@@ -1504,7 +1787,7 @@
       "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--bar-h": null,
+      "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
@@ -1523,7 +1806,9 @@
     "tpDuplicateKeyframes": 0,
     "drift": {
       "dx": 0,
-      "dw": 0
+      "dw": 0,
+      "resizedAlignment": null,
+      "restoredAlignment": null
     },
     "pageErrors": 2
   },
@@ -1548,27 +1833,36 @@
         "y": 0
       },
       "subbar": {
-        "w": 241.4,
-        "h": 33.2,
-        "x": 55.3,
-        "y": 388.9
+        "w": 292.7,
+        "h": 36,
+        "x": 29.7,
+        "y": 387.5
       },
       "subbarBtn": {
-        "w": 52.7,
-        "h": 23,
-        "x": 65.5,
-        "y": 394
+        "w": 64.6,
+        "h": 26.6,
+        "x": 40.8,
+        "y": 392.2
       },
+      "activeSubbarBtn": null,
       "subbarInd": {
-        "w": 0,
-        "h": 23,
-        "x": 56.1,
-        "y": 394
+        "w": 64.6,
+        "h": 26.6,
+        "x": 40.8,
+        "y": 392.2
       },
+      "activeLabel": null,
       "send": {
         "w": 69.2,
-        "h": 37,
+        "h": 36,
         "x": 338,
+        "y": 387.5
+      },
+      "splitPill": null,
+      "actionRow": {
+        "w": 360,
+        "h": 37,
+        "x": 0,
         "y": 387
       },
       "amount": {
@@ -1597,8 +1891,16 @@
       },
       "screens": 1,
       "visibleStackRows": 0,
-      "sendVsBarDelta": 3.8,
-      "indVsBtnDelta": 0,
+      "sendVsBarDelta": 0,
+      "indVsBtnDelta": null,
+      "barScrollOverflow": 0,
+      "barScrollFitViolation": 0,
+      "sendHeightViolation": 0,
+      "splitHeightViolation": 0,
+      "indicatorHeightViolation": 0,
+      "indicatorWidthViolation": 0,
+      "indicatorLabelContainmentViolation": 0,
+      "rowViewportFitViolation": 0,
       "amountOverflow": -56
     },
     "tokens": {
@@ -1609,7 +1911,7 @@
       "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--bar-h": null,
+      "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
@@ -1628,7 +1930,9 @@
     "tpDuplicateKeyframes": 0,
     "drift": {
       "dx": 0,
-      "dw": 0
+      "dw": 0,
+      "resizedAlignment": null,
+      "restoredAlignment": null
     },
     "pageErrors": 2
   },
@@ -1653,27 +1957,36 @@
         "y": 0
       },
       "subbar": {
-        "w": 241.4,
-        "h": 33.2,
-        "x": 62.8,
-        "y": 402.4
+        "w": 300.3,
+        "h": 37.5,
+        "x": 33.4,
+        "y": 400.3
       },
       "subbarBtn": {
-        "w": 52.7,
-        "h": 23,
-        "x": 73,
-        "y": 407.5
+        "w": 66.3,
+        "h": 27.8,
+        "x": 44.9,
+        "y": 405.1
       },
+      "activeSubbarBtn": null,
       "subbarInd": {
-        "w": 0,
-        "h": 23,
-        "x": 63.6,
-        "y": 407.5
+        "w": 66.3,
+        "h": 27.8,
+        "x": 44.9,
+        "y": 405.1
       },
+      "activeLabel": null,
       "send": {
         "w": 69.2,
-        "h": 37,
+        "h": 37.5,
         "x": 353,
+        "y": 400.3
+      },
+      "splitPill": null,
+      "actionRow": {
+        "w": 375,
+        "h": 37,
+        "x": 0,
         "y": 400.5
       },
       "amount": {
@@ -1702,8 +2015,16 @@
       },
       "screens": 1,
       "visibleStackRows": 0,
-      "sendVsBarDelta": 3.8,
-      "indVsBtnDelta": 0,
+      "sendVsBarDelta": 0,
+      "indVsBtnDelta": null,
+      "barScrollOverflow": 0,
+      "barScrollFitViolation": 0,
+      "sendHeightViolation": 0,
+      "splitHeightViolation": 0,
+      "indicatorHeightViolation": 0,
+      "indicatorWidthViolation": 0,
+      "indicatorLabelContainmentViolation": 0,
+      "rowViewportFitViolation": 0,
       "amountOverflow": -56
     },
     "tokens": {
@@ -1714,7 +2035,7 @@
       "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--bar-h": null,
+      "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
@@ -1733,7 +2054,9 @@
     "tpDuplicateKeyframes": 0,
     "drift": {
       "dx": 0,
-      "dw": 0
+      "dw": 0,
+      "resizedAlignment": null,
+      "restoredAlignment": null
     },
     "pageErrors": 2
   },
@@ -1758,27 +2081,36 @@
         "y": 0
       },
       "subbar": {
-        "w": 241.4,
-        "h": 33.2,
-        "x": 70.3,
-        "y": 490.9
+        "w": 307.8,
+        "h": 39,
+        "x": 37.1,
+        "y": 488
       },
       "subbarBtn": {
-        "w": 52.7,
-        "h": 22.9,
-        "x": 80.5,
-        "y": 496
+        "w": 68,
+        "h": 29,
+        "x": 49.1,
+        "y": 493
       },
+      "activeSubbarBtn": null,
       "subbarInd": {
-        "w": 0,
-        "h": 22.9,
-        "x": 71.1,
-        "y": 496
+        "w": 68,
+        "h": 29,
+        "x": 49.1,
+        "y": 493
       },
+      "activeLabel": null,
       "send": {
         "w": 69.2,
-        "h": 37,
+        "h": 39,
         "x": 368,
+        "y": 488
+      },
+      "splitPill": null,
+      "actionRow": {
+        "w": 390,
+        "h": 37,
+        "x": 0,
         "y": 489
       },
       "amount": {
@@ -1807,8 +2139,16 @@
       },
       "screens": 1,
       "visibleStackRows": 1,
-      "sendVsBarDelta": 3.8,
-      "indVsBtnDelta": 0,
+      "sendVsBarDelta": 0,
+      "indVsBtnDelta": null,
+      "barScrollOverflow": 0,
+      "barScrollFitViolation": 0,
+      "sendHeightViolation": 0,
+      "splitHeightViolation": 0,
+      "indicatorHeightViolation": 0,
+      "indicatorWidthViolation": 0,
+      "indicatorLabelContainmentViolation": 0,
+      "rowViewportFitViolation": 0,
       "amountOverflow": -56
     },
     "tokens": {
@@ -1819,7 +2159,7 @@
       "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--bar-h": null,
+      "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
@@ -1838,7 +2178,9 @@
     "tpDuplicateKeyframes": 0,
     "drift": {
       "dx": 0,
-      "dw": 0
+      "dw": 0,
+      "resizedAlignment": null,
+      "restoredAlignment": null
     },
     "pageErrors": 2
   },
@@ -1856,27 +2198,36 @@
         "y": 0
       },
       "subbar": {
-        "w": 241.4,
-        "h": 33.2,
-        "x": 81.3,
-        "y": 526.4
+        "w": 308,
+        "h": 39,
+        "x": 48,
+        "y": 523.5
       },
       "subbarBtn": {
-        "w": 52.7,
-        "h": 22.9,
-        "x": 91.5,
-        "y": 531.5
+        "w": 68,
+        "h": 29,
+        "x": 60,
+        "y": 528.5
       },
+      "activeSubbarBtn": null,
       "subbarInd": {
-        "w": 0,
-        "h": 22.9,
-        "x": 82.1,
-        "y": 531.5
+        "w": 68,
+        "h": 29,
+        "x": 60,
+        "y": 528.5
       },
+      "activeLabel": null,
       "send": {
         "w": 69.2,
-        "h": 37,
+        "h": 39,
         "x": 390,
+        "y": 523.5
+      },
+      "splitPill": null,
+      "actionRow": {
+        "w": 412,
+        "h": 37,
+        "x": 0,
         "y": 524.5
       },
       "amount": {
@@ -1905,8 +2256,16 @@
       },
       "screens": 1,
       "visibleStackRows": 2,
-      "sendVsBarDelta": 3.8,
-      "indVsBtnDelta": 0,
+      "sendVsBarDelta": 0,
+      "indVsBtnDelta": null,
+      "barScrollOverflow": 0,
+      "barScrollFitViolation": 0,
+      "sendHeightViolation": 0,
+      "splitHeightViolation": 0,
+      "indicatorHeightViolation": 0,
+      "indicatorWidthViolation": 0,
+      "indicatorLabelContainmentViolation": 0,
+      "rowViewportFitViolation": 0,
       "amountOverflow": -56
     },
     "tokens": {
@@ -1917,7 +2276,7 @@
       "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--bar-h": null,
+      "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
@@ -1936,7 +2295,9 @@
     "tpDuplicateKeyframes": 0,
     "drift": {
       "dx": 0,
-      "dw": 0
+      "dw": 0,
+      "resizedAlignment": null,
+      "restoredAlignment": null
     },
     "pageErrors": 2
   },
@@ -1954,27 +2315,36 @@
         "y": 0
       },
       "subbar": {
-        "w": 241.4,
-        "h": 33.2,
-        "x": 90.3,
-        "y": 534.9
+        "w": 308,
+        "h": 39,
+        "x": 57,
+        "y": 532
       },
       "subbarBtn": {
-        "w": 52.7,
-        "h": 22.9,
-        "x": 100.5,
-        "y": 540
+        "w": 68,
+        "h": 29,
+        "x": 69,
+        "y": 537
       },
+      "activeSubbarBtn": null,
       "subbarInd": {
-        "w": 0,
-        "h": 22.9,
-        "x": 91.1,
-        "y": 540
+        "w": 68,
+        "h": 29,
+        "x": 69,
+        "y": 537
       },
+      "activeLabel": null,
       "send": {
         "w": 69.2,
-        "h": 37,
+        "h": 39,
         "x": 408,
+        "y": 532
+      },
+      "splitPill": null,
+      "actionRow": {
+        "w": 430,
+        "h": 37,
+        "x": 0,
         "y": 533
       },
       "amount": {
@@ -2003,8 +2373,16 @@
       },
       "screens": 1,
       "visibleStackRows": 2,
-      "sendVsBarDelta": 3.8,
-      "indVsBtnDelta": 0,
+      "sendVsBarDelta": 0,
+      "indVsBtnDelta": null,
+      "barScrollOverflow": 0,
+      "barScrollFitViolation": 0,
+      "sendHeightViolation": 0,
+      "splitHeightViolation": 0,
+      "indicatorHeightViolation": 0,
+      "indicatorWidthViolation": 0,
+      "indicatorLabelContainmentViolation": 0,
+      "rowViewportFitViolation": 0,
       "amountOverflow": -56
     },
     "tokens": {
@@ -2015,7 +2393,7 @@
       "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--bar-h": null,
+      "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
@@ -2034,7 +2412,9 @@
     "tpDuplicateKeyframes": 0,
     "drift": {
       "dx": 0,
-      "dw": 0
+      "dw": 0,
+      "resizedAlignment": null,
+      "restoredAlignment": null
     },
     "pageErrors": 2
   },
@@ -2059,27 +2439,36 @@
         "y": 0
       },
       "subbar": {
-        "w": 241.4,
-        "h": 33.2,
-        "x": 70.3,
-        "y": 490.9
+        "w": 307.8,
+        "h": 39,
+        "x": 37.1,
+        "y": 488
       },
       "subbarBtn": {
-        "w": 52.7,
-        "h": 22.9,
-        "x": 80.5,
-        "y": 496
+        "w": 68,
+        "h": 29,
+        "x": 49.1,
+        "y": 493
       },
+      "activeSubbarBtn": null,
       "subbarInd": {
-        "w": 0,
-        "h": 22.9,
-        "x": 71.1,
-        "y": 496
+        "w": 68,
+        "h": 29,
+        "x": 49.1,
+        "y": 493
       },
+      "activeLabel": null,
       "send": {
         "w": 69.2,
-        "h": 37,
+        "h": 39,
         "x": 368,
+        "y": 488
+      },
+      "splitPill": null,
+      "actionRow": {
+        "w": 390,
+        "h": 37,
+        "x": 0,
         "y": 489
       },
       "amount": {
@@ -2108,8 +2497,16 @@
       },
       "screens": 1,
       "visibleStackRows": 1,
-      "sendVsBarDelta": 3.8,
-      "indVsBtnDelta": 0,
+      "sendVsBarDelta": 0,
+      "indVsBtnDelta": null,
+      "barScrollOverflow": 0,
+      "barScrollFitViolation": 0,
+      "sendHeightViolation": 0,
+      "splitHeightViolation": 0,
+      "indicatorHeightViolation": 0,
+      "indicatorWidthViolation": 0,
+      "indicatorLabelContainmentViolation": 0,
+      "rowViewportFitViolation": 0,
       "amountOverflow": -56
     },
     "tokens": {
@@ -2120,7 +2517,7 @@
       "--sp-4": "calc(4 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-6": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--bar-h": null,
+      "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
       "--row-h": null,
       "--stack-hdr-h": null,
@@ -2139,7 +2536,9 @@
     "tpDuplicateKeyframes": 0,
     "drift": {
       "dx": 0,
-      "dw": 0
+      "dw": 0,
+      "resizedAlignment": null,
+      "restoredAlignment": null
     },
     "pageErrors": 3
   }

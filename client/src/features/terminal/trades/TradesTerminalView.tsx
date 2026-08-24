@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { formatNzd } from "@/lib/trades-money";
 import { TRADES_THEME } from "@/lib/trades-theme";
 import { setDockCollapse } from "@/features/navigation/dock-collapse-store";
+import { SegmentedBar } from "../SegmentedBar";
 import "../terminal-keyframes.css";
 import "../terminal-tokens.css";
 import "./trades-terminal-view.css";
@@ -63,56 +64,9 @@ const SCREEN_TO_SUBBAR: Record<string, number> = { clients: 0, quote: 1, invoice
 const SUBBAR_ROUTE: Record<number, string> = { 0: 'clients', 1: 'quote', 2: 'invoice', 3: 'external' };
 
 function SubBar({ activeIdx = -1, onPick, compact = false, hideLabel = false }: any) {
-  const trackRef  = useRef<HTMLDivElement>(null);
-  const btnRefs   = useRef<(HTMLElement | null)[]>([]);
-  const mounted   = useRef(false);
-  const [ind, setInd]       = useState({ x: 0, w: 0, on: false });
-  const [animate, setAnim]  = useState(false);
-
-  const measure = (i: number) => {
-    const el = btnRefs.current[i];
-    if (!el) return { x: 0, w: 0 };
-    // Use offsetLeft/offsetWidth, not getBoundingClientRect: the indicator lives
-    // inside .tp-subbar's `transform: scale(0.85)`, so its inline left/width are in
-    // the track's PRE-scale local space.
-    return { x: el.offsetLeft, w: el.offsetWidth };
-  };
-
-  useEffect(() => {
-    const tick = () => {
-      if (activeIdx < 0) { setInd(p => ({ ...p, on: false })); }
-      else { const m = measure(activeIdx); setInd({ x: m.x, w: m.w, on: true }); }
-    };
-    if (!mounted.current) {
-      requestAnimationFrame(() => requestAnimationFrame(() => { tick(); mounted.current = true; }));
-    } else {
-      setAnim(true);
-      requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(tick)));
-      const t = setTimeout(() => setAnim(false), 520);
-      return () => clearTimeout(t);
-    }
-  }, [activeIdx]);
-
-  return (
-    <div className="tp-subbar-wrap">
-      <div className={`tp-subbar${compact ? ' compact' : ''}`} ref={trackRef}>
-        <div className={`tp-subbar-ind${animate ? ' animate' : ''}${ind.on ? ' on' : ''}`} style={{ left: ind.x, width: ind.w }} />
-        {SUBBAR_ITEMS.map(({ id, label, Icon }, i) => {
-          const active = activeIdx === i;
-          const ic = active ? BLUE : 'rgba(244,244,244,0.55)';
-          return (
-            <button key={id} ref={(el: any) => (btnRefs.current[i] = el)}
-              className={`tp-subbar-btn tap-target${active ? ' active' : ''}`}
-              data-demo-id={`trades-mode-${id}`}
-              onClick={() => onPick?.(i)} aria-label={label}>
-              <Icon sz={18} c={ic} />
-              {active && !hideLabel && <span className="tp-subbar-label">{label}</span>}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
+  return <SegmentedBar items={SUBBAR_ITEMS} activeIdx={activeIdx} onPick={onPick}
+    compact={compact} hideLabel={hideLabel} activeColor={BLUE}
+    inactiveColor="rgba(244,244,244,0.55)" demoIdPrefix="trades-mode" />;
 }
 
 function SendBtn({ onClick }: any) {

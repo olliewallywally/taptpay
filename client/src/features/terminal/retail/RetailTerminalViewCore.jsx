@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { setDockCollapse } from "@/features/navigation/dock-collapse-store";
+import { SegmentedBar } from "../SegmentedBar";
 
 const NAVY = '#040D6D';
 const BLUE = '#58ABFF';
@@ -85,53 +86,9 @@ const SUBBAR_ITEMS = [
    padding-bottom (terminal-tokens.css), which reads --dock-h directly. */
 
 function SubBar({ activeIdx = -1, onPick, compact = false }) {
-  const trackRef   = useRef(null);
-  const btnRefs    = useRef([]);
-  const mountedRef = useRef(false);
-  const [ind, setInd]         = useState({ x: 0, w: 0, on: false });
-  const [animate, setAnimate] = useState(false);
-
-  const measure = i => {
-    const el = btnRefs.current[i], tr = trackRef.current;
-    if (!el || !tr) return { x: 0, w: 0 };
-    const r = el.getBoundingClientRect(), t = tr.getBoundingClientRect();
-    return { x: r.left - t.left, w: r.width };
-  };
-
-  useEffect(() => {
-    const tick = () => {
-      if (activeIdx < 0) { setInd(p => ({ ...p, on: false })); }
-      else { const m = measure(activeIdx); setInd({ x: m.x, w: m.w, on: true }); }
-    };
-    if (!mountedRef.current) {
-      requestAnimationFrame(() => { tick(); mountedRef.current = true; });
-    } else {
-      setAnimate(true);
-      requestAnimationFrame(() => requestAnimationFrame(tick));
-      const t = setTimeout(() => setAnimate(false), 520);
-      return () => clearTimeout(t);
-    }
-  }, [activeIdx]);
-
-  return (
-    <div className="tp-subbar-wrap">
-      <div className={`tp-subbar${compact ? ' compact' : ''}`} ref={trackRef}>
-        <div className={`tp-subbar-ind${animate ? ' animate' : ''}${ind.on ? ' on' : ''}`} style={{ left: ind.x, width: ind.w }} />
-        {SUBBAR_ITEMS.map(({ id, label, Icon }, i) => {
-          const active = activeIdx === i;
-          const ic = active ? BLUE : 'rgba(4,13,109,0.55)';
-          return (
-            <button key={id} ref={el => (btnRefs.current[i] = el)}
-              className={`tp-subbar-btn tap-target${active ? ' active' : ''}`}
-              onClick={() => onPick?.(i)} aria-label={label} data-demo-id={`retail-mode-${id}`}>
-              <Icon sz={20} c={ic} />
-              {active && <span className="tp-subbar-label">{label}</span>}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
+  return <SegmentedBar items={SUBBAR_ITEMS} activeIdx={activeIdx} onPick={onPick}
+    compact={compact} activeColor={BLUE} inactiveColor="rgba(4,13,109,0.55)"
+    demoIdPrefix="retail-mode" iconSize={20} />;
 }
 
 function SendBtn({ onClick }) {

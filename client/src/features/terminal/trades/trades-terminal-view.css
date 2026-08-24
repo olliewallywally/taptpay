@@ -20,17 +20,12 @@
 .trades-terminal-view .tp-subhead-btn { width: 44px; height: 44px; border-radius: 999px; border: 2px solid #040D6D; display: flex; align-items: center; justify-content: center; color: #040D6D; background: none; cursor: pointer; transition: transform 120ms, background 120ms; }
 .trades-terminal-view .tp-subhead-btn:active { transform: scale(0.92); background: rgba(4,13,109,0.06); }
 .trades-terminal-view .tp-amount { font-family: 'Outfit', system-ui; font-weight: 800; letter-spacing: -0.04em; line-height: 0.95; }
-.trades-terminal-view .tp-subbar-wrap { display: flex; justify-content: center; }
-.trades-terminal-view .tp-subbar { position: relative; display: inline-flex; align-items: center; justify-content: center; background: #58ABFF; border-radius: 26px; padding: 5px 11px; gap: 4px; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 16px 48px rgba(4,13,109,0.2), 0 4px 12px rgba(4,13,109,0.1), inset 0 1px 0 rgba(255,255,255,0.25); transform: scale(0.85); transform-origin: center; }
-.trades-terminal-view .tp-subbar-ind { position: absolute; top: 5px; height: 27px; background: #040D6D; border-radius: 16px; box-shadow: 0 4px 16px rgba(4,13,109,0.4); pointer-events: none; z-index: 2; opacity: 0; will-change: left, width, opacity; }
-.trades-terminal-view .tp-subbar-ind.on { opacity: 1; }
-.trades-terminal-view .tp-subbar-ind.animate { transition: left 0.45s cubic-bezier(0.34,1.56,0.64,1), width 0.45s cubic-bezier(0.34,1.56,0.64,1), opacity 0.25s ease; }
-.trades-terminal-view .tp-subbar-btn { position: relative; z-index: 1; height: 27px; padding: 0 22px; display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 16px; border: none; cursor: pointer; background: transparent; color: rgba(244,244,244,0.55); transition: color 0.2s ease, transform 0.18s ease; -webkit-tap-highlight-color: transparent; flex-shrink: 0; }
-.trades-terminal-view .tp-subbar-btn:active { transform: scale(0.92); }
-.trades-terminal-view .tp-subbar-btn.active { background: transparent !important; box-shadow: none !important; color: #F4F4F4; z-index: 3; }
-.trades-terminal-view .tp-subbar.compact .tp-subbar-btn { padding: 0 11px; }
-.trades-terminal-view .tp-subbar-label { font-family: 'Outfit', system-ui; font-weight: 600; font-size: 12px; letter-spacing: 0.4px; color: #F4F4F4; white-space: nowrap; animation: tp-labelIn 0.3s ease-out; }
-.trades-terminal-view .tp-send { display: flex; align-items: center; gap: 6px; padding: 4px 14px 4px 4px; border-radius: 26px; background: #040D6D; border: none; cursor: pointer; box-shadow: 0 4px 16px rgba(4,13,109,0.25); transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); -webkit-tap-highlight-color: transparent; flex-shrink: 0; height: 37px; }
+.trades-terminal-view .tp-subbar { background: #58ABFF; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 16px 48px rgba(4,13,109,0.2), 0 4px 12px rgba(4,13,109,0.1), inset 0 1px 0 rgba(255,255,255,0.25); }
+.trades-terminal-view .tp-subbar-ind { background: #040D6D; box-shadow: 0 4px 16px rgba(4,13,109,0.4); }
+.trades-terminal-view .tp-subbar-btn { color: rgba(244,244,244,0.55); }
+.trades-terminal-view .tp-subbar-btn.active { color: #F4F4F4; }
+.trades-terminal-view .tp-subbar-label { color: #F4F4F4; }
+.trades-terminal-view .tp-send { display: flex; align-items: center; gap: 6px; padding: 4px 14px 4px 4px; border-radius: 26px; background: #040D6D; border: none; cursor: pointer; box-shadow: 0 4px 16px rgba(4,13,109,0.25); transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); -webkit-tap-highlight-color: transparent; flex-shrink: 0; }
 .trades-terminal-view .tp-send:active { transform: scale(0.94); }
 .trades-terminal-view .tp-send-circle { width: 20px; height: 20px; border-radius: 50%; background: #58ABFF; display: flex; align-items: center; justify-content: center; }
 .trades-terminal-view .tp-send-label { font-size: 11px; font-weight: 700; color: #F4F4F4; letter-spacing: 0.3px; }
@@ -90,13 +85,13 @@
 .trades-terminal-view .tp-pfab { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); transition: opacity 240ms cubic-bezier(0,0,0.2,1), transform 360ms cubic-bezier(0.34,1.56,0.64,1); will-change: opacity, transform; }
 .trades-terminal-view .tp-pfab.hide { opacity: 0; transform: translate(-50%, -50%) translateY(8px) scale(0.7); pointer-events: none; }
 .trades-terminal-view .tp-pfab.show { opacity: 1; }
-.trades-terminal-view .tp-psubbar { position: absolute; top: 50%; left: 0; right: 0; padding: 0 22px; box-sizing: border-box; transform: translateY(67px); display: flex; align-items: center; gap: 8px; transition: opacity 220ms cubic-bezier(0,0,0.2,1), transform 300ms cubic-bezier(0.4,0,0.2,1); will-change: opacity, transform; height: 37px; pointer-events: none; }
+.trades-terminal-view .tp-psubbar { position: absolute; top: 50%; left: 0; right: 0; padding: 0 22px; box-sizing: border-box; transform: translateY(67px); display: flex; align-items: center; gap: 8px; transition: opacity 220ms cubic-bezier(0,0,0.2,1), transform 300ms cubic-bezier(0.4,0,0.2,1); will-change: opacity, transform; pointer-events: none; }
 .trades-terminal-view .tp-psubbar.show .tp-subbar, .trades-terminal-view .tp-psubbar.show .tp-send-slot { pointer-events: auto; }
 .trades-terminal-view .tp-psubbar.hide { opacity: 0; transform: translateY(67px) scale(0.92); pointer-events: none; }
 .trades-terminal-view .tp-psubbar.show { opacity: 1; }
 .trades-terminal-view .tp-psubbar.feature { transform: translateY(calc(-100% - 20px)); }
 .trades-terminal-view .tp-subbar-center { flex: 1 1 auto; min-width: 0; display: flex; justify-content: center; }
-.trades-terminal-view .tp-send-slot { flex-shrink: 0; display: flex; align-items: center; overflow: hidden; max-width: 0; opacity: 0; transition: max-width 420ms cubic-bezier(0.34,1.56,0.64,1), opacity 280ms ease 80ms; height: 37px; }
+.trades-terminal-view .tp-send-slot { flex-shrink: 0; display: flex; align-items: center; overflow: hidden; max-width: 0; opacity: 0; }
 /* Was absent until phase 2: this sheet stopped one rule short of the literal it
    was copied from, so the trades send shortcut stayed at max-width:0/opacity:0
    and never appeared when a client was selected. */

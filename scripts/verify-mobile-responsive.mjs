@@ -104,6 +104,14 @@ async function measure(page, allowlist) {
       const r = el.getBoundingClientRect();
       return r.width > 0 && r.height > 0;
     };
+    const visiblyMounted = (el) => {
+      if (!el || !visible(el)) return false;
+      for (let n = el.parentElement; n && n !== document.body; n = n.parentElement) {
+        const s = getComputedStyle(n);
+        if (s.display === "none" || s.visibility === "hidden" || s.opacity === "0") return false;
+      }
+      return true;
+    };
     const classesOf = (el) => String(el.className?.baseVal ?? el.className ?? "").split(/\s+/);
     const allowed = (el) => {
       for (let n = el; n && n !== document.body; n = n.parentElement) {
@@ -156,12 +164,24 @@ async function measure(page, allowlist) {
     }
 
     const amountEl = document.querySelector(".tp-amount");
+    const subbarEl = document.querySelector(".tp-subbar");
+    const activeBtnEl = document.querySelector(".tp-subbar-btn.active");
+    const indicatorEl = document.querySelector(".tp-subbar-ind.on");
+    const activeLabelEl = activeBtnEl?.querySelector(".tp-subbar-label");
+    const sendEl = document.querySelector(".tp-send");
+    const splitSlotEl = document.querySelector(".tp-split-slot.show");
+    const splitPillEl = splitSlotEl?.querySelector("button");
+    const rowEl = document.querySelector(".tp-psubbar.show");
     const components = {
       viewport: one(".tp-viewport"),
-      subbar: one(".tp-subbar"),
+      subbar: box(subbarEl),
       subbarBtn: one(".tp-subbar-btn"),
-      subbarInd: one(".tp-subbar-ind"),
-      send: one(".tp-send"),
+      activeSubbarBtn: box(activeBtnEl),
+      subbarInd: box(indicatorEl ?? document.querySelector(".tp-subbar-ind")),
+      activeLabel: box(activeLabelEl),
+      send: box(sendEl),
+      splitPill: box(splitPillEl),
+      actionRow: box(rowEl),
       amount: one(".tp-amount"),
       amountParent: box(amountEl?.parentElement),
       stackScroll: one(".tp-stack-scroll"),
@@ -176,9 +196,40 @@ async function measure(page, allowlist) {
     /* The action bar's label sits below its bubble because the indicator is a
        <div> and escapes the button rule. */
     components.indVsBtnDelta =
-      components.subbarInd && components.subbarBtn
-        ? r1(components.subbarInd.h - components.subbarBtn.h)
+      components.subbarInd && components.activeSubbarBtn
+        ? r1(components.subbarInd.h - components.activeSubbarBtn.h)
         : null;
+    const within = (inner, outer, slack = 0.6) =>
+      inner && outer && inner.x >= outer.x - slack && inner.x + inner.w <= outer.x + outer.w + slack &&
+      inner.y >= outer.y - slack && inner.y + inner.h <= outer.y + outer.h + slack;
+    const same = (a, b, slack = 0.6) => Math.abs(a - b) <= slack;
+
+    /* Phase 7's six action-bar invariants. These are violation counters rather
+       than raw deltas so they can be baseline-ratcheted like the other
+       geometry failures. A state-specific contract is evaluated only while
+       that state is actually mounted and visible in the fixture. */
+    components.barScrollOverflow = subbarEl
+      ? Math.max(0, r1(subbarEl.scrollWidth - subbarEl.clientWidth))
+      : 0;
+    components.barScrollFitViolation = components.barScrollOverflow > 0.5 ? 1 : 0;
+    components.sendHeightViolation =
+      visiblyMounted(sendEl) && components.subbar && !same(components.send.h, components.subbar.h) ? 1 : 0;
+    components.splitHeightViolation =
+      visiblyMounted(splitPillEl) && components.subbar && !same(components.splitPill.h, components.subbar.h) ? 1 : 0;
+    components.indicatorHeightViolation =
+      visiblyMounted(indicatorEl) && components.activeSubbarBtn &&
+      !same(components.subbarInd.h, components.activeSubbarBtn.h) ? 1 : 0;
+    components.indicatorWidthViolation =
+      visiblyMounted(indicatorEl) && components.activeSubbarBtn &&
+      !same(components.subbarInd.w, components.activeSubbarBtn.w) ? 1 : 0;
+    components.indicatorLabelContainmentViolation =
+      visiblyMounted(indicatorEl) && visiblyMounted(activeLabelEl) &&
+      !within(components.activeLabel, components.subbarInd) ? 1 : 0;
+    components.rowViewportFitViolation = (() => {
+      if (!visiblyMounted(rowEl)) return 0;
+      const r = rowEl.getBoundingClientRect();
+      return r.left < -0.5 || r.right > vw + 0.5 || r.width > vw + 1 ? 1 : 0;
+    })();
     /* Amount overflowing its own parent is §6.5's failure, and the fitter has
        to make this <= 0 at every size. */
     components.amountOverflow =
@@ -261,6 +312,22 @@ async function measure(page, allowlist) {
       ".tp-hero",
       ".tp-panel",
       ".tp-viewport .tp-screen.tp-plain",
+      ".tp-viewport .tp-subbar-wrap",
+      ".tp-viewport .tp-subbar.tp-bar",
+      ".tp-viewport .tp-subbar.tp-bar .tp-bar-ind",
+      ".tp-viewport .tp-subbar.tp-bar .tp-bar-ind.on",
+      ".tp-viewport .tp-subbar.tp-bar .tp-bar-ind.animate",
+      ".tp-viewport .tp-subbar.tp-bar .tp-bar-btn",
+      ".tp-viewport .tp-subbar.tp-bar .tp-bar-btn:active",
+      ".tp-viewport .tp-subbar.tp-bar .tp-bar-btn.active",
+      ".tp-viewport .tp-psubbar",
+      ".tp-viewport .tp-psubbar .tp-send-slot",
+      ".tp-viewport .tp-psubbar .tp-split-slot",
+      ".tp-viewport .tp-psubbar .tp-send",
+      ".tp-viewport .tp-subbar.tp-bar.compact .tp-bar-btn",
+      ".tp-bar-label-track",
+      ".tp-bar-label-track.show",
+      ".tp-bar-label-track > .tp-subbar-label",
     ]);
     for (const sheet of document.styleSheets) {
       /* terminal-tokens.css is deliberately shared across all three verticals.
@@ -306,25 +373,37 @@ async function measure(page, allowlist) {
    width with no ResizeObserver, so a size change leaves it behind. Round-trip
    the viewport and compare the indicator against where it started. */
 async function measureDrift(page, vp) {
-  const before = await page.evaluate(() => {
+  const read = () => page.evaluate(() => {
     const el = document.querySelector(".tp-subbar-ind");
     if (!el) return null;
     const r = el.getBoundingClientRect();
-    return { x: r.x, w: r.width };
+    const active = document.querySelector(".tp-subbar-btn.active");
+    const a = active?.getBoundingClientRect();
+    return {
+      x: r.x,
+      w: r.width,
+      active: a ? { x: a.x, w: a.width } : null,
+    };
   });
+  const alignment = (sample) => sample?.active ? {
+    dx: round(Math.abs(sample.x - sample.active.x)),
+    dw: round(Math.abs(sample.w - sample.active.w)),
+  } : null;
+  const before = await read();
   if (!before) return null;
   await page.setViewportSize({ width: vp.width - 40, height: vp.height });
   await page.waitForTimeout(220);
+  const resized = await read();
   await page.setViewportSize({ width: vp.width, height: vp.height });
   await page.waitForTimeout(320);
-  const after = await page.evaluate(() => {
-    const el = document.querySelector(".tp-subbar-ind");
-    if (!el) return null;
-    const r = el.getBoundingClientRect();
-    return { x: r.x, w: r.width };
-  });
+  const after = await read();
   if (!after) return null;
-  return { dx: round(Math.abs(after.x - before.x)), dw: round(Math.abs(after.w - before.w)) };
+  return {
+    dx: round(Math.abs(after.x - before.x)),
+    dw: round(Math.abs(after.w - before.w)),
+    resizedAlignment: alignment(resized),
+    restoredAlignment: alignment(after),
+  };
 }
 
 async function runCell(browser, vertical, vp, safeArea) {
@@ -356,6 +435,10 @@ async function runCell(browser, vertical, vp, safeArea) {
 const COUNTERS = [
   "docOverflow", "edgeCrosserCount", "clippedTextCount",
   "tapInflated", "tapCentreMiss", "tpUnscopedRules", "tpDuplicateKeyframes",
+  "components.barScrollFitViolation", "components.sendHeightViolation",
+  "components.splitHeightViolation", "components.indicatorHeightViolation",
+  "components.indicatorWidthViolation", "components.indicatorLabelContainmentViolation",
+  "components.rowViewportFitViolation",
 ];
 const RATCHETS = ["components.visibleStackRows"];
 
@@ -387,6 +470,20 @@ function compare(current, baseline) {
     if (dNow && dWas) {
       if (dNow.dx > dWas.dx + 0.6) regressions.push(`${cell}  drift.dx: ${dWas.dx} → ${dNow.dx}`);
       else if (dNow.dx < dWas.dx - 0.6) improvements.push(`${cell}  drift.dx: ${dWas.dx} → ${dNow.dx}`);
+      if (dNow.dw > dWas.dw + 0.6) regressions.push(`${cell}  drift.dw: ${dWas.dw} → ${dNow.dw}`);
+      else if (dNow.dw < dWas.dw - 0.6) improvements.push(`${cell}  drift.dw: ${dWas.dw} → ${dNow.dw}`);
+      for (const state of ["resizedAlignment", "restoredAlignment"]) {
+        const a = dNow[state], b = dWas[state];
+        if (!a) continue;
+        /* Old baselines do not contain alignment samples. Treat their absent
+           value as the desired zero so phase 7 cannot pass merely because its
+           fixtures pre-date the invariant. */
+        const old = b ?? { dx: 0, dw: 0 };
+        for (const axis of ["dx", "dw"]) {
+          if (a[axis] > old[axis] + 0.6) regressions.push(`${cell}  drift.${state}.${axis}: ${old[axis]} → ${a[axis]}`);
+          else if (a[axis] < old[axis] - 0.6) improvements.push(`${cell}  drift.${state}.${axis}: ${old[axis]} → ${a[axis]}`);
+        }
+      }
     }
     /* Tokens: appearing or changing is recorded, never scored — but a token
        that computes to 0px is the v1 defect and is always a failure. */

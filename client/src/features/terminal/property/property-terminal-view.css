@@ -30,22 +30,12 @@
 .property-terminal-view .tp-pill:active { transform: scale(0.96); }
 .property-terminal-view .tp-pill.solid { background: #58ABFF; color: #040D6D; }
 .property-terminal-view .tp-pill.outline { background: transparent; color: #58ABFF; box-shadow: inset 0 0 0 0.1px #58ABFF; }
-.property-terminal-view .tp-subbar-wrap { display: flex; justify-content: center; }
-.property-terminal-view .tp-subbar { position: relative; display: inline-flex; align-items: center; justify-content: center; background: #58ABFF; border-radius: 26px; padding: 5px 11px; gap: 4px; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 16px 48px rgba(4,13,109,0.2), 0 4px 12px rgba(4,13,109,0.1), inset 0 1px 0 rgba(255,255,255,0.25); transform: scale(0.85); transform-origin: center; }
-/* Indicator sits ABOVE buttons (z-index 2) but pointer-events:none so clicks pass through */
-.property-terminal-view .tp-subbar-ind { position: absolute; top: 5px; height: 27px; background: #040D6D; border-radius: 16px; box-shadow: 0 4px 16px rgba(4,13,109,0.4); pointer-events: none; z-index: 2; opacity: 0; will-change: left, width, opacity; }
-.property-terminal-view .tp-subbar-ind.on { opacity: 1; }
-.property-terminal-view .tp-subbar-ind.animate { transition: left 0.45s cubic-bezier(0.34,1.56,0.64,1), width 0.45s cubic-bezier(0.34,1.56,0.64,1), opacity 0.25s ease; }
-/* Buttons below indicator (z-index 1). No padding transition — instant width change so measurement is always correct */
-.property-terminal-view .tp-subbar-btn { position: relative; z-index: 1; height: 27px; padding: 0 22px; display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 16px; border: none; cursor: pointer; background: transparent; color: rgba(4,13,109,0.55); transition: color 0.2s ease, transform 0.18s ease; -webkit-tap-highlight-color: transparent; flex-shrink: 0; }
-.property-terminal-view .tp-subbar-btn:active { transform: scale(0.92); }
-/* Active: light-blue icon/text. Lift above the navy indicator (z-index 2) so the
-   light-blue icon/label paint ON TOP of the navy pill instead of being hidden behind it. */
-.property-terminal-view .tp-subbar-btn.active { background: transparent !important; box-shadow: none !important; color: #58ABFF; z-index: 3; }
-.property-terminal-view .tp-subbar.compact .tp-subbar-btn { padding: 0 11px; }
-/* Label is white too (same colour as icon when active) */
-.property-terminal-view .tp-subbar-label { font-family: 'Outfit', system-ui; font-weight: 600; font-size: 12px; letter-spacing: 0.4px; color: #58ABFF; white-space: nowrap; animation: tp-labelIn 0.3s ease-out; }
-.property-terminal-view .tp-send { display: flex; align-items: center; gap: 6px; padding: 4px 14px 4px 4px; border-radius: 26px; background: #040D6D; border: none; cursor: pointer; box-shadow: 0 4px 16px rgba(4,13,109,0.25); transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); -webkit-tap-highlight-color: transparent; flex-shrink: 0; height: 37px; }
+.property-terminal-view .tp-subbar { background: #58ABFF; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 16px 48px rgba(4,13,109,0.2), 0 4px 12px rgba(4,13,109,0.1), inset 0 1px 0 rgba(255,255,255,0.25); }
+.property-terminal-view .tp-subbar-ind { background: #040D6D; box-shadow: 0 4px 16px rgba(4,13,109,0.4); }
+.property-terminal-view .tp-subbar-btn { color: rgba(4,13,109,0.55); }
+.property-terminal-view .tp-subbar-btn.active { color: #58ABFF; }
+.property-terminal-view .tp-subbar-label { color: #58ABFF; }
+.property-terminal-view .tp-send { display: flex; align-items: center; gap: 6px; padding: 4px 14px 4px 4px; border-radius: 26px; background: #040D6D; border: none; cursor: pointer; box-shadow: 0 4px 16px rgba(4,13,109,0.25); transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); -webkit-tap-highlight-color: transparent; flex-shrink: 0; }
 .property-terminal-view .tp-send:active { transform: scale(0.94); }
 .property-terminal-view .tp-send-circle { width: 20px; height: 20px; border-radius: 50%; background: #58ABFF; display: flex; align-items: center; justify-content: center; }
 .property-terminal-view .tp-send-label { font-size: 11px; font-weight: 700; color: #58ABFF; letter-spacing: 0.3px; }
@@ -113,7 +103,7 @@
 .property-terminal-view .tp-pfab.raised { top: 40%; }
 .property-terminal-view .tp-pfab.hide { opacity: 0; transform: translate(-50%, -50%) translateY(8px) scale(0.7); pointer-events: none; }
 .property-terminal-view .tp-pfab.show { opacity: 1; }
-.property-terminal-view .tp-psubbar { position: absolute; top: 50%; left: 0; right: 0; padding: 0 22px; box-sizing: border-box; transform: translateY(67px); display: flex; align-items: center; gap: 8px; transition: opacity 220ms cubic-bezier(0,0,0.2,1), transform 300ms cubic-bezier(0.4,0,0.2,1), top 0.45s cubic-bezier(0.34,1.56,0.64,1); will-change: opacity, transform; height: 37px; pointer-events: none; }
+.property-terminal-view .tp-psubbar { position: absolute; top: 50%; left: 0; right: 0; padding: 0 22px; box-sizing: border-box; transform: translateY(67px); display: flex; align-items: center; gap: 8px; transition: opacity 220ms cubic-bezier(0,0,0.2,1), transform 300ms cubic-bezier(0.4,0,0.2,1), top var(--dur-bar) var(--ease-bar); will-change: opacity, transform; pointer-events: none; }
 .property-terminal-view .tp-psubbar.raised { top: 40%; }
 /* Only the visible pills capture taps — the bar's empty full-width area passes
    taps through to the screen beneath (e.g. the "send bill" CTA). */
@@ -124,7 +114,7 @@
 /* Action bar lives in a flex:1 cell and centres itself in whatever space is left
    after the split pill / send button — so it can never overlap either of them. */
 .property-terminal-view .tp-subbar-center { flex: 1 1 auto; min-width: 0; display: flex; justify-content: center; }
-.property-terminal-view .tp-send-slot { flex-shrink: 0; display: flex; align-items: center; overflow: hidden; max-width: 0; opacity: 0; transition: max-width 420ms cubic-bezier(0.34,1.56,0.64,1), opacity 280ms ease 80ms; height: 37px; }
+.property-terminal-view .tp-send-slot { flex-shrink: 0; display: flex; align-items: center; overflow: hidden; max-width: 0; opacity: 0; }
 .property-terminal-view .tp-send-slot.show { max-width: 143px; opacity: 1; }
-.property-terminal-view .tp-split-slot { flex-shrink: 0; display: flex; align-items: center; overflow: hidden; max-width: 0; opacity: 0; transition: max-width 420ms cubic-bezier(0.34,1.56,0.64,1), opacity 280ms ease 80ms; height: 37px; }
+.property-terminal-view .tp-split-slot { flex-shrink: 0; display: flex; align-items: center; overflow: hidden; max-width: 0; opacity: 0; }
 .property-terminal-view .tp-split-slot.show { max-width: 120px; opacity: 1; }
