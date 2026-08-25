@@ -2,12 +2,27 @@ import { useState, useEffect, useRef } from "react";
 import { setDockCollapse } from "@/features/navigation/dock-collapse-store";
 import { SegmentedBar } from "../SegmentedBar";
 import { useMeasuredChromeGutter } from "../useMeasuredChromeGutter";
+import { useFitTerminalAmounts } from "../useFitTerminalAmounts";
 
 const NAVY = '#040D6D';
 const BLUE = '#58ABFF';
 const OFFW = '#F4F4F4';
 const GREEN = '#1BBF85';
 const fmt = c => `$${(c / 100).toFixed(2)}`;
+
+const Amount = ({ value, authoredSize, style, ...props }) => (
+  <div
+    {...props}
+    className="tp-amount"
+    style={{
+      ...style,
+      '--amount-authored': `${authoredSize}px`,
+      '--amount-chars': Math.max(String(value).length, 1),
+    }}
+  >
+    {value}
+  </div>
+);
 
 const requestShare = async (onShare, intent, toast, successMessage) => {
   try {
@@ -287,7 +302,7 @@ function MainTerminal({ state, go, paywaveOn, togglePaywave, onItemClick, showPa
   return (
     <div className="tp-screen tp-home">
       <div className="stagger tp-home-hero" style={{ background: NAVY, padding: 'clamp(52px, 11svh, 100px) 28px 18px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
-        <div className="tp-amount" style={{ fontSize: 88, color: BLUE }}>{fmt(total)}</div>
+        <Amount value={fmt(total)} authoredSize={88} style={{ color: BLUE }} />
         <div style={{ display: 'flex', gap: 8, marginTop: 22 }}>
           {showPaywave && (
             <button className={`tp-pill tap-target${paywaveOn ? ' solid' : ' outline'}`} onClick={togglePaywave} data-demo-id="retail-paywave">paywave</button>
@@ -320,7 +335,7 @@ function PendingTerminal({ state, go, paywaveOn, togglePaywave, onItemClick, sho
           onTouchStart={e => e.currentTarget.style.transform = 'scale(0.92)'}
           onTouchEnd={e => e.currentTarget.style.transform = ''}
         ><Ic.X sz={16} sw={2.4} /></button>
-        <div className="tp-amount" style={{ fontSize: 88, color: BLUE }}>{fmt(total)}</div>
+        <Amount value={fmt(total)} authoredSize={88} style={{ color: BLUE }} />
         <div style={{ display: 'flex', gap: 8, marginTop: 22 }}>
           {showPaywave && (
             <button className={`tp-pill tap-target${paywaveOn ? ' solid' : ' outline'}`} onClick={togglePaywave} data-demo-id="retail-paywave">paywave</button>
@@ -357,7 +372,7 @@ function Keypad({ state, go, onCommit }) {
       <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={() => go('cancel')} onCommit={commit} demoScope="retail-keypad" />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <div className="tp-amount" data-demo-id="retail-amount" style={{ fontSize: 88, color: cents === 0 ? 'rgba(4,13,109,0.32)' : NAVY, marginTop: 18 }}>{fmt(cents)}</div>
+          <Amount value={fmt(cents)} authoredSize={88} data-demo-id="retail-amount" style={{ color: cents === 0 ? 'rgba(4,13,109,0.32)' : NAVY, marginTop: 18 }} />
           <button className="tp-pill" data-demo-id="retail-split-toggle" style={{ alignSelf: 'flex-start', padding: '8px 16px', background: splitOn ? NAVY : 'transparent', color: splitOn ? BLUE : NAVY, boxShadow: splitOn ? 'none' : `inset 0 0 0 1px rgba(4,13,109,0.5)`, transition: 'background 0.18s ease, color 0.18s ease' }} onClick={handleSplit}>split bill</button>
         </div>
         <div style={{ height: 52 }} />
@@ -396,7 +411,7 @@ function SplitPayment({ state, go, onCommitSplit }) {
       <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={() => go('cancel')} onCommit={commit} demoScope="retail-split" />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div className="tp-amount" style={{ fontSize: 88, textAlign: 'center' }}>{fmt(partAmount)}</div>
+          <Amount value={fmt(partAmount)} authoredSize={88} style={{ textAlign: 'center' }} />
           <div style={{ marginTop: 18, textAlign: 'center', fontWeight: 500, fontSize: 19, color: NAVY, lineHeight: 1.4 }}>
             payment 1/{parts}<br />total: {fmt(total)}
           </div>
@@ -408,7 +423,7 @@ function SplitPayment({ state, go, onCommitSplit }) {
         <div style={{ fontWeight: 700, fontSize: 22 }}>split bill</div>
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 36 }}>
           <button className="tp-stepper" data-demo-id="retail-split-decrease" aria-label="decrease split" onClick={() => setParts(p => Math.max(2, p - 1))}><Ic.Minus /></button>
-          <div className="tp-amount" data-demo-id={parts === 4 ? 'retail-split-four' : `retail-split-${parts}`} style={{ fontSize: 88, color: BLUE, fontWeight: 900 }}>{parts}</div>
+          <Amount value={parts} authoredSize={88} data-demo-id={parts === 4 ? 'retail-split-four' : `retail-split-${parts}`} style={{ color: BLUE, fontWeight: 900 }} />
           <button className="tp-stepper" data-demo-id="retail-split-increase" aria-label="increase split" onClick={() => setParts(p => Math.min(12, p + 1))}><Ic.Plus sz={22} /></button>
         </div>
         <button onClick={() => go('keypad')} style={{ color: BLUE, fontWeight: 500, fontSize: 16, textDecoration: 'underline', textUnderlineOffset: 4, marginBottom: 22, background: 'none', border: 'none', cursor: 'pointer' }}>enter amount</button>
@@ -446,7 +461,7 @@ function ChooseStock({ state, go, onCommitStock }) {
       <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={() => go('cancel')} onCommit={commit} demoScope="retail-stock" />
         <div style={{ flex: 1, padding: '8px 28px 12px', display: 'flex', alignItems: 'center' }}>
-          <div className="tp-amount" style={{ fontSize: 88 }}>{fmt(total)}</div>
+          <Amount value={fmt(total)} authoredSize={88} />
         </div>
         <div style={{ height: 52 }} />
       </div>
@@ -502,7 +517,7 @@ function EnterDetails({ state, go, onCommitDetails, initialAmount = 0 }) {
       <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={() => go('cancel')} onCommit={commit} demoScope="retail-details" />
         <div style={{ flex: 1, padding: '8px 28px 12px', display: 'flex', alignItems: 'center' }}>
-          <div className="tp-amount" style={{ fontSize: 88 }}>{fmt(centsPreview || initialAmount)}</div>
+          <Amount value={fmt(centsPreview || initialAmount)} authoredSize={88} />
         </div>
         <div style={{ height: 52 }} />
       </div>
@@ -546,7 +561,7 @@ function CashEntry({ go, onCommitCash }) {
       <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={() => go('cancel')} onCommit={commit} demoScope="retail-cash" />
         <div style={{ flex: 1, padding: '8px 28px 12px', display: 'flex', alignItems: 'center' }}>
-          <div className="tp-amount" style={{ fontSize: 88 }}>{fmt(cents * qty)}</div>
+          <Amount value={fmt(cents * qty)} authoredSize={88} />
         </div>
         <div style={{ height: 52 }} />
       </div>
@@ -593,7 +608,7 @@ function SharePayment({ state, go, toast, onShare, onExpandQR, onConfirmPayment,
       <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={() => go('cancel')} onCommit={handleConfirm} demoScope="retail-share" />
         <div style={{ flex: 1, padding: '8px 28px 18px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
-          <div className="tp-amount" style={{ fontSize: 76 }}>{fmt(state.pending?.amount || total)}</div>
+          <Amount value={fmt(state.pending?.amount || total)} authoredSize={76} />
           <div style={{ marginTop: 16, fontWeight: 500, fontSize: 18, lineHeight: 1.4 }}>
             {state.pending?.name || 'payment'}
           </div>
@@ -643,7 +658,7 @@ function CashSuccess({ state, go, setState, toast, onShare }) {
       <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={clear} onCommit={clear} demoScope="retail-cash-success" />
         <div style={{ flex: 1, padding: '8px 28px 12px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-          <div className="tp-amount" style={{ fontSize: 88 }}>{fmt(total)}</div>
+          <Amount value={fmt(total)} authoredSize={88} />
           <div style={{ marginTop: 22, fontWeight: 700, fontSize: 22 }}>cash payment</div>
         </div>
         <div style={{ height: 52 }} />
@@ -1176,6 +1191,7 @@ export default function RetailTerminalViewCore({
   const sendVisible     = onHome && !!state.pending;
   const conveyorDir     = conveyor?.dir || 'up';
   useMeasuredChromeGutter(viewportRef, fabVisible ? 'fab' : subbarVisible ? 'bar' : null);
+  useFitTerminalAmounts(viewportRef);
 
   return (
     <div className="retail-terminal-view tp-viewport" data-retail-terminal-view ref={viewportRef}>

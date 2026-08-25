@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { formatNzd } from "@/lib/trades-money";
 import { TRADES_THEME } from "@/lib/trades-theme";
 import { setDockCollapse } from "@/features/navigation/dock-collapse-store";
 import { SegmentedBar } from "../SegmentedBar";
 import { useMeasuredChromeGutter } from "../useMeasuredChromeGutter";
+import { useFitTerminalAmounts } from "../useFitTerminalAmounts";
 import "../terminal-keyframes.css";
 import "../terminal-tokens.css";
 import "./trades-terminal-view.css";
@@ -17,6 +18,19 @@ const RED   = TRADES_THEME.RED;
 const AMBER = TRADES_THEME.AMBER;
 
 const fmt = formatNzd; // canonical NZD formatter (Intl en-NZ) — see trades-money.ts
+
+type AmountStyle = CSSProperties & {
+  '--amount-authored': string;
+  '--amount-chars': number;
+};
+
+function amountStyle(displayed: string, authoredPx: number, style: CSSProperties = {}): AmountStyle {
+  return {
+    ...style,
+    '--amount-authored': `${authoredPx}px`,
+    '--amount-chars': displayed.length,
+  };
+}
 
 function clientInitials(t: any) {
   return `${t.firstName?.[0] ?? ''}${t.lastName?.[0] ?? ''}`.toUpperCase();
@@ -120,6 +134,7 @@ function SubHead({ onCancel, onCommit, demoCommitId }: any) {
 
 /* ═══ SCREEN: JobsHome — the stack of quotes/jobs/invoices ═══ */
 function JobsHome({ invoices, outstanding, go, onRowTap }: any) {
+  const outstandingText = fmt(outstanding);
   const recent = [...invoices]
     .filter((i: any) => i.status !== 'voided')
     .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -129,7 +144,7 @@ function JobsHome({ invoices, outstanding, go, onRowTap }: any) {
     <div className="tp-screen tp-home">
       {/* Top — ink */}
       <div className="stagger tp-home-hero" style={{ background: NAVY, padding: 'clamp(52px, 11svh, 100px) 28px 18px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
-        <div className="tp-amount" style={{ fontSize: 82, color: OFFW }}>{fmt(outstanding)}</div>
+        <div className="tp-amount" style={amountStyle(outstandingText, 82, { color: OFFW })}>{outstandingText}</div>
         <div style={{ marginTop: 10, color: OFFW, fontWeight: 500, fontSize: 16 }}>outstanding</div>
       </div>
       <div className="tp-home-chrome" aria-hidden="true" />
@@ -257,6 +272,7 @@ function ChooseClient({ clients, invoices, go, onSelect, onQuickInvoice }: any) 
 function AmountKeypad({ go, selectedClient, onCommit, backTo = 'invoice' }: any) {
   const [digits, setDigits] = useState('');
   const cents = parseInt(digits || '0', 10);
+  const amountText = fmt(cents);
   const press = (d: string) => { if (digits.length < 7) setDigits(p => p === '' && d === '0' ? '' : p + d); };
   const back  = () => setDigits(p => p.slice(0, -1));
   const commit = () => { if (cents === 0) return; onCommit(cents); };
@@ -266,7 +282,7 @@ function AmountKeypad({ go, selectedClient, onCommit, backTo = 'invoice' }: any)
       <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={() => go(backTo, 'down')} onCommit={commit} demoCommitId="trades-amount-confirm" />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <div className="tp-amount" data-demo-id="trades-amount" style={{ fontSize: 82, color: cents === 0 ? 'rgba(4,13,109,0.25)' : NAVY, marginTop: 18 }}>{fmt(cents)}</div>
+          <div className="tp-amount" data-demo-id="trades-amount" style={amountStyle(amountText, 82, { color: cents === 0 ? 'rgba(4,13,109,0.25)' : NAVY, marginTop: 18 })}>{amountText}</div>
           {selectedClient && (
             <div style={{ fontWeight: 500, fontSize: 15, color: 'rgba(4,13,109,0.5)', paddingBottom: 8 }}>
               {clientName(selectedClient)} · {selectedClient.siteAddress}
@@ -295,6 +311,7 @@ function AmountKeypad({ go, selectedClient, onCommit, backTo = 'invoice' }: any)
 /* ═══ SCREEN: QuickInvoice — keypad amount → optional note → send (kind: full)
    quickMode: no client — the merchant types recipient details inline instead. ═══ */
 function QuickInvoice({ go, selectedClient, quickMode, recipient, setRecipient, amount, onEditAmount, jobNote, setJobNote, splitEnabled, setSplitEnabled, onSend, sending }: any) {
+  const amountText = fmt(amount);
   if (!selectedClient && !quickMode) {
     return (
       <div className="tp-screen tp-feature" style={{ background: NAVY }}>
@@ -328,7 +345,7 @@ function QuickInvoice({ go, selectedClient, quickMode, recipient, setRecipient, 
         <SubHead onCancel={() => go('home', 'down')} onCommit={onSend} />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <button onClick={onEditAmount} data-demo-id="trades-invoice-amount" style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'baseline', gap: 10 }}>
-            <span className="tp-amount" style={{ fontSize: 82, color: amount === 0 ? 'rgba(4,13,109,0.25)' : NAVY }}>{fmt(amount)}</span>
+            <span className="tp-amount" style={amountStyle(amountText, 82, { color: amount === 0 ? 'rgba(4,13,109,0.25)' : NAVY })}>{amountText}</span>
             <span style={{ fontWeight: 600, fontSize: 12, color: 'rgba(4,13,109,0.4)', textDecoration: 'underline', textUnderlineOffset: 2 }}>edit</span>
           </button>
           <div style={{ marginTop: 14, fontWeight: 500, fontSize: 16, color: NAVY, lineHeight: 1.4 }}>
@@ -445,13 +462,14 @@ function MarkExternal({ go, selectedClient, amount, invoices, onMark, marking }:
     .filter((i: any) => i.clientProfileId === selectedClient?.id && LIVE.includes(i.status))
     .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   const picked = outstanding.find((i: any) => i.id === pickedId) || outstanding[0] || null;
+  const amountText = picked ? fmt(picked.amountCents) : fmt(amount);
 
   return (
     <div className="tp-screen tp-feature" style={{ background: NAVY }}>
       <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={() => go('home', 'down')} onCommit={() => picked && onMark(picked.id, ref)} />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div className="tp-amount" style={{ fontSize: 82 }}>{picked ? fmt(picked.amountCents) : fmt(amount)}</div>
+          <div className="tp-amount" style={amountStyle(amountText, 82)}>{amountText}</div>
           {selectedClient && (
             <div style={{ marginTop: 14, fontWeight: 500, fontSize: 15, color: NAVY }}>{clientName(selectedClient)}</div>
           )}
@@ -515,12 +533,13 @@ function MarkExternal({ go, selectedClient, amount, invoices, onMark, marking }:
 /* ═══ SCREEN: SentSuccess — quick invoices offer "add client" (promotes the
    hidden prospect profile into a real directory client) ═══ */
 function SentSuccess({ amount, label, go, showAddClient, onAddClient, addState }: any) {
+  const amountText = fmt(amount);
   return (
     <div className="tp-screen tp-feature" style={{ background: NAVY }}>
       <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={() => go('home', 'down')} onCommit={() => go('home', 'down')} />
         <div style={{ flex: 1, padding: '12px 28px 12px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-          <div className="tp-amount" style={{ fontSize: 82 }}>{fmt(amount)}</div>
+          <div className="tp-amount" style={amountStyle(amountText, 82)}>{amountText}</div>
           <div style={{ marginTop: 18, fontWeight: 700, fontSize: 22 }}>invoice sent</div>
         </div>
         <div style={{ height: 52 }} />
@@ -688,13 +707,14 @@ export function QuoteView({
   const selected = clients.find((client: any) => client.id === clientId);
   const selectedName = selected ? `${selected.firstName} ${selected.lastName}` : '';
   const ready = !!clientId && totals.total > 0;
+  const amountText = fmt(totals.total);
 
   return (
     <div className="tp-screen tp-feature" style={{ background: NAVY }} data-demo-id="trades-quote" data-hero="compact">
       <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={onCancel} onCommit={() => { if (created) { onExit(); return; } if (ready) onCreate(); }} />
         <div style={{ flex: 1, minHeight: 0, padding: '2px 28px 10px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <span className="tp-amount" style={{ fontSize: 44, color: totals.total === 0 ? 'rgba(4,13,109,0.25)' : NAVY }}>{fmt(totals.total)}</span>
+          <span className="tp-amount" style={amountStyle(amountText, 44, { color: totals.total === 0 ? 'rgba(4,13,109,0.25)' : NAVY })}>{amountText}</span>
           <div style={{ marginTop: 4, fontWeight: 500, fontSize: 13, color: 'rgba(4,13,109,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {created ? 'quote created' : selectedName || 'new quote'}
           </div>
@@ -1035,6 +1055,7 @@ export function TradesTerminalView(props: TradesTerminalViewProps) {
   const sendVisible = props.screen === 'home' && !!props.selectedClient;
   const conveyorDirection = props.conveyor?.dir || 'up';
   useMeasuredChromeGutter(viewportRef, fabVisible ? 'fab' : subbarVisible ? 'bar' : null);
+  useFitTerminalAmounts(viewportRef);
 
   return (
     <div

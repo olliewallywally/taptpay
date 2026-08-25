@@ -3,6 +3,7 @@ import { WireframeLiquidButton } from "@/components/wireframe-liquid-button";
 import { setDockCollapse } from "@/features/navigation/dock-collapse-store";
 import { SegmentedBar } from "../SegmentedBar";
 import { useMeasuredChromeGutter } from "../useMeasuredChromeGutter";
+import { useFitTerminalAmounts } from "../useFitTerminalAmounts";
 
 import "../terminal-keyframes.css";
 import "../terminal-tokens.css";
@@ -17,6 +18,21 @@ const RED   = '#FF3B4E';
 const AMBER = '#FFB02E';
 
 const fmt = (c: number) => `$${(c / 100).toFixed(2)}`;
+
+type AmountStyle = React.CSSProperties & {
+  '--amount-authored': string;
+  '--amount-chars': number;
+};
+
+const amountStyle = (
+  displayed: string,
+  authoredSize: number,
+  style: React.CSSProperties = {},
+): AmountStyle => ({
+  ...style,
+  '--amount-authored': `${authoredSize}px`,
+  '--amount-chars': displayed.length,
+});
 
 /* One CTA size for every feature-screen confirm button (25% down from the old tp-cta) */
 const CTA_SIZE: React.CSSProperties = { padding: '10px 27px', fontSize: 13, minWidth: 165 };
@@ -171,10 +187,10 @@ function RequestsHome({ invoices, tenants, outstanding, outstandingExpenses = 0,
       {/* Top — navy. Collapses to 0 and slides its content up when the feed expands. */}
       <div className="stagger tp-feed-hero tp-home-hero" style={{ background: NAVY, padding: feedOpen ? '0 28px' : 'clamp(44px, 9.5svh, 86px) 28px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
         <div className={`tp-feed-hero-inner${feedOpen ? ' off' : ''}`}>
-          <div className="tp-amount" style={{ fontSize: 82, color: BLUE }}>{fmt(outstanding)}</div>
+          <div className="tp-amount" style={amountStyle(fmt(outstanding), 82, { color: BLUE })}>{fmt(outstanding)}</div>
           <div style={{ marginTop: 10, color: BLUE, fontWeight: 500, fontSize: 16 }}>outstanding rent</div>
           {/* Expenses — smaller and lighter than the hero figure, faded */}
-          <div className="tp-amount" style={{ marginTop: 12, fontSize: 42, fontWeight: 500, color: 'rgba(88,171,255,0.55)' }}>{fmt(outstandingExpenses)}</div>
+          <div className="tp-amount" style={amountStyle(fmt(outstandingExpenses), 42, { marginTop: 12, fontWeight: 500, color: 'rgba(88,171,255,0.55)' })}>{fmt(outstandingExpenses)}</div>
           <div style={{ marginTop: 4, color: 'rgba(88,171,255,0.55)', fontWeight: 400, fontSize: 13 }}>outstanding expenses</div>
         </div>
       </div>
@@ -375,7 +391,7 @@ function RentAmount({ go, selectedTenant, onCommit, backTo = 'send' }: any) {
       <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={() => go(backTo, 'down')} onCommit={commit} demoCommitId="property-amount-confirm" />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <div className="tp-amount" data-demo-id="property-amount" style={{ fontSize: 82, color: cents === 0 ? 'rgba(4,13,109,0.25)' : NAVY, marginTop: 18 }}>{fmt(cents)}</div>
+          <div className="tp-amount" data-demo-id="property-amount" style={amountStyle(fmt(cents), 82, { color: cents === 0 ? 'rgba(4,13,109,0.25)' : NAVY, marginTop: 18 })}>{fmt(cents)}</div>
           {selectedTenant && (
             <div style={{ fontWeight: 500, fontSize: 15, color: 'rgba(4,13,109,0.5)', paddingBottom: 8 }}>
               {tenantName(selectedTenant)} · {selectedTenant.propertyAddress}
@@ -434,7 +450,7 @@ function SendRentLink({ go, selectedTenant, amount, onSend, sending, frequency, 
       <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={() => go('home', 'down')} onCommit={onSend} />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div className="tp-amount" style={{ fontSize: 82 }}>{fmt(amount)}</div>
+          <div className="tp-amount" style={amountStyle(fmt(amount), 82)}>{fmt(amount)}</div>
           {selectedTenant && (
             <div style={{ marginTop: 14, fontWeight: 500, fontSize: 16, color: NAVY, lineHeight: 1.4 }}>
               {tenantName(selectedTenant)}
@@ -558,7 +574,7 @@ function ChargeBill({ go, selectedTenant, amount, onEditAmount, chargeType, setC
         <SubHead onCancel={() => go('home', 'down')} onCommit={() => ready && onSend()} />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <button onClick={onEditAmount} data-demo-id="property-bill-amount" style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'baseline', gap: 10 }}>
-            <span className="tp-amount" style={{ fontSize: 82, color: amount === 0 ? 'rgba(4,13,109,0.25)' : NAVY }}>{fmt(amount)}</span>
+            <span className="tp-amount" style={amountStyle(fmt(amount), 82, { color: amount === 0 ? 'rgba(4,13,109,0.25)' : NAVY })}>{fmt(amount)}</span>
             <span style={{ fontWeight: 600, fontSize: 12, color: 'rgba(4,13,109,0.4)', textDecoration: 'underline', textUnderlineOffset: 2 }}>edit</span>
           </button>
           <div style={{ marginTop: 14, fontWeight: 500, fontSize: 16, color: NAVY, lineHeight: 1.4 }}>
@@ -718,7 +734,7 @@ function AutomateScreen({ go, schedules, tenants, onPauseResume, onCancel, busyI
       <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={() => go('home', 'down')} onCommit={() => go('home', 'down')} />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div className="tp-amount" style={{ fontSize: 64 }}>{live.length}</div>
+          <div className="tp-amount" style={amountStyle(String(live.length), 64)}>{live.length}</div>
           <div style={{ marginTop: 10, fontWeight: 500, fontSize: 15, color: 'rgba(4,13,109,0.5)' }}>
             active automation{live.length !== 1 ? 's' : ''}
           </div>
@@ -821,7 +837,7 @@ function MarkExternal({ go, selectedTenant, amount, invoices, onMark, marking }:
       <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={() => go('home', 'down')} onCommit={() => picked && onMark(picked.id, ref)} />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div className="tp-amount" style={{ fontSize: 82 }}>{picked ? fmt(picked.amountCents) : fmt(amount)}</div>
+          <div className="tp-amount" style={amountStyle(picked ? fmt(picked.amountCents) : fmt(amount), 82)}>{picked ? fmt(picked.amountCents) : fmt(amount)}</div>
           {selectedTenant && (
             <div style={{ marginTop: 14, fontWeight: 500, fontSize: 15, color: NAVY }}>{tenantName(selectedTenant)}</div>
           )}
@@ -905,11 +921,11 @@ function BatchAndAutoScreen({ go, tenants, invoices, onBatchSend, sending, sched
 
   /* ── Top half headline ── */
   const headline = tab === 'batch'
-    ? <><div className="tp-amount" style={{ fontSize: 82, color: totalCents === 0 ? 'rgba(4,13,109,0.25)' : NAVY }}>{fmt(totalCents)}</div>
+    ? <><div className="tp-amount" style={amountStyle(fmt(totalCents), 82, { color: totalCents === 0 ? 'rgba(4,13,109,0.25)' : NAVY })}>{fmt(totalCents)}</div>
         <div style={{ marginTop: 10, fontWeight: 500, fontSize: 15, color: 'rgba(4,13,109,0.5)' }}>
           {selected.size === 0 ? 'select tenants below' : `${selected.size} selected`}
         </div></>
-    : <><div className="tp-amount" style={{ fontSize: 82, color: liveSchedules.length === 0 ? 'rgba(4,13,109,0.25)' : NAVY }}>{liveSchedules.length}</div>
+    : <><div className="tp-amount" style={amountStyle(String(liveSchedules.length), 82, { color: liveSchedules.length === 0 ? 'rgba(4,13,109,0.25)' : NAVY })}>{liveSchedules.length}</div>
         <div style={{ marginTop: 10, fontWeight: 500, fontSize: 15, color: 'rgba(4,13,109,0.5)' }}>
           active automation{liveSchedules.length !== 1 ? 's' : ''}
         </div></>;
@@ -1038,7 +1054,7 @@ function SentSuccess({ amount, label, go, kind = 'rent' }: any) {
       <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={() => go('home', 'down')} onCommit={() => go('home', 'down')} />
         <div style={{ flex: 1, padding: '12px 28px 12px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-          <div className="tp-amount" style={{ fontSize: 82 }}>{fmt(amount)}</div>
+          <div className="tp-amount" style={amountStyle(fmt(amount), 82)}>{fmt(amount)}</div>
           <div style={{ marginTop: 18, fontWeight: 700, fontSize: 22 }}>{title}</div>
         </div>
         <div style={{ height: 52 }} />
@@ -1291,6 +1307,7 @@ export function PropertyTerminalView(props: PropertyTerminalViewProps) {
   const sendVisible = props.screen === 'home' && !feedExpanded && !!props.selectedTenant;
   const conveyorDirection = props.conveyor?.dir || 'up';
   useMeasuredChromeGutter(viewportRef, fabVisible ? 'fab' : subbarVisible ? 'bar' : null);
+  useFitTerminalAmounts(viewportRef);
 
   return (
     <div className="property-terminal-view tp-viewport" ref={viewportRef} data-demo-id="property-terminal">
