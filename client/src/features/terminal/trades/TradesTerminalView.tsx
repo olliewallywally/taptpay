@@ -3,6 +3,7 @@ import { formatNzd } from "@/lib/trades-money";
 import { TRADES_THEME } from "@/lib/trades-theme";
 import { setDockCollapse } from "@/features/navigation/dock-collapse-store";
 import { SegmentedBar } from "../SegmentedBar";
+import { useMeasuredChromeGutter } from "../useMeasuredChromeGutter";
 import "../terminal-keyframes.css";
 import "../terminal-tokens.css";
 import "./trades-terminal-view.css";
@@ -127,12 +128,13 @@ function JobsHome({ invoices, outstanding, go, onRowTap }: any) {
   return (
     <div className="tp-screen tp-home">
       {/* Top — ink */}
-      <div className="stagger" style={{ background: NAVY, height: '50%', padding: '100px 28px 28px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
+      <div className="stagger tp-home-hero" style={{ background: NAVY, padding: 'clamp(52px, 11svh, 100px) 28px 18px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
         <div className="tp-amount" style={{ fontSize: 82, color: OFFW }}>{fmt(outstanding)}</div>
         <div style={{ marginTop: 10, color: OFFW, fontWeight: 500, fontSize: 16 }}>outstanding</div>
       </div>
+      <div className="tp-home-chrome" aria-hidden="true" />
       {/* Bottom — OFFW */}
-      <div className="stagger" style={{ flex: 1, background: OFFW, padding: '154px 22px 110px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="stagger tp-home-stack" style={{ background: OFFW, padding: '0 22px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <div className="tp-stack-title">jobs</div>
         </div>
@@ -1032,6 +1034,7 @@ export function TradesTerminalView(props: TradesTerminalViewProps) {
   const fabVisible = props.screen === 'home';
   const sendVisible = props.screen === 'home' && !!props.selectedClient;
   const conveyorDirection = props.conveyor?.dir || 'up';
+  useMeasuredChromeGutter(viewportRef, fabVisible ? 'fab' : subbarVisible ? 'bar' : null);
 
   return (
     <div
@@ -1054,11 +1057,11 @@ export function TradesTerminalView(props: TradesTerminalViewProps) {
 
       <div className="tp-overlay">
         <TopBanner msg={props.banner} />
-        <div className={`tp-pfab${fabVisible ? ' show' : ' hide'}`}>
+        <div className={`tp-pfab${fabVisible ? ' show' : ' hide'}${props.screen === 'home' ? ' home' : ''}`}>
           <FabBtn onClick={() => props.onNavigate('clients')} />
         </div>
         <div
-          className={`tp-psubbar${subbarVisible ? ' show' : ' hide'}${isFeatureScreen ? ' feature' : ''}`}
+          className={`tp-psubbar${subbarVisible ? ' show' : ' hide'}${isFeatureScreen ? ' feature' : ''}${props.screen === 'home' ? ' home' : ''}`}
           style={isFeatureScreen ? { transform: `translateY(calc(${boundaryDelta}px - 100% - 20px))` } : undefined}
         >
           <div className="tp-subbar-center">

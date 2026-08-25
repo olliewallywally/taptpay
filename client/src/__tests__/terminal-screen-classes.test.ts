@@ -56,6 +56,8 @@ const SCREEN_FILES = [
 ];
 
 const CLASSES = ["tp-home", "tp-feature", "tp-plain"] as const;
+const hasClass = (value: string, className: string): boolean =>
+  value.split(/\s+/).includes(className);
 
 /* The three vertical sheets each open with the same authored base rule. It
  * predates both plans, and phases 6 and 8 are what replace it — until then it
@@ -165,7 +167,7 @@ describe("terminal screen classes (§6.6.1)", () => {
       const malformed: string[] = [];
 
       for (const value of screens) {
-        const found = CLASSES.filter((c) => new RegExp(`\\b${c}\\b`).test(value));
+        const found = CLASSES.filter((c) => hasClass(value, c));
         if (found.length !== 1) malformed.push(`${found.length} classes: ${value.trim()}`);
         else counts[found[0]]++;
       }
@@ -190,8 +192,8 @@ describe("terminal screen classes (§6.6.1)", () => {
     for (const file of walk(SRC, /\.(?:tsx|jsx)$/)) {
       if (file.includes("__tests__")) continue;
       for (const value of classAttributes(readFileSync(file, "utf8"))) {
-        const carries = CLASSES.some((c) => new RegExp(`\\b${c}\\b`).test(value));
-        if (carries && !/\btp-screen\b/.test(value)) {
+        const carries = CLASSES.some((c) => hasClass(value, c));
+        if (carries && !hasClass(value, "tp-screen")) {
           strays.push(`${file.slice(SRC.length + 1)}: ${value.trim()}`);
         }
       }

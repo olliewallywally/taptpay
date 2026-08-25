@@ -253,6 +253,7 @@ async function measure(page, allowlist) {
     let tapUnder44 = 0;
     let tapInflated = 0;
     let tapCentreMiss = 0;
+    const tapCentreMissSamples = [];
     const inflatedSamples = [];
     for (const el of controls) {
       if (!visible(el)) continue;
@@ -281,7 +282,15 @@ async function measure(page, allowlist) {
          own its centre point, so it is not an actionable tap target. */
       if (s.pointerEvents !== "none" && cx >= 0 && cy >= 0 && cx <= vw && cy <= vh) {
         const hit = document.elementFromPoint(cx, cy);
-        if (hit && hit !== el && !el.contains(hit)) tapCentreMiss++;
+        if (hit && hit !== el && !el.contains(hit)) {
+          tapCentreMiss++;
+          if (tapCentreMissSamples.length < 8) {
+            tapCentreMissSamples.push({
+              control: el.getAttribute("aria-label") || el.getAttribute("data-demo-id") || classesOf(el).filter(Boolean).slice(0, 2).join("."),
+              hit: hit.getAttribute?.("aria-label") || hit.getAttribute?.("data-demo-id") || classesOf(hit).filter(Boolean).slice(0, 2).join(".") || hit.tagName.toLowerCase(),
+            });
+          }
+        }
       }
     }
 
@@ -312,6 +321,17 @@ async function measure(page, allowlist) {
       ".tp-hero",
       ".tp-panel",
       ".tp-viewport .tp-screen.tp-plain",
+      ".tp-viewport .tp-screen.tp-home",
+      ".tp-viewport .tp-home-hero",
+      ".tp-viewport .tp-home-chrome",
+      ".tp-viewport .tp-home-stack",
+      ".tp-viewport .tp-home-stack .tp-stack-scroll",
+      ".tp-viewport .tp-home-stack .tp-stack-row",
+      ".tp-viewport .tp-pfab.home",
+      ".tp-viewport .tp-psubbar.home",
+      '.tp-viewport .tp-screen.tp-home[data-feed-open="true"]',
+      ".tp-viewport .tp-home-stack-header",
+      ".tp-viewport .tp-home-stack-filters",
       ".tp-viewport .tp-subbar-wrap",
       ".tp-viewport .tp-subbar.tp-bar",
       ".tp-viewport .tp-subbar.tp-bar .tp-bar-ind",
@@ -362,6 +382,7 @@ async function measure(page, allowlist) {
       tapUnder44,
       tapInflated,
       tapCentreMiss,
+      tapCentreMissSamples,
       inflatedSamples,
       tpUnscopedRules,
       tpDuplicateKeyframes,
@@ -581,6 +602,11 @@ function summarise(current) {
   }
   const rowsMin = Math.min(...cells.map(([, m]) => m.components?.visibleStackRows ?? 0));
   console.log(`\n  visibleStackRows floor across all cells: ${rowsMin}  (§6.4 contract: >= 3)`);
+  if (VERBOSE) {
+    for (const [cell, m] of cells) {
+      if (m.tapCentreMissSamples?.length) console.log(`  ${cell} tap misses: ${JSON.stringify(m.tapCentreMissSamples)}`);
+    }
+  }
 }
 
 process.exit(await main());

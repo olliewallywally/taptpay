@@ -13,64 +13,64 @@
         "y": 0
       },
       "subbar": {
-        "w": 281.3,
+        "w": 274.9,
         "h": 32.2,
-        "x": 15.4,
-        "y": 353.4
+        "x": 18.6,
+        "y": 227.1
       },
       "subbarBtn": {
-        "w": 62.3,
+        "w": 61.2,
         "h": 23.6,
-        "x": 25.4,
-        "y": 357.7
+        "x": 28.6,
+        "y": 231.4
       },
       "activeSubbarBtn": null,
       "subbarInd": {
-        "w": 62.3,
+        "w": 61.2,
         "h": 23.6,
-        "x": 25.4,
-        "y": 357.7
+        "x": 28.6,
+        "y": 231.4
       },
       "activeLabel": null,
       "send": {
         "w": 69.2,
         "h": 32.2,
-        "x": 304.6,
-        "y": 353.4
+        "x": 301.4,
+        "y": 227.1
       },
       "splitPill": null,
       "actionRow": {
-        "w": 289.3,
-        "h": 37,
-        "x": 15.4,
-        "y": 351
+        "w": 282.9,
+        "h": 32.2,
+        "x": 18.6,
+        "y": 227.1
       },
       "amount": {
         "w": 264,
-        "h": 83.6,
+        "h": 54,
         "x": 28,
-        "y": 100
+        "y": 69.1
       },
       "amountParent": {
         "w": 320,
-        "h": 284,
+        "h": 191.1,
         "x": 0,
         "y": 0
       },
       "stackScroll": {
         "w": 276,
-        "h": 40,
+        "h": 192.9,
         "x": 22,
-        "y": 438
+        "y": 297.1
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 125,
-        "y": 249
+        "y": 156.1
       },
       "screens": 1,
-      "visibleStackRows": 0,
+      "visibleStackRows": 3,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -93,18 +93,19 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": null,
-      "--stack-hdr-h": null,
+      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
-      "--chrome-gutter": null,
+      "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
       "--kb-h": null
     },
     "tapUnder44": 15,
     "tapInflated": 0,
     "tapCentreMiss": 0,
+    "tapCentreMissSamples": [],
     "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
@@ -130,64 +131,64 @@
         "y": 0
       },
       "subbar": {
-        "w": 300.7,
+        "w": 297.8,
         "h": 36,
-        "x": 25.7,
-        "y": 387.5
+        "x": 27.1,
+        "y": 251.4
       },
       "subbarBtn": {
-        "w": 66.6,
+        "w": 66.1,
         "h": 26.6,
-        "x": 36.8,
-        "y": 392.2
+        "x": 38.2,
+        "y": 256
       },
       "activeSubbarBtn": null,
       "subbarInd": {
-        "w": 66.6,
+        "w": 66.1,
         "h": 26.6,
-        "x": 36.8,
-        "y": 392.2
+        "x": 38.2,
+        "y": 256
       },
       "activeLabel": null,
       "send": {
         "w": 69.2,
         "h": 36,
-        "x": 334.3,
-        "y": 387.5
+        "x": 332.9,
+        "y": 251.4
       },
       "splitPill": null,
       "actionRow": {
-        "w": 308.7,
-        "h": 37,
-        "x": 25.7,
-        "y": 387
+        "w": 305.8,
+        "h": 36,
+        "x": 27.1,
+        "y": 251.4
       },
       "amount": {
         "w": 304,
-        "h": 83.6,
+        "h": 60.8,
         "x": 28,
-        "y": 100
+        "y": 77.8
       },
       "amountParent": {
         "w": 360,
-        "h": 320,
+        "h": 215.4,
         "x": 0,
         "y": 0
       },
       "stackScroll": {
         "w": 316,
-        "h": 76,
+        "h": 238.7,
         "x": 22,
-        "y": 474
+        "y": 323.3
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 145,
-        "y": 285
+        "y": 180.4
       },
       "screens": 1,
-      "visibleStackRows": 0,
+      "visibleStackRows": 3,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -210,18 +211,19 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": null,
-      "--stack-hdr-h": null,
+      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
-      "--chrome-gutter": null,
+      "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
       "--kb-h": null
     },
     "tapUnder44": 15,
     "tapInflated": 0,
     "tapCentreMiss": 0,
+    "tapCentreMissSamples": [],
     "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
@@ -247,64 +249,64 @@
         "y": 0
       },
       "subbar": {
-        "w": 308.3,
+        "w": 306.8,
         "h": 37.5,
-        "x": 29.4,
-        "y": 400.3
+        "x": 30.1,
+        "y": 260.4
       },
       "subbarBtn": {
-        "w": 68.3,
+        "w": 68,
         "h": 27.8,
-        "x": 40.9,
-        "y": 405.1
+        "x": 41.6,
+        "y": 265.3
       },
       "activeSubbarBtn": null,
       "subbarInd": {
-        "w": 68.3,
+        "w": 68,
         "h": 27.8,
-        "x": 40.9,
-        "y": 405.1
+        "x": 41.6,
+        "y": 265.3
       },
       "activeLabel": null,
       "send": {
         "w": 69.2,
         "h": 37.5,
-        "x": 345.6,
-        "y": 400.3
+        "x": 344.9,
+        "y": 260.4
       },
       "splitPill": null,
       "actionRow": {
-        "w": 316.3,
-        "h": 37,
-        "x": 29.4,
-        "y": 400.5
+        "w": 314.8,
+        "h": 37.5,
+        "x": 30.1,
+        "y": 260.4
       },
       "amount": {
         "w": 319,
-        "h": 83.6,
+        "h": 60.8,
         "x": 28,
-        "y": 100
+        "y": 81
       },
       "amountParent": {
         "w": 375,
-        "h": 333.5,
+        "h": 224.4,
         "x": 0,
         "y": 0
       },
       "stackScroll": {
         "w": 331,
-        "h": 89.5,
+        "h": 255.1,
         "x": 22,
-        "y": 487.5
+        "y": 333.9
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 152.5,
-        "y": 298.5
+        "y": 189.4
       },
       "screens": 1,
-      "visibleStackRows": 0,
+      "visibleStackRows": 3,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -327,18 +329,19 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": null,
-      "--stack-hdr-h": null,
+      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
-      "--chrome-gutter": null,
+      "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
       "--kb-h": null
     },
     "tapUnder44": 15,
     "tapInflated": 0,
     "tapCentreMiss": 0,
+    "tapCentreMissSamples": [],
     "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
@@ -364,64 +367,64 @@
         "y": 0
       },
       "subbar": {
-        "w": 315.8,
+        "w": 315.7,
         "h": 39,
         "x": 33.1,
-        "y": 488
+        "y": 351
       },
       "subbarBtn": {
         "w": 70,
         "h": 29,
         "x": 45.1,
-        "y": 493
+        "y": 356
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 70,
         "h": 29,
         "x": 45.1,
-        "y": 493
+        "y": 356
       },
       "activeLabel": null,
       "send": {
         "w": 69.2,
         "h": 39,
         "x": 356.9,
-        "y": 488
+        "y": 351
       },
       "splitPill": null,
       "actionRow": {
-        "w": 323.8,
-        "h": 37,
+        "w": 323.7,
+        "h": 39,
         "x": 33.1,
-        "y": 489
+        "y": 351
       },
       "amount": {
         "w": 334,
         "h": 83.6,
         "x": 28,
-        "y": 100
+        "y": 92.8
       },
       "amountParent": {
         "w": 390,
-        "h": 422,
+        "h": 284,
         "x": 0,
         "y": 0
       },
       "stackScroll": {
         "w": 346,
-        "h": 178,
+        "h": 328,
         "x": 22,
-        "y": 576
+        "y": 426
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 160,
-        "y": 387
+        "y": 249
       },
       "screens": 1,
-      "visibleStackRows": 2,
+      "visibleStackRows": 4,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -444,18 +447,19 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": null,
-      "--stack-hdr-h": null,
+      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
-      "--chrome-gutter": null,
+      "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
       "--kb-h": null
     },
     "tapUnder44": 15,
     "tapInflated": 0,
     "tapCentreMiss": 0,
+    "tapCentreMissSamples": [],
     "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
@@ -484,34 +488,34 @@
         "w": 316,
         "h": 39,
         "x": 44,
-        "y": 523.5
+        "y": 374.9
       },
       "subbarBtn": {
         "w": 70,
         "h": 29,
         "x": 56,
-        "y": 528.5
+        "y": 379.9
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 70,
         "h": 29,
         "x": 56,
-        "y": 528.5
+        "y": 379.9
       },
       "activeLabel": null,
       "send": {
         "w": 69.2,
         "h": 39,
         "x": 368,
-        "y": 523.5
+        "y": 374.9
       },
       "splitPill": null,
       "actionRow": {
         "w": 324,
-        "h": 37,
+        "h": 39,
         "x": 44,
-        "y": 524.5
+        "y": 374.9
       },
       "amount": {
         "w": 356,
@@ -521,24 +525,24 @@
       },
       "amountParent": {
         "w": 412,
-        "h": 457.5,
+        "h": 307.9,
         "x": 0,
         "y": 0
       },
       "stackScroll": {
         "w": 368,
-        "h": 213.5,
+        "h": 375.1,
         "x": 22,
-        "y": 611.5
+        "y": 449.9
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 171,
-        "y": 422.5
+        "y": 272.9
       },
       "screens": 1,
-      "visibleStackRows": 2,
+      "visibleStackRows": 5,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -561,18 +565,24 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": null,
-      "--stack-hdr-h": null,
+      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
-      "--chrome-gutter": null,
+      "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
       "--kb-h": null
     },
     "tapUnder44": 15,
     "tapInflated": 0,
     "tapCentreMiss": 1,
+    "tapCentreMissSamples": [
+      {
+        "control": "send",
+        "hit": "tp-screen.tp-home"
+      }
+    ],
     "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
@@ -601,34 +611,34 @@
         "w": 316,
         "h": 39,
         "x": 53,
-        "y": 532
+        "y": 380.6
       },
       "subbarBtn": {
         "w": 70,
         "h": 29,
         "x": 65,
-        "y": 537
+        "y": 385.6
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 70,
         "h": 29,
         "x": 65,
-        "y": 537
+        "y": 385.6
       },
       "activeLabel": null,
       "send": {
         "w": 69.2,
         "h": 39,
         "x": 377,
-        "y": 532
+        "y": 380.6
       },
       "splitPill": null,
       "actionRow": {
         "w": 324,
-        "h": 37,
+        "h": 39,
         "x": 53,
-        "y": 533
+        "y": 380.6
       },
       "amount": {
         "w": 374,
@@ -638,24 +648,24 @@
       },
       "amountParent": {
         "w": 430,
-        "h": 466,
+        "h": 313.6,
         "x": 0,
         "y": 0
       },
       "stackScroll": {
         "w": 386,
-        "h": 222,
+        "h": 386.4,
         "x": 22,
-        "y": 620
+        "y": 455.6
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 180,
-        "y": 431
+        "y": 278.6
       },
       "screens": 1,
-      "visibleStackRows": 2,
+      "visibleStackRows": 5,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -678,18 +688,24 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": null,
-      "--stack-hdr-h": null,
+      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
-      "--chrome-gutter": null,
+      "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
       "--kb-h": null
     },
     "tapUnder44": 15,
     "tapInflated": 0,
     "tapCentreMiss": 1,
+    "tapCentreMissSamples": [
+      {
+        "control": "send",
+        "hit": "tp-screen.tp-home"
+      }
+    ],
     "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
@@ -715,64 +731,64 @@
         "y": 0
       },
       "subbar": {
-        "w": 315.8,
+        "w": 315.7,
         "h": 39,
         "x": 33.1,
-        "y": 488
+        "y": 351
       },
       "subbarBtn": {
         "w": 70,
         "h": 29,
         "x": 45.1,
-        "y": 493
+        "y": 356
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 70,
         "h": 29,
         "x": 45.1,
-        "y": 493
+        "y": 356
       },
       "activeLabel": null,
       "send": {
         "w": 69.2,
         "h": 39,
         "x": 356.9,
-        "y": 488
+        "y": 351
       },
       "splitPill": null,
       "actionRow": {
-        "w": 323.8,
-        "h": 37,
+        "w": 323.7,
+        "h": 39,
         "x": 33.1,
-        "y": 489
+        "y": 351
       },
       "amount": {
         "w": 334,
         "h": 83.6,
         "x": 28,
-        "y": 100
+        "y": 92.8
       },
       "amountParent": {
         "w": 390,
-        "h": 422,
+        "h": 284,
         "x": 0,
         "y": 0
       },
       "stackScroll": {
         "w": 346,
-        "h": 178,
+        "h": 328,
         "x": 22,
-        "y": 576
+        "y": 426
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 160,
-        "y": 387
+        "y": 249
       },
       "screens": 1,
-      "visibleStackRows": 2,
+      "visibleStackRows": 4,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -795,18 +811,19 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": null,
-      "--stack-hdr-h": null,
+      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
-      "--chrome-gutter": null,
+      "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
       "--kb-h": null
     },
     "tapUnder44": 15,
     "tapInflated": 0,
     "tapCentreMiss": 0,
+    "tapCentreMissSamples": [],
     "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
@@ -820,16 +837,8 @@
   },
   "property@320x568": {
     "docOverflow": 0,
-    "edgeCrossers": [
-      {
-        "tag": "button",
-        "cls": "tap-target",
-        "left": 301,
-        "right": 370.6,
-        "w": 69.6
-      }
-    ],
-    "edgeCrosserCount": 1,
+    "edgeCrossers": [],
+    "edgeCrosserCount": 0,
     "clippedText": [
       {
         "cls": "tp-amount",
@@ -847,64 +856,64 @@
         "y": 0
       },
       "subbar": {
-        "w": 273.3,
+        "w": 266.9,
         "h": 32.2,
-        "x": 23.4,
-        "y": 296.6
+        "x": 26.6,
+        "y": 227.1
       },
       "subbarBtn": {
-        "w": 60.3,
+        "w": 59.2,
         "h": 23.6,
-        "x": 33.4,
-        "y": 300.9
+        "x": 36.6,
+        "y": 231.4
       },
       "activeSubbarBtn": null,
       "subbarInd": {
-        "w": 60.3,
+        "w": 59.2,
         "h": 23.6,
-        "x": 33.4,
-        "y": 300.9
+        "x": 36.6,
+        "y": 231.4
       },
       "activeLabel": null,
       "send": {
         "w": 69.2,
         "h": 32.2,
         "x": 298,
-        "y": 296.6
+        "y": 227.1
       },
       "splitPill": null,
       "actionRow": {
         "w": 320,
-        "h": 37,
+        "h": 32.2,
         "x": 0,
-        "y": 294.2
+        "y": 227.1
       },
       "amount": {
         "w": 264,
         "h": 77.9,
         "x": 28,
-        "y": 86
+        "y": 54
       },
       "amountParent": {
         "w": 264,
         "h": 190.2,
         "x": 28,
-        "y": 86
+        "y": 54
       },
       "stackScroll": {
         "w": 276,
-        "h": 14.8,
+        "h": 203.2,
         "x": 22,
-        "y": 453.2
+        "y": 286.8
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 125,
-        "y": 192.2
+        "y": 156.1
       },
       "screens": 1,
-      "visibleStackRows": 0,
+      "visibleStackRows": 3,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -927,18 +936,24 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": null,
-      "--stack-hdr-h": null,
+      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
-      "--chrome-gutter": null,
+      "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
       "--kb-h": null
     },
-    "tapUnder44": 18,
+    "tapUnder44": 13,
     "tapInflated": 0,
     "tapCentreMiss": 1,
+    "tapCentreMissSamples": [
+      {
+        "control": "tap-target",
+        "hit": "tenants"
+      }
+    ],
     "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
@@ -952,16 +967,8 @@
   },
   "property@360x640": {
     "docOverflow": 0,
-    "edgeCrossers": [
-      {
-        "tag": "button",
-        "cls": "tap-target",
-        "left": 301,
-        "right": 370.6,
-        "w": 69.6
-      }
-    ],
-    "edgeCrosserCount": 1,
+    "edgeCrossers": [],
+    "edgeCrosserCount": 0,
     "clippedText": [
       {
         "cls": "tp-amount",
@@ -979,64 +986,64 @@
         "y": 0
       },
       "subbar": {
-        "w": 292.7,
+        "w": 289.8,
         "h": 36,
-        "x": 33.7,
-        "y": 323.5
+        "x": 35.1,
+        "y": 251.4
       },
       "subbarBtn": {
-        "w": 64.6,
+        "w": 64.1,
         "h": 26.6,
-        "x": 44.8,
-        "y": 328.2
+        "x": 46.2,
+        "y": 256
       },
       "activeSubbarBtn": null,
       "subbarInd": {
-        "w": 64.6,
+        "w": 64.1,
         "h": 26.6,
-        "x": 44.8,
-        "y": 328.2
+        "x": 46.2,
+        "y": 256
       },
       "activeLabel": null,
       "send": {
         "w": 69.2,
         "h": 36,
         "x": 338,
-        "y": 323.5
+        "y": 251.4
       },
       "splitPill": null,
       "actionRow": {
         "w": 360,
-        "h": 37,
+        "h": 36,
         "x": 0,
-        "y": 323
+        "y": 251.4
       },
       "amount": {
         "w": 304,
         "h": 77.9,
         "x": 28,
-        "y": 86
+        "y": 60.8
       },
       "amountParent": {
         "w": 304,
         "h": 190.2,
         "x": 28,
-        "y": 86
+        "y": 60.8
       },
       "stackScroll": {
         "w": 316,
-        "h": 58,
+        "h": 248.6,
         "x": 22,
-        "y": 482
+        "y": 313.4
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 145,
-        "y": 221
+        "y": 180.4
       },
       "screens": 1,
-      "visibleStackRows": 0,
+      "visibleStackRows": 3,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -1059,18 +1066,24 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": null,
-      "--stack-hdr-h": null,
+      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
-      "--chrome-gutter": null,
+      "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
       "--kb-h": null
     },
-    "tapUnder44": 18,
+    "tapUnder44": 13,
     "tapInflated": 0,
     "tapCentreMiss": 1,
+    "tapCentreMissSamples": [
+      {
+        "control": "tap-target",
+        "hit": "tenants"
+      }
+    ],
     "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
@@ -1103,64 +1116,64 @@
         "y": 0
       },
       "subbar": {
-        "w": 300.3,
+        "w": 298.8,
         "h": 37.5,
-        "x": 37.4,
-        "y": 333.6
+        "x": 38.1,
+        "y": 260.4
       },
       "subbarBtn": {
-        "w": 66.3,
+        "w": 66,
         "h": 27.8,
-        "x": 48.9,
-        "y": 338.4
+        "x": 49.6,
+        "y": 265.3
       },
       "activeSubbarBtn": null,
       "subbarInd": {
-        "w": 66.3,
+        "w": 66,
         "h": 27.8,
-        "x": 48.9,
-        "y": 338.4
+        "x": 49.6,
+        "y": 265.3
       },
       "activeLabel": null,
       "send": {
         "w": 69.2,
         "h": 37.5,
         "x": 353,
-        "y": 333.6
+        "y": 260.4
       },
       "splitPill": null,
       "actionRow": {
         "w": 375,
-        "h": 37,
+        "h": 37.5,
         "x": 0,
-        "y": 333.8
+        "y": 260.4
       },
       "amount": {
         "w": 319,
         "h": 77.9,
         "x": 28,
-        "y": 86
+        "y": 63.4
       },
       "amountParent": {
         "w": 319,
         "h": 190.2,
         "x": 28,
-        "y": 86
+        "y": 63.4
       },
       "stackScroll": {
         "w": 331,
-        "h": 74.2,
+        "h": 264.8,
         "x": 22,
-        "y": 492.8
+        "y": 324.2
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 152.5,
-        "y": 231.8
+        "y": 189.4
       },
       "screens": 1,
-      "visibleStackRows": 1,
+      "visibleStackRows": 3,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -1183,18 +1196,24 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": null,
-      "--stack-hdr-h": null,
+      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
-      "--chrome-gutter": null,
+      "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
       "--kb-h": null
     },
-    "tapUnder44": 18,
+    "tapUnder44": 13,
     "tapInflated": 0,
     "tapCentreMiss": 1,
+    "tapCentreMissSamples": [
+      {
+        "control": "tap-target",
+        "hit": "tenants"
+      }
+    ],
     "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
@@ -1227,64 +1246,64 @@
         "y": 0
       },
       "subbar": {
-        "w": 307.8,
+        "w": 307.7,
         "h": 39,
         "x": 41.1,
-        "y": 403.6
+        "y": 351
       },
       "subbarBtn": {
         "w": 68,
         "h": 29,
         "x": 53.1,
-        "y": 408.6
+        "y": 356
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 68,
         "h": 29,
         "x": 53.1,
-        "y": 408.6
+        "y": 356
       },
       "activeLabel": null,
       "send": {
         "w": 69.2,
         "h": 39,
         "x": 368,
-        "y": 403.6
+        "y": 351
       },
       "splitPill": null,
       "actionRow": {
         "w": 390,
-        "h": 37,
+        "h": 39,
         "x": 0,
-        "y": 404.6
+        "y": 351
       },
       "amount": {
         "w": 334,
         "h": 77.9,
         "x": 28,
-        "y": 86
+        "y": 80.2
       },
       "amountParent": {
         "w": 334,
         "h": 190.2,
         "x": 28,
-        "y": 86
+        "y": 80.2
       },
       "stackScroll": {
         "w": 346,
-        "h": 180.4,
+        "h": 292,
         "x": 22,
-        "y": 563.6
+        "y": 462
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 160,
-        "y": 302.6
+        "y": 249
       },
       "screens": 1,
-      "visibleStackRows": 2,
+      "visibleStackRows": 4,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -1307,18 +1326,24 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": null,
-      "--stack-hdr-h": null,
+      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
-      "--chrome-gutter": null,
+      "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
       "--kb-h": null
     },
     "tapUnder44": 18,
     "tapInflated": 0,
     "tapCentreMiss": 1,
+    "tapCentreMissSamples": [
+      {
+        "control": "tap-target",
+        "hit": "tenants"
+      }
+    ],
     "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
@@ -1347,34 +1372,34 @@
         "w": 308,
         "h": 39,
         "x": 52,
-        "y": 432
+        "y": 374.9
       },
       "subbarBtn": {
         "w": 68,
         "h": 29,
         "x": 64,
-        "y": 437
+        "y": 379.9
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 68,
         "h": 29,
         "x": 64,
-        "y": 437
+        "y": 379.9
       },
       "activeLabel": null,
       "send": {
         "w": 69.2,
         "h": 39,
         "x": 390,
-        "y": 432
+        "y": 374.9
       },
       "splitPill": null,
       "actionRow": {
         "w": 412,
-        "h": 37,
+        "h": 39,
         "x": 0,
-        "y": 433
+        "y": 374.9
       },
       "amount": {
         "w": 356,
@@ -1390,18 +1415,18 @@
       },
       "stackScroll": {
         "w": 368,
-        "h": 223,
+        "h": 339.1,
         "x": 22,
-        "y": 592
+        "y": 485.9
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 171,
-        "y": 331
+        "y": 272.9
       },
       "screens": 1,
-      "visibleStackRows": 3,
+      "visibleStackRows": 4,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -1424,18 +1449,24 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": null,
-      "--stack-hdr-h": null,
+      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
-      "--chrome-gutter": null,
+      "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
       "--kb-h": null
     },
     "tapUnder44": 18,
     "tapInflated": 0,
     "tapCentreMiss": 1,
+    "tapCentreMissSamples": [
+      {
+        "control": "tap-target",
+        "hit": "tp-subbar.tp-bar"
+      }
+    ],
     "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
@@ -1464,34 +1495,34 @@
         "w": 308,
         "h": 39,
         "x": 61,
-        "y": 438.8
+        "y": 380.6
       },
       "subbarBtn": {
         "w": 68,
         "h": 29,
         "x": 73,
-        "y": 443.8
+        "y": 385.6
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 68,
         "h": 29,
         "x": 73,
-        "y": 443.8
+        "y": 385.6
       },
       "activeLabel": null,
       "send": {
         "w": 69.2,
         "h": 39,
         "x": 408,
-        "y": 438.8
+        "y": 380.6
       },
       "splitPill": null,
       "actionRow": {
         "w": 430,
-        "h": 37,
+        "h": 39,
         "x": 0,
-        "y": 439.8
+        "y": 380.6
       },
       "amount": {
         "w": 374,
@@ -1507,18 +1538,18 @@
       },
       "stackScroll": {
         "w": 386,
-        "h": 233.2,
+        "h": 350.4,
         "x": 22,
-        "y": 598.8
+        "y": 491.6
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 180,
-        "y": 337.8
+        "y": 278.6
       },
       "screens": 1,
-      "visibleStackRows": 3,
+      "visibleStackRows": 5,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -1541,18 +1572,24 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": null,
-      "--stack-hdr-h": null,
+      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
-      "--chrome-gutter": null,
+      "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
       "--kb-h": null
     },
     "tapUnder44": 18,
     "tapInflated": 0,
     "tapCentreMiss": 1,
+    "tapCentreMissSamples": [
+      {
+        "control": "tap-target",
+        "hit": "tp-screen.tp-home"
+      }
+    ],
     "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
@@ -1585,64 +1622,64 @@
         "y": 0
       },
       "subbar": {
-        "w": 307.8,
+        "w": 307.7,
         "h": 39,
         "x": 41.1,
-        "y": 403.6
+        "y": 351
       },
       "subbarBtn": {
         "w": 68,
         "h": 29,
         "x": 53.1,
-        "y": 408.6
+        "y": 356
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 68,
         "h": 29,
         "x": 53.1,
-        "y": 408.6
+        "y": 356
       },
       "activeLabel": null,
       "send": {
         "w": 69.2,
         "h": 39,
         "x": 368,
-        "y": 403.6
+        "y": 351
       },
       "splitPill": null,
       "actionRow": {
         "w": 390,
-        "h": 37,
+        "h": 39,
         "x": 0,
-        "y": 404.6
+        "y": 351
       },
       "amount": {
         "w": 334,
         "h": 77.9,
         "x": 28,
-        "y": 86
+        "y": 80.2
       },
       "amountParent": {
         "w": 334,
         "h": 190.2,
         "x": 28,
-        "y": 86
+        "y": 80.2
       },
       "stackScroll": {
         "w": 346,
-        "h": 180.4,
+        "h": 292,
         "x": 22,
-        "y": 563.6
+        "y": 462
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 160,
-        "y": 302.6
+        "y": 249
       },
       "screens": 1,
-      "visibleStackRows": 2,
+      "visibleStackRows": 4,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -1665,18 +1702,24 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": null,
-      "--stack-hdr-h": null,
+      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
-      "--chrome-gutter": null,
+      "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
       "--kb-h": null
     },
     "tapUnder44": 18,
     "tapInflated": 0,
     "tapCentreMiss": 1,
+    "tapCentreMissSamples": [
+      {
+        "control": "tap-target",
+        "hit": "tenants"
+      }
+    ],
     "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
@@ -1692,15 +1735,8 @@
     "docOverflow": 0,
     "edgeCrossers": [],
     "edgeCrosserCount": 0,
-    "clippedText": [
-      {
-        "cls": "tp-amount",
-        "text": "$1,605.00",
-        "scrollW": 357,
-        "clientW": 264
-      }
-    ],
-    "clippedTextCount": 1,
+    "clippedText": [],
+    "clippedTextCount": 0,
     "components": {
       "viewport": {
         "w": 320,
@@ -1709,64 +1745,64 @@
         "y": 0
       },
       "subbar": {
-        "w": 273.3,
+        "w": 266.9,
         "h": 32.2,
-        "x": 19.4,
-        "y": 353.4
+        "x": 22.5,
+        "y": 227.1
       },
       "subbarBtn": {
-        "w": 60.3,
+        "w": 59.2,
         "h": 23.6,
-        "x": 29.4,
-        "y": 357.7
+        "x": 32.6,
+        "y": 231.4
       },
       "activeSubbarBtn": null,
       "subbarInd": {
-        "w": 60.3,
+        "w": 59.2,
         "h": 23.6,
-        "x": 29.4,
-        "y": 357.7
+        "x": 32.6,
+        "y": 231.4
       },
       "activeLabel": null,
       "send": {
         "w": 69.2,
         "h": 32.2,
         "x": 298,
-        "y": 353.4
+        "y": 227.1
       },
       "splitPill": null,
       "actionRow": {
         "w": 320,
-        "h": 37,
+        "h": 32.2,
         "x": 0,
-        "y": 351
+        "y": 227.1
       },
       "amount": {
         "w": 264,
-        "h": 77.9,
+        "h": 54,
         "x": 28,
-        "y": 100
+        "y": 62.5
       },
       "amountParent": {
         "w": 320,
-        "h": 284,
+        "h": 191.1,
         "x": 0,
         "y": 0
       },
       "stackScroll": {
         "w": 276,
-        "h": 0,
+        "h": 194.5,
         "x": 22,
-        "y": 472.4
+        "y": 295.5
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 125,
-        "y": 249
+        "y": 156.1
       },
       "screens": 1,
-      "visibleStackRows": 0,
+      "visibleStackRows": 3,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -1789,18 +1825,19 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": null,
-      "--stack-hdr-h": null,
+      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
-      "--chrome-gutter": null,
+      "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
       "--kb-h": null
     },
     "tapUnder44": 11,
     "tapInflated": 0,
     "tapCentreMiss": 0,
+    "tapCentreMissSamples": [],
     "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
@@ -1816,15 +1853,8 @@
     "docOverflow": 0,
     "edgeCrossers": [],
     "edgeCrosserCount": 0,
-    "clippedText": [
-      {
-        "cls": "tp-amount",
-        "text": "$1,605.00",
-        "scrollW": 357,
-        "clientW": 304
-      }
-    ],
-    "clippedTextCount": 1,
+    "clippedText": [],
+    "clippedTextCount": 0,
     "components": {
       "viewport": {
         "w": 360,
@@ -1833,64 +1863,64 @@
         "y": 0
       },
       "subbar": {
-        "w": 292.7,
+        "w": 289.8,
         "h": 36,
-        "x": 29.7,
-        "y": 387.5
+        "x": 31.1,
+        "y": 251.4
       },
       "subbarBtn": {
-        "w": 64.6,
+        "w": 64.1,
         "h": 26.6,
-        "x": 40.8,
-        "y": 392.2
+        "x": 42.2,
+        "y": 256
       },
       "activeSubbarBtn": null,
       "subbarInd": {
-        "w": 64.6,
+        "w": 64.1,
         "h": 26.6,
-        "x": 40.8,
-        "y": 392.2
+        "x": 42.2,
+        "y": 256
       },
       "activeLabel": null,
       "send": {
         "w": 69.2,
         "h": 36,
         "x": 338,
-        "y": 387.5
+        "y": 251.4
       },
       "splitPill": null,
       "actionRow": {
         "w": 360,
-        "h": 37,
+        "h": 36,
         "x": 0,
-        "y": 387
+        "y": 251.4
       },
       "amount": {
         "w": 304,
-        "h": 77.9,
+        "h": 60.8,
         "x": 28,
-        "y": 100
+        "y": 70.4
       },
       "amountParent": {
         "w": 360,
-        "h": 320,
+        "h": 215.4,
         "x": 0,
         "y": 0
       },
       "stackScroll": {
         "w": 316,
-        "h": 21.6,
+        "h": 240.3,
         "x": 22,
-        "y": 508.4
+        "y": 321.7
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 145,
-        "y": 285
+        "y": 180.4
       },
       "screens": 1,
-      "visibleStackRows": 0,
+      "visibleStackRows": 3,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -1913,18 +1943,19 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": null,
-      "--stack-hdr-h": null,
+      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
-      "--chrome-gutter": null,
+      "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
       "--kb-h": null
     },
     "tapUnder44": 11,
     "tapInflated": 0,
     "tapCentreMiss": 0,
+    "tapCentreMissSamples": [],
     "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
@@ -1940,15 +1971,8 @@
     "docOverflow": 0,
     "edgeCrossers": [],
     "edgeCrosserCount": 0,
-    "clippedText": [
-      {
-        "cls": "tp-amount",
-        "text": "$1,605.00",
-        "scrollW": 357,
-        "clientW": 319
-      }
-    ],
-    "clippedTextCount": 1,
+    "clippedText": [],
+    "clippedTextCount": 0,
     "components": {
       "viewport": {
         "w": 375,
@@ -1957,64 +1981,64 @@
         "y": 0
       },
       "subbar": {
-        "w": 300.3,
+        "w": 298.8,
         "h": 37.5,
-        "x": 33.4,
-        "y": 400.3
+        "x": 34.1,
+        "y": 260.4
       },
       "subbarBtn": {
-        "w": 66.3,
+        "w": 66,
         "h": 27.8,
-        "x": 44.9,
-        "y": 405.1
+        "x": 45.6,
+        "y": 265.3
       },
       "activeSubbarBtn": null,
       "subbarInd": {
-        "w": 66.3,
+        "w": 66,
         "h": 27.8,
-        "x": 44.9,
-        "y": 405.1
+        "x": 45.6,
+        "y": 265.3
       },
       "activeLabel": null,
       "send": {
         "w": 69.2,
         "h": 37.5,
         "x": 353,
-        "y": 400.3
+        "y": 260.4
       },
       "splitPill": null,
       "actionRow": {
         "w": 375,
-        "h": 37,
+        "h": 37.5,
         "x": 0,
-        "y": 400.5
+        "y": 260.4
       },
       "amount": {
         "w": 319,
-        "h": 77.9,
+        "h": 60.8,
         "x": 28,
-        "y": 100
+        "y": 73.4
       },
       "amountParent": {
         "w": 375,
-        "h": 333.5,
+        "h": 224.4,
         "x": 0,
         "y": 0
       },
       "stackScroll": {
         "w": 331,
-        "h": 35.1,
+        "h": 256.7,
         "x": 22,
-        "y": 521.9
+        "y": 332.3
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 152.5,
-        "y": 298.5
+        "y": 189.4
       },
       "screens": 1,
-      "visibleStackRows": 0,
+      "visibleStackRows": 3,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -2037,18 +2061,19 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": null,
-      "--stack-hdr-h": null,
+      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
-      "--chrome-gutter": null,
+      "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
       "--kb-h": null
     },
     "tapUnder44": 11,
     "tapInflated": 0,
     "tapCentreMiss": 0,
+    "tapCentreMissSamples": [],
     "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
@@ -2081,64 +2106,64 @@
         "y": 0
       },
       "subbar": {
-        "w": 307.8,
+        "w": 307.7,
         "h": 39,
         "x": 37.1,
-        "y": 488
+        "y": 351
       },
       "subbarBtn": {
         "w": 68,
         "h": 29,
         "x": 49.1,
-        "y": 493
+        "y": 356
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 68,
         "h": 29,
         "x": 49.1,
-        "y": 493
+        "y": 356
       },
       "activeLabel": null,
       "send": {
         "w": 69.2,
         "h": 39,
         "x": 368,
-        "y": 488
+        "y": 351
       },
       "splitPill": null,
       "actionRow": {
         "w": 390,
-        "h": 37,
+        "h": 39,
         "x": 0,
-        "y": 489
+        "y": 351
       },
       "amount": {
         "w": 334,
         "h": 77.9,
         "x": 28,
-        "y": 100
+        "y": 92.8
       },
       "amountParent": {
         "w": 390,
-        "h": 422,
+        "h": 284,
         "x": 0,
         "y": 0
       },
       "stackScroll": {
         "w": 346,
-        "h": 123.6,
+        "h": 329.6,
         "x": 22,
-        "y": 610.4
+        "y": 424.4
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 160,
-        "y": 387
+        "y": 249
       },
       "screens": 1,
-      "visibleStackRows": 1,
+      "visibleStackRows": 4,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -2161,18 +2186,19 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": null,
-      "--stack-hdr-h": null,
+      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
-      "--chrome-gutter": null,
+      "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
       "--kb-h": null
     },
     "tapUnder44": 11,
     "tapInflated": 0,
     "tapCentreMiss": 0,
+    "tapCentreMissSamples": [],
     "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
@@ -2201,34 +2227,34 @@
         "w": 308,
         "h": 39,
         "x": 48,
-        "y": 523.5
+        "y": 374.9
       },
       "subbarBtn": {
         "w": 68,
         "h": 29,
         "x": 60,
-        "y": 528.5
+        "y": 379.9
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 68,
         "h": 29,
         "x": 60,
-        "y": 528.5
+        "y": 379.9
       },
       "activeLabel": null,
       "send": {
         "w": 69.2,
         "h": 39,
         "x": 390,
-        "y": 523.5
+        "y": 374.9
       },
       "splitPill": null,
       "actionRow": {
         "w": 412,
-        "h": 37,
+        "h": 39,
         "x": 0,
-        "y": 524.5
+        "y": 374.9
       },
       "amount": {
         "w": 356,
@@ -2238,24 +2264,24 @@
       },
       "amountParent": {
         "w": 412,
-        "h": 457.5,
+        "h": 307.9,
         "x": 0,
         "y": 0
       },
       "stackScroll": {
         "w": 368,
-        "h": 159.1,
+        "h": 376.7,
         "x": 22,
-        "y": 645.9
+        "y": 448.3
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 171,
-        "y": 422.5
+        "y": 272.9
       },
       "screens": 1,
-      "visibleStackRows": 2,
+      "visibleStackRows": 5,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -2278,18 +2304,19 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": null,
-      "--stack-hdr-h": null,
+      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
-      "--chrome-gutter": null,
+      "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
       "--kb-h": null
     },
     "tapUnder44": 11,
     "tapInflated": 0,
     "tapCentreMiss": 0,
+    "tapCentreMissSamples": [],
     "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
@@ -2318,34 +2345,34 @@
         "w": 308,
         "h": 39,
         "x": 57,
-        "y": 532
+        "y": 380.6
       },
       "subbarBtn": {
         "w": 68,
         "h": 29,
         "x": 69,
-        "y": 537
+        "y": 385.6
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 68,
         "h": 29,
         "x": 69,
-        "y": 537
+        "y": 385.6
       },
       "activeLabel": null,
       "send": {
         "w": 69.2,
         "h": 39,
         "x": 408,
-        "y": 532
+        "y": 380.6
       },
       "splitPill": null,
       "actionRow": {
         "w": 430,
-        "h": 37,
+        "h": 39,
         "x": 0,
-        "y": 533
+        "y": 380.6
       },
       "amount": {
         "w": 374,
@@ -2355,24 +2382,24 @@
       },
       "amountParent": {
         "w": 430,
-        "h": 466,
+        "h": 313.6,
         "x": 0,
         "y": 0
       },
       "stackScroll": {
         "w": 386,
-        "h": 167.6,
+        "h": 388,
         "x": 22,
-        "y": 654.4
+        "y": 454
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 180,
-        "y": 431
+        "y": 278.6
       },
       "screens": 1,
-      "visibleStackRows": 2,
+      "visibleStackRows": 5,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -2395,18 +2422,19 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": null,
-      "--stack-hdr-h": null,
+      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
-      "--chrome-gutter": null,
+      "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
       "--kb-h": null
     },
     "tapUnder44": 11,
     "tapInflated": 0,
     "tapCentreMiss": 0,
+    "tapCentreMissSamples": [],
     "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
@@ -2439,64 +2467,64 @@
         "y": 0
       },
       "subbar": {
-        "w": 307.8,
+        "w": 307.7,
         "h": 39,
         "x": 37.1,
-        "y": 488
+        "y": 351
       },
       "subbarBtn": {
         "w": 68,
         "h": 29,
         "x": 49.1,
-        "y": 493
+        "y": 356
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 68,
         "h": 29,
         "x": 49.1,
-        "y": 493
+        "y": 356
       },
       "activeLabel": null,
       "send": {
         "w": 69.2,
         "h": 39,
         "x": 368,
-        "y": 488
+        "y": 351
       },
       "splitPill": null,
       "actionRow": {
         "w": 390,
-        "h": 37,
+        "h": 39,
         "x": 0,
-        "y": 489
+        "y": 351
       },
       "amount": {
         "w": 334,
         "h": 77.9,
         "x": 28,
-        "y": 100
+        "y": 92.8
       },
       "amountParent": {
         "w": 390,
-        "h": 422,
+        "h": 284,
         "x": 0,
         "y": 0
       },
       "stackScroll": {
         "w": 346,
-        "h": 123.6,
+        "h": 329.6,
         "x": 22,
-        "y": 610.4
+        "y": 424.4
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 160,
-        "y": 387
+        "y": 249
       },
       "screens": 1,
-      "visibleStackRows": 1,
+      "visibleStackRows": 4,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -2519,18 +2547,19 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": null,
-      "--stack-hdr-h": null,
+      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": null,
-      "--chrome-gutter": null,
+      "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
       "--kb-h": null
     },
     "tapUnder44": 11,
     "tapInflated": 0,
     "tapCentreMiss": 0,
+    "tapCentreMissSamples": [],
     "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,

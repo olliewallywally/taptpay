@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { WireframeLiquidButton } from "@/components/wireframe-liquid-button";
 import { setDockCollapse } from "@/features/navigation/dock-collapse-store";
 import { SegmentedBar } from "../SegmentedBar";
+import { useMeasuredChromeGutter } from "../useMeasuredChromeGutter";
 
 import "../terminal-keyframes.css";
 import "../terminal-tokens.css";
@@ -166,9 +167,9 @@ function RequestsHome({ invoices, tenants, outstanding, outstandingExpenses = 0,
   const recent = feedOpen ? filtered : filtered.slice(0, 12);
 
   return (
-    <div className="tp-screen tp-home">
+    <div className="tp-screen tp-home" data-feed-open={feedOpen || undefined}>
       {/* Top — navy. Collapses to 0 and slides its content up when the feed expands. */}
-      <div className="stagger tp-feed-hero" style={{ background: NAVY, height: feedOpen ? 0 : '40%', padding: feedOpen ? '0 28px' : '86px 28px 24px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
+      <div className="stagger tp-feed-hero tp-home-hero" style={{ background: NAVY, padding: feedOpen ? '0 28px' : 'clamp(44px, 9.5svh, 86px) 28px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
         <div className={`tp-feed-hero-inner${feedOpen ? ' off' : ''}`}>
           <div className="tp-amount" style={{ fontSize: 82, color: BLUE }}>{fmt(outstanding)}</div>
           <div style={{ marginTop: 10, color: BLUE, fontWeight: 500, fontSize: 16 }}>outstanding rent</div>
@@ -177,9 +178,10 @@ function RequestsHome({ invoices, tenants, outstanding, outstandingExpenses = 0,
           <div style={{ marginTop: 4, color: 'rgba(88,171,255,0.55)', fontWeight: 400, fontSize: 13 }}>outstanding expenses</div>
         </div>
       </div>
+      <div className="tp-home-chrome" aria-hidden="true" />
       {/* Bottom — OFFW. Rises to the top of the page as the hero leaves. */}
-      <div className="stagger tp-feed-body" style={{ flex: 1, background: OFFW, padding: feedOpen ? '64px 22px 100px' : '154px 22px 100px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 9 }}>
+      <div className="stagger tp-feed-body tp-home-stack" style={{ background: OFFW, padding: feedOpen ? '12px 22px 0' : '0 22px' }}>
+        <div className="tp-home-stack-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 9 }}>
           <button className="tap-target" type="button" onClick={() => onToggleFeed?.()} aria-expanded={feedOpen}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'Outfit, system-ui', WebkitTapHighlightColor: 'transparent' }}>
             <span className="tp-stack-title">rent requests</span>
@@ -190,7 +192,7 @@ function RequestsHome({ invoices, tenants, outstanding, outstandingExpenses = 0,
           </button>
         </div>
         {/* Status filter chips — deep-linkable from the dashboard */}
-        <div style={{ display: 'flex', gap: 6, marginBottom: 9, overflowX: 'auto', scrollbarWidth: 'none' as any, WebkitOverflowScrolling: 'touch' }}>
+        <div className="tp-home-stack-filters" style={{ display: 'flex', gap: 6, marginBottom: 9, overflowX: 'auto', scrollbarWidth: 'none' as any, WebkitOverflowScrolling: 'touch' }}>
           {(['all', 'overdue', 'sent', 'paid', 'failed'] as const).map(f => (
             <button className="tap-target" key={f} type="button" onClick={() => onFilter?.(f)}
               style={{ flexShrink: 0, padding: '6px 14px', borderRadius: 999, border: `1.5px solid ${filter === f ? NAVY : 'rgba(4,13,109,0.25)'}`, cursor: 'pointer', fontFamily: 'Outfit, system-ui', fontWeight: 700, fontSize: 11, letterSpacing: '0.04em', textTransform: 'uppercase', background: filter === f ? NAVY : 'transparent', color: filter === f ? BLUE : 'rgba(4,13,109,0.45)', transition: 'all 0.2s ease', WebkitTapHighlightColor: 'transparent' }}>
@@ -1288,6 +1290,7 @@ export function PropertyTerminalView(props: PropertyTerminalViewProps) {
   const fabVisible = props.screen === 'home' && !feedExpanded;
   const sendVisible = props.screen === 'home' && !feedExpanded && !!props.selectedTenant;
   const conveyorDirection = props.conveyor?.dir || 'up';
+  useMeasuredChromeGutter(viewportRef, fabVisible ? 'fab' : subbarVisible ? 'bar' : null);
 
   return (
     <div className="property-terminal-view tp-viewport" ref={viewportRef} data-demo-id="property-terminal">
@@ -1301,11 +1304,11 @@ export function PropertyTerminalView(props: PropertyTerminalViewProps) {
       >{renderScreen(props.screen)}</div>
       <div className="tp-overlay">
         <TopBanner msg={props.banner} />
-        <div className={`tp-pfab${fabVisible ? ' show' : ' hide'}${props.screen === 'home' ? ' raised' : ''}`}>
+        <div className={`tp-pfab${fabVisible ? ' show' : ' hide'}${props.screen === 'home' ? ' home' : ''}`}>
           <FabBtn onClick={() => props.onNavigate('tenants')} />
         </div>
         <div
-          className={`tp-psubbar${subbarVisible ? ' show' : ' hide'}${isFeatureScreen ? ' feature' : ''}${props.screen === 'home' ? ' raised' : ''}`}
+          className={`tp-psubbar${subbarVisible ? ' show' : ' hide'}${isFeatureScreen ? ' feature' : ''}${props.screen === 'home' ? ' home' : ''}`}
           style={isFeatureScreen ? { transform: `translateY(calc(${boundaryDelta}px - 100% - 20px))` } : undefined}
         >
           <div className={`tp-split-slot${props.screen === 'tenants' ? ' show' : ''}`}>

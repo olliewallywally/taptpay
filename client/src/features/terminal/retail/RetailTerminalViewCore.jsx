@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { setDockCollapse } from "@/features/navigation/dock-collapse-store";
 import { SegmentedBar } from "../SegmentedBar";
+import { useMeasuredChromeGutter } from "../useMeasuredChromeGutter";
 
 const NAVY = '#040D6D';
 const BLUE = '#58ABFF';
@@ -175,13 +176,17 @@ function SubHead({ onCancel, onCommit, demoScope, demoCommitId }) {
   );
 }
 
-function ActiveStack({ items, status = 'awaiting payment', onItemClick, onExpand, onRowClick }) {
+function StackHeader({ onExpand }) {
   return (
-    <div>
-      <div className="tp-stack-hdr">
-        <div className="tp-stack-title">active stack</div>
-        <button className="tap-target" onClick={onExpand} data-demo-id="retail-stack-expand" aria-label="expand active stack" style={{ color: BLUE, display: 'flex', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}><Ic.ChevR /></button>
-      </div>
+    <div className="tp-stack-hdr">
+      <div className="tp-stack-title">active stack</div>
+      <button className="tap-target" onClick={onExpand} data-demo-id="retail-stack-expand" aria-label="expand active stack" style={{ color: BLUE, display: 'flex', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}><Ic.ChevR /></button>
+    </div>
+  );
+}
+
+function ActiveStack({ items, status = 'awaiting payment', onItemClick, onRowClick }) {
+  return (
       <div className="tp-stack-card">
         {items.length === 0 ? (
           <div className="tp-stack-empty">tap + to add an item</div>
@@ -246,7 +251,6 @@ function ActiveStack({ items, status = 'awaiting payment', onItemClick, onExpand
             </div>
           );
         })}
-      </div>
     </div>
   );
 }
@@ -282,7 +286,7 @@ function MainTerminal({ state, go, paywaveOn, togglePaywave, onItemClick, showPa
   const line  = state.items.map(i => i.name).join(', ');
   return (
     <div className="tp-screen tp-home">
-      <div className="stagger" style={{ background: NAVY, height: '50%', padding: '100px 28px 28px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
+      <div className="stagger tp-home-hero" style={{ background: NAVY, padding: 'clamp(52px, 11svh, 100px) 28px 18px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
         <div className="tp-amount" style={{ fontSize: 88, color: BLUE }}>{fmt(total)}</div>
         <div style={{ display: 'flex', gap: 8, marginTop: 22 }}>
           {showPaywave && (
@@ -292,9 +296,11 @@ function MainTerminal({ state, go, paywaveOn, togglePaywave, onItemClick, showPa
         </div>
         <div style={{ marginTop: 33, color: BLUE, fontWeight: 500, fontSize: 18 }}>{line || 'no items yet'}</div>
       </div>
-      <div className="stagger" style={{ flex: 1, background: OFFW, padding: '154px 22px 90px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="tp-home-chrome" aria-hidden="true" />
+      <div className="stagger tp-home-stack" style={{ background: OFFW, padding: '0 22px' }}>
+        <StackHeader onExpand={onExpand} />
         <div className="tp-stack-scroll" style={{ flex: 1, overflow: 'auto', paddingRight: 2 }}>
-          <ActiveStack items={state.sent || []} status="sent" onItemClick={onItemClick} onExpand={onExpand} onRowClick={onRowClick} />
+          <ActiveStack items={state.sent || []} status="sent" onItemClick={onItemClick} onRowClick={onRowClick} />
         </div>
       </div>
     </div>
@@ -306,7 +312,7 @@ function PendingTerminal({ state, go, paywaveOn, togglePaywave, onItemClick, sho
   const total   = pending?.amount || 0;
   return (
     <div className="tp-screen tp-home">
-      <div className="stagger" style={{ background: NAVY, height: '50%', padding: '100px 28px 28px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', position: 'relative' }}>
+      <div className="stagger tp-home-hero" style={{ background: NAVY, padding: 'clamp(52px, 11svh, 100px) 28px 18px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', position: 'relative' }}>
         <button onClick={() => go('cancel')} aria-label="cancel transaction" style={{ position: 'absolute', top: 18, left: 20, width: 44, height: 44, borderRadius: 999, border: 'none', color: NAVY, background: BLUE, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'transform 120ms, opacity 120ms' }}
           onMouseDown={e => e.currentTarget.style.transform = 'scale(0.92)'}
           onMouseUp={e => e.currentTarget.style.transform = ''}
@@ -326,9 +332,11 @@ function PendingTerminal({ state, go, paywaveOn, togglePaywave, onItemClick, sho
           <div style={{ marginTop: 6, color: '#fff', fontWeight: 600, fontSize: 14 }}>tap send to share payment</div>
         </div>
       </div>
-      <div className="stagger" style={{ flex: 1, background: OFFW, padding: '154px 22px 90px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="tp-home-chrome" aria-hidden="true" />
+      <div className="stagger tp-home-stack" style={{ background: OFFW, padding: '0 22px' }}>
+        <StackHeader onExpand={onExpand} />
         <div className="tp-stack-scroll" style={{ flex: 1, overflow: 'auto', paddingRight: 2 }}>
-          <ActiveStack items={state.sent || []} status="sent" onItemClick={onItemClick} onExpand={onExpand} onRowClick={onRowClick} />
+          <ActiveStack items={state.sent || []} status="sent" onItemClick={onItemClick} onRowClick={onRowClick} />
         </div>
       </div>
     </div>
@@ -1167,6 +1175,7 @@ export default function RetailTerminalViewCore({
   const dockVisible     = !showBoards && (onHome || !onTerminal);
   const sendVisible     = onHome && !!state.pending;
   const conveyorDir     = conveyor?.dir || 'up';
+  useMeasuredChromeGutter(viewportRef, fabVisible ? 'fab' : subbarVisible ? 'bar' : null);
 
   return (
     <div className="retail-terminal-view tp-viewport" data-retail-terminal-view ref={viewportRef}>
@@ -1182,12 +1191,12 @@ export default function RetailTerminalViewCore({
       <div className="tp-overlay">
         <TopBanner notification={successNotification} />
 
-        <div className={`tp-pfab${fabVisible ? ' show' : ' hide'}`}>
+        <div className={`tp-pfab${fabVisible ? ' show' : ' hide'}${onHome ? ' home' : ''}`}>
           <FabBtn onClick={() => go('keypad')} />
         </div>
 
         <div
-          className={`tp-psubbar${subbarVisible ? ' show' : ' hide'}${isFeatureScreen ? ' feature' : ''}`}
+          className={`tp-psubbar${subbarVisible ? ' show' : ' hide'}${isFeatureScreen ? ' feature' : ''}${onHome ? ' home' : ''}`}
           style={isFeatureScreen ? { transform: `translate(-50%, calc(${boundaryDelta}px - 100% - 20px))` } : undefined}
         >
           <SubBar activeIdx={subbarActiveIdx} onPick={i => go(SUBBAR_ROUTE[i])} compact={sendVisible} />
