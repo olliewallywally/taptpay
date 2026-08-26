@@ -1,0 +1,9 @@
+{
+  "id": "5",
+  "subject": "Code review: client (app shell, pages, hooks, desktop)",
+  "description": "Line-level review of client/src excluding landing page: routing, chunk resilience, data hooks, forms, desktop pages.",
+  "activeForm": "Reviewing client code",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

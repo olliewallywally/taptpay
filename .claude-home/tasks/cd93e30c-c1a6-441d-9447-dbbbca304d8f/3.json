@@ -1,0 +1,9 @@
+{
+  "id": "3",
+  "subject": "Browser sweep: every app page, mobile + tablet + desktop",
+  "description": "Drive nix chromium over every non-landing route at 3 device classes; capture console errors, network failures, blank screens.",
+  "activeForm": "Sweeping pages in browser",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

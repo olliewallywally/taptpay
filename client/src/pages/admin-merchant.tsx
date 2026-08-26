@@ -42,7 +42,6 @@ interface MerchantDetails {
   contactEmail: string;
   contactPhone: string;
   businessAddress: string;
-  currentProviderRate: string;
   qrCodeUrl: string;
   paymentUrl: string;
   status: 'active' | 'inactive';
@@ -103,7 +102,7 @@ export default function AdminMerchantDetail() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/merchants', merchantId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/merchants', merchantId] });
       setIsEditingDetails(false);
       toast({
         title: "Success",
@@ -149,9 +148,9 @@ export default function AdminMerchantDetail() {
 
   // Fetch merchant details
   const { data: merchant, isLoading: merchantLoading } = useQuery<MerchantDetails>({
-    queryKey: ['/api/merchants', merchantId],
+    queryKey: ['/api/admin/merchants', merchantId],
     queryFn: async () => {
-      const response = await fetch(`/api/merchants/${merchantId}`, {
+      const response = await fetch(`/api/admin/merchants/${merchantId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('adminAuthToken')}`
         }
@@ -411,10 +410,6 @@ export default function AdminMerchantDetail() {
                   <div>
                     <Label className="text-sm font-medium">Contact Phone</Label>
                     <p className="text-gray-900 mt-1">{merchant.contactPhone}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium">Current Provider Rate</Label>
-                    <p className="text-gray-900 mt-1">{merchant.currentProviderRate}%</p>
                   </div>
                 </div>
                 <div>

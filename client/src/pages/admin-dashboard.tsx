@@ -51,7 +51,8 @@ interface AdminAnalytics {
   totalRevenue: number;
   totalTransactions: number;
   completedTransactions: number;
-  transactionFeeRevenue: number;
+  monthlyRecurringRevenue: number;
+  payingSubscriptions: number;
   recentMerchants: Array<{
     id: number;
     name: string;
@@ -64,11 +65,17 @@ interface AdminAnalytics {
 }
 
 // Animated Counter Component
-const AnimatedCounter = ({ value, duration = 2000, prefix = "", suffix = "" }: { 
+export const formatCounterValue = (value: number, decimals = 0) => value.toLocaleString("en-NZ", {
+  minimumFractionDigits: decimals,
+  maximumFractionDigits: decimals,
+});
+
+const AnimatedCounter = ({ value, duration = 2000, prefix = "", suffix = "", decimals = 0 }: {
   value: number; 
   duration?: number; 
   prefix?: string; 
   suffix?: string; 
+  decimals?: number;
 }) => {
   const [count, setCount] = useState(0);
 
@@ -80,7 +87,8 @@ const AnimatedCounter = ({ value, duration = 2000, prefix = "", suffix = "" }: {
       if (!startTime) startTime = currentTime;
       const progress = Math.min((currentTime - startTime) / duration, 1);
       
-      setCount(Math.floor(progress * value));
+      const factor = 10 ** decimals;
+      setCount(Math.round(progress * value * factor) / factor);
 
       if (progress < 1) {
         animationId = requestAnimationFrame(animate);
@@ -89,9 +97,9 @@ const AnimatedCounter = ({ value, duration = 2000, prefix = "", suffix = "" }: {
 
     animationId = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(animationId);
-  }, [value, duration]);
+  }, [value, duration, decimals]);
 
-  return <span>{prefix}{count.toLocaleString()}{suffix}</span>;
+  return <span>{prefix}{formatCounterValue(count, decimals)}{suffix}</span>;
 };
 
 // Progress Ring Component
@@ -399,16 +407,20 @@ export default function AdminDashboard() {
                 <div className="flex items-center justify-between mb-2 sm:mb-4">
                   <TrendingUp className="w-5 h-5 sm:w-8 sm:h-8 text-green-400 group-hover:scale-110 transition-transform duration-300" />
                   <div className="text-right">
-                    <p className="text-white/60 text-xs leading-tight">Platform</p>
-                    <p className="text-white/60 text-xs leading-tight">Revenue</p>
+                    <p className="text-white/60 text-xs leading-tight">Monthly</p>
+                    <p className="text-white/60 text-xs leading-tight">Recurring</p>
                   </div>
                 </div>
                 <div className="text-xl sm:text-4xl font-light text-white mb-1 sm:mb-2">
-                  $<AnimatedCounter value={analytics?.transactionFeeRevenue || 0} />
+                  <AnimatedCounter
+                    value={analytics?.monthlyRecurringRevenue || 0}
+                    prefix="$"
+                    decimals={2}
+                  />
                 </div>
                 <div className="flex items-center text-green-400 text-xs">
                   <ArrowUpRight className="w-3 h-3 mr-1" />
-                  <span className="truncate">Transaction fees</span>
+                  <span className="truncate">{analytics?.payingSubscriptions || 0} subscriptions</span>
                 </div>
               </div>
             </div>

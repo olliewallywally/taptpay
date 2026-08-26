@@ -11,6 +11,7 @@ import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { NotificationProvider } from '@/components/notification-system';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { TutorialProvider } from '@/features/tutorial/tutorial';
 
 // Test wrapper for React Query. NotificationProvider/TooltipProvider are required
 // by the terminal pages (useNotifications / tooltip) or they throw at render.
@@ -25,11 +26,13 @@ const createTestWrapper = () => {
   return function TestWrapper({ children }: { children: React.ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>
-        <NotificationProvider>
-          <TooltipProvider>
-            {children}
-          </TooltipProvider>
-        </NotificationProvider>
+        <TutorialProvider enabled={false}>
+          <NotificationProvider>
+            <TooltipProvider>
+              {children}
+            </TooltipProvider>
+          </NotificationProvider>
+        </TutorialProvider>
       </QueryClientProvider>
     );
   };
@@ -44,6 +47,8 @@ jest.mock('@/lib/auth', () => ({
 jest.mock('@/lib/sse-client', () => ({
   sseClient: {
     connect: jest.fn(),
+    connectCustomer: jest.fn(),
+    connectMerchant: jest.fn(),
     disconnect: jest.fn(),
     subscribe: jest.fn(),
     unsubscribe: jest.fn(),

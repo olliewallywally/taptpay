@@ -1,9 +1,0 @@
-{
-  "id": "3",
-  "subject": "Stage 3: server additive fields (resolve frequency/quote, quote GET invoice)",
-  "description": "server/routes.ts: resolve (6058) adds frequency (property scheduleId lookup), quote {totalCents,depositType,depositValue} for trades with quoteId, description fallback via linked quote line item. Quote GET (6738) adds invoice {token,kind,amountCents,status} when accepted.",
-  "activeForm": "Extending server resolve/quote endpoints",
-  "status": "pending",
-  "blocks": [],
-  "blockedBy": []
-}

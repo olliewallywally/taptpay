@@ -1,9 +1,0 @@
-- [TaptPay design language](taptpay-design-language.md) — landing page is the user's own PR #2 design; they prefer implementing their concrete designs over Claude designing from a brief
-- [Trades vertical project](trades-vertical-project.md) — building 3rd vertical (Trades) mirroring Property; approved spec + key decisions
-- [Trades branch git state](trades-branch-git-state.md) — split-bill work safe in a single stash; restore steps
-- [DB schema drift & FK sequences](db-schema-drift-fk-sequences.md) — latent bug: FK cols have rogue auto-increment; never db:push from main-based branch
-- [Split-bill cross-vertical](split-bill-cross-vertical.md) — shipped to PR 2026-06-27; merchant-gated split to trades + neutral wording; webview verify still owed
-- [Bug audit 2026-07-07](audit-2026-07-07-bugfixes.md) — fixed IDORs, debug backdoors, Windcave double-charge, jest config; remaining flaws + plan
-- [Report gen integration](report-gen-integration.md) — Task #59 COMPLETE: 11 reports live in 5 pages, PDF engine lazy-chunked, all PDFs/CSVs verified headlessly; uncommitted
-- [App perf & loading](app-perf-loading.md) — slow-load root cause: 3.5MB eager catch-all vendor chunk; fix plan + progress
-- [Checkout redesign handoff](checkout-redesign-handoff.md) — Stages 1-2 done & screenshot-verified; plan re-verified for cheaper-model execution of Stages 3-6; Fable reviews after

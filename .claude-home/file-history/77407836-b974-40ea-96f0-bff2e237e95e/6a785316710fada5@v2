@@ -1,0 +1,1021 @@
+<title>The 44-Pixel Rule</title>
+<style>
+  /* ─────────── tokens: light is the base set ─────────── */
+  :root {
+    --ground:      #F1F3F8;
+    --surface:     #FFFFFF;
+    --surface-2:   #E9EDF6;
+    --deep:        #040D6D;   /* the product's navy — used as a deep panel */
+    --deep-ink:    #BFD8FF;
+
+    --ink:         #0B1338;
+    --ink-2:       #4A5378;
+    --ink-3:       #838CAB;
+
+    --accent:      #1F6FE0;
+    --accent-soft: #58ABFF;   /* the product's blue */
+    --accent-wash: #E3EDFC;
+
+    --bad:         #BE3346;
+    --bad-wash:    #FBE7EA;
+    --good:        #0B8F62;
+    --good-wash:   #E0F4EC;
+
+    --line:        #D9DEEC;
+    --line-soft:   #E7EBF4;
+
+    --shadow:      0 1px 2px rgba(11,19,56,.05), 0 8px 24px -12px rgba(11,19,56,.18);
+
+    --display: "Outfit", "Avenir Next", "Segoe UI Variable Display", system-ui, -apple-system, sans-serif;
+    --body: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --data: ui-monospace, "SF Mono", SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+
+    --col: 68ch;
+    --gutter: 88px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #060A22;
+      --surface:     #0C1231;
+      --surface-2:   #121A40;
+      --deep:        #020730;
+      --deep-ink:    #8FBEFF;
+
+      --ink:         #E9ECF7;
+      --ink-2:       #A3ABC9;
+      --ink-3:       #6D779C;
+
+      --accent:      #74B6FF;
+      --accent-soft: #58ABFF;
+      --accent-wash: #13224C;
+
+      --bad:         #FF8592;
+      --bad-wash:    #35141C;
+      --good:        #45D9A4;
+      --good-wash:   #0C2C22;
+
+      --line:        #1F2A56;
+      --line-soft:   #162044;
+
+      --shadow:      0 1px 2px rgba(0,0,0,.4), 0 8px 28px -14px rgba(0,0,0,.7);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:      #060A22;
+    --surface:     #0C1231;
+    --surface-2:   #121A40;
+    --deep:        #020730;
+    --deep-ink:    #8FBEFF;
+
+    --ink:         #E9ECF7;
+    --ink-2:       #A3ABC9;
+    --ink-3:       #6D779C;
+
+    --accent:      #74B6FF;
+    --accent-soft: #58ABFF;
+    --accent-wash: #13224C;
+
+    --bad:         #FF8592;
+    --bad-wash:    #35141C;
+    --good:        #45D9A4;
+    --good-wash:   #0C2C22;
+
+    --line:        #1F2A56;
+    --line-soft:   #162044;
+
+    --shadow:      0 1px 2px rgba(0,0,0,.4), 0 8px 28px -14px rgba(0,0,0,.7);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: calc(var(--gutter) + var(--col) + 96px);
+    margin: 0 auto;
+    padding: 0 24px 120px;
+  }
+
+  /* ─────────── the measurement rule: a caliper tick strip ─────────── */
+  .ticks {
+    height: 9px;
+    background:
+      repeating-linear-gradient(to right, var(--line) 0 1px, transparent 1px 12px) bottom / 100% 5px no-repeat,
+      linear-gradient(to right, var(--line), var(--line)) bottom / 100% 1px no-repeat;
+  }
+
+  /* ─────────── masthead ─────────── */
+  header.mast {
+    padding: 76px 0 34px;
+  }
+  .eyebrow {
+    font-family: var(--data);
+    font-size: 11.5px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 0 0 20px;
+  }
+  h1 {
+    font-family: var(--display);
+    font-weight: 800;
+    letter-spacing: -0.045em;
+    font-size: clamp(42px, 7vw, 74px);
+    line-height: .96;
+    margin: 0 0 22px;
+    text-wrap: balance;
+  }
+  h1 em {
+    font-style: normal;
+    color: var(--accent);
+  }
+  .standfirst {
+    font-size: clamp(17px, 2.1vw, 20px);
+    line-height: 1.5;
+    color: var(--ink-2);
+    max-width: 60ch;
+    margin: 0 0 30px;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    font-family: var(--data);
+    font-size: 12px;
+    color: var(--ink-2);
+  }
+  .meta span {
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 4px 9px;
+    background: var(--surface);
+  }
+  .meta span b { font-weight: 600; color: var(--ink); }
+
+  /* ─────────── section scaffolding ─────────── */
+  section { padding-top: 58px; }
+
+  .sec-head {
+    display: grid;
+    grid-template-columns: var(--gutter) minmax(0, 1fr);
+    gap: 0 8px;
+    align-items: baseline;
+    margin-bottom: 22px;
+  }
+  .sec-num {
+    font-family: var(--data);
+    font-size: 12px;
+    letter-spacing: .1em;
+    color: var(--accent);
+    padding-top: 6px;
+  }
+  h2 {
+    font-family: var(--display);
+    font-weight: 700;
+    letter-spacing: -0.032em;
+    font-size: clamp(25px, 3.4vw, 33px);
+    line-height: 1.12;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h3 {
+    font-family: var(--display);
+    font-weight: 700;
+    letter-spacing: -0.022em;
+    font-size: 19px;
+    line-height: 1.25;
+    margin: 0 0 8px;
+  }
+
+  .body { display: grid; grid-template-columns: var(--gutter) minmax(0, 1fr); gap: 0 8px; }
+  .body > .rail {
+    font-family: var(--data);
+    font-size: 11px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    padding-top: 7px;
+  }
+  .body > .flow { min-width: 0; }
+  .flow > * + * { margin-top: 16px; }
+  .flow p { margin: 0; max-width: var(--col); }
+  .flow ul, .flow ol { margin: 0; padding-left: 20px; max-width: var(--col); }
+  .flow li + li { margin-top: 7px; }
+
+  @media (max-width: 700px) {
+    .sec-head, .body { grid-template-columns: 1fr; }
+    .body > .rail { padding: 0 0 8px; }
+    :root { --gutter: 0px; }
+  }
+
+  code, .num {
+    font-family: var(--data);
+    font-size: .88em;
+    font-variant-numeric: tabular-nums;
+  }
+  code {
+    background: var(--surface-2);
+    border-radius: 3px;
+    padding: 1px 5px;
+    color: var(--ink);
+    overflow-wrap: anywhere;
+  }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  /* ─────────── the thesis panel ─────────── */
+  .thesis {
+    background: var(--deep);
+    color: var(--deep-ink);
+    border-radius: 6px;
+    padding: 30px 30px 26px;
+    margin-top: 8px;
+  }
+  .thesis h3 { color: #FFFFFF; font-size: 21px; margin-bottom: 12px; }
+  .thesis p { color: #C9DDFF; margin: 0; max-width: 62ch; }
+  .thesis p + p { margin-top: 12px; }
+  .thesis code {
+    background: rgba(255,255,255,.1);
+    color: #FFFFFF;
+  }
+
+  /* ─────────── tables ─────────── */
+  .tw {
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 480px;
+    font-size: 14.5px;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line-soft);
+    vertical-align: top;
+  }
+  thead th {
+    font-family: var(--data);
+    font-size: 11px;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    font-weight: 600;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.n, th.n {
+    font-family: var(--data);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  td .rc {
+    font-family: var(--data);
+    font-size: 11.5px;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+  .bad  { color: var(--bad);  font-weight: 600; }
+  .good { color: var(--good); font-weight: 600; }
+
+  .chip {
+    display: inline-block;
+    font-family: var(--data);
+    font-size: 11px;
+    letter-spacing: .05em;
+    padding: 2px 7px;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+  .chip.bad  { background: var(--bad-wash);  color: var(--bad); }
+  .chip.good { background: var(--good-wash); color: var(--good); }
+  .chip.info { background: var(--accent-wash); color: var(--accent); }
+
+  /* ─────────── root-cause cards ─────────── */
+  .rc-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 22px 24px;
+    box-shadow: var(--shadow);
+  }
+  .rc-card.primary { border-color: var(--bad); }
+  .rc-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .rc-id {
+    font-family: var(--data);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    color: var(--accent);
+  }
+  .rc-card.primary .rc-id { color: var(--bad); }
+  .rc-head h3 { margin: 0; flex: 1 1 260px; }
+  .rc-card p { margin: 0; max-width: var(--col); }
+  .rc-card > * + * { margin-top: 13px; }
+  .rc-where {
+    font-family: var(--data);
+    font-size: 12px;
+    color: var(--ink-3);
+  }
+
+  pre {
+    margin: 0;
+    background: var(--surface-2);
+    border: 1px solid var(--line-soft);
+    border-radius: 4px;
+    padding: 13px 15px;
+    overflow-x: auto;
+    font-family: var(--data);
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--ink);
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+
+  /* ─────────── the stack-rows evidence graphic ─────────── */
+  .rows-viz {
+    display: grid;
+    gap: 7px;
+    font-family: var(--data);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  .rows-row {
+    display: grid;
+    grid-template-columns: 92px 1fr 78px;
+    align-items: center;
+    gap: 12px;
+  }
+  .rows-track {
+    position: relative;
+    height: 20px;
+    background: var(--surface-2);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .rows-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: var(--accent-soft);
+    border-radius: 3px;
+  }
+  .rows-target {
+    position: absolute;
+    top: -3px;
+    bottom: -3px;
+    width: 2px;
+    background: var(--bad);
+  }
+  .rows-row .label { color: var(--ink-2); }
+  .rows-row .val { color: var(--bad); font-weight: 600; }
+  .rows-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    font-family: var(--data);
+    font-size: 11.5px;
+    color: var(--ink-3);
+    margin-top: 12px;
+  }
+  .rows-legend i { font-style: normal; }
+  .swatch {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 2px;
+    vertical-align: -1px;
+    margin-right: 5px;
+  }
+
+  /* ─────────── phase list ─────────── */
+  .phases { display: grid; gap: 10px; }
+  .phase {
+    display: grid;
+    grid-template-columns: 62px minmax(0,1fr);
+    gap: 0 16px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent-soft);
+    border-radius: 4px;
+    padding: 16px 18px;
+  }
+  .phase.first { border-left-color: var(--bad); }
+  .phase-n {
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: 26px;
+    letter-spacing: -0.04em;
+    color: var(--ink-3);
+    line-height: 1;
+  }
+  .phase h3 { margin-bottom: 6px; }
+  .phase p { margin: 0; color: var(--ink-2); font-size: 15px; max-width: 62ch; }
+  .phase .gate {
+    margin-top: 9px;
+    font-family: var(--data);
+    font-size: 11.5px;
+    color: var(--ink-3);
+  }
+  .phase .gate b { color: var(--ink-2); font-weight: 600; }
+
+  /* ─────────── decisions ─────────── */
+  .decision {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 18px 20px;
+  }
+  .decision + .decision { margin-top: 10px; }
+  .decision h3 { margin-bottom: 6px; }
+  .decision p { margin: 0; color: var(--ink-2); font-size: 15px; }
+  .decision p + p { margin-top: 8px; }
+  .rec {
+    font-family: var(--data);
+    font-size: 11px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--good);
+    background: var(--good-wash);
+    padding: 2px 7px;
+    border-radius: 3px;
+    margin-left: 6px;
+    white-space: nowrap;
+  }
+
+  footer {
+    margin-top: 72px;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+    font-family: var(--data);
+    font-size: 12px;
+    color: var(--ink-3);
+  }
+  footer p { margin: 0 0 6px; max-width: 70ch; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="page">
+
+  <header class="mast">
+    <p class="eyebrow">Diagnosis &amp; plan · phone merchant app</p>
+    <h1>The <em>44-pixel</em> rule</h1>
+    <p class="standfirst">
+      Five separate mobile bugs were reported. Four of them are the same bug: one blanket CSS
+      rule that silently inflates every button in the app below 640&nbsp;px — and only below
+      640&nbsp;px, which is why nothing in the test suite has ever seen it.
+    </p>
+    <div class="meta">
+      <span><b>2026-08-17</b></span>
+      <span>branch <b>feat/tablet-desktop-app</b></span>
+      <span>measured in-browser · <b>7 phone sizes</b></span>
+      <span>status <b>diagnosis complete, no code changed</b></span>
+    </div>
+  </header>
+
+  <div class="ticks"></div>
+
+  <!-- ══════════ 1 · THE FINDING ══════════ -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">01</div>
+      <h2>What's actually wrong</h2>
+    </div>
+    <div class="body">
+      <div class="rail">Finding</div>
+      <div class="flow">
+        <div class="thesis">
+          <h3>One rule, four symptoms</h3>
+          <p>
+            <code>client/src/index.css:360</code> applies
+            <code>min-height:&nbsp;44px; min-width:&nbsp;44px</code> to every
+            <code>&lt;button&gt;</code> in the app inside a <code>@media (max-width: 640px)</code>
+            block. <code>min-height</code> beats <code>height</code>, so no component can set a
+            smaller box. The action bar's buttons ask for 27&nbsp;px and render at 44. The
+            highlight bubble is a <code>&lt;div&gt;</code>, so it stays 27.
+          </p>
+          <p>
+            Because the query is <em>max-width</em>, tablet and desktop never see it — and every
+            probe in <code>scripts/desktop-shots/</code> runs at 1194&nbsp;px or wider. The bug is
+            invisible to the entire existing suite by construction.
+          </p>
+        </div>
+
+        <div class="tw">
+          <table>
+            <thead>
+              <tr><th>Reported</th><th>Cause</th><th>Measured proof</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Doesn't adapt across sizes; squished, wrong padding</td>
+                <td><span class="rc">RC-1 · 3 · 4 · 5</span></td>
+                <td>5–13 inflated buttons on <em>every</em> mobile route; <span class="num">0</span> uses of <code>clamp()</code> in 4,500 lines of terminal UI</td>
+              </tr>
+              <tr>
+                <td>Active stack shows 1 row, needs ≥3</td>
+                <td><span class="rc">RC-3 (+RC-1)</span></td>
+                <td>0 rows at 320 &amp; 375; 1 at 390 &amp; 393; 2 at 344, 412, 430. <span class="bad">Never 3 on any phone.</span></td>
+              </tr>
+              <tr>
+                <td>$$ figure doesn't shrink when large</td>
+                <td><span class="rc">RC-4</span></td>
+                <td><code>$99999.99</code> needs <span class="num">430&nbsp;px</span> at the hardcoded 88&nbsp;px; only <span class="num">264–374&nbsp;px</span> available</td>
+              </tr>
+              <tr>
+                <td>Action bar breaks; bubble half height, cuts text</td>
+                <td><span class="rc">RC-1 + RC-2</span></td>
+                <td>Bubble <span class="num">27&nbsp;px</span> inside a <span class="num">44&nbsp;px</span> row. Label's bottom sits <span class="bad">4.6&nbsp;px below</span> the bubble</td>
+              </tr>
+              <tr>
+                <td>Split-bill pill taller than the action bar</td>
+                <td><span class="rc">RC-1</span></td>
+                <td>Pill renders <span class="num">44&nbsp;px</span> against a designed <span class="num">30</span>; bar is <span class="num">56&nbsp;px</span> inside its own <span class="num">37&nbsp;px</span> row</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          A sixth cause explains the <em>intermittency</em> — why it "keeps breaking" rather than
+          simply being broken. And a seventh explains why none of it was caught.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ 2 · ROOT CAUSES ══════════ -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">02</div>
+      <h2>Seven root causes</h2>
+    </div>
+    <div class="body">
+      <div class="rail">Causes</div>
+      <div class="flow">
+
+        <div class="rc-card primary">
+          <div class="rc-head">
+            <span class="rc-id">RC-1</span>
+            <h3>A blanket 44&nbsp;px minimum on every button below 640&nbsp;px</h3>
+            <span class="chip bad">primary</span>
+          </div>
+          <p class="rc-where">client/src/index.css:360–368</p>
+          <pre><code>@media (max-width: 640px) {
+  button, [role="button"], input[type="submit"], input[type="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}</code></pre>
+          <div class="tw">
+            <table>
+              <thead><tr><th>Element</th><th class="n">Author intent</th><th class="n">Renders</th><th class="n">Δ</th></tr></thead>
+              <tbody>
+                <tr><td><code>.tp-subbar-btn</code></td><td class="n">27 px</td><td class="n bad">44 px</td><td class="n">+17</td></tr>
+                <tr><td><code>.tp-subbar-ind</code> <span class="chip info">a div — unaffected</span></td><td class="n">27 px</td><td class="n">27 px</td><td class="n">—</td></tr>
+                <tr><td><code>.tp-subbar</code> (bar shell)</td><td class="n">39 px</td><td class="n bad">56 px</td><td class="n">+17</td></tr>
+                <tr><td><code>.tp-psubbar</code> (its row, a div)</td><td class="n">37 px</td><td class="n">37 px</td><td class="n">—</td></tr>
+                <tr><td><code>.tp-send</code></td><td class="n">37 px</td><td class="n bad">44 px</td><td class="n">+7</td></tr>
+                <tr><td><code>.tp-pill</code> "split bill"</td><td class="n">30 px</td><td class="n bad">44 px</td><td class="n">+14</td></tr>
+                <tr><td><code>.tp-pill</code> paywave / boards</td><td class="n">26 px</td><td class="n bad">44 px</td><td class="n">+18</td></tr>
+                <tr><td><code>.tp-stack-hdr</code></td><td class="n">24 px</td><td class="n bad">44 px</td><td class="n">+20</td></tr>
+                <tr><td><code>.tp-stepper</code> (quantity)</td><td class="n">32×32</td><td class="n bad">44×44</td><td class="n">+12</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            So the action bar is a 56&nbsp;px lozenge inside a 37&nbsp;px row, holding a 27&nbsp;px
+            highlight bubble behind a label centred in a 44&nbsp;px box. <strong>A/B proof:</strong>
+            disabling only those two declarations at runtime takes the stack header from
+            <span class="num">44&nbsp;px → 24&nbsp;px</span> with nothing else changed.
+          </p>
+          <p>
+            The same media block (lines 360–473) is a legacy dark-glass override set that still
+            fires on every modern mobile page: <code>label { color: white !important }</code>,
+            <code>input { background/border/color !important }</code>,
+            <code>table … { background: transparent !important }</code>. Not the reported bugs, but
+            the same failure mode, and it will keep producing "padding is wrong" reports.
+          </p>
+        </div>
+
+        <div class="rc-card">
+          <div class="rc-head">
+            <span class="rc-id">RC-2</span>
+            <h3>The bubble is half-measured, half-hardcoded, and never re-measured</h3>
+          </div>
+          <p class="rc-where">RetailTerminalViewCore.jsx:89–109</p>
+          <p>
+            <code>measure()</code> returns <code>{ x, w }</code> only — <code>top: 5px</code> and
+            <code>height: 27px</code> live in CSS. The bubble is <em>guaranteed</em> wrong the moment
+            a button's real height differs from 27, which RC-1 makes permanent. The effect also
+            depends on <code>[activeIdx]</code> alone, with no <code>ResizeObserver</code>: resizing
+            390&nbsp;→&nbsp;320 leaves the bubble <span class="bad">14.5&nbsp;px off its button</span>,
+            permanently. On a real phone that fires on rotation, on the keyboard opening, and on the
+            iOS URL bar collapsing.
+          </p>
+        </div>
+
+        <div class="rc-card">
+          <div class="rc-head">
+            <span class="rc-id">RC-3</span>
+            <h3>Layout is absolute-pixel choreography around floating chrome</h3>
+          </div>
+          <p class="rc-where">RetailTerminalViewCore.jsx:318–374 · 28 such panels across three verticals</p>
+          <pre><code>&lt;div style={{ height: '50%', padding: '100px 28px 28px' }}&gt;   {/* hero  */}
+&lt;div style={{ flex: 1,      padding: '154px 22px 90px'  }}&gt;   {/* stack */}</code></pre>
+          <p>
+            <code>154px</code> is a guess at the floating FAB + action bar's footprint;
+            <code>90px</code> a guess at the dock's. Nothing measures either — and the dock
+            collapses 78&nbsp;px&nbsp;→&nbsp;44&nbsp;px after four seconds of idle while the padding
+            never reacts.
+          </p>
+        </div>
+
+        <div class="rc-card">
+          <div class="rc-head">
+            <span class="rc-id">RC-4</span>
+            <h3>No fluid type, no intrinsic sizing, anywhere</h3>
+          </div>
+          <div class="tw">
+            <table>
+              <thead><tr><th>Terminal view</th><th class="n">fontSize literals</th><th class="n">height:'50%'</th><th class="n">clamp() / cq*</th></tr></thead>
+              <tbody>
+                <tr><td>retail</td><td class="n">66</td><td class="n">9</td><td class="n bad">0</td></tr>
+                <tr><td>property</td><td class="n">104</td><td class="n">11</td><td class="n bad">0</td></tr>
+                <tr><td>trades</td><td class="n">58</td><td class="n">8</td><td class="n bad">0</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            Plus 194 hardcoded <code>px</code> values in the retail CSS. The amount is
+            <code>fontSize: 88</code> at ten call sites. <code>$99999.99</code> measures
+            <span class="num">430&nbsp;px</span> — it clips on the largest phone made. On a 320&nbsp;px
+            phone the wrap pushes the hero to <code>y: -162</code> and the split-bill pill to
+            <code>y: -78</code>: <span class="bad">both entirely above the top of the screen</span>.
+          </p>
+        </div>
+
+        <div class="rc-card">
+          <div class="rc-head">
+            <span class="rc-id">RC-5</span>
+            <h3>Wrong viewport unit, no safe areas</h3>
+          </div>
+          <p>
+            The retail terminal uses <code>height: 100vh</code>; every other mobile surface in the
+            app uses <code>100svh</code>. On iOS Safari <code>100vh</code> is the <em>large</em>
+            viewport, so with the URL bar showing the terminal runs 60–100&nbsp;px past the visible
+            area — the bottom of the stack and the dock fall below the fold, on top of RC-3's
+            squeeze. <code>viewport-fit=cover</code> is set, but the terminal uses no
+            <code>env(safe-area-inset-*)</code> at all: the notch is cleared with a hardcoded
+            <code>padding-top: 100px</code> and the home indicator not at all.
+          </p>
+        </div>
+
+        <div class="rc-card">
+          <div class="rc-head">
+            <span class="rc-id">RC-6</span>
+            <h3>Three unscoped copies of the same global stylesheet</h3>
+            <span class="chip info">the intermittency</span>
+          </div>
+          <p>
+            Retail's <code>TP_CSS</code> and property's <code>TP_TERM_CSS</code> are both injected
+            as <strong>unscoped</strong> global <code>.tp-*</code> rules with identical selectors and
+            different values — property adds <code>transform: scale(0.85)</code> and
+            <code>z-index: 2</code> on the bubble, which paints it <em>over</em> the label instead of
+            behind it. Trades is correctly scoped. Measured on <code>/property/terminal</code>: two
+            <code>&lt;style&gt;</code> tags defining <code>.tp-subbar</code> live at once, and the bar
+            renders <span class="num">241×48</span> instead of <span class="num">316×56</span>.
+            Whichever tag is later in the DOM wins.
+          </p>
+        </div>
+
+        <div class="rc-card">
+          <div class="rc-head">
+            <span class="rc-id">RC-7</span>
+            <h3>The only mobile gate proves nothing about layout</h3>
+          </div>
+          <p class="rc-where">scripts/verify-mobile-retail-regression.mjs</p>
+          <p>
+            One viewport (390×844). It asserts the <em>outer</em> box is 390×844 with no horizontal
+            scroll, plus API-contract checks. It passes today, against every screenshot behind this
+            document. It never measures an internal component, never changes size, never rotates, and
+            never simulates a safe area. <strong>Fixing the five symptoms without fixing this is how
+            they come back.</strong>
+          </p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ 3 · EVIDENCE ══════════ -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">03</div>
+      <h2>The active stack, measured</h2>
+    </div>
+    <div class="body">
+      <div class="rail">Evidence</div>
+      <div class="flow">
+        <p>
+          Row height 69&nbsp;px, header 44&nbsp;px, card border 2&nbsp;px — three rows need
+          <span class="num">245&nbsp;px</span> of content box. The panel is <code>height: 50%</code>
+          minus 244&nbsp;px of hardcoded padding, so what's left is:
+        </p>
+
+        <div class="rows-viz" role="img" aria-label="Rows of the active stack visible on seven phone sizes: 0 rows at 320×568 and 375×667, 1 row at 390×844 and 393×851, 2 rows at 344×882, 412×915 and 430×932. Three rows are required and never reached.">
+          <div class="rows-row"><span class="label">320 × 568</span><span class="rows-track"><span class="rows-fill" style="width:16.3%"></span><span class="rows-target" style="left:100%"></span></span><span class="val">0 rows</span></div>
+          <div class="rows-row"><span class="label">375 × 667</span><span class="rows-track"><span class="rows-fill" style="width:36.3%"></span><span class="rows-target" style="left:100%"></span></span><span class="val">0 rows</span></div>
+          <div class="rows-row"><span class="label">390 × 844</span><span class="rows-track"><span class="rows-fill" style="width:72.7%"></span><span class="rows-target" style="left:100%"></span></span><span class="val">1 row</span></div>
+          <div class="rows-row"><span class="label">393 × 851</span><span class="rows-track"><span class="rows-fill" style="width:73.9%"></span><span class="rows-target" style="left:100%"></span></span><span class="val">1 row</span></div>
+          <div class="rows-row"><span class="label">344 × 882</span><span class="rows-track"><span class="rows-fill" style="width:80.4%"></span><span class="rows-target" style="left:100%"></span></span><span class="val">2 rows</span></div>
+          <div class="rows-row"><span class="label">412 × 915</span><span class="rows-track"><span class="rows-fill" style="width:86.9%"></span><span class="rows-target" style="left:100%"></span></span><span class="val">2 rows</span></div>
+          <div class="rows-row"><span class="label">430 × 932</span><span class="rows-track"><span class="rows-fill" style="width:90.6%"></span><span class="rows-target" style="left:100%"></span></span><span class="val">2 rows</span></div>
+        </div>
+        <div class="rows-legend">
+          <i><span class="swatch" style="background:var(--accent-soft)"></span>content box available</i>
+          <i><span class="swatch" style="background:var(--bad)"></span>245 px needed for three rows</i>
+        </div>
+
+        <p>
+          "At least 3" is not reachable on <em>any</em> phone without changing the structure. Note
+          the stack header sits <em>inside</em> the scroll container, so it also eats first-paint
+          budget and then scrolls away.
+        </p>
+
+        <h3>Other measurements</h3>
+        <div class="tw">
+          <table>
+            <thead><tr><th>What</th><th>Measured</th></tr></thead>
+            <tbody>
+              <tr><td>Amount overflow, <code>$99999.99</code> @88 px</td><td class="n"><span class="bad">+166 / +111 / +96 / +56 px</span> at 320 / 375 / 390 / 430</td></tr>
+              <tr><td>Action bar inside its own row</td><td class="n">56 px in 37 px — <span class="bad">overflows by 19 px</span></td></tr>
+              <tr><td>Label vs highlight bubble</td><td class="n">topGap <span class="num">+12.4</span>, bottomGap <span class="bad">−4.6 px</span></td></tr>
+              <tr><td>Bubble drift after a 390→320 resize</td><td class="n">1 px → <span class="bad">14.5 px</span>, and it stays</td></tr>
+              <tr><td>Buttons pinned to exactly 44 px per route</td><td class="n">terminal 13 · property/terminal 12 · property 10 · trades 10 · dashboard 9 · stock 9 · transactions 9 · settings 9</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          The per-route counts are identical at 320, 390 and 430 — this is not a small-screen edge
+          case, it is every phone.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ 4 · PLAN ══════════ -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">04</div>
+      <h2>The plan, in order</h2>
+    </div>
+    <div class="body">
+      <div class="rail">Execution</div>
+      <div class="flow">
+        <p>
+          Two stop conditions: Phase 3 can't start before Phase 1 lands (the invariants can't hold
+          while RC-1 is live), and Phase 4 can't start before Phase 2 (the grid needs the tokens).
+          Phases 5 and 6 are independent of each other.
+        </p>
+
+        <div class="phases">
+
+          <div class="phase first">
+            <div class="phase-n">0</div>
+            <div>
+              <h3>Land the gate first — failing</h3>
+              <p>
+                Write <code>scripts/verify-mobile-responsive.mjs</code> before touching any UI, and
+                record today's numbers as the baseline. A fix with no gate is a fix with a
+                half-life.
+              </p>
+              <p class="gate"><b>Gate:</b> probe runs and reports the current failures</p>
+            </div>
+          </div>
+
+          <div class="phase first">
+            <div class="phase-n">1</div>
+            <div>
+              <h3>Remove RC-1 without losing touch accessibility</h3>
+              <p>
+                The 44&nbsp;px rule exists for a real reason. Give the hit area back without touching
+                the layout box — a pseudo-element is part of its element for hit-testing, so the tap
+                region grows while the painted box and every sibling's position stay as designed.
+                Then audit the rest of the 640&nbsp;px block as one unit; keep the
+                <code>font-size: 16px</code> on inputs that prevents the iOS focus zoom.
+              </p>
+              <pre><code>.tap-target { position: relative; }
+.tap-target::after {
+  content: ""; position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width: max(100%, 44px); height: max(100%, 44px);
+}</code></pre>
+              <p class="gate"><b>Gate:</b> the new probe + a full visual sweep — this changes every mobile page</p>
+            </div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-n">2</div>
+            <div>
+              <h3>The responsive foundation</h3>
+              <p>
+                One token layer on <code>.tp-viewport</code>: a design ratio
+                <code>--u: clamp(0.84, calc(100cqi / 390), 1.10)</code> driving spacing and type, the
+                <code>svh</code>/<code>dvh</code> fallback chain, and real safe-area insets.
+                Container units rather than viewport units, so the same components stay correct
+                inside the landing page's phone demo and on a tablet.
+              </p>
+              <p class="gate"><b>Gate:</b> no horizontal scroll, no edge-crossing box, no clipped text — six sizes</p>
+            </div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-n">3</div>
+            <div>
+              <h3>The action bar, unable to diverge</h3>
+              <p>
+                One shared <code>SegmentedBar</code> for all three verticals. Put the buttons and the
+                indicator in the same CSS grid row so the bubble's height <em>is</em> the button's
+                height — whatever RC-1-shaped rule appears next. Keep measurement only for the
+                sliding transform, and add a <code>ResizeObserver</code> plus a
+                <code>document.fonts.ready</code> re-measure. The split-bill pill takes
+                <code>var(--bar-h)</code>, so "exactly the height of the action bar" becomes a token,
+                not two numbers that happen to match.
+              </p>
+              <p class="gate"><b>Gate:</b> bar height fixed; bubble ≡ active button; label fully inside bubble; send ≡ bar; never clipped; all still true after a resize</p>
+            </div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-n">4</div>
+            <div>
+              <h3>Terminal home: measured gutters, three-row floor</h3>
+              <p>
+                Replace <code>height: 50%</code> + magic padding with a three-row grid whose middle
+                row is the <em>measured</em> height of whatever chrome is actually floating, and
+                whose stack row has
+                <code>min-height: calc(3 × var(--row-h) + var(--stack-hdr-h))</code>. "At least
+                three" stops being an outcome and becomes a CSS invariant. Pin the header outside the
+                scroll container. On short screens the hero contracts first — the stack floor is
+                non-negotiable.
+              </p>
+              <p class="gate"><b>Gate:</b> <code>visibleStackRows &gt;= 3</code> on all six sizes</p>
+            </div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-n">5</div>
+            <div>
+              <h3>The money display fits its box</h3>
+              <p>
+                <code>white-space: nowrap</code> plus
+                <code>font-size: min(var(--amount-max), calc(100cqi / var(--amount-chars) × k))</code>,
+                with React setting the character count. Deterministic, no measurement, no reflow
+                loop, trivially assertable. A <code>useFitText</code> fallback covers late font loads,
+                with a floor below which the presentation compacts rather than shrinking into
+                illegibility. Applies to all ten call sites, not just the hero.
+              </p>
+              <p class="gate"><b>Gate:</b> the amount's box sits inside its parent at the maximum value, six sizes</p>
+            </div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-n">6</div>
+            <div>
+              <h3>Scope the stylesheets, extract the primitives</h3>
+              <p>
+                Scope retail and property under their own class the way trades already is; better,
+                move all three out of template literals into real <code>.css</code> files so Vite
+                dedupes them and they stop being re-parsed on every mount. Then extract the shared
+                primitives — bar, amount, stack row, pill, field, CTA — so the next fix lands once
+                instead of three times.
+              </p>
+              <p class="gate"><b>Gate:</b> no unscoped <code>.tp-</code> selector survives the grep</p>
+            </div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-n">7</div>
+            <div>
+              <h3>Make the gate permanent</h3>
+              <p>
+                Six viewports × every mobile route × both orientations, with the component contracts
+                as hard assertions, a re-measure after a size change, and runs with a simulated safe
+                area and a collapsed dock. Plus four cheap CI greps that catch the <em>cause</em>:
+                no <code>min-height</code> on a bare element selector inside a media query; no new
+                <code>fontSize</code> literals or <code>height: '50%'</code> under
+                <code>features/terminal/</code>; no <code>100vh</code> on a phone surface; no
+                unscoped <code>.tp-</code> rule in a style literal.
+              </p>
+              <p class="gate"><b>Gate:</b> wired in beside <code>verify-desktop-p0.mjs</code>, exiting non-zero</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ 5 · DECISIONS ══════════ -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">05</div>
+      <h2>Four calls that are yours</h2>
+    </div>
+    <div class="body">
+      <div class="rail">Decisions</div>
+      <div class="flow">
+        <p>
+          These change the shape of the work. The plan above assumes the recommended answer, and a
+          different answer only changes Phases 2, 4 and 5.
+        </p>
+
+        <div class="decision">
+          <h3>D1 · Adaptation strategy</h3>
+          <p>
+            <strong>Fluid / intrinsic layout</strong><span class="rec">recommended</span> — tokens,
+            <code>clamp()</code>, container queries, measured gutters. Everything reflows and type
+            stays a readable physical size on every device.
+          </p>
+          <p>
+            The alternative is the scaled canvas the desktop app already uses: design once at 390×844
+            and <code>transform: scale()</code> to fit. Cheap and pixel-perfect — but text goes
+            physically tiny on a 320&nbsp;px phone and tap targets scale below the minimum. Right for
+            simulating a laptop on a tablet; wrong for a real phone.
+          </p>
+        </div>
+
+        <div class="decision">
+          <h3>D2 · Smallest supported phone</h3>
+          <p>
+            The plan assumes <strong>320×568</strong> — iPhone SE 1st gen, older Android, and any
+            iPhone in Display Zoom. That's the size where three stack rows plus a hero genuinely
+            don't fit without the hero contracting, and it may need a compact row variant. If
+            360×640 is the real floor, every clamp minimum relaxes.
+          </p>
+        </div>
+
+        <div class="decision">
+          <h3>D3 · Blast radius of the RC-1 fix</h3>
+          <p>
+            Removing the blanket rule changes the rendered height of 5–13 buttons on
+            <em>every</em> mobile page — mostly back toward the original design. One sweeping commit
+            plus the gate<span class="rec">recommended</span>, because a half-applied fix leaves two
+            inconsistent button systems live at the same time.
+          </p>
+        </div>
+
+        <div class="decision">
+          <h3>D4 · Money formatting</h3>
+          <p>
+            <code>fmt()</code> produces <code>$99999.99</code> with no thousands separator. Should it
+            be <code>$99,999.99</code>? Grouping widens the string, so the fitter has to be
+            calibrated for whichever you want. Current maximum is 7 digits.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>
+      Measured against the dev server on :5000 with the nix Chromium, using
+      <code>scripts/desktop-shots/retail-fixtures.mjs</code> for auth and API mocks, at
+      <code>hasTouch: true, isMobile: true</code>. Seven phone viewports, three screens each,
+      plus a resize pass and a cross-vertical navigation pass.
+    </p>
+    <p>
+      Full plan with file-level steps: <code>docs/PLAN-2026-08-17-mobile-responsive-ui.md</code>
+    </p>
+  </footer>
+
+</div>

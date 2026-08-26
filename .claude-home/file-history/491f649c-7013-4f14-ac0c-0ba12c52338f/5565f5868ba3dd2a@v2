@@ -1,0 +1,45 @@
+#!/usr/bin/env python3
+"""Dump the last N entries of a transcript in full-ish detail."""
+import json, sys
+
+path = sys.argv[1]
+n = int(sys.argv[2]) if len(sys.argv) > 2 else 20
+trunc = int(sys.argv[3]) if len(sys.argv) > 3 else 900
+
+entries = []
+with open(path) as f:
+    for line in f:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entries.append(json.loads(line))
+        except Exception:
+            pass
+
+for i, e in enumerate(entries[-n:], start=len(entries) - n):
+    t = e.get("type")
+    ts = e.get("timestamp")
+    print(f"\n===== [{i}] {t} {ts} =====")
+    m = e.get("message", {})
+    c = m.get("content")
+    if isinstance(c, str):
+        print(c[:trunc])
+    elif isinstance(c, list):
+        for b in c:
+            if not isinstance(b, dict):
+                print(str(b)[:trunc]); continue
+            bt = b.get("type")
+            if bt == "text":
+                print("TEXT:", b.get("text", "")[:trunc])
+            elif bt == "thinking":
+                print("THINKING:", b.get("thinking", "")[:trunc])
+            elif bt == "tool_use":
+                print(f"TOOL_USE {b.get('name')}:", json.dumps(b.get("input", {}))[:trunc])
+            elif bt == "tool_result":
+                cc = b.get("content")
+                if isinstance(cc, list):
+                    cc = " ".join(x.get("text", "") for x in cc if isinstance(x, dict))
+                print(f"TOOL_RESULT (err={b.get('is_error')}):", str(cc)[:trunc])
+    if e.get("toolUseResult") and not isinstance(c, list):
+        print("RESULT:", str(e["toolUseResult"])[:trunc])

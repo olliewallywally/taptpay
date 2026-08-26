@@ -1,0 +1,131 @@
+/* Terminal token layer — the single source for terminal geometry.
+ *
+ * Amendment A1 §3.1 (MD1 answered): one clamped unit, every other length
+ * derived as calc(N * var(--u)) where N = authored_px / 4. Do not add a
+ * second clamped token here — if a value needs a different curve, it is
+ * either height-driven (the B group below) or on A1 §3.5's exemption list.
+ *
+ * Shared and unscoped deliberately, like terminal-keyframes.css beside it —
+ * the tokens must resolve identically on all three verticals. Do not add
+ * this file to terminal-css-scoping.test.ts's VERTICAL_SHEETS, and do not
+ * copy it into the three vertical sheets: three copies of a token layer is
+ * RC-6 wearing a different hat.
+ */
+
+.tp-viewport {
+  container-type: inline-size;          /* size off our own 430-capped box, not the window */
+  --u: clamp(3.3px, 1.0256cqi, 4px);    /* exactly 4.000px at the 390 reference */
+
+  --sp-1: calc(1 * var(--u));
+  --sp-2: calc(2 * var(--u));
+  --sp-3: calc(3 * var(--u));
+  --sp-4: calc(4 * var(--u));
+  --sp-6: calc(6 * var(--u));
+  --sp-7: calc(7 * var(--u));
+
+  --kp-max:   calc(19 * var(--u));      /* 76 @390 — the keypad key's DESIGN size (§5) */
+  --fab-size: calc(17.5 * var(--u));
+
+  /* ── B. Height-driven: the vertical budget ────────────────────────────
+     A hero sized off width is 233px on a 320x568 phone, where the whole
+     screen is 568 — so these key off svh at the top level instead. */
+  --hero-min:  184px;
+  --hero-pref: clamp(184px, 33.65svh, 316px);
+  --panel-min: calc(4 * 44px + 3 * var(--sp-3) + 2 * var(--sp-6));   /* legibility floor */
+
+  /* Trades' quote screen (data-hero="compact") is authored at 20%, not 50% —
+     without this a blanket --hero-min would grow it from 114px to 184px. */
+  --hero-min-compact:  96px;
+  --hero-pref-compact: clamp(96px, 17svh, 160px);
+
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  /* SPEC-2026-08-20 §4.3: not measured. The plan's §3.1 rule 2 has this read
+     from the floating action bar, but on a feature screen that bar sits
+     ABOVE the hero/panel boundary (translateY(-100% - 20px)), inside the
+     hero — it never overlaps the panel. This is just the panel's top
+     breathing room, replacing the six hand-tuned literals in plan §1.2. */
+  --panel-top: calc(9.5 * var(--u));    /* 38 @390 — the keypad's authored value */
+
+  /* JS-written. The only one, and the read at §4.1 carries its own fallback:
+     --dock-h  documentElement, published by TerminalDockView (Phase A, shipped). init 0px */
+
+  height: 100vh;      /* fallback order matters */
+  height: 100svh;
+  height: 100dvh;
+}
+
+@supports not (container-type: inline-size) {
+  .tp-viewport { --u: 4px; }    /* design size, fixed layout — degrades to today's behaviour */
+}
+
+/* ── C. Region-local, from the region's own realised height ─────────────
+   §1.2/§5: declared on .tp-panel-body, never on .tp-panel itself — an
+   element is never its own size-query container, so 100cqh written on the
+   container that also carries container-type:size resolves against the
+   NEXT container up (.tp-viewport, inline-size only) and falls back to the
+   small viewport. And no padding term: 100cqh is the content box, so
+   .tp-panel's own padding is already excluded — subtracting it again draws
+   a key 16% smaller than the panel can afford.
+
+   Do NOT @property-register --kp-size. Registration makes it compute
+   eagerly at the declaring element, pinning it to --kp-max (76px) and
+   putting the keypad back over the edge at 320 and 360 with 3 rows visible
+   instead of 4 — the same silent-failure class this token replaced. */
+.tp-panel-body {
+  --kp-size: min(var(--kp-max), calc((100cqh - 3 * var(--sp-3)) / 4));
+}
+
+/* ── Two regions: the hero yields, the panel takes the rest and never goes
+   under the dock. NEVER bare .tp-screen — that is all 31 screens, including
+   the four homes the companion grids differently and DockPlaceholder, which
+   has one region and no hero at all (companion §6.6.1's ownership rule).
+
+   Prefixed with .tp-viewport for SPECIFICITY, not scoping: each vertical's
+   stylesheet declares `.retail-terminal-view .tp-screen { display:flex }`
+   and its twins — (0,2,0), the same specificity as a bare
+   .tp-screen.tp-feature, so a tie would be broken by import order and this
+   rule would silently lose. (0,3,0) wins outright. */
+.tp-viewport .tp-screen.tp-feature {
+  display: grid;
+  grid-template-rows:
+    minmax(var(--hero-min), var(--hero-pref))     /* off-white: yields first */
+    minmax(var(--panel-min), 1fr);                /* navy: takes the rest */
+  overflow: hidden;
+}
+
+.tp-viewport .tp-screen.tp-feature[data-hero="compact"] {
+  grid-template-rows:
+    minmax(var(--hero-min-compact), var(--hero-pref-compact))
+    minmax(var(--panel-min), 1fr);
+}
+
+.tp-hero {
+  min-height: 0;                  /* without this the row minimum is content, not --hero-min */
+  container-type: size;
+}
+
+.tp-panel {
+  min-height: 0;                  /* THE missing declaration — flex/grid items refuse to
+                                      shrink below min-content until this is set. It is the
+                                      whole of the plan's §1.1 in one line. */
+  container-type: size;           /* so --kp-size can read the panel's realised height */
+  display: flex;
+  flex-direction: column;
+  padding-top: var(--panel-top);
+  padding-left: var(--sp-7);
+  padding-right: var(--sp-7);
+  padding-bottom: calc(var(--dock-h, 0px) + var(--safe-bottom) + var(--sp-3));
+}
+
+.tp-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;               /* DK1: scrolling is a first-class outcome */
+  overscroll-behavior: contain;   /* a flick must not chain to the page */
+}
+
+/* One region, no hero. Takes the dock reservation and nothing else. */
+.tp-viewport .tp-screen.tp-plain {
+  padding-bottom: calc(var(--dock-h, 0px) + var(--safe-bottom) + var(--sp-3));
+}

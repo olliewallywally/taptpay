@@ -1,18 +1,51 @@
-import { pgTable, text, serial, decimal, timestamp, boolean, integer, jsonb, uuid, uniqueIndex, index, customType } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, decimal, timestamp, boolean, integer, jsonb, uuid, uniqueIndex, index, customType, check } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { planIdSchema } from "./plans";
 
+/**
+ * Login identities. One row per person who can sign in, so a merchant on a
+ * multi-seat plan has one row per teammate. `email` is globally unique: a login
+ * addresses exactly one account, which is what makes seat revocation meaningful.
+ */
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   merchantId: integer("merchant_id").references(() => merchants.id),
-  role: text("role").notNull().default("merchant"), // merchant, admin
+  role: text("role").notNull().default("member"), // owner, member, admin
+  name: text("name"),
+  // active = can sign in; invited = has not accepted yet; disabled = seat revoked.
+  // Invited and active seats both count against the plan's seat limit.
+  status: text("status").notNull().default("active"),
+  inviteTokenHash: text("invite_token_hash"),
+  inviteExpiresAt: timestamp("invite_expires_at"),
+  lastLoginAt: timestamp("last_login_at"),
   resetToken: text("reset_token"),
   resetTokenExpiry: timestamp("reset_token_expiry"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => ({
+  merchantIdIdx: index("users_merchant_id_idx").on(t.merchantId),
+  emailLowerUnique: uniqueIndex("users_email_lower_uq").on(sql`lower(${t.email})`),
+  inviteTokenHashUnique: uniqueIndex("users_invite_token_hash_uq")
+    .on(t.inviteTokenHash)
+    .where(sql`${t.inviteTokenHash} is not null`),
+  resetTokenHashUnique: uniqueIndex("users_reset_token_hash_uq")
+    .on(t.resetToken)
+    .where(sql`${t.resetToken} is not null`),
+  roleCheck: check("users_role_check", sql`${t.role} in ('owner', 'member', 'admin')`),
+  statusCheck: check("users_status_check", sql`${t.status} in ('active', 'invited', 'disabled')`),
+}));
+
+export const USER_ROLES = ["owner", "member", "admin"] as const;
+export type UserRole = (typeof USER_ROLES)[number];
+
+export const USER_STATUSES = ["active", "invited", "disabled"] as const;
+export type UserStatus = (typeof USER_STATUSES)[number];
+
+/** Seats consumed by a user in this state. Disabled seats are free to reuse. */
+export const SEAT_CONSUMING_STATUSES = ["active", "invited"] as const;
 
 export const merchants = pgTable("merchants", {
   id: serial("id").primaryKey(),
@@ -142,7 +175,7 @@ export const transactions = pgTable("transactions", {
   // Fee tracking (Marketplace Model)
   windcaveFeeRate: decimal("windcave_fee_rate", { precision: 5, scale: 4 }).default("0.0290"), // 2.9% typical Windcave rate
   windcaveFeeAmount: decimal("windcave_fee_amount", { precision: 10, scale: 2 }), // Calculated Windcave fee
-  platformFeeRate: decimal("platform_fee_rate", { precision: 5, scale: 4 }).default("0.0050"), // 0.5% platform fee
+  platformFeeRate: decimal("platform_fee_rate", { precision: 5, scale: 4 }).default("0.0000"),
   platformFeeAmount: decimal("platform_fee_amount", { precision: 10, scale: 2 }), // Calculated platform fee
   merchantNet: decimal("merchant_net", { precision: 10, scale: 2 }), // Amount to settle to merchant
   
@@ -155,19 +188,34 @@ export const transactions = pgTable("transactions", {
   windcaveSessionState: text("windcave_session_state"), // pending, processing, approved, declined
   windcaveXId: text("windcave_x_id"), // Idempotency key for session creation
 
+  // SHA-256 digest of the per-payment bearer credential. The raw credential is
+  // returned once by the create service and is never stored on a transaction.
+  paymentTokenHash: text("payment_token_hash"),
+
   // Split bill toggle (set by merchant at transaction creation time)
   splitEnabled: boolean("split_enabled").default(false),
   
   createdAt: timestamp("created_at").defaultNow(),
+  // Canonical settlement time for non-split retail payments. Unlike createdAt,
+  // this is written only when payment reaches a completed state and therefore
+  // safely supports date-windowed payout summaries.
+  completedAt: timestamp("completed_at"),
 }, (t) => ({
   merchantIdIdx: index("transactions_merchant_id_idx").on(t.merchantId),
   taptStoneIdIdx: index("transactions_tapt_stone_id_idx").on(t.taptStoneId),
+  paymentTokenHashUnique: uniqueIndex("transactions_payment_token_hash_uq")
+    .on(t.paymentTokenHash)
+    .where(sql`${t.paymentTokenHash} is not null`),
+  paymentTokenHashShape: check(
+    "transactions_payment_token_hash_shape_check",
+    sql`${t.paymentTokenHash} is null or ${t.paymentTokenHash} ~ '^[0-9a-f]{64}$'`,
+  ),
 }));
 
 // Split payments table to track individual payments for split bills
 export const splitPayments = pgTable("split_payments", {
   id: serial("id").primaryKey(),
-  transactionId: integer("transaction_id").references(() => transactions.id),
+  transactionId: integer("transaction_id").references(() => transactions.id).notNull(),
   merchantId: integer("merchant_id").references(() => merchants.id),
   splitIndex: integer("split_index").notNull(), // Which split this is (1, 2, 3, etc.)
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(), // Amount for this split
@@ -185,6 +233,92 @@ export const splitPayments = pgTable("split_payments", {
 }, (t) => ({
   transactionIdIdx: index("split_payments_transaction_id_idx").on(t.transactionId),
   merchantIdIdx: index("split_payments_merchant_id_idx").on(t.merchantId),
+  transactionSplitUnique: uniqueIndex("split_payments_transaction_split_uq")
+    .on(t.transactionId, t.splitIndex),
+}));
+
+export const paymentAttemptStates = [
+  "claiming",
+  "ready",
+  "finalizing",
+  "approved",
+  "declined",
+  "cancelled",
+  "abandoned",
+] as const;
+
+export type PaymentAttemptState = (typeof paymentAttemptStates)[number];
+
+export const paymentAttemptOutcomes = ["approved", "declined", "cancelled"] as const;
+
+export type PaymentAttemptOutcome = (typeof paymentAttemptOutcomes)[number];
+
+// Phase 3 claim/return services must use these exact bounds; the database checks
+// below are the final guard against accidentally creating longer-lived secrets.
+export const PAYMENT_ATTEMPT_MAX_LEASE_MS = 5 * 60 * 1000;
+export const PAYMENT_RETURN_STATE_MAX_AGE_MS = 30 * 60 * 1000;
+
+// Durable claim/session record for one transaction-local share. A share index of
+// zero addresses an unsplit transaction; configured split shares start at one.
+export const paymentAttempts = pgTable("payment_attempts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  transactionId: integer("transaction_id")
+    .references(() => transactions.id, { onDelete: "cascade" })
+    .notNull(),
+  shareIndex: integer("share_index").notNull().default(0),
+  idempotencyKey: uuid("idempotency_key").notNull(),
+  state: text("state").$type<PaymentAttemptState>().notNull().default("claiming"),
+  leaseExpiresAt: timestamp("lease_expires_at").notNull(),
+  processorSessionId: text("processor_session_id"),
+  processorXId: text("processor_x_id"),
+  returnStateHash: text("return_state_hash"),
+  returnStateExpiresAt: timestamp("return_state_expires_at"),
+  outcome: text("outcome").$type<PaymentAttemptOutcome>(),
+  receiptShare: integer("receipt_share"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  transactionIdx: index("payment_attempts_transaction_idx").on(t.transactionId),
+  transactionShareKeyUnique: uniqueIndex("payment_attempts_transaction_share_key_uq")
+    .on(t.transactionId, t.shareIndex, t.idempotencyKey),
+  liveTransactionShareUnique: uniqueIndex("payment_attempts_live_transaction_share_uq")
+    .on(t.transactionId, t.shareIndex)
+    .where(sql`${t.state} in ('claiming', 'ready', 'finalizing')`),
+  returnStateHashUnique: uniqueIndex("payment_attempts_return_state_hash_uq")
+    .on(t.returnStateHash)
+    .where(sql`${t.returnStateHash} is not null`),
+  shareIndexCheck: check(
+    "payment_attempts_share_index_check",
+    sql`${t.shareIndex} >= 0`,
+  ),
+  stateCheck: check(
+    "payment_attempts_state_check",
+    sql`${t.state} in ('claiming', 'ready', 'finalizing', 'approved', 'declined', 'cancelled', 'abandoned')`,
+  ),
+  finiteLeaseCheck: check(
+    "payment_attempts_lease_expiry_check",
+    sql`${t.leaseExpiresAt} > ${t.createdAt} and ${t.leaseExpiresAt} <= ${t.createdAt} + interval '5 minutes'`,
+  ),
+  returnStatePairCheck: check(
+    "payment_attempts_return_state_pair_check",
+    sql`(${t.returnStateHash} is null) = (${t.returnStateExpiresAt} is null)`,
+  ),
+  returnStateHashShapeCheck: check(
+    "payment_attempts_return_state_hash_shape_check",
+    sql`${t.returnStateHash} is null or ${t.returnStateHash} ~ '^[0-9a-f]{64}$'`,
+  ),
+  returnStateExpiryCheck: check(
+    "payment_attempts_return_state_expiry_check",
+    sql`${t.returnStateExpiresAt} is null or (${t.returnStateExpiresAt} > ${t.createdAt} and ${t.returnStateExpiresAt} <= ${t.createdAt} + interval '30 minutes')`,
+  ),
+  outcomeCheck: check(
+    "payment_attempts_outcome_check",
+    sql`${t.outcome} is null or (${t.outcome} in ('approved', 'declined', 'cancelled') and ${t.state} = ${t.outcome})`,
+  ),
+  receiptShareCheck: check(
+    "payment_attempts_receipt_share_check",
+    sql`${t.receiptShare} is null or (${t.shareIndex} >= 1 and ${t.receiptShare} = ${t.shareIndex})`,
+  ),
 }));
 
 // Refunds table to track all refund activities
@@ -289,6 +423,26 @@ export const publicSignupSchema = z.object({
   businessDescription: z.string().min(1, "Business description is required").max(500),
   websiteUrl: z.union([z.string().url("Enter a valid website URL"), z.literal("")]).default(""),
   estimatedAnnualTurnover: z.enum(["Under $50k", "$50k–$150k", "$150k–$500k", "$500k–$1m", "Over $1m"]),
+  planId: planIdSchema.default("solo"),
+  password: z.string()
+    .min(8, "Password must be at least 8 characters")
+    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+    .regex(/[0-9]/, "Password must contain at least one number"),
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
+});
+
+export const inviteTeamMemberSchema = z.object({
+  email: z.string().email("Valid email is required").max(200),
+  name: z.string().max(100).optional(),
+});
+
+export const acceptInviteSchema = z.object({
+  token: z.string().min(1, "Invite token is required"),
+  name: z.string().max(100).optional(),
   password: z.string()
     .min(8, "Password must be at least 8 characters")
     .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
@@ -347,10 +501,6 @@ export const verifyMerchantSchema = z.object({
   path: ["confirmPassword"],
 });
 
-export const updateMerchantRatesSchema = z.object({
-  currentProviderRate: z.string().regex(/^\d+(\.\d{1,4})?$/, "Rate must be a valid percentage"),
-});
-
 export const updateMerchantDetailsSchema = z.object({
   businessName: z.string().min(1, "Business name is required").max(100),
   contactEmail: z.string().email("Valid email is required"),
@@ -378,10 +528,12 @@ export const changePasswordSchema = z.object({
 export const insertTransactionSchema = createInsertSchema(transactions).omit({
   id: true,
   createdAt: true,
+  completedAt: true,
   windcaveTransactionId: true,
   windcaveSessionId: true,
   windcaveSessionState: true,
   windcaveXId: true,
+  paymentTokenHash: true,
 }).extend({
   merchantId: z.number(),
   price: z.string().regex(/^\d+(\.\d{2})?$/, "Price must be a valid decimal"),
@@ -390,6 +542,24 @@ export const insertTransactionSchema = createInsertSchema(transactions).omit({
   selectedStoneId: z.number().optional(),
   splitEnabled: z.boolean().optional().default(false),
 });
+
+// External merchant-terminal request contract. Keep this separate from the
+// table-derived insert schema so callers can never set database/payment fields.
+// Existing phone clients redundantly send status:"pending"; accept and discard
+// only that literal during the compatibility cutover.
+export const retailTransactionCreateRequestSchema = z.object({
+  merchantId: z.number().int().positive(),
+  itemName: z.string().trim().min(1).max(200),
+  price: z.string()
+    .regex(/^\d+(\.\d{1,2})?$/, "Price must be a valid decimal")
+    .refine((value) => Number(value) > 0, "Price must be greater than zero"),
+  splitEnabled: z.boolean().optional().default(false),
+  selectedStoneId: z.number().int().positive().nullable().optional(),
+  linkMode: z.enum(["legacy", "per_payment"]).optional().default("legacy"),
+  status: z.literal("pending").optional(),
+}).strict();
+
+export type RetailTransactionCreateRequest = z.infer<typeof retailTransactionCreateRequestSchema>;
 
 // Password reset schemas
 export const forgotPasswordSchema = z.object({
@@ -405,12 +575,6 @@ export const resetPasswordSchema = z.object({
   path: ["confirmPassword"],
 });
 
-export const insertPlatformFeeSchema = createInsertSchema(platformFees).omit({
-  id: true,
-  createdAt: true,
-  collectedAt: true,
-});
-
 // Tapt Stones table - multiple QR codes per merchant
 export const taptStones = pgTable("tapt_stones", {
   id: serial("id").primaryKey(),
@@ -422,7 +586,11 @@ export const taptStones = pgTable("tapt_stones", {
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => ({
+  activeMerchantNumberUnique: uniqueIndex("tapt_stones_active_merchant_number_uq")
+    .on(t.merchantId, t.stoneNumber)
+    .where(sql`${t.isActive} is true`),
+}));
 
 // Stock Items table - merchant inventory management
 export const stockItems = pgTable("stock_items", {
@@ -492,38 +660,88 @@ export const webhookDeliveries = pgTable("webhook_deliveries", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Merchant Subscriptions table - tracks subscription tier and transaction counts
+/**
+ * One subscription per merchant. Seat-priced monthly plans (see shared/plans.ts);
+ * there are no per-transaction fees.
+ *
+ * `planId` / `seatLimit` / `priceCents` are denormalised from the catalogue on
+ * purpose: a merchant keeps the price they signed up at until they change plan,
+ * so a catalogue price rise cannot silently re-price an existing subscription.
+ */
 export const merchantSubscriptions = pgTable("merchant_subscriptions", {
   id: serial("id").primaryKey(),
   merchantId: integer("merchant_id").references(() => merchants.id).notNull().unique(),
-  tier: text("tier").notNull().default("free"), // free, paid
-  status: text("status").notNull().default("active"), // active, cancelled, past_due, suspended
-  
-  // Transaction tracking
+  planId: text("plan_id").notNull().default("solo"), // solo, team, crew
+  seatLimit: integer("seat_limit").notNull().default(1),
+  priceCents: integer("price_cents").notNull().default(799),
+  status: text("status").notNull().default("pending"), // pending, active, past_due, suspended, cancelled
+
+  // Billing period. The rebill job charges when currentPeriodEnd passes.
+  currentPeriodStart: timestamp("current_period_start"),
+  currentPeriodEnd: timestamp("current_period_end"),
+  nextBillingDate: timestamp("next_billing_date"),
+  lastBillingDate: text("last_billing_date"), // ISO string of last successful billing
+
+  // Queued downgrade — applied by the billing job at period end so nobody loses
+  // seats they have already paid for.
+  pendingPlanId: text("pending_plan_id"),
+  pendingPlanEffectiveAt: timestamp("pending_plan_effective_at"),
+
+  // Cancellation: access continues until currentPeriodEnd, then no renewal.
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+  cancellationRequestedAt: timestamp("cancellation_requested_at"),
+  cancellationEffectiveDate: timestamp("cancellation_effective_date"),
+  cancellationReason: text("cancellation_reason"),
+
+  // Windcave card-on-file. The PAN never reaches this server: Windcave returns a
+  // card token plus the masked metadata mirrored here for display.
+  windcaveCardId: text("windcave_card_id"),
+  windcaveBillingRef: text("windcave_billing_ref"),
+  cardBrand: text("card_brand"),
+  cardLast4: text("card_last4"),
+  cardExpiry: text("card_expiry"), // MM/YY
+
+  // Dunning
+  failedPaymentCount: integer("failed_payment_count").notNull().default(0),
+  lastPaymentFailureAt: timestamp("last_payment_failure_at"),
+  lastPaymentFailureReason: text("last_payment_failure_reason"),
+
+  // A short lease prevents overlapping cron workers from billing the same row.
+  // Only the worker holding this token may finalise the provider outcome.
+  billingClaimToken: text("billing_claim_token"),
+  billingClaimedAt: timestamp("billing_claimed_at"),
+
+  // Usage statistics only — these no longer gate or price anything.
   currentMonthTransactions: integer("current_month_transactions").default(0),
   totalLifetimeTransactions: integer("total_lifetime_transactions").default(0),
-  monthStartDate: timestamp("month_start_date").defaultNow(), // When current month started (resets monthly)
-  
-  // Billing configuration
-  billingFrequency: text("billing_frequency").default("monthly"), // weekly, bi_weekly, monthly
-  nextBillingDate: timestamp("next_billing_date"),
-  unbilledTransactionCount: integer("unbilled_transaction_count").default(0), // Transactions not yet billed
-  unbilledAmount: decimal("unbilled_amount", { precision: 10, scale: 2 }).default("0.00"), // Total unbilled fees
-  
-  // Cancellation tracking
-  cancellationRequestedAt: timestamp("cancellation_requested_at"),
-  cancellationEffectiveDate: timestamp("cancellation_effective_date"), // 30 days after request
-  cancellationReason: text("cancellation_reason"),
-  
-  // Stripe integration
+  monthStartDate: timestamp("month_start_date").defaultNow(),
+
+  // Superseded columns, retained so historical rows stay readable. Nothing reads
+  // them: `tier`/`billingFrequency` predate seat plans, the unbilled_* pair
+  // accrued the old $0.10 transaction fee, and Stripe was never wired up.
+  tier: text("tier").default("free"),
+  billingFrequency: text("billing_frequency").default("monthly"),
+  unbilledTransactionCount: integer("unbilled_transaction_count").default(0),
+  unbilledAmount: decimal("unbilled_amount", { precision: 10, scale: 2 }).default("0.00"),
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
   stripePaymentMethodId: text("stripe_payment_method_id"),
-  lastBillingDate: text("last_billing_date"), // ISO string of last successful billing
-  
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => ({
+  planIdCheck: check("merchant_subscriptions_plan_id_check", sql`${t.planId} in ('solo', 'team', 'crew')`),
+  pendingPlanIdCheck: check(
+    "merchant_subscriptions_pending_plan_id_check",
+    sql`${t.pendingPlanId} is null or ${t.pendingPlanId} in ('solo', 'team', 'crew')`,
+  ),
+  statusCheck: check(
+    "merchant_subscriptions_status_check",
+    sql`${t.status} in ('pending', 'active', 'past_due', 'suspended', 'cancelled')`,
+  ),
+  seatLimitCheck: check("merchant_subscriptions_seat_limit_check", sql`${t.seatLimit} >= 1`),
+  priceCentsCheck: check("merchant_subscriptions_price_cents_check", sql`${t.priceCents} >= 0`),
+}));
 
 // Subscription Billing History table - tracks all billing events
 export const subscriptionBillingHistory = pgTable("subscription_billing_history", {
@@ -531,25 +749,35 @@ export const subscriptionBillingHistory = pgTable("subscription_billing_history"
   merchantId: integer("merchant_id").references(() => merchants.id).notNull(),
   subscriptionId: integer("subscription_id").references(() => merchantSubscriptions.id),
   
-  // Billing details
-  billingType: text("billing_type").notNull(), // tier_upgrade, transaction_fees, monthly_subscription
+  // Billing details. `monthly_subscription` and `plan_change` are the live types;
+  // `transaction_fees` and `tier_upgrade` only appear on pre-2026-08 rows.
+  billingType: text("billing_type").notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   transactionCount: integer("transaction_count").default(0), // Number of transactions billed
   billingPeriodStart: timestamp("billing_period_start"),
   billingPeriodEnd: timestamp("billing_period_end"),
   
-  // Stripe payment details
+  // Provider reconciliation details. Stripe columns remain for historical rows.
   stripePaymentIntentId: text("stripe_payment_intent_id"),
   stripeChargeId: text("stripe_charge_id"),
+  windcaveTransactionId: text("windcave_transaction_id"),
+  idempotencyKey: text("idempotency_key"),
+  attemptNumber: integer("attempt_number"),
   status: text("status").notNull().default("pending"), // pending, succeeded, failed, refunded
   
   // Details
-  description: text("description"), // e.g., "Transaction fees: 150 transactions @ $0.10 each"
+  description: text("description"), // e.g., "Team plan — 1 Sep to 1 Oct 2026"
   failureReason: text("failure_reason"),
   
   paidAt: timestamp("paid_at"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => ({
+  merchantCreatedIdx: index("subscription_billing_history_merchant_created_idx")
+    .on(t.merchantId, t.createdAt),
+  idempotencyKeyUnique: uniqueIndex("subscription_billing_history_idempotency_key_uq")
+    .on(t.idempotencyKey)
+    .where(sql`${t.idempotencyKey} is not null`),
+}));
 
 // Info pack lead capture table
 export const infoPackLeads = pgTable("info_pack_leads", {
@@ -569,6 +797,39 @@ export const createInfoPackLeadSchema = z.object({
 export type InfoPackLead = typeof infoPackLeads.$inferSelect;
 export type InsertInfoPackLead = z.infer<typeof insertInfoPackLeadSchema>;
 
+export const DEFAULT_PUSH_NOTIFICATION_PREFERENCES = Object.freeze({
+  paymentReceived: true,
+  dailyPayoutSummary: true,
+  failedPaymentAlerts: false,
+});
+
+export const pushNotificationPreferencesSchema = z.object({
+  paymentReceived: z.boolean(),
+  dailyPayoutSummary: z.boolean(),
+  failedPaymentAlerts: z.boolean(),
+}).strict();
+
+export type PushNotificationPreferences = z.infer<typeof pushNotificationPreferencesSchema>;
+
+export function normalizePushNotificationPreferences(
+  value: unknown,
+): PushNotificationPreferences {
+  const parsed = pushNotificationPreferencesSchema.safeParse(value);
+  return parsed.success
+    ? parsed.data
+    : { ...DEFAULT_PUSH_NOTIFICATION_PREFERENCES };
+}
+
+export const PUSH_NOTIFICATION_EVENT_TYPES = [
+  "transaction_created",
+  "payment_received",
+  "payment_failed",
+  "refund_processed",
+  "daily_payout_summary",
+] as const;
+
+export type PushNotificationEventType = typeof PUSH_NOTIFICATION_EVENT_TYPES[number];
+
 // Push notification subscriptions table
 export const pushSubscriptions = pgTable("push_subscriptions", {
   id: serial("id").primaryKey(),
@@ -578,13 +839,46 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
   auth: text("auth").notNull(),
   userAgent: text("user_agent"),
   isActive: boolean("is_active").default(true),
+  preferences: jsonb("preferences")
+    .$type<PushNotificationPreferences>()
+    .notNull()
+    .default(DEFAULT_PUSH_NOTIFICATION_PREFERENCES),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions).omit({
   id: true,
+  preferences: true,
   createdAt: true,
 });
+
+// Persistent claim records make scheduled push producers safe under cron
+// retries and overlapping processes. No notification payload or endpoint secret
+// is stored here.
+export const pushNotificationDeliveries = pgTable("push_notification_deliveries", {
+  id: serial("id").primaryKey(),
+  merchantId: integer("merchant_id")
+    .references(() => merchants.id, { onDelete: "cascade" })
+    .notNull(),
+  eventType: text("event_type").$type<PushNotificationEventType>().notNull(),
+  eventKey: text("event_key").notNull(),
+  status: text("status").notNull().default("claimed"),
+  claimToken: uuid("claim_token").notNull().defaultRandom(),
+  claimedAt: timestamp("claimed_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  completedAt: timestamp("completed_at"),
+}, (t) => ({
+  merchantEventKeyUnique: uniqueIndex("push_notification_deliveries_merchant_event_key_uq")
+    .on(t.merchantId, t.eventType, t.eventKey),
+  eventTypeCheck: check(
+    "push_notification_deliveries_event_type_check",
+    sql`${t.eventType} in ('transaction_created', 'payment_received', 'payment_failed', 'refund_processed', 'daily_payout_summary')`,
+  ),
+  statusCheck: check(
+    "push_notification_deliveries_status_check",
+    sql`${t.status} in ('claimed', 'processed', 'skipped', 'failed')`,
+  ),
+}));
 
 // API Key schemas
 export const createApiKeySchema = z.object({
@@ -665,11 +959,6 @@ export const insertMerchantSubscriptionSchema = createInsertSchema(merchantSubsc
   updatedAt: true,
 });
 
-export const updateSubscriptionSchema = z.object({
-  tier: z.enum(["free", "paid"]).optional(),
-  billingFrequency: z.enum(["weekly", "bi_weekly", "monthly"]).optional(),
-});
-
 export const cancelSubscriptionSchema = z.object({
   cancellationReason: z.string().min(1, "Cancellation reason is required").max(500, "Reason too long"),
 });
@@ -688,8 +977,9 @@ export type CreateMerchant = z.infer<typeof createMerchantSchema>;
 export type VerifyMerchant = z.infer<typeof verifyMerchantSchema>;
 export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
-export type PlatformFee = typeof platformFees.$inferSelect;
-export type InsertPlatformFee = z.infer<typeof insertPlatformFeeSchema>;
+export type SplitPayment = typeof splitPayments.$inferSelect;
+export type PaymentAttempt = typeof paymentAttempts.$inferSelect;
+export type InsertPaymentAttempt = typeof paymentAttempts.$inferInsert;
 export type MerchantSettlement = typeof merchantSettlements.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -712,7 +1002,6 @@ export type CreateStockItem = z.infer<typeof createStockItemSchema>;
 // Subscription types
 export type MerchantSubscription = typeof merchantSubscriptions.$inferSelect;
 export type InsertMerchantSubscription = z.infer<typeof insertMerchantSubscriptionSchema>;
-export type UpdateSubscription = z.infer<typeof updateSubscriptionSchema>;
 export type CancelSubscription = z.infer<typeof cancelSubscriptionSchema>;
 
 // Billing History types
@@ -722,6 +1011,7 @@ export type InsertBillingHistory = z.infer<typeof insertBillingHistorySchema>;
 // Push Subscription types
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 export type InsertPushSubscription = z.infer<typeof insertPushSubscriptionSchema>;
+export type PushNotificationDelivery = typeof pushNotificationDeliveries.$inferSelect;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PROPERTY MANAGEMENT VERTICAL

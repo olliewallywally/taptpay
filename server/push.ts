@@ -1,6 +1,11 @@
 import webpush from "web-push";
 import http2 from "http2";
 import jwt from "jsonwebtoken";
+import {
+  normalizePushNotificationPreferences,
+  type PushNotificationEventType,
+  type PushSubscription,
+} from "@shared/schema";
 import { storage } from "./storage";
 
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || "";
@@ -28,60 +33,97 @@ interface PushPayload {
   icon?: string;
   badge?: string;
   tag?: string;
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
 }
 
-function buildTransactionPayload(
-  status: string,
-  itemName: string,
-  amount: string,
-  transactionId: number
-): PushPayload {
-  const formattedAmount = `$${parseFloat(amount).toFixed(2)}`;
+type TransactionPushFields = {
+  transactionId: number;
+  itemName: string;
+  amount: string;
+};
 
-  const messages: Record<string, { title: string; body: string }> = {
-    pending: {
-      title: "New Transaction Created",
-      body: `${itemName} - ${formattedAmount} awaiting payment`,
-    },
-    processing: {
-      title: "Payment Processing",
-      body: `${itemName} - ${formattedAmount} is being processed`,
-    },
-    completed: {
-      title: "Payment Received",
-      body: `${itemName} - ${formattedAmount} payment successful`,
-    },
-    failed: {
-      title: "Payment Failed",
-      body: `${itemName} - ${formattedAmount} payment was declined`,
-    },
-    cancelled: {
-      title: "Transaction Cancelled",
-      body: `${itemName} - ${formattedAmount} was cancelled`,
-    },
-    refunded: {
-      title: "Refund Processed",
-      body: `${itemName} - ${formattedAmount} has been refunded`,
-    },
-    partially_refunded: {
-      title: "Partial Refund Processed",
-      body: `${itemName} - partial refund processed`,
-    },
-  };
+export type MerchantPushEvent =
+  | ({ type: "transaction_created" } & TransactionPushFields)
+  | ({ type: "payment_received" } & TransactionPushFields)
+  | ({ type: "payment_failed"; reason?: "failed" | "cancelled" } & TransactionPushFields)
+  | ({ type: "refund_processed"; partial?: boolean } & TransactionPushFields)
+  | {
+      type: "daily_payout_summary";
+      localDate: string;
+      amount: string;
+      paymentCount: number;
+    };
 
-  const msg = messages[status] || {
-    title: "Transaction Update",
-    body: `${itemName} - ${formattedAmount} status: ${status}`,
-  };
+export interface PushDeliveryResult {
+  eligibleSubscriptions: number;
+  attempted: number;
+  delivered: number;
+  failed: number;
+}
+
+function formatAmount(amount: string): string {
+  const parsed = Number(amount);
+  return `$${Number.isFinite(parsed) ? parsed.toFixed(2) : "0.00"}`;
+}
+
+export function buildPushPayload(event: MerchantPushEvent): PushPayload {
+  if (event.type === "daily_payout_summary") {
+    const paymentLabel = event.paymentCount === 1 ? "payment" : "payments";
+    return {
+      title: "Daily payout summary",
+      body: `${formatAmount(event.amount)} received across ${event.paymentCount} ${paymentLabel} yesterday`,
+      icon: "/icons/icon-192x192.png",
+      badge: "/icons/icon-192x192.png",
+      tag: `daily-payout-${event.localDate}`,
+      data: { eventType: event.type, localDate: event.localDate, url: "/transactions" },
+    };
+  }
+
+  const formattedAmount = formatAmount(event.amount);
+  let title: string;
+  let body: string;
+  if (event.type === "transaction_created") {
+    title = "New Transaction Created";
+    body = `${event.itemName} - ${formattedAmount} awaiting payment`;
+  } else if (event.type === "payment_received") {
+    title = "Payment Received";
+    body = `${event.itemName} - ${formattedAmount} payment successful`;
+  } else if (event.type === "payment_failed") {
+    const cancelled = event.reason === "cancelled";
+    title = cancelled ? "Transaction Cancelled" : "Payment Failed";
+    body = cancelled
+      ? `${event.itemName} - ${formattedAmount} was cancelled`
+      : `${event.itemName} - ${formattedAmount} payment was declined`;
+  } else {
+    title = event.partial ? "Partial Refund Processed" : "Refund Processed";
+    body = event.partial
+      ? `${event.itemName} - ${formattedAmount} partial refund processed`
+      : `${event.itemName} - ${formattedAmount} has been refunded`;
+  }
 
   return {
-    ...msg,
+    title,
+    body,
     icon: "/icons/icon-192x192.png",
     badge: "/icons/icon-192x192.png",
-    tag: `transaction-${transactionId}`,
-    data: { transactionId, status, url: "/" },
+    tag: `transaction-${event.transactionId}`,
+    data: {
+      eventType: event.type,
+      transactionId: event.transactionId,
+      url: "/transactions",
+    },
   };
+}
+
+function subscriptionAllowsEvent(
+  subscription: Pick<PushSubscription, "preferences">,
+  eventType: PushNotificationEventType,
+): boolean {
+  const preferences = normalizePushNotificationPreferences(subscription.preferences);
+  if (eventType === "payment_received") return preferences.paymentReceived;
+  if (eventType === "payment_failed") return preferences.failedPaymentAlerts;
+  if (eventType === "daily_payout_summary") return preferences.dailyPayoutSummary;
+  return true;
 }
 
 let apnsJwtToken: string | null = null;
@@ -183,9 +225,9 @@ async function sendApnsNotification(
 }
 
 async function sendNativePushToMerchant(
-  nativeSubs: any[],
+  nativeSubs: PushSubscription[],
   payload: PushPayload
-): Promise<void> {
+): Promise<Pick<PushDeliveryResult, "attempted" | "delivered" | "failed">> {
   const hasCredentials = !!(
     process.env.APNS_KEY_P8 &&
     process.env.APNS_KEY_ID &&
@@ -193,7 +235,7 @@ async function sendNativePushToMerchant(
   );
 
   if (!hasCredentials) {
-    return;
+    return { attempted: 0, delivered: 0, failed: 0 };
   }
 
   const results = await Promise.allSettled(
@@ -212,65 +254,72 @@ async function sendNativePushToMerchant(
       }
     }
   }
+  return {
+    attempted: results.length,
+    delivered: results.length - failed.length,
+    failed: failed.length,
+  };
 }
 
 export async function sendPushToMerchant(
   merchantId: number,
-  status: string,
-  itemName: string,
-  amount: string,
-  transactionId: number
-): Promise<void> {
+  event: MerchantPushEvent,
+): Promise<PushDeliveryResult> {
   initPush();
+  const subscriptions = await storage.getPushSubscriptionsByMerchant(merchantId);
+  const eligible = subscriptions.filter(
+    (subscription) => subscription.isActive && subscriptionAllowsEvent(subscription, event.type),
+  );
+  const result: PushDeliveryResult = {
+    eligibleSubscriptions: eligible.length,
+    attempted: 0,
+    delivered: 0,
+    failed: 0,
+  };
+  if (eligible.length === 0) return result;
 
-  try {
-    const subscriptions = await storage.getPushSubscriptionsByMerchant(merchantId);
-    if (!subscriptions || subscriptions.length === 0) return;
+  const payload = buildPushPayload(event);
+  const payloadStr = JSON.stringify(payload);
+  const webSubs = eligible.filter((sub) => !sub.endpoint.startsWith("apns://"));
+  const nativeSubs = eligible.filter((sub) => sub.endpoint.startsWith("apns://"));
 
-    const payload = buildTransactionPayload(status, itemName, amount, transactionId);
-    const payloadStr = JSON.stringify(payload);
-
-    const webSubs = subscriptions.filter(
-      (sub: any) => sub.isActive && !sub.endpoint.startsWith("apns://")
-    );
-    const nativeSubs = subscriptions.filter(
-      (sub: any) => sub.isActive && sub.endpoint.startsWith("apns://")
-    );
-
-    if (pushInitialized && webSubs.length > 0) {
-      const results = await Promise.allSettled(
-        webSubs.map(async (sub: any) => {
-          try {
-            await webpush.sendNotification(
-              {
-                endpoint: sub.endpoint,
-                keys: { p256dh: sub.p256dh, auth: sub.auth },
-              },
-              payloadStr
-            );
-          } catch (error: any) {
-            if (error.statusCode === 404 || error.statusCode === 410) {
-              await storage.deactivatePushSubscription(sub.id);
-            }
-            throw error;
+  if (pushInitialized && webSubs.length > 0) {
+    const results = await Promise.allSettled(
+      webSubs.map(async (sub) => {
+        try {
+          await webpush.sendNotification(
+            {
+              endpoint: sub.endpoint,
+              keys: { p256dh: sub.p256dh, auth: sub.auth },
+            },
+            payloadStr,
+          );
+        } catch (error: unknown) {
+          const statusCode = (error as { statusCode?: unknown }).statusCode;
+          if (statusCode === 404 || statusCode === 410) {
+            await storage.deactivatePushSubscription(sub.id);
           }
-        })
+          throw error;
+        }
+      }),
+    );
+    const failed = results.filter((delivery) => delivery.status === "rejected").length;
+    result.attempted += results.length;
+    result.delivered += results.length - failed;
+    result.failed += failed;
+    if (failed > 0) {
+      console.log(
+        `Web push: ${results.length - failed}/${results.length} delivered for merchant ${merchantId}`,
       );
-
-      const failed = results.filter((r) => r.status === "rejected").length;
-      if (failed > 0) {
-        console.log(
-          `Web push: ${results.length - failed}/${results.length} delivered for merchant ${merchantId}`
-        );
-      }
     }
-
-    if (nativeSubs.length > 0) {
-      await sendNativePushToMerchant(nativeSubs, payload).catch((err) => {
-        console.error("APNs batch error:", err);
-      });
-    }
-  } catch (error) {
-    console.error("Push notification error:", error);
   }
+
+  if (nativeSubs.length > 0) {
+    const nativeResult = await sendNativePushToMerchant(nativeSubs, payload);
+    result.attempted += nativeResult.attempted;
+    result.delivered += nativeResult.delivered;
+    result.failed += nativeResult.failed;
+  }
+
+  return result;
 }

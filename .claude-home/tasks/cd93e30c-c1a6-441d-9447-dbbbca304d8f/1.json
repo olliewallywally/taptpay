@@ -1,0 +1,9 @@
+{
+  "id": "1",
+  "subject": "Static verification: typecheck, lint, full test suites, build",
+  "description": "Run tsc, eslint, jest server+client, postgres verifier, vite build. Record every failure.",
+  "activeForm": "Running static verification",
+  "status": "completed",
+  "blocks": [],
+  "blockedBy": []
+}

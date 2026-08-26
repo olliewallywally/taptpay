@@ -408,11 +408,11 @@ export function MerchantDetail({ merchantId }: MerchantDetailProps) {
               </div>
             </div>
 
-            {/* Windcave API Key */}
+            {/* Windcave integration status — never return the credential itself. */}
             <div className="bg-[#1a1b2e] rounded-xl p-4">
-              <p className="text-[#dbdfea]/50 text-xs mb-1 uppercase tracking-wide">Windcave API Key</p>
-              <p className="text-[#dbdfea] text-sm font-mono">
-                {merchant.windcaveApiKey ? '••••••••' + merchant.windcaveApiKey.slice(-4) : <span className="text-[#dbdfea]/30 italic text-xs">Not configured</span>}
+              <p className="text-[#dbdfea]/50 text-xs mb-1 uppercase tracking-wide">Windcave integration</p>
+              <p className="text-[#dbdfea] text-sm">
+                {merchant.windcaveApiConfigured ? 'Configured' : <span className="text-[#dbdfea]/30 italic text-xs">Not configured</span>}
               </p>
             </div>
           </div>

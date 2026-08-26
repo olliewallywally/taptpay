@@ -13,8 +13,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, X } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { useDeviceClass } from "@/hooks/use-device-class";
 import type { TutorialPageKey, TutorialPageStatus } from "@shared/tutorial";
-import { TUTORIAL_REGISTRY, type TutorialStep } from "./tutorial-registry";
+import {
+  TUTORIAL_REGISTRY,
+  tutorialStepsForDevice,
+  type TutorialStep,
+} from "./tutorial-registry";
 import "./tutorial.css";
 
 interface TutorialProgressEntry {
@@ -64,6 +69,7 @@ export function TutorialPageBoundary({ pageKey, children }: { pageKey: TutorialP
 
 export function TutorialProvider({ enabled, children }: { enabled: boolean; children: React.ReactNode }) {
   const queryClient = useQueryClient();
+  const deviceClass = useDeviceClass();
   const [currentPage, setCurrentPage] = useState<TutorialPageKey | null>(null);
   const [active, setActive] = useState<ActiveTutorial | null>(null);
   const [isRestarting, setIsRestarting] = useState(false);
@@ -167,7 +173,7 @@ export function TutorialProvider({ enabled, children }: { enabled: boolean; chil
 
   const nextStep = useCallback(() => {
     if (!active) return;
-    const steps = TUTORIAL_REGISTRY[active.pageKey].steps;
+    const steps = tutorialStepsForDevice(active.pageKey, deviceClass);
     if (active.stepIndex >= steps.length - 1) {
       closeTutorial("completed");
       return;
@@ -176,7 +182,7 @@ export function TutorialProvider({ enabled, children }: { enabled: boolean; chil
     setActive({ ...active, stepIndex: nextIndex });
     setCachedProgress(active.pageKey, { status: "started", lastStep: nextIndex });
     void saveProgress(active.pageKey, "started", nextIndex).catch(() => {});
-  }, [active, closeTutorial, saveProgress, setCachedProgress]);
+  }, [active, closeTutorial, deviceClass, saveProgress, setCachedProgress]);
 
   const restartTutorials = useCallback(async () => {
     setIsRestarting(true);
@@ -202,7 +208,8 @@ export function TutorialProvider({ enabled, children }: { enabled: boolean; chil
   }), [isRestarting, registerPage, restartTutorials, stateQuery.data?.pageCount, stateQuery.isSuccess, visitedPages]);
 
   const definition = active ? TUTORIAL_REGISTRY[active.pageKey] : null;
-  const step = definition && active ? definition.steps[active.stepIndex] : null;
+  const steps = active ? tutorialStepsForDevice(active.pageKey, deviceClass) : [];
+  const step = definition && active ? steps[active.stepIndex] : null;
 
   return (
     <TutorialContext.Provider value={contextValue}>
@@ -214,7 +221,7 @@ export function TutorialProvider({ enabled, children }: { enabled: boolean; chil
             pageLabel={definition.label}
             step={step}
             stepIndex={active.stepIndex}
-            stepCount={definition.steps.length}
+            stepCount={steps.length}
             onNext={nextStep}
             onDismiss={() => closeTutorial("dismissed")}
           />
@@ -293,12 +300,25 @@ function TutorialOverlay({ pageLabel, step, stepIndex, stepCount, onNext, onDism
     const settle = window.setTimeout(measure, reducedMotion ? 0 : 360);
     const observer = target ? new ResizeObserver(measure) : null;
     if (target && observer) observer.observe(target);
+    // The desktop entry cascade animates a transform on an ancestor block, which
+    // no ResizeObserver reports and which outlives the settle timer, so without
+    // this the spotlight freezes around a mid-bounce rect. Animation events are
+    // listened for in capture so an ancestor's completion still re-measures.
+    const onAnimationSettled = (event: Event) => {
+      const node = event.target;
+      if (!target || !(node instanceof Node)) return;
+      if (node === target || node.contains(target)) measure();
+    };
+    document.addEventListener("animationend", onAnimationSettled, true);
+    document.addEventListener("transitionend", onAnimationSettled, true);
     window.addEventListener("resize", measure);
     window.addEventListener("scroll", measure, true);
     return () => {
       cancelAnimationFrame(raf);
       window.clearTimeout(settle);
       observer?.disconnect();
+      document.removeEventListener("animationend", onAnimationSettled, true);
+      document.removeEventListener("transitionend", onAnimationSettled, true);
       window.removeEventListener("resize", measure);
       window.removeEventListener("scroll", measure, true);
     };
@@ -396,4 +416,3 @@ function TutorialOverlay({ pageLabel, step, stepIndex, stepCount, onNext, onDism
 function BlurPanel({ style }: { style: React.CSSProperties }) {
   return <div className="tutorial-blur-panel" style={style} />;
 }
-

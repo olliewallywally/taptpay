@@ -1,0 +1,182 @@
+#!/usr/bin/env python3
+"""Minimal GFM -> HTML for the two 2026-08-17 plan documents.
+
+Covers exactly what they use: ATX headings, pipe tables, fenced code,
+blockquotes (recursive, may contain tables and fences), ordered and
+unordered lists with continuation lines, thematic breaks, and the
+inline set (code, strong, em, links).
+"""
+import re, sys, html, json
+
+# ---------- inline ----------
+
+def inline(text):
+    text = html.escape(text, quote=False)
+    spans = []
+
+    def stash(m):
+        spans.append(m.group(1))
+        return f"\x00{len(spans)-1}\x00"
+
+    # code spans first: their contents take no further processing
+    text = re.sub(r'`([^`]+)`', stash, text)
+
+    text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)',
+                  lambda m: f'<a href="{m.group(2)}">{m.group(1)}</a>', text)
+    text = re.sub(r'\*\*([^*]+)\*\*', r'<strong>\1</strong>', text)
+    text = re.sub(r'(?<![\w*])\*([^*\n]+)\*(?![\w*])', r'<em>\1</em>', text)
+
+    # bare URLs that were not already linked
+    text = re.sub(r'(?<!")(?<!=)(https?://[^\s<>()]+)', r'<a href="\1">\1</a>', text)
+
+    return re.sub(r'\x00(\d+)\x00', lambda m: f'<code>{spans[int(m.group(1))]}</code>', text)
+
+
+# ---------- blocks ----------
+
+FENCE = re.compile(r'^\s*```\s*([A-Za-z0-9_+-]*)\s*$')
+HEAD = re.compile(r'^(#{1,6})\s+(.*)$')
+HR = re.compile(r'^\s*(-{3,}|\*{3,})\s*$')
+ULI = re.compile(r'^(\s*)[-*]\s+(.*)$')
+OLI = re.compile(r'^(\s*)(\d+)\.\s+(.*)$')
+QUOTE = re.compile(r'^>\s?(.*)$')
+ROW = re.compile(r'^\s*\|.*\|\s*$')
+SEP = re.compile(r'^\s*\|[\s:|-]+\|\s*$')
+
+
+def split_row(line):
+    line = line.strip()
+    if line.startswith('|'):
+        line = line[1:]
+    if line.endswith('|'):
+        line = line[:-1]
+    # the documents contain no escaped pipes; a plain split is exact here
+    return [c.strip() for c in line.split('|')]
+
+
+def render(lines, slugs=None, depth=0):
+    out, i, n = [], 0, len(lines)
+    while i < n:
+        line = lines[i]
+
+        if not line.strip():
+            i += 1
+            continue
+
+        m = FENCE.match(line)
+        if m:
+            lang = m.group(1) or 'text'
+            i += 1
+            buf = []
+            while i < n and not FENCE.match(lines[i]):
+                buf.append(lines[i])
+                i += 1
+            i += 1
+            code = html.escape('\n'.join(buf), quote=False)
+            out.append(f'<pre class="code" data-lang="{lang}"><code>{code}</code></pre>')
+            continue
+
+        if HR.match(line):
+            out.append('<hr />')
+            i += 1
+            continue
+
+        m = HEAD.match(line)
+        if m:
+            lv = len(m.group(1))
+            txt = m.group(2).strip()
+            attr = ''
+            if slugs is not None and lv in (2, 3):
+                sid = 's%d' % len(slugs)
+                slugs.append((lv, re.sub(r'<[^>]+>', '', inline(txt)), sid))
+                attr = f' id="{sid}"'
+            out.append(f'<h{lv}{attr}>{inline(txt)}</h{lv}>')
+            i += 1
+            continue
+
+        if QUOTE.match(line):
+            buf = []
+            while i < n and (QUOTE.match(lines[i]) or (lines[i].strip() and buf and not lines[i].startswith('#'))):
+                mq = QUOTE.match(lines[i])
+                if not mq:
+                    break
+                buf.append(mq.group(1))
+                i += 1
+            out.append('<blockquote>' + render(buf, None, depth + 1) + '</blockquote>')
+            continue
+
+        if ROW.match(line) and i + 1 < n and SEP.match(lines[i + 1]):
+            head = split_row(line)
+            i += 2
+            body = []
+            while i < n and ROW.match(lines[i]):
+                body.append(split_row(lines[i]))
+                i += 1
+            th = ''.join(f'<th>{inline(c)}</th>' for c in head)
+            tb = ''
+            for r in body:
+                r = (r + [''] * len(head))[:len(head)]
+                tb += '<tr>' + ''.join(f'<td>{inline(c)}</td>' for c in r) + '</tr>'
+            out.append(f'<div class="tablewrap"><table><thead><tr>{th}</tr></thead>'
+                       f'<tbody>{tb}</tbody></table></div>')
+            continue
+
+        if ULI.match(line) or OLI.match(line):
+            ordered = bool(OLI.match(line))
+            items, cur = [], None
+            while i < n:
+                mu, mo = ULI.match(lines[i]), OLI.match(lines[i])
+                if mo and ordered:
+                    if cur is not None:
+                        items.append(cur)
+                    cur = [mo.group(3)]
+                elif mu and not ordered:
+                    if cur is not None:
+                        items.append(cur)
+                    cur = [mu.group(2)]
+                elif lines[i].startswith(('  ', '\t')) and lines[i].strip() and cur is not None:
+                    cur.append(lines[i].strip())
+                elif not lines[i].strip():
+                    nxt = lines[i + 1] if i + 1 < n else ''
+                    if ULI.match(nxt) or OLI.match(nxt):
+                        i += 1
+                        continue
+                    break
+                else:
+                    break
+                i += 1
+            if cur is not None:
+                items.append(cur)
+            tag = 'ol' if ordered else 'ul'
+            lis = ''.join(f'<li>{inline(" ".join(it))}</li>' for it in items)
+            out.append(f'<{tag}>{lis}</{tag}>')
+            continue
+
+        buf = []
+        while i < n and lines[i].strip() and not (
+            FENCE.match(lines[i]) or HEAD.match(lines[i]) or HR.match(lines[i])
+            or QUOTE.match(lines[i]) or ULI.match(lines[i]) or OLI.match(lines[i])
+            or (ROW.match(lines[i]) and i + 1 < n and SEP.match(lines[i + 1]))
+        ):
+            buf.append(lines[i].strip())
+            i += 1
+        if buf:
+            out.append(f'<p>{inline(" ".join(buf))}</p>')
+        else:
+            i += 1
+
+    return '\n'.join(out)
+
+
+def convert(path):
+    src = open(path, encoding='utf-8').read().split('\n')
+    title = src[0].lstrip('# ').strip() if src and src[0].startswith('#') else 'Plan'
+    slugs = []
+    body = render(src[1:], slugs)
+    return title, body, slugs
+
+
+if __name__ == '__main__':
+    t, b, s = convert(sys.argv[1])
+    json.dump({'title': t, 'body': b, 'toc': s}, open(sys.argv[2], 'w'))
+    print(f'{sys.argv[1]}: {len(b)} chars, {len(s)} toc entries')

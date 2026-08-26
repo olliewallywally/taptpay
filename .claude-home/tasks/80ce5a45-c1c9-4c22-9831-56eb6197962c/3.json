@@ -1,0 +1,9 @@
+{
+  "id": "3",
+  "subject": "Make \"try it live\" open the real demo app on a sandboxed session",
+  "description": "Seed a demo merchant, issue a scoped anonymous sandbox token, route the orphaned demo-terminal.tsx, and wire the button to it. Public write surface must be sandboxed and rate-limited.",
+  "activeForm": "Wiring the sandboxed demo app",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

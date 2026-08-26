@@ -1,0 +1,19 @@
+docs(desktop): record the 2026-08-08 cascade deviation rulings
+
+Oliver ruled "keep as shipped" on all four cascade omissions left by the
+page-transition work (666b898, a7d15a3), so §6 now closes them out with the
+reason each one is load-bearing, rather than leaving them queued as open
+questions the next session re-raises.
+
+Also records what was on that list but was NOT ruled — cascade coverage has
+never been audited screen-by-screen, the six empty CSS declarations at
+trades-terminal.tsx:1224-1229, the four 403 console errors in the probe runs,
+and the visual side-by-side vs the .dc.html reference — so accepting the four
+deviations does not quietly absorb them.
+
+Documents why probe-transitions.mjs exits 1 on a healthy tree: its detector
+logs a loader flash for any added .animate-spin node, catching board-builder's
+own content spinners. Desktop routes cannot render the full-screen loader at
+all, since PageLoader is wired only to the mobile/public Suspense.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>

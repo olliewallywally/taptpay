@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Download, Share2, FileText, ArrowRight, CheckCircle, Loader2, Phone, Mail, User } from "lucide-react";
 import logoImage from "@assets/IMG_6592_1755070818452.png";
+import { PLANS, formatPlanPrice } from "@shared/plans";
 
 const LS_KEY = "infoPackUnlocked";
 
@@ -81,7 +82,7 @@ export default function InfoPage() {
 
   const highlights = [
     "100% digital POS system — no hardware needed",
-    "$0.10 per transaction, no lock-in contracts",
+    `From ${formatPlanPrice(PLANS.solo.priceCents)}/month, no transaction fees, no lock-in contracts`,
     "QR code & NFC payment boards",
     "Real-time dashboard & analytics",
     "Split bill & shareable payment requests",

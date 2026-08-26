@@ -130,10 +130,10 @@ export default function Transactions() {
   });
 
   const { data: merchant } = useQuery({
-    queryKey: ["/api/merchants", merchantId],
+    queryKey: ["/api/merchants", merchantId, "profile"],
     queryFn: async () => {
       const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}`, {
+      const response = await fetch(`/api/merchants/${merchantId}/profile`, {
         headers: { "Authorization": `Bearer ${token}` },
       });
       if (!response.ok) throw new Error("Failed to fetch merchant");
@@ -444,7 +444,7 @@ export default function Transactions() {
         {/* Period pills */}
         <div data-tutorial-id="tx-period" style={{ display: 'flex', gap: 0, background: 'rgba(255,255,255,0.06)', borderRadius: 999, padding: 3, marginBottom: 20 }}>
           {(['day', 'week', 'month', 'year'] as Timeframe[]).map(p => (
-            <button key={p} onClick={() => switchTf(p)} style={{ flex: 1, padding: '8px 0', borderRadius: 999, border: 'none', fontSize: 13, fontWeight: tf === p ? 600 : 500, textTransform: 'capitalize', background: tf === p ? C.sky : 'transparent', color: tf === p ? C.navy : 'rgba(255,255,255,0.4)', transition: 'all 0.3s cubic-bezier(0.34,1.56,0.64,1)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+            <button className="tap-target" key={p} onClick={() => switchTf(p)} style={{ flex: 1, padding: '8px 0', borderRadius: 999, border: 'none', fontSize: 13, fontWeight: tf === p ? 600 : 500, textTransform: 'capitalize', background: tf === p ? C.sky : 'transparent', color: tf === p ? C.navy : 'rgba(255,255,255,0.4)', transition: 'all 0.3s cubic-bezier(0.34,1.56,0.64,1)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
               {p}
             </button>
           ))}
@@ -523,7 +523,7 @@ export default function Transactions() {
           {/* Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <h2 data-tutorial-id="tx-history" style={{ fontSize: 20, fontWeight: 700, color: C.dark, margin: 0, letterSpacing: '-0.4px' }}>Transaction History</h2>
-            <button
+            <button className="tap-target"
               data-tutorial-id="tx-export"
               onClick={() => setShowDownloads(v => !v)}
               style={{ fontSize: 12, fontWeight: 600, color: C.sky, background: 'none', border: 'none', cursor: 'pointer' }}

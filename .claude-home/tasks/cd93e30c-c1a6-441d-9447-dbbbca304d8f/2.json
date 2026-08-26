@@ -1,0 +1,9 @@
+{
+  "id": "2",
+  "subject": "Runtime smoke: boot server, exercise every API route",
+  "description": "Start dev server on :5000, enumerate all API routes, exercise auth/merchant/property/trades/payments/subscription/admin endpoints against real DB.",
+  "activeForm": "Exercising API routes",
+  "status": "completed",
+  "blocks": [],
+  "blockedBy": []
+}

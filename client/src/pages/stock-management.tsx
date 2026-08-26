@@ -366,10 +366,10 @@ export default function StockManagement() {
   }
 
   const { data: merchant } = useQuery({
-    queryKey: ["/api/merchants", merchantId],
+    queryKey: ["/api/merchants", merchantId, "profile"],
     queryFn: async () => {
       const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}`, {
+      const response = await fetch(`/api/merchants/${merchantId}/profile`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) throw new Error("Failed to fetch merchant");
@@ -576,7 +576,7 @@ export default function StockManagement() {
             <button
               key={key}
               onClick={() => setSortKey(key)}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              className={`tap-target flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 sortKey === key
                   ? "bg-[#040D6D] text-white shadow-sm"
                   : "bg-white text-gray-500 border border-gray-200 hover:border-[#040D6D] hover:text-[#040D6D]"

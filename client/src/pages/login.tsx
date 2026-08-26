@@ -155,7 +155,7 @@ export default function Login() {
       <div className="w-full max-w-xs md:max-w-sm lg:max-w-md mb-3 flex items-center">
         <button
           onClick={() => setLocation("/")}
-          className="flex items-center gap-1.5 text-gray-500 hover:text-[#0055FF] transition-colors group"
+          className="tap-target flex items-center gap-1.5 text-gray-500 hover:text-[#0055FF] transition-colors group"
           data-testid="button-back-to-landing"
         >
           <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
@@ -193,7 +193,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setLoginType('merchant')}
-                  className={`px-4 py-1 rounded-full text-xs transition-all ${
+                  className={`tap-target px-4 py-1 rounded-full text-xs transition-all ${
                     loginType === 'merchant'
                       ? 'bg-[#00E5CC] text-[#0055FF] font-medium'
                       : 'text-[#00E5CC] hover:text-white'
@@ -204,7 +204,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setLoginType('admin')}
-                  className={`px-4 py-1 rounded-full text-xs transition-all ${
+                  className={`tap-target px-4 py-1 rounded-full text-xs transition-all ${
                     loginType === 'admin'
                       ? 'bg-[#00E5CC] text-[#0055FF] font-medium'
                       : 'text-[#00E5CC] hover:text-white'

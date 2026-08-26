@@ -1,0 +1,68 @@
+/* Terminal keyframes — defined once for all three verticals.
+ *
+ * A descendant selector cannot scope a @keyframes rule: the name is global and
+ * the last definition parsed wins. So while phase 2 of
+ * docs/PLAN-2026-08-17-mobile-responsive-ui.md scopes every `.tp-*` selector
+ * under its vertical's root class, these thirteen would still have collided —
+ * retail, property and trades each shipped their own copy of tp-labelIn,
+ * tp-stackIn, tp-pulse, tp-pulseDot, tp-popIn and the four conveyor moves.
+ *
+ * They were byte-identical across all three, which is why nobody noticed. This
+ * file is the single definition; each vertical's stylesheet @imports it.
+ *
+ * tp-bannerPulse, tp-fadeIn, tp-scaleIn and tp-outMorph are retail-only today.
+ * They live here anyway — one file, one place to look — and cost nothing to a
+ * vertical that never names them.
+ */
+
+@keyframes tp-bannerPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(27,191,133,0.5); }
+  70%  { box-shadow: 0 0 0 18px rgba(27,191,133,0); }
+  100% { box-shadow: 0 0 0 0 rgba(27,191,133,0); }
+}
+@keyframes tp-labelIn { from { opacity:0; transform:translateX(-4px); } to { opacity:1; transform:translateX(0); } }
+@keyframes tp-stackIn { from { opacity:0; transform:translateY(-12px) scale(0.97); } to { opacity:1; transform:translateY(0) scale(1); } }
+@keyframes tp-pulse { 0%,100% { opacity:0.4; } 50% { opacity:1; } }
+@keyframes tp-pulseDot { 0%,100% { transform:scale(1); opacity:1; } 50% { transform:scale(1.08); opacity:0.85; } }
+@keyframes tp-popIn { from { opacity:0; transform:translateY(16px) scale(0.96); } to { opacity:1; transform:translateY(0) scale(1); } }
+
+/* Conveyor — the screen-to-screen moves. */
+@keyframes tp-inUp    { from { transform: translateY(100%);  } to { transform: translateY(0); } }
+@keyframes tp-outUp   { from { transform: translateY(0);     } to { transform: translateY(-100%); } }
+@keyframes tp-inDown  { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+@keyframes tp-outDown { from { transform: translateY(0);     } to { transform: translateY(100%); } }
+@keyframes tp-outMorph { from { opacity: 1; } to { opacity: 0; } }
+
+/* Retail's QR modal. */
+@keyframes tp-fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes tp-scaleIn { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: scale(1); } }
+
+/* The row action sheet — property's InvoiceActionSheet and trades' JobActionSheet.
+   Both carried their own inline `<style>` with these two, re-injected on every
+   open. The plan's RC-6 inventory counted four stylesheets and missed these,
+   because they declare no `.tp-` selector — only keyframe names, which a
+   selector guard cannot see. */
+@keyframes tp-fade    { from { opacity: 0; } to { opacity: 1; } }
+@keyframes tp-sheetup { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+/* Phase F of docs/PLAN-2026-08-17-terminal-panels-and-dock.md — the dock's
+   collapse/expand blob layer. --slot-x is set inline per blob (the icon
+   slot it converges from/to); --m-ease-out (index.css:60-71), never an
+   overshoot curve — this squashes to a 4px handle and index.css forbids
+   overshoot on anything that clips or clamps. Not scoped under a vertical
+   root: the dock is a sibling of the router (App.tsx), not a descendant of
+   any .tp-viewport, so these live here with the rest of the shared set. */
+@keyframes tp-dock-collapse {
+  0%   { transform: translateX(var(--slot-x)) scaleY(1); }
+  35%  { transform: translateX(calc(var(--slot-x) * 0.80)) scaleY(0.92); }
+  70%  { transform: translateX(0) scaleY(0.50); }
+  100% { transform: translateX(0) scaleY(0.0833); }
+}
+@keyframes tp-dock-expand {
+  0%   { transform: translateX(0) scaleY(0.0833); }
+  30%  { transform: translateX(0) scaleY(0.42); }
+  70%  { transform: translateX(calc(var(--slot-x) * 0.88)) scaleY(0.94); }
+  100% { transform: translateX(var(--slot-x)) scaleY(1); }
+}
+@keyframes tp-dock-icons-out { 0% { opacity: 1; transform: scale(1); } 35%, 100% { opacity: 0; transform: scale(0.7); } }
+@keyframes tp-dock-icons-in  { 0%, 65% { opacity: 0; transform: scale(0.7); } 100% { opacity: 1; transform: scale(1); } }

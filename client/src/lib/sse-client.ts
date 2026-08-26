@@ -1,69 +1,130 @@
 export interface SSEMessage {
   type: string;
   transaction?: any;
+  addressingMode?: "legacy-no-board" | "board";
+  stoneId?: number;
+  [key: string]: any;
 }
+
+type Listener = (data: SSEMessage) => void;
 
 export class SSEClient {
   private eventSource: EventSource | null = null;
-  private listeners: Map<string, ((data: any) => void)[]> = new Map();
+  private abortController: AbortController | null = null;
+  private listeners = new Map<string, Listener[]>();
 
-  connect(merchantId: number, stoneId?: number | null, token?: string | null) {
-    if (this.eventSource) {
-      this.eventSource.close();
+  private closeTransport() {
+    this.eventSource?.close();
+    this.eventSource = null;
+    this.abortController?.abort();
+    this.abortController = null;
+  }
+
+  private dispatch(raw: string) {
+    try {
+      const message: SSEMessage = JSON.parse(raw);
+      const callbacks = this.listeners.get(message.type) || [];
+      callbacks.forEach((callback) => callback(message));
+    } catch (error) {
+      console.error("Failed to parse SSE message:", error);
     }
+  }
 
-    // EventSource can't send an Authorization header, so an authenticated merchant
-    // passes its JWT in the query string to unlock the full event payload. The
-    // anonymous customer payment page connects without a token and receives a
-    // redacted view (server strips fee/margin internals for unauthenticated subs).
+  connectCustomer(merchantId: number, stoneId?: number | null) {
+    this.closeTransport();
     const params = new URLSearchParams();
-    if (stoneId) params.set('stoneId', String(stoneId));
-    if (token) params.set('token', token);
-    const qs = params.toString();
-    console.log(`Connecting to SSE for merchant ${merchantId}${stoneId ? ` and stone ${stoneId}` : ''}`);
-    this.eventSource = new EventSource(`/api/merchants/${merchantId}/events${qs ? `?${qs}` : ''}`);
-    
-    this.eventSource.onopen = () => {
-      console.log(`SSE connection opened for merchant ${merchantId}`);
-    };
-    
-    this.eventSource.onmessage = (event) => {
-      try {
-        const message: SSEMessage = JSON.parse(event.data);
-        console.log('SSE message received:', message);
-        const callbacks = this.listeners.get(message.type) || [];
-        callbacks.forEach(callback => callback(message));
-      } catch (error) {
-        console.error('Failed to parse SSE message:', error);
-      }
-    };
-
+    if (stoneId !== undefined && stoneId !== null) params.set("stoneId", String(stoneId));
+    const query = params.toString();
+    this.eventSource = new EventSource(
+      `/api/merchants/${merchantId}/events${query ? `?${query}` : ""}`,
+    );
+    this.eventSource.onmessage = (event) => this.dispatch(event.data);
     this.eventSource.onerror = (error) => {
-      console.error('SSE connection error:', error);
-      console.log('SSE readyState:', this.eventSource?.readyState);
+      console.error("Customer SSE connection error:", error);
     };
   }
 
-  subscribe(eventType: string, callback: (data: any) => void) {
-    if (!this.listeners.has(eventType)) {
-      this.listeners.set(eventType, []);
+  connectMerchant(merchantId: number, token: string) {
+    this.closeTransport();
+    const controller = new AbortController();
+    this.abortController = controller;
+    void this.consumeMerchantStream(merchantId, token, controller.signal);
+  }
+
+  // Compatibility for anonymous customer callers while call sites migrate to
+  // the explicit method. Authenticated streams must use connectMerchant.
+  connect(merchantId: number, stoneId?: number | null) {
+    this.connectCustomer(merchantId, stoneId);
+  }
+
+  private async consumeMerchantStream(merchantId: number, token: string, signal: AbortSignal) {
+    const decoder = new TextDecoder();
+    while (!signal.aborted) {
+      try {
+        const response = await fetch(`/api/merchants/${merchantId}/events`, {
+          headers: {
+            Accept: "text/event-stream",
+            Authorization: `Bearer ${token}`,
+          },
+          credentials: "include",
+          cache: "no-store",
+          signal,
+        });
+        if (response.status === 401 || response.status === 403) {
+          console.error("Merchant SSE authentication expired or was revoked");
+          return;
+        }
+        if (!response.ok || !response.body) {
+          throw new Error(`SSE request failed with ${response.status}`);
+        }
+
+        const reader = response.body.getReader();
+        let buffer = "";
+        while (!signal.aborted) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+          let boundary = buffer.indexOf("\n\n");
+          while (boundary >= 0) {
+            const frame = buffer.slice(0, boundary);
+            buffer = buffer.slice(boundary + 2);
+            const data = frame
+              .split("\n")
+              .filter((line) => line.startsWith("data:"))
+              .map((line) => line.slice(5).trimStart())
+              .join("\n");
+            if (data) this.dispatch(data);
+            boundary = buffer.indexOf("\n\n");
+          }
+        }
+      } catch (error) {
+        if (signal.aborted) return;
+        console.error("Merchant SSE connection error:", error);
+      }
+
+      await new Promise<void>((resolve) => {
+        const timeout = window.setTimeout(resolve, 1_500);
+        signal.addEventListener("abort", () => {
+          window.clearTimeout(timeout);
+          resolve();
+        }, { once: true });
+      });
     }
+  }
+
+  subscribe(eventType: string, callback: Listener) {
+    if (!this.listeners.has(eventType)) this.listeners.set(eventType, []);
     this.listeners.get(eventType)!.push(callback);
   }
 
-  unsubscribe(eventType: string, callback: (data: any) => void) {
+  unsubscribe(eventType: string, callback: Listener) {
     const callbacks = this.listeners.get(eventType) || [];
     const index = callbacks.indexOf(callback);
-    if (index > -1) {
-      callbacks.splice(index, 1);
-    }
+    if (index > -1) callbacks.splice(index, 1);
   }
 
   disconnect() {
-    if (this.eventSource) {
-      this.eventSource.close();
-      this.eventSource = null;
-    }
+    this.closeTransport();
     this.listeners.clear();
   }
 }

@@ -1,0 +1,103 @@
+/* Trades terminal chrome — every selector scoped under `.trades-terminal-view`.
+ *
+ * This vertical was already scoped; retail and property joined it in phase 2 of
+ * docs/PLAN-2026-08-17-mobile-responsive-ui.md §5.1, and the fourth copy of this
+ * sheet — the unscoped `TP_TERM_CSS` that pages/trades/trades-terminal.tsx
+ * exported for /trades/quote — was deleted against it.
+ *
+ * The shared @keyframes moved to ../terminal-keyframes.css, imported alongside
+ * this file by TradesTerminalView — a descendant selector cannot scope a
+ * keyframe, so deduping is the only way to stop those colliding.
+ */
+.trades-terminal-view.tp-viewport { width: 100%; max-width: 430px; height: 100svh; margin: 0 auto; position: relative; overflow: hidden; font-family: 'Outfit', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+.trades-terminal-view .tp-screen { position: absolute; inset: 0; display: flex; flex-direction: column; overflow: hidden; }
+.trades-terminal-view .tp-top-banner { position: absolute; top: 0; left: 0; right: 0; z-index: 55; background: linear-gradient(150deg,#040D6D 0%,#072b20 100%); border-bottom: 2px solid #1BBF85; box-shadow: 0 8px 40px rgba(27,191,133,0.3); padding: 52px 22px 20px; display: flex; align-items: center; gap: 16px; transform: translateY(-100%); transition: transform 0.6s cubic-bezier(0.34,1.56,0.64,1); pointer-events: none; }
+.trades-terminal-view .tp-top-banner.show { transform: translateY(0); pointer-events: auto; }
+.trades-terminal-view .tp-banner-icon { width: 44px; height: 44px; border-radius: 50%; background: #1BBF85; color: #040D6D; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.trades-terminal-view .tp-banner-body { display: flex; flex-direction: column; }
+.trades-terminal-view .tp-banner-title { font-weight: 700; font-size: 16px; color: #fff; }
+.trades-terminal-view .tp-subhead { display: flex; justify-content: space-between; align-items: center; padding: 20px 22px 0; }
+.trades-terminal-view .tp-subhead-btn { width: 44px; height: 44px; border-radius: 999px; border: 2px solid #040D6D; display: flex; align-items: center; justify-content: center; color: #040D6D; background: none; cursor: pointer; transition: transform 120ms, background 120ms; }
+.trades-terminal-view .tp-subhead-btn:active { transform: scale(0.92); background: rgba(4,13,109,0.06); }
+.trades-terminal-view .tp-amount { font-family: 'Outfit', system-ui; font-weight: 800; letter-spacing: -0.04em; line-height: 0.95; }
+.trades-terminal-view .tp-subbar-wrap { display: flex; justify-content: center; }
+.trades-terminal-view .tp-subbar { position: relative; display: inline-flex; align-items: center; justify-content: center; background: #58ABFF; border-radius: 26px; padding: 5px 11px; gap: 4px; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 16px 48px rgba(4,13,109,0.2), 0 4px 12px rgba(4,13,109,0.1), inset 0 1px 0 rgba(255,255,255,0.25); transform: scale(0.85); transform-origin: center; }
+.trades-terminal-view .tp-subbar-ind { position: absolute; top: 5px; height: 27px; background: #040D6D; border-radius: 16px; box-shadow: 0 4px 16px rgba(4,13,109,0.4); pointer-events: none; z-index: 2; opacity: 0; will-change: left, width, opacity; }
+.trades-terminal-view .tp-subbar-ind.on { opacity: 1; }
+.trades-terminal-view .tp-subbar-ind.animate { transition: left 0.45s cubic-bezier(0.34,1.56,0.64,1), width 0.45s cubic-bezier(0.34,1.56,0.64,1), opacity 0.25s ease; }
+.trades-terminal-view .tp-subbar-btn { position: relative; z-index: 1; height: 27px; padding: 0 22px; display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 16px; border: none; cursor: pointer; background: transparent; color: rgba(244,244,244,0.55); transition: color 0.2s ease, transform 0.18s ease; -webkit-tap-highlight-color: transparent; flex-shrink: 0; }
+.trades-terminal-view .tp-subbar-btn:active { transform: scale(0.92); }
+.trades-terminal-view .tp-subbar-btn.active { background: transparent !important; box-shadow: none !important; color: #F4F4F4; z-index: 3; }
+.trades-terminal-view .tp-subbar.compact .tp-subbar-btn { padding: 0 11px; }
+.trades-terminal-view .tp-subbar-label { font-family: 'Outfit', system-ui; font-weight: 600; font-size: 12px; letter-spacing: 0.4px; color: #F4F4F4; white-space: nowrap; animation: tp-labelIn 0.3s ease-out; }
+.trades-terminal-view .tp-send { display: flex; align-items: center; gap: 6px; padding: 4px 14px 4px 4px; border-radius: 26px; background: #040D6D; border: none; cursor: pointer; box-shadow: 0 4px 16px rgba(4,13,109,0.25); transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); -webkit-tap-highlight-color: transparent; flex-shrink: 0; height: 37px; }
+.trades-terminal-view .tp-send:active { transform: scale(0.94); }
+.trades-terminal-view .tp-send-circle { width: 20px; height: 20px; border-radius: 50%; background: #58ABFF; display: flex; align-items: center; justify-content: center; }
+.trades-terminal-view .tp-send-label { font-size: 11px; font-weight: 700; color: #F4F4F4; letter-spacing: 0.3px; }
+.trades-terminal-view .tp-fab { width: 70px; height: 70px; border-radius: 999px; background: #58ABFF; color: #F4F4F4; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 18px rgba(4,13,109,0.25); border: none; cursor: pointer; transition: transform 140ms; -webkit-tap-highlight-color: transparent; }
+.trades-terminal-view .tp-fab:active { transform: scale(0.92); }
+.trades-terminal-view .tp-stack-hdr { display: flex; justify-content: space-between; align-items: center; padding: 0 4px; margin-bottom: 12px; }
+.trades-terminal-view .tp-stack-title { font-weight: 700; font-size: 14px; color: #040D6D; letter-spacing: -0.2px; }
+.trades-terminal-view .tp-stack-card { border-radius: 14px; background: #fff; overflow: hidden; box-shadow: 0 2px 12px rgba(4,13,109,0.06); border: 1px solid rgba(4,13,109,0.04); }
+.trades-terminal-view .tp-stack-row { display: flex; align-items: center; padding: 14px 16px; animation: tp-stackIn 0.38s cubic-bezier(0.34,1.56,0.64,1) both; }
+.trades-terminal-view .tp-stack-row + .tp-stack-row { border-top: 1px solid rgba(4,13,109,0.05); }
+.trades-terminal-view .tp-stack-name { font-weight: 600; font-size: 14px; color: #040D6D; margin-bottom: 1px; }
+.trades-terminal-view .tp-stack-meta { display: flex; align-items: center; gap: 5px; }
+.trades-terminal-view .tp-stack-status { font-weight: 500; font-size: 11px; color: rgba(4,13,109,0.35); }
+.trades-terminal-view .tp-stack-price { font-weight: 700; font-size: 15px; color: #040D6D; letter-spacing: -0.3px; }
+.trades-terminal-view .tp-stack-empty { padding: 14px 16px; font-size: 13px; color: rgba(4,13,109,0.4); text-align: center; }
+.trades-terminal-view .tp-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; animation: tp-pulse 2s ease-in-out infinite; }
+.trades-terminal-view .tp-dot.awaiting { background: #58ABFF; }
+.trades-terminal-view .tp-dot.payment-sent { background: #58ABFF; }
+.trades-terminal-view .tp-dot.paid { background: #1BBF85; animation: none; opacity: 1; }
+.trades-terminal-view .tp-dot.declined { background: #FF3B4E; animation: none; opacity: 1; }
+.trades-terminal-view .tp-field { width: 100%; padding: 18px 24px; border-radius: 999px; background: #F4F4F4; border: none; color: #040D6D; font-family: 'Outfit', system-ui; font-weight: 500; font-size: 17px; letter-spacing: -0.01em; outline: none; box-sizing: border-box; }
+.trades-terminal-view .tp-field::placeholder { color: rgba(4,13,109,0.35); }
+.trades-terminal-view .tp-cta { display: inline-flex; align-items: center; justify-content: center; padding: 14px 36px; border-radius: 999px; background: #58ABFF; color: #F4F4F4; font-family: 'Outfit', system-ui; font-weight: 600; font-size: 15px; transition: transform 120ms, opacity 120ms; white-space: nowrap; border: none; cursor: pointer; box-sizing: border-box; }
+.trades-terminal-view .tp-cta:active { transform: scale(0.96); opacity: 0.92; }
+.trades-terminal-view .tp-cta-wire { display: inline-flex; align-items: center; justify-content: center; padding: 14px 36px; border-radius: 999px; background: transparent; color: #58ABFF; font-family: 'Outfit', system-ui; font-weight: 600; font-size: 15px; border: 1.5px solid #58ABFF; transition: background 160ms ease, color 160ms ease, transform 120ms; white-space: nowrap; cursor: pointer; box-sizing: border-box; }
+.trades-terminal-view .tp-cta-wire:active { background: #58ABFF; color: #040D6D; transform: scale(0.96); }
+/* --kp-size: docs/SPEC-2026-08-20-dock-implementation.md §5 — declared on
+   .tp-panel-body (terminal-tokens.css), capped at --kp-max (76px). */
+.trades-terminal-view .tp-kp { width: var(--kp-size, 76px); height: var(--kp-size, 76px); border-radius: 999px; display: flex; align-items: center; justify-content: center; font-family: 'Outfit', system-ui; font-weight: 700; font-size: calc(var(--kp-size, 76px) * 0.3947); transition: transform 100ms, background 100ms; background: #58ABFF; color: #fff; border: none; cursor: pointer; }
+.trades-terminal-view .tp-kp:active { transform: scale(0.92); }
+.trades-terminal-view .tp-kp.outline { background: transparent; color: #F4F4F4; box-shadow: inset 0 0 0 2px #F4F4F4; }
+.trades-terminal-view .tp-kp.outline:active { background: rgba(88,171,255,0.12); }
+.trades-terminal-view .tp-success-check { width: 92px; height: 92px; border-radius: 999px; background: #58ABFF; display: flex; align-items: center; justify-content: center; color: #F4F4F4; }
+.trades-terminal-view .tp-pulse { animation: tp-pulseDot 1800ms ease-in-out infinite; }
+.trades-terminal-view .tp-thin-scroll { scrollbar-width: thin; scrollbar-color: rgba(88,171,255,0) transparent; transition: scrollbar-color 350ms; }
+.trades-terminal-view .tp-thin-scroll::-webkit-scrollbar { width: 3px; }
+.trades-terminal-view .tp-thin-scroll::-webkit-scrollbar-thumb { background-color: rgba(88,171,255,0); border-radius: 999px; }
+.trades-terminal-view .tp-stack-scroll { scrollbar-width: thin; scrollbar-color: #040D6D transparent; }
+.trades-terminal-view .tp-stack-scroll::-webkit-scrollbar { width: 4px; background: transparent; }
+.trades-terminal-view .tp-stack-scroll::-webkit-scrollbar-track { background: transparent; }
+.trades-terminal-view .tp-stack-scroll::-webkit-scrollbar-thumb { background: #040D6D; border-radius: 999px; }
+.trades-terminal-view .tp-toast { position: absolute; left: 50%; transform: translateX(-50%); bottom: 110px; background: #040D6D; color: #F4F4F4; padding: 12px 22px; border-radius: 999px; font-size: 14px; font-weight: 500; opacity: 0; pointer-events: none; transition: opacity 200ms, transform 200ms; z-index: 60; }
+.trades-terminal-view .tp-toast.show { opacity: 1; transform: translateX(-50%) translateY(-4px); }
+.trades-terminal-view .tp-layer { position: absolute; inset: 0; display: flex; flex-direction: column; overflow: hidden; will-change: transform; z-index: 0; }
+.trades-terminal-view .tp-layer.leaving.up   { animation: tp-outUp   0.48s cubic-bezier(0.4,0,0.2,1) both; z-index: 1; }
+.trades-terminal-view .tp-layer.leaving.down { animation: tp-outDown 0.48s cubic-bezier(0.4,0,0.2,1) both; z-index: 1; }
+.trades-terminal-view .tp-layer.entering.up   { animation: tp-inUp   0.48s cubic-bezier(0.16,1,0.3,1) both; }
+.trades-terminal-view .tp-layer.entering.down { animation: tp-inDown 0.48s cubic-bezier(0.16,1,0.3,1) both; }
+.trades-terminal-view .stagger { transition: height 0.55s cubic-bezier(0.34,1.56,0.64,1); }
+.trades-terminal-view .stagger > * { animation: tp-popIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both; }
+.trades-terminal-view .stagger > *:nth-child(1) { animation-delay: 0s; }
+.trades-terminal-view .stagger > *:nth-child(2) { animation-delay: 0.06s; }
+.trades-terminal-view .stagger > *:nth-child(3) { animation-delay: 0.12s; }
+.trades-terminal-view .stagger > *:nth-child(4) { animation-delay: 0.18s; }
+.trades-terminal-view .tp-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 30; }
+.trades-terminal-view .tp-overlay > * { pointer-events: auto; }
+.trades-terminal-view .tp-pfab { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); transition: opacity 240ms cubic-bezier(0,0,0.2,1), transform 360ms cubic-bezier(0.34,1.56,0.64,1); will-change: opacity, transform; }
+.trades-terminal-view .tp-pfab.hide { opacity: 0; transform: translate(-50%, -50%) translateY(8px) scale(0.7); pointer-events: none; }
+.trades-terminal-view .tp-pfab.show { opacity: 1; }
+.trades-terminal-view .tp-psubbar { position: absolute; top: 50%; left: 0; right: 0; padding: 0 22px; box-sizing: border-box; transform: translateY(67px); display: flex; align-items: center; gap: 8px; transition: opacity 220ms cubic-bezier(0,0,0.2,1), transform 300ms cubic-bezier(0.4,0,0.2,1); will-change: opacity, transform; height: 37px; pointer-events: none; }
+.trades-terminal-view .tp-psubbar.show .tp-subbar, .trades-terminal-view .tp-psubbar.show .tp-send-slot { pointer-events: auto; }
+.trades-terminal-view .tp-psubbar.hide { opacity: 0; transform: translateY(67px) scale(0.92); pointer-events: none; }
+.trades-terminal-view .tp-psubbar.show { opacity: 1; }
+.trades-terminal-view .tp-psubbar.feature { transform: translateY(calc(-100% - 20px)); }
+.trades-terminal-view .tp-subbar-center { flex: 1 1 auto; min-width: 0; display: flex; justify-content: center; }
+.trades-terminal-view .tp-send-slot { flex-shrink: 0; display: flex; align-items: center; overflow: hidden; max-width: 0; opacity: 0; transition: max-width 420ms cubic-bezier(0.34,1.56,0.64,1), opacity 280ms ease 80ms; height: 37px; }
+/* Was absent until phase 2: this sheet stopped one rule short of the literal it
+   was copied from, so the trades send shortcut stayed at max-width:0/opacity:0
+   and never appeared when a client was selected. */
+.trades-terminal-view .tp-send-slot.show { max-width: 143px; opacity: 1; }

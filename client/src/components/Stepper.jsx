@@ -187,7 +187,7 @@ function StepIndicator({ step, label, currentStep, onClickStep, disableStepIndic
     <button
       type="button"
       onClick={() => step !== currentStep && !disableStepIndicators && onClickStep(step)}
-      className={`step-indicator ${status}`}
+      className={`step-indicator tap-target ${status}`}
       disabled={disableStepIndicators}
       aria-label={`${label || `Step ${step}`}${status === "active" ? ", current step" : ""}`}
     >

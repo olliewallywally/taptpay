@@ -1,0 +1,525 @@
+@font-face {
+  font-family: "Larken";
+  src: url("/assets/fonts/LarkenDEMO-Black.otf") format("opentype");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Larken";
+  src: url("/assets/fonts/LarkenDEMO-BlackItalic.otf") format("opentype");
+  font-weight: 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Outfit";
+  src: url("/assets/fonts/Outfit-Light.otf") format("opentype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Outfit";
+  src: url("/assets/fonts/Outfit-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Outfit";
+  src: url("/assets/fonts/Outfit-Medium.otf") format("opentype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Outfit";
+  src: url("/assets/fonts/Outfit-SemiBold.otf") format("opentype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Outfit";
+  src: url("/assets/fonts/Outfit-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Outfit";
+  src: url("/assets/fonts/Outfit-ExtraBold.otf") format("opentype");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Interaction surfaces — modals, filters, report panels, mode switches, detail
+ * rows. These open under the user's finger, so they are short and crisp, and
+ * they carry no scale: a panel that scales as it opens is the "pop" the entry
+ * tiers were toned to remove. Always paired with --m-dur-ui / --m-ease-out;
+ * they used to run at nine different per-page durations.
+ * See docs/PLAN-2026-08-15-motion-toning.md. */
+@keyframes tileIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes reportIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes glowDrift {
+  0% {
+    transform: translate(-28%, -42%) scale(1);
+  }
+  50% {
+    transform: translate(30%, 22%) scale(1.18);
+  }
+  100% {
+    transform: translate(-28%, -42%) scale(1);
+  }
+}
+
+/* ── Cascading rise ────────────────────────────────────────────────────────
+ *
+ * The desktop counterpart of the mobile `.pt-bounce` tier (index.css). Because
+ * the chrome persists across navigations, this cascade IS the page transition —
+ * every screen's blocks rise in sequence as the slot swaps.
+ *
+ * Two keyframes, expo-out, no scale. It used to be a three-overshoot bounce on
+ * cubic-bezier(0.34, 1.56, 0.64, 1); since CSS applies the timing function to
+ * every keyframe interval, that curve's 9.8% overshoot compounded with the
+ * keyframes and the tail ran to ~1.2s. See docs/PLAN-2026-08-15-motion-toning.md.
+ *
+ * Usage: put `.dt-cascade` on a container to auto-index its direct children, or
+ * `.dt-rise` on any element and set `--dt-i` (step) / `--dt-d` (extra delay).
+ */
+@keyframes desktopRiseIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.dt-rise,
+.dt-cascade > * {
+  opacity: 0;
+  animation: desktopRiseIn var(--m-dur-enter) var(--m-ease-out) both;
+  animation-delay: calc(var(--dt-i, 0) * var(--m-stagger) + var(--dt-d, 0ms));
+}
+
+/* Auto-index for `.dt-cascade` containers. Six steps is the cascade budget —
+   past that a stagger stops reading as motion and starts reading as lag, so
+   anything beyond simply lands on the last step. */
+.dt-cascade > *:nth-child(1) { --dt-i: 0; }
+.dt-cascade > *:nth-child(2) { --dt-i: 1; }
+.dt-cascade > *:nth-child(3) { --dt-i: 2; }
+.dt-cascade > *:nth-child(4) { --dt-i: 3; }
+.dt-cascade > *:nth-child(5) { --dt-i: 4; }
+.dt-cascade > *:nth-child(n + 6) { --dt-i: 5; }
+
+@keyframes popIn {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.94);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1.015);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* The backdrop the app sits on — off-white, the same `#F4F4F4` sheet the mobile
+   app uses, rather than the deep navy the spec originally called for. Only the
+   surface *behind* the app changes: the navy canvas and, on desktop, the navy
+   slate the canvas sits in are untouched. */
+.tapt-desktop-viewport {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #f4f4f4;
+  font-family: "Outfit", system-ui, sans-serif;
+  font-weight: 400;
+  line-height: normal;
+  letter-spacing: normal;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@supports (height: 100dvh) {
+  .tapt-desktop-viewport {
+    height: 100dvh;
+  }
+}
+
+.tapt-desktop-viewport,
+.tapt-desktop-viewport *,
+.tapt-desktop-viewport *::before,
+.tapt-desktop-viewport *::after {
+  box-sizing: border-box;
+}
+
+.tapt-desktop-viewport :where(button, input, select, textarea) {
+  font-family: inherit;
+  letter-spacing: normal;
+}
+
+.tapt-desktop-viewport :where(button) {
+  border: 0;
+  margin: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.tapt-desktop-viewport :where(a) {
+  color: inherit;
+  text-decoration: none;
+}
+
+.tapt-desktop-viewport :where(input)::placeholder {
+  color: rgba(94, 158, 255, 0.5);
+}
+
+.tapt-desktop-viewport :where(*) {
+  scrollbar-width: none;
+}
+
+.tapt-desktop-viewport :where(*)::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.tapt-desktop-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #f4f4f4;
+}
+
+.tapt-desktop-viewport[data-device-class="desktop"]
+  > .tapt-desktop-frame {
+  width: min(1000px, 94vw, 126.0455vh);
+  height: auto;
+  aspect-ratio: 59 / 44;
+  border-radius: 28px;
+  background: #000f3f;
+  /* Retuned for the off-white backdrop. The old `0 40px 120px rgba(0,0,0,.55)`
+     was ambient against navy; on light it reads as a grey smudge, so this is a
+     navy-tinted lift plus a tight contact shadow. */
+  box-shadow:
+    0 28px 80px rgba(0, 9, 38, 0.22),
+    0 4px 14px rgba(0, 9, 38, 0.1);
+}
+
+@supports (height: 100dvh) {
+  .tapt-desktop-viewport[data-device-class="desktop"]
+    > .tapt-desktop-frame {
+    width: min(1000px, 94vw, 126.0455dvh);
+  }
+}
+
+.tapt-desktop-viewport[data-device-class="desktop"]
+  > .tapt-desktop-frame::after {
+  position: absolute;
+  z-index: 20;
+  inset: 0;
+  border: 1px solid rgba(94, 158, 255, 0.18);
+  border-radius: inherit;
+  pointer-events: none;
+  content: "";
+}
+
+.tapt-desktop-scale-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #f4f4f4;
+}
+
+/* Inside the desktop slate the letterbox is part of the device, not part of the
+   backdrop, so it matches the canvas rather than the off-white behind it. */
+.tapt-desktop-viewport[data-device-class="desktop"]
+  .tapt-desktop-scale-stage {
+  background: #000f3f;
+}
+
+.tapt-desktop-scale-box {
+  position: relative;
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+.tapt-desktop-scale-content {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1180px;
+  height: 880px;
+  max-width: none !important;
+  max-height: none !important;
+  transform-origin: top left;
+}
+
+.tapt-desktop-canvas {
+  position: relative;
+  width: 1180px;
+  height: 880px;
+  max-width: none !important;
+  max-height: none !important;
+  overflow: hidden;
+  background: #000f3f;
+  color: #ffffff;
+  font-family: "Outfit", system-ui, sans-serif;
+  font-weight: 400;
+  line-height: normal;
+  letter-spacing: normal;
+  isolation: isolate;
+}
+
+.tapt-desktop-header {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 66px;
+  padding: 0 44px 0 46px;
+}
+
+.tapt-desktop-wordmark {
+  display: flex;
+  align-items: baseline;
+  flex: 0 0 auto;
+  color: #5e9eff;
+  font-family: "Larken", Georgia, serif;
+  font-size: 23px;
+  font-weight: 900;
+  line-height: 1;
+  user-select: none;
+}
+
+.tapt-desktop-wordmark-pay {
+  font-style: italic;
+}
+
+.tapt-desktop-nav {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1;
+  min-width: 0;
+  margin-left: 210px;
+  padding-right: 30px;
+}
+
+/* The one moving part of the header. Sits under the labels and slides between
+   them; the items themselves never change size, so nothing else can shift. */
+.tapt-desktop-nav-bubble {
+  position: absolute;
+  z-index: 0;
+  top: 50%;
+  left: 0;
+  height: 34px;
+  border-radius: 9999px;
+  background: #66a9ff;
+  transform: translate(var(--bubble-x, 0px), -50%);
+  width: var(--bubble-w, 0px);
+  pointer-events: none;
+  /* A sliding indicator is the one place a small overshoot is idiomatic, so the
+     travel keeps one — but only the travel. `width` overshooting made the pill
+     stretch past its label and snap back, which reads as a glitch rather than
+     as spring. Same duration on both so they land together. */
+  transition:
+    transform 260ms var(--m-ease-pop),
+    width 260ms var(--m-ease-out);
+}
+
+/* Before the first measurement the bubble must not slide in from the origin. */
+.tapt-desktop-nav-bubble[data-ready="false"] {
+  opacity: 0;
+  transition: none;
+}
+
+.tapt-desktop-nav-item {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  align-items: center;
+  justify-items: center;
+  flex: 0 0 auto;
+  /* Always carries the active padding so selecting a page cannot resize it. */
+  padding: 8px 22px;
+  border-radius: 9999px;
+  background: transparent;
+  color: #4a86f0;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: normal;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 220ms ease;
+}
+
+/* A hidden bold copy of the label shares the grid cell, so the cell is already
+   as wide as the active (700-weight) text. Without this the weight change alone
+   would widen the item and nudge its neighbours. */
+.tapt-desktop-nav-item > .tapt-desktop-nav-label,
+.tapt-desktop-nav-item::after {
+  grid-area: 1 / 1;
+}
+
+.tapt-desktop-nav-item::after {
+  content: attr(data-label);
+  font-weight: 700;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.tapt-desktop-nav-item:hover {
+  color: #93baff;
+}
+
+.tapt-desktop-nav-item[aria-current="page"] {
+  color: #000f3f;
+  font-weight: 700;
+}
+
+.tapt-desktop-nav-item[aria-current="page"]:hover {
+  color: #000f3f;
+}
+
+.tapt-desktop-nav-item:focus-visible,
+.tapt-desktop-scope:focus-visible {
+  outline: 2px solid #93baff;
+  outline-offset: 3px;
+}
+
+.tapt-desktop-divider {
+  height: 1px;
+  margin: 0 2px;
+  background: rgba(94, 158, 255, 0.3);
+}
+
+.tapt-desktop-main {
+  position: relative;
+  width: 100%;
+  height: 813px;
+  overflow: hidden;
+}
+
+.tapt-desktop-scope {
+  position: absolute;
+  z-index: 5;
+  top: 26px;
+  left: 52px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 20px;
+  border: 1px solid rgba(94, 158, 255, 0.55) !important;
+  border-radius: 9999px;
+  color: #7fb2ff;
+  font-size: 13.5px;
+  font-weight: 400;
+  line-height: normal;
+  cursor: pointer;
+  transition: background 180ms ease;
+}
+
+.tapt-desktop-scope:hover {
+  background: rgba(94, 158, 255, 0.08);
+}
+
+.tapt-desktop-scope-chevron {
+  display: block;
+  flex: 0 0 auto;
+}
+
+.tapt-desktop-page-slot {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* Lazy-chunk placeholder. Occupies the slot without painting anything, so a
+   cold chunk never flashes a spinner over chrome that is already on screen. */
+.tapt-desktop-page-fallback {
+  width: 100%;
+  height: 100%;
+}
+
+.tapt-desktop-legacy-wrap {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding-top: 18px;
+}
+
+.tapt-desktop-legacy-column {
+  width: 430px;
+  max-width: 430px !important;
+  height: 795px;
+  max-height: 795px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border-radius: 24px 24px 0 0;
+  background: #f4f4f4;
+  box-shadow: 0 18px 60px rgba(0, 4, 28, 0.35);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tapt-desktop-viewport *,
+  .tapt-desktop-viewport *::before,
+  .tapt-desktop-viewport *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+
+  /* The cascade hides its elements at opacity 0 and relies on the animation to
+     reveal them, so clamping the duration is not enough — drop the animation and
+     restore visibility outright. Matches `.pt-bounce` in index.css. */
+  .tapt-desktop-viewport .dt-rise,
+  .tapt-desktop-viewport .dt-cascade > * {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+}

@@ -1,9 +1,0 @@
-{
-  "id": "11",
-  "subject": "Sweep C: load/performance",
-  "description": "N+1 queries in routes/storage, unbounded SELECTs (no limit), the 3.5MB eager vendor chunk, SSE connection accumulation, synchronous heavy ops in request path.",
-  "activeForm": "Sweeping load/performance",
-  "status": "in_progress",
-  "blocks": [],
-  "blockedBy": []
-}

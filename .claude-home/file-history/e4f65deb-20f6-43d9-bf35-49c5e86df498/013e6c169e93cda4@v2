@@ -1,0 +1,44 @@
+---
+name: head-broken-stash1-fix
+description: "feat/tablet-desktop-app HEAD (c350644) does not typecheck; the missing implementations are in stash@{1}"
+metadata: 
+  node_type: memory
+  type: project
+  originSessionId: e4f65deb-20f6-43d9-bf35-49c5e86df498
+  modified: 2026-08-08T05:02:20.118Z
+---
+
+On branch `feat/tablet-desktop-app`, commit `c350644` ("feat(subscription): add
+plans, team logins, and billing flows", 2026-08-08) was made from a partially
+staged working tree. It committed the **callers** but left their
+**implementations** uncommitted in `stash@{1}`
+(`wip/save-remaining-landing-and-pricing-2026-08-07`).
+
+`npm run check` on HEAD fails with 6 errors:
+
+- `server/routes.ts:3257` — `ReportData` still requires `currentProviderCost`,
+  `ourCost`, `savings`, `currentProviderRate`, `ourRate`; routes.ts already
+  stopped passing them. Fix is in the stash's `server/report-generator.ts`.
+- `server/routes.ts:5175` — passes `userId` into `{ kind: "merchant" }`, which
+  has no such field. Fix is the stash's widened `SseAudience`.
+- `server/routes.ts:6631,6661` — call `sseBroker.disconnectUser(...)`, which does
+  not exist. Fix is the stash's `SseBroker.disconnectUser` (drops live SSE
+  streams for a revoked team-login principal — security-relevant to team logins).
+- `server/storage.ts:1459,4436` — `platformFee` missing from
+  `FinalizePaymentAttemptResult`; the stash's `server/payment-attempt-service.ts`
+  edit resolves it.
+
+Verified 2026-08-08: applying `stash@{1}` to a detached worktree at `c350644`
+makes `npx tsc` exit 0. The stash's base commit **is** `c350644`, and
+`git apply --check` on it passes, so it restores cleanly onto HEAD.
+
+`stash@{2}` (`wip/save-mixed-subscription-landing-2026-08-07`, based on `7ab2b2b`)
+is superseded — its subscription half became `c350644`; its landing half is
+byte-identical to `stash@{1}`'s. `stash@{0}` is harness noise
+(`.claude/settings.local.json` + session JSON), not real work.
+
+Beyond the typecheck fixes, `stash@{1}` also carries the landing-page half of the
+pricing repositioning — see [[landing-pricing-repositioning]] — plus Stripe
+dependency removal from `package.json` and woocommerce-plugin edits. Restoring it
+wholesale brings ~35 files, so review it as a unit rather than assuming it is
+only landing work. Related: [[landing-phone-demo-status]].

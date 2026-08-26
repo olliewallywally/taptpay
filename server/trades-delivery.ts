@@ -124,7 +124,9 @@ export async function sendTradeQuote(
     storage.getMerchant(quote.merchantId),
   ]);
   if (!client || !merchant) return { sent: false, reason: 'missing_data' };
-  if (!billingCardIsReady(merchant)) return { sent: false, reason: 'billing_card_required' };
+  if (!billingCardIsReady(await storage.getSubscription(merchant.id))) {
+    return { sent: false, reason: 'billing_card_required' };
+  }
   const ref = String(quote.token || quote.id).slice(0, 8).toUpperCase();
   const pdf = generateQuotePdf(quote, client, merchant, baseUrl);
   const result = await deliver(

@@ -7,7 +7,7 @@ channel = "stable-24_05"
 
 [deployment]
 deploymentTarget = "autoscale"
-build = ["npm", "run", "build"]
+build = ["bash", "-c", "npm run build && npm run db:migrate"]
 run = ["npm", "run", "start"]
 
 [[ports]]
@@ -38,6 +38,10 @@ externalPort = 80
 localPort = 5904
 externalPort = 3000
 
+[[ports]]
+localPort = 8199
+externalPort = 6000
+
 [workflows]
 runButton = "Project"
 
@@ -61,9 +65,6 @@ waitForPort = 5000
 
 [workflows.workflow.metadata]
 outputType = "webview"
-
-[agent]
-integrations = ["stripe:1.0.0"]
 
 [userenv]
 

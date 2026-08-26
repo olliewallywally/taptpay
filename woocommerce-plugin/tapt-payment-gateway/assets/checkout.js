@@ -26,14 +26,14 @@ jQuery(document).ready(function($) {
 
     // Add visual feedback
     if ($('input[name="payment_method"]:checked').val() === 'tapt_payment_gateway') {
-        $('#tapt-payment-data').prepend('<div class="tapt-payment-info"><p><strong>Secure Payment Process:</strong></p><ul><li>✓ NFC tap-to-pay support</li><li>✓ QR code scanning</li><li>✓ Fixed $0.25 transaction fee</li><li>✓ Bank-level security</li></ul></div>');
+        $('#tapt-payment-data').prepend('<div class="tapt-payment-info"><p><strong>Secure Payment Process:</strong></p><ul><li>✓ NFC tap-to-pay support</li><li>✓ QR code scanning</li><li>✓ No TaptPay transaction fee</li><li>✓ Bank-level security</li></ul></div>');
     }
 
     // Update payment info when payment method changes
     $('body').on('updated_checkout', function() {
         if ($('input[name="payment_method"]:checked').val() === 'tapt_payment_gateway') {
             if (!$('.tapt-payment-info').length) {
-                $('#tapt-payment-data').prepend('<div class="tapt-payment-info"><p><strong>Secure Payment Process:</strong></p><ul><li>✓ NFC tap-to-pay support</li><li>✓ QR code scanning</li><li>✓ Fixed $0.25 transaction fee</li><li>✓ Bank-level security</li></ul></div>');
+                $('#tapt-payment-data').prepend('<div class="tapt-payment-info"><p><strong>Secure Payment Process:</strong></p><ul><li>✓ NFC tap-to-pay support</li><li>✓ QR code scanning</li><li>✓ No TaptPay transaction fee</li><li>✓ Bank-level security</li></ul></div>');
             }
         } else {
             $('.tapt-payment-info').remove();

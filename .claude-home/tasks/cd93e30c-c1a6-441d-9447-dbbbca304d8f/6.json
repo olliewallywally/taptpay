@@ -1,0 +1,9 @@
+{
+  "id": "6",
+  "subject": "Write the full detailed review report",
+  "description": "Consolidate every finding with severity, file:line, evidence, and reproduction into a report.",
+  "activeForm": "Writing the review report",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

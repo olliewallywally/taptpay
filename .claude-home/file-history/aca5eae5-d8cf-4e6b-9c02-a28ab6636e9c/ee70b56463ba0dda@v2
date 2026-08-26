@@ -1,0 +1,104 @@
+/**
+ * Production migration REHEARSAL. Applies 0011-0013 inside one transaction,
+ * verifies the result on that same connection (so it sees the uncommitted DDL),
+ * then ALWAYS rolls back. Nothing is ever committed: the word COMMIT does not
+ * appear in this file, each migration's own COMMIT is stripped before it runs
+ * (an inner COMMIT would end the outer transaction and make the rollback a lie),
+ * and a fresh connection re-checks prod afterwards to prove it is unchanged.
+ */
+import pg from "pg";
+import { readFileSync } from "node:fs";
+import { getTableConfig } from "drizzle-orm/pg-core";
+import * as schema from "../shared/schema";
+
+const URL_ENV = "NEON_DATABASE_URL";
+const url = process.env[URL_ENV];
+if (!url) throw new Error(`${URL_ENV} not set`);
+
+const FILES = [
+  "migrations/0011_payment_links_and_board_numbers.sql",
+  "migrations/0012_push_notification_preferences.sql",
+  "migrations/0013_subscription_plans.sql",
+];
+
+/** Remove the file's own transaction control so it nests inside ours. */
+function strip(sql: string): string {
+  return sql
+    .split("\n")
+    .filter((line) => !/^\s*(BEGIN|COMMIT|ROLLBACK)\s*;\s*$/.test(line))
+    .join("\n");
+}
+
+type Missing = { tables: string[]; columns: string[] };
+
+async function measureDrift(exec: (q: string) => Promise<any>): Promise<Missing> {
+  const res = await exec(
+    `select table_name, column_name from information_schema.columns where table_schema = 'public'`,
+  );
+  const byTable = new Map<string, Set<string>>();
+  for (const r of res.rows) {
+    if (!byTable.has(r.table_name)) byTable.set(r.table_name, new Set());
+    byTable.get(r.table_name)!.add(r.column_name);
+  }
+  const tables: string[] = [];
+  const columns: string[] = [];
+  for (const val of Object.values(schema)) {
+    let cfg;
+    try { cfg = getTableConfig(val as any); } catch { continue; }
+    const live = byTable.get(cfg.name);
+    if (!live) { tables.push(cfg.name); continue; }
+    for (const c of cfg.columns) if (!live.has(c.name)) columns.push(`${cfg.name}.${c.name}`);
+  }
+  return { tables, columns };
+}
+
+const client = new pg.Client({ connectionString: url });
+await client.connect();
+const exec = (q: string) => client.query(q);
+
+let rolledBack = false;
+try {
+  const before = await measureDrift(exec);
+  console.log(`BEFORE  missing tables=${before.tables.length} columns=${before.columns.length}`);
+
+  await exec("BEGIN");
+  console.log("\n--- applying inside transaction ---");
+  for (const f of FILES) {
+    const t0 = Date.now();
+    await exec(strip(readFileSync(f, "utf8")));
+    console.log(`  applied ${f}  (${Date.now() - t0}ms)`);
+  }
+
+  const after = await measureDrift(exec);
+  console.log(`\nAFTER   missing tables=${after.tables.length} columns=${after.columns.length}`);
+  if (after.tables.length) console.log("  still missing tables: " + after.tables.join(", "));
+  if (after.columns.length) console.log("  still missing columns: " + after.columns.join(", "));
+
+  console.log("\n--- resulting data state (inside the transaction) ---");
+  for (const [label, q] of [
+    ["subscriptions", `select plan_id, seat_limit, price_cents, status, count(*)::int n
+                       from merchant_subscriptions group by 1,2,3,4 order by 1`],
+    ["users created", `select role, status, count(*)::int n from users group by 1,2`],
+    ["owner per password-enabled merchant", `select count(*)::int as merchants_with_pw,
+        (select count(*)::int from merchants m where m.password_hash is not null
+           and not exists (select 1 from users u where u.merchant_id=m.id and u.role='owner')) as still_missing_owner
+        from merchants where password_hash is not null`],
+    ["subs still lacking a plan", `select count(*)::int as n from merchant_subscriptions where plan_id is null`],
+  ] as const) {
+    const r = await exec(q);
+    console.log(`  ${label}: ${JSON.stringify(r.rows)}`);
+  }
+} finally {
+  await client.query("ROLLBACK");
+  rolledBack = true;
+  await client.end();
+}
+
+// Prove nothing persisted, on a brand new connection.
+const verify = new pg.Client({ connectionString: url });
+await verify.connect();
+const post = await measureDrift((q) => verify.query(q));
+await verify.end();
+console.log(`\nrolled back: ${rolledBack}`);
+console.log(`PROD AFTER ROLLBACK  missing tables=${post.tables.length} columns=${post.columns.length}  <- must equal BEFORE`);
+process.exit(0);

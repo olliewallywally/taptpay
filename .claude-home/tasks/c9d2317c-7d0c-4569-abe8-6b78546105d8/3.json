@@ -1,9 +1,0 @@
-{
-  "id": "3",
-  "subject": "Fix navy background bleed beyond mobile column",
-  "description": "transactions.tsx outer wrapper navy → white; screenshot-sweep all routes at 1280px for other offenders",
-  "activeForm": "Fixing navy background bleed",
-  "status": "completed",
-  "blocks": [],
-  "blockedBy": []
-}

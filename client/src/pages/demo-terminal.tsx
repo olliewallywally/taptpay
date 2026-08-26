@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { sseClient } from "@/lib/sse-client";
 import { Plus, Minus, Users2, Share2, Calculator, QrCode, Grid3x3, ChevronDown, Menu, X, LogOut, Tag, Copy, Check, Loader2, CheckCircle2, Smartphone, Pencil, Trash2, Download, Banknote, CheckCircle } from "lucide-react";
 import waveIconPath from "@assets/wave_1762733987203.png";
 import { Button } from "@/components/ui/button";
@@ -184,7 +185,7 @@ export default function DemoTerminal() {
 
   // Fetch merchant data
   const { data: merchant } = useQuery<Merchant>({
-    queryKey: [`/api/merchants/${merchantId}`],
+    queryKey: [`/api/merchants/${merchantId}/profile`],
     enabled: !!merchantId,
   });
 
@@ -250,45 +251,27 @@ export default function DemoTerminal() {
     const token = localStorage.getItem('authToken');
     if (!token) return;
 
-    const stoneParam = selectedStoneId ? `&stoneId=${selectedStoneId}` : '';
-    const eventSource = new EventSource(
-      `/api/merchants/${merchantId}/events?token=${encodeURIComponent(token)}${stoneParam}`
-    );
+    const handleTransaction = (data: any) => {
+      if (!data.transaction) return;
+      // The authenticated merchant stream includes every board; retain the demo's
+      // selected-board view locally.
+      if (!selectedStoneId || data.transaction.taptStoneId === selectedStoneId) {
+        setCurrentTransaction(data.transaction);
+        queryClient.invalidateQueries({ queryKey: [`/api/merchants/${merchantId}/active-transaction`] });
 
-    eventSource.onopen = () => {
-      console.log(`SSE connected for merchant ${merchantId}`);
-    };
-
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        
-        if ((data.type === "transaction_update" || data.type === "transaction_updated") && data.transaction) {
-          // Only update if transaction belongs to the currently selected stone
-          if (!selectedStoneId || data.transaction.taptStoneId === selectedStoneId) {
-            setCurrentTransaction(data.transaction);
-            queryClient.invalidateQueries({ queryKey: [`/api/merchants/${merchantId}/active-transaction`] });
-            
-            // Clear transaction if it's completed/failed/cancelled
-            if (['completed', 'failed', 'cancelled'].includes(data.transaction.status)) {
-              setTimeout(() => {
-                setCurrentTransaction(null);
-              }, 3000);
-            }
-          }
+        if (['completed', 'failed', 'cancelled'].includes(data.transaction.status)) {
+          setTimeout(() => setCurrentTransaction(null), 3000);
         }
-      } catch (error) {
-        console.error('Failed to parse SSE message:', error);
       }
     };
-
-    eventSource.onerror = (error) => {
-      console.error('SSE connection error:', error);
-      eventSource.close();
-    };
+    sseClient.connectMerchant(merchantId, token);
+    sseClient.subscribe("transaction_update", handleTransaction);
+    sseClient.subscribe("transaction_updated", handleTransaction);
 
     return () => {
-      eventSource.close();
+      sseClient.unsubscribe("transaction_update", handleTransaction);
+      sseClient.unsubscribe("transaction_updated", handleTransaction);
+      sseClient.disconnect();
     };
   }, [merchantId, selectedStoneId]);
 
@@ -302,7 +285,7 @@ export default function DemoTerminal() {
             merchantId,
             itemName: data.itemName,
             price: data.price,
-            taptStoneId: parseInt(data.taptStoneId),
+            selectedStoneId: parseInt(data.taptStoneId),
             status: "pending",
             splitEnabled,
           }

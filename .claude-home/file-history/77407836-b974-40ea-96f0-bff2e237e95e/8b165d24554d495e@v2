@@ -1,0 +1,575 @@
+# Plan — mobile responsive UI (phone terminal + app-wide)
+
+Date: 2026-08-17
+Status: **diagnosis complete and measured; no code changed yet**
+Scope: the phone merchant app. Tablet/desktop (`client/src/desktop/**`) is *not* affected
+by the primary root cause and is out of scope except where a shared component is extracted.
+
+Everything below was measured in a real browser, not inferred. Method and raw numbers
+are in §8. Reproduce with the probes described there.
+
+---
+
+## 0. Summary
+
+Oliver reported five issues. All five reproduce, and **four of them share one root cause**:
+a blanket `min-height: 44px; min-width: 44px` applied to *every* `<button>` in the app
+below 640px (`client/src/index.css:360-368`). Because `min-height` beats `height`, every
+component that sets its own height is silently inflated on phones only — and only on
+phones, which is why every existing desktop/tablet probe passes while the phone UI is
+visibly broken.
+
+| # | Reported | Root cause | Confirmed by |
+|---|---|---|---|
+| 1 | UI doesn't adapt across sizes; squished, wrong padding | RC-1 + RC-3 + RC-4 + RC-5 | 5–13 inflated buttons on *every* mobile route; 0 uses of `clamp()` in 4 500 lines of terminal UI |
+| 2 | Active stack squished, shows 1 of N, needs ≥3 | RC-3 (+RC-1) | 0 rows at 320/375, 1 row at 390/393, 2 rows at 344/412/430. Never 3 on any phone |
+| 3 | `$$` figure doesn't shrink when large | RC-4 | `$99999.99` needs 430px at the hardcoded 88px; only 264–374px available. Overflows on *every* phone |
+| 4 | Action bar breaks; highlight bubble half height, cuts text | RC-1 + RC-2 | Bubble 27px inside a 44px row (61%); label's bottom sits **4.6px below** the bubble |
+| 5 | Split-bill pill changes shape / taller than the action bar | RC-1 | Pill renders 44px against a designed 30px; bar 56px inside its own 37px row; send 44px in a 37px slot |
+
+There is also a latent sixth cause (three unscoped copies of the same global `.tp-*`
+stylesheet) that explains the *intermittency* — "keeps breaking" rather than "is broken".
+
+**None of this was caught because the only mobile gate runs at one viewport and never
+measures a single internal component.** Fixing the five symptoms without fixing that is
+how they come back; §7 is the part that actually prevents recurrence.
+
+---
+
+## 1. Decisions needed from Oliver
+
+These change the shape of the work. The plan below assumes the recommended answer and
+is written so a different answer only changes §4 and §5.
+
+**D1 — Adaptation strategy.**
+- **(a) Fluid / intrinsic layout — recommended.** Design tokens + `clamp()` + container
+  queries + measured chrome gutters. Everything reflows; type stays a readable physical
+  size on every device; respects OS text-size settings. Most work, correct result.
+- (b) Uniform scaled canvas, the way `client/src/desktop/ScaledCanvas` already works:
+  design once at 390×844 and `transform: scale()` to fit. Cheap and pixel-perfect, but
+  text becomes physically tiny on a 320px phone and tap targets scale below the 44px
+  minimum. Appropriate for the tablet *simulation* of a laptop; wrong for a real phone.
+- (c) Hybrid: scale a root design unit with the viewport (clamped), let vertical stacks
+  flex. This is what the plan actually implements — (a) with (c)'s type ramp.
+
+**D2 — Smallest supported phone.** The plan assumes **320×568** (iPhone SE 1st gen,
+older Android, and iPhone in Display Zoom). If 360×640 is the floor instead, the clamp
+minimums relax and §4's "3 rows at 568px tall" stops needing a compact row variant.
+
+**D3 — Blast radius of the RC-1 fix.** Removing the blanket 44px rule changes the
+rendered height of 5–13 buttons on *every* mobile page — mostly back toward the original
+design. One sweeping commit with a full visual sweep, or page-by-page? Recommend one
+commit plus the §7 gate, because a half-applied fix leaves two inconsistent button
+systems live at once.
+
+**D4 — Money formatting.** `fmt()` produces `$99999.99` with no thousands separator.
+Should it be `$99,999.99`? Grouping *widens* the string, so the fitter in §5 must be
+sized for whichever is chosen. Current maximum is 7 digits (`digits.length < 7`).
+
+---
+
+## 2. Root causes
+
+### RC-1 — A blanket 44px minimum on every button below 640px  ⟵ *the primary cause*
+
+`client/src/index.css:360-368`:
+
+```css
+@media (max-width: 640px) {
+  button, [role="button"], input[type="submit"], input[type="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+```
+
+`min-height` wins over `height`, so no component can set a smaller box without
+`!important`. Measured consequences (iPhone 14, 390×844):
+
+| Element | Author intent | Rendered | Delta |
+|---|---|---|---|
+| `.tp-subbar-btn` | `height: 27px` | **44px** | +17 |
+| `.tp-subbar-ind` (a `<div>`, so unaffected) | 27px | 27px | — |
+| `.tp-subbar` (bar shell) | 5+27+5+2 = 39px | **56px** | +17 |
+| `.tp-psubbar` (the row it lives in, a `<div>`) | 37px | 37px | — |
+| `.tp-send` | `height: 37px` | **44px** | +7 |
+| `.tp-pill` "split bill" | ~30px | **44px** | +14 |
+| `.tp-pill` "paywave"/"boards" | ~26px | **44px** | +18 |
+| `.tp-stack-hdr` (sized by its chevron button) | 24px | **44px** | +20 |
+| `.tp-stepper` (quantity) | `32×32` | **44×44** | +12 |
+
+So the action bar is a 56px lozenge inside a 37px row, holding a 27px highlight bubble
+behind a label that is centred in a 44px box. A/B proof: disabling only these two
+declarations at runtime takes the stack header from **44px → 24px** with nothing else
+changed (§8.4).
+
+Two secondary effects worth knowing:
+- It is a `max-width: 640px` query, so tablet/desktop never see it. Every probe in
+  `scripts/desktop-shots/` runs at ≥1194px. The bug is invisible to the entire existing
+  test suite by construction.
+- `min-width: 44px` also inflates narrow controls — the quantity steppers, the share
+  icons, the stack chevron.
+
+**The rest of that media block is also load-bearing damage.** Lines 360–473 are a legacy
+"dark glass" override set that now applies to every modern mobile page:
+
+```css
+label  { color: rgba(255,255,255,0.95) !important; }   /* white labels on light panels */
+input  { background: rgba(255,255,255,0.08) !important;
+         border: 1px solid rgba(255,255,255,0.20) !important;
+         color: black !important; }                    /* overrides .tp-field entirely */
+table, tbody, thead, tr, td, th { background: transparent !important; }
+.backdrop-blur-xl, .backdrop-blur-sm { background/border !important; }
+```
+
+These are not the reported bugs, but they are the same failure mode and they will keep
+producing "padding is not correct" reports. Treat the block as one unit (§3.1).
+
+### RC-2 — The highlight bubble is half-measured, half-hardcoded, and never re-measured
+
+`RetailTerminalViewCore.jsx:89-109`. `measure()` returns `{ x, w }` only; `top: 5px` and
+`height: 27px` live in CSS. The bubble is therefore *guaranteed* to be wrong the moment a
+button's real height differs from 27px — which RC-1 makes permanent.
+
+Second defect in the same hook: the effect depends on `[activeIdx]` with no
+`ResizeObserver` and no `resize` listener. Measured drift after resizing 390 → 320 with
+"split" active: the bubble ends up **14.5px off-centre from its button** and stays there
+(§8.5). On a real phone that fires on rotation, on the software keyboard opening, and on
+the iOS URL bar collapsing.
+
+`TerminalDockView.tsx:98-118` has the identical pattern; it survives only because its
+track width is pinned at 280px.
+
+### RC-3 — Layout is absolute-pixel choreography around floating chrome
+
+`MainTerminal` / `PendingTerminal` (`RetailTerminalViewCore.jsx:318-374`):
+
+```jsx
+<div style={{ height: '50%', padding: '100px 28px 28px' }}>   {/* hero  */}
+<div style={{ flex: 1,      padding: '154px 22px 90px'  }}>   {/* stack */}
+```
+
+`154px` is a guess at the footprint of the floating FAB + action bar; `90px` is a guess
+at the dock's. Nothing measures either. The dock is 78px tall and **collapses to 44px
+after 4 seconds of idle** — the padding never reacts. There are **28** `height: '50%'`
+panels across the three terminal views.
+
+The arithmetic, measured (row height 69px, header 44px, card border 2px — 3 rows needs
+**245px** of content box):
+
+| Device | lower panel | content box (−244 padding) | rows fully visible |
+|---|---|---|---|
+| 320×568 | 284 | **40** | **0** |
+| 375×667 | 333 | **89** | **0** |
+| 390×844 | 422 | 178 | **1** |
+| 393×851 | 425 | 181 | **1** |
+| 344×882 | 441 | 197 | 2 |
+| 412×915 | 457 | 213 | 2 |
+| 430×932 | 466 | 222 | 2 |
+
+The requirement "at least 3" is not reachable on **any** phone without changing the
+structure. Note the stack header lives *inside* the scroll container, so it also consumes
+first-paint budget and then scrolls away.
+
+### RC-4 — No fluid type, no intrinsic sizing, anywhere
+
+Census of the three terminal views:
+
+| | retail | property | trades |
+|---|---|---|---|
+| `fontSize: <number>` literals | 66 | 104 | 58 |
+| `height: '50%'` panels | 9 | 11 | 8 |
+| `clamp()` / `min()` / `max()` / `cq*` | **0** | **0** | **0** |
+
+Plus 194 hardcoded `px` values in the retail CSS template literal.
+
+The amount is `fontSize: 88` at ten call sites (76 at one). Measured widths of
+`$99999.99` at 88px Outfit 900 vs the space available:
+
+| Device | text needs | space | overflow |
+|---|---|---|---|
+| 320×568 | 430px | 264px | **+166** |
+| 375×667 | 430px | 319px | **+111** |
+| 390×844 | 430px | 334px | **+96** |
+| 430×932 | 430px | 374px | **+56** |
+
+It clips on the largest phone made. On 320 the wrap pushes the hero block to `y: -162`
+and the split-bill pill to `y: -78` — **both entirely above the top of the screen** — and
+the keypad's top row is left half-hidden behind the action bar.
+
+### RC-5 — Wrong viewport unit, no safe areas
+
+`.tp-viewport` in the retail terminal uses `height: 100vh`. Every other mobile surface in
+the app (`property`, `trades`, `transactions`, `settings`, `stock-management`) uses
+`100svh`. On iOS Safari `100vh` is the *large* viewport, so with the URL bar showing the
+terminal is ~60–100px taller than the visible area — the bottom of the active stack and
+the dock fall below the fold, on top of RC-3's squeeze.
+
+`viewport-fit=cover` is set in `client/index.html:5`, so `env(safe-area-inset-*)` is
+available — but the terminal uses none of it. The notch is cleared by a hardcoded
+`padding-top: 100px` (hero) and `52px` (top banner, subhead is `20px` and sits under the
+status bar); the home indicator is not cleared at all. Only `TerminalDockView` and
+`notification-system` use safe-area insets today.
+
+### RC-6 — Three unscoped copies of the same `.tp-*` global stylesheet (the intermittency)
+
+- `RetailTerminalViewCore.jsx:1451` injects `TP_CSS` — **unscoped** global `.tp-*` rules.
+- `PropertyTerminalView.tsx:1339` injects `TP_TERM_CSS` — **unscoped**, same selectors,
+  *different values*: `.tp-subbar { transform: scale(0.85) }`, `.tp-subbar-btn { padding: 0 22px }`,
+  and `.tp-subbar-ind { z-index: 2 }` — which paints the navy bubble **over** the label
+  rather than behind it.
+- `trades-terminal-view.css` is correctly scoped under `.trades-terminal-view`.
+
+Measured on `/property/terminal`: **two `<style>` tags defining `.tp-subbar` are live at
+once**, and the retail-shaped bar renders at `matrix(0.85, …)`, 241×48 instead of 316×56.
+Whichever `<style>` is later in the DOM wins. Routes are usually exclusive so the window
+is short, but it opens on every cross-vertical transition and whenever two terminal views
+mount together (the landing phone demo). This is the difference between "is broken" and
+"keeps breaking".
+
+### RC-7 — The only mobile gate proves nothing about layout
+
+`scripts/verify-mobile-retail-regression.mjs` runs **one** viewport (390×844) and asserts
+the *outer* box is 390×844 with `scrollWidth === 390`, plus API-contract checks. It passes
+today, against the screenshots in §8. It never measures an internal component, never
+changes size, never rotates, and never simulates a safe area.
+
+---
+
+## 3. Phase 1 — remove RC-1 without losing touch accessibility
+
+The 44px rule exists for a real reason (Apple HIG minimum tap target; WCAG 2.2 SC 2.5.8
+requires 24×24 CSS px). Deleting it outright regresses accessibility. Give the hit area
+back **without touching the layout box**:
+
+```css
+/* client/src/styles/tap-target.css */
+.tap-target { position: relative; }
+.tap-target::after {
+  content: "";
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width:  max(100%, 44px);
+  height: max(100%, 44px);
+  /* no background; extends the hit region only */
+}
+```
+
+A pseudo-element is part of its originating element for hit-testing, so the tap region
+grows while the painted box, the flex/grid contribution, and every sibling's position stay
+exactly as designed.
+
+### 3.1 Steps
+
+1. Delete `min-height: 44px; min-width: 44px` from `client/src/index.css:362-368`.
+   **Keep** the `input … { font-size: 16px }` rule at :371-379 (it prevents the iOS focus
+   zoom) but split it out so it no longer carries `min-height`.
+2. Add `.tap-target` to the controls that are now smaller than 44px: `.tp-subbar-btn`,
+   the active-stack chevron, `.tp-stepper` at its 32px call sites, `.tp-share-btn`,
+   `.tp-qr-expand`, `.tp-qr-modal-close`, and the equivalents in property/trades.
+   Everything already ≥44px needs nothing.
+3. Audit the rest of the `@media (max-width: 640px)` block (lines 360–473) as one unit.
+   Each `!important` override is either (a) still needed by a specific legacy page — move
+   it behind a `.legacy-glass` class on that page's root, or (b) dead — delete it. The
+   `label`, `input`, `table`, and `.backdrop-blur-*` overrides are the ones that will keep
+   producing "padding is wrong" reports on new pages.
+4. Run the §7 gate and a full visual sweep before committing. Expect *every* mobile page
+   to change; that is the point, and it is why D3 matters.
+
+### 3.2 Expected effect on the reported issues
+
+Issue 4's bubble goes from 27-in-44 to 27-in-27 (correct by accident — §5 makes it correct
+by construction). Issue 5's pill returns to 30px and the bar to 39px. Issue 2 recovers 20px
+of stack budget. Issue 1 improves on every route. Issue 3 is untouched — that is RC-4.
+
+---
+
+## 4. Phase 2 — the responsive foundation
+
+### 4.1 One token layer
+
+New `client/src/styles/mobile-tokens.css`, applied at the phone app root:
+
+```css
+.tp-viewport {
+  container-type: inline-size;          /* size off our own 430px-capped box, not the window */
+
+  /* the design ratio: 1.0 at the 390px reference, clamped so 320 and 430 stay sane */
+  --u: clamp(0.84, calc(100cqi / 390), 1.10);
+
+  --sp-1: calc(4px  * var(--u));  --sp-2: calc(8px  * var(--u));
+  --sp-3: calc(12px * var(--u));  --sp-4: calc(16px * var(--u));
+  --sp-6: calc(24px * var(--u));  --sp-7: calc(28px * var(--u));
+
+  --safe-top:    env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  --bar-h:  calc(38px * var(--u));   /* the action bar's *only* height source */
+  --row-h:  calc(64px * var(--u));   /* one active-stack row */
+
+  height: 100vh;      /* fallback order matters */
+  height: 100svh;
+  height: 100dvh;
+}
+```
+
+Container queries (`cqi`, `container-type`) are Baseline since Safari 16 / Chrome 105 and
+need no build support — Vite 5 + Tailwind 3.4 pass them through untouched. Using `cqi`
+rather than `vw` is what makes the same components correct inside the landing page's
+phone demo and on a tablet, not only in a full-window phone.
+
+### 4.2 Rules that replace the current habits
+
+| Instead of | Use |
+|---|---|
+| `fontSize: 88` | `font-size: clamp(<floor>, <fluid cqi>, <ceiling>)` from the type ramp |
+| `padding: '154px 22px 90px'` | grid rows + measured gutters (§5.2) |
+| `height: '50%'` | `grid-template-rows` with `minmax()` |
+| `height: 100vh` | the `svh`/`dvh` chain above |
+| hardcoded notch/home-indicator clearance | `var(--safe-top)` / `var(--safe-bottom)` |
+| a hardcoded `height` on any flex child | a token, and `min-height: 0` on the scroll parent |
+
+Every fixed dimension gets a `clamp()` whose floor still works at **320×568** (per D2).
+
+---
+
+## 5. Phase 3–5 — the three reported components
+
+### 5.1 Phase 3 — the action bar (issues 4 and 5)
+
+Extract one `SegmentedBar` component (`client/src/features/terminal/shared/`) and use it
+from all three verticals — this also removes three divergent copies of the same bug.
+
+**Make the bubble unable to diverge, rather than measuring it more carefully.** Put the
+buttons and the indicator in the same CSS grid and let the grid place it:
+
+```css
+.tp-bar        { display: grid; grid-auto-flow: column; align-items: stretch;
+                 height: var(--bar-h); padding: var(--sp-1); }
+.tp-bar-ind    { grid-row: 1; grid-column: var(--active-col);
+                 transition: grid-column 0s, transform .45s var(--ease-bar); }
+.tp-bar-btn    { grid-row: 1; height: 100%; }   /* stretch — never a fixed px height */
+```
+
+The indicator now shares the row track with the buttons, so its height *is* the button
+height, always, whatever RC-1-shaped rule appears in future. Keep the JS measurement only
+for the sliding `transform` between columns, and add:
+
+- a `ResizeObserver` on the track and on each button,
+- a `document.fonts.ready` re-measure (label widths change when Outfit loads),
+- the same treatment for `TerminalDockView`'s indicator.
+
+**Invariants the gate enforces** (§7):
+
+1. `bar.height === var(--bar-h)`, independent of button count, labels, or compact state.
+2. `indicator.height === activeButton.height` and the active label's box is fully inside
+   the indicator's box (top and bottom gap both ≥ 0).
+3. `sendButton.height === bar.height` and `splitPill.height === bar.height`.
+4. `bar.scrollWidth <= bar.clientWidth` — the bar is never clipped.
+5. The whole row fits inside the viewport with a gutter at 320px wide.
+6. After a viewport change, (2) still holds — this is the RC-2 regression test.
+
+**Morphing.** The compact ⇄ expanded transition currently animates `padding` while the
+label pops in at full width, which is what reads as "breaking". Animate the label's track
+(`grid-template-columns: … 0fr → 1fr`, or a `max-width` on `.tp-bar-label`) so the bar's
+width change is continuous, and keep the same `--ease-bar` for the indicator and the width
+so they arrive together.
+
+**Split-bill pill.** Its height becomes `var(--bar-h)` — the same token as the bar, so
+"exact height of the action bar" is enforced by construction, not by two numbers that
+happen to match. The row it participates in reserves its width the same way the send slot
+does, so the bar morphs to make room instead of the pill overlapping it.
+
+### 5.2 Phase 4 — terminal home layout (issue 2)
+
+Replace `height: 50%` + magic padding with an explicit three-row grid:
+
+```css
+.tp-screen {
+  display: grid;
+  grid-template-rows:
+    minmax(var(--hero-min), var(--hero-pref))            /* hero  */
+    var(--chrome-gutter)                                 /* the floating FAB / bar band */
+    minmax(var(--stack-min), 1fr);                       /* stack */
+  padding-bottom: calc(var(--dock-h) + var(--safe-bottom) + var(--sp-3));
+}
+```
+
+- `--chrome-gutter` is **measured** from the overlay that is actually visible (FAB when
+  shown, otherwise the bar) by a `ResizeObserver`, and written to the root as a custom
+  property. It can never be a stale `154px` again.
+- `--dock-h` is measured from `TerminalDockView` the same way — it collapses 58px → 44px
+  after 4s of idle and today nothing reacts.
+- `--stack-min: calc(3 * var(--row-h) + var(--stack-hdr-h) + 2px)` makes **"at least 3
+  rows" a CSS invariant**, not an outcome.
+- Move `.tp-stack-hdr` **out** of `.tp-stack-scroll` so it pins and the three rows are
+  three *content* rows.
+
+Budget check at 390×844 — the stack needs 245px and has 178px, so 67px must come back:
+header out of the scroll (+24 to the scroll's usable height), gutter 154 → ~110 (+44),
+bottom padding 90 → measured ~86 (+4), hero 422 → ~400 (+22). Comfortably feasible.
+
+At **320×568** (D2) the arithmetic is tighter: dock 78 + hero floor 240 leaves ~250px, and
+three rows plus a header need ~243px. It fits, but only if the hero contracts first and
+the amount clamps with it. If Oliver wants headroom there, add a compact row variant below
+~600px of height (status word → dot + chip) — flag as a design call, do not invent it.
+
+Ordering rule for short screens: **the stack floor is non-negotiable; the hero contracts
+first**, and the amount's `clamp()` ceiling is tied to the hero's realised height.
+
+### 5.3 Phase 5 — the money display (issue 3)
+
+The requirement is "cut off on space, then the font shrinks". Two layers:
+
+1. **Normal case, no JS.** `white-space: nowrap` plus a width-aware size:
+
+   ```css
+   .tp-amount {
+     white-space: nowrap;
+     font-size: min(
+       var(--amount-max),                                   /* the 88px design ceiling */
+       calc(100cqi / var(--amount-chars) * var(--amount-k))  /* fit to the character count */
+     );
+   }
+   ```
+
+   React sets `--amount-chars` from the formatted string's length. Deterministic, no
+   measurement, no reflow loop, and trivially assertable in a test. `--amount-k` is a
+   single constant calibrated once against the Outfit 900 advance width.
+
+2. **Fallback for the long case / late font load.** A small `useFitText` hook comparing
+   `scrollWidth` to `clientWidth` on `[text, boxWidth, fontsReady]`, writing a `--fit`
+   scale with a floor (~0.55 of base). Below the floor, switch to a compact presentation
+   rather than shrinking into illegibility.
+
+Apply to **all ten** `.tp-amount` call sites in retail plus the property/trades
+equivalents — each currently hardcodes `fontSize: 88` (or `76`).
+
+Also fix the containers: `.tp-screen` and `.tp-layer` are `overflow: hidden`, which is
+what turns an overflow into a silent clip. Once the amount is fitted they stay hidden, but
+the gate must assert the amount's box is inside its parent rather than trusting the clip.
+
+Related, pending D4: `fmt()` has no thousands separator. If grouping is added the string
+gets wider and `--amount-k` must be recalibrated.
+
+---
+
+## 6. Phase 6 — scope the CSS and de-duplicate (RC-6)
+
+1. Scope `TP_CSS` under `.retail-terminal-view` and `TP_TERM_CSS` under
+   `.property-terminal-view`, exactly as `trades-terminal-view.css` already does.
+2. Better: move all three out of template literals into real `.css` files so Vite dedupes
+   them, they are cacheable, and they stop being re-parsed on every mount.
+3. Then extract the genuinely shared primitives — bar, amount, stack row, pill, field,
+   CTA, dot — into one `terminal-primitives.css` driven by the §4.1 tokens, so the next
+   fix lands once instead of three times.
+
+Note for whoever does this: the handoff (`docs/HANDOFF-2026-07-28-tablet-desktop-app.md`
+§6) records that Oliver **accepted** the duplication of the *home-screen* furniture on
+desktop. That ruling was about desktop home screens; it does not cover these three
+unscoped global stylesheets colliding on the phone, which is a correctness bug, not a
+duplication preference. Raise it if in doubt — do not silently reverse a ruling.
+
+---
+
+## 7. Phase 7 — the gates that stop this recurring
+
+This is the part that matters most. Without it the five symptoms return the next time
+someone adds a global rule.
+
+### 7.1 `scripts/verify-mobile-responsive.mjs`
+
+For each viewport in **{320×568, 360×640, 375×667, 390×844, 412×915, 430×932}**, each
+mobile route, and both orientations:
+
+1. `document.scrollWidth === clientWidth` (no horizontal scroll).
+2. No visible element's box crosses the viewport edge, with an explicit allowlist for
+   deliberately-clipped elements (e.g. the collapsed `.tp-send-slot`).
+3. No text node clipped: `scrollWidth <= clientWidth + 2` for every leaf with text.
+4. **Component contracts** — the invariants in §5.1, plus:
+   `visibleStackRows >= 3`; the amount's box inside its parent at `$99,999.99`.
+5. **Re-measure after `setViewportSize`** — this is the RC-2 drift test and the one that
+   would have caught the 14.5px bubble offset.
+6. Run once with a simulated safe-area inset and once with the dock collapsed.
+
+Model it on `scripts/desktop-shots/probe-terminal-geometry.mjs`, which already proves the
+"measure, don't look" pattern works. Use `retail-fixtures.mjs` for auth and mocks. **Exit
+non-zero on failure** — several existing scripts collect errors and still exit 0.
+
+### 7.2 Static guards (cheap, catch the cause not the symptom)
+
+- CI grep: no `min-height`/`min-width` in a bare *element* selector inside a media query
+  in `client/src/**/*.css`. This is the rule that would have blocked RC-1 at review.
+- CI grep: no new `fontSize: <number>` literals or `height: '50%'` under
+  `client/src/features/terminal/**`.
+- CI grep: no `height: 100vh` in phone surfaces — `svh`/`dvh` only.
+- CI grep: no unscoped `.tp-` selector in a `<style>` template literal.
+
+### 7.3 Process
+
+- Wire `verify-mobile-responsive.mjs` into the same place `verify-desktop-p0.mjs` runs, so
+  "phone" is a first-class gate rather than a manual check.
+- Record the six device classes in `CLAUDE.md` next to the existing desktop/tablet
+  definitions, so the next agent tests all of them by default.
+
+---
+
+## 8. Evidence
+
+Dev server on `:5000` (single instance — memory `dev-server-single-instance`), nix
+Chromium at `/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium`
+(memory `playwright-nix-chromium`), auth and API via `scripts/desktop-shots/retail-fixtures.mjs`
+with `hasTouch: true, isMobile: true`. Probe sources and raw JSON are in this session's
+scratchpad; they are the starting point for §7.1.
+
+**8.1 Stack rows visible** — 7 transactions in the fixture, row height 69px:
+0 rows at 320×568 and 375×667; 1 at 390×844 and 393×851; 2 at 344×882, 412×915, 430×932.
+
+**8.2 Action bar, iPhone 14** — `.tp-subbar-btn` computed `44px` (CSS: 27px);
+`.tp-subbar-ind` `27px`; `.tp-subbar` box `316×56`; `.tp-psubbar` `37px` → the bar
+overflows its own row by **19px**; `.tp-send` `44px` in a `37px` slot. With "split" active:
+`labelInsideInd = { topGap: 12.4, bottomGap: -4.6 }` — **the label's bottom edge is 4.6px
+below the bottom of the bubble.**
+
+**8.3 Amount** — `$99999.99` at 88px measures **430px**; available 264 / 319 / 334 / 374px
+at 320 / 375 / 390 / 430. At 320 the hero lands at `y: -162` and the split pill at `y: -78`.
+
+**8.4 RC-1 A/B** — removing only `min-height`/`min-width` from the 640px block at runtime:
+`.tp-stack-hdr` 44px → **24px**, its button 44×44 → **24×32**. Nothing else changed.
+
+**8.5 RC-2 drift** — with "split" active, resizing 390 → 320: bubble centre vs active
+button centre goes from **1px** to **14.5px** and stays. The dock indicator holds (its
+track is a fixed 280px).
+
+**8.6 RC-6 collision** — on `/property/terminal`, two `<style>` tags define `.tp-subbar`;
+the computed transform is `matrix(0.85, 0, 0, 0.85, 0, 0)` and `.tp-subbar-ind` computes
+`z-index: 2` (over the label) instead of retail's `0` (behind it).
+
+**8.7 App-wide inflation** — buttons pinned to exactly 44px per route:
+`/terminal` 13, `/property/terminal` 12, `/property` 10, `/trades` 10, `/dashboard` 9,
+`/stock` 9, `/transactions` 9, `/settings` 9, `/trades/terminal` 5. Identical at 320, 390
+and 430, i.e. it is not a small-screen edge case — it is every phone.
+
+---
+
+## 9. Execution order
+
+| Phase | Content | Gate before commit |
+|---|---|---|
+| 0 | Land §7.1 as a **failing** baseline; record current numbers | probe runs, reports failures |
+| 1 | RC-1: remove the blanket rule, add `.tap-target`, audit the 640px block | §7.1 + full visual sweep (D3) |
+| 2 | §4 token layer, `svh`/`dvh`, safe areas | §7.1 clauses 1–3 pass |
+| 3 | `SegmentedBar` + grid indicator + observers (issues 4, 5) | §5.1 invariants 1–6 pass |
+| 4 | Terminal home grid + measured gutters (issue 2) | `visibleStackRows >= 3` on all six sizes |
+| 5 | Amount fitting (issue 3) | amount inside its parent at max value, all six sizes |
+| 6 | Scope + de-duplicate the three stylesheets | §7.2 greps clean; no `.tp-` leakage |
+| 7 | Wire the gate into CI, update `CLAUDE.md` | full suite green |
+
+Stop conditions: do not start Phase 3 before Phase 1 lands (the invariants cannot hold
+while RC-1 is live), and do not start Phase 4 before Phase 2 (the grid needs the tokens).
+Phases 5 and 6 are independent of each other.
+
+Regression boundaries that must stay green throughout: the tablet/desktop app
+(`scripts/desktop-shots/*`, `scripts/verify-desktop-p0.mjs`), the landing phone demo, and
+the public customer routes.

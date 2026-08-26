@@ -1,0 +1,451 @@
+import { useEffect, useId, useRef, useState } from "react";
+import { TRADES_THEME } from "@/lib/trades-theme";
+import type { DockCollapse } from "./dock-collapse-store";
+import { gooEnabled } from "./dock-morph";
+import "../terminal/terminal-keyframes.css";
+
+export type TerminalDockMode = "retail" | "property" | "trades";
+export type TerminalDockPlacement = "fixed" | "absolute";
+type DockIconProps = { c: string };
+
+export type TerminalDockItem = {
+  id: string;
+  path: string;
+  Icon: (props: DockIconProps) => JSX.Element;
+};
+
+export type TerminalDockViewProps = {
+  mode: TerminalDockMode;
+  activeId: string;
+  onPick: (item: Pick<TerminalDockItem, "id" | "path">) => void;
+  placement?: TerminalDockPlacement;
+  collapseAfterMs?: number | null;
+  /* Phase D of docs/PLAN-2026-08-17-terminal-panels-and-dock.md. "collapsed"
+     and "expanded" are a request, not a lock — an explicit swipe (Phase E)
+     still wins over it until the next change of this prop. Only the type is
+     imported here; BottomNavigation and the terminal controllers own the
+     store itself, keeping this file's purity boundary intact. */
+  collapse?: DockCollapse;
+};
+
+const DOCK_BG = "#02093D";
+const BLUE = "#58ABFF";
+const BLUE_DIM = "rgba(88,171,255,0.45)";
+const TRADES_DOCK = TRADES_THEME.INK;
+const TRADES_ACTIVE = TRADES_THEME.OFFW;
+const TRADES_DIM = "rgba(244,244,244,0.5)";
+
+function IcoHome({ c }: DockIconProps) {
+  return <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 9.5L12 3l9 6.5V20a1.5 1.5 0 01-1.5 1.5h-15A1.5 1.5 0 013 20V9.5z"/><path d="M9 21.5V14h6v7.5"/></svg>;
+}
+function IcoPerson({ c }: DockIconProps) {
+  return <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="7.5" r="4"/><path d="M3.5 21c0-4 3.8-7 8.5-7s8.5 3 8.5 7"/></svg>;
+}
+function IcoBox({ c }: DockIconProps) {
+  return <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5v8l9 5 9-5V8z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/></svg>;
+}
+function IcoTerminal({ c }: DockIconProps) {
+  return <svg width={22} height={22} viewBox="0 0 32 22" fill="none" aria-hidden="true"><path d="M4 4l6 7-6 7" stroke={c} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/><path d="M15 18h13" stroke={c} strokeWidth="2.6" strokeLinecap="round"/></svg>;
+}
+function IcoAnalytics({ c }: DockIconProps) {
+  return <svg width={22} height={22} viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4" stroke={c} strokeWidth="1.7"/><path d="M8 16.5V11" stroke={c} strokeWidth="1.7" strokeLinecap="round"/><path d="M12 16.5V7.5" stroke={c} strokeWidth="1.7" strokeLinecap="round"/><path d="M16 16.5v-3.5" stroke={c} strokeWidth="1.7" strokeLinecap="round"/></svg>;
+}
+function IcoSettings({ c }: DockIconProps) {
+  return <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2.6"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>;
+}
+
+export const TERMINAL_DOCK_ITEMS: Record<TerminalDockMode, readonly TerminalDockItem[]> = {
+  retail: [
+    { id: "home", path: "/dashboard", Icon: IcoHome },
+    { id: "stock", path: "/stock", Icon: IcoBox },
+    { id: "terminal", path: "/terminal", Icon: IcoTerminal },
+    { id: "analytics", path: "/transactions", Icon: IcoAnalytics },
+    { id: "settings", path: "/settings", Icon: IcoSettings },
+  ],
+  property: [
+    { id: "home", path: "/property", Icon: IcoHome },
+    { id: "tenants", path: "/property/tenants", Icon: IcoPerson },
+    { id: "terminal", path: "/property/terminal", Icon: IcoTerminal },
+    { id: "analytics", path: "/property/analytics", Icon: IcoAnalytics },
+    { id: "settings", path: "/settings", Icon: IcoSettings },
+  ],
+  trades: [
+    { id: "home", path: "/trades", Icon: IcoHome },
+    { id: "clients", path: "/trades/clients", Icon: IcoPerson },
+    { id: "terminal", path: "/trades/terminal", Icon: IcoTerminal },
+    { id: "analytics", path: "/trades/analytics", Icon: IcoAnalytics },
+    { id: "settings", path: "/settings", Icon: IcoSettings },
+  ],
+};
+
+const initialNavWidth = () => typeof window === "undefined" ? 320 : Math.min(320, window.innerWidth - 32);
+
+/* docs/SPEC-2026-08-20-dock-implementation.md §7.3. Linear up to full travel,
+   then asymptotic to 1.32 — 56px of overshoot yields ~12px of extra visual
+   movement and the dock never detaches from the finger. */
+const rubber = (p: number) => (p <= 1 ? Math.max(0, p) : 1 + (1 - Math.exp(-(p - 1) * 0.55)) * 0.32);
+const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
+
+const SWIPE_TRAVEL = 56; // px of drag that maps to progress 1.0
+const EXPAND_THRESHOLD = 0.45;
+const FLICK_VELOCITY = 0.4; // px/ms
+const TAP_SLOP = 6; // px — below this a body pointerdown is still a tap, not a drag
+
+export function TerminalDockView({ mode, activeId, onPick, placement = "fixed", collapseAfterMs = 4_000, collapse = "auto" }: TerminalDockViewProps) {
+  const items = TERMINAL_DOCK_ITEMS[mode];
+  const activeIdx = items.findIndex((item) => item.id === activeId);
+  const filterId = useId();
+  const navRef = useRef<HTMLElement>(null);
+  const dockRef = useRef<HTMLDivElement>(null);
+  const handleRef = useRef<HTMLButtonElement>(null);
+  const btnRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const mounted = useRef(false);
+  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [indLeft, setIndLeft] = useState(0);
+  const [animating, setAnimating] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const collapsedRef = useRef(collapsed);
+  const [navWidth, setNavWidth] = useState(initialNavWidth);
+
+  /* Phase F: the blob layer's per-slot travel distance, measured from the
+     same button rects §7's indicator already tracks. */
+  const [slotXs, setSlotXs] = useState<number[]>(() => items.map(() => 0));
+  const [reducedMotion, setReducedMotion] = useState(false);
+  const [morphing, setMorphing] = useState<"collapsing" | "expanding" | null>(null);
+  const morphTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* Gesture state. Refs for the per-frame math (no re-render needed until the
+     visual progress actually changes); dragT is the one piece read by render. */
+  const gesture = useRef<{ kind: "expand" | "collapse"; x0: number; y0: number; t0: number; crossedSlop: boolean } | null>(null);
+  const [dragT, setDragT] = useState<number | null>(null); // null = not dragging
+
+  useEffect(() => {
+    const onResize = () => setNavWidth(Math.min(320, window.innerWidth - 32));
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  /* Phase F §8.6. Precedent for reading the query from JS: desktop/bucket-
+     morph.ts:213-219. Under reduced motion the morph is skipped outright —
+     the existing crossfade (Phase E) still runs, just without the blobs. */
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReducedMotion(mq.matches);
+    update();
+    mq.addEventListener?.("change", update);
+    return () => mq.removeEventListener?.("change", update);
+  }, []);
+
+  /* Each blob's travel distance: the icon slot it converges from/to, measured
+     the same way §7's active indicator is (calcLeft below), but relative to
+     the dock's own centre rather than its left edge, since the blob's base
+     position is centred (transform-origin: 50% 100%). */
+  useEffect(() => {
+    const measure = () => {
+      const dock = dockRef.current;
+      if (!dock) return;
+      const dockRect = dock.getBoundingClientRect();
+      if (dockRect.width === 0) return;
+      const xs = btnRefs.current.map((button) => {
+        if (!button) return 0;
+        const buttonRect = button.getBoundingClientRect();
+        return buttonRect.left - dockRect.left + buttonRect.width / 2 - dockRect.width / 2;
+      });
+      if (xs.length === items.length) setSlotXs(xs);
+    };
+    const raf = requestAnimationFrame(measure);
+    window.addEventListener("resize", measure);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", measure);
+    };
+  }, [mode, navWidth]);
+
+  /* Phase A of docs/PLAN-2026-08-17-terminal-panels-and-dock.md: publish the
+     dock's real footprint so every screen reserves the same number instead of
+     the six hand-tuned literals in §1.2.
+
+     It goes on `document.documentElement` deliberately. App.tsx renders
+     <Router /> and <BottomNavigation /> as siblings, so a terminal-scoped
+     write is invisible to the dock and a dock-scoped one is invisible to the
+     terminal — the variable would silently resolve to its initial value on
+     exactly the screens that need it.
+
+     Only the fixed placement publishes. The landing page's phone demo mounts
+     this dock with placement="absolute" inside a scaled mock; its height is not
+     the real chrome and must not become the app's reservation (§4.3 clause 9). */
+  useEffect(() => {
+    if (placement !== "fixed") return;
+    const nav = navRef.current;
+    if (!nav || typeof document === "undefined") return;
+    const root = document.documentElement;
+
+    const publish = () => {
+      const { height } = nav.getBoundingClientRect();
+      root.style.setProperty("--dock-h", `${Math.round(height * 100) / 100}px`);
+    };
+    publish();
+
+    /* The wrapper's height is transitioned, so this fires per frame during a
+       collapse and the token tracks it rather than jumping at the end. */
+    const observer =
+      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(publish);
+    observer?.observe(nav);
+
+    return () => {
+      observer?.disconnect();
+      /* Cleared, not left stale: a screen rendered with no dock must not go on
+         reserving space for one. */
+      root.style.removeProperty("--dock-h");
+    };
+  }, [placement]);
+
+  const calcLeft = (idx: number) => {
+    const button = btnRefs.current[Math.max(0, idx)];
+    const dock = dockRef.current;
+    if (!button || !dock) return indLeft;
+    const buttonRect = button.getBoundingClientRect();
+    const dockRect = dock.getBoundingClientRect();
+    return buttonRect.left - dockRect.left + buttonRect.width / 2 - 32.5;
+  };
+
+  useEffect(() => {
+    const idx = Math.max(0, activeIdx);
+    if (!mounted.current) {
+      setIndLeft(calcLeft(idx));
+      requestAnimationFrame(() => { mounted.current = true; });
+      return;
+    }
+    setAnimating(true);
+    setIndLeft(calcLeft(idx));
+    const timer = setTimeout(() => setAnimating(false), 550);
+    return () => clearTimeout(timer);
+  }, [activeId, mode]);
+
+  /* Phase F. A clean, non-drag change of `collapsed` (idle timeout, a Phase D
+     request, or a keyboard activation) gets the full blob choreography; a
+     drag release does not — it already animated live via visualT below, and
+     blending a variable-distance release into a fixed-percentage keyframe
+     set is a case the plan's own §3.4 choreography doesn't resolve, so
+     `animate=false` there deliberately keeps using Phase E's crossfade.
+     The timing itself never depends on the filter (DK3) — gooEnabled() only
+     gates the `filter` property applied to the blob layer, never whether
+     this runs or how long it takes. */
+  const settleTo = (next: boolean, animate: boolean) => {
+    if (animate && !reducedMotion && collapsedRef.current !== next) {
+      setMorphing(next ? "collapsing" : "expanding");
+      if (morphTimer.current) clearTimeout(morphTimer.current);
+      morphTimer.current = setTimeout(() => setMorphing(null), next ? 460 : 520);
+    }
+    collapsedRef.current = next;
+    setCollapsed(next);
+  };
+
+  /* Phase D. `collapse` is a request from the terminal (via the store) or
+     "auto" for the idle-timer behaviour this dock has always had. Either way,
+     a route/mode change re-asserts the requested state — that is intent, not
+     a stray touch, and it is the only thing (besides a swipe) allowed to move
+     `collapsed` once E lands. */
+  useEffect(() => {
+    if (idleTimer.current) { clearTimeout(idleTimer.current); idleTimer.current = null; }
+    if (collapse === "collapsed") { settleTo(true, true); return; }
+    if (collapse === "expanded") { settleTo(false, true); return; }
+    settleTo(false, true);
+    if (collapseAfterMs !== null) idleTimer.current = setTimeout(() => settleTo(true, true), collapseAfterMs);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collapse, activeId, mode, collapseAfterMs, reducedMotion]);
+
+  useEffect(() => () => {
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+    if (morphTimer.current) clearTimeout(morphTimer.current);
+  }, []);
+
+  /* ── Phase E: the swipe. Track the gesture, don't detect it — pointer
+     events + touch-action: none + transition: dragging ? 'none' : '…', the
+     idiom already used at transactions.tsx:512-518,
+     property-analytics.tsx:309-313, trades-analytics.tsx:317-321. ── */
+
+  const endGesture = (expand: boolean | null) => {
+    gesture.current = null;
+    setDragT(null);
+    if (expand === true) settleTo(false, false);
+    else if (expand === false) settleTo(true, false);
+    // null = settle back to whatever `collapsed` already was (aborted/cancelled)
+  };
+
+  const onHandlePointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!collapsed) return;
+    handleRef.current?.setPointerCapture(event.pointerId);
+    gesture.current = { kind: "expand", x0: event.clientX, y0: event.clientY, t0: event.timeStamp, crossedSlop: true };
+    setDragT(0);
+  };
+  const onHandlePointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const g = gesture.current;
+    if (!g || g.kind !== "expand") return;
+    const dy = g.y0 - event.clientY;
+    const dx = event.clientX - g.x0;
+    if (Math.abs(dx) > Math.abs(dy) + 8) { endGesture(null); return; } // sideways — not this gesture
+    setDragT(rubber(dy / SWIPE_TRAVEL));
+  };
+  const onHandlePointerUp = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const g = gesture.current;
+    if (!g || g.kind !== "expand") return;
+    const dy = g.y0 - event.clientY;
+    const elapsed = Math.max(1, event.timeStamp - g.t0);
+    const velocity = dy / elapsed;
+    const progress = rubber(dy / SWIPE_TRAVEL);
+    endGesture(progress > EXPAND_THRESHOLD || velocity > FLICK_VELOCITY);
+  };
+  const onHandlePointerCancel = () => endGesture(null);
+
+  /* A keyboard activation dispatches a click with detail === 0; a pointer tap
+     is detail >= 1. The tap path is owned entirely by the drag lifecycle
+     above (a tap yields ~0 progress, which resolves to "stay collapsed") —
+     this handler exists only for the keyboard/AT path. */
+  const onHandleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (event.detail !== 0) return;
+    settleTo(false, true);
+  };
+
+  /* Downward swipe on the expanded dock body collapses it again (§7.5). A tap
+     on an icon must keep working: nothing is captured or prevented until the
+     drag actually crosses TAP_SLOP, so a plain tap's click reaches the button
+     under the finger completely untouched. */
+  const onBodyPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (collapsed) return;
+    gesture.current = { kind: "collapse", x0: event.clientX, y0: event.clientY, t0: event.timeStamp, crossedSlop: false };
+  };
+  const onBodyPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const g = gesture.current;
+    if (!g || g.kind !== "collapse") return;
+    const dy = event.clientY - g.y0;
+    const dx = event.clientX - g.x0;
+    if (!g.crossedSlop) {
+      if (Math.hypot(dx, dy) < TAP_SLOP) return; // still might be a tap — do nothing yet
+      if (Math.abs(dx) > Math.abs(dy)) { gesture.current = null; return; } // sideways — let it be whatever it is
+      g.crossedSlop = true;
+      dockRef.current?.setPointerCapture(event.pointerId);
+    }
+    event.preventDefault();
+    setDragT(rubber(dy / SWIPE_TRAVEL));
+  };
+  const onBodyPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    const g = gesture.current;
+    if (!g || g.kind !== "collapse") { gesture.current = null; return; }
+    if (!g.crossedSlop) { gesture.current = null; return; } // a tap — let the button's own onClick handle it
+    const dy = event.clientY - g.y0;
+    const elapsed = Math.max(1, event.timeStamp - g.t0);
+    const velocity = dy / elapsed;
+    const progress = rubber(dy / SWIPE_TRAVEL);
+    endGesture(!(progress > EXPAND_THRESHOLD || velocity > FLICK_VELOCITY));
+  };
+  const onBodyPointerCancel = () => { gesture.current = null; endGesture(null); };
+  /* A drag that crossed the slop must not also fire the icon button's click
+     underneath it — capture-phase so it runs before the button's own onClick. */
+  const onBodyClickCapture = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (gesture.current?.kind === "collapse" && gesture.current.crossedSlop) event.stopPropagation();
+  };
+
+  const dragging = dragT !== null;
+  const restT = collapsed ? 1 : 0;
+  const visualT = dragging ? clamp01(gesture.current?.kind === "expand" ? 1 - (dragT as number) : (dragT as number)) : restT;
+  const dragCurve = dragging ? "none" : undefined;
+
+  const palette = mode === "trades"
+    ? { dock: TRADES_DOCK, active: TRADES_ACTIVE, dim: TRADES_DIM }
+    : { dock: DOCK_BG, active: BLUE, dim: BLUE_DIM };
+
+  /* Phase F §4.4/§8.4: overshoot comes from --m-ease-pop and nothing else
+     (index.css:60-71) — never on height, opacity or transform, which either
+     clip their content or clamp, reading as a glitch either way. These three
+     transitions used cubic-bezier(0.34,1.56,0.64,1), one of the violations
+     named in §1.8/§8.4; --m-ease-out replaces it, durations unchanged. */
+  return (
+    <nav ref={navRef} aria-label="Merchant navigation" data-demo-id="terminal-dock" data-terminal-dock-mode={mode} style={{ position: placement, bottom: 0, left: 0, right: 0, display: "flex", justifyContent: "center", paddingBottom: "max(20px, env(safe-area-inset-bottom, 20px))", zIndex: 60, pointerEvents: "none" }}>
+      <div style={{ position: "relative", width: navWidth, height: 58 - 14 * visualT, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "auto", transition: dragCurve ?? "height 0.5s var(--m-ease-out)", overflow: "visible" }}>
+        <button
+          className="tap-target"
+          ref={handleRef}
+          type="button"
+          aria-expanded={!collapsed}
+          aria-label="show navigation"
+          data-demo-id="dock-handle"
+          onPointerDown={onHandlePointerDown}
+          onPointerMove={onHandlePointerMove}
+          onPointerUp={onHandlePointerUp}
+          onPointerCancel={onHandlePointerCancel}
+          onClick={onHandleClick}
+          style={{
+            position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)",
+            width: 120, height: 36, padding: 0, margin: 0, border: "none", background: "none",
+            display: "flex", alignItems: "flex-end", justifyContent: "center", paddingBottom: 10,
+            touchAction: "none", cursor: collapsed ? "grab" : "default",
+            pointerEvents: collapsed ? "auto" : "none",
+            WebkitTapHighlightColor: "transparent",
+          }}
+        >
+          <span aria-hidden="true" style={{ width: 56 * visualT, height: Math.max(4, 4 * visualT), background: palette.dock, borderRadius: 999, opacity: visualT, transition: dragCurve ?? "width 0.45s var(--m-ease-out), opacity 0.3s ease", pointerEvents: "none" }} />
+        </button>
+        <div
+          ref={dockRef}
+          onPointerDown={onBodyPointerDown}
+          onPointerMove={onBodyPointerMove}
+          onPointerUp={onBodyPointerUp}
+          onPointerCancel={onBodyPointerCancel}
+          onClickCapture={onBodyClickCapture}
+          style={{ position: "relative", width: 280, height: 48, background: palette.dock, borderRadius: 24, display: "flex", alignItems: "center", justifyContent: "space-around", padding: "0 16px", overflow: "visible", opacity: 1 - visualT, transform: `scale(${1 - 0.15 * visualT})`, transition: dragCurve ?? "opacity 0.3s ease, transform 0.45s var(--m-ease-out)", pointerEvents: visualT < 0.5 ? "auto" : "none" }}
+        >
+          <div aria-hidden="true" style={{ position: "absolute", left: indLeft, top: -5, width: 65, height: 58, background: palette.dock, borderRadius: 29, boxShadow: "0 4px 20px rgba(0,0,0,0.45)", pointerEvents: "none", willChange: "left", transition: animating ? "left 0.45s cubic-bezier(0.34,1.56,0.64,1)" : "none", zIndex: 0 }} />
+          {items.map(({ id, path, Icon }, index) => {
+            const isActive = index === activeIdx;
+            return <button className="tap-target" key={id} ref={(element) => { btnRefs.current[index] = element; }} type="button" onClick={() => onPick({ id, path })} aria-label={id} aria-current={isActive ? "page" : undefined} data-demo-id={`dock-${id}`} style={{ position: "relative", zIndex: 1, background: "none", border: "none", padding: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transform: isActive ? "scale(1.15)" : "scale(1)", transition: "transform 0.25s ease", WebkitTapHighlightColor: "transparent" }}><Icon c={isActive ? palette.active : palette.dim} /></button>;
+          })}
+        </div>
+
+        {/* ── Phase F: the oozing morph. Additive over the crossfade above —
+           it never replaces the base opacity/scale transition, only overlays
+           the merging motion on top of it. filter: none at rest is achieved
+           structurally: this whole layer is unmounted outside `morphing`, so
+           there is nothing to sample a filter on. Icons are never a
+           descendant of this layer (they live in dockRef above) — the
+           structural half of §3.4's mandatory two-layer split; the other
+           half (icons on their own fade timeline) is a simplification this
+           pass did not build — see the implementation notes. ── */}
+        {morphing && (
+          <>
+            <svg aria-hidden="true" width="0" height="0" style={{ position: "absolute" }}>
+              <defs>
+                <filter id={filterId} x="-60%" y="-60%" width="220%" height="220%" colorInterpolationFilters="sRGB">
+                  <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="tp-goo-blur" />
+                  <feColorMatrix in="tp-goo-blur" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -10" />
+                </filter>
+              </defs>
+            </svg>
+            <div
+              aria-hidden="true"
+              data-demo-id="dock-goo"
+              style={{
+                position: "absolute", inset: 0, pointerEvents: "none",
+                filter: gooEnabled() ? `url(#${filterId})` : "none",
+              }}
+            >
+              {slotXs.map((x, index) => (
+                <span
+                  key={index}
+                  style={{
+                    position: "absolute", left: "50%", bottom: 0, marginLeft: -28,
+                    width: 56, height: 48, borderRadius: 24, background: palette.dock,
+                    transformOrigin: "50% 100%",
+                    animation: `${morphing === "collapsing" ? "tp-dock-collapse 420ms" : "tp-dock-expand 480ms"} var(--m-ease-out) both`,
+                    ...({ "--slot-x": `${x}px` } as React.CSSProperties),
+                  }}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </nav>
+  );
+}

@@ -1,0 +1,70 @@
+#!/usr/bin/env python3
+"""Summarise a Claude Code transcript JSONL: prompts, assistant narrative, tool calls."""
+import json, sys, re
+
+path = sys.argv[1]
+mode = sys.argv[2] if len(sys.argv) > 2 else "overview"
+
+entries = []
+with open(path) as f:
+    for line in f:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entries.append(json.loads(line))
+        except Exception:
+            pass
+
+def clean(t):
+    t = re.sub(r'<system-reminder>.*?</system-reminder>', '', t, flags=re.S)
+    t = re.sub(r'<local-command-caveat>.*?</local-command-caveat>', '', t, flags=re.S)
+    return t.strip()
+
+print(f"# entries: {len(entries)}")
+if entries:
+    print("first ts:", entries[0].get("timestamp"), " last ts:", entries[-1].get("timestamp"))
+    print("sessionId:", entries[0].get("sessionId"))
+
+# user prompts
+if mode in ("overview", "prompts"):
+    print("\n===== USER PROMPTS =====")
+    for i, e in enumerate(entries):
+        if e.get("type") != "user":
+            continue
+        m = e.get("message", {})
+        c = m.get("content")
+        if isinstance(c, str):
+            txt = clean(c)
+        elif isinstance(c, list):
+            txt = "\n".join(clean(b.get("text", "")) for b in c if isinstance(b, dict) and b.get("type") == "text")
+        else:
+            txt = ""
+        if txt:
+            print(f"\n--- [{i}] {e.get('timestamp')} ---")
+            print(txt[:2500])
+
+if mode in ("overview", "narrative"):
+    print("\n\n===== ASSISTANT NARRATIVE (last N) =====")
+    texts = []
+    for i, e in enumerate(entries):
+        if e.get("type") != "assistant":
+            continue
+        for b in e.get("message", {}).get("content", []) or []:
+            if isinstance(b, dict) and b.get("type") == "text" and b.get("text", "").strip():
+                texts.append((i, e.get("timestamp"), b["text"].strip()))
+    n = int(sys.argv[3]) if len(sys.argv) > 3 else 12
+    for i, ts, t in texts[-n:]:
+        print(f"\n--- [{i}] {ts} ---")
+        print(t[:3000])
+
+if mode == "tools":
+    print("\n===== TOOL CALLS =====")
+    for i, e in enumerate(entries):
+        if e.get("type") != "assistant":
+            continue
+        for b in e.get("message", {}).get("content", []) or []:
+            if isinstance(b, dict) and b.get("type") == "tool_use":
+                inp = b.get("input", {})
+                desc = inp.get("command") or inp.get("file_path") or inp.get("pattern") or inp.get("prompt") or ""
+                print(f"[{i}] {b['name']}: {str(desc)[:180]}")

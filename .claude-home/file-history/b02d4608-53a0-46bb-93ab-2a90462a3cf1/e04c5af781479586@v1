@@ -1,0 +1,575 @@
+import { useState, useEffect, useRef } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { propFetch } from "@/lib/property-api";
+import { usePropertyTenants, usePropertyInvoices } from "@/lib/property-data";
+import { notifyIfBillingCardRequired } from "@/lib/queryClient";
+import {
+  PropertyTerminalView,
+  type PropertyTerminalScreen,
+} from "@/features/terminal/property/PropertyTerminalView";
+
+const PROPERTY_TERMINAL_FONT_CSS =
+  "@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap');";
+
+const SUBBAR_ROUTE: Record<number, PropertyTerminalScreen> = {
+  0: 'tenants', 1: 'send', 2: 'bill', 3: 'external',
+};
+
+const CHARGE_TYPES = [
+  { id: 'utilities', preset: 'Water / utilities' },
+  { id: 'late_fee', preset: 'Late fee' },
+  { id: 'cleaning', preset: 'Cleaning' },
+  { id: 'damages', preset: 'Damages' },
+  { id: 'other', preset: '' },
+];
+
+function addInterval(from: Date, frequency: string): Date {
+  const date = new Date(from);
+  if (frequency === 'weekly') date.setDate(date.getDate() + 7);
+  else if (frequency === 'fortnightly') date.setDate(date.getDate() + 14);
+  else date.setMonth(date.getMonth() + 1);
+  return date;
+}
+
+function propHeaders(): HeadersInit {
+  const token = localStorage.getItem('authToken');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+export default function PropertyTerminal() {
+  const queryClient = useQueryClient();
+
+  /* State */
+  const [screen, setScreen]               = useState<PropertyTerminalScreen>('home');
+  const [selectedTenant, setSelectedTenant] = useState<any>(null);
+  const [amount, setAmount]               = useState(0);
+  const [conveyor, setConveyor]           = useState<any>(null);
+  const [contentKey, setContentKey]       = useState(0);
+  const [toastMsg, setToastMsg]           = useState<string | null>(null);
+  const [banner, setBanner]               = useState<string | null>(null);
+  const [successLabel, setSuccessLabel]   = useState('');
+  const [frequency, setFrequency]         = useState('once');
+  const [splitMode, setSplitMode]         = useState(false);
+  const [busyScheduleId, setBusyScheduleId] = useState<string | null>(null);
+  // When send/external/bill is tapped from subbar without a tenant, remember where to go after selection
+  const [pendingDest, setPendingDest]     = useState<'send' | 'external' | 'bill' | null>(null);
+  // Which screen the amount keypad returns to ('send' for rent, 'bill' for a charge)
+  const [amountDest, setAmountDest]       = useState<'send' | 'bill'>('send');
+  const [successKind, setSuccessKind]     = useState<'rent' | 'bill'>('rent');
+  // Charge (Bill) draft state — lives in the parent so it survives the keypad round-trip
+  const [chargeType, setChargeType]       = useState<string | null>(null);
+  const [chargeLabel, setChargeLabel]     = useState('');
+  const [dueSel, setDueSel]               = useState(7);
+  // Optional invoice document attached to a one-off charge (uploaded ahead of send).
+  const [chargeDocUrl, setChargeDocUrl]   = useState<string | null>(null);
+  const [chargeDocName, setChargeDocName] = useState<string>('');
+  const [uploadingDoc, setUploadingDoc]   = useState(false);
+  // Tapped invoice row → action sheet (resend / mark received / cancel).
+  const [rowAction, setRowAction]         = useState<any>(null);
+  // Active-stack status filter + reminder mode (deep-linked from the dashboard).
+  const [stackFilter, setStackFilter]     = useState<'all' | 'overdue' | 'sent' | 'paid' | 'failed'>('all');
+  const [remindMode, setRemindMode]       = useState(false);
+  const [feedOpen, setFeedOpen]           = useState(false); // rent-request feed pulled to the top of the page
+  const conveyorTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  /* Data — shared hooks so the stack, dashboard chart, and analytics all read
+     the same cache entry and refresh together */
+  const { data: tenants = [] } = usePropertyTenants();
+  const { data: invoices = [] } = usePropertyInvoices();
+
+  const { data: schedules = [] } = useQuery<any[]>({
+    queryKey: ['/api/property/schedules'],
+    queryFn: () => propFetch('/api/property/schedules').then(r => r.ok ? r.json() : []),
+    staleTime: 30000, retry: false,
+  });
+
+  const { data: reminderSettings } = useQuery<any>({
+    queryKey: ['/api/property/reminder-settings'],
+    queryFn: () => propFetch('/api/property/reminder-settings').then(r => r.ok ? r.json() : null),
+    staleTime: 60000, retry: false,
+  });
+
+  /* Mutations */
+  const sendMutation = useMutation({
+    mutationFn: async ({ tenantId, amountCents, channel, freq, split }: any) => {
+      const now = new Date();
+      const due = new Date(now); due.setDate(due.getDate() + 7);
+      // 1. Send the first request immediately
+      const r = await fetch('/api/property/invoices', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...propHeaders() },
+        body: JSON.stringify({ tenantProfileId: tenantId, amountCents, deliveryChannel: channel, dueAt: due.toISOString(), splitEnabled: !!split }),
+      });
+      if (!r.ok) {
+        notifyIfBillingCardRequired(r);
+        const message = await r.json().then((data: any) => data.message).catch(() => 'Failed to send');
+        throw new Error(message);
+      }
+      const invoice = await r.json();
+      // 2. If recurring, set up the automation starting one interval from now
+      if (freq && freq !== 'once') {
+        const startDate = addInterval(now, freq);
+        const sr = await fetch(`/api/property/tenants/${tenantId}/schedules`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', ...propHeaders() },
+          body: JSON.stringify({ amountCents, frequency: freq, deliveryChannel: channel, startDate: startDate.toISOString() }),
+        });
+        if (!sr.ok) {
+          notifyIfBillingCardRequired(sr);
+          throw new Error('Sent, but failed to set up automation');
+        }
+      }
+      return invoice;
+    },
+    onSuccess: (_, vars: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/property/invoices'] });
+      if (vars?.freq && vars.freq !== 'once') queryClient.invalidateQueries({ queryKey: ['/api/property/schedules'] });
+      setSuccessLabel(selectedTenant?.email || selectedTenant?.phone || '');
+      setSuccessKind('rent');
+      setContentKey(k => k + 1);
+      setScreen('success');
+      setFrequency('once');
+      setSplitMode(false);
+    },
+    onError: (err: any) => { toast(err?.message || 'Failed to send'); },
+  });
+
+  const billMutation = useMutation({
+    mutationFn: async ({ tenantId, amountCents, channel, chargeType, description, dueDays, split, documentUrl, documentName }: any) => {
+      const due = new Date(); due.setDate(due.getDate() + (dueDays || 0));
+      const r = await fetch('/api/property/invoices', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...propHeaders() },
+        body: JSON.stringify({
+          tenantProfileId: tenantId, amountCents, deliveryChannel: channel,
+          dueAt: due.toISOString(), splitEnabled: !!split,
+          kind: 'charge', chargeType, description, documentUrl, documentName,
+        }),
+      });
+      if (!r.ok) {
+        notifyIfBillingCardRequired(r);
+        const msg = await r.json().then((d: any) => d.message).catch(() => 'Failed to send bill');
+        throw new Error(msg);
+      }
+      return r.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/property/invoices'] });
+      setSuccessLabel(selectedTenant?.email || selectedTenant?.phone || '');
+      setSuccessKind('bill');
+      setContentKey(k => k + 1);
+      setScreen('success');
+      setSplitMode(false);
+      setChargeDocUrl(null); setChargeDocName('');
+    },
+    onError: (err: any) => { toast(err?.message || 'Failed to send bill'); },
+  });
+
+  const scheduleActionMutation = useMutation({
+    mutationFn: async ({ id, action, status }: any) => {
+      setBusyScheduleId(id);
+      const r = action === 'cancel'
+        ? await fetch(`/api/property/schedules/${id}`, { method: 'DELETE', headers: propHeaders() })
+        : await fetch(`/api/property/schedules/${id}`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json', ...propHeaders() },
+            body: JSON.stringify({ status }),
+          });
+      if (!r.ok) throw new Error('Action failed');
+      return r.json();
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/property/schedules'] }); },
+    onError: () => { toast('Could not update automation'); },
+    onSettled: () => { setBusyScheduleId(null); },
+  });
+
+  const reminderMutation = useMutation({
+    mutationFn: async (patch: any) => {
+      const r = await fetch('/api/property/reminder-settings', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json', ...propHeaders() },
+        body: JSON.stringify(patch),
+      });
+      if (!r.ok) throw new Error('Failed to save');
+      return r.json();
+    },
+    onMutate: async (patch: any) => {
+      await queryClient.cancelQueries({ queryKey: ['/api/property/reminder-settings'] });
+      const prev = queryClient.getQueryData(['/api/property/reminder-settings']);
+      queryClient.setQueryData(['/api/property/reminder-settings'], (old: any) => ({ ...(old || {}), ...patch }));
+      return { prev };
+    },
+    onError: (_e, _v, ctx: any) => {
+      if (ctx?.prev !== undefined) queryClient.setQueryData(['/api/property/reminder-settings'], ctx.prev);
+      toast('Could not save reminders');
+    },
+    onSuccess: (data: any) => { queryClient.setQueryData(['/api/property/reminder-settings'], data); },
+  });
+
+  const markMutation = useMutation({
+    mutationFn: async ({ invoiceId, ref }: any) => {
+      const r = await fetch(`/api/property/invoices/${invoiceId}/mark-paid-external`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...propHeaders() },
+        body: JSON.stringify({ externalPaymentReference: ref || null }),
+      });
+      if (!r.ok) throw new Error('Failed to mark');
+      return r.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/property/invoices'] });
+      setBanner('Marked as received');
+      triggerConveyor(screen, 'down');
+      setScreen('home');
+      setSelectedTenant(null);
+    },
+  });
+
+  const batchMutation = useMutation({
+    mutationFn: async (tenantIds: string[]) => {
+      const LIVE = ['pending_dispatch', 'dispatched', 'overdue', 'dispatch_failed'];
+      const outcomes = await Promise.all(tenantIds.map(async (tid) => {
+        // Resend the tenant's existing live invoice — never create a duplicate.
+        const inv = [...(invoices as any[])]
+          .filter(i => i.tenantProfileId === tid && LIVE.includes(i.status))
+          .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+        if (!inv) return 'skipped';
+        try {
+          const r = await fetch(`/api/property/invoices/${inv.id}/resend`, { method: 'POST', headers: propHeaders() });
+          return r.ok ? 'sent' : 'failed';
+        } catch { return 'failed'; }
+      }));
+      return outcomes;
+    },
+    onSuccess: (outcomes: string[]) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/property/invoices'] });
+      const sent = outcomes.filter(o => o === 'sent').length;
+      const skipped = outcomes.filter(o => o === 'skipped').length;
+      const failed = outcomes.filter(o => o === 'failed').length;
+      const parts = [`Resent ${sent}`];
+      if (skipped) parts.push(`${skipped} skipped`);
+      if (failed) parts.push(`${failed} failed`);
+      setBanner(parts.join(' · '));
+      triggerConveyor(screen, 'down');
+      setScreen('home');
+    },
+    onError: () => { toast('Batch resend failed'); },
+  });
+
+  // Cancel (void) a single invoice/charge — from the row action sheet.
+  const voidMutation = useMutation({
+    mutationFn: async (invoiceId: string) => {
+      const r = await fetch(`/api/property/invoices/${invoiceId}/void`, { method: 'POST', headers: propHeaders() });
+      if (!r.ok) {
+        const msg = await r.json().then((d: any) => d.message).catch(() => 'Failed to cancel');
+        throw new Error(msg);
+      }
+      return r.json();
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/property/invoices'] }); setBanner('Invoice cancelled'); },
+    onError: (e: any) => { toast(e?.message || 'Could not cancel invoice'); },
+  });
+
+  // Resend a single invoice's link — from the row action sheet.
+  const resendOneMutation = useMutation({
+    mutationFn: async (invoiceId: string) => {
+      const r = await fetch(`/api/property/invoices/${invoiceId}/resend`, { method: 'POST', headers: propHeaders() });
+      if (!r.ok) throw new Error('Failed to resend');
+      return r.json();
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/property/invoices'] }); setBanner('Link resent'); },
+    onError: () => { toast('Could not resend link'); },
+  });
+
+  /* Helpers */
+  const toast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 1600); };
+  const unpaid = (invoices as any[])
+    .filter((i: any) => ['pending_dispatch', 'dispatched', 'overdue', 'dispatch_failed'].includes(i.status));
+  const owing = (list: any[]) => list.reduce((s: number, i: any) => s + (i.owingCents ?? i.amountCents ?? 0), 0);
+  const outstanding = owing(unpaid.filter((i: any) => i.kind !== 'charge'));
+  const outstandingExpenses = owing(unpaid.filter((i: any) => i.kind === 'charge'));
+
+  const triggerConveyor = (prevId: PropertyTerminalScreen, dir: string) => {
+    setConveyor({ prevId, dir });
+    clearTimeout(conveyorTimer.current);
+    conveyorTimer.current = setTimeout(() => setConveyor(null), 650);
+  };
+
+  const go = (next: PropertyTerminalScreen, dir = 'up') => {
+    if (next === 'home') {
+      triggerConveyor(screen, dir);
+      setScreen('home');
+      setSelectedTenant(null);
+      setAmount(0);
+      setFrequency('once');
+      setSplitMode(false);
+      setPendingDest(null);
+      setAmountDest('send');
+      setChargeType(null);
+      setChargeLabel('');
+      setDueSel(7);
+      setChargeDocUrl(null);
+      setChargeDocName('');
+      return;
+    }
+    // Send/External with no tenant: remember destination, go to tenant picker
+    if ((next === 'send' || next === 'external') && !selectedTenant) {
+      setPendingDest(next as 'send' | 'external');
+      if (screen === 'home') triggerConveyor(screen, 'up');
+      setContentKey(k => k + 1);
+      setScreen('tenants');
+      return;
+    }
+    if (screen === 'home') triggerConveyor(screen, dir);
+    setContentKey(k => k + 1);
+    setScreen(next);
+  };
+
+  /* Dashboard deep links: ?screen=tenants|bill → jump into that flow;
+     ?stack=overdue → home stack pre-filtered; &remind=1 → inline remind buttons.
+     Params are consumed once, then stripped so back/refresh doesn't re-trigger. */
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const scr = params.get('screen');
+    const stack = params.get('stack');
+    if (!scr && !stack) return;
+    if (scr === 'tenants') {
+      go('tenants');
+    } else if (scr === 'bill') {
+      // Mirror handleSubbarPick's no-tenant bill path: pick a tenant first, then bill.
+      setPendingDest('bill');
+      triggerConveyor('home', 'up');
+      setContentKey(k => k + 1);
+      setScreen('tenants');
+    }
+    if (stack === 'overdue') setStackFilter('overdue');
+    if (params.get('remind') === '1') setRemindMode(true);
+    // Strip the params only once this instance survives: during the route
+    // transition (Suspense + AnimatePresence) the first mount can be discarded
+    // along with its state — stripping there starves the real mount.
+    const strip = setTimeout(() => window.history.replaceState({}, '', window.location.pathname), 800);
+    return () => clearTimeout(strip);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleTenantSelect = (t: any, preAmount: number) => {
+    setSelectedTenant(t);
+    setContentKey(k => k + 1);
+    // Go to the screen the user originally intended (send / external / bill), default send
+    const dest = pendingDest || 'send';
+    setPendingDest(null);
+    if (dest === 'bill') {
+      // A charge is a fresh amount — start at the keypad, then land on the bill configurator.
+      setChargeType(null); setChargeLabel(''); setDueSel(7); setAmount(0);
+      setChargeDocUrl(null); setChargeDocName('');
+      setAmountDest('bill');
+      setScreen('amount');
+      return;
+    }
+    setAmount(preAmount);
+    setScreen(dest);
+  };
+
+  // Begin a charge for the already-selected tenant (from the subbar Bill tab).
+  const startBill = () => {
+    setChargeType(null); setChargeLabel(''); setDueSel(7); setAmount(0);
+    setChargeDocUrl(null); setChargeDocName('');
+    setAmountDest('bill');
+    if (screen === 'home') triggerConveyor(screen, 'up');
+    setContentKey(k => k + 1);
+    setScreen('amount');
+  };
+
+  // Upload the chosen invoice document, stashing the returned URL + name so the
+  // next send attaches them. Runs immediately on file pick for instant feedback.
+  const uploadChargeDoc = async (file: File) => {
+    if (file.size > 20 * 1024 * 1024) { toast('file must be under 20MB'); return; }
+    setUploadingDoc(true);
+    try {
+      const fd = new FormData();
+      fd.append('document', file);
+      const r = await fetch('/api/property/invoices/document', { method: 'POST', headers: propHeaders(), body: fd });
+      if (!r.ok) {
+        const msg = await r.json().then((d: any) => d.message).catch(() => 'Upload failed');
+        throw new Error(msg);
+      }
+      const { documentUrl, documentName } = await r.json();
+      setChargeDocUrl(documentUrl);
+      setChargeDocName(documentName || file.name);
+    } catch (err: any) {
+      toast(err?.message || 'Failed to upload document');
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  const clearChargeDoc = () => { setChargeDocUrl(null); setChargeDocName(''); };
+
+  const handleBill = () => {
+    if (!selectedTenant) { toast('choose a tenant'); return; }
+    if (amount === 0) { toast('set an amount first'); return; }
+    if (!chargeType) { toast('choose what this is for'); return; }
+    const typeDef = CHARGE_TYPES.find(c => c.id === chargeType);
+    const description = (chargeLabel || typeDef?.preset || '').trim();
+    if (!description) { toast('add a description'); return; }
+    billMutation.mutate({
+      tenantId: selectedTenant.id, amountCents: amount,
+      channel: selectedTenant.preferredChannel || 'email',
+      chargeType, description, dueDays: dueSel, split: splitMode,
+      documentUrl: chargeDocUrl || undefined, documentName: chargeDocName || undefined,
+    });
+  };
+
+  // Tapping a request row opens the action sheet (resend / mark received / cancel)
+  // — never routes a charge into the rent send flow.
+  const handleRowTap = (inv: any) => { setRowAction(inv); };
+
+  // "edit amount & resend" from the sheet — opens the rent send screen pre-filled.
+  const openEditResend = () => {
+    const inv = rowAction;
+    setRowAction(null);
+    if (!inv) return;
+    const t = (tenants as any[]).find(x => x.id === inv.tenantProfileId);
+    if (t) {
+      setSelectedTenant(t);
+      setAmount(inv.amountCents ?? 0);
+      triggerConveyor('home', 'up');
+      setContentKey(k => k + 1);
+      setScreen('send');
+    }
+  };
+
+  const handleVoid = () => {
+    const inv = rowAction;
+    if (!inv) return;
+    if (window.confirm('Cancel this invoice? The tenant will no longer be able to pay it. This cannot be undone.')) {
+      voidMutation.mutate(inv.id);
+      setRowAction(null);
+    }
+  };
+
+  const handleSend = () => {
+    if (!selectedTenant || amount === 0) { toast('set an amount first'); return; }
+    sendMutation.mutate({ tenantId: selectedTenant.id, amountCents: amount, channel: selectedTenant.preferredChannel || 'email', freq: frequency, split: splitMode });
+  };
+
+  const handleMark = (invoiceId: string, ref: string) => {
+    markMutation.mutate({ invoiceId, ref });
+  };
+
+  const handleBatch = (ids: string[]) => {
+    batchMutation.mutate(ids);
+  };
+
+  const handlePauseResume = (s: any) => {
+    scheduleActionMutation.mutate({ id: s.id, action: 'status', status: s.status === 'paused' ? 'active' : 'paused' });
+  };
+
+  const handleCancelSchedule = (s: any) => {
+    scheduleActionMutation.mutate({ id: s.id, action: 'cancel' });
+  };
+
+  /* Subbar → go shortcut (only when no tenant → redirect to tenants) */
+  const handleSubbarPick = (i: number) => {
+    const dest = SUBBAR_ROUTE[i];
+    if (!dest || dest === screen) return;
+    // Bill: with a tenant, jump straight into a fresh charge (keypad → configurator);
+    // without one, remember the intent and pick a tenant first.
+    if (dest === 'bill') {
+      if (!selectedTenant) {
+        setPendingDest('bill');
+        if (screen === 'home') triggerConveyor(screen, 'up');
+        setContentKey(k => k + 1);
+        setScreen('tenants');
+      } else {
+        startBill();
+      }
+      return;
+    }
+    // Always open the tapped tab's own page. Send/External screens handle the
+    // no-tenant case themselves (they show a "choose a tenant" prompt); we just
+    // remember the intent so picking a tenant returns the user to the right page.
+    if ((dest === 'send' || dest === 'external') && !selectedTenant) setPendingDest(dest);
+    if (screen === 'home') triggerConveyor(screen, 'up');
+    setContentKey(k => k + 1);
+    setFeedOpen(false); // leaving home always lands back on the resting layout
+    setScreen(dest);
+  };
+
+  return <>
+    <style>{PROPERTY_TERMINAL_FONT_CSS}</style>
+    <PropertyTerminalView
+    screen={screen}
+    contentKey={contentKey}
+    conveyor={conveyor}
+    tenants={tenants as any[]}
+    invoices={invoices as any[]}
+    schedules={schedules}
+    outstanding={outstanding}
+    outstandingExpenses={outstandingExpenses}
+    selectedTenant={selectedTenant}
+    amount={amount}
+    amountDest={amountDest}
+    frequency={frequency}
+    splitMode={splitMode}
+    chargeType={chargeType}
+    chargeLabel={chargeLabel}
+    dueSel={dueSel}
+    chargeDocUrl={chargeDocUrl}
+    chargeDocName={chargeDocName}
+    uploadingDoc={uploadingDoc}
+    reminderSettings={reminderSettings}
+    busyScheduleId={busyScheduleId}
+    stackFilter={stackFilter}
+    remindMode={remindMode}
+    remindBusyId={resendOneMutation.isPending ? (resendOneMutation.variables as string) : null}
+    feedOpen={feedOpen}
+    successLabel={successLabel}
+    successKind={successKind}
+    banner={banner}
+    toastMessage={toastMsg}
+    rowAction={rowAction}
+    busy={{
+      send: sendMutation.isPending,
+      bill: billMutation.isPending,
+      mark: markMutation.isPending,
+      batch: batchMutation.isPending,
+      row: voidMutation.isPending || resendOneMutation.isPending || markMutation.isPending,
+    }}
+    onNavigate={go}
+    onTenantSelect={handleTenantSelect}
+    onAmountCommit={(amountCents, destination) => {
+      setAmount(amountCents);
+      go(destination);
+    }}
+    onEditAmount={(destination) => {
+      setAmountDest(destination);
+      go('amount');
+    }}
+    onSendRent={handleSend}
+    onSendBill={handleBill}
+    onFrequencyChange={setFrequency}
+    onToggleSplit={() => setSplitMode(mode => !mode)}
+    onChargeTypeChange={setChargeType}
+    onChargeLabelChange={setChargeLabel}
+    onDueChange={setDueSel}
+    onUploadDocument={uploadChargeDoc}
+    onClearDocument={clearChargeDoc}
+    onStackFilterChange={setStackFilter}
+    onRemind={(invoiceId) => resendOneMutation.mutate(invoiceId)}
+    onToggleFeed={() => setFeedOpen(open => !open)}
+    onRowTap={handleRowTap}
+    onMarkExternal={handleMark}
+    onBatchSend={handleBatch}
+    onPauseResume={handlePauseResume}
+    onCancelSchedule={handleCancelSchedule}
+    onUpdateReminders={(patch) => reminderMutation.mutate(patch)}
+    onSubbarPick={handleSubbarPick}
+    onCloseRow={() => setRowAction(null)}
+    onEditResend={openEditResend}
+    onResendRow={() => {
+      resendOneMutation.mutate(rowAction.id);
+      setRowAction(null);
+    }}
+    onMarkRowReceived={() => {
+      markMutation.mutate({ invoiceId: rowAction.id, ref: '' });
+      setRowAction(null);
+    }}
+      onVoidRow={handleVoid}
+    />
+  </>;
+}

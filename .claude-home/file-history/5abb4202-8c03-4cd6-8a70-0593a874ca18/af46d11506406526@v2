@@ -1,0 +1,30 @@
+/* Throwaway: reproduce the probe's context and print which requests 403. */
+import { chromium } from "playwright";
+import { BASE_URL, newRetailPage, CHROMIUM_PATH } from "/home/runner/workspace/scripts/desktop-shots/retail-fixtures.mjs";
+
+const ROUTES = ["/", "/stock", "/terminal", "/analytics", "/settings", "/property", "/trades", "/board-builder"];
+
+const browser = await chromium.launch({ executablePath: CHROMIUM_PATH });
+const { context, page } = await newRetailPage(browser, "desktop", {
+  viewport: { width: 1440, height: 900 },
+});
+
+const bad = new Map();
+page.on("response", (r) => {
+  if (r.status() >= 400) {
+    const key = `${r.status()} ${r.request().method()} ${new URL(r.url()).pathname}`;
+    bad.set(key, (bad.get(key) ?? 0) + 1);
+  }
+});
+
+for (const route of ROUTES) {
+  await page.goto(`${BASE_URL}${route}`, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(1800);
+}
+
+console.log("\n=== non-2xx responses ===");
+for (const [k, n] of [...bad.entries()].sort()) console.log(`  ×${n}  ${k}`);
+if (!bad.size) console.log("  (none)");
+
+await context.close();
+await browser.close();

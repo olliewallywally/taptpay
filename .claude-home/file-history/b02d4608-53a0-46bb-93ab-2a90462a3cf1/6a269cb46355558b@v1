@@ -1,0 +1,533 @@
+import { useState, useEffect, useRef, useMemo } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { tradesFetch, tradesHeaders } from "@/lib/trades-api";
+import { computeQuoteTotals } from "@shared/trades-gst";
+import { TRADES_THEME } from "@/lib/trades-theme";
+import ClientProfile from "./client-profile";
+import { notifyIfBillingCardRequired } from "@/lib/queryClient";
+import {
+  QuoteView,
+  TradesTerminalView,
+  type QuoteDraftLine,
+  type TradesTerminalScreen,
+} from "@/features/terminal/trades/TradesTerminalView";
+
+/* ═══ TOKENS (trades palette via TRADES_THEME — see trades-theme.ts) ═══ */
+const NAVY  = TRADES_THEME.INK;    // charcoal base (was property NAVY)
+const BLUE  = TRADES_THEME.ACCENT; // safety amber (was property BLUE)
+const OFFW  = TRADES_THEME.OFFW;
+const GREEN = TRADES_THEME.GREEN;
+const RED   = TRADES_THEME.RED;
+
+function clientName(client: any) {
+  return client.firstName + ' ' + client.lastName;
+}
+
+const SUBBAR_ROUTE: Record<number, TradesTerminalScreen> = {
+  0: 'clients',
+  1: 'quote',
+  2: 'invoice',
+  3: 'external',
+};
+
+/* ═══ PRODUCTION QUOTE CONTROLLER ═══ */
+export function QuoteScreen({ onCancel, onExit }: { onCancel: () => void; onExit: () => void }) {
+  const queryClient = useQueryClient();
+  const [clientId, setClientId]             = useState('');
+  const [lines, setLines]                   = useState<QuoteDraftLine[]>([{ id: 1, description: '', qty: '1', unitPrice: '' }]);
+  const [depositEnabled, setDepositEnabled] = useState(false);
+  const [depositType, setDepositType]       = useState<'percent' | 'fixed'>('percent');
+  const [depositValue, setDepositValue]     = useState('20');
+  const [notes, setNotes]                   = useState('');
+  const [created, setCreated]               = useState<any>(null);
+  const [error, setError]                   = useState('');
+
+  const { data: clients = [] } = useQuery<any[]>({
+    queryKey: ['/api/trades/clients'],
+    queryFn: () => tradesFetch('/api/trades/clients').then(r => r.ok ? r.json() : []),
+  });
+  const { data: auth } = useQuery<any>({
+    queryKey: ['/api/auth/me', 'trades-quote'],
+    queryFn: () => tradesFetch('/api/auth/me').then(r => r.ok ? r.json() : null),
+  });
+
+  const gstMode = auth?.user?.tradeGstMode === 'exclusive' ? 'exclusive' : 'inclusive';
+  const totals = useMemo(() => {
+    const lineInputs = lines.map(line => ({
+      qty: Math.max(0, Number(line.qty) || 0),
+      unitPriceCents: Math.max(0, Math.round((Number(line.unitPrice) || 0) * 100)),
+    }));
+    const depositInput = depositEnabled
+      ? depositType === 'percent' ? Number(depositValue) || 0 : Math.round((Number(depositValue) || 0) * 100)
+      : undefined;
+    const computed = computeQuoteTotals(lineInputs, {
+      gstRegistered: !!auth?.user?.gstRegistered,
+      gstMode,
+      depositEnabled,
+      depositType: depositEnabled ? depositType : undefined,
+      depositValue: depositInput,
+    });
+    return { total: computed.totalCents, gst: computed.gstCents, net: computed.subtotalCents, deposit: computed.depositCents ?? 0 };
+  }, [lines, auth?.user?.gstRegistered, gstMode, depositEnabled, depositType, depositValue]);
+
+  const createQuote = useMutation({
+    mutationFn: async () => {
+      setError('');
+      const lineItems = lines.map(line => {
+        const qty = Number(line.qty);
+        const unitPriceCents = Math.round(Number(line.unitPrice) * 100);
+        return { description: line.description.trim(), qty, unitPriceCents, lineTotalCents: Math.round(qty * unitPriceCents) };
+      });
+      if (!clientId) throw new Error('Choose a client');
+      if (lineItems.some(line => !line.description || !Number.isInteger(line.qty) || line.qty <= 0 || line.unitPriceCents < 0)) throw new Error('Complete every line item');
+      const validUntil = new Date(); validUntil.setDate(validUntil.getDate() + 30);
+      const selected = clients.find((client: any) => client.id === clientId);
+      const body = {
+        clientProfileId: clientId,
+        lineItems,
+        deliveryChannel: selected?.preferredChannel || 'email',
+        depositEnabled,
+        depositType: depositEnabled ? depositType : undefined,
+        depositValue: depositEnabled ? (depositType === 'percent' ? Math.round(Number(depositValue)) : Math.round(Number(depositValue) * 100)) : undefined,
+        validUntil: validUntil.toISOString(),
+        notes: notes.trim() || undefined,
+      };
+      const response = await fetch('/api/trades/quotes', { method: 'POST', headers: { 'Content-Type': 'application/json', ...tradesHeaders() }, body: JSON.stringify(body) });
+      if (!response.ok) {
+        notifyIfBillingCardRequired(response);
+        throw new Error(await response.json().then((d: any) => d.message).catch(() => 'Could not create quote'));
+      }
+      return response.json();
+    },
+    onSuccess: quote => { queryClient.invalidateQueries({ queryKey: ['/api/trades/quotes'] }); setCreated(quote); },
+    onError: (err: any) => setError(err?.message || 'Could not create quote'),
+  });
+
+  const updateLine = (id: number, field: keyof QuoteDraftLine, value: string) => setLines(cur => cur.map(l => l.id === id ? { ...l, [field]: value } : l));
+  const gstReg = !!auth?.user?.gstRegistered;
+
+  const publicUrl = created ? `${window.location.origin}/trades/quote/${created.token}` : '';
+  const downloadPdf = async () => {
+    if (!created?.id) return;
+    const response = await fetch(`/api/trades/quotes/${created.id}/pdf`, { headers: tradesHeaders() });
+    if (!response.ok) { setError(await response.json().then((d: any) => d.message).catch(() => 'Could not download PDF')); return; }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url; link.download = `quote-${String(created.token || created.id).slice(0, 8)}.pdf`; link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <QuoteView
+      clients={clients}
+      clientId={clientId}
+      lines={lines}
+      depositEnabled={depositEnabled}
+      depositType={depositType}
+      depositValue={depositValue}
+      notes={notes}
+      created={created}
+      error={error}
+      gstRegistered={gstReg}
+      gstMode={gstMode}
+      totals={totals}
+      publicUrl={publicUrl}
+      isCreating={createQuote.isPending}
+      onClientIdChange={setClientId}
+      onLineChange={updateLine}
+      onRemoveLine={(id) => setLines(current => current.filter(line => line.id !== id))}
+      onAddLine={() => setLines(current => [...current, { id: Date.now(), description: '', qty: '1', unitPrice: '' }])}
+      onDepositEnabledChange={setDepositEnabled}
+      onDepositTypeChange={setDepositType}
+      onDepositValueChange={setDepositValue}
+      onNotesChange={setNotes}
+      onCreate={() => createQuote.mutate()}
+      onCopyLink={() => { void navigator.clipboard?.writeText(publicUrl); }}
+      onDownloadPdf={downloadPdf}
+      onCancel={onCancel}
+      onExit={onExit}
+    />
+  );
+}
+
+/* ═══ MAIN ═══ */
+export default function TradesTerminal() {
+  const queryClient = useQueryClient();
+
+  /* State */
+  const [screen, setScreen]                 = useState<TradesTerminalScreen>('home');
+  const [selectedClient, setSelectedClient] = useState<any>(null);
+  const [amount, setAmount]                 = useState(0);
+  const [jobNote, setJobNote]               = useState('');
+  const [splitEnabled, setSplitEnabled]     = useState(false);
+  const [conveyor, setConveyor]             = useState<{ prevId: TradesTerminalScreen; dir: string } | null>(null);
+  const [contentKey, setContentKey]         = useState(0);
+  const [toastMsg, setToastMsg]             = useState<string | null>(null);
+  const [banner, setBanner]                 = useState<string | null>(null);
+  const [successLabel, setSuccessLabel]     = useState('');
+  // Quick invoice: no client required — recipient details are typed inline and
+  // the server creates a hidden 'prospect' profile behind the scenes.
+  const [quickMode, setQuickMode]           = useState(false);
+  const [recipient, setRecipient]           = useState({ name: '', email: '', phone: '', channel: 'email' as 'email' | 'sms' });
+  const [sentInvoice, setSentInvoice]       = useState<any>(null);
+  // When invoice/external is tapped from the subbar without a client, remember where to go after selection.
+  const [pendingDest, setPendingDest]       = useState<'invoice' | 'external' | null>(null);
+  // Tapped job row → action sheet (mark received / cancel).
+  const [rowAction, setRowAction]           = useState<any>(null);
+  // Tapped quote row → in-terminal client profile (never leaves the terminal page).
+  const [profileClientId, setProfileClientId] = useState<string | null>(null);
+  const conveyorTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  // Dashboard "quick invoice" tile deep-links here with ?quick=1 — jump straight
+  // into the amount keypad in quick mode (no client picker). Strip the param so
+  // refresh/back doesn't re-trigger.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('quick') === '1') {
+      setQuickMode(true);
+      setScreen('amount');
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, []);
+
+  /* Data */
+  const { data: clients = [] } = useQuery<any[]>({
+    queryKey: ['/api/trades/clients'],
+    queryFn: () => tradesFetch('/api/trades/clients').then(r => r.ok ? r.json() : []),
+    staleTime: 60000, retry: false,
+  });
+
+  const { data: rawInvoices = [] } = useQuery<any[]>({
+    queryKey: ['/api/trades/invoices'],
+    queryFn: () => tradesFetch('/api/trades/invoices').then(r => r.ok ? r.json() : []),
+    staleTime: 30000, retry: false,
+  });
+
+  const { data: rawQuotes = [] } = useQuery<any[]>({
+    queryKey: ['/api/trades/quotes'],
+    queryFn: () => tradesFetch('/api/trades/quotes').then(r => r.ok ? r.json() : []),
+    staleTime: 30000, retry: false,
+  });
+
+  // The invoices endpoint returns plain rows; decorate each with its client's name
+  // (looked up from the clients query) so the stack + action sheet can show it.
+  const clientById = (id: string) => (clients as any[]).find((c: any) => c.id === id);
+  const invoices = (rawInvoices as any[]).map((i: any) => {
+    const c = clientById(i.clientProfileId);
+    const balanceSent = i.kind === 'deposit' && (rawInvoices as any[]).some((other: any) => other.quoteId === i.quoteId && other.kind === 'balance' && other.status !== 'voided');
+    return { ...i, clientName: c ? clientName(c) : '', balanceSent };
+  });
+  const quoteRows = (rawQuotes as any[])
+    .filter((q: any) => !['accepted', 'expired'].includes(q.status))
+    .map((q: any) => {
+      const c = clientById(q.clientProfileId);
+      return { ...q, id: `quote-${q.id}`, quoteId: q.id, isQuote: true, kind: 'quote', amountCents: q.totalCents, clientName: c ? clientName(c) : '' };
+    });
+  const stackRows = [...quoteRows, ...invoices].sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  /* Mutations */
+  const invoiceMutation = useMutation({
+    mutationFn: async ({ clientId, recipient, amountCents, channel, jobDetails, splitEnabled }: any) => {
+      const due = new Date(); due.setDate(due.getDate() + 7);
+      const r = await fetch('/api/trades/invoices', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...tradesHeaders() },
+        body: JSON.stringify({
+          // Quick invoice sends inline recipient details; the server creates a
+          // hidden prospect profile. Otherwise a normal client-linked invoice.
+          ...(recipient
+            ? { recipient: { name: recipient.name, email: recipient.email || undefined, phone: recipient.phone || undefined, channel: recipient.channel } }
+            : { clientProfileId: clientId }),
+          amountCents, deliveryChannel: channel,
+          dueAt: due.toISOString(), kind: 'full',
+          jobDetails: jobDetails || undefined,
+          splitEnabled: !!splitEnabled,
+        }),
+      });
+      if (!r.ok) {
+        notifyIfBillingCardRequired(r);
+        const msg = await r.json().then((d: any) => d.message).catch(() => 'Failed to send invoice');
+        throw new Error(msg);
+      }
+      return r.json();
+    },
+    onSuccess: (data: any, vars: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/trades/invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/trades/clients'] });
+      setSplitEnabled(false);
+      setSuccessLabel(vars.recipient
+        ? (vars.recipient.email || vars.recipient.phone || '')
+        : (selectedClient?.email || selectedClient?.phone || ''));
+      setSentInvoice(data);
+      promoteMutation.reset();
+      setContentKey(k => k + 1);
+      setScreen('success');
+    },
+    onError: (err: any) => { toast(err?.message || 'Failed to send invoice'); },
+  });
+
+  // "add client" on the quick-invoice success screen — turns the hidden
+  // prospect profile into a real directory client.
+  const promoteMutation = useMutation({
+    mutationFn: async (clientProfileId: string) => {
+      const r = await fetch(`/api/trades/clients/${clientProfileId}/promote`, { method: 'POST', headers: tradesHeaders() });
+      if (!r.ok) throw new Error(await r.json().then((d: any) => d.message).catch(() => 'Could not save client'));
+      return r.json();
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/trades/clients'] }); },
+    onError: (e: any) => toast(e?.message || 'Could not save client'),
+  });
+
+  const markMutation = useMutation({
+    mutationFn: async ({ invoiceId, ref }: any) => {
+      const r = await fetch(`/api/trades/invoices/${invoiceId}/mark-paid-external`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...tradesHeaders() },
+        body: JSON.stringify({ externalPaymentReference: ref || null }),
+      });
+      if (!r.ok) throw new Error('Failed to mark');
+      return r.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/trades/invoices'] });
+      setBanner('Marked as received');
+      triggerConveyor(screen, 'down');
+      setScreen('home');
+      setSelectedClient(null);
+      setRowAction(null);
+    },
+  });
+
+  // Cancel (void) a single job invoice — from the row action sheet.
+  const voidMutation = useMutation({
+    mutationFn: async (invoiceId: string) => {
+      const r = await fetch(`/api/trades/invoices/${invoiceId}/void`, { method: 'POST', headers: tradesHeaders() });
+      if (!r.ok) throw new Error('Failed to cancel');
+      return r.json();
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/trades/invoices'] }); setBanner('Invoice cancelled'); setRowAction(null); },
+    onError: (e: any) => { toast(e?.message || 'Could not cancel'); },
+  });
+
+  const jobActionMutation = useMutation({
+    mutationFn: async ({ invoiceId, action, splitEnabled }: { invoiceId: string; action: 'send-balance' | 'complete'; splitEnabled?: boolean }) => {
+      const r = await fetch(`/api/trades/invoices/${invoiceId}/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...tradesHeaders() },
+        body: action === 'send-balance' ? JSON.stringify({ splitEnabled: !!splitEnabled }) : undefined,
+      });
+      if (!r.ok) throw new Error(await r.json().then((d: any) => d.message).catch(() => 'Action failed'));
+      return r.json();
+    },
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/trades/invoices'] });
+      setBanner(vars.action === 'send-balance' ? 'Balance invoice created' : 'Job completed');
+      setRowAction(null);
+    },
+    onError: (e: any) => toast(e?.message || 'Action failed'),
+  });
+
+  /* Helpers */
+  const toast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 1600); };
+  const outstanding = (invoices as any[])
+    .filter((i: any) => ['pending_dispatch', 'dispatched', 'viewed', 'deposit_paid', 'balance_due', 'dispatch_failed'].includes(i.status))
+    .reduce((s: number, i: any) => s + (i.amountCents ?? 0), 0);
+
+  const triggerConveyor = (prevId: TradesTerminalScreen, dir: string) => {
+    setConveyor({ prevId, dir });
+    clearTimeout(conveyorTimer.current);
+    conveyorTimer.current = setTimeout(() => setConveyor(null), 650);
+  };
+
+  const go = (next: TradesTerminalScreen, dir = 'up') => {
+    if (next === 'home') {
+      triggerConveyor(screen, dir);
+      setScreen('home');
+      setSelectedClient(null);
+      setAmount(0);
+      setJobNote('');
+      setSplitEnabled(false);
+      setPendingDest(null);
+      setQuickMode(false);
+      setRecipient({ name: '', email: '', phone: '', channel: 'email' });
+      setSentInvoice(null);
+      return;
+    }
+    // invoice/external with no client: remember destination, go to client picker
+    // (quick mode is the exception — its invoice screen takes inline details)
+    if ((next === 'invoice' || next === 'external') && !selectedClient && !(quickMode && next === 'invoice')) {
+      setPendingDest(next as 'invoice' | 'external');
+      if (screen === 'home') triggerConveyor(screen, 'up');
+      setContentKey(k => k + 1);
+      setScreen('clients');
+      return;
+    }
+    if (screen === 'home') triggerConveyor(screen, dir);
+    setContentKey(k => k + 1);
+    setScreen(next);
+  };
+
+  const handleClientSelect = (c: any) => {
+    setSelectedClient(c);
+    setQuickMode(false);
+    setContentKey(k => k + 1);
+    const dest = pendingDest || 'invoice';
+    setPendingDest(null);
+    if (dest === 'external') { setScreen('external'); return; }
+    setAmount(0);
+    setJobNote('');
+    setSplitEnabled(false);
+    setScreen('amount');
+  };
+
+  // "quick invoice · no client" from the client picker — enter quick mode.
+  const handleQuickInvoice = () => {
+    setQuickMode(true);
+    setSelectedClient(null);
+    setPendingDest(null);
+    setAmount(0);
+    setJobNote('');
+    setSplitEnabled(false);
+    setContentKey(k => k + 1);
+    setScreen('amount');
+  };
+
+  const handleRowTap = (inv: any) => {
+    if (inv.isQuote) { setProfileClientId(inv.clientProfileId); go('profile'); return; }
+    setRowAction(inv);
+  };
+
+  const handleVoid = () => {
+    const inv = rowAction;
+    if (!inv) return;
+    if (window.confirm('Cancel this invoice? The client will no longer be able to pay it. This cannot be undone.')) {
+      voidMutation.mutate(inv.id);
+    }
+  };
+
+  // Send button / FAB entry into the invoice flow.
+  const handleSend = () => {
+    if (!selectedClient) { go('clients'); return; }
+    go('invoice');
+  };
+
+  const handleSendInvoice = () => {
+    if (amount <= 0) { toast('set an amount first'); return; }
+    if (selectedClient) {
+      invoiceMutation.mutate({
+        clientId: selectedClient.id,
+        amountCents: amount,
+        channel: selectedClient.preferredChannel || 'email',
+        jobDetails: jobNote,
+        splitEnabled,
+      });
+      return;
+    }
+    if (quickMode) {
+      const missingRecipient = !recipient.name.trim()
+        || (recipient.channel === 'email' ? !recipient.email.trim() : !recipient.phone.trim());
+      if (missingRecipient) { toast('enter the customer details first'); return; }
+      invoiceMutation.mutate({
+        recipient,
+        amountCents: amount,
+        channel: recipient.channel,
+        jobDetails: jobNote,
+        splitEnabled,
+      });
+    }
+  };
+
+  const handleMark = (invoiceId: string, ref: string) => {
+    markMutation.mutate({ invoiceId, ref });
+  };
+
+  /* Subbar → go shortcut */
+  const handleSubbarPick = (i: number) => {
+    const dest = SUBBAR_ROUTE[i];
+    if (!dest || dest === screen) return;
+    if ((dest === 'invoice' || dest === 'external') && !selectedClient && !(quickMode && dest === 'invoice')) {
+      setPendingDest(dest as 'invoice' | 'external');
+      if (screen === 'home') triggerConveyor(screen, 'up');
+      setContentKey(k => k + 1);
+      setScreen('clients');
+      return;
+    }
+    if (screen === 'home') triggerConveyor(screen, 'up');
+    setContentKey(k => k + 1);
+    setScreen(dest);
+  };
+
+  return (
+    <TradesTerminalView
+      screen={screen}
+      contentKey={contentKey}
+      conveyor={conveyor}
+      clients={clients}
+      invoices={invoices}
+      stackRows={stackRows}
+      outstanding={outstanding}
+      selectedClient={selectedClient}
+      amount={amount}
+      jobNote={jobNote}
+      splitEnabled={splitEnabled}
+      quickMode={quickMode}
+      recipient={recipient}
+      allowQuickInvoice={pendingDest === 'invoice'}
+      successLabel={successLabel}
+      showAddClient={quickMode && !!sentInvoice?.clientProfileId}
+      addClientState={promoteMutation.isSuccess ? 'saved' : promoteMutation.isPending ? 'saving' : 'idle'}
+      banner={banner}
+      toastMessage={toastMsg}
+      rowAction={rowAction}
+      quoteView={<QuoteScreen onCancel={() => go('home', 'down')} onExit={() => go('home', 'down')} />}
+      profileView={<ClientProfile embedded clientId={profileClientId ?? undefined} onClose={() => go('home')} />}
+      busy={{
+        invoice: invoiceMutation.isPending,
+        mark: markMutation.isPending,
+        row: voidMutation.isPending || markMutation.isPending || jobActionMutation.isPending,
+      }}
+      onNavigate={go}
+      onClientSelect={handleClientSelect}
+      onQuickInvoice={handleQuickInvoice}
+      onAmountCommit={(amountCents) => { setAmount(amountCents); go('invoice'); }}
+      onRecipientChange={setRecipient}
+      onJobNoteChange={setJobNote}
+      onSplitEnabledChange={setSplitEnabled}
+      onSendInvoice={handleSendInvoice}
+      onEditAmount={() => go('amount')}
+      onRowTap={handleRowTap}
+      onMarkExternal={handleMark}
+      onSubbarPick={handleSubbarPick}
+      onSendShortcut={handleSend}
+      onAddClient={() => {
+        if (sentInvoice?.clientProfileId) promoteMutation.mutate(sentInvoice.clientProfileId);
+      }}
+      onCloseRow={() => setRowAction(null)}
+      onSendBalance={(rowSplitEnabled) => {
+        if (rowAction) jobActionMutation.mutate({ invoiceId: rowAction.id, action: 'send-balance', splitEnabled: rowSplitEnabled });
+      }}
+      onCompleteRow={() => {
+        if (rowAction) jobActionMutation.mutate({ invoiceId: rowAction.id, action: 'complete' });
+      }}
+      onMarkRowReceived={() => {
+        if (rowAction) markMutation.mutate({ invoiceId: rowAction.id, ref: '' });
+      }}
+      onVoidRow={handleVoid}
+    />
+  );
+}
+
+/* ═══ CSS ═══
+   Deleted in phase 2 (docs/PLAN-2026-08-17-mobile-responsive-ui.md §5.1). This
+   file used to export `TP_TERM_CSS`, a fourth unscoped copy of the terminal
+   chrome that only /trades/quote injected. Diffed rule-by-rule against
+   features/terminal/trades/trades-terminal-view.css with the TRADES_THEME
+   constants substituted: 94 of its 95 rules were identical, and the 95th —
+   `.tp-send-slot.show` — was the one the scoped sheet was missing, so it moved
+   there rather than being lost.
+
+   It also carried the app's only request for Outfit 800/900
+   (`@import url(fonts.googleapis.com/...&wght@...800;900)`). index.css and
+   index.html both stop at 700, so /trades/quote was the one route rendering
+   `.tp-amount` in a real 800 while /trades/terminal synthesised it. Removing
+   the import makes the two routes agree; loading the weights properly is MD6,
+   which phase 3's goldens depend on. */
+

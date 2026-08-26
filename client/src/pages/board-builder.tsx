@@ -295,9 +295,9 @@ export default function BoardBuilder() {
   }, [merchantId, setLocation]);
 
   const merchantQuery = useQuery<MerchantData>({
-    queryKey: ["/api/merchants", merchantId],
+    queryKey: ["/api/merchants", merchantId, "profile"],
     queryFn: async () => {
-      const res = await fetch(`/api/merchants/${merchantId}`, {
+      const res = await fetch(`/api/merchants/${merchantId}/profile`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error("Failed to fetch merchant");

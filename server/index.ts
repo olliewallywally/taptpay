@@ -1,4 +1,4 @@
-import express, { type Request, Response, NextFunction } from "express";
+import express from "express";
 import fs from "fs";
 import path from "path";
 import helmet from "helmet";
@@ -14,6 +14,8 @@ import {
   setupGracefulShutdown, 
   getPortConflictHelp 
 } from "./port-manager";
+import { createRequestLogger } from "./request-log";
+import { createGlobalErrorHandler } from "./http-error-handler";
 
 const app = express();
 
@@ -57,6 +59,25 @@ app.use(helmet({
 // very small payloads (< 1 KB) where compression overhead outweighs savings.
 app.use(compression({ threshold: 1024 }));
 
+// Bearer-addressed payment pages must not leak their URL through browser
+// referrers or shared caches. This runs before Vite/static fallback, so the HTML
+// document receives the policy before any checkout script is loaded.
+app.use((req, res, next) => {
+  if (
+    req.path === "/accept-invite" ||
+    /^\/(?:pay|split|checkout|receipt)\/t\//.test(req.path) ||
+    /^\/pay\/return\//.test(req.path) ||
+    /^\/api\/pay\/(?:t|return)\//.test(req.path)
+  ) {
+    res.set({
+      "Cache-Control": "private, no-store",
+      Pragma: "no-cache",
+      "Referrer-Policy": "no-referrer",
+    });
+  }
+  next();
+});
+
 // Skip JSON parsing for webhook routes to preserve raw body for signature verification
 app.use((req, res, next) => {
   if (req.path === '/api/windcave/notification') {
@@ -68,35 +89,7 @@ app.use((req, res, next) => {
 
 app.use(express.urlencoded({ extended: false }));
 
-app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
-
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
-      log(logLine);
-    }
-  });
-
-  next();
-});
+app.use(createRequestLogger(log));
 
 (async () => {
   // ── JWT_SECRET validation ────────────────────────────────────────────────
@@ -137,6 +130,21 @@ app.use((req, res, next) => {
     }
   }
 
+  // ── Read-only migration gate ─────────────────────────────────────────────
+  // Production must never accept traffic against pending, drifted, orphaned,
+  // or out-of-order schema history. Development reports the same issues loudly.
+  try {
+    const { reportPendingMigrations } = await import("./migrate");
+    await reportPendingMigrations({ failOnIssues: isProduction });
+  } catch (error) {
+    if (isProduction) {
+      console.error("[FATAL] Database migration gate failed.");
+      console.error(error);
+      process.exit(1);
+    }
+    log(`⚠️  Migration check unavailable (non-fatal in development): ${error}`);
+  }
+
   // ── Schema push (drizzle-kit push) ───────────────────────────────────────
   // Never run schema sync as a normal app-start side effect. The trades branch
   // must use reviewed additive SQL, and drizzle-kit push can propose destructive
@@ -147,7 +155,11 @@ app.use((req, res, next) => {
   // a non-zero exit code instead of silently destroying live data. If you need
   // to apply schema changes, run `npm run db:push` manually after reviewing
   // exactly what will be changed, or start with RUN_SCHEMA_PUSH=true.
-  const runSchemaPush = process.env.RUN_SCHEMA_PUSH === 'true' || process.env.RUN_MIGRATIONS === 'true';
+  if (process.env.RUN_MIGRATIONS === 'true') {
+    console.error('[FATAL] RUN_MIGRATIONS is retired; run `npm run db:migrate` as a deliberate deploy step.');
+    process.exit(1);
+  }
+  const runSchemaPush = process.env.RUN_SCHEMA_PUSH === 'true';
   if (isDatabaseConnected() && runSchemaPush) {
     log('Running schema push to sync database...');
     try {
@@ -180,29 +192,6 @@ app.use((req, res, next) => {
     }
   }
 
-  // Consolidated signup KYC fields. This is an additive, idempotent migration
-  // and intentionally lives outside drizzle-kit push so production deploys do
-  // not require RUN_SCHEMA_PUSH for these non-destructive columns.
-  if (isDatabaseConnected()) {
-    try {
-      const pgDb = getDb();
-      if (pgDb) {
-        await pgDb.execute(sql`
-          ALTER TABLE merchants
-            ADD COLUMN IF NOT EXISTS business_description text,
-            ADD COLUMN IF NOT EXISTS website_url text,
-            ADD COLUMN IF NOT EXISTS estimated_annual_turnover text
-        `);
-        log("✅ Merchant signup KYC columns ready");
-      }
-    } catch (error) {
-      if (isProduction) {
-        console.error("FATAL: Failed to prepare merchant signup KYC columns:", error);
-        process.exit(1);
-      }
-      log(`⚠️ Failed to prepare merchant signup KYC columns: ${error}`);
-    }
-  }
 
   const server = await registerRoutes(app);
 
@@ -223,50 +212,6 @@ app.use((req, res, next) => {
     log(`⚠️ Failed to sync verified merchants: ${error}`);
   }
 
-  // Ensure info_pack_leads table exists (additive migration, safe to re-run)
-  if (isDatabaseConnected()) {
-    try {
-      const { getDb } = await import("./database");
-      const { sql } = await import("drizzle-orm");
-      const pgDb = getDb();
-      if (pgDb) {
-        await pgDb.execute(sql`
-          CREATE TABLE IF NOT EXISTS info_pack_leads (
-            id serial PRIMARY KEY,
-            name text NOT NULL,
-            email text NOT NULL,
-            created_at timestamp DEFAULT now()
-          )
-        `);
-        log("✅ info_pack_leads table ready");
-      }
-    } catch (error) {
-      log(`⚠️ Failed to ensure info_pack_leads table: ${error}`);
-    }
-  }
-
-  // Ensure uploaded_files table exists (additive migration, safe to re-run).
-  // Merchant logos and invoice documents are stored here instead of the local
-  // filesystem, which is wiped on every autoscale deploy/restart.
-  if (isDatabaseConnected()) {
-    try {
-      const pgDb = getDb();
-      if (pgDb) {
-        await pgDb.execute(sql`
-          CREATE TABLE IF NOT EXISTS uploaded_files (
-            id serial PRIMARY KEY,
-            path text NOT NULL UNIQUE,
-            mime_type text NOT NULL,
-            data bytea NOT NULL,
-            created_at timestamp DEFAULT now() NOT NULL
-          )
-        `);
-        log("✅ uploaded_files table ready");
-      }
-    } catch (error) {
-      log(`⚠️ Failed to ensure uploaded_files table: ${error}`);
-    }
-  }
 
   // Dev-only automatic DB backups: snapshot both databases (workspace helium +
   // production Neon) on every boot and then daily, via pg_dump into db-backups/.
@@ -289,38 +234,8 @@ app.use((req, res, next) => {
     }
   }
 
-  // Mark all pre-existing verified/active merchants as onboarding completed
-  // so they aren't forced through the new onboarding flow
-  if (isDatabaseConnected()) {
-    try {
-      const { db } = await import("./db");
-      const { merchants } = await import("../shared/schema");
-      const { eq, or } = await import("drizzle-orm");
-      await db.update(merchants)
-        .set({ onboardingCompleted: true })
-        .where(
-          or(
-            eq(merchants.status, 'verified'),
-            eq(merchants.status, 'active')
-          )
-        );
-      log("✅ Existing verified merchants marked as onboarding completed");
-    } catch (error) {
-      log(`⚠️ Failed to mark existing merchants as onboarded: ${error}`);
-    }
-  }
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    if (!res.headersSent) {
-      res.status(status).json({ message });
-    }
-    // Log instead of re-throwing: a re-thrown error here escapes Express and
-    // (combined with process-level handlers) previously took the server down.
-    console.error("[EXPRESS_ERROR]", err);
-  });
+  app.use(createGlobalErrorHandler());
 
 
   const CRAWLER_UA_PATTERN = /bot|crawl|spider|slurp|facebookexternalhit|linkedinbot|twitterbot|whatsapp|telegram|pinterest|googlebot|bingbot|yandex|baiduspider|duckduckbot|applebot|ia_archiver|semrush|ahrefs|mj12bot/i;

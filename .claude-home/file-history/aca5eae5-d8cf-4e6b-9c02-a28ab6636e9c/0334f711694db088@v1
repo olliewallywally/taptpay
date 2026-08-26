@@ -1,0 +1,22 @@
+- [TaptPay design language](taptpay-design-language.md) — landing page is the user's own PR #2 design; they prefer implementing their concrete designs over Claude designing from a brief
+- [Trades vertical project](trades-vertical-project.md) — building 3rd vertical (Trades) mirroring Property; approved spec + key decisions
+- [Trades branch git state](trades-branch-git-state.md) — split-bill work safe in a single stash; restore steps
+- [DB schema drift & FK sequences](db-schema-drift-fk-sequences.md) — latent bug: FK cols have rogue auto-increment; never db:push from main-based branch
+- [Split-bill cross-vertical](split-bill-cross-vertical.md) — shipped to PR 2026-06-27; merchant-gated split to trades + neutral wording; webview verify still owed
+- [Bug audit 2026-07-07](audit-2026-07-07-bugfixes.md) — fixed IDORs, debug backdoors, Windcave double-charge, jest config; remaining flaws + plan
+- [Security audit 2026-07-12](audit-2026-07-12-security.md) — fixed C1 merchant-secret leak (crit), C2 onboarding IDOR, C3 SSE cross-tenant leak (dual-payload), C4 refund race, C5 cron race — all committed + verified live
+- [Report gen integration](report-gen-integration.md) — Task #59 COMPLETE: 11 reports live in 5 pages, PDF engine lazy-chunked, all PDFs/CSVs verified headlessly; committed (verified 2026-07-13)
+- [App perf & loading](app-perf-loading.md) — slow-load root cause: 3.5MB eager catch-all vendor chunk; fix plan + progress
+- [Checkout redesign handoff](checkout-redesign-handoff.md) — all stages built; real-mode E2E done 2026-07-11, 2 quote bugs fixed, live app de-mocked to production-only (landing phone demo kept)
+- [Dev server single instance](dev-server-single-instance.md) — only ONE dev server on :5000; workflow does NOT auto-restart (supervisor loop added); two servers → HMR token clash overlay
+- [Server crash hardening](server-crash-hardening.md) — root cause of "keeps crashing/timing out": unhandledRejection → process.exit + no workflow restart; both fixed 2026-07-11, committed
+- [Quick invoice & PageTransition fix](quickinv-pagetransition-fix.md) — quick-invoice + directory redesign verified E2E; PageTransition double-mounted every page (fixed via Switch location pin), committed
+- [Data persistence topology](data-persistence-topology.md) — prod=Neon (durable), dev=helium (Replit-forked ~06-30, divergent); uploads moved to Postgres + auto pg_dump backups (2026-07-13)
+- [Playwright nix chromium](playwright-nix-chromium.md) — bundled chromium broken (libnspr4); use nix-store executablePath + minted JWT for merchant 22
+- [UI consistency plan 2026-07-12](ui-consistency-plan-2026-07-12.md) — 5-item plan (charts, widths, navy bleed, stock page, analytics drag), order 5→2→3→4→1, commit+memory per step
+- [HEAD broken, stash@{1} was the fix](head-broken-stash1-fix.md) — RESOLVED as 2565a68: c350644 committed callers without implementations (incl. SSE revoke path)
+- [Landing phone demo status](landing-phone-demo-status.md) — demo BUILT + WIRED IN (28e8b96), blank screen fixed, verified at 3 viewports; P2 (delete Three.js) remains
+- [git stash hides untracked files](git-stash-hides-untracked.md) — stash^3 is invisible to `stash show` and `log --all`; check it before declaring work missing
+- [Desktop transitions work](desktop-transitions-work.md) — 666b898 shipped the transitions but FAILS its own P0 gate; a7d15a3 fixes it (lazy chrome), fully verified
+- [Landing pricing repositioning](landing-pricing-repositioning.md) — site still sells retired 10¢/0.3% pricing; the $0-per-transaction subscription rewrite is stuck in stash@{1}
+- [Landing phone realism WIP](landing-phone-realism-wip.md) — PAUSED 2026-08-08, uncommitted: phone now autoplays as a real session with visible taps, 8/8 scenes open on their home screen; browser re-verify + overlap pass + demo app still owed

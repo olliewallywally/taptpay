@@ -42,7 +42,7 @@ export default function MerchantOnboarding() {
     nzbn: string;
     gstNumber: string;
   }>({
-    queryKey: [`/api/merchants/${merchantId}`],
+    queryKey: [`/api/merchants/${merchantId}/profile`],
     enabled: !!merchantId,
   });
 

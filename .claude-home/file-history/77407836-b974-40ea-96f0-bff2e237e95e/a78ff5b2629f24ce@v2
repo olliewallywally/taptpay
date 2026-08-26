@@ -1,0 +1,127 @@
+/* Mobile terminal responsiveness probe.
+ * Measures the retail mobile terminal at a spread of real phone viewports and
+ * reports the geometry the five reported bugs live in. */
+import { chromium } from "playwright";
+import { mkdir } from "node:fs/promises";
+import { BASE_URL, CHROMIUM_PATH, MERCHANT_ID, newRetailPage } from "/home/runner/workspace/scripts/desktop-shots/retail-fixtures.mjs";
+
+const OUT = "/tmp/claude-1000/-home-runner-workspace/77407836-b974-40ea-96f0-bff2e237e95e/scratchpad/shots";
+
+const PHONES = [
+  ["iphone-se1-320x568", 320, 568],
+  ["galaxy-fold-344x882", 344, 882],
+  ["iphone-se2-375x667", 375, 667],
+  ["pixel-5-393x851", 393, 851],
+  ["iphone-14-390x844", 390, 844],
+  ["iphone-15-pm-430x932", 430, 932],
+  ["pixel-7-412x915", 412, 915],
+];
+
+const measure = () => {
+  const q = (s) => document.querySelector(s);
+  const r = (el) => {
+    if (!el) return null;
+    const b = el.getBoundingClientRect();
+    return { x: +b.x.toFixed(1), y: +b.y.toFixed(1), w: +b.width.toFixed(1), h: +b.height.toFixed(1), bottom: +b.bottom.toFixed(1), right: +b.right.toFixed(1) };
+  };
+  const vp = q(".tp-viewport");
+  const amount = q(".tp-amount");
+  const stackCard = q(".tp-stack-card");
+  const rows = [...document.querySelectorAll(".tp-stack-row")];
+  const psubbar = q(".tp-psubbar");
+  const subbar = q(".tp-subbar");
+  const ind = q(".tp-subbar-ind");
+  const btns = [...document.querySelectorAll(".tp-subbar-btn")];
+  const send = q(".tp-send");
+  const stackScroll = q(".tp-stack-scroll");
+  // The OFFW lower panel is the second .stagger inside the visible layer
+  const layer = q(".tp-layer:not(.leaving)") || q(".tp-layer");
+  const staggers = layer ? [...layer.querySelectorAll(":scope > .tp-screen > .stagger")] : [];
+  const hero = staggers[0];
+  const lower = staggers[1];
+
+  const visibleRows = (() => {
+    if (!stackScroll || !rows.length) return 0;
+    const sc = stackScroll.getBoundingClientRect();
+    return rows.filter((row) => {
+      const b = row.getBoundingClientRect();
+      return b.top >= sc.top - 1 && b.bottom <= sc.bottom + 1;
+    }).length;
+  })();
+
+  return {
+    innerW: window.innerWidth,
+    innerH: window.innerHeight,
+    viewport: r(vp),
+    viewportOverflowY: vp ? vp.scrollHeight - vp.clientHeight : null,
+    hero: r(hero),
+    heroPad: hero ? getComputedStyle(hero).padding : null,
+    lower: r(lower),
+    lowerPad: lower ? getComputedStyle(lower).padding : null,
+    amount: r(amount),
+    amountText: amount?.textContent,
+    amountFontSize: amount ? getComputedStyle(amount).fontSize : null,
+    amountScrollW: amount?.scrollWidth ?? null,
+    amountOverflowsParent: amount ? (amount.scrollWidth > amount.clientWidth + 1) : null,
+    stackScroll: r(stackScroll),
+    stackScrollable: stackScroll ? stackScroll.scrollHeight - stackScroll.clientHeight : null,
+    stackCard: r(stackCard),
+    rowCount: rows.length,
+    rowH: rows[0] ? +rows[0].getBoundingClientRect().height.toFixed(1) : null,
+    visibleRows,
+    psubbar: r(psubbar),
+    psubbarH: psubbar ? getComputedStyle(psubbar).height : null,
+    subbar: r(subbar),
+    subbarClipped: psubbar && vp ? (r(psubbar).x < r(vp).x - 0.5 || r(psubbar).right > r(vp).right + 0.5) : null,
+    ind: r(ind),
+    indCss: ind ? { top: getComputedStyle(ind).top, height: getComputedStyle(ind).height, zIndex: getComputedStyle(ind).zIndex } : null,
+    btn0: r(btns[0]),
+    btnH: btns[0] ? getComputedStyle(btns[0]).height : null,
+    btnZ: btns[0] ? getComputedStyle(btns[0]).zIndex : null,
+    activeBtn: r(document.querySelector(".tp-subbar-btn.active")),
+    send: r(send),
+    dock: r(document.querySelector('[data-demo-id="terminal-dock"]')),
+  };
+};
+
+async function run() {
+  await mkdir(OUT, { recursive: true });
+  const browser = await chromium.launch({ executablePath: CHROMIUM_PATH });
+  const report = [];
+  try {
+    for (const [label, width, height] of PHONES) {
+      const { context, page, errors } = await newRetailPage(browser, label, {
+        viewport: { width, height },
+        hasTouch: true,
+        isMobile: true,
+        deviceScaleFactor: 2,
+      });
+      await page.goto(`${BASE_URL}/terminal`, { waitUntil: "networkidle" });
+      await page.waitForSelector(".tp-viewport", { timeout: 15000 });
+      await page.waitForTimeout(1400);
+
+      const home = await page.evaluate(measure);
+      await page.screenshot({ path: `${OUT}/${label}-1-home.png` });
+
+      // keypad screen (FAB) → split bill pill + action bar in feature position
+      await page.click('[data-demo-id="retail-add-sale"]').catch(() => {});
+      await page.waitForTimeout(900);
+      const keypad = await page.evaluate(measure);
+      await page.screenshot({ path: `${OUT}/${label}-2-keypad.png` });
+
+      // click split in the action bar
+      await page.click('[data-demo-id="retail-mode-split"]').catch(() => {});
+      await page.waitForTimeout(900);
+      const split = await page.evaluate(measure);
+      await page.screenshot({ path: `${OUT}/${label}-3-split.png` });
+
+      report.push({ label, width, height, home, keypad, split, errors: errors.slice(0, 6) });
+      await context.close();
+    }
+  } finally {
+    await browser.close();
+  }
+  console.log(JSON.stringify(report, null, 1));
+}
+
+run().catch((e) => { console.error(e); process.exit(1); });

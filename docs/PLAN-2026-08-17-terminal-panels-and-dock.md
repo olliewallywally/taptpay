@@ -1,0 +1,649 @@
+# Plan — terminal feature panels + the nav dock (fill, swipe, ooze)
+
+Date: 2026-08-17 · **v2 completed 2026-08-18**
+Status: **execution-ready, decisions settled.** Screen inventory corrected, the companion
+boundary settled, the verification section written. DK1-DK4 all answered by Oliver on
+2026-08-19 (see §7). No code changed yet.
+
+> **If you are implementing this, read `docs/SPEC-2026-08-20-dock-implementation.md` first.**
+> This plan is the *why* — the measurements, the evidence, the settled decisions, and the list of
+> what may not change. It stays authoritative for all of that. But it was written against a mental
+> model of the code rather than the code, and **eight of its instructions cannot be followed
+> literally**: `.tp-panel`/`.tp-panel-body`/`.tp-hero` do not exist, `--kp-size` is defined twice
+> and on the wrong element, there are 26 feature screens and not 27, the 50/50 split is 28 inline
+> literals, `--panel-top` measures a bar that is not over the panel, and Phase D has no channel
+> between the terminal and the dock. The spec carries the corrections (its §1), the exact code,
+> and the gate clauses for phases B–F. **Where the two disagree, the spec wins.**
+
+Companion to `docs/PLAN-2026-08-17-mobile-responsive-ui.md` (v2.1). That plan owns the terminal
+*home* screen, the token layer and the app-wide 44px rule; this one owns the terminal
+**feature** screens and the bottom nav dock. Both are bound by the **screen-class contract** in
+that plan's §6.6.1, which is what tells the two grids apart.
+
+**Decision namespacing.** This plan's decisions are **DK1–DK4** (§7); the companion's are
+**MD1–MD7**. v1 numbered both `D1…`, so "D2" meant two different things.
+
+Three requests:
+
+1. The blue bottom box on every feature screen has cut-off at top and bottom — it should
+   fill the whole screen with nothing clipped inside it.
+2. The nav bar expands on any touch. It should require a deliberate **swipe up** on the
+   collapsed bar.
+3. The nav bar's collapse/expand should be a **morphing, oozing** transition — smooth, and
+   structureless until it resolves into structure.
+
+They are more connected than they look: §3's aggressive dock collapse is what frees the
+height §1 needs, and §2's swipe gesture is what makes that collapse safe.
+
+---
+
+## 0. What changed in v2
+
+v1's diagnosis and its three mechanisms stand — every measurement in §1, §2 and §6 was
+re-checked and none moved. What was missing was everything an implementer needs *after*
+agreeing with it.
+
+| Gap in v1 | Fixed in |
+|---|---|
+| **§3.1's grid was on bare `.tp-screen`** — which is not the feature screens, it is all **31** terminal screens across three verticals, including the two the companion plan grids as home and one that has no two-region split at all. v1 made, in mirror image, the exact mistake the companion caught in *its* v1 | §3.1, scoped to `.tp-screen.tp-feature` |
+| **"The six feature screens" undercounted by more than half** — retail alone has seven, and property and trades were not inventoried at all | §1.0, full table |
+| **Every companion phase reference was stale.** v1 cited "the companion plan's Phase 2 token layer" and "Phase 4"; the companion's v2 renumbered those to **6** and **8**. Followed literally, §3.1 would have been built on the stylesheet-scoping phase | §3.1, §5, §8 |
+| **`--kp-size` had no definition, and §1.3's conclusion was computed against the layout this plan replaces** — "the key must drop 76 → ~40px" assumed the old 50/50 split with an expanded dock. Under this grid with the dock collapsed it is 60.7px at 320×568 | §1.3, and companion §6.1 |
+| **No verification section at all.** The gates were one-liners in the execution table — no viewport matrix, nothing for the swipe, nothing that could catch the goo filter left on at rest | §4, new |
+| No regression boundaries, no reduced-motion gate, no statement of what may not change visually | §4.5, §4.6 |
+
+---
+
+## 1. Measured diagnosis — the blue panel
+
+### 1.0 Which screens this plan owns
+
+The companion's §6.6.1 classifies all 31 `.tp-screen` elements into `.tp-home`, `.tp-feature`
+and `.tp-plain`. **This plan owns the 27 `.tp-feature` screens**, and applies to `.tp-plain`
+only its dock reservation:
+
+| File | `.tp-feature` screens |
+|---|---|
+| `features/terminal/retail/RetailTerminalViewCore.jsx` | `Keypad`, `SplitPayment`, `ChooseStock`, `EnterDetails`, `CashEntry`, `SharePayment`, `CashSuccess` (7) |
+| `features/terminal/property/PropertyTerminalView.tsx` | `ChooseTenant`, `RentAmount`, `SendRentLink` ×2, `ChargeBill` ×2, `AutomateScreen`, `MarkExternal` ×2, `BatchAndAutoScreen`, `SentSuccess` (11) |
+| `features/terminal/trades/TradesTerminalView.tsx` | `ChooseClient`, `AmountKeypad`, `QuickInvoice` ×2, `MarkExternal` ×2, `SentSuccess`, quote (8) |
+| `RetailTerminalViewCore.jsx` `DockPlaceholder` | `.tp-plain` — dock reservation only, no grid |
+
+The measurements in §1.1–§1.3 were taken on the five retail screens. **They were not re-taken
+on property and trades**, which carry the `scale(0.85)` divergence recorded as the companion's
+RC-6 — so their numbers are probably *worse*, not better. Phase A's gate measures all 27; do
+not assume the retail figures transfer.
+
+Two traps from that inventory apply directly here: five of the components return `.tp-screen`
+from **two** branches, and `CashSuccess` is palette-inverted but topologically identical. See
+companion §6.6.1.
+
+### 1.1 It overflows the screen on small phones, and hides under the dock on all of them
+
+`.tp-screen` is `position: absolute; inset: 0; display: flex; flex-direction: column;
+overflow: hidden`. The off-white hero is `height: 50%`; the navy panel is `flex: 1`.
+
+`flex: 1` is `flex: 1 1 0%`, but a flex item's default `min-height: auto` refuses to shrink
+below its content's min-content size. The keypad grid's min-content height is
+`4 × 76px keys + 3 × 14px gaps + 66px padding = 412px`. So on a 568px phone the navy panel
+renders **412px tall in a 284px slot** and `overflow: hidden` amputates the rest.
+
+Measured, every feature screen, four phones (px past the viewport bottom / px hidden under
+the dock):
+
+| Screen | 320×568 | 375×667 | 390×844 | 430×932 |
+|---|---|---|---|---|
+| keypad | **100 clipped** / 178 under dock | **12.6 clipped** / 90.6 | 0 / **50** | 0 / **50** |
+| split | **8.8 clipped** / 86.8 | 0 / 50 | 0 / **50** | 0 / **50** |
+| stock | **2.8 clipped** / 80.8 | — | 0 / **78** | 0 / **78** |
+| share | — | 0 / 62.4 | 0 / **56** | 0 / **56** |
+| cash | **75.2 clipped** / 153.2 | 0 / 54.2 | 0 / **50** | 0 / **50** |
+
+Read the second number as the bug that survives on *every* device: **50–78px of the navy
+panel's content is permanently behind the dock.** Verified visually — on a 430×932 iPhone
+15 Pro Max, the share screen's download/SMS/email row is entirely behind the dock; on the
+stock screen the confirm button is completely covered.
+
+On a 320px phone the keypad is worse than clipped, it is **unusable**: keys 7, 8, 9, `·`,
+`0` and backspace are below the fold with no scroll container, so they cannot be reached at
+all.
+
+### 1.2 Nothing on a feature screen reserves the dock's footprint
+
+The dock is 78px tall expanded (58 + `max(20px, safe-area-inset-bottom)`), 64px collapsed.
+The terminal *home* screen reserves 90px for it. The feature screens reserve:
+
+| Screen | padding-top | padding-bottom |
+|---|---|---|
+| home (off-white) | 154px | **90px** |
+| keypad | 38px | 28px |
+| cash | 40px | 28px |
+| stock | 52px | **0px** |
+| share | 52px | 22px |
+| split | 56px | 28px |
+
+Six different top paddings and five different bottom paddings, none derived from anything,
+none matching the dock. Same failure mode as `PLAN-2026-08-17-mobile-responsive-ui.md`
+RC-3: absolute-pixel choreography around chrome that nothing measures.
+
+### 1.3 The 50/50 split cannot host the keypad on small phones
+
+With the dock's footprint honoured, the height available to the navy panel is
+`50% of viewport − 78`:
+
+| Device | navy panel gets | 4 keypad rows need | verdict |
+|---|---|---|---|
+| 320×568 | 206px | 346px | key size must drop 76 → ~40px |
+| 375×667 | 255px | 346px | key size must drop 76 → ~52px |
+| 390×844 | 344px | 346px | fits once the split flexes ~2px |
+| 430×932 | 388px | 346px | fits |
+
+So two things have to change together: **the split has to flex** (the hero gives up height
+on short screens) and **the key size has to be fluid** (the token work in the companion
+plan's **Phase 6**).
+
+> **That "drop to ~40px" verdict is superseded — and the real answer is much better.** The
+> table above is measured against the layout this plan *replaces*: a rigid 50% hero and an
+> expanded 78px dock. Apply both changes and the arithmetic inverts. At 320×568 the hero
+> resolves to `--hero-pref` = 191px and the collapsed dock to 64px, leaving the panel
+> **313px**, not 206. The companion's `--kp-size` then derives the key from the panel's own
+> realised height:
+>
+> ```css
+> --kp-size: min(76px, calc((100cqh - 3 * var(--sp-3) - 2 * var(--sp-6)) / 4));
+> ```
+>
+> | Device | panel gets | `--kp-size` | 4 rows visible |
+> |---|---|---|---|
+> | 320×568 | 313 | **60.7** | ✓ |
+> | 375×667 | 379 | **74.4** | ✓ |
+> | 390×844 | 496 | **76.0** (design cap) | ✓ |
+> | 430×932 | 554 | **76.0** (design cap) | ✓ |
+>
+> Four rows fit at every size with no special case, and the key never grows past its design
+> size. The keypad never needs to scroll, so DK1 answers itself for this screen — the formula
+> *is* the guarantee. Derivation and the circularity trap it avoids: companion §6.1.
+
+---
+
+## 2. Measured diagnosis — the dock
+
+### 2.1 The whole strip is a tap target
+
+`TerminalDockView.tsx:131` puts three expand triggers on the wrapper:
+
+```jsx
+onTouchStart={resetIdle}  onMouseMove={resetIdle}  onClick={collapsed ? resetIdle : undefined}
+```
+
+The wrapper is `navWidth × 44` when collapsed — **320 × 44 = 14,080px²**. The visible
+affordance is a 56 × 4 handle — **224px²**. The touch region is **63× the thing you can
+see**, and `touch-action` is `auto`, so nothing is reserved for a gesture.
+
+Probed with a 30-point grid across the collapsed wrapper: **30 of 30 points expand it.** A
+tap 20px from the left edge — nowhere near the handle — expanded the dock. That is the
+reported behaviour exactly.
+
+### 2.2 The collapse is a crossfade, not a morph
+
+Three independent tweens run against each other:
+
+| Element | Property | Duration |
+|---|---|---|
+| wrapper | `height` 58 → 44 | 0.5s back-out |
+| handle pill | `width` 0 → 56, `height` 0 → 4, `opacity` 0 → 1 | 0.45s / 0.3s |
+| dock body | `opacity` 1 → 0, `transform` `scale(1)` → `scale(0.85)` | 0.3s / 0.45s |
+
+Two separate objects fading through each other. Nothing is ever formless — the dock stays a
+crisp rounded rectangle right up to opacity 0, and the handle appears already fully formed.
+That is why it reads as structured throughout rather than oozing.
+
+---
+
+## 3. Approach
+
+### 3.1 The blue panel fills the screen
+
+Replace the fixed 50/50 split and the six hand-tuned paddings with a flexible two-region
+grid, sharing the token layer from the companion plan's **Phase 6**.
+
+**The selector is `.tp-screen.tp-feature`, never bare `.tp-screen`.** v1 wrote the bare
+selector, which would have applied this grid to all 31 terminal screens — the two home screens
+the companion grids differently, and `DockPlaceholder`, which has one region and no hero at
+all. That class comes from the companion's §6.6.1 and lands in its Phase 2b, before either
+grid.
+
+```css
+.tp-screen.tp-feature {
+  display: grid;
+  grid-template-rows:
+    minmax(var(--hero-min), var(--hero-pref))   /* off-white: yields first */
+    minmax(var(--panel-min), 1fr);              /* navy: takes the rest */
+  overflow: hidden;
+}
+.tp-panel {                       /* the navy box */
+  min-height: 0;                  /* the missing declaration — lets it actually flex */
+  container-type: size;           /* so --kp-size can read the panel's realised height */
+  display: flex; flex-direction: column;
+  padding-top: var(--panel-top);              /* derived from the floating bar, measured */
+  padding-bottom: calc(var(--dock-h) + var(--safe-bottom) + var(--sp-3));
+}
+.tp-panel-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+
+/* One region, no hero. Takes the dock reservation and nothing else. */
+.tp-screen.tp-plain { padding-bottom: calc(var(--dock-h) + var(--safe-bottom) + var(--sp-3)); }
+```
+
+`container-type: size` on `.tp-panel` is what makes `--kp-size` (§1.3) work, and it is legal
+only because the grid row above gives the panel a definite height. It also makes the panel a
+containing block for any `position: fixed` descendant — nothing in the feature screens uses
+one today, and §4.2 asserts that stays true.
+
+Four rules follow, and they are what "fill the whole screen, no cut-off inside the box"
+means in practice:
+
+1. **`--dock-h` is measured, never guessed.** One `ResizeObserver` on the dock writes its
+   real height (78 expanded, 64 collapsed, 0 when absent) to a custom property. Every screen
+   reads the same value, so the six-paddings problem cannot recur.
+   **It must be written to `document.documentElement`, not to a terminal-scoped node.**
+   `App.tsx:1002-1004` renders `<Router />` and `<BottomNavigation />` as *siblings*, so a
+   property set anywhere inside the terminal is invisible to the dock and vice versa. Found
+   in review of the companion plan; getting this wrong yields a variable that silently
+   resolves to its initial value on exactly the screens that need it.
+2. **`--panel-top` is measured from the floating action bar**, the same mechanism the
+   companion plan's **Phase 8** uses for the home screen's `--chrome-gutter` — one source, not
+   six literals. Measure in a layout effect on mount and keep a `ResizeObserver` for changes,
+   so there is no first-paint jump from the seed value.
+3. **Content that cannot fit scrolls inside the panel**, never past it. `.tp-panel-body`
+   owns the overflow with `overscroll-behavior: contain` so a flick doesn't chain to the
+   page. Today `overflow: hidden` on `.tp-screen` silently amputates instead.
+4. **The hero yields first.** On short screens `--hero-pref` clamps down so the navy panel
+   keeps its content height, mirroring the home screen's "stack floor is non-negotiable"
+   rule.
+
+The keypad additionally needs fluid key sizing, or it will merely scroll instead of fitting,
+which is a worse keypad. `--kp-size` is defined in companion §6.1 and derived in §1.3 above:
+it reads the panel's realised height through `100cqh` and caps at the 76px design size, giving
+4 rows at every viewport in the matrix with no per-device value. Target met by construction —
+the gate in §4.2 still measures it, because the formula depends on `container-type: size`
+resolving, which is the same silent-failure class as the token defect.
+
+### 3.2 Collapse the dock on feature screens
+
+Once §3.3's swipe exists, the dock can collapse the moment you enter a feature screen
+instead of waiting out a 4-second idle timer. That converts `--dock-h` from 78 to 64 for
+the whole screen and removes the object that is physically covering the confirm buttons.
+
+`TerminalDockView` gains a `collapsed` control prop (`"auto" | "collapsed" | "expanded"`)
+so the terminal can request the collapsed state on a feature screen and release it on home.
+Keep the internal idle timer for the `"auto"` case.
+
+**A decision, not an assumption:** the alternative is hiding the dock outright on feature
+screens, which is defensible — every feature screen already carries its own ✕ / ✓ subhead
+for cancel and commit, so the dock is redundant there. Collapsing is recommended because it
+keeps navigation reachable and keeps the layout height constant between screens. Flagged in
+§7 as DK2.
+
+### 3.3 Swipe up to expand
+
+**Track the gesture, don't detect it.** A discrete "swipe recognised → expand" still feels
+like a trigger; following the finger and snapping is what reads as intentional. The codebase
+already has this exact idiom in three places — `transactions.tsx:512-518`,
+`property-analytics.tsx:309-313`, `trades-analytics.tsx:317-321` — pointer events plus
+`touch-action: none` plus `transition: dragging ? 'none' : '…'`. Reuse it.
+
+```
+pointerdown on the handle  → capture, record y0, dragging = true, transition off
+pointermove                → dy = y0 - y;  progress = clamp(dy / 56, 0, 1)
+                             rubber-band past 1.0; abort if |dx| > |dy|
+pointerup / cancel         → progress > 0.45 (or velocity > 0.4 px/ms) ? expand : settle closed
+```
+
+Details that decide whether it feels right:
+
+- **Hit area**: shrink the collapsed wrapper's pointer surface from 320 × 44 to roughly
+  120 × 36, centred on the handle. That alone kills "it pops up if you touch it".
+- **`touch-action: none` on the handle only** — never the full-width strip, or a page scroll
+  starting near the bottom edge gets eaten.
+- **Delete `onTouchStart` and `onMouseMove` from the expand path.** Keep `resetIdle()` on
+  route change (`[activeId, mode]`) — that is intent, not a stray touch.
+- **Downward swipe collapses**, symmetrically, when expanded. Cheap and expected.
+- **Keyboard and AT must still work.** The handle becomes a real `<button aria-expanded>`
+  with an accessible name ("show navigation"). A keyboard activation expands; a pointer tap
+  does not. Distinguish with `event.detail === 0` (keyboard-synthesised clicks report
+  `detail: 0`) or a "gesture in progress" ref — do not rely on `onClick` alone, which fires
+  for both.
+- **`collapseAfterMs === null`** (the landing demo's iframe mount) means the dock never
+  collapses, so the gesture is inert there. Falls out for free; assert it.
+
+### 3.4 The oozing morph
+
+**The two-layer gooey filter, with the filter only alive during the transition.**
+
+Prototyped in the real app, on the real dock, in Chromium 125 (§6.3):
+
+```html
+<filter id="dock-goo" x="-60%" y="-60%" width="220%" height="220%"
+        color-interpolation-filters="sRGB">
+  <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="b"/>
+  <feColorMatrix in="b" type="matrix"
+    values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -10"/>
+</filter>
+```
+
+The blur spreads each shape; the alpha row of the colour matrix (`20 × a − 10`) hard-
+contrasts the result, so overlapping blurs snap into one blob with a meniscus where they
+join. That meniscus is the "ooze".
+
+Structure — and the layering is **mandatory**, not stylistic:
+
+- **Layer A, filtered — solid shapes only.** One blob per dock slot plus the active-tab
+  indicator. This is the layer that merges.
+- **Layer B, unfiltered, above — the icons.** Proof it must be separate: applying the filter
+  to the real dock with its icons inside blurred every icon into an unreadable smudge
+  (§6.3). Icons cross-fade on their own timeline; they never touch the filter.
+
+The choreography, which is what delivers "structureless until it has structure":
+
+| | Collapse (≈420ms) | Expand (≈480ms) |
+|---|---|---|
+| 0–35% | icons fade + scale to 0.7; filter **on** | handle stretches wide, still one blob |
+| 35–70% | five blobs converge toward centre, merging into one lozenge — no discrete parts | the lozenge separates into five blobs that travel to their slots |
+| 70–100% | the lozenge thins to the 56 × 4 handle; filter **off** at the end | blobs settle, filter **off**, icons fade in last |
+
+Rules:
+
+- **`filter: none` at rest, both states.** Zero steady-state cost, and the resting dock
+  stays a crisp 280 × 48 pill — the prototype showed the filter leaves visible scalloping
+  between slots if left on at rest.
+- **Toggle the filter on `transitionstart` / `transitionend`**, not on a timer, so it can
+  never be left on.
+- **`prefers-reduced-motion`**: skip the goo entirely, cross-fade in ~150ms. The existing
+  reduced-motion block at `index.css:1100-1115` is the precedent.
+- **Give the `<filter>` an explicit region** (`x/y/width/height` above). The default −10%/+10%
+  clips a `stdDeviation: 8` blur and the blobs get square edges at the boundary.
+- **A `filter` on the child does not disturb the fixed `<nav>`** — verified: the nav stayed
+  `position: fixed` with an unchanged rect.
+
+---
+
+## 4. Verification
+
+v1 had none — six one-line gates in the execution table, none of which could catch a filter
+left on at rest, a swipe that still fires on tap, or the panel bug surviving on property and
+trades. Every measurement in §1 and §2 was taken with a throwaway probe; each one becomes a
+committed assertion, because the bug it found is the bug that will come back.
+
+### 4.1 Where it lives
+
+No new harness. The companion's §7.5 creates `npm run verify:mobile`
+(`scripts/verify-mobile-responsive.mjs`), `npm run test:golden` and
+`.github/workflows/verify.yml`; this plan adds `scripts/verify-terminal-dock.mjs` behind the
+same `verify:mobile` script and the same workflow. Same fixtures
+(`scripts/desktop-shots/retail-fixtures.mjs`), same nix Chromium, same
+`hasTouch: true, isMobile: true`. **Exit non-zero on failure** — several existing scripts in
+this repo collect errors and still exit 0.
+
+One correction to the companion while we are here: its §7.1 golden set was sized against
+"seven terminal screens". With the real inventory the DPR-1 fidelity tier is ~37 files, not
+~15, and the set totals **~65 files / 8–10MB**. The escape hatch it already names — drop the
+DPR-2 tier and rely on geometry for fidelity — is the one to reach for if that is too much
+repo weight.
+
+### 4.2 The panel — 27 screens × 6 portrait viewports
+
+Per screen, per viewport in companion §4.1:
+
+1. **Nothing past the viewport.** `panel.getBoundingClientRect().bottom <= innerHeight + 1`.
+   This is §1.1's "clipped" column driven to zero.
+2. **Nothing under the dock.** No interactive element's rect intersects the dock's rect. This
+   is the bug that survives on *every* device today (§1.1's second column, 50–78px) and is the
+   single most important assertion in this plan.
+3. **Overflow is contained, not clipped.** DK1 permits any feature screen to scroll, so this
+   is no longer a fits-or-fails assertion. Where `.tp-panel-body.scrollHeight > clientHeight`,
+   the panel must genuinely scroll: `getComputedStyle(body).overflowY === 'auto'` and
+   `scrollTop` can reach `scrollHeight - clientHeight`. What stays forbidden is content
+   amputated by an ancestor's `overflow: hidden` — today's bug — and that is clauses 1 and 2.
+4. **Four keypad rows visible — reported, not blocking (DK1).** All four rows have
+   `rect.bottom <= panel.bottom`, and `4 × --kp-size + 3 × --sp-3 + 2 × --sp-6 <=
+   panel.height`. Print the per-viewport result. Under DK1 a miss is a Phase C tuning signal
+   rather than a failed gate, because the panel may scroll — but it is still the target, since
+   a keypad you have to scroll is a bad keypad even when it is a legal one.
+5. **`container-type` resolved.** `getComputedStyle(panel).containerType === 'size'`. Without
+   it `--kp-size`'s `100cqh` resolves against the small viewport instead of the panel and the
+   keys come out wrong — silently, which is the same failure class as the companion's v1 token
+   defect.
+6. **The hero yields first.** Sweeping 932 → 568 in height, `panel.height` never falls below
+   `--panel-min`, and the hero reaches `--hero-min` before the panel reaches its own minimum.
+7. **`.tp-plain` takes no grid.** `getComputedStyle(DockPlaceholder).display !== 'grid'`, and
+   its bottom padding still clears the dock.
+8. **Property and trades are measured, not assumed** (§1.0). Their `scale(0.85)` divergence
+   means the retail numbers do not transfer; if the companion's RC-6 scoping has not landed
+   yet, record their failures as baseline rather than blocking on them.
+
+### 4.3 The dock gesture
+
+1. **The 30-point probe becomes a regression test.** §6.2 found 30 of 30 points across the
+   collapsed wrapper expand it. After phase E: **0 of 30** expand, except points inside the
+   ~120×36 handle region, which all do.
+2. A **56px upward drag** on the handle expands it; a **20px** drag settles closed.
+3. A **flick faster than 0.4px/ms** expands regardless of distance (DK4).
+4. A **downward drag** when expanded collapses it.
+5. **Keyboard:** `Enter` and `Space` on the handle expand it and flip `aria-expanded`; the
+   handle has an accessible name. A pointer tap does neither — assert both halves, since the
+   `event.detail === 0` discrimination is exactly what a refactor breaks.
+6. **Page scroll survives.** A scroll flick starting in the bottom 80px of every mobile route
+   still scrolls the page. This is the `touch-action: none` risk in §5, and the reason the hit
+   area shrinks.
+7. `touch-action: none` is present on the **handle** and absent on the wrapper.
+8. **`--dock-h` on `document.documentElement`** reports 78 expanded, 64 collapsed, 0 when the
+   dock is absent, and updates within one frame of a state change. Assert it is read from
+   `documentElement` — a terminal-scoped write resolves to the initial value on exactly the
+   screens that need it (companion §6.1, gate 3).
+9. **The landing demo stays inert.** With `placement="absolute" collapseAfterMs={null}` the
+   dock never collapses and the gesture does nothing.
+
+### 4.4 The morph
+
+1. **`filter` computes to `none` at rest, in both states** — sampled after `transitionend` and
+   again after 2s idle. The prototype showed visible scalloping between slots if it is left on,
+   and a permanently filtered dock is a permanent GPU cost.
+2. **The filter is live mid-transition** — sampled at ~50% — so "off at rest" cannot be
+   satisfied by never turning it on.
+3. **Icons are outside the filtered layer**, asserted structurally: no icon node is a
+   descendant of the element carrying `filter`, and each icon's own computed `filter` is
+   `none`. §6.3 is the evidence for why this is mandatory rather than stylistic.
+4. **Reduced motion:** under `prefers-reduced-motion: reduce`, `filter` is never set at any
+   sample and the transition completes within ~150ms.
+5. **The filter region is explicit** — the `<filter>` element carries `x`/`y`/`width`/`height`.
+   The default −10%/+10% clips a `stdDeviation: 8` blur and the blobs get square edges.
+6. **The `<nav>` stays fixed** with an unchanged rect while the filter is applied (§6.4).
+7. **Frame budget** recorded as a baseline: no frame over 32ms across the animation on CI
+   Chromium. Headless is not a phone GPU — this proves the budget is not blown, and the real
+   check is §5's device pass.
+
+### 4.5 Regression boundaries
+
+Green throughout, no exceptions:
+
+- `client/src/__tests__/terminal-dock-view-boundary.test.tsx` — the purity boundary. Pointer
+  handlers and local state are fine; `wouter`, storage, `fetch`, react-query and
+  `window.location/open/history` are not.
+- The landing demo's `placement="absolute" collapseAfterMs={null}` mount.
+- The tablet/desktop app — `scripts/verify-desktop-p0.mjs`, `probe-cascade.mjs`,
+  `probe-transitions.mjs`. It uses its own chrome and must not see any of this.
+- `client/src/__tests__/tutorial-registry.test.ts` — the spotlight anchors resolve on all three
+  verticals.
+
+### 4.6 What may not change
+
+Mirroring the companion's §2.2/§2.3, because a geometry gate will happily pass a redesign.
+
+**Immutable:** the dock's slot order, its icon set, the identity and colour of the active
+indicator, which region of each screen is navy and which is off-white (including
+`CashSuccess`'s inversion), and every label.
+
+**Adaptable:** key size within its 76px cap, padding and gaps within their token ranges,
+whether the panel body scrolls, and the hero's proportion of the screen.
+
+**And note what this plan is deliberately agnostic about:** if DK2 is answered "hide", or the
+design's no-dock reading (§7) is adopted wholesale, `--dock-h` resolves to `0px` and every rule
+in §3.1 and every assertion in §4.2 still holds unchanged. Nothing here depends on the dock
+existing — only on its height being measured rather than guessed.
+
+---
+
+## 5. Risks and the honest unknowns
+
+| Risk | Assessment |
+|---|---|
+| SVG filter cost on a real phone GPU | Headless Chromium showed **no measurable difference** from baseline (both pinned at 16.7ms median, zero long frames over a 1.5s animation). Headless is not a phone GPU, so this proves the budget is not blown, not that it is free. **Needs a real-device check** — fold into the iOS gate already pending in `HANDOFF-2026-07-28` §7.2. |
+| iOS Safari `filter: url()` + fixed/transform artifacts | Historically buggy; not reproducible headlessly. The `filter: none` at rest design limits any artifact to the transition. Have a geometry-only fallback ready (§7 DK3). |
+| `touch-action: none` swallowing page scroll | Real, and the reason the hit area shrinks to ~120 × 36. Test a scroll flick starting inside the bottom 80px on every mobile route. |
+| Swipe-only expansion is inaccessible | Addressed by the `<button aria-expanded>` keyboard path in §3.3. This is a hard requirement, not a nice-to-have. |
+| `TerminalDockView` purity boundary | `client/src/__tests__/terminal-dock-view-boundary.test.tsx` forbids `wouter`, storage, `fetch`, react-query and `window.location/open/history` in that file. Pointer handlers and local state are fine; keep it that way. |
+| Panel restructure vs the companion plan | §3.1 needs that plan's Phase 6 token layer, and its Phase 2b class contract. Sequence accordingly (§8). |
+
+---
+
+## 6. Evidence
+
+Dev server on :5000, nix Chromium, `scripts/desktop-shots/retail-fixtures.mjs`,
+`hasTouch: true, isMobile: true`. Probe sources are in this session's scratchpad.
+
+**6.1 Panel clipping** — the table in §1.1; five feature screens × four phones. Visual
+confirmation: 320×568 keypad missing its bottom two rows entirely; 375×667 keypad's bottom
+row sliced by the viewport edge; 390×844 stock with the confirm button fully covered;
+430×932 share with the entire share-icon row behind the dock.
+
+**6.2 Dock tap zone** — collapsed wrapper 320 × 44 = **14,080px²**; visible handle
+56 × 4 = **224px²**; **63:1**. 30 of 30 grid-probed points expand it. A synthetic tap at
+`x = wrapper.left + 20` expanded the dock (wrapper grew 320×44 → 320×58).
+`touch-action: auto`.
+
+**6.3 Goo prototype** — injected into the live app at `/terminal`. The filter resolved
+(`filter: url("#gooey")`) and rendered the metaball meniscus correctly across three phases:
+five separate blobs → merged scalloped bar → single lozenge. Applied to the *real* dock it
+produced the intended organic silhouette (the active-tab indicator reads as a droplet
+swelling out of the bar) **and blurred every icon into an unreadable smudge** — which is the
+evidence for the mandatory two-layer split. Frame timing under the filter: median 16.7ms,
+p95 16.8ms, worst 16.8ms, zero frames over 16.7ms — identical to the unfiltered baseline.
+
+**6.4 Fixed positioning** — with `filter` applied to the dock's inner element, the `<nav>`
+kept `position: fixed` and an unchanged bounding rect.
+
+---
+
+## 7. Decisions
+
+**All four settled by Oliver, 2026-08-19.** Answers and their consequences below; the
+recommendations they replace are kept so the reasoning stays readable.
+
+**DK1 — Does the blue panel scroll, or must everything always fit?**
+*Was recommended: always fit down to 320×568, scrolling only as a safety net.*
+**ANSWERED: the panel can scroll.**
+
+Scrolling is a first-class outcome, not a last resort. `.tp-panel-body` (§3.1) owns the
+overflow with `overscroll-behavior: contain`, and §4.2 clause 3's allowlist disappears — any
+feature screen may overflow into its own scroll region without that being a design failure.
+
+What this decision does **not** relax: nothing may spill past the viewport (clause 1) and
+nothing may sit under the dock (clause 2). Those are the actual reported bug, and a scroll
+region does not fix them — a panel whose content scrolls but whose last row is still behind
+the dock is exactly as broken as today.
+
+*Consequence for Phase C:* fluid `--kp-size` stays and still targets four keypad rows at
+320×568, because a keypad you scroll is a bad keypad even when it is a legal one. But §4.2
+clause 4 drops from a blocking gate to a reported measurement — if the formula cannot reach
+four rows on some screen, that screen scrolls and Phase C is not blocked.
+
+**DK2 — Dock on feature screens: collapse, or hide?**
+*Was recommended: collapse. v2 added counter-evidence for hiding from the phone design.*
+**ANSWERED: collapse — and an upward touch-grab brings it back up.**
+
+§3.2's `collapsed` control prop lands as written, and §3.3's swipe is the restore path. This
+couples D and E more tightly than §8 assumed: D on its own would leave a dock that collapses
+on every feature screen and can only be restored by the sloppy any-touch handler E exists to
+delete. **D may land alone, but must not reach users without E.** §8's sequencing note is
+amended accordingly.
+
+The `retail terminal.png` counter-evidence is settled against hiding.
+
+*Not covered by this answer:* whether the dock belongs on the terminal **home** screen at
+all. That question came out of the same design review and remains open — home keeps its
+expanded dock until it is ruled on separately.
+
+**DK3 — Fallback if the goo misbehaves on iOS.**
+**ANSWERED: accepted as recommended.**
+
+Build the choreography so the goo is an *enhancement* behind a single flag, with the
+geometry-only morph as the switchable fallback: one element animating
+`width`/`height`/`border-radius` from pill to handle with a squash-and-stretch overshoot,
+icons fading first. It reads as melting rather than oozing. The binding constraint is that
+**the timing must not depend on the filter** — if the flag goes off, the motion must still be
+correct, not merely present.
+
+**DK4 — Swipe distance and direction.**
+**ANSWERED: accepted as recommended.**
+
+56px of upward travel or a 0.4px/ms flick, with the dock tracking the finger throughout and
+rubber-banding past 1.0; a downward swipe collapses it again. Still worth feeling on a real
+device before the numbers are frozen — they are the kind of value that is right or wrong by
+touch, not by argument.
+
+---
+
+## 8. Execution order
+
+| Phase | Content | Gate (all in `scripts/verify-terminal-dock.mjs`, §4) |
+|---|---|---|
+| A | ✅ **done** (`12414f2`, `2d3b24c`) — `--dock-h` measured on `document.documentElement` by `TerminalDockView`; feature screens consume it | §4.3 clause 8, and §4.2 clause 2 across **27 screens × 6 sizes** |
+| B | `.tp-screen.tp-feature` grid + `min-height: 0` + `container-type: size` + `.tp-panel-body` scroll region; delete the six hand-tuned paddings | §4.2 clauses 1, 3, 5, 6, 7 |
+| C | Fluid keypad/tile sizing from `--kp-size` (§1.3) | §4.2 clause 4 — 4 rows at 320×568 through 430×932, **reported not blocking** under DK1 |
+| D | Dock `collapsed` control prop; terminal collapses it on feature screens | `--dock-h` reports 64 on a feature screen, 78 on home |
+| E | Pointer-tracked swipe: shrink the hit area, drop `onTouchStart`/`onMouseMove`, add the `aria-expanded` keyboard path | all nine clauses of §4.3 |
+| F | Two-layer goo morph, filter only during transition, reduced-motion path | all seven clauses of §4.4, then the real-device pass in §5 |
+
+**Phase A outcome, 2026-08-19.** `scripts/verify-terminal-dock.mjs` exists and gates
+clauses §4.3/8 and §4.2/2 across six portrait phones and 11 of the 27 screens (retail's
+keypad/details/share, plus both subbar sets). Findings went **24 → 6** on retail alone, then
+**21 → 17** once property and trades were driven.
+
+- **390×844, 412×915 and 430×932 are clean** across all three verticals. The 50–78px of
+  content permanently behind the dock — §1.1's second column, "the bug that survives on
+  every device" — is gone wherever the layout has room.
+- **320×568, 360×640 and 375×667 still fail (17).** All of them are §1.1's `min-height: auto`
+  refusal: the panel is already at its min-content height, so a bottom reservation has
+  nowhere to go. Numbers are equal or better than baseline everywhere — nothing regressed —
+  and **Phase B's `min-height: 0` is what unlocks them.**
+- Driving the other two verticals found what retail could not: trades' quote screen put
+  *create quote* 54px inside the dock band on **all six** phones, small and large alike.
+  §4.2 clause 8's "measure them, don't assume" earned its place.
+- Panels already reserving 100–110px were left alone — they clear the dock and pass the
+  gate. Still underived; Phase B deletes every one of these literals.
+
+**Sequencing constraints.**
+
+- **B depends on the companion's Phase 2b** (the `.tp-feature` class must exist) **and its
+  Phase 6** (the token layer). It is the one hard cross-plan dependency, and v1 pointed it at
+  the wrong phase numbers.
+- B depends on A — the grid's bottom reservation reads `--dock-h`.
+- C depends on B: `--kp-size` reads `100cqh`, which needs the panel to be a sized container.
+- F depends on D and E. The morph is only worth building once the collapsed state is one you
+  enter deliberately.
+- **A, D and E are independently shippable** and need nothing from the companion plan. If the
+  companion stalls on a decision, these three still land — and A alone removes the
+  50–78px-behind-the-dock bug on every screen, which is the most-felt defect in either plan.
+- **D must not reach users ahead of E (DK2).** Oliver's answer makes the upward touch-grab
+  *the* way back from a collapsed dock. D alone collapses the dock on all 27 feature screens
+  while the only restore path is the any-touch handler E exists to delete — shipping that
+  order means every feature screen gets a dock that pops open when you brush it. Land D
+  behind E, or land them together.
+
+**Combined order across both plans** (companion §9 carries the same line):
+
+`0 → 1 → 2 → 2b → 3 → 4 → 5 → 6 → [7 ‖ A] → [8 ‖ B] → [9 ‖ C] → [D → E → F] → 10`
+
+**Do not break:** see §4.5 — the `TerminalDockView` purity boundary test, the landing demo's
+`placement="absolute" collapseAfterMs={null}` mount, the tablet/desktop app, and the tutorial
+registry.

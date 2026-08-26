@@ -1,9 +1,0 @@
-{
-  "id": "9",
-  "subject": "Sweep A: email/PDF/WhatsApp/SMS side-effect paths",
-  "description": "HTML/template injection (unescaped user data in emails), correct money/GST amounts in generated PDFs/invoices, unhandled failures that break the parent request or get wrongly swallowed, phone/number formatting.",
-  "activeForm": "Sweeping email/PDF/WhatsApp side-effect paths",
-  "status": "completed",
-  "blocks": [],
-  "blockedBy": []
-}

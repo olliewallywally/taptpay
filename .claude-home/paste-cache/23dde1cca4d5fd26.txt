@@ -1,0 +1,16 @@
+ok on the home screen for all verticles, the graph selector from days, weeks etc. when I click between them I need it to be a smooth slurp animation when the light blue bubble goes between the options and I need the graph animation to also be smoother and have a more morph like animation.
+
+
+on the retail terminal. on the send icon where the $0.00 is, I need position of that to be reflected on all the other feature tabs except the + icon that more centred position is fine. on the others its all too inconsistent. 
+
+on the stock selection on the feature tab, I need to be able to tab on any stock item and then confirm, right now I click one and it automatically brings me to the send payment, it doesn't let me add more than one nstock item, each click adds a stock items and i can add as manyt as i like and then have a confirm button below. 
+
+all confirm, send payment buttons etc on all tabs need to sit below the buttom of the action bar and all $ figures at the top need to sit about the top of the action bar, we need to keep this consistant across all the features. 
+
+on the split payment tab, the width of the split selection i need all the tabs to be that width, make it consitant across on the feature tabs except the + tab. and we cant have things off alignment like on the split bill tab, everything needs to be aligned, follow the rule i set above of $ figure about the top ofn the action bar, $confirm buttons below the action bar buttom and all content in between that, centred in the middle and width the same as split bill content width across everything besides the + feature. 
+
+also i need all the terminal functions to operate the same as the mobile, the mobile has all the correct functions like how the active stack works etc and split bill,. please ensure all functions are properly copied. 
+
+for the active stack section, when im clicking the filters, the payment stack goes down on the page, it needs to stay exactly where it is and the list below movesupp and down, the active stack and filters and search boix needs to stay exactly where it is. the active stack isn't working like it was before, remember I need to still be able to hold a payment like we can on mobile where I can make a payment and create a payment but ifi don't send the payment it just goes to the active stack which I can click on and then send payment as this is retail/hospo and people want to order at the start and pay at the end. the active stack isn't clickable, also I want to be able to click on a payment from the stack and if it has been sent it auto takes to the share feature tab on the right where I have all the share options like the mobile. also the active stack text title, I want to be able to click on that and I want it to bring up active stack list to the top and the componants above it animate out as the active stack moves upo the whole page on the left side, similar to the mobile.
+
+for all animations of any lists like the active stack and transaction histry etc, I want to keep the bounce pop in casdade effect but make it smooth and not to aggressive and make it slower and smoother than before. 

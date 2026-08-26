@@ -95,8 +95,14 @@ export function ReportModal({ onClose, title = "Reports", options, clients, onGe
     color: on ? M.white : M.navy,
   });
 
+  const desktopFrame = document.querySelector<HTMLElement>(".tapt-desktop-frame");
+  const portalTarget = desktopFrame ?? document.body;
+
   return createPortal(
-    <div style={{ position: "fixed", inset: 0, zIndex: 1000 }}>
+    <div
+      data-testid="report-modal-layer"
+      style={{ position: desktopFrame ? "absolute" : "fixed", inset: 0, zIndex: 1000 }}
+    >
       <style>{`
         @keyframes rmUp   { from { transform: translateY(100%); } to { transform: translateY(0); } }
         @keyframes rmDown { from { transform: translateY(0); } to { transform: translateY(100%); } }
@@ -256,7 +262,7 @@ export function ReportModal({ onClose, title = "Reports", options, clients, onGe
         </div>
       </div>
     </div>,
-    document.body,
+    portalTarget,
   );
 }
 
@@ -280,6 +286,7 @@ export function ExportButton({ onClick, tone = "onLight", color, style }: {
   const hue = color ?? (dark ? "#58ABFF" : "#040D6D");
   return (
     <button
+      className="tap-target"
       type="button"
       onClick={onClick}
       aria-label="Export reports"

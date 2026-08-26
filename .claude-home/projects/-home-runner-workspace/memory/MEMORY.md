@@ -14,3 +14,17 @@
 - [Data persistence topology](data-persistence-topology.md) — prod=Neon (durable), dev=helium (Replit-forked ~06-30, divergent); uploads moved to Postgres + auto pg_dump backups (2026-07-13)
 - [Playwright nix chromium](playwright-nix-chromium.md) — bundled chromium broken (libnspr4); use nix-store executablePath + minted JWT for merchant 22
 - [UI consistency plan 2026-07-12](ui-consistency-plan-2026-07-12.md) — 5-item plan (charts, widths, navy bleed, stock page, analytics drag), order 5→2→3→4→1, commit+memory per step
+- [HEAD broken, stash@{1} was the fix](head-broken-stash1-fix.md) — RESOLVED as 2565a68: c350644 committed callers without implementations (incl. SSE revoke path)
+- [Landing phone demo status](landing-phone-demo-status.md) — demo BUILT + WIRED IN (28e8b96), blank screen fixed, verified at 3 viewports; P2 (delete Three.js) remains
+- [git stash hides untracked files](git-stash-hides-untracked.md) — stash^3 is invisible to `stash show` and `log --all`; check it before declaring work missing
+- [Desktop transitions work](desktop-transitions-work.md) — 666b898 shipped the transitions but FAILS its own P0 gate; a7d15a3 fixes it (lazy chrome), fully verified
+- [Landing pricing repositioning](landing-pricing-repositioning.md) — site still sells retired 10¢/0.3% pricing; the $0-per-transaction subscription rewrite is stuck in stash@{1}
+- [Landing phone realism WIP](landing-phone-realism-wip.md) — PAUSED 2026-08-08, uncommitted: phone now autoplays as a real session with visible taps, 8/8 scenes open on their home screen; browser re-verify + overlap pass + demo app still owed
+- [DB drift outage & the 4 fixes](dev-db-unapplied-migrations.md) — 2026-08-09 "app loads forever": both DBs were behind schema; migration runner + async guard + auth-outage semantics shipped, dev & prod now level; 8 open items
+- [Full app review 2026-08-15](review-2026-08-15-full-app.md) — 9 findings, none caught by CI; C2 blocks the deploy (billing gate vs migration 0014) and awaits Oliver's call
+- [Crash recovery from transcripts](crash-recovery-from-transcripts.md) — recover a crashed session's findings from its .jsonl instead of redoing them; persist long-task findings to disk as you go
+- [Motion toning plan](motion-toning-plan.md) — "violent" transitions = one back-out curve (78×) compounding with bounce keyframes; plan written 2026-08-15, no code changed yet, Property first
+- [Mobile 44px rule](mobile-44px-rule.md) — mobile UI breakage: a blanket button min-height under 640px; MD1 amended 2026-08-19 to a single-unit fluid foundation + 9 new gaps; MD7 settled (its premise was wrong) so MD1 is the last blocker
+- [probe-transitions cannot exit 0](probe-transitions-cannot-exit-zero.md) — it gates on third-party network errors (the Replit dev banner, ORB-blocked); read its summary line, not its exit code
+- [No new status colours](no-new-status-colours.md) — never add red/green to merchant UI, not even as status, unless Oliver asks
+- [Peer sessions: don't narrate](dont-report-peer-sessions.md) — only raise another Claude session when it actually blocks the work

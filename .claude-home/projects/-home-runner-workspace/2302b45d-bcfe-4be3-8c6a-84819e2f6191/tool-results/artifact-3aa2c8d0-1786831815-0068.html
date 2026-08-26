@@ -1,0 +1,765 @@
+<!doctype html><html><head><!-- frame-runtime --><base href="/_f/1786831815-0068/"><script>window.__FRAME_PREAMBLE={"capabilities":{"artifact":"artifact.BWD0CGLd.js","assets":"assets.a_mJ8q_Q.js","comments":"comments.DGBrvfFR.js","db":"db.VpIrzqr_.js","downloads":"downloads.BXsoAvg9.js","mcp":"mcp.D3B2EyQu.js","permissions":"permissions.BNySkLV5.js","room":"room.BgXZkiYR.js","sample":"sample.kXGC3wc0.js","self":"artifact.BWD0CGLd.js","user":"user.CGub7vEP.js"},"transforms":"_transforms.BI3gXbbT.js","comments":"_comments.hMHmCz0l.js","translate":"_translate.3AdCy0Ua.js"}</script><script>(function(){"use strict";var ce=["light","dark","system"],ue=/^[A-Za-z0-9_-]{1,64}$/,V=/^[a-zA-Z_:][a-zA-Z0-9_:.-]{0,127}$/,fe=new Set(["class","hidden","value","checked"]);function de(e){const t=e.toLowerCase();return t.startsWith("data-")||t.startsWith("aria-")||fe.has(t)}var pe="http://www.w3.org/1999/xhtml",me="http://www.w3.org/2000/svg",ge=new Set(["script","style","iframe","noscript","noframes","noembed","xmp","plaintext","template","title","textarea","object","embed"]),_e=new Set(["script","style"]);function ve(e){const t=e.localName.toLowerCase();return e.namespaceURI===pe?!ge.has(t):e.namespaceURI===me?!_e.has(t):!1}function he(e){if(e===null||typeof e!="object")return!1;const t=e.__frame_patch;if(t===null||typeof t!="object")return!1;const{seq:n,elements:a}=t;if(typeof n!="number"||!Number.isSafeInteger(n)||!Array.isArray(a)||a.length===0||a.length>64)return!1;for(const i of a){if(i===null||typeof i!="object")return!1;const r=i;if(typeof r.target!="string"||!ue.test(r.target)||r.text!==void 0&&typeof r.text!="string")return!1;if(r.attrsSet!==void 0){if(r.attrsSet===null||typeof r.attrsSet!="object")return!1;for(const[l,c]of Object.entries(r.attrsSet))if(!V.test(l)||typeof c!="string")return!1}if(r.attrsRemoved!==void 0){if(!Array.isArray(r.attrsRemoved))return!1;for(const l of r.attrsRemoved)if(typeof l!="string"||!V.test(l))return!1}}return!0}function ye(e){if(e===null||typeof e!="object")return!1;const t=e.__frame_init;return t!==null&&typeof t=="object"}function be(e){return e!==null&&typeof e=="object"&&e.__frame_size_poke===!0}function Ee(e){if(e===null||typeof e!="object")return!1;const t=e.__frame_theme;if(t===null||typeof t!="object")return!1;const n=t.theme;return typeof n=="string"&&ce.includes(n)}function we(e){try{typeof reportError=="function"?reportError(e):setTimeout(()=>{throw e},0)}catch{}}var X=["#62744c","#b04e72","#5b7596","#a3651f","#7a6ba8","#3f7a75"],J=e=>{let t=0;for(let n=0;n<e.length;n++)t=t*31+e.charCodeAt(n)>>>0;return X[t%X.length]??"#788c5d"},Z="#c7c9d1",Ae=["data:image","/svg+xml,"].join(""),Q=e=>Ae+"%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 2 2'%3E%3Ccircle cx='1' cy='1' r='1' fill='"+encodeURIComponent(e)+"'/%3E%3C/svg%3E",Se=Object.freeze({id:null,name:"",avatarUrl:Q(Z),color:Z,email:null,isOwner:!1,canEdit:!1}),je=(...e)=>{const t=e[0],n=typeof t=="string"?[t]:Array.isArray(t)?t.filter(i=>typeof i=="string"):[],a=Object.create(null);for(const i of n)a[i]={id:i,name:"",avatarUrl:Q(J(i)),color:J(i),email:null,isMe:!1};return a},ee=Object.freeze(Object.assign(Object.create(null),{user:Object.freeze(Object.assign(Object.create(null),{id:null,isOwner:!1,canEdit:!1,me:Se,profiles:je,name:"",avatarUrl:null,search:Object.freeze([]),email:null}))})),Re={sample:"sample"};function te(){const e=new Uint8Array(20);try{crypto.getRandomValues(e)}catch{for(let n=0;n<e.length;n++)e[n]=Math.floor(Math.random()*256)}let t="";for(const n of e)t+=(n%36).toString(36);return t}function Oe(e,t){const n=r=>{const l={path:r},c=r.split("/");return{id:c[c.length-1],path:r,get:()=>t("get",[l]),set:d=>t("set",[l,d]),update:d=>t("update",[l,d]),delete:()=>t("delete",[l]),acquire:d=>t("acquire",[l,d]),onSnapshot:(d,E)=>t("subscribe",[l,d,E]),collection:d=>i(r+"/"+String(d))}},a=r=>({where:(l,c,d)=>a({...r,where:[...r.where??[],{f:String(l),op:String(c),v:d}]}),orderBy:(l,c)=>a({...r,orderBy:{f:String(l),dir:c===void 0?"asc":String(c)}}),limit:l=>a({...r,limit:Number(l)}),get:()=>t("query",[r]),onSnapshot:(l,c)=>t("subscribe",[r,l,c])}),i=r=>({...a({collection:r}),path:r,doc:l=>n(r+"/"+(l===void 0?te():String(l))),add:l=>{const c=n(r+"/"+te());return Promise.resolve(c.set(l)).then(()=>c)}});e.doc=r=>n(String(r)),e.collection=r=>i(String(r))}var Pe=Object.freeze([]);function Te(e,t){let n=null,a=null;const i=()=>e.__settled;e.peers=()=>Pe,e.connected=()=>!1,e.emit=()=>i()?.()??Promise.resolve(),e.presence=r=>{const l=i();if(l)return l();let c=null;if(r!==null&&typeof r=="object")try{Array.isArray(r)||(c={...r})}catch{}return c===null?Promise.reject({code:"invalid_argument",message:"presence takes an object"}):(n===null&&(n=Object.create(null),a=Promise.resolve(t("presence",[n]))),Object.assign(n,c),a)}}var B="__frame_scroll",Me=150,Le=310,ke=160,Ce=3e4;function Ne(){let e=0,t=!1,n=!1,a=!1,i=0,r=null;const l=u=>{try{sessionStorage.setItem(B,JSON.stringify({y:u}))}catch{}},c=()=>{if(clearTimeout(e),r===null)return;const u=r;r=null,l(u)},d=()=>{if(t){t=!1;return}n=!0,r=scrollY,clearTimeout(e),e=setTimeout(c,Me)};try{addEventListener("scroll",d,{passive:!0}),addEventListener("pagehide",c)}catch{}const E=()=>{let u;try{u=sessionStorage.getItem(B)}catch{return null}if(u===null)return null;let g;try{g=JSON.parse(u)}catch{g=null}const f=g?.y;if(!(typeof f=="number"&&Number.isFinite(f)&&f>=0)){try{sessionStorage.removeItem(B)}catch{}return null}return f};let T=!1;const h=u=>{try{const g=scrollY;scrollTo({top:u,left:0,behavior:"instant"}),i=u,a=!0,clearTimeout(e),r=null,l(u);const f=scrollY;f!==g&&(t=!0),f!==u&&!T&&(T=!0,addEventListener("load",()=>{try{if(scrollY===f){const p=E();h(p!==null?p:i)}}catch{}},{once:!0}))}catch{}},R=()=>{try{return!!location.hash}catch{return!0}};let A=!1;const O=()=>{try{if(A||innerWidth>Le||innerHeight>ke)return;A=!0;const u=Date.now(),g=()=>{try{removeEventListener("resize",g)}catch{}if(Date.now()-u>Ce||n||R())return;const f=E();h(f!==null?f:i)};addEventListener("resize",g)}catch{}};let M=!1,o=!1;return{restore(){if(M||(M=!0,R()))return;const u=E();u!==null&&(h(u),O())},promoted(){if(o||(o=!0,R()))return;const u=E();u!==null?(h(u),O()):a&&h(i)}}}var Ye="modulepreload",We=function(e){return"/"+e},Ke={},Ue=function(t,n,a){let i=Promise.resolve();function r(l){const c=new Event("vite:preloadError",{cancelable:!0});if(c.payload=l,window.dispatchEvent(c),!c.defaultPrevented)throw l}return i.then(l=>{for(const c of l||[])c.status==="rejected"&&r(c.reason);return t().catch(r)})};(function(){const e=Object.defineProperty,t=globalThis,n=["RTCPeerConnection","webkitRTCPeerConnection","RTCDataChannel","RTCIceCandidate","RTCSessionDescription","RTCRtpSender","RTCRtpReceiver"];let a=0;for(let i=0;i<n.length;i++){const r=n[i];try{e(t,r,{value:void 0,writable:!1,configurable:!1})}catch{try{delete t[r]}catch{}try{e(t,r,{value:void 0,writable:!1,configurable:!0})}catch{}}typeof t[r]=="function"&&a++}if(a&&window!==top)try{parent.postMessage({__frame_rtc_lockdown_failed:a},"*")}catch{}})();var qe=1e4,Ie=Object.freeze([...window.__FRAME_PREAMBLE?.origins??["https://claude.ai","https://preview.claude.ai"]]);function re(e){for(const t of Ie)if(t.endsWith(":*"))try{const n=new URL(e);if(`${n.protocol}//${n.hostname}:*`===t)return!0}catch{}else if(e===t)return!0;return!1}var k=Object.freeze({...window.__FRAME_PREAMBLE?.capabilities}),x=window.__FRAME_PREAMBLE?.transforms,$=window.__FRAME_PREAMBLE?.comments,z=window.__FRAME_PREAMBLE?.translate,q=/^[\w.-]+\.js$/,De=/^[a-z][a-z0-9_-]{0,63}$/,I=e=>Ue(()=>import("/_runtime/"+e),void 0);function Be(e,t){return{contract:e.contract,changes:new Set(e.changes??[]),flags:new Set(e.flags??[]),capabilities:e.capabilities??{},capBudgets:e.capBudgets??{},transforms:new Map,shellOrigin:t,mount:Y,pipe:()=>({wrap:(n,a)=>(...i)=>{try{return a(...i)}catch(r){return Promise.reject(r)}}})}}var ne=null,C=null;function F(e,t,n){try{Object.defineProperty(e,t,{value:n,writable:!1,configurable:!1,enumerable:!0})}catch{try{Object.defineProperty(e,t,{value:n,writable:!1,configurable:!0,enumerable:!0})}catch{}}}var H=!1;function xe(e,t){const n=[];for(const a of e.elements){const i=document.querySelector(`[data-id="${a.target}"]`);if(!i){parent.postMessage({__frame_patch_miss:{seq:e.seq}},t);return}if([...Object.keys(a.attrsSet??{}),...a.attrsRemoved??[]].some(r=>!de(r))){parent.postMessage({__frame_patch_miss:{seq:e.seq}},t);return}if(a.text!==void 0&&!ve(i)){parent.postMessage({__frame_patch_miss:{seq:e.seq}},t);return}for(const[r,l]of Object.entries(a.attrsSet??{}))if(!oe(i,r)){try{i.setAttribute(r,l)}catch{}se(i,r,l)}for(const r of a.attrsRemoved??[])oe(i,r)||(i.removeAttribute(r),se(i,r,null));typeof a.text=="string"&&(i.textContent=a.text),n.push(a.target)}try{document.dispatchEvent(new CustomEvent("claude:edit",{detail:{seq:e.seq,targets:n}}))}catch{}}function se(e,t,n){if(!(e instanceof HTMLInputElement))return;const a=t.toLowerCase();a==="checked"?e.checked=n!==null:a==="value"&&e.type!=="file"&&(e.value=n??"")}function oe(e,t){const n=t.toLowerCase(),a=e;return n==="data-id"||(n==="value"||n==="checked")&&(a.__artifactSecret===!0||/^(password|hidden|file)$/.test(a.type??"")||/(^|\s)(cc-|one-time-code|current-password|new-password)/i.test(`${e.getAttribute("autocomplete")??""} ${a.autocomplete??""}`))}function ae(e){const t=document.documentElement;e==="light"||e==="dark"?(t.dataset.theme=e,t.style.colorScheme=e,H=!0):H&&(delete t.dataset.theme,t.style.colorScheme="",H=!1)}var ie=256,N=Object.assign(Object.create(null),{mcp:Object.assign(Object.create(null),{watchTool:{handlerArg:3}}),db:Object.assign(Object.create(null),{subscribe:{handlerArg:1,errArg:2}}),room:Object.assign(Object.create(null),{on:{handlerArg:1,errArg:2},onPeers:{handlerArg:0,errArg:1},onConnection:{handlerArg:0,errArg:1}})}),$e=Object.assign(Object.create(null),{db:(e,t)=>Oe(e,t),room:(e,t,n)=>Te(e,n)}),j=new Map;function Y(e,t){const n=j.get(e);if(!n)return;const a=Object.assign(Object.create(null),t);Object.assign(n.impl,a),n.r(n.ns),n.impl.__settled=()=>Promise.reject({code:"capability_removed",message:`${e}: method not in this runtime`});const i=n.queue;n.queue=[];for(const r of i){const l=a[r.method];if(l)if(N[e]?.[r.method])try{r.resolve(l(...r.args))}catch{U(r,N[e][r.method],{code:"transform_error",message:`${e}.${r.method} rejected its arguments`})}else l(...r.args).then(r.resolve,r.reject);else{const c={code:"capability_removed",message:`${e}.${r.method} is not in this runtime`},d=N[e]?.[r.method];if(d){U(r,d,c);continue}r.reject(c)}}}function ze(e,t){const n=j.get(e);if(!n)return;n.impl.__settled=()=>Promise.reject(t),n.r(null);const a=n.queue;n.queue=[];for(const i of a){const r=N[e]?.[i.method];if(r){U(i,r,t);continue}i.reject(t)}}function le(e,t){if(typeof e=="function")try{return e(...t)}catch{return Object.create(null)}return Array.isArray(e)?[...e]:e!==null&&typeof e=="object"?{...e}:e}function D(e,t){const n=ee[e];if(!n){ze(e,t);return}j.get(e)?.r(null),Y(e,Object.fromEntries(Object.entries(n).map(([a,i])=>[a,(...r)=>Promise.resolve(le(i,r))])))}function U(e,t,n){if(e.syncState?.dead)return;const a=t.errArg===void 0?void 0:e.args[t.errArg],i=t.errArg===void 0?e.args[t.handlerArg]:a;typeof i=="function"&&queueMicrotask(()=>{if(!e.syncState?.dead)try{i(t.errArg===void 0?{type:"error",error:n}:n)}catch(r){we(r)}})}var W=Object.getOwnPropertyDescriptor(window,"claude");if(window!==top&&!(W&&W.writable===!1)){const e=x&&q.test(x)?I(x).catch(()=>{}):Promise.resolve(void 0),t=o=>{if(o.type==="auxclick"&&o.button!==1)return;const u=o.target,g=u&&u.closest?u.closest("a[href],area[href]"):null;if(!g)return;const f=g.getAttribute("href");if(!f)return;let p,P;try{p=new URL(f,document.baseURI),P=new URL(document.baseURI).origin}catch{return}if((p.protocol==="http:"||p.protocol==="https:")&&p.origin!==P){o.preventDefault();const w=(g.getAttribute("target")??"").toLowerCase(),y=o.type==="auxclick"||o.metaKey||o.ctrlKey||o.shiftKey||o.altKey||!["","_self","_top","_parent"].includes(w);parent.postMessage({__frame_nav:!0,url:p.href,newTab:y},"*")}};addEventListener("click",t,!0),addEventListener("auxclick",t,!0);const n={},a=o=>{o.isTrusted&&(n.pointer=!0)},i=o=>{o.isTrusted&&(n.click=!0)};addEventListener("pointermove",a,{capture:!0,passive:!0}),addEventListener("click",i,{capture:!0,passive:!0}),e.then(o=>{o?.wireNav&&(o.wireNav(),removeEventListener("click",t,!0),removeEventListener("auxclick",t,!0),removeEventListener("pointermove",a,!0),removeEventListener("click",i,!0),o.wireEngagement?.(n))});let r=null;try{r=Ne()}catch{}const l=W?.value??{};F(window,"claude",l);const c=o=>{let u;const g=new Promise(v=>{u=v}),f={impl:Object.create(null),queue:[],u:g,r:u,ns:null};j.set(o,f);const p=f.impl,P=v=>({code:"queue_overflow",message:`${o}.${v}: pre-init call queue is full`}),w=(v,s)=>{if(f.queue.length>=ie){const m=ee[o];return m&&v in m?Promise.resolve(le(m[v],s)):Promise.reject(P(v))}return new Promise((m,_)=>{f.queue.push({method:v,args:s,resolve:m,reject:_})})},y=Re[o],L=new Proxy(y===void 0?p:(()=>{}),{apply:(v,s,m)=>{const _=y,b=p[_]??p.__settled;return b?b(...m):w(_,m)},get:(v,s)=>{if(typeof s!="string"||s==="then"||s==="toJSON"||s==="valueOf")return;if(s==="toString")return Object.prototype.toString;if(y!==void 0&&(s==="call"||s==="apply"||s==="bind"))return Function.prototype[s];const m=N[o]?.[s];return m?(..._)=>{if(typeof _[m.handlerArg]!="function")throw new TypeError(`${o}.${s} requires a handler function`);const b=p[s];if(b)return b(..._);if(p.__settled){const S={dead:!1},Fe={args:[..._],syncState:S};return p.__settled().catch(He=>U(Fe,m,He)),()=>{S.dead=!0}}if(f.queue.length>=ie){const S={dead:!1};return U({args:[..._],syncState:S},m,P(s)),()=>{S.dead=!0}}let K=null;const G={dead:!1};return f.queue.push({method:s,args:_,resolve:S=>{K=typeof S=="function"?S:null,G.dead&&K?.()},reject:()=>{},syncState:G}),()=>{G.dead=!0,K?.()}}:(..._)=>{const b=p[s]??p.__settled;return b?b(..._):w(s,_)}},set:()=>!1});$e[o]?.(p,(v,s)=>L[v](...s),w),f.ns=L,F(l,o,L)};for(const o of Object.keys(k)){if(l[o]!==void 0){F(l,o,l[o]);continue}c(o)}if(l.use===void 0){const o=u=>{if(typeof u!="string"||!Object.hasOwn(k,u))return Promise.resolve(null);const g=j.get(u);return g?g.u:Promise.resolve(l[u]??null)};try{Object.defineProperty(l,"use",{value:o,writable:!0,configurable:!0,enumerable:!1})}catch{}}let d=null,E=null,T=0;const h=o=>{o.source!==parent||!re(o.origin)||ye(o.data)&&(d=o.data.__frame_init,C=o.origin,removeEventListener("message",h),clearTimeout(T),E?.())};addEventListener("message",h),parent.postMessage({__frame_connect:!0},"*");const R=new Promise(o=>{E=o,T=setTimeout(()=>{removeEventListener("message",h),o()},qe)}),A=document.readyState==="loading"?new Promise(o=>document.addEventListener("DOMContentLoaded",()=>o(),{once:!0})):Promise.resolve();A.then(()=>{try{r?.restore()}catch{}});const O={cb:null},M=o=>{if(!(o.source!==parent||!re(o.origin))&&be(o.data)){try{r?.promoted()}catch{}O.cb?.()}};addEventListener("message",M),R.then(async()=>{if(!d||!C){for(const s of j.keys())D(s,{code:"not_granted",message:"frame initialization did not arrive - capability unavailable"});return}ae(d.theme);const o=C;let u=!1,g=!1;addEventListener("message",s=>{if(s.source!==parent||s.origin!==o)return;Ee(s.data)&&ae(s.data.__frame_theme.theme),he(s.data)&&xe(s.data.__frame_patch,o);const m=s.data?.__fc_mode;m&&typeof m=="object"&&!u&&$&&q.test($)&&(u=!0,I($).then(b=>b.install?.(o,m.on===!0)).catch(()=>{}));const _=s.data?.__ft_cmd;_&&typeof _=="object"&&!g&&z&&q.test(z)&&(g=!0,I(z).then(b=>b.install?.(o,_)).catch(()=>{}))});const f=Object.keys(d.capabilities??{});for(const s of f)Object.hasOwn(k,s)||De.test(s)&&l[s]===void 0&&(c(s),D(s,{code:"capability_disabled",message:"capability not in this runtime generation"}));const p=f.filter(s=>Object.hasOwn(k,s)).map(s=>[s,k[s]]).filter(s=>typeof s[1]=="string"&&q.test(s[1])),P=await Promise.allSettled(p.map(([,s])=>I(s))),w=await e,y=C;w?.buildBoot||parent.postMessage({__frame_cap_telemetry:{kind:"cap-load-error",cap:"_transforms"}},y),ne=w?.buildBoot?w.buildBoot(d,w.TRANSFORMS??{},{shellOrigin:y,mount:Y},s=>parent.postMessage({__frame_cap_telemetry:s},y)):Be(d,y);const L=s=>parent.postMessage({__frame_cap_telemetry:{kind:"cap-load-error",cap:s}},y),v=ne;P.forEach((s,m)=>{const _=p[m][0];if(s.status!=="fulfilled"){L(_);return}try{s.value?.install?.(v)}catch{L(_)}});for(const[s,m]of j)if(m.impl.__settled===void 0){if(f.includes(s)){D(s,{code:"capability_disabled",message:"capability not available in this session"});continue}D(s,{code:"not_granted",message:"capability not available in this session"})}await A,parent.postMessage({__frame_ready:!0},C),e.then(s=>s?.installSizeReporter?.(y,O))})}})();</script><!-- /frame-runtime --><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}</style></head><body>
+<title>Property Terminal Parity</title>
+<style>
+/* ───────────────────────────────────────────────────────────
+   Palette is TaptPay's own: the property terminal's navy canvas
+   (#000F3F), its accent (#5E9EFF) and the popover panel (#0B1436).
+   Dark-first, because that is the world this plan is about.
+   ─────────────────────────────────────────────────────────── */
+:root {
+  --ground:      #00071C;
+  --surface:     #000F3F;
+  --surface-2:   #0B1436;
+  --line:        rgba(94,158,255,0.18);
+  --line-strong: rgba(94,158,255,0.40);
+  --ink:         #F4F6FF;
+  --ink-dim:     #C6CFE2;
+  --ink-faint:   #8A9BC4;
+  --accent:      #5E9EFF;
+  --accent-soft: #7FB2FF;
+  --wash:        rgba(94,158,255,0.10);
+  --code-bg:     rgba(94,158,255,0.13);
+  --good:        #35D07F;
+  --warn:        #F0A34E;
+  --bad:         #F0656C;
+  --shadow:      0 18px 40px rgba(0,4,24,0.55);
+
+  --font-display: "Avenir Next", Avenir, "Nimbus Sans", "Helvetica Neue", system-ui, sans-serif;
+  --font-body:    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono:    ui-monospace, SFMono-Regular, "SF Mono", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --ground:      #F1F4FC;
+    --surface:     #FFFFFF;
+    --surface-2:   #FFFFFF;
+    --line:        rgba(20,45,110,0.15);
+    --line-strong: rgba(20,45,110,0.30);
+    --ink:         #0A1330;
+    --ink-dim:     #33406A;
+    --ink-faint:   #5D6B96;
+    --accent:      #2C63D8;
+    --accent-soft: #23509F;
+    --wash:        rgba(44,99,216,0.07);
+    --code-bg:     rgba(44,99,216,0.10);
+    --good:        #0E8A58;
+    --warn:        #9C6009;
+    --bad:         #C1323E;
+    --shadow:      0 14px 34px rgba(20,45,110,0.13);
+  }
+}
+
+:root[data-theme="light"] {
+  --ground:      #F1F4FC;
+  --surface:     #FFFFFF;
+  --surface-2:   #FFFFFF;
+  --line:        rgba(20,45,110,0.15);
+  --line-strong: rgba(20,45,110,0.30);
+  --ink:         #0A1330;
+  --ink-dim:     #33406A;
+  --ink-faint:   #5D6B96;
+  --accent:      #2C63D8;
+  --accent-soft: #23509F;
+  --wash:        rgba(44,99,216,0.07);
+  --code-bg:     rgba(44,99,216,0.10);
+  --good:        #0E8A58;
+  --warn:        #9C6009;
+  --bad:         #C1323E;
+  --shadow:      0 14px 34px rgba(20,45,110,0.13);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: clamp(2.5rem, 6vw, 5rem) clamp(1.1rem, 4vw, 2.5rem) 6rem;
+}
+
+/* ── type ── */
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; }
+h1 {
+  font-size: clamp(2.15rem, 5vw, 3.15rem);
+  font-weight: 700;
+  letter-spacing: -0.034em;
+  line-height: 1.02;
+}
+h2 {
+  font-size: clamp(1.4rem, 2.6vw, 1.7rem);
+  font-weight: 650;
+  letter-spacing: -0.022em;
+  line-height: 1.15;
+}
+h3 {
+  font-size: 1.06rem;
+  font-weight: 650;
+  letter-spacing: -0.012em;
+  line-height: 1.3;
+}
+p { margin: 0; max-width: 68ch; }
+strong { font-weight: 650; color: var(--ink); }
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 1.1rem;
+}
+.standfirst {
+  font-size: clamp(1.02rem, 1.9vw, 1.16rem);
+  line-height: 1.6;
+  color: var(--ink-dim);
+  max-width: 62ch;
+}
+.label {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+code, .mono {
+  font-family: var(--font-mono);
+  font-size: 0.855em;
+  background: var(--code-bg);
+  color: var(--accent-soft);
+  padding: 0.12em 0.4em;
+  border-radius: 4px;
+  overflow-wrap: anywhere;
+}
+th code, td code { font-size: 0.82em; }
+
+/* ── header ── */
+header { border-bottom: 1px solid var(--line-strong); padding-bottom: 2.4rem; }
+header .standfirst { margin-top: 1.4rem; }
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 2.6rem;
+  margin-top: 2.2rem;
+  padding-top: 1.6rem;
+  border-top: 1px solid var(--line);
+}
+.meta div { display: flex; flex-direction: column; gap: 0.24rem; padding: 0.4rem 0; }
+.meta .v {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── sections ── */
+section { margin-top: clamp(3rem, 6vw, 4.4rem); }
+.section-head { display: flex; flex-direction: column; gap: 0.7rem; margin-bottom: 1.9rem; }
+.section-head p { color: var(--ink-dim); }
+
+/* ── tables ── */
+.table-scroll { overflow-x: auto; margin-top: 0.4rem; }
+table { border-collapse: collapse; width: 100%; min-width: 540px; }
+th, td {
+  text-align: left;
+  padding: 0.85rem 1.1rem 0.85rem 0;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+th {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-weight: 500;
+  border-bottom-color: var(--line-strong);
+  padding-bottom: 0.7rem;
+}
+td { font-size: 0.945rem; line-height: 1.55; color: var(--ink-dim); }
+td:first-child { color: var(--ink); font-weight: 600; padding-right: 1.6rem; }
+tr:last-child td { border-bottom: none; }
+td .num { font-family: var(--font-mono); color: var(--accent); font-variant-numeric: tabular-nums; }
+
+/* ── chips ── */
+.chip {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.63rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  padding: 0.24rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+.chip-bug     { color: var(--bad); }
+.chip-new     { color: var(--accent); }
+.chip-clean   { color: var(--ink-faint); }
+.chip-blocked { color: var(--warn); }
+
+/* ── phase cards ── */
+.phases { display: flex; flex-direction: column; gap: 0; }
+.phase {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  gap: 0 1.6rem;
+  padding: 2.1rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.phase:last-child { border-bottom: none; }
+/* The numeral echoes the terminal's own 84px tabular hero figure. */
+.phase-n {
+  font-family: var(--font-display);
+  font-size: 2.9rem;
+  font-weight: 700;
+  line-height: 0.85;
+  letter-spacing: -0.045em;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+.phase-body { display: flex; flex-direction: column; gap: 0.85rem; min-width: 0; }
+.phase-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.7rem 0.9rem; }
+.phase-body p { color: var(--ink-dim); font-size: 0.965rem; }
+.phase-body ul { margin: 0; padding-left: 1.15rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.phase-body li { color: var(--ink-dim); font-size: 0.945rem; line-height: 1.55; }
+.phase-body li::marker { color: var(--accent); }
+
+.note {
+  border-left: 2px solid var(--line-strong);
+  padding: 0.15rem 0 0.15rem 1rem;
+  font-size: 0.9rem;
+  color: var(--ink-faint);
+  max-width: 64ch;
+}
+.note strong { color: var(--ink-dim); }
+
+/* ── panels ── */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: clamp(1.3rem, 3vw, 1.9rem);
+  box-shadow: var(--shadow);
+}
+.panel + .panel { margin-top: 1rem; }
+.panel h3 { margin-bottom: 0.55rem; }
+.panel p { color: var(--ink-dim); font-size: 0.945rem; }
+
+.stack { display: flex; flex-direction: column; gap: 1rem; }
+
+/* ── ordered prerequisites ── */
+ol.steps { margin: 0; padding: 0; list-style: none; counter-reset: s; display: flex; flex-direction: column; gap: 1rem; }
+ol.steps li {
+  counter-increment: s;
+  display: grid;
+  grid-template-columns: 2rem 1fr;
+  gap: 0 0.9rem;
+  align-items: baseline;
+  color: var(--ink-dim);
+  font-size: 0.965rem;
+}
+ol.steps li::before {
+  content: counter(s);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── questions ── */
+.q { display: grid; grid-template-columns: 2.1rem 1fr; gap: 0 0.9rem; padding: 1.15rem 0; border-bottom: 1px solid var(--line); }
+.q:last-child { border-bottom: none; }
+.q-n { font-family: var(--font-mono); font-size: 0.82rem; color: var(--warn); font-variant-numeric: tabular-nums; padding-top: 0.15rem; }
+.q-b { display: flex; flex-direction: column; gap: 0.4rem; }
+.q-b p { font-size: 0.945rem; color: var(--ink-dim); }
+.q-t { font-weight: 650; color: var(--ink); font-size: 0.98rem; }
+.rec { font-size: 0.9rem; color: var(--good); }
+
+/* ── code block ── */
+pre {
+  margin: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1.1rem 1.2rem;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  line-height: 1.75;
+  color: var(--ink-dim);
+}
+pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
+pre .c { color: var(--ink-faint); }
+
+footer {
+  margin-top: clamp(3.5rem, 7vw, 5rem);
+  padding-top: 1.8rem;
+  border-top: 1px solid var(--line-strong);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+
+@media (max-width: 640px) {
+  .phase { grid-template-columns: 1fr; gap: 0.7rem; }
+  .phase-n { font-size: 2.1rem; }
+  .meta { gap: 0 1.6rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+</style>
+
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">TaptPay · feat/tablet-desktop-app · 2026-08-15</p>
+  <h1>Property Terminal Parity</h1>
+  <p class="standfirst">
+    Nine phases closing the logic gap between the tablet/desktop property terminal
+    and the phone one — plus the eight behaviours that are staying exactly as they
+    are, because on a 1180&times;880 canvas they are the better call.
+  </p>
+  <div class="meta">
+    <div><span class="label">Target</span><span class="v">desktop/pages/property-terminal.tsx</span></div>
+    <div><span class="label">Phases</span><span class="v">9</span></div>
+    <div><span class="label">Closed</span><span class="v">8</span></div>
+    <div><span class="label">Blocking questions</span><span class="v">4</span></div>
+  </div>
+</header>
+
+<section>
+  <div class="section-head">
+    <h2>Tablet and desktop are the same code</h2>
+    <p>
+      <code>App.tsx:906-909</code> routes both device classes to
+      <code>DesktopPropertyTerminal</code>. The only difference is that
+      <code>DesktopFrame</code> letterboxes desktop into a 13&Prime; slate and lets
+      tablet bleed full width. Everything below lands on both, so every new control
+      is sized for touch as well as pointer.
+    </p>
+  </div>
+</section>
+
+<section>
+  <div class="section-head">
+    <h2>Before any code</h2>
+  </div>
+  <ol class="steps">
+    <li><span><strong>Apply the three pending migrations.</strong> <code>CLAUDE.md</code> makes this step&nbsp;0 for anything in this tree. The tree is in a state that looks fine and is not.</span></li>
+    <li><span>The working tree already carries an unrelated motion-token edit in this same file, from the motion-toning plan. Don't revert it, don't fold it in.</span></li>
+    <li><span>Dev server: one instance on <code>:5000</code> only. The workflow does not auto-restart.</span></li>
+    <li><span>Never <code>git add -A</code>. Exclude <code>.claude-home/**</code> and <code>.claude/settings.local.json</code>.</span></li>
+  </ol>
+</section>
+
+<section>
+  <div class="section-head">
+    <h2>Staying as it is</h2>
+    <p>
+      Places the tablet build deliberately differs from the phone and is either
+      better or design-bound. These are closed — don't "fix" them.
+    </p>
+  </div>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th scope="col">Behaviour</th><th scope="col">Why it stays</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Flat mark-paid list</td>
+          <td>Lists every outstanding invoice across all tenants instead of the phone's tenant-first flow. Better — and it makes the phone's "which invoice?" picker unnecessary, so <strong>that item is dropped from the plan entirely</strong>.</td>
+        </tr>
+        <tr>
+          <td>Contact check before send</td>
+          <td>Desktop refuses to send when the tenant has no address on the preferred channel; the phone lets the server reject. Keep the stricter path.</td>
+        </tr>
+        <tr>
+          <td>Decimal keypad</td>
+          <td>Shared with 4c and 3c and already ruled on. The phone's cents-accumulator is a small-screen affordance; the live <span class="mono">$5,000.00</span> readout makes the desktop model self-evident.</td>
+        </tr>
+        <tr>
+          <td>Inline "sent&nbsp;✓" flash</td>
+          <td>The rail-and-panel model has no room for a full-screen success state, and the row lands in the left column immediately. Phase&nbsp;2 fixes the state reset this leaves behind, not the pattern.</td>
+        </tr>
+        <tr>
+          <td>Rail-driven modes</td>
+          <td>The whole 2c design. Every new surface below attaches to the rail or the left column — never a modal over the frame.</td>
+        </tr>
+        <tr>
+          <td>Whole-dollar heroes</td>
+          <td>Design. The 84px hero figure has no room for cents.</td>
+        </tr>
+        <tr>
+          <td>Full scrollable request list</td>
+          <td>Desktop has the height; the phone caps at 12 rows. Keep.</td>
+        </tr>
+        <tr>
+          <td>Pre-selected charge type</td>
+          <td>All five chips are visible at once on desktop, unlike the phone where they're a scroll away, and the design shows a selected chip. <strong>The one "keep" I'd happily reverse</strong> — question&nbsp;2.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="section-head">
+    <h2>The queue</h2>
+    <p>One phase per commit, in order. Phase&nbsp;4 depends on Phase&nbsp;3's resend mutation; Phase&nbsp;7 reuses the toggle built in Phase&nbsp;6.</p>
+  </div>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th scope="col">#</th><th scope="col">Phase</th><th scope="col">What</th><th scope="col">Class</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><span class="num">1</span></td><td>Money correctness</td><td>Split owing, live-status whitelist, archived-tenant names, honest "awaiting" label</td><td><span class="chip chip-bug">bug</span></td></tr>
+        <tr><td><span class="num">2</span></td><td>Send-flow safety</td><td>Keypad zero-guard, post-send reset, description clobber rule</td><td><span class="chip chip-bug">bug</span></td></tr>
+        <tr><td><span class="num">3</span></td><td>Row actions</td><td>Resend, edit&nbsp;&amp;&nbsp;resend, mark received, cancel — in an anchored popover</td><td><span class="chip chip-new">new surface</span></td></tr>
+        <tr><td><span class="num">4</span></td><td>Deep links</td><td><code>?mode=</code> <code>?stack=</code> <code>?client=</code>, plus remind on overdue rows</td><td><span class="chip chip-new">behaviour</span></td></tr>
+        <tr><td><span class="num">5</span></td><td>Bill completeness</td><td>Due-date chips, attach-invoice upload</td><td><span class="chip chip-new">controls</span></td></tr>
+        <tr><td><span class="num">6</span></td><td>Split</td><td>Toggle on rent and bill, split badges in the request list</td><td><span class="chip chip-new">controls</span></td></tr>
+        <tr><td><span class="num">7</span></td><td>Automation mode</td><td>Sixth rail button: schedules and overdue reminders</td><td><span class="chip chip-new">new mode</span></td></tr>
+        <tr><td><span class="num">8</span></td><td>External reference</td><td>Reference field on mark-paid</td><td><span class="chip chip-new">control</span></td></tr>
+        <tr><td><span class="num">9</span></td><td>Scope chip</td><td>Wire it or remove it</td><td><span class="chip chip-clean">cleanup</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="section-head">
+    <h2>Rules the pass must not break</h2>
+    <p>The 2c design language is narrow. Every addition below reuses something already on the page rather than inventing a new visual idea.</p>
+  </div>
+  <div class="stack">
+    <div class="panel">
+      <h3>Geometry</h3>
+      <p>
+        Canvas is 1180&times;880: a 66px header, a 1px divider, then
+        <code>.tapt-desktop-main</code> at 1180&times;813. A design <span class="mono">y</span>
+        maps to <span class="mono">y&nbsp;&minus;&nbsp;66</span>. The right panel's usable height is
+        <strong>787px</strong> and its usable width is <strong>466px</strong>; existing blocks
+        size to 430–445px, so stay in that band.
+      </p>
+    </div>
+    <div class="panel">
+      <h3>No <code>position: fixed</code>, ever</h3>
+      <p>
+        The canvas sits inside <code>transform: scale(…)</code>, so fixed positioning
+        becomes scale-relative — the exact trap already recorded against
+        <code>ReportModal</code>. Every overlay here is <code>position: absolute</code> inside a
+        relative ancestor on the page. And no <code>window.confirm</code>: it paints browser
+        chrome over the simulated 13&Prime; frame, so destructive confirmation is two-step
+        and in-surface.
+      </p>
+    </div>
+    <div class="panel">
+      <h3>Cascade</h3>
+      <p>
+        <code>.dt-cascade &gt; *</code> and <code>.dt-rise</code> ship <code>opacity: 0</code>
+        under an <code>animation: … both</code> fill, so a block carrying either class that
+        never animates is <strong>permanently invisible</strong>, not merely un-animated. New
+        top-level blocks in <code>.pt-left</code> shift the <code>--dt-i</code> step numbering —
+        the rail is 6, the panel is 7. Never transform a rail slot: it becomes the
+        containing block for the absolutely-positioned rail and moves it.
+      </p>
+    </div>
+    <div class="panel">
+      <h3>Palette and prefix</h3>
+      <p>
+        Class prefix stays <code>pt-</code>, in the one page-scoped CSS template literal.
+        New states reuse the file's ten colour constants: pressed is <code>ACTIVE</code>
+        on <code>NAVY</code> text, unpressed is <code>ACCENT_SOFT</code> on transparent with a
+        <span class="mono">rgba(94,158,255,0.5)</span> border, destructive is <code>RED</code>,
+        confirmed is <code>GREEN</code>. New primary actions are ≥&nbsp;40px on their short
+        axis for touch; new chips match the sizes already on the page.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="section-head">
+    <h2>The phases</h2>
+  </div>
+  <div class="phases">
+
+    <article class="phase">
+      <div class="phase-n">1</div>
+      <div class="phase-body">
+        <div class="phase-top"><h3>Money correctness</h3><span class="chip chip-bug">bug</span><span class="label">no visual change</span></div>
+        <p>
+          The heroes and row amounts use <code>amountCents</code>, so a 4-way split with three
+          shares paid reports its full value as outstanding. The phone uses the
+          server-computed <code>owingCents</code>. The live set is a blacklist rather than the
+          phone's whitelist, and row names resolve from the archived-filtered tenant list —
+          so an archived tenant's live invoice renders as <span class="mono">"tenant"</span>.
+        </p>
+        <ul>
+          <li>Extract the model to <code>desktop/data/property-terminal-model.ts</code>, matching the <code>desktop/data/*</code> convention, with a unit test beside it.</li>
+          <li><code>owing(i) = i.owingCents ?? i.amountCents ?? 0</code> for both heroes <em>and</em> row amounts, so the column and the figures agree.</li>
+          <li>Live set becomes the phone's whitelist: <span class="mono">pending_dispatch, dispatched, overdue, dispatch_failed</span>.</li>
+          <li>Names come from the server's enriched <code>inv.tenantName</code>, with the tenant map as fallback.</li>
+          <li>Keep bucketing <span class="mono">pending_dispatch</span> under <em>sent</em> — the phone's filter hides those rows, which is worse — but add a separate label so the row reads <strong>awaiting send</strong> instead of claiming it was sent.</li>
+        </ul>
+      </div>
+    </article>
+
+    <article class="phase">
+      <div class="phase-n">2</div>
+      <div class="phase-body">
+        <div class="phase-top"><h3>Send-flow safety</h3><span class="chip chip-bug">bug</span><span class="label">no new UI</span></div>
+        <ul>
+          <li><strong>Keypad zero-guard.</strong> Confirming an empty keypad silently sets the amount to $0. Dim the confirm circle to <span class="mono">opacity&nbsp;0.45</span> and return early — mirroring <code>.pt-send-btn:disabled</code>, the file's existing disabled language.</li>
+          <li><strong>Post-send reset.</strong> Tenant and amount both survive a successful send, so a second click issues a second invoice. Zero the amount on success; keep the tenant, which is the useful desktop state. The 1.6s flash covers the transition.</li>
+          <li><strong>Description clobber.</strong> Picking a charge chip unconditionally overwrites typed text. Port the phone's rule: only overwrite when the field is empty or still holds a preset.</li>
+        </ul>
+        <p class="note">This phase creates <code>client/src/desktop/property-terminal.test.tsx</code>, modelled on <code>retail-terminal.test.tsx</code>. There is currently <strong>no test at all</strong> for this page — none of the nine defects behind this plan would have been caught by CI.</p>
+      </div>
+    </article>
+
+    <article class="phase">
+      <div class="phase-n">3</div>
+      <div class="phase-body">
+        <div class="phase-top"><h3>Row actions</h3><span class="chip chip-new">new surface</span></div>
+        <p>
+          The phone has an action sheet on every request row. Desktop rows are inert
+          <code>&lt;div&gt;</code>s, and <code>/invoices/:id/resend</code> and
+          <code>/invoices/:id/void</code> have <strong>no caller anywhere in the desktop app</strong>.
+        </p>
+        <ul>
+          <li><strong>An anchored popover in the left column</strong> — not a mode, not a modal. It reuses the panel already shipped as <code>.ph-scope-menu</code> on property home: <span class="mono">#0B1436</span>, radius 14, blue hairline, soft shadow.</li>
+          <li><code>.pt-rows</code> scrolls, so a popover inside it clips. Render it as a child of <code>.pt-stack</code>, offset by <code>row.offsetTop − scrollTop</code>. Use <code>offsetTop</code>, not <code>getBoundingClientRect()</code> — offset values are pre-scale and need no division by the canvas scale.</li>
+          <li>Contents branch the way the phone's do: settled invoices get a message, charges get <em>resend link</em>, rent gets <em>edit amount &amp; resend</em>, then <em>mark received</em> and <em>cancel invoice</em>.</li>
+          <li>Cancel is two-step in-surface: the popover swaps to a red "this can't be undone" with confirm / back.</li>
+          <li>Both new mutations call <code>notifyIfBillingCardRequired</code> on failure. The phone omits it here, but the desktop send paths already do it and a silent 402 on a resend is the kind of thing this branch has been bitten by.</li>
+        </ul>
+      </div>
+    </article>
+
+    <article class="phase">
+      <div class="phase-n">4</div>
+      <div class="phase-body">
+        <div class="phase-top"><h3>Deep links and remind</h3><span class="chip chip-new">behaviour</span><span class="label">needs phase 3</span></div>
+        <p>
+          The desktop property home already links to <code>?mode=reminder</code> and
+          <code>?mode=expense</code>, and the terminal reads no query parameters at all — so
+          both quick actions silently open the default request panel.
+        </p>
+        <ul>
+          <li>Read them in a <code>useState</code> initializer, following <code>property-clients.tsx</code> and <code>trades-terminal.tsx</code>. Don't port the phone's 800ms <code>replaceState</code> strip — that hack exists because its route transition can discard the first mount.</li>
+          <li><code>mode=expense</code> opens bill; <code>mode=reminder</code> filters to overdue and reveals the remind buttons; <code>stack=</code> sets the filter; <code>client=</code> preselects a tenant, matching 2b's param name.</li>
+          <li>Remind button on overdue rows, on the phone's exact rule, calling Phase 3's resend mutation. ~28px tall so it sits inside the 40px row.</li>
+        </ul>
+      </div>
+    </article>
+
+    <article class="phase">
+      <div class="phase-n">5</div>
+      <div class="phase-body">
+        <div class="phase-top"><h3>Bill completeness</h3><span class="chip chip-new">controls</span></div>
+        <p>
+          Every desktop bill is hard-coded <em>due on receipt</em>, with no way to say otherwise,
+          and can't carry the supporting document the phone uploads. The attach omission was
+          logged as deliberate — "worth its own pass rather than a cramped port". This is that pass.
+        </p>
+        <ul>
+          <li><strong>Due chips</strong> in the existing label-then-chips rhythm: <em>on receipt / in 7 days / in 14 days</em>, defaulting to 7, in a grid mirroring <code>.pt-freq-chips</code> so the two screens' chip rows are the same object.</li>
+          <li><strong>Attach invoice</strong> — a label-wrapped hidden file input styled as a 50px dashed row at radius 12, matching <code>.pt-field-row</code> rather than the phone's 16. Uploads on pick with the phone's 20MB guard; attached state swaps to filename plus <em>remove</em>.</li>
+        </ul>
+        <p class="note"><strong>Vertical budget.</strong> Bill mode currently uses ≈468px of the 787px panel. Due adds ≈96, attach ≈102 → ≈666, leaving 121. Phase 6's split row takes ≈62 of that → ≈728, 59px spare. Reclaim 40px while you're in there by tightening <code>.pt-bill</code>'s top margin and the four label margins. <strong>Screenshot both device classes and confirm nothing crosses 813px</strong> — 3c's compose block failed exactly here.</p>
+      </div>
+    </article>
+
+    <article class="phase">
+      <div class="phase-n">6</div>
+      <div class="phase-body">
+        <div class="phase-top"><h3>Split</h3><span class="chip chip-new">controls</span><span class="chip chip-blocked">question 1</span></div>
+        <p>
+          Desktop hard-codes <code>splitEnabled: false</code> on both mutations and renders no
+          split state at all. The phone offers split on a rent request and on a bill, and
+          shows <span class="mono">paid/count split</span> plus "left of&nbsp;$X" on part-paid rows.
+        </p>
+        <ul>
+          <li>One more <code>.pt-field-row</code> on both the request and bill panels: split glyph, "split this bill", toggle. It reuses the 54px row already used twice above it, so the lower block reads as three consistent rows plus chips.</li>
+          <li><code>.pt-switch</code> is the one genuinely new component in this plan — worth defining rather than substituting a chip, because Phase 7 reuses it.</li>
+          <li>In the request list: a green <span class="mono">paid/count split</span> badge, and a "left of&nbsp;$X" caption stacked under the amount the way <code>.pt-tc-right</code> already stacks amount over caption.</li>
+        </ul>
+      </div>
+    </article>
+
+    <article class="phase">
+      <div class="phase-n">7</div>
+      <div class="phase-body">
+        <div class="phase-top"><h3>Automation mode</h3><span class="chip chip-new">new mode</span></div>
+        <p>
+          <strong>Desktop can create recurring rent and then gives the merchant no way to see,
+          pause or cancel it.</strong> The desktop <em>trades</em> terminal already ships this
+          surface, so it's a desktop-internal inconsistency as much as a phone gap.
+        </p>
+        <ul>
+          <li><strong>A sixth rail button</strong>, and tighten the rail's gap from 40px to 32px at the same time: six buttons at gap 40 makes the rail 547px tall ending at y=748 and visibly bottom-heavy; at 32 it's 507px ending at y=708, growing by one button height rather than a button plus a gap.</li>
+          <li><code>usePropertySchedules()</code> already exists in <code>property-data.ts</code> — use it, don't add a query. One new query for reminder settings, optimistic like the phone's.</li>
+          <li><strong>Overdue reminders</strong> block: title, sub, the Phase 6 toggle, then <em>remind after</em> / <em>repeat every</em> / <em>max reminders</em> chip rows and the summary sentence. Render it in the page's blue language, <strong>not</strong> the phone's amber card — amber on this page means <em>overdue</em>, and an amber panel here would read as an alert.</li>
+          <li><strong>Active schedules</strong> list reusing <code>.pt-paid-row</code>'s geometry, with a state pill, next-run date, pause/resume and a two-step cancel.</li>
+        </ul>
+      </div>
+    </article>
+
+    <article class="phase">
+      <div class="phase-n">8</div>
+      <div class="phase-body">
+        <div class="phase-top"><h3>External reference</h3><span class="chip chip-new">control</span></div>
+        <p>
+          <code>markPaid</code> hard-codes the reference to <code>null</code> while the column
+          exists and the phone captures it. Keep the flat list — clicking a row's check
+          <strong>expands that row in place</strong> with a slim input and confirm / cancel,
+          other rows untouched, one row open at a time.
+        </p>
+      </div>
+    </article>
+
+    <article class="phase">
+      <div class="phase-n">9</div>
+      <div class="phase-body">
+        <div class="phase-top"><h3>Scope chip</h3><span class="chip chip-clean">cleanup</span><span class="chip chip-blocked">question 3</span></div>
+        <p>
+          The "all properties" chip has no <code>onClick</code> and no state — a dead control,
+          while property home has the identical chip fully wired.
+          <strong>Recommendation: wire it.</strong> Port the home's scope pattern, derive the
+          address list from <em>active</em> tenants only so the known
+          "archived-only properties remain selectable" defect isn't reintroduced, and let both
+          heroes, the request list and the mark-paid list follow the scope. The tenant picker
+          does not — you may need to bill a tenant outside the current scope.
+        </p>
+      </div>
+    </article>
+
+  </div>
+</section>
+
+<section>
+  <div class="section-head">
+    <h2>Verification</h2>
+    <p>Per phase, before committing.</p>
+  </div>
+  <pre><code>npx tsc --noEmit                    <span class="c"># silent</span>
+npx vite build                      <span class="c"># property-terminal in its own chunk</span>
+node scripts/verify-desktop-p0.mjs  <span class="c"># gating, geometry, chunk isolation</span>
+npx jest client/src/desktop/data/__tests__/property-terminal-model.test.ts \
+         client/src/desktop/property-terminal.test.tsx \
+         client/src/pages/__tests__/smoke-tests.test.tsx
+
+node scripts/desktop-shots/shot-property-terminal.mjs   <span class="c"># both device classes</span></code></pre>
+  <div class="stack" style="margin-top:1.4rem">
+    <div class="panel">
+      <h3>The shot script already exists</h3>
+      <p>
+        It mocks <code>/api/property/schedules</code> and shoots 8 states at desktop
+        (1440&times;900) and tablet (1194&times;834 with <code>hasTouch</code> — without that flag
+        you get the desktop path and aren't testing tablet at all). Extend its fixtures as the
+        phases land: a split part-paid and a <span class="mono">pending_dispatch</span> invoice
+        for Phase 1, the popover and its cancel confirmation for Phase 3, a
+        <code>?mode=reminder</code> run for Phase 4, a re-shot bill for 5–6, a new automation
+        shot for 7, an expanded reference row for 8.
+      </p>
+      <p style="margin-top:0.7rem">
+        It currently collects page errors but <strong>exits zero</strong>. Make it fail hard
+        while you're in there.
+      </p>
+    </div>
+    <div class="panel">
+      <h3>After any change to the left column or the rail</h3>
+      <p>
+        <code>probe-cascade.mjs</code> must stay at 13/13 screens with nothing stuck at
+        opacity&nbsp;0, and <code>probe-transitions.mjs</code> at zero chrome remounts and zero
+        route-loader flashes.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="section-head">
+    <h2>Questions for Oliver</h2>
+    <p>Answer before Phase 5. Phases 1–4 can start now.</p>
+  </div>
+  <div class="q">
+    <div class="q-n">01</div>
+    <div class="q-b">
+      <span class="q-t">Split was deliberately deferred. Un-defer it?</span>
+      <p>The bill's split toggle was logged as a deliberate omission. This plan un-defers it and also adds split to the rent request, which the phone has and desktop never did.</p>
+    </div>
+  </div>
+  <div class="q">
+    <div class="q-n">02</div>
+    <div class="q-b">
+      <span class="q-t">Should the bill keep its pre-selected charge type?</span>
+      <p>Desktop pre-selects "water / utilities", so a bill can go out without the type ever being chosen; the phone forces an explicit pick.</p>
+      <p class="rec">Recommend keeping it — all five chips are visible at once and the design shows a selected chip — but this is the one I'd happily reverse.</p>
+    </div>
+  </div>
+  <div class="q">
+    <div class="q-n">03</div>
+    <div class="q-b">
+      <span class="q-t">Scope chip: wire it or delete it?</span>
+      <p class="rec">Recommend wiring. A dead control is worse than either outcome.</p>
+    </div>
+  </div>
+  <div class="q">
+    <div class="q-n">04</div>
+    <div class="q-b">
+      <span class="q-t">The phone's unreachable screen: wire it up or delete it?</span>
+      <p>See below — it's a phone commit either way, not tablet work.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="section-head">
+    <h2>Out of scope: the phone's dead screen</h2>
+  </div>
+  <div class="panel">
+    <p>
+      <code>BatchAndAutoScreen</code> implements batch send, schedule management and reminder
+      settings on the phone in ~140 lines, and <strong>nothing navigates to it.</strong> The
+      subbar covers only tenants / send / bill / external, and there is no
+      <code>go('batch')</code> anywhere in <code>client/src</code> — the only surviving reference
+      is a <code>busy.batch</code> key in a test fixture. <code>batchMutation</code> is dead with it.
+    </p>
+    <p style="margin-top:0.9rem">
+      So schedule management and reminder settings are missing from <strong>both</strong> clients,
+      and Phase 7 is new functionality rather than parity. Wire it up — a fifth subbar slot,
+      which also gives the phone batch send — or delete it, since once Phase 7 lands an
+      unreachable duplicate of the same UI is a liability. Either way it's a phone commit and
+      doesn't belong in this branch's screen-at-a-time queue.
+    </p>
+  </div>
+</section>
+
+<footer>
+  docs/PLAN-2026-08-15-property-terminal-parity.md · branch feat/tablet-desktop-app
+</footer>
+
+</div>
+
+</body></html>

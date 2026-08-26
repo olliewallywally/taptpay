@@ -27,8 +27,7 @@ export async function runTradesGeneratePass(now: Date = new Date()): Promise<{ g
 
   for (const schedule of schedules) {
     try {
-      const merchant = await storage.getMerchant(schedule.merchantId);
-      if (!billingCardIsReady(merchant)) {
+      if (!billingCardIsReady(await storage.getSubscription(schedule.merchantId))) {
         result.skipped++;
         continue;
       }

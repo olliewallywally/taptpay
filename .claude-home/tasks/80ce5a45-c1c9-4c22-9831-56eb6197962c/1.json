@@ -1,0 +1,9 @@
+{
+  "id": "1",
+  "subject": "Make the phone read as a real session, not a slideshow",
+  "description": "PAUSED. Infra + all 8 scenes rewritten as FRAMES scripts opening on their home screen; tsc clean, jest 27/27, build green. Owed: rerun browser gates after the rewrite, and eyeball filmstrips for the 7 scenes other than retail-sale.",
+  "activeForm": "Making the demo look like real usage",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

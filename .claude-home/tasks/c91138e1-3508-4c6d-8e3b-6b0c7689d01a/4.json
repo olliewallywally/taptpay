@@ -1,0 +1,9 @@
+{
+  "id": "4",
+  "subject": "Step 5 — catch-up migration 0017 for schema history",
+  "description": "One IF NOT EXISTS migration creating the 6 tables (refunds, merchant_settlements, stock_items, api_keys, api_requests, webhook_deliveries) and 15 columns named in plan Step 5. Gate: scratch DB built from migrations/ alone shows zero drift vs shared/schema.ts; scratch DB dropped.",
+  "activeForm": "Writing the catch-up migration",
+  "status": "completed",
+  "blocks": [],
+  "blockedBy": []
+}

@@ -1,9 +1,0 @@
-{
-  "id": "10",
-  "subject": "Sweep B: client money/critical-flow logic bugs",
-  "description": "Checkout, split-payment, quote-builder, invoice creation, terminal, analytics: amount/cents math, split share rounding, GST display, null-guards that crash render, mutation races, wrong conditionals, stale state.",
-  "activeForm": "Sweeping client money/critical-flow logic",
-  "status": "completed",
-  "blocks": [],
-  "blockedBy": []
-}

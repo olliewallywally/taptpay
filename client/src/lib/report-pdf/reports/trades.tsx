@@ -14,6 +14,10 @@ import {
   fmtNZD, fmtDate, dateRangeLabel, calcGSTByMode, daysOverdue,
   inRange, agedBuckets, sumCents, ratePct, fmtPct, buildCSV,
 } from "../../report-utils";
+import {
+  tradesInvoiceRemainingCents,
+  tradesOutstandingCents,
+} from "../../trades-money";
 import { savePdf, downloadCsv } from "../savePdf";
 import type { ReportFormat, DateRange } from "./types";
 
@@ -200,8 +204,17 @@ function QuoteConversionDoc(data: TradesReportData, range: DateRange) {
 function AgedReceivablesDoc(data: TradesReportData) {
   const now = new Date();
   const cmap = byId(data.clients);
-  const overdue = data.invoices.filter((i) => !isPaid(i) && !isVoided(i) && daysOverdue(i.dueAt, now) >= 1);
-  const { buckets, grandTotalCents } = agedBuckets(overdue, (i) => i.dueAt, (i) => i.amountCents ?? 0, now);
+  const overdue = data.invoices.filter(
+    (invoice) =>
+      tradesInvoiceRemainingCents(invoice) > 0 &&
+      daysOverdue(invoice.dueAt, now) >= 1,
+  );
+  const { buckets, grandTotalCents } = agedBuckets<any>(
+    overdue,
+    (invoice) => invoice.dueAt,
+    (invoice) => tradesInvoiceRemainingCents(invoice),
+    now,
+  );
   const oldest = overdue.reduce((m, i) => Math.max(m, daysOverdue(i.dueAt, now)), 0);
 
   const columns: Column<any>[] = [
@@ -209,7 +222,7 @@ function AgedReceivablesDoc(data: TradesReportData) {
     { header: "Email", flex: 2.4, render: (i) => cmap.get(i.clientProfileId)?.email ?? "—" },
     { header: "Site", flex: 2.6, render: (i) => siteOf(i, cmap) },
     { header: "Type", flex: 1.3, render: (i) => kindLabel(i.kind) },
-    { header: "Amount", flex: 1.5, align: "right", render: (i) => <Money cents={i.amountCents ?? 0} /> },
+    { header: "Outstanding", flex: 1.5, align: "right", render: (i) => <Money cents={tradesInvoiceRemainingCents(i)} /> },
     { header: "Days", flex: 1, align: "right", render: (i) => String(daysOverdue(i.dueAt, now)) },
   ];
 
@@ -261,7 +274,7 @@ function ClientStatementDoc(data: TradesReportData, range: DateRange, clientId: 
           const invs = data.invoices
             .filter((i) => i.clientProfileId === c.id && !isVoided(i) && inRange(i.createdAt, range.start, range.end))
             .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-          const balance = sumCents(invs.filter((i) => !isPaid(i)), (i) => i.amountCents ?? 0);
+          const balance = tradesOutstandingCents(invs);
           return (
             <React.Fragment key={c.id}>
               <SectionTitle>{`${clientName(c)}  ·  ${c.siteAddress ?? "—"}`}</SectionTitle>

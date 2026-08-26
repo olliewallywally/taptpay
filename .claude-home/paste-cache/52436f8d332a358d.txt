@@ -1,0 +1,29 @@
+Major 
+
+Mobile UI
+
+Ui across different mobile sizes is not adapting properly, components are getting squished and padding is not correct.we need to make this app perfectly adjust to any size device used; this has to self-adjust all padding, spacing, components, dont etc. shrkink, adjust, resize etc. 
+
+Terminal home, active stack is squished and only showing 1 of the stacks, needs to be atleast 3 
+
+$$ figure in hero section is not shrinking when $$ figure gets large. Need to ensure it has a cut off on space and then font needs tk shrink in size 
+
+The action bar in the terminal keeps breaking, needs to remain thinner and morph smooth across all screens, when clicked, the dark blue highlighted bubble needs to be the correct height, currently its half the height and cutting of thr text on the action bar 
+
+The split bill button keeps customers going shape. When on screen the action is meant to morph and allow space for the split bill pill button and can never be taller in height, needs to stick to the exact height of the action bar
+
+On Mon, Aug 17, 2026 at 10:43 PM Oliver Leonard <oliverharryleonard@gmail.com> wrote:
+
+Major 
+
+Mobile UI
+
+Ui across different mobile sizes is not adapting properly, components are getting squished and padding is not correct.
+
+Terminal home, active stack is squished and only showing 1 of the stacks, needs to be atleast 3 
+
+$$ figure in hero section is not shrinking when $$ figure gets large. Need to ensure it has a cut off on space and then font needs tk shrink in size 
+
+The action bar in the terminal keeps breaking, needs to remain thinner and morph smooth across all screens, when clicked, the dark blue highlighted bubble needs to be the correct height, currently its half the height and cutting of thr text on the action bar 
+
+The split bill button keeps customers going shape. When on screen the action is meant to morph and allow space for the split bill pill button and can never be taller in height, needs to stick to the exact height of the action bar

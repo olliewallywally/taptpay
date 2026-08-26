@@ -53,6 +53,30 @@
   --forest-green-light: hsl(155, 40%, 25%);
   --bronze: hsl(30, 50%, 60%);
   --bronze-light: hsl(30, 40%, 70%);
+
+  /* ── Motion tokens ─────────────────────────────────────────────────────
+     One curve per job. See docs/PLAN-2026-08-15-motion-toning.md.
+
+     The app previously used cubic-bezier(0.34, 1.56, 0.64, 1) as its default
+     for everything. That curve overshoots its target by a measured 9.8%, and
+     CSS applies an animation's timing function to *every keyframe interval* —
+     so on a keyframe set that already bounces, the two compound. Elements
+     ended up travelling ~41px through five direction reversals to move 0px.
+
+     Rule: overshoot comes from --m-ease-pop and nothing else. Keyframe sets
+     stay two-keyframe, so there is at most one reversal. Never put an
+     overshooting curve on height, width, padding, colour, or opacity — those
+     either clip their content or clamp, and read as a glitch either way. */
+  --m-ease-out:  cubic-bezier(0.22, 1, 0.36, 1);    /* expo-out, 0% overshoot — the default */
+  --m-ease-soft: cubic-bezier(0.4, 0, 0.2, 1);      /* state changes: colour, background */
+  --m-ease-pop:  cubic-bezier(0.34, 1.3, 0.64, 1);  /* ~2.5% overshoot — budgeted accents only */
+
+  --m-dur-micro: 120ms;   /* press, hover, toggle */
+  --m-dur-ui:    200ms;   /* tab switch, indicator slide */
+  --m-dur-fade:  180ms;   /* tier 1 entrance */
+  --m-dur-enter: 280ms;   /* tier 2 entrance */
+  --m-dur-pop:   300ms;   /* tier 3 entrance */
+  --m-stagger:    28ms;   /* cascade step; cap at 6 steps (~168ms) */
 }
 
 .dark {
@@ -334,13 +358,21 @@
 
 /* Mobile optimizations */
 @media (max-width: 640px) {
-  /* Ensure touch targets are at least 44px */
-  button, 
-  [role="button"], 
-  input[type="submit"], 
-  input[type="button"] {
-    min-height: 44px;
-    min-width: 44px;
+  /* Keep compact controls visually faithful while giving them a 44px hit area.
+     Apply only to reviewed controls; blanket element minimums broke terminal
+     geometry throughout the phone app. */
+  .tap-target {
+    position: relative;
+  }
+
+  .tap-target::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
   }
   
   /* Improve form input spacing on mobile */
@@ -350,7 +382,6 @@
   input[type="number"], 
   textarea, 
   select {
-    min-height: 44px;
     font-size: 16px; /* Prevents zoom on iOS */
   }
   
@@ -998,11 +1029,14 @@
 }
 
 /* ── Hero: content cross-fade inside the morphing card ──────────────── */
+/* Both sides run at the browser's default ~250ms group (geometry) morph. They
+   used to run 340/500ms, so the card's contents visibly lagged the box; and an
+   overshooting curve on opacity just clamps at 1, making the tail dead time. */
 ::view-transition-old(property-hero) {
-  animation: 340ms cubic-bezier(0.4, 0, 0.2, 1) both pt-fade-out;
+  animation: 250ms var(--m-ease-soft) both pt-fade-out;
 }
 ::view-transition-new(property-hero) {
-  animation: 500ms cubic-bezier(0.34, 1.56, 0.64, 1) both pt-fade-in;
+  animation: 250ms var(--m-ease-out) both pt-fade-in;
 }
 @keyframes pt-fade-out { to   { opacity: 0; } }
 @keyframes pt-fade-in  { from { opacity: 0; } }
@@ -1019,30 +1053,52 @@
   to { opacity: 0; transform: scale(0.97) translateY(-6px); }
 }
 
-/* ── Bounce pop in — used for profile secondary elements ─────────────── */
-@keyframes bouncePopIn {
-  0%   { opacity: 0; transform: translateY(30px) scale(0.86); }
-  55%  { opacity: 1; transform: translateY(-7px) scale(1.045); }
-  74%  { transform: translateY(3px) scale(0.983); }
-  88%  { transform: translateY(-1.5px) scale(1.007); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
-}
+/* ── Entrance tiers ──────────────────────────────────────────────────────
+ *
+ * Three tiers, each a *two-keyframe* set. Tier 0 is "no class at all" — most
+ * chrome (section labels, icons, dividers, timeline rails, anything already
+ * inside a morphing container) should simply be there on arrival.
+ *
+ *   .pt-fade   tier 1  list rows, feed rows, empty states, secondary text
+ *   .pt-bounce tier 2  primary content blocks: hero, chart, search row, panel
+ *   .pt-pop    tier 3  budgeted accents only — two per vertical, max
+ *
+ * `.pt-bounce` keeps its historical name (~25 call sites) but is now a plain
+ * rise: no scale, no bounce. Set the stagger with --pt-d, capped at 6 steps of
+ * --m-stagger; past that a cascade stops reading as motion and starts reading
+ * as lag.
+ */
+@keyframes ptFade { from { opacity: 0; }                             to { opacity: 1; } }
+@keyframes ptRise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes ptPop  { from { opacity: 0; transform: translateY(10px) scale(0.96); } to { opacity: 1; transform: none; } }
 
-/* ── Slide pop from above — used for the top bar ─────────────────────── */
-@keyframes slideInFromTop {
-  from { opacity: 0; transform: translateY(-18px) scale(0.96); }
-  to   { opacity: 1; transform: translateY(0)     scale(1);    }
+.pt-fade {
+  opacity: 0;
+  animation: ptFade var(--m-dur-fade) var(--m-ease-out) both;
+  animation-delay: var(--pt-d, 0ms);
 }
 
 .pt-bounce {
   opacity: 0;
-  animation: bouncePopIn 0.52s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation: ptRise var(--m-dur-enter) var(--m-ease-out) both;
   animation-delay: var(--pt-d, 0ms);
+}
+
+.pt-pop {
+  opacity: 0;
+  animation: ptPop var(--m-dur-pop) var(--m-ease-pop) both;
+  animation-delay: var(--pt-d, 0ms);
+}
+
+/* Slide from above — the only tier-2 variant, for bars anchored to the top. */
+@keyframes slideInFromTop {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: none; }
 }
 
 .pt-slide-top {
   opacity: 0;
-  animation: slideInFromTop 0.30s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: slideInFromTop var(--m-dur-enter) var(--m-ease-out) both;
   animation-delay: var(--pt-d, 0ms);
 }
 
@@ -1054,7 +1110,11 @@
   ::view-transition-new(root) {
     animation-duration: 0.01ms !important;
   }
+  /* These start at opacity 0 and rely on the animation to reveal, so clamping
+     the duration is not enough — drop the animation and restore visibility. */
+  .pt-fade,
   .pt-bounce,
+  .pt-pop,
   .pt-slide-top {
     animation: none !important;
     opacity: 1 !important;

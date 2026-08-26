@@ -20,10 +20,41 @@ export interface User {
   email: string;
   password: string;
   merchantId: number;
-  role: 'merchant' | 'admin';
+  /**
+   * `owner` holds the account (billing, plan, team); `member` is a teammate on
+   * one of the plan's extra seats. `merchant` is the pre-team-logins spelling of
+   * owner and is retained so old code paths still typecheck.
+   */
+  role: 'owner' | 'member' | 'merchant' | 'admin';
+  /** Identity of the users row this principal came from, when there is one. */
+  userId?: number;
   resetToken?: string;
   resetTokenExpiry?: Date;
   createdAt: Date;
+}
+
+/** Owner-equivalent roles. Members are excluded from billing and team writes. */
+export function isAccountOwner(user: Pick<User, 'role'> | undefined | null): boolean {
+  return user?.role === 'owner' || user?.role === 'merchant' || user?.role === 'admin';
+}
+
+/**
+ * Claim marking a token as issued by the team-logins scheme.
+ *
+ * Before team logins, `userId` in a JWT was the *merchant* id and
+ * authenticateToken ignored it entirely. Now that real `users.id` values exist,
+ * an old token's `userId` would address a different row, so tokens without this
+ * claim are rejected outright. The 1h TTL caps the disruption at one re-login.
+ */
+export const TOKEN_PRINCIPAL = 'user' as const;
+const ADMIN_TOKEN_PRINCIPAL = 'admin' as const;
+
+function isMerchantUserRole(role: unknown): role is 'owner' | 'member' {
+  return role === 'owner' || role === 'member';
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
 }
 
 // ============================================
@@ -176,7 +207,7 @@ export function clearFailedAttempts(email: string) {
 }
 
 // Cleanup old login attempts periodically
-setInterval(() => {
+const loginAttemptCleanupTimer = setInterval(() => {
   const now = Date.now();
   
   // Clean email-based attempts
@@ -195,39 +226,16 @@ setInterval(() => {
     }
   }
 }, 10 * 60 * 1000); // Clean up every 10 minutes
+loginAttemptCleanupTimer.unref();
 
 export interface AuthenticatedRequest extends Request {
   user?: User;
 }
 
-// Merchant auth is backed directly by the `merchants` table (email + passwordHash
-// are the source of truth). There is no in-memory user store: it did not survive
-// restarts and was inconsistent across multiple server instances, which could make a
-// valid merchant fail to log in ("Invalid email or password") after a redeploy or on
-// an instance that had not yet synced.
-
-// Build the auth User view of a merchant record.
-function merchantToUser(merchant: {
-  id: number;
-  email: string;
-  passwordHash?: string | null;
-}): User {
-  return {
-    // For merchants the identity IS the merchant id — no separate synthetic id.
-    id: merchant.id,
-    email: merchant.email,
-    password: merchant.passwordHash || '',
-    merchantId: merchant.id,
-    role: 'merchant',
-    createdAt: new Date(),
-  };
-}
-
-// Retained as a no-op for backwards compatibility: callers (index.ts, verify /
-// confirm-email routes) used to call this to rebuild the in-memory store. With the DB
-// as the source of truth there is nothing to sync.
+// Retained for backwards compatibility with startup and verification call sites.
+// User rows are synchronised by the storage write that sets an owner's password.
 export async function syncVerifiedMerchants(): Promise<void> {
-  // no-op — merchant auth reads live from the merchants table
+  // no-op — authentication reads live from the users table
 }
 
 export const JWT_SECRET = process.env.JWT_SECRET ?? (() => {
@@ -237,27 +245,104 @@ export const JWT_SECRET = process.env.JWT_SECRET ?? (() => {
   return 'dev-only-jwt-secret-not-for-production';
 })();
 
+function userRowToUser(row: {
+  id: number;
+  email: string;
+  password: string;
+  merchantId: number | null;
+  role: string;
+  createdAt?: Date | null;
+}): User | null {
+  // Admins are environment-backed, never merchant-scoped database users. Unknown
+  // roles fail closed instead of silently inheriting member access.
+  if (
+    !isPositiveInteger(row.id) ||
+    !isPositiveInteger(row.merchantId) ||
+    !isMerchantUserRole(row.role) ||
+    typeof row.email !== 'string' ||
+    typeof row.password !== 'string'
+  ) {
+    return null;
+  }
+  return {
+    id: row.id,
+    userId: row.id,
+    email: row.email,
+    password: row.password,
+    merchantId: row.merchantId,
+    role: row.role,
+    createdAt: row.createdAt ?? new Date(),
+  };
+}
+
+/**
+ * Resolves a login against the `users` table — one row per person, so a seat can
+ * be revoked without disturbing anyone else's access.
+ *
+ * Three gates, all of which must pass: the user row is active, the parent
+ * merchant is verified/active, and the password matches. A disabled teammate
+ * fails the first gate even though their password is still correct.
+ */
 export async function authenticateUser(email: string, password: string): Promise<User | null> {
   const { storage } = await import('./storage');
-  const merchant = await storage.getMerchantByEmail(email);
-  if (!merchant || !merchant.passwordHash) return null;
 
-  // Only verified/active merchants may log in.
+  const userRow = await storage.getUserByEmail(email);
+  if (!userRow || userRow.status !== 'active') return null;
+
+  const user = userRowToUser(userRow);
+  if (!user) return null;
+
+  const merchant = await storage.getMerchant(user.merchantId);
+  if (!merchant) return null;
   if (merchant.status !== 'verified' && merchant.status !== 'active') return null;
 
-  const isValid = await bcrypt.compare(password, merchant.passwordHash);
+  const isValid = await bcrypt.compare(password, userRow.password);
   if (!isValid) return null;
 
-  return merchantToUser(merchant);
+  // Downgrades are normally blocked while too many seats are occupied, but this
+  // second gate covers races, manual repairs and future migrations. The owner
+  // always retains access so the account can remove seats or fix billing.
+  if (user.role === 'member') {
+    const subscription = await storage.getSubscription(user.merchantId);
+    const seatLimit = subscription?.seatLimit;
+    if (!isPositiveInteger(seatLimit)) return null;
+    const seatsInUse = await storage.countSeatsInUse(user.merchantId);
+    if (seatsInUse > seatLimit) return null;
+  }
+
+  await storage.recordUserLogin(userRow.id, new Date()).catch(() => {});
+  return user;
 }
 
 export function generateToken(user: User): string {
+  const userId = user.userId ?? user.id;
+  if (!isPositiveInteger(userId) || typeof user.email !== 'string' || !user.email) {
+    throw new Error('Cannot issue a token for an invalid principal');
+  }
+
+  if (user.role === 'admin') {
+    const adminEmail = process.env.ADMIN_EMAIL;
+    if (!adminEmail || user.email.toLowerCase() !== adminEmail.toLowerCase() || user.merchantId !== 0) {
+      throw new Error('Cannot issue an admin token for an unconfigured principal');
+    }
+    return jwt.sign(
+      { principal: ADMIN_TOKEN_PRINCIPAL, userId, email: adminEmail, merchantId: 0, role: 'admin' },
+      JWT_SECRET,
+      { expiresIn: '1h' },
+    );
+  }
+
+  if (!isMerchantUserRole(user.role) || !isPositiveInteger(user.merchantId)) {
+    throw new Error('Cannot issue a token without a users-row principal');
+  }
+
   return jwt.sign(
-    { 
-      userId: user.id, 
-      email: user.email, 
+    {
+      principal: TOKEN_PRINCIPAL,
+      userId,
+      email: user.email,
       merchantId: user.merchantId,
-      role: user.role 
+      role: user.role
     },
     JWT_SECRET,
     { expiresIn: '1h' } // 1 hour as requested
@@ -272,73 +357,164 @@ export function verifyToken(token: string): any {
   }
 }
 
+/**
+ * Marks a storage read that never answered, as opposed to one that answered
+ * "no such row".
+ *
+ * Collapsing the two is how a database outage came to be reported to every
+ * signed-in merchant as `404 User not found` — indistinguishable from a deleted
+ * account. Reads on the authentication path go through `readForAuth`, which
+ * returns this marker instead of throwing, so the caller has to decide which of
+ * the two it is rather than falling through to the same answer for both.
+ */
+const STORAGE_UNAVAILABLE = Symbol('auth.storageUnavailable');
+
+async function readForAuth<T>(
+  what: string,
+  read: () => Promise<T>,
+): Promise<T | typeof STORAGE_UNAVAILABLE> {
+  try {
+    return await read();
+  } catch (error) {
+    // Never logged through logSecurityEvent: an outage makes this fire on every
+    // request, and the audit log is an append-only file on the same box.
+    console.error(`[AUTH_STORAGE_UNAVAILABLE] failed to ${what}:`, error);
+    return STORAGE_UNAVAILABLE;
+  }
+}
+
+/**
+ * The honest answer when we cannot tell whether a session is valid. 503 (not
+ * 401/403/404) so the client keeps the credentials it holds: nothing about them
+ * has been disproved, we simply could not check.
+ */
+function respondAuthBackendUnavailable(res: Response) {
+  res.setHeader('Retry-After', '5');
+  return res.status(503).json({
+    code: 'AUTH_BACKEND_UNAVAILABLE',
+    message: 'Could not verify your session right now. This is a problem on our side — please retry.',
+  });
+}
+
 export async function authenticateToken(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+  const match = typeof authHeader === 'string' ? authHeader.match(/^Bearer ([^\s]+)$/i) : null;
 
-  if (!token) {
+  if (!match) {
     return res.status(401).json({ message: 'Access token required' });
   }
-
+  const token = match[1];
   const decoded = verifyToken(token);
   if (!decoded) {
     return res.status(403).json({ message: 'Invalid or expired token' });
   }
 
-  // Handle admin users (not stored in users Map)
+  // A role string alone is not admin authority. Require the dedicated principal,
+  // the configured email, and a zero merchant scope.
   if (decoded.role === 'admin') {
+    const adminEmail = process.env.ADMIN_EMAIL;
+    if (
+      decoded.principal !== ADMIN_TOKEN_PRINCIPAL ||
+      !adminEmail ||
+      typeof decoded.email !== 'string' ||
+      decoded.email.toLowerCase() !== adminEmail.toLowerCase() ||
+      decoded.merchantId !== 0 ||
+      !isPositiveInteger(decoded.userId)
+    ) {
+      return res.status(403).json({ message: 'Invalid admin session' });
+    }
     req.user = {
       id: decoded.userId,
-      email: decoded.email,
-      password: '', // Admin doesn't need password stored
-      merchantId: decoded.merchantId,
-      role: decoded.role,
+      email: adminEmail,
+      password: '',
+      merchantId: 0,
+      role: 'admin',
       createdAt: new Date(),
     };
     return next();
   }
 
-  // Regular merchant: resolve from the merchants table (source of truth).
-  if (!decoded.merchantId) {
-    return res.status(404).json({ message: 'User not found' });
+  // Reject pre-team-logins tokens: their `userId` is a merchant id, so honouring
+  // one would resolve the wrong users row. See TOKEN_PRINCIPAL.
+  if (decoded.principal !== TOKEN_PRINCIPAL) {
+    return res.status(401).json({ message: 'Session expired. Please sign in again.' });
   }
-  try {
-    const { storage } = await import('./storage');
-    const merchant = await storage.getMerchant(decoded.merchantId);
-    if (merchant && (merchant.status === 'verified' || merchant.status === 'active') && merchant.passwordHash) {
-      req.user = merchantToUser(merchant);
-      return next();
-    }
-  } catch {
-    // fall through to user not found below
+
+  if (
+    !isPositiveInteger(decoded.merchantId) ||
+    !isPositiveInteger(decoded.userId) ||
+    !isMerchantUserRole(decoded.role)
+  ) {
+    return res.status(401).json({ code: 'INVALID_SESSION', message: 'Invalid session' });
   }
-  return res.status(404).json({ message: 'User not found' });
+
+  // Each read is guarded on its own, and the decisions sit outside the guard, so
+  // that only a genuine answer from the database can produce a 403/404 — a
+  // rejection here is a statement about this principal, never about our uptime.
+  const storageModule = await readForAuth('load the storage module', () => import('./storage'));
+  if (storageModule === STORAGE_UNAVAILABLE) return respondAuthBackendUnavailable(res);
+  const { storage } = storageModule;
+
+  const userRow = await readForAuth('read the users row', () => storage.getUserById(decoded.userId));
+  if (userRow === STORAGE_UNAVAILABLE) return respondAuthBackendUnavailable(res);
+
+  const user = userRow ? userRowToUser(userRow) : null;
+
+  // Re-check the identity on every request so disabling a teammate takes effect
+  // within the token's remaining lifetime rather than at its natural expiry.
+  if (!userRow || !user || userRow.status !== 'active' || user.merchantId !== decoded.merchantId) {
+    return res.status(403).json({ message: 'Access revoked' });
+  }
+
+  const merchant = await readForAuth('read the merchant row', () => storage.getMerchant(decoded.merchantId));
+  if (merchant === STORAGE_UNAVAILABLE) return respondAuthBackendUnavailable(res);
+
+  // A row that is absent, unverified or suspended — the database answered, and
+  // the answer is that this login has no usable account behind it.
+  if (!merchant || (merchant.status !== 'verified' && merchant.status !== 'active')) {
+    return res.status(403).json({ code: 'ACCESS_REVOKED', message: 'Access revoked' });
+  }
+
+  // The database role is authoritative; stale JWT role claims are ignored.
+  req.user = user;
+  return next();
 }
 
-// Enable password login for a merchant by ensuring its passwordHash is set.
-// (Merchant auth is DB-backed, so "creating a user" means writing the hash onto the
-// merchant record.) Idempotent: won't clobber an already-set hash. Returns the User view.
+// Enable the owner's login and return the real users-row principal. The merchant
+// hash writer synchronises/creates that owner row; re-reading it prevents Google
+// OAuth from minting a token whose uid is accidentally the merchant id.
 export async function createUser(email: string, password: string, merchantId: number, role: 'merchant' | 'admin' = 'merchant'): Promise<User> {
+  if (role === 'admin') {
+    throw new Error('Admin identities cannot be created in the merchant users table');
+  }
+
   const { storage } = await import('./storage');
   const merchant = await storage.getMerchant(merchantId);
   if (!merchant) {
     throw new Error(`Cannot create login for unknown merchant ${merchantId}`);
   }
-
-  if (!merchant.passwordHash) {
-    const hashedPassword = await bcrypt.hash(password, 12);
-    await storage.updateMerchantPasswordHash(merchantId, hashedPassword);
-    merchant.passwordHash = hashedPassword;
+  if (merchant.email.trim().toLowerCase() !== email.trim().toLowerCase()) {
+    throw new Error(`Cannot create login with an email that does not match merchant ${merchantId}`);
   }
 
-  console.log(`Login enabled for ${email} (merchant ${merchantId})`);
-  return merchantToUser(merchant);
+  const passwordHash = merchant.passwordHash || await bcrypt.hash(password, 12);
+  const updated = await storage.updateMerchantPasswordHash(merchantId, passwordHash);
+  if (!updated) {
+    throw new Error(`Failed to enable login for merchant ${merchantId}`);
+  }
+
+  const userRow = await storage.getUserByEmail(merchant.email);
+  const user = userRow ? userRowToUser(userRow) : null;
+  if (!userRow || !user || userRow.status !== 'active' || user.role !== 'owner' || user.merchantId !== merchantId) {
+    throw new Error(`Merchant ${merchantId} does not have a unique active owner login`);
+  }
+  return user;
 }
 
 export async function getUserByEmail(email: string): Promise<User | undefined> {
   const { storage } = await import('./storage');
-  const merchant = await storage.getMerchantByEmail(email);
-  return merchant ? merchantToUser(merchant) : undefined;
+  const userRow = await storage.getUserByEmail(email);
+  return userRow ? userRowToUser(userRow) ?? undefined : undefined;
 }
 
 // Password reset functionality
@@ -346,33 +522,39 @@ export function generateResetToken(): string {
   return crypto.randomBytes(32).toString('hex');
 }
 
-export async function requestPasswordReset(email: string, baseUrl?: string): Promise<boolean> {
-  const resetToken = generateResetToken();
-  const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
+function hashResetToken(token: string): string {
+  return crypto.createHash('sha256').update(token, 'utf8').digest('hex');
+}
 
-  // Look up merchant in database (single source of truth)
+function resetEligible(user: {
+  merchantId: number | null;
+  role: string;
+  status: string;
+  resetTokenExpiry?: Date | null;
+}, now: Date): boolean {
+  const expiry = user.resetTokenExpiry ? new Date(user.resetTokenExpiry).getTime() : Number.NaN;
+  return isPositiveInteger(user.merchantId)
+    && isMerchantUserRole(user.role)
+    && user.status === 'active'
+    && Number.isFinite(expiry)
+    && expiry > now.getTime();
+}
+
+export async function requestPasswordReset(email: string, baseUrl?: string): Promise<boolean> {
   try {
     const { storage } = await import('./storage');
-    const merchant = await storage.getMerchantByEmail(email);
-    
-    if (!merchant) {
-      return true; // Don't reveal if email exists
+    const user = await storage.getUserByEmail(email);
+    if (!user || !isPositiveInteger(user.merchantId) || !isMerchantUserRole(user.role) || user.status !== 'active') {
+      return true; // Do not reveal whether a usable login exists.
     }
 
-    await storage.updateMerchant(merchant.id, {
-      resetToken,
-      resetTokenExpiry,
-    } as any);
-  } catch (error) {
-    console.error('Failed to store reset token in database:', error);
-    return false;
-  }
+    const resetToken = generateResetToken();
+    const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000);
+    await storage.setUserResetToken(user.id, hashResetToken(resetToken), resetTokenExpiry);
 
-  try {
-    await sendPasswordResetEmail(email, resetToken, baseUrl);
-    return true;
+    return await sendPasswordResetEmail(user.email, resetToken, baseUrl);
   } catch (error) {
-    console.error('Failed to send password reset email:', error);
+    console.error('Failed to process password reset request:', error);
     return false;
   }
 }
@@ -380,21 +562,14 @@ export async function requestPasswordReset(email: string, baseUrl?: string): Pro
 export async function resetPassword(token: string, newPassword: string): Promise<boolean> {
   try {
     const { storage } = await import('./storage');
-    const merchant = await storage.getMerchantByResetToken(token);
-    
-    if (!merchant || !merchant.resetTokenExpiry || new Date(merchant.resetTokenExpiry) < new Date()) {
-      return false;
-    }
+    const tokenHash = hashResetToken(token);
+    const now = new Date();
+    const candidate = await storage.getUserByResetToken(tokenHash);
+    if (!candidate || !resetEligible(candidate, now)) return false;
 
     const hashedPassword = await bcrypt.hash(newPassword, 12);
-    
-    await storage.updateMerchant(merchant.id, {
-      passwordHash: hashedPassword,
-      resetToken: null,
-      resetTokenExpiry: null,
-    } as any);
-
-    return true;
+    const updated = await storage.resetUserPasswordByToken(tokenHash, hashedPassword, now);
+    return !!updated && isMerchantUserRole(updated.role) && updated.status === 'active';
   } catch (error) {
     console.error('Failed to reset password:', error);
     return false;
@@ -404,10 +579,8 @@ export async function resetPassword(token: string, newPassword: string): Promise
 export async function validateResetToken(token: string): Promise<boolean> {
   try {
     const { storage } = await import('./storage');
-    const merchant = await storage.getMerchantByResetToken(token);
-    if (merchant && merchant.resetTokenExpiry && new Date(merchant.resetTokenExpiry) > new Date()) {
-      return true;
-    }
+    const user = await storage.getUserByResetToken(hashResetToken(token));
+    return !!user && resetEligible(user, new Date());
   } catch (error) {
     console.error('Failed to validate reset token:', error);
   }

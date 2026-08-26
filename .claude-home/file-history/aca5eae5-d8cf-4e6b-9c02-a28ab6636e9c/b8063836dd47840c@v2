@@ -1,0 +1,38 @@
+---
+name: dev-db-unapplied-migrations
+description: "Dev DB was 3 migrations behind, hanging /api/auth/me and bricking the whole app; fixed 2026-08-09 + how to re-diagnose"
+metadata: 
+  node_type: memory
+  type: project
+  originSessionId: aca5eae5-d8cf-4e6b-9c02-a28ab6636e9c
+  modified: 2026-08-09T05:29:49.498Z
+---
+
+**2026-08-09: "app just loads forever after login" on desktop AND mobile.** Root cause was
+the dev database (helium), not the UI.
+
+`shared/schema.ts` had run ahead of the dev DB: migrations **0011, 0012, 0013 were never
+applied** there. Drizzle's `select()` enumerates every declared column, so
+`getOrCreateSubscription()` issued `select … billing_claim_token …` against a table without
+it → Postgres `42703 undefined_column`.
+
+**Why that bricked the entire app rather than showing an error:** `/api/auth/me` had no
+try/catch, and Express 4 does not route an async rejection to the error handler — so the
+request stayed open forever. `AuthProvider` in `client/src/App.tsx` gates first paint on that
+one call (`isChecking` only clears in `.finally()`), so every device class sat on `PageLoader`
+indefinitely. Fixed by wrapping the handler (uncommitted on `feat/tablet-desktop-app`).
+**~25 other async handlers in `server/routes.ts` still lack try/catch** — same hang is
+reachable through any of them.
+
+**Applied fix:** ran 0011/0012/0013 with `psql -v ON_ERROR_STOP=1`. They are additive and
+re-runnable; verified first that 0013's destructive `UPDATE` matched 0 rows and no user's
+role would flip. Drift went 2 missing tables + 7 missing columns → 0.
+
+**Re-diagnosing drift (the reliable way):** `drizzle.__drizzle_migrations` is EMPTY on dev —
+the DB was built by `db:push`, so applied-state cannot be read from it. Instead diff
+`getTableConfig()` over every export of `shared/schema.ts` against `information_schema.columns`.
+Do NOT `npm run db:push` — see [[db-schema-drift-fk-sequences]].
+
+Also note `pg_stat_activity.state` is `'disabled'` on this Neon instance (track_activities off),
+so it cannot be used to prove "no query is running". Related: [[data-persistence-topology]],
+[[playwright-nix-chromium]], [[server-crash-hardening]].

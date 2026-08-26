@@ -1,0 +1,770 @@
+<!doctype html><html><head><!-- frame-runtime --><base href="/_f/1786966340-4f2a/"><script>window.__FRAME_PREAMBLE={"capabilities":{"artifact":"artifact.BWD0CGLd.js","assets":"assets.BkxVItX2.js","comments":"comments.CqCXYViZ.js","db":"db.5PgiKS-2.js","downloads":"downloads.C3GSvEDP.js","mcp":"mcp.D3B2EyQu.js","permissions":"permissions.BNySkLV5.js","room":"room.BgXZkiYR.js","sample":"sample.B5DdHYz7.js","self":"artifact.BWD0CGLd.js","user":"user.BpKav-Rf.js"},"transforms":"_transforms.BI3gXbbT.js","comments":"_comments.DOfpa5nr.js","translate":"_translate.5HCW4BJh.js"}</script><script>(function(){"use strict";var ce=["light","dark","system"],ue=/^[A-Za-z0-9_-]{1,64}$/,V=/^[a-zA-Z_:][a-zA-Z0-9_:.-]{0,127}$/,fe=new Set(["class","hidden","value","checked"]);function de(e){const t=e.toLowerCase();return t.startsWith("data-")||t.startsWith("aria-")||fe.has(t)}var pe="http://www.w3.org/1999/xhtml",me="http://www.w3.org/2000/svg",ge=new Set(["script","style","iframe","noscript","noframes","noembed","xmp","plaintext","template","title","textarea","object","embed"]),_e=new Set(["script","style"]);function ve(e){const t=e.localName.toLowerCase();return e.namespaceURI===pe?!ge.has(t):e.namespaceURI===me?!_e.has(t):!1}function he(e){if(e===null||typeof e!="object")return!1;const t=e.__frame_patch;if(t===null||typeof t!="object")return!1;const{seq:n,elements:a}=t;if(typeof n!="number"||!Number.isSafeInteger(n)||!Array.isArray(a)||a.length===0||a.length>64)return!1;for(const i of a){if(i===null||typeof i!="object")return!1;const r=i;if(typeof r.target!="string"||!ue.test(r.target)||r.text!==void 0&&typeof r.text!="string")return!1;if(r.attrsSet!==void 0){if(r.attrsSet===null||typeof r.attrsSet!="object")return!1;for(const[l,c]of Object.entries(r.attrsSet))if(!V.test(l)||typeof c!="string")return!1}if(r.attrsRemoved!==void 0){if(!Array.isArray(r.attrsRemoved))return!1;for(const l of r.attrsRemoved)if(typeof l!="string"||!V.test(l))return!1}}return!0}function ye(e){if(e===null||typeof e!="object")return!1;const t=e.__frame_init;return t!==null&&typeof t=="object"}function be(e){return e!==null&&typeof e=="object"&&e.__frame_size_poke===!0}function Ee(e){if(e===null||typeof e!="object")return!1;const t=e.__frame_theme;if(t===null||typeof t!="object")return!1;const n=t.theme;return typeof n=="string"&&ce.includes(n)}function we(e){try{typeof reportError=="function"?reportError(e):setTimeout(()=>{throw e},0)}catch{}}var X=["#62744c","#b04e72","#5b7596","#a3651f","#7a6ba8","#3f7a75"];function J(e){let t=0;for(let n=0;n<e.length;n++)t=t*31+e.charCodeAt(n)>>>0;return X[t%X.length]??"#788c5d"}var Z="#c7c9d1",Ae=["data:image","/svg+xml,"].join("");function Q(e){return Ae+"%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 2 2'%3E%3Ccircle cx='1' cy='1' r='1' fill='"+encodeURIComponent(e)+"'/%3E%3C/svg%3E"}var Se=Object.freeze({id:null,name:"",avatarUrl:Q(Z),color:Z,email:null,isOwner:!1,canEdit:!1});function je(...e){const t=e[0],n=typeof t=="string"?[t]:Array.isArray(t)?t.filter(i=>typeof i=="string"):[],a=Object.create(null);for(const i of n)a[i]={id:i,name:"",avatarUrl:Q(J(i)),color:J(i),email:null,isMe:!1};return a}var ee=Object.freeze(Object.assign(Object.create(null),{user:Object.freeze(Object.assign(Object.create(null),{id:null,isOwner:!1,canEdit:!1,me:Se,profiles:je,name:"",avatarUrl:null,search:Object.freeze([]),email:null}))})),Re={sample:"sample"};function te(){const e=new Uint8Array(20);try{crypto.getRandomValues(e)}catch{for(let n=0;n<e.length;n++)e[n]=Math.floor(Math.random()*256)}let t="";for(const n of e)t+=(n%36).toString(36);return t}function Oe(e,t){const n=r=>{const l={path:r},c=r.split("/");return{id:c[c.length-1],path:r,get:()=>t("get",[l]),set:d=>t("set",[l,d]),update:d=>t("update",[l,d]),delete:()=>t("delete",[l]),acquire:d=>t("acquire",[l,d]),onSnapshot:(d,E)=>t("subscribe",[l,d,E]),collection:d=>i(r+"/"+String(d))}},a=r=>({where:(l,c,d)=>a({...r,where:[...r.where??[],{f:String(l),op:String(c),v:d}]}),orderBy:(l,c)=>a({...r,orderBy:{f:String(l),dir:c===void 0?"asc":String(c)}}),limit:l=>a({...r,limit:Number(l)}),get:()=>t("query",[r]),onSnapshot:(l,c)=>t("subscribe",[r,l,c])}),i=r=>({...a({collection:r}),path:r,doc:l=>n(r+"/"+(l===void 0?te():String(l))),add:l=>{const c=n(r+"/"+te());return Promise.resolve(c.set(l)).then(()=>c)}});e.doc=r=>n(String(r)),e.collection=r=>i(String(r))}var Pe=Object.freeze([]);function Te(e,t){let n=null,a=null;const i=()=>e.__settled;e.peers=()=>Pe,e.connected=()=>!1,e.emit=()=>i()?.()??Promise.resolve(),e.presence=r=>{const l=i();if(l)return l();let c=null;if(r!==null&&typeof r=="object")try{Array.isArray(r)||(c={...r})}catch{}return c===null?Promise.reject({code:"invalid_argument",message:"presence takes an object"}):(n===null&&(n=Object.create(null),a=Promise.resolve(t("presence",[n]))),Object.assign(n,c),a)}}var B="__frame_scroll",Me=150,Le=310,ke=160,Ce=3e4;function Ne(){let e=0,t=!1,n=!1,a=!1,i=0,r=null;const l=u=>{try{sessionStorage.setItem(B,JSON.stringify({y:u}))}catch{}},c=()=>{if(clearTimeout(e),r===null)return;const u=r;r=null,l(u)},d=()=>{if(t){t=!1;return}n=!0,r=scrollY,clearTimeout(e),e=setTimeout(c,Me)};try{addEventListener("scroll",d,{passive:!0}),addEventListener("pagehide",c)}catch{}const E=()=>{let u;try{u=sessionStorage.getItem(B)}catch{return null}if(u===null)return null;let g;try{g=JSON.parse(u)}catch{g=null}const f=g?.y;if(!(typeof f=="number"&&Number.isFinite(f)&&f>=0)){try{sessionStorage.removeItem(B)}catch{}return null}return f};let T=!1;const h=u=>{try{const g=scrollY;scrollTo({top:u,left:0,behavior:"instant"}),i=u,a=!0,clearTimeout(e),r=null,l(u);const f=scrollY;f!==g&&(t=!0),f!==u&&!T&&(T=!0,addEventListener("load",()=>{try{if(scrollY===f){const p=E();h(p!==null?p:i)}}catch{}},{once:!0}))}catch{}},R=()=>{try{return!!location.hash}catch{return!0}};let A=!1;const O=()=>{try{if(A||innerWidth>Le||innerHeight>ke)return;A=!0;const u=Date.now(),g=()=>{try{removeEventListener("resize",g)}catch{}if(Date.now()-u>Ce||n||R())return;const f=E();h(f!==null?f:i)};addEventListener("resize",g)}catch{}};let M=!1,o=!1;return{restore(){if(M||(M=!0,R()))return;const u=E();u!==null&&(h(u),O())},promoted(){if(o||(o=!0,R()))return;const u=E();u!==null?(h(u),O()):a&&h(i)}}}var Ye="modulepreload",We=function(e){return"/"+e},Ke={},Ue=function(t,n,a){let i=Promise.resolve();function r(l){const c=new Event("vite:preloadError",{cancelable:!0});if(c.payload=l,window.dispatchEvent(c),!c.defaultPrevented)throw l}return i.then(l=>{for(const c of l||[])c.status==="rejected"&&r(c.reason);return t().catch(r)})};(function(){const e=Object.defineProperty,t=globalThis,n=["RTCPeerConnection","webkitRTCPeerConnection","RTCDataChannel","RTCIceCandidate","RTCSessionDescription","RTCRtpSender","RTCRtpReceiver"];let a=0;for(let i=0;i<n.length;i++){const r=n[i];try{e(t,r,{value:void 0,writable:!1,configurable:!1})}catch{try{delete t[r]}catch{}try{e(t,r,{value:void 0,writable:!1,configurable:!0})}catch{}}typeof t[r]=="function"&&a++}if(a&&window!==top)try{parent.postMessage({__frame_rtc_lockdown_failed:a},"*")}catch{}})();var qe=1e4,Ie=Object.freeze([...window.__FRAME_PREAMBLE?.origins??["https://claude.ai","https://preview.claude.ai"]]);function re(e){for(const t of Ie)if(t.endsWith(":*"))try{const n=new URL(e);if(`${n.protocol}//${n.hostname}:*`===t)return!0}catch{}else if(e===t)return!0;return!1}var k=Object.freeze({...window.__FRAME_PREAMBLE?.capabilities}),x=window.__FRAME_PREAMBLE?.transforms,$=window.__FRAME_PREAMBLE?.comments,z=window.__FRAME_PREAMBLE?.translate,q=/^[\w.-]+\.js$/,De=/^[a-z][a-z0-9_-]{0,63}$/;function I(e){return Ue(()=>import("/_runtime/"+e),void 0)}function Be(e,t){return{contract:e.contract,changes:new Set(e.changes??[]),flags:new Set(e.flags??[]),capabilities:e.capabilities??{},capBudgets:e.capBudgets??{},transforms:new Map,shellOrigin:t,mount:Y,pipe:()=>({wrap:(n,a)=>(...i)=>{try{return a(...i)}catch(r){return Promise.reject(r)}}})}}var ne=null,C=null;function F(e,t,n){try{Object.defineProperty(e,t,{value:n,writable:!1,configurable:!1,enumerable:!0})}catch{try{Object.defineProperty(e,t,{value:n,writable:!1,configurable:!0,enumerable:!0})}catch{}}}var H=!1;function xe(e,t){const n=[];for(const a of e.elements){const i=document.querySelector(`[data-id="${a.target}"]`);if(!i){parent.postMessage({__frame_patch_miss:{seq:e.seq}},t);return}if([...Object.keys(a.attrsSet??{}),...a.attrsRemoved??[]].some(r=>!de(r))){parent.postMessage({__frame_patch_miss:{seq:e.seq}},t);return}if(a.text!==void 0&&!ve(i)){parent.postMessage({__frame_patch_miss:{seq:e.seq}},t);return}for(const[r,l]of Object.entries(a.attrsSet??{}))if(!oe(i,r)){try{i.setAttribute(r,l)}catch{}se(i,r,l)}for(const r of a.attrsRemoved??[])oe(i,r)||(i.removeAttribute(r),se(i,r,null));typeof a.text=="string"&&(i.textContent=a.text),n.push(a.target)}try{document.dispatchEvent(new CustomEvent("claude:edit",{detail:{seq:e.seq,targets:n}}))}catch{}}function se(e,t,n){if(!(e instanceof HTMLInputElement))return;const a=t.toLowerCase();a==="checked"?e.checked=n!==null:a==="value"&&e.type!=="file"&&(e.value=n??"")}function oe(e,t){const n=t.toLowerCase(),a=e;return n==="data-id"||(n==="value"||n==="checked")&&(a.__artifactSecret===!0||/^(password|hidden|file)$/.test(a.type??"")||/(^|\s)(cc-|one-time-code|current-password|new-password)/i.test(`${e.getAttribute("autocomplete")??""} ${a.autocomplete??""}`))}function ae(e){const t=document.documentElement;e==="light"||e==="dark"?(t.dataset.theme=e,t.style.colorScheme=e,H=!0):H&&(delete t.dataset.theme,t.style.colorScheme="",H=!1)}var ie=256,N=Object.assign(Object.create(null),{mcp:Object.assign(Object.create(null),{watchTool:{handlerArg:3}}),db:Object.assign(Object.create(null),{subscribe:{handlerArg:1,errArg:2}}),room:Object.assign(Object.create(null),{on:{handlerArg:1,errArg:2},onPeers:{handlerArg:0,errArg:1},onConnection:{handlerArg:0,errArg:1}})}),$e=Object.assign(Object.create(null),{db:(e,t)=>Oe(e,t),room:(e,t,n)=>Te(e,n)}),j=new Map;function Y(e,t){const n=j.get(e);if(!n)return;const a=Object.assign(Object.create(null),t);Object.assign(n.impl,a),n.r(n.ns),n.impl.__settled=()=>Promise.reject({code:"capability_removed",message:`${e}: method not in this runtime`});const i=n.queue;n.queue=[];for(const r of i){const l=a[r.method];if(l)if(N[e]?.[r.method])try{r.resolve(l(...r.args))}catch{U(r,N[e][r.method],{code:"transform_error",message:`${e}.${r.method} rejected its arguments`})}else l(...r.args).then(r.resolve,r.reject);else{const c={code:"capability_removed",message:`${e}.${r.method} is not in this runtime`},d=N[e]?.[r.method];if(d){U(r,d,c);continue}r.reject(c)}}}function ze(e,t){const n=j.get(e);if(!n)return;n.impl.__settled=()=>Promise.reject(t),n.r(null);const a=n.queue;n.queue=[];for(const i of a){const r=N[e]?.[i.method];if(r){U(i,r,t);continue}i.reject(t)}}function le(e,t){if(typeof e=="function")try{return e(...t)}catch{return Object.create(null)}return Array.isArray(e)?[...e]:e!==null&&typeof e=="object"?{...e}:e}function D(e,t){const n=ee[e];if(!n){ze(e,t);return}j.get(e)?.r(null),Y(e,Object.fromEntries(Object.entries(n).map(([a,i])=>[a,(...r)=>Promise.resolve(le(i,r))])))}function U(e,t,n){if(e.syncState?.dead)return;const a=t.errArg===void 0?void 0:e.args[t.errArg],i=t.errArg===void 0?e.args[t.handlerArg]:a;typeof i=="function"&&queueMicrotask(()=>{if(!e.syncState?.dead)try{i(t.errArg===void 0?{type:"error",error:n}:n)}catch(r){we(r)}})}var W=Object.getOwnPropertyDescriptor(window,"claude");if(window!==top&&!(W&&W.writable===!1)){const e=x&&q.test(x)?I(x).catch(()=>{}):Promise.resolve(void 0),t=o=>{if(o.type==="auxclick"&&o.button!==1)return;const u=o.target,g=u&&u.closest?u.closest("a[href],area[href]"):null;if(!g)return;const f=g.getAttribute("href");if(!f)return;let p,P;try{p=new URL(f,document.baseURI),P=new URL(document.baseURI).origin}catch{return}if((p.protocol==="http:"||p.protocol==="https:")&&p.origin!==P){o.preventDefault();const w=(g.getAttribute("target")??"").toLowerCase(),y=o.type==="auxclick"||o.metaKey||o.ctrlKey||o.shiftKey||o.altKey||!["","_self","_top","_parent"].includes(w);parent.postMessage({__frame_nav:!0,url:p.href,newTab:y},"*")}};addEventListener("click",t,!0),addEventListener("auxclick",t,!0);const n={},a=o=>{o.isTrusted&&(n.pointer=!0)},i=o=>{o.isTrusted&&(n.click=!0)};addEventListener("pointermove",a,{capture:!0,passive:!0}),addEventListener("click",i,{capture:!0,passive:!0}),e.then(o=>{o?.wireNav&&(o.wireNav(),removeEventListener("click",t,!0),removeEventListener("auxclick",t,!0),removeEventListener("pointermove",a,!0),removeEventListener("click",i,!0),o.wireEngagement?.(n))});let r=null;try{r=Ne()}catch{}const l=W?.value??{};F(window,"claude",l);const c=o=>{let u;const g=new Promise(v=>{u=v}),f={impl:Object.create(null),queue:[],u:g,r:u,ns:null};j.set(o,f);const p=f.impl,P=v=>({code:"queue_overflow",message:`${o}.${v}: pre-init call queue is full`}),w=(v,s)=>{if(f.queue.length>=ie){const m=ee[o];return m&&v in m?Promise.resolve(le(m[v],s)):Promise.reject(P(v))}return new Promise((m,_)=>{f.queue.push({method:v,args:s,resolve:m,reject:_})})},y=Re[o],L=new Proxy(y===void 0?p:(()=>{}),{apply:(v,s,m)=>{const _=y,b=p[_]??p.__settled;return b?b(...m):w(_,m)},get:(v,s)=>{if(typeof s!="string"||s==="then"||s==="toJSON"||s==="valueOf")return;if(s==="toString")return Object.prototype.toString;if(y!==void 0&&(s==="call"||s==="apply"||s==="bind"))return Function.prototype[s];const m=N[o]?.[s];return m?(..._)=>{if(typeof _[m.handlerArg]!="function")throw new TypeError(`${o}.${s} requires a handler function`);const b=p[s];if(b)return b(..._);if(p.__settled){const S={dead:!1},Fe={args:[..._],syncState:S};return p.__settled().catch(He=>U(Fe,m,He)),()=>{S.dead=!0}}if(f.queue.length>=ie){const S={dead:!1};return U({args:[..._],syncState:S},m,P(s)),()=>{S.dead=!0}}let K=null;const G={dead:!1};return f.queue.push({method:s,args:_,resolve:S=>{K=typeof S=="function"?S:null,G.dead&&K?.()},reject:()=>{},syncState:G}),()=>{G.dead=!0,K?.()}}:(..._)=>{const b=p[s]??p.__settled;return b?b(..._):w(s,_)}},set:()=>!1});$e[o]?.(p,(v,s)=>L[v](...s),w),f.ns=L,F(l,o,L)};for(const o of Object.keys(k)){if(l[o]!==void 0){F(l,o,l[o]);continue}c(o)}if(l.use===void 0){const o=u=>{if(typeof u!="string"||!Object.hasOwn(k,u))return Promise.resolve(null);const g=j.get(u);return g?g.u:Promise.resolve(l[u]??null)};try{Object.defineProperty(l,"use",{value:o,writable:!0,configurable:!0,enumerable:!1})}catch{}}let d=null,E=null,T=0;const h=o=>{o.source!==parent||!re(o.origin)||ye(o.data)&&(d=o.data.__frame_init,C=o.origin,removeEventListener("message",h),clearTimeout(T),E?.())};addEventListener("message",h),parent.postMessage({__frame_connect:!0},"*");const R=new Promise(o=>{E=o,T=setTimeout(()=>{removeEventListener("message",h),o()},qe)}),A=document.readyState==="loading"?new Promise(o=>document.addEventListener("DOMContentLoaded",()=>o(),{once:!0})):Promise.resolve();A.then(()=>{try{r?.restore()}catch{}});const O={cb:null},M=o=>{if(!(o.source!==parent||!re(o.origin))&&be(o.data)){try{r?.promoted()}catch{}O.cb?.()}};addEventListener("message",M),R.then(async()=>{if(!d||!C){for(const s of j.keys())D(s,{code:"not_granted",message:"frame initialization did not arrive - capability unavailable"});return}ae(d.theme);const o=C;let u=!1,g=!1;addEventListener("message",s=>{if(s.source!==parent||s.origin!==o)return;Ee(s.data)&&ae(s.data.__frame_theme.theme),he(s.data)&&xe(s.data.__frame_patch,o);const m=s.data?.__fc_mode;m&&typeof m=="object"&&!u&&$&&q.test($)&&(u=!0,I($).then(b=>b.install?.(o,m.on===!0)).catch(()=>{}));const _=s.data?.__ft_cmd;_&&typeof _=="object"&&!g&&z&&q.test(z)&&(g=!0,I(z).then(b=>b.install?.(o,_)).catch(()=>{}))});const f=Object.keys(d.capabilities??{});for(const s of f)Object.hasOwn(k,s)||De.test(s)&&l[s]===void 0&&(c(s),D(s,{code:"capability_disabled",message:"capability not in this runtime generation"}));const p=f.filter(s=>Object.hasOwn(k,s)).map(s=>[s,k[s]]).filter(s=>typeof s[1]=="string"&&q.test(s[1])),P=await Promise.allSettled(p.map(([,s])=>I(s))),w=await e,y=C;w?.buildBoot||parent.postMessage({__frame_cap_telemetry:{kind:"cap-load-error",cap:"_transforms"}},y),ne=w?.buildBoot?w.buildBoot(d,w.TRANSFORMS??{},{shellOrigin:y,mount:Y},s=>parent.postMessage({__frame_cap_telemetry:s},y)):Be(d,y);const L=s=>parent.postMessage({__frame_cap_telemetry:{kind:"cap-load-error",cap:s}},y),v=ne;P.forEach((s,m)=>{const _=p[m][0];if(s.status!=="fulfilled"){L(_);return}try{s.value?.install?.(v)}catch{L(_)}});for(const[s,m]of j)if(m.impl.__settled===void 0){if(f.includes(s)){D(s,{code:"capability_disabled",message:"capability not available in this session"});continue}D(s,{code:"not_granted",message:"capability not available in this session"})}await A,parent.postMessage({__frame_ready:!0},C),e.then(s=>s?.installSizeReporter?.(y,O))})}})();</script><!-- /frame-runtime --><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}</style></head><body>
+<title>The Blue Box and the Dock</title>
+<style>
+  :root {
+    --ground:      #F1F3F8;
+    --surface:     #FFFFFF;
+    --surface-2:   #E9EDF6;
+    --navy:        #040D6D;
+    --dock-navy:   #02093D;
+
+    --ink:         #0B1338;
+    --ink-2:       #4A5378;
+    --ink-3:       #838CAB;
+
+    --accent:      #1F6FE0;
+    --accent-soft: #58ABFF;
+    --accent-wash: #E3EDFC;
+
+    --spill:       #BE3346;
+    --spill-wash:  #FBE7EA;
+    --good:        #0B8F62;
+    --good-wash:   #E0F4EC;
+
+    --line:        #D9DEEC;
+    --line-soft:   #E7EBF4;
+    --shadow:      0 1px 2px rgba(11,19,56,.05), 0 8px 24px -12px rgba(11,19,56,.18);
+
+    --display: "Outfit", "Avenir Next", "Segoe UI Variable Display", system-ui, -apple-system, sans-serif;
+    --body: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --data: ui-monospace, "SF Mono", SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+
+    --col: 68ch;
+    --gutter: 88px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #060A22;
+      --surface:     #0C1231;
+      --surface-2:   #121A40;
+      --navy:        #061276;
+      --dock-navy:   #02093D;
+      --ink:         #E9ECF7;
+      --ink-2:       #A3ABC9;
+      --ink-3:       #6D779C;
+      --accent:      #74B6FF;
+      --accent-soft: #58ABFF;
+      --accent-wash: #13224C;
+      --spill:       #FF8592;
+      --spill-wash:  #35141C;
+      --good:        #45D9A4;
+      --good-wash:   #0C2C22;
+      --line:        #1F2A56;
+      --line-soft:   #162044;
+      --shadow:      0 1px 2px rgba(0,0,0,.4), 0 8px 28px -14px rgba(0,0,0,.7);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:      #060A22;
+    --surface:     #0C1231;
+    --surface-2:   #121A40;
+    --navy:        #061276;
+    --dock-navy:   #02093D;
+    --ink:         #E9ECF7;
+    --ink-2:       #A3ABC9;
+    --ink-3:       #6D779C;
+    --accent:      #74B6FF;
+    --accent-soft: #58ABFF;
+    --accent-wash: #13224C;
+    --spill:       #FF8592;
+    --spill-wash:  #35141C;
+    --good:        #45D9A4;
+    --good-wash:   #0C2C22;
+    --line:        #1F2A56;
+    --line-soft:   #162044;
+    --shadow:      0 1px 2px rgba(0,0,0,.4), 0 8px 28px -14px rgba(0,0,0,.7);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: calc(var(--gutter) + var(--col) + 96px); margin: 0 auto; padding: 0 24px 120px; }
+
+  header.mast { padding: 76px 0 34px; }
+  .eyebrow {
+    font-family: var(--data); font-size: 11.5px; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--ink-3); margin: 0 0 20px;
+  }
+  h1 {
+    font-family: var(--display); font-weight: 800; letter-spacing: -0.045em;
+    font-size: clamp(40px, 6.6vw, 70px); line-height: .98; margin: 0 0 22px; text-wrap: balance;
+  }
+  h1 em { font-style: normal; color: var(--accent); }
+  .standfirst {
+    font-size: clamp(17px, 2.1vw, 20px); line-height: 1.5; color: var(--ink-2);
+    max-width: 60ch; margin: 0 0 30px;
+  }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 10px; font-family: var(--data); font-size: 12px; color: var(--ink-2); }
+  .meta span { border: 1px solid var(--line); border-radius: 3px; padding: 4px 9px; background: var(--surface); }
+  .meta span b { font-weight: 600; color: var(--ink); }
+
+  .ticks {
+    height: 9px;
+    background:
+      repeating-linear-gradient(to right, var(--line) 0 1px, transparent 1px 12px) bottom / 100% 5px no-repeat,
+      linear-gradient(to right, var(--line), var(--line)) bottom / 100% 1px no-repeat;
+  }
+
+  section { padding-top: 58px; }
+  .sec-head { display: grid; grid-template-columns: var(--gutter) minmax(0,1fr); gap: 0 8px; align-items: baseline; margin-bottom: 22px; }
+  .sec-num { font-family: var(--data); font-size: 12px; letter-spacing: .1em; color: var(--accent); padding-top: 6px; }
+  h2 { font-family: var(--display); font-weight: 700; letter-spacing: -0.032em; font-size: clamp(25px, 3.4vw, 33px); line-height: 1.12; margin: 0; text-wrap: balance; }
+  h3 { font-family: var(--display); font-weight: 700; letter-spacing: -0.022em; font-size: 19px; line-height: 1.25; margin: 0 0 8px; }
+
+  .body { display: grid; grid-template-columns: var(--gutter) minmax(0,1fr); gap: 0 8px; }
+  .body > .rail { font-family: var(--data); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding-top: 7px; }
+  .body > .flow { min-width: 0; }
+  .flow > * + * { margin-top: 16px; }
+  .flow p { margin: 0; max-width: var(--col); }
+  .flow ul { margin: 0; padding-left: 20px; max-width: var(--col); }
+  .flow li + li { margin-top: 7px; }
+
+  @media (max-width: 700px) {
+    .sec-head, .body { grid-template-columns: 1fr; }
+    .body > .rail { padding: 0 0 8px; }
+    :root { --gutter: 0px; }
+  }
+
+  code, .num { font-family: var(--data); font-size: .88em; font-variant-numeric: tabular-nums; }
+  code { background: var(--surface-2); border-radius: 3px; padding: 1px 5px; color: var(--ink); overflow-wrap: anywhere; }
+  a { color: var(--accent); }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+
+  .tw { overflow-x: auto; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); box-shadow: var(--shadow); }
+  table { border-collapse: collapse; width: 100%; min-width: 480px; font-size: 14.5px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  thead th {
+    font-family: var(--data); font-size: 11px; letter-spacing: .09em; text-transform: uppercase;
+    color: var(--ink-3); font-weight: 600; background: var(--surface-2);
+    border-bottom: 1px solid var(--line); white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.n, th.n { font-family: var(--data); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .spill { color: var(--spill); font-weight: 600; }
+  .ok { color: var(--good); font-weight: 600; }
+
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 5px; padding: 22px 24px; box-shadow: var(--shadow); }
+  .card > * + * { margin-top: 13px; }
+  .card p { margin: 0; max-width: var(--col); }
+  .where { font-family: var(--data); font-size: 12px; color: var(--ink-3); }
+
+  pre { margin: 0; background: var(--surface-2); border: 1px solid var(--line-soft); border-radius: 4px; padding: 13px 15px; overflow-x: auto; font-family: var(--data); font-size: 12.5px; line-height: 1.55; color: var(--ink); }
+  pre code { background: none; padding: 0; font-size: inherit; }
+
+  figure { margin: 0; }
+  figcaption { font-family: var(--data); font-size: 11.5px; color: var(--ink-3); margin-top: 10px; line-height: 1.5; }
+
+  /* ─────────── panel-overflow diagram ─────────── */
+  .phones { display: flex; flex-wrap: wrap; gap: 22px; }
+  .phone-fig { flex: 0 0 auto; }
+  .phone {
+    position: relative;
+    width: 104px;
+    border: 2px solid var(--ink-3);
+    border-radius: 12px;
+    background: var(--surface-2);
+    overflow: visible;
+  }
+  .phone-clip { position: relative; overflow: hidden; border-radius: 10px; }
+  .p-hero { background: var(--surface); }
+  .p-navy { background: var(--navy); }
+  .p-spill {
+    background: repeating-linear-gradient(-45deg, var(--spill) 0 3px, transparent 3px 7px);
+    border-top: 1px dashed var(--spill);
+    opacity: .85;
+  }
+  .p-dock {
+    position: absolute; left: 12px; right: 12px; bottom: 6px; height: 11px;
+    background: var(--dock-navy); border-radius: 6px;
+    outline: 1.5px dashed var(--accent-soft); outline-offset: 2px;
+  }
+  .phone-label { font-family: var(--data); font-size: 11px; color: var(--ink-2); margin-top: 9px; text-align: center; }
+  .phone-note { font-family: var(--data); font-size: 10.5px; color: var(--spill); text-align: center; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; font-family: var(--data); font-size: 11.5px; color: var(--ink-3); }
+  .legend i { font-style: normal; }
+  .sw { display: inline-block; width: 11px; height: 11px; border-radius: 2px; vertical-align: -1px; margin-right: 5px; }
+
+  /* ─────────── tap zone diagram ─────────── */
+  .tapzone {
+    position: relative; height: 88px; border-radius: 6px;
+    background: var(--surface-2); border: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .tz-region {
+    position: absolute; left: 8%; right: 8%; top: 18px; bottom: 18px;
+    background: var(--spill-wash); border: 1.5px dashed var(--spill); border-radius: 5px;
+  }
+  .tz-handle { position: relative; width: 56px; height: 4px; border-radius: 999px; background: var(--dock-navy); }
+  .tz-tag {
+    position: absolute; font-family: var(--data); font-size: 10.5px; letter-spacing: .04em;
+  }
+  .tz-tag.a { color: var(--spill); left: 8%; top: 2px; }
+  .tz-tag.b { color: var(--ink-2); left: 50%; transform: translateX(-50%); bottom: 2px; }
+
+  /* ─────────── the live goo demo ─────────── */
+  .goo-demo {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
+    padding: 26px 24px 22px; box-shadow: var(--shadow);
+  }
+  .goo-stage {
+    height: 92px; border-radius: 6px;
+    background: linear-gradient(180deg, var(--accent-wash), var(--surface-2));
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  .goo-dock { position: relative; width: 280px; height: 58px; }
+  .goo-layer-a { position: absolute; inset: 0; }
+  .goo-layer-a.morphing { filter: url(#dockGoo); }
+  .blob {
+    position: absolute; top: 50%; left: 50%; background: var(--dock-navy); border-radius: 999px;
+    width: var(--w); height: var(--h);
+    transform: translate(-50%,-50%) translateX(var(--x));
+    transition: width .46s cubic-bezier(.65,0,.35,1),
+                height .46s cubic-bezier(.65,0,.35,1),
+                transform .46s cubic-bezier(.65,0,.35,1);
+  }
+  .goo-dock[data-state="open"]   .blob { --x: calc((var(--i) - 2) * 56px); --w: 62px; --h: 48px; }
+  .goo-dock[data-state="closed"] .blob { --x: calc((var(--i) - 2) * 5px);  --w: 26px; --h: 4px;  }
+  /* the bar body: at rest it makes the silhouette a clean pill, so the resting dock
+     never shows the seams between slots. It collapses with everything else. */
+  .blob.bar { border-radius: 24px; }
+  .goo-dock[data-state="open"]   .blob.bar { --x: 0px; --w: 280px; --h: 48px; }
+  .goo-dock[data-state="closed"] .blob.bar { --x: 0px; --w: 56px;  --h: 4px;  }
+
+  .goo-layer-b { position: absolute; inset: 0; display: flex; align-items: center; justify-content: space-around; padding: 0 16px; }
+  .goo-icon {
+    color: var(--accent-soft); display: flex; opacity: 1; transform: scale(1);
+    transition: opacity .17s ease .2s, transform .3s cubic-bezier(.34,1.56,.64,1) .16s;
+  }
+  .goo-dock[data-state="closed"] .goo-icon { opacity: 0; transform: scale(.62); transition-delay: 0s; }
+  .goo-icon.active { color: #FFFFFF; }
+
+  .goo-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 16px; }
+  .goo-btn {
+    font-family: var(--data); font-size: 12px; letter-spacing: .04em;
+    background: var(--accent); color: #FFFFFF; border: none; border-radius: 4px;
+    padding: 8px 14px; cursor: pointer;
+  }
+  .goo-btn.ghost { background: transparent; color: var(--accent); border: 1px solid var(--line); }
+  .goo-state { font-family: var(--data); font-size: 11.5px; color: var(--ink-3); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .blob, .goo-icon { transition-duration: .01ms !important; }
+    .goo-layer-a.morphing { filter: none; }
+  }
+
+  /* ─────────── phases ─────────── */
+  .phases { display: grid; gap: 10px; }
+  .phase {
+    display: grid; grid-template-columns: 44px minmax(0,1fr); gap: 0 16px;
+    background: var(--surface); border: 1px solid var(--line);
+    border-left: 3px solid var(--accent-soft); border-radius: 4px; padding: 16px 18px;
+  }
+  .phase-n { font-family: var(--display); font-weight: 800; font-size: 24px; letter-spacing: -0.04em; color: var(--ink-3); line-height: 1; }
+  .phase p { margin: 0; color: var(--ink-2); font-size: 15px; max-width: 62ch; }
+  .phase .gate { margin-top: 9px; font-family: var(--data); font-size: 11.5px; color: var(--ink-3); }
+  .phase .gate b { color: var(--ink-2); font-weight: 600; }
+
+  .decision { background: var(--surface); border: 1px solid var(--line); border-radius: 5px; padding: 18px 20px; }
+  .decision + .decision { margin-top: 10px; }
+  .decision p { margin: 0; color: var(--ink-2); font-size: 15px; }
+  .decision p + p { margin-top: 8px; }
+  .rec {
+    font-family: var(--data); font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--good); background: var(--good-wash); padding: 2px 7px; border-radius: 3px;
+    margin-left: 6px; white-space: nowrap;
+  }
+
+  footer { margin-top: 72px; padding-top: 22px; border-top: 1px solid var(--line); font-family: var(--data); font-size: 12px; color: var(--ink-3); }
+  footer p { margin: 0 0 6px; max-width: 70ch; }
+</style>
+
+<svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+  <filter id="dockGoo" x="-60%" y="-60%" width="220%" height="220%" color-interpolation-filters="sRGB">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="b"/>
+    <feColorMatrix in="b" type="matrix"
+      values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -10"/>
+  </filter>
+</svg>
+
+<div class="page">
+
+  <header class="mast">
+    <p class="eyebrow">Diagnosis &amp; plan · terminal feature screens + nav dock</p>
+    <h1>The blue box <em>and the dock</em></h1>
+    <p class="standfirst">
+      The navy panel doesn't fill the screen — it overflows it. On every phone, 50 to 78&nbsp;px
+      of it sits permanently behind the nav dock, which nothing on a feature screen reserves
+      space for. The three requests turn out to be one job: collapse the dock, and the box has
+      room to fill.
+    </p>
+    <div class="meta">
+      <span><b>2026-08-17</b></span>
+      <span>5 feature screens × <b>4 phone sizes</b></span>
+      <span>goo filter <b>prototyped in-app</b></span>
+      <span>status <b>diagnosis complete, no code changed</b></span>
+    </div>
+  </header>
+
+  <div class="ticks"></div>
+
+  <!-- ══════════ 01 ══════════ -->
+  <section>
+    <div class="sec-head"><div class="sec-num">01</div><h2>Why the blue box is cut off</h2></div>
+    <div class="body">
+      <div class="rail">Panel</div>
+      <div class="flow">
+        <p>
+          <code>.tp-screen</code> is a flex column: the off-white hero is <code>height: 50%</code>,
+          the navy panel is <code>flex: 1</code>. But a flex item's default
+          <code>min-height: auto</code> refuses to shrink below its content — and the keypad's
+          content is <span class="num">4 × 76 px keys + 3 × 14 px gaps + 66 px padding =
+          412&nbsp;px</span>. On a 568&nbsp;px phone that renders <strong>412&nbsp;px tall in a
+          284&nbsp;px slot</strong>, and <code>overflow: hidden</code> amputates the rest.
+        </p>
+
+        <figure>
+          <div class="phones" id="phones"></div>
+          <div class="legend" style="margin-top:14px">
+            <i><span class="sw" style="background:var(--navy)"></span>navy panel</i>
+            <i><span class="sw" style="background:var(--spill)"></span>content past the screen edge</i>
+            <i><span class="sw" style="background:var(--dock-navy);outline:1.5px dashed var(--accent-soft);outline-offset:1px"></span>dock, covering the panel</i>
+          </div>
+          <figcaption>
+            Keypad screen, to scale. On the two smallest phones the panel runs off the bottom of
+            the device; on all four, the dock sits on top of what's left.
+          </figcaption>
+        </figure>
+
+        <div class="tw">
+          <table>
+            <thead><tr><th>Screen</th><th class="n">320×568</th><th class="n">375×667</th><th class="n">390×844</th><th class="n">430×932</th></tr></thead>
+            <tbody>
+              <tr><td>keypad</td><td class="n"><span class="spill">100 cut</span> / 178 dock</td><td class="n"><span class="spill">12.6 cut</span> / 90.6</td><td class="n">— / <span class="spill">50</span></td><td class="n">— / <span class="spill">50</span></td></tr>
+              <tr><td>split</td><td class="n"><span class="spill">8.8 cut</span> / 86.8</td><td class="n">— / 50</td><td class="n">— / <span class="spill">50</span></td><td class="n">— / <span class="spill">50</span></td></tr>
+              <tr><td>stock</td><td class="n"><span class="spill">2.8 cut</span> / 80.8</td><td class="n">—</td><td class="n">— / <span class="spill">78</span></td><td class="n">— / <span class="spill">78</span></td></tr>
+              <tr><td>share</td><td class="n">—</td><td class="n">— / 62.4</td><td class="n">— / <span class="spill">56</span></td><td class="n">— / <span class="spill">56</span></td></tr>
+              <tr><td>cash</td><td class="n"><span class="spill">75.2 cut</span> / 153.2</td><td class="n">— / 54.2</td><td class="n">— / <span class="spill">50</span></td><td class="n">— / <span class="spill">50</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          The second number is the bug that survives on every device. Confirmed visually: on a
+          430×932 iPhone 15 Pro Max the share screen's download / SMS / email row is entirely
+          behind the dock, and on the stock screen the confirm button is completely covered. On a
+          320&nbsp;px phone the keypad is worse than clipped — keys <span class="num">7 8 9 · 0 ⌫</span>
+          are below the fold with no scroll container, so they <strong>cannot be reached at
+          all</strong>.
+        </p>
+
+        <div class="card">
+          <h3>Nothing on a feature screen reserves the dock</h3>
+          <p class="where">The dock is 78 px expanded, 64 px collapsed. Home reserves 90. The feature screens reserve:</p>
+          <div class="tw">
+            <table>
+              <thead><tr><th>Screen</th><th class="n">padding-top</th><th class="n">padding-bottom</th></tr></thead>
+              <tbody>
+                <tr><td>home (off-white)</td><td class="n">154 px</td><td class="n ok">90 px</td></tr>
+                <tr><td>keypad</td><td class="n">38 px</td><td class="n spill">28 px</td></tr>
+                <tr><td>cash</td><td class="n">40 px</td><td class="n spill">28 px</td></tr>
+                <tr><td>stock</td><td class="n">52 px</td><td class="n spill">0 px</td></tr>
+                <tr><td>share</td><td class="n">52 px</td><td class="n spill">22 px</td></tr>
+                <tr><td>split</td><td class="n">56 px</td><td class="n spill">28 px</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            Six top paddings and five bottom paddings, none derived from anything, none matching
+            the dock. Same failure mode as RC-3 in the companion plan: absolute-pixel choreography
+            around chrome that nothing measures.
+          </p>
+        </div>
+
+        <div class="card">
+          <h3>And 50/50 can't host the keypad on small phones</h3>
+          <div class="tw">
+            <table>
+              <thead><tr><th>Device</th><th class="n">navy panel gets</th><th class="n">4 keypad rows need</th><th>verdict</th></tr></thead>
+              <tbody>
+                <tr><td>320×568</td><td class="n">206 px</td><td class="n">346 px</td><td class="spill">keys must drop 76 → ~40 px</td></tr>
+                <tr><td>375×667</td><td class="n">255 px</td><td class="n">346 px</td><td class="spill">keys must drop 76 → ~52 px</td></tr>
+                <tr><td>390×844</td><td class="n">344 px</td><td class="n">346 px</td><td>fits once the split flexes</td></tr>
+                <tr><td>430×932</td><td class="n">388 px</td><td class="n">346 px</td><td class="ok">fits</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            Two things have to change together: <strong>the split has to flex</strong> — the hero
+            gives up height on short screens — and <strong>key size has to be fluid</strong>.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ 02 ══════════ -->
+  <section>
+    <div class="sec-head"><div class="sec-num">02</div><h2>Why the dock pops up on any touch</h2></div>
+    <div class="body">
+      <div class="rail">Dock</div>
+      <div class="flow">
+        <p>
+          <code>TerminalDockView.tsx:131</code> puts three expand triggers on the wrapper —
+          <code>onTouchStart</code>, <code>onMouseMove</code>, and <code>onClick</code> — and the
+          wrapper is the full width of the strip.
+        </p>
+
+        <figure>
+          <div class="tapzone">
+            <span class="tz-region"></span>
+            <span class="tz-tag a">320 × 44 — expands on any touch</span>
+            <span class="tz-handle"></span>
+            <span class="tz-tag b">56 × 4 — the part you can see</span>
+          </div>
+          <figcaption>
+            To scale. <span class="num">14,080 px²</span> of trigger behind
+            <span class="num">224 px²</span> of affordance — a ratio of <span class="num">63 : 1</span>.
+            Probed with a 30-point grid: <strong>30 of 30 points expand it</strong>, and
+            <code>touch-action</code> is <code>auto</code>, so nothing is reserved for a gesture.
+          </figcaption>
+        </figure>
+
+        <div class="card">
+          <h3>The collapse is a crossfade, not a morph</h3>
+          <div class="tw">
+            <table>
+              <thead><tr><th>Element</th><th>Animates</th><th class="n">Duration</th></tr></thead>
+              <tbody>
+                <tr><td>wrapper</td><td><code>height</code> 58 → 44</td><td class="n">0.5 s</td></tr>
+                <tr><td>handle pill</td><td><code>width</code> 0 → 56, <code>height</code> 0 → 4, <code>opacity</code> 0 → 1</td><td class="n">0.45 / 0.3 s</td></tr>
+                <tr><td>dock body</td><td><code>opacity</code> 1 → 0, <code>scale</code> 1 → 0.85</td><td class="n">0.3 / 0.45 s</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            Two separate objects fading through each other. Nothing is ever formless — the dock
+            stays a crisp rounded rectangle right up to opacity 0, and the handle arrives already
+            fully formed. That's why it reads as structured the whole way through.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ 03 ══════════ -->
+  <section>
+    <div class="sec-head"><div class="sec-num">03</div><h2>The ooze, prototyped</h2></div>
+    <div class="body">
+      <div class="rail">Morph</div>
+      <div class="flow">
+        <p>
+          Press the button. The blobs merge under an SVG gooey filter — a Gaussian blur whose
+          alpha channel is then hard-contrasted, so overlapping blurs snap into one shape with a
+          meniscus where they join. That meniscus is the ooze.
+        </p>
+
+        <div class="goo-demo">
+          <div class="goo-stage">
+            <div class="goo-dock" id="gooDock" data-state="open">
+              <div class="goo-layer-a" id="gooLayerA">
+                <span class="blob bar" style="--i:2"></span>
+                <span class="blob" style="--i:0"></span>
+                <span class="blob" style="--i:1"></span>
+                <span class="blob" style="--i:2"></span>
+                <span class="blob" style="--i:3"></span>
+                <span class="blob" style="--i:4"></span>
+              </div>
+              <div class="goo-layer-b" aria-hidden="true" id="gooLayerB"></div>
+            </div>
+          </div>
+          <div class="goo-controls">
+            <button class="goo-btn" id="gooToggle" type="button">Collapse</button>
+            <button class="goo-btn ghost" id="gooFilter" type="button">Filter: on during transition</button>
+            <span class="goo-state" id="gooState">state: open · filter idle</span>
+          </div>
+        </div>
+        <p class="where">
+          Layer A (blobs) carries the filter; layer B (icons) never does. Toggling the filter off
+          shows the same choreography as a plain geometry morph — the fallback in D3.
+        </p>
+
+        <div class="card">
+          <h3>Two layers, and the second one is mandatory</h3>
+          <p>
+            Applying the filter to the <em>real</em> dock, icons included, blurred every icon into
+            an unreadable smudge. So: <strong>layer A</strong> is filtered and holds solid shapes
+            only — one blob per slot plus the active-tab indicator. <strong>Layer B</strong> sits
+            above, unfiltered, and holds the icons on their own timeline.
+          </p>
+          <pre><code>&lt;filter id="dock-goo" x="-60%" y="-60%" width="220%" height="220%"
+        color-interpolation-filters="sRGB"&gt;
+  &lt;feGaussianBlur in="SourceGraphic" stdDeviation="8" result="b"/&gt;
+  &lt;feColorMatrix in="b" type="matrix"
+    values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -10"/&gt;
+&lt;/filter&gt;</code></pre>
+          <p>
+            The explicit filter region matters — the default −10 % / +10 % clips a
+            <code>stdDeviation: 8</code> blur and the blobs get square edges at the boundary.
+          </p>
+        </div>
+
+        <div class="card">
+          <h3>Choreography — structureless, then structured</h3>
+          <div class="tw">
+            <table>
+              <thead><tr><th class="n">Progress</th><th>Collapse ≈420 ms</th><th>Expand ≈480 ms</th></tr></thead>
+              <tbody>
+                <tr><td class="n">0–35 %</td><td>icons fade + scale to 0.7; filter <b>on</b></td><td>handle stretches wide, still one blob</td></tr>
+                <tr><td class="n">35–70 %</td><td>five blobs converge and merge into one lozenge — no discrete parts</td><td>the lozenge separates into five blobs travelling to their slots</td></tr>
+                <tr><td class="n">70–100 %</td><td>lozenge thins to the 56 × 4 handle; filter <b>off</b></td><td>blobs settle, filter <b>off</b>, icons fade in last</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            <code>filter: none</code> at rest in both states — zero steady-state cost, and the
+            resting dock stays a crisp pill. The prototype showed visible scalloping between slots
+            if the filter is left on. Toggle it on <code>transitionstart</code> /
+            <code>transitionend</code>, never a timer, so it can't be left on.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ 04 ══════════ -->
+  <section>
+    <div class="sec-head"><div class="sec-num">04</div><h2>Swipe, don't tap</h2></div>
+    <div class="body">
+      <div class="rail">Gesture</div>
+      <div class="flow">
+        <p>
+          <strong>Track the gesture, don't detect it.</strong> A discrete "swipe recognised →
+          expand" still feels like a trigger; following the finger and snapping is what reads as
+          intentional. The codebase already has this idiom in three drag sheets —
+          <code>transactions.tsx:512</code>, <code>property-analytics.tsx:309</code>,
+          <code>trades-analytics.tsx:317</code> — pointer events plus <code>touch-action: none</code>
+          plus <code>transition: dragging ? 'none' : '…'</code>.
+        </p>
+        <pre><code>pointerdown on the handle → capture, record y0, dragging = true, transition off
+pointermove               → dy = y0 - y;  progress = clamp(dy / 56, 0, 1)
+                            rubber-band past 1.0; abort if |dx| &gt; |dy|
+pointerup / cancel        → progress &gt; 0.45 (or velocity &gt; 0.4 px/ms) ? expand : settle closed</code></pre>
+        <ul>
+          <li><strong>Shrink the hit area</strong> from 320 × 44 to about 120 × 36, centred on the handle. That alone kills "it pops up if you touch it".</li>
+          <li><strong><code>touch-action: none</code> on the handle only</strong> — never the full-width strip, or a page scroll starting near the bottom edge gets eaten.</li>
+          <li><strong>Delete <code>onTouchStart</code> and <code>onMouseMove</code></strong> from the expand path. Keep the expand-on-route-change — that's intent, not a stray touch.</li>
+          <li><strong>Downward swipe collapses</strong>, symmetrically, when expanded.</li>
+          <li><strong>Keyboard and AT must still work.</strong> The handle becomes a real <code>&lt;button aria-expanded&gt;</code> named "show navigation". Keyboard activation expands; a pointer tap does not — distinguish with <code>event.detail === 0</code>, not <code>onClick</code> alone, which fires for both.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ 05 ══════════ -->
+  <section>
+    <div class="sec-head"><div class="sec-num">05</div><h2>The plan</h2></div>
+    <div class="body">
+      <div class="rail">Execution</div>
+      <div class="flow">
+        <p>
+          B depends on A and on the companion plan's token layer. C depends on B. F depends on D
+          and E — the morph is only worth building once the collapsed state is one you enter
+          deliberately. A, D and E are independently shippable.
+        </p>
+        <div class="phases">
+          <div class="phase">
+            <div class="phase-n">A</div>
+            <div>
+              <h3>Publish the dock's real height</h3>
+              <p>One <code>ResizeObserver</code> on the dock writes <code>--dock-h</code> (78 expanded, 64 collapsed, 0 absent). Every screen reads the same value, so the six-paddings problem can't recur.</p>
+              <p class="gate"><b>Gate:</b> no content behind the dock — 5 screens × 6 sizes</p>
+            </div>
+          </div>
+          <div class="phase">
+            <div class="phase-n">B</div>
+            <div>
+              <h3>The panel fills the screen</h3>
+              <p><code>.tp-screen</code> becomes a two-row grid that lets the hero yield; the navy panel gets the <code>min-height: 0</code> it's missing plus a real scroll region with <code>overscroll-behavior: contain</code>. Delete all six hand-tuned paddings.</p>
+              <p class="gate"><b>Gate:</b> nothing clipped past the viewport; the hero yields before the panel does</p>
+            </div>
+          </div>
+          <div class="phase">
+            <div class="phase-n">C</div>
+            <div>
+              <h3>Fluid keypad and tiles</h3>
+              <p>Key size clamps against the panel's own container box, so the keypad fits rather than scrolls.</p>
+              <p class="gate"><b>Gate:</b> 4 keypad rows visible without scrolling at 320×568</p>
+            </div>
+          </div>
+          <div class="phase">
+            <div class="phase-n">D</div>
+            <div>
+              <h3>Collapse the dock on feature screens</h3>
+              <p>A <code>collapsed</code> control prop (<code>auto | collapsed | expanded</code>) lets the terminal request the collapsed state on a feature screen and release it on home — converting <code>--dock-h</code> from 78 to 64 and moving the object that's covering the confirm buttons.</p>
+              <p class="gate"><b>Gate:</b> <code>--dock-h</code> reports 64 on a feature screen, 78 on home</p>
+            </div>
+          </div>
+          <div class="phase">
+            <div class="phase-n">E</div>
+            <div>
+              <h3>Pointer-tracked swipe</h3>
+              <p>Shrink the hit area, drop the touch/mouse-move triggers, add the <code>aria-expanded</code> keyboard path.</p>
+              <p class="gate"><b>Gate:</b> a tap anywhere on the strip does <b>not</b> expand; a 56 px upward drag does; Enter on the handle does; page scroll near the bottom edge still works</p>
+            </div>
+          </div>
+          <div class="phase">
+            <div class="phase-n">F</div>
+            <div>
+              <h3>The two-layer goo morph</h3>
+              <p>Filter alive only during the transition, icons on their own unfiltered layer, reduced-motion path to a 150 ms cross-fade.</p>
+              <p class="gate"><b>Gate:</b> icons legible at every frame; <code>filter: none</code> at rest in both states; no dropped frames on device</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ 06 ══════════ -->
+  <section>
+    <div class="sec-head"><div class="sec-num">06</div><h2>Four calls, and one honest unknown</h2></div>
+    <div class="body">
+      <div class="rail">Decisions</div>
+      <div class="flow">
+        <div class="decision">
+          <h3>D1 · Does the panel scroll, or must everything fit?</h3>
+          <p><strong>Always fit, down to 320×568</strong><span class="rec">recommended</span> — scrolling only as the safety net for screens that genuinely can't, like the stock grid, which already scrolls. A keypad you have to scroll is a broken keypad.</p>
+        </div>
+        <div class="decision">
+          <h3>D2 · Dock on feature screens: collapse, or hide?</h3>
+          <p><strong>Collapse</strong><span class="rec">recommended</span> — navigation stays reachable and the layout height stays constant between screens.</p>
+          <p>Hiding is defensible: every feature screen already carries its own ✕ / ✓ subhead for cancel and commit, so the dock is redundant there, and it would give back another 64 px. Your call.</p>
+        </div>
+        <div class="decision">
+          <h3>D3 · Fallback if the goo misbehaves on iOS</h3>
+          <p>A geometry-only morph — one element animating <code>width</code> / <code>height</code> / <code>border-radius</code> from pill to handle with a squash-and-stretch overshoot, icons fading first. Reads as melting rather than oozing, but it's bulletproof. Build the choreography so the goo layer is an <em>enhancement</em> behind a flag, not the mechanism the timing depends on.</p>
+        </div>
+        <div class="decision">
+          <h3>D4 · Swipe distance and direction</h3>
+          <p><strong>56 px of upward travel or a 0.4 px/ms flick</strong><span class="rec">recommended</span>, dock tracking the finger throughout, downward swipe collapsing again. Worth feeling on a real device before the numbers are fixed.</p>
+        </div>
+        <div class="decision">
+          <h3>The unknown · filter cost on a real phone GPU</h3>
+          <p>Headless Chromium showed <strong>no measurable difference</strong> from baseline — median 16.7 ms, p95 16.8, zero long frames across a 1.5 s animation, identical unfiltered. Headless is not a phone GPU, so that proves the budget isn't blown, not that it's free. Fold a real-device check into the iOS gate already pending in the tablet/desktop handoff.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>
+      Measured against the dev server on :5000 with the nix Chromium and
+      <code>scripts/desktop-shots/retail-fixtures.mjs</code>, at
+      <code>hasTouch: true, isMobile: true</code>. Five feature screens × four phone viewports,
+      plus a 30-point hit-zone grid and a goo filter injected into the live app.
+    </p>
+    <p>
+      Full plan: <code>docs/PLAN-2026-08-17-terminal-panels-and-dock.md</code> · companion:
+      <code>docs/PLAN-2026-08-17-mobile-responsive-ui.md</code>
+    </p>
+  </footer>
+</div>
+
+<script>
+  /* ── panel-overflow diagram, drawn from the measured numbers ── */
+  (function () {
+    // [label, viewport h, navy panel top, navy panel height, px of content past the screen]
+    const DEVICES = [
+      ["320 × 568", 568, 284, 412, 100],
+      ["375 × 667", 667, 333, 412, 13],
+      ["390 × 844", 844, 422, 422, 0],
+      ["430 × 932", 932, 466, 466, 0],
+    ];
+    const SCALE = 0.26;
+    const host = document.getElementById("phones");
+    for (const [label, vh, navyTop, navyH, cut] of DEVICES) {
+      const visibleNavy = Math.min(navyH, vh - navyTop);
+      const spill = Math.max(0, navyH - visibleNavy);
+      const fig = document.createElement("figure");
+      fig.className = "phone-fig";
+      fig.innerHTML =
+        '<div class="phone">' +
+          '<div class="phone-clip" style="height:' + (vh * SCALE) + 'px">' +
+            '<div class="p-hero" style="height:' + (navyTop * SCALE) + 'px"></div>' +
+            '<div class="p-navy" style="height:' + (visibleNavy * SCALE) + 'px"></div>' +
+            '<div class="p-dock"></div>' +
+          '</div>' +
+          (spill > 0
+            ? '<div class="p-spill" style="height:' + (spill * SCALE) + 'px;border-radius:0 0 10px 10px"></div>'
+            : "") +
+        '</div>' +
+        '<div class="phone-label">' + label + '</div>' +
+        (cut > 0 ? '<div class="phone-note">' + cut + ' px unreachable</div>' : '');
+      host.appendChild(fig);
+    }
+  })();
+
+  /* ── the goo demo ── */
+  (function () {
+    const layerB = document.getElementById("gooLayerB");
+    const svgs = [
+      '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1.5 1.5 0 01-1.5 1.5h-15A1.5 1.5 0 013 20V9.5z"/><path d="M9 21.5V14h6v7.5"/></svg>',
+      '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5v8l9 5 9-5V8z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/></svg>',
+      '<svg width="22" height="22" viewBox="0 0 32 22" fill="none"><path d="M4 4l6 7-6 7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 18h13" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>',
+      '<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3.5" y="3.5" width="17" height="17" rx="4" stroke="currentColor" stroke-width="1.7"/><path d="M8 16.5V11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M12 16.5V7.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M16 16.5v-3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+      '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.6"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>',
+    ];
+    svgs.forEach(function (markup, i) {
+      const span = document.createElement("span");
+      span.className = "goo-icon" + (i === 2 ? " active" : "");
+      span.innerHTML = markup;
+      layerB.appendChild(span);
+    });
+
+    const dock = document.getElementById("gooDock");
+    const layerA = document.getElementById("gooLayerA");
+    const toggle = document.getElementById("gooToggle");
+    const filterBtn = document.getElementById("gooFilter");
+    const state = document.getElementById("gooState");
+    let filterEnabled = true;
+    let timer = null;
+
+    function report(phase) {
+      state.textContent = "state: " + dock.dataset.state + " · filter " + phase;
+    }
+
+    toggle.addEventListener("click", function () {
+      const opening = dock.dataset.state === "closed";
+      if (filterEnabled) { layerA.classList.add("morphing"); report("active"); }
+      dock.dataset.state = opening ? "open" : "closed";
+      toggle.textContent = opening ? "Collapse" : "Expand";
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        layerA.classList.remove("morphing");
+        report("idle");
+      }, 500);
+      report(filterEnabled ? "active" : "off");
+    });
+
+    filterBtn.addEventListener("click", function () {
+      filterEnabled = !filterEnabled;
+      if (!filterEnabled) layerA.classList.remove("morphing");
+      filterBtn.textContent = filterEnabled ? "Filter: on during transition" : "Filter: off (D3 fallback)";
+      report(filterEnabled ? "idle" : "off");
+    });
+
+    report("idle");
+  })();
+</script>
+
+</body></html>

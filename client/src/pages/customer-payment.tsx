@@ -79,10 +79,13 @@ export default function CustomerPayment() {
 
   useEffect(() => {
     if (!id) return;
-    sseClient.connect(id, stoneNumber);
+    sseClient.connectCustomer(id, stoneNumber);
 
     const handleTransactionUpdate = (message: any) => {
-      if (stoneNumber && message.transaction.taptStoneId !== stoneNumber) return;
+      const expectedMode = stoneNumber ? "board" : "legacy-no-board";
+      if (message.addressingMode !== expectedMode) return;
+      if (stoneNumber && (message.stoneId !== stoneNumber || message.transaction.taptStoneId !== stoneNumber)) return;
+      if (!stoneNumber && message.transaction.taptStoneId !== null) return;
       setCurrentTransaction(message.transaction);
       queryClient.setQueryData(["/api/merchants", id, "active-transaction", stoneNumber], message.transaction);
 

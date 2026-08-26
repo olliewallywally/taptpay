@@ -1,9 +1,0 @@
-{
-  "id": "2",
-  "subject": "Stage 2: restyle checkout.tsx to navy design (all verticals)",
-  "description": "Replace style constants (1468-1651) + JSX with navy card design per plan; sky-blue card panel; HF fieldStyle values + 3DS overlay color; restyle all sibling states; zero changes to payment wiring (see DO NOT TOUCH in plan).",
-  "activeForm": "Restyling checkout page",
-  "status": "in_progress",
-  "blocks": [],
-  "blockedBy": []
-}

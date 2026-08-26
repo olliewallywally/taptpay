@@ -9,12 +9,71 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { getCurrentMerchantId } from "@/lib/auth";
+import { apiErrorMessage } from "@/lib/api-error";
 import { apiRequest } from "@/lib/queryClient";
-import { isNativeApp, isNativeIOS } from "@/lib/native";
+import { isNativeApp } from "@/lib/native";
+import { usePushNotifications } from "@/hooks/use-push-notifications";
+import {
+  BILLING_CARD_SESSION_KEY,
+  useBillingCardReturn,
+} from "@/hooks/use-billing-card-return";
 import { TRADES_THEME } from "@/lib/trades-theme";
 import { Switch } from "@/components/ui/switch";
 import { WireframeLiquidButton } from "@/components/wireframe-liquid-button";
 import { useTutorial } from "@/features/tutorial/tutorial";
+import { PLAN_LIST, formatPlanPrice, planForOrDefault, type PlanId } from "@shared/plans";
+import {
+  cardSetupBillingDisclosure,
+  hasPaidCurrentSubscriptionPeriod,
+  planChangeBillingDisclosure,
+  subscriptionCancellationState,
+} from "@/lib/subscription-ui";
+
+interface TeamMember {
+  id: number;
+  email: string;
+  name: string | null;
+  role: string;
+  status: string;
+  lastLoginAt: string | null;
+}
+
+interface BillingHistoryEntry {
+  id: number;
+  billingType: string;
+  amount: string | number;
+  status: string;
+  description: string | null;
+  failureReason: string | null;
+  paidAt: string | null;
+  createdAt: string | null;
+}
+
+interface AuthMeResponse {
+  user: {
+    id: number;
+    email: string;
+    role: string;
+  };
+}
+
+const billingMoney = (value: string | number) =>
+  new Intl.NumberFormat("en-NZ", { style: "currency", currency: "NZD" })
+    .format(Number(value) || 0);
+
+const billingDate = (value: string | null) => value
+  ? new Date(value).toLocaleDateString("en-NZ", { day: "numeric", month: "short", year: "numeric" })
+  : "—";
+
+const BILLING_TYPE_LABELS: Record<string, string> = {
+  monthly_subscription: "Monthly subscription",
+  plan_change: "Plan change",
+  transaction_fees: "Legacy transaction fees",
+  tier_upgrade: "Legacy tier upgrade",
+};
+
+const billingTypeLabel = (value: string) =>
+  BILLING_TYPE_LABELS[value] ?? value.replace(/_/g, " ");
 import { 
   Upload, CheckCircle, XCircle, LogOut, AlertCircle, Bell, BellOff, ChevronDown, Printer, ArrowRight, CreditCard, Building2, Wrench, BookOpen, RotateCcw
 } from "lucide-react";
@@ -88,6 +147,7 @@ export default function Settings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const merchantId = getCurrentMerchantId();
+  const { confirmingCard } = useBillingCardReturn();
   const {
     restartTutorials,
     visitedPages: tutorialVisitedPages,
@@ -126,23 +186,25 @@ export default function Settings() {
   const [dailyGoal, setDailyGoal] = useState('500');
   
   // Subscription state
-  const [billingFrequency, setBillingFrequency] = useState('monthly');
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancellationReason, setCancellationReason] = useState('');
 
-  // Billing card state
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvc, setCardCvc] = useState('');
-  const [showCardForm, setShowCardForm] = useState(false);
+  // Team invites
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteName, setInviteName] = useState('');
+
+  // Billing card state. The card itself is entered on Windcave's hosted page —
+  // no PAN, expiry or CVC is ever held in this component.
   const [cardSaving, setCardSaving] = useState(false);
   const [cardRemoving, setCardRemoving] = useState(false);
 
-  // Push notification state
-  const [pushEnabled, setPushEnabled] = useState(false);
-  const [pushLoading, setPushLoading] = useState(false);
-  const [pushSupported, setPushSupported] = useState(false);
-  const [vapidAvailable, setVapidAvailable] = useState(false);
+  const {
+    enabled: pushEnabled,
+    loading: pushLoading,
+    supported: pushSupported,
+    available: vapidAvailable,
+    toggle: togglePushNotifications,
+  } = usePushNotifications();
 
   const [gstRegistered, setGstRegistered] = useState(false);
   const [tradeGstMode, setTradeGstMode] = useState<"inclusive" | "exclusive">("inclusive");
@@ -165,221 +227,16 @@ export default function Settings() {
     });
   };
 
-  useEffect(() => {
-    if (isNativeIOS()) {
-      setPushSupported(true);
-      fetch('/api/push/capabilities')
-        .then(r => r.json())
-        .then(caps => {
-          setVapidAvailable(!!caps?.nativePush?.available);
-          checkNativePushStatus();
-        })
-        .catch(() => {
-          setVapidAvailable(false);
-        });
-    } else {
-      const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
-      setPushSupported(supported);
-      if (supported) {
-        fetch('/api/push/capabilities')
-          .then(r => r.json())
-          .then(caps => {
-            const webReady = !!caps?.webPush?.available;
-            setVapidAvailable(webReady);
-            if (webReady) checkPushStatus();
-          })
-          .catch(() => setVapidAvailable(false));
-      }
-    }
-  }, []);
-
-  async function checkNativePushStatus() {
-    try {
-      const { PushNotifications } = await import('@capacitor/push-notifications');
-      const { receive } = await PushNotifications.checkPermissions();
-      if (receive !== 'granted') {
-        setPushEnabled(false);
-        return;
-      }
-      const token = localStorage.getItem("authToken");
-      if (token) {
-        const statusResp = await fetch('/api/push/status', {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-        if (statusResp.ok) {
-          const status = await statusResp.json();
-          setPushEnabled(!!status.nativeSubscribed);
-          return;
-        }
-      }
-      setPushEnabled(true);
-    } catch {
-      setPushSupported(false);
-    }
-  }
-
-  async function checkPushStatus() {
-    try {
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
-      setPushEnabled(!!subscription);
-    } catch {
-      setPushEnabled(false);
-    }
-  }
-
-  async function togglePushNotifications(enable: boolean) {
-    if (isNativeIOS()) {
-      return toggleNativePushNotifications(enable);
-    }
-    return toggleWebPushNotifications(enable);
-  }
-
-  async function toggleNativePushNotifications(enable: boolean) {
-    setPushLoading(true);
-    try {
-      const { PushNotifications } = await import('@capacitor/push-notifications');
-      if (enable) {
-        const permStatus = await PushNotifications.requestPermissions();
-        if (permStatus.receive !== 'granted') {
-          toast({ title: "Notification permission denied", description: "Please enable in iOS Settings > TaptPay", variant: "destructive" });
-          setPushLoading(false);
-          return;
-        }
-        await new Promise<void>((resolve, reject) => {
-          const timer = setTimeout(() => reject(new Error('Registration timed out')), 15000);
-          const regHandle = PushNotifications.addListener('registration', async (token) => {
-            clearTimeout(timer);
-            regHandle.then(h => h.remove());
-            errHandle.then(h => h.remove());
-            try {
-              const authToken = localStorage.getItem("authToken");
-              const resp = await fetch('/api/push/native-subscribe', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-                body: JSON.stringify({ deviceToken: token.value }),
-              });
-              if (resp.ok) {
-                setPushEnabled(true);
-                toast({ title: "Notifications enabled", description: "You'll receive alerts for transaction updates" });
-                resolve();
-              } else {
-                reject(new Error("Server rejected device token"));
-              }
-            } catch (e) { reject(e); }
-          });
-          const errHandle = PushNotifications.addListener('registrationError', async (err) => {
-            clearTimeout(timer);
-            regHandle.then(h => h.remove());
-            errHandle.then(h => h.remove());
-            reject(new Error(err.error));
-          });
-          PushNotifications.register();
-        });
-      } else {
-        const authToken = localStorage.getItem("authToken");
-        const unsubResp = await fetch('/api/push/native-unsubscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-        });
-        if (!unsubResp.ok) {
-          throw new Error("Server failed to remove notification subscription");
-        }
-        setPushEnabled(false);
-        toast({ title: "Notifications disabled" });
-      }
-    } catch (error) {
-      console.error("Native push toggle error:", error);
-      toast({ title: "Failed to update notification settings", variant: "destructive" });
-    }
-    setPushLoading(false);
-  }
-
-  async function toggleWebPushNotifications(enable: boolean) {
-    setPushLoading(true);
-    try {
-      if (enable) {
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') {
-          toast({ title: "Notification permission denied", description: "Please enable notifications in your browser settings", variant: "destructive" });
-          setPushLoading(false);
-          return;
-        }
-
-        const registration = await navigator.serviceWorker.ready;
-        const vapidResponse = await fetch('/api/push/vapid-key');
-        if (!vapidResponse.ok) {
-          setVapidAvailable(false);
-          throw new Error("VAPID key unavailable — push notifications not configured on server");
-        }
-        const { publicKey } = await vapidResponse.json();
-        if (!publicKey) throw new Error("Invalid VAPID public key received from server");
-
-        const subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(publicKey),
-        });
-
-        const token = localStorage.getItem("authToken");
-        const response = await fetch('/api/push/subscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ subscription: subscription.toJSON() }),
-        });
-
-        if (!response.ok) {
-          await subscription.unsubscribe();
-          throw new Error("Server rejected subscription");
-        }
-
-        setPushEnabled(true);
-        toast({ title: "Notifications enabled", description: "You'll receive alerts for transaction updates" });
-      } else {
-        const registration = await navigator.serviceWorker.ready;
-        const subscription = await registration.pushManager.getSubscription();
-        if (subscription) {
-          const endpoint = subscription.endpoint;
-          await subscription.unsubscribe();
-
-          const token = localStorage.getItem("authToken");
-          await fetch('/api/push/unsubscribe', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ endpoint }),
-          });
-        }
-
-        setPushEnabled(false);
-        toast({ title: "Notifications disabled" });
-      }
-    } catch (error) {
-      console.error("Push notification toggle error:", error);
-      toast({ title: "Failed to update notification settings", variant: "destructive" });
-    }
-    setPushLoading(false);
-  }
-
-  function urlBase64ToUint8Array(base64String: string): Uint8Array {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-    for (let i = 0; i < rawData.length; ++i) {
-      outputArray[i] = rawData.charCodeAt(i);
-    }
-    return outputArray;
-  }
-
   if (!merchantId) {
     setLocation('/login');
     return null;
   }
 
   const { data: merchant, isLoading } = useQuery({
-    queryKey: ["/api/merchants", merchantId],
+    queryKey: ["/api/merchants", merchantId, "profile"],
     queryFn: async () => {
       const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/merchants/${merchantId}`, {
+      const response = await fetch(`/api/merchants/${merchantId}/profile`, {
         headers: { "Authorization": `Bearer ${token}` },
       });
       if (!response.ok) throw new Error("Failed to fetch merchant");
@@ -393,8 +250,8 @@ export default function Settings() {
         email: data.email || '',
         gstNumber: data.gstNumber || '',
       });
-      setWindcaveApi(data.windcaveApiKey || '');
-      setApiActive(!!data.windcaveApiKey);
+      setWindcaveApi('');
+      setApiActive(!!data.windcaveApiConfigured);
       setDailyGoal(data.dailyGoal || '500.00');
       if (data.customLogoUrl) {
         setLogoPreview(data.customLogoUrl);
@@ -403,11 +260,22 @@ export default function Settings() {
     },
   });
 
+  const { data: authData } = useQuery<AuthMeResponse>({
+    queryKey: ["/api/auth/me"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/auth/me");
+      if (!response.ok) throw new Error("Failed to load account access");
+      return response.json();
+    },
+  });
+  const isOwner = authData?.user?.role === "owner" || authData?.user?.role === "admin";
+
   const { data: billingCardStatus } = useQuery<{
     ready: boolean;
-    card: { last4: string; brand: string; expiry: string } | null;
+    card: { last4: string; brand: string | null; expiry: string | null } | null;
   }>({
     queryKey: ["/api/billing/card"],
+    enabled: isOwner,
   });
 
   useEffect(() => {
@@ -433,7 +301,7 @@ export default function Settings() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "profile"] });
       toast({ title: "Business details saved successfully" });
     },
     onError: () => {
@@ -456,7 +324,7 @@ export default function Settings() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "profile"] });
       toast({ title: "Daily goal updated successfully" });
     },
     onError: () => {
@@ -481,7 +349,7 @@ export default function Settings() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "profile"] });
       setLogoFile(null);
       setLogoPreview(null);
       toast({ title: "Logo uploaded successfully" });
@@ -504,7 +372,7 @@ export default function Settings() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId, "profile"] });
       setLogoPreview(null);
       toast({ title: "Logo deleted successfully" });
     },
@@ -523,42 +391,168 @@ export default function Settings() {
     },
   });
 
-  useEffect(() => {
-    if (subscriptionData?.subscription) {
-      setBillingFrequency(subscriptionData.subscription.billingFrequency || 'monthly');
-    }
-  }, [subscriptionData]);
+  const subscription = subscriptionData?.subscription;
+  const currentPlan = planForOrDefault(subscription?.planId);
 
-  const updateBillingFrequencyMutation = useMutation({
-    mutationFn: async (frequency: string) => {
-      const response = await apiRequest('PUT', '/api/subscription/billing-frequency', { frequency });
-      if (!response.ok) throw new Error("Failed to update billing frequency");
-      return response.json();
+  const {
+    data: teamData,
+    isLoading: teamLoading,
+    error: teamError,
+  } = useQuery<{ members: TeamMember[]; seatLimit: number; seatsInUse: number }>({
+    queryKey: ["/api/team"],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/team');
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body?.message || "Failed to fetch team");
+      return body;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
-      toast({ title: "Billing frequency updated successfully" });
+    enabled: isOwner && currentPlan.id !== "solo",
+  });
+
+  const {
+    data: billingHistoryData,
+    isLoading: billingHistoryLoading,
+    error: billingHistoryError,
+  } = useQuery<{ history: BillingHistoryEntry[] }>({
+    queryKey: ["/api/subscription/billing-history"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/subscription/billing-history?limit=12");
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body?.message || "Failed to load billing history");
+      return body;
     },
-    onError: () => {
-      toast({ title: "Failed to update billing frequency", variant: "destructive" });
+    enabled: isOwner,
+  });
+
+  const refreshBilling = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/subscription/billing-history"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/team"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/billing/card"] });
+  };
+
+  // Reads the server's message so a refused downgrade explains itself ("Crew ->
+  // Solo needs 1 login; you have 4") instead of showing a generic failure.
+  const changePlanMutation = useMutation({
+    mutationFn: async (planId: PlanId) => {
+      const response = await apiRequest('PUT', '/api/subscription/plan', { planId });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body?.message || "Failed to change plan");
+      return body;
+    },
+    onSuccess: (data: any) => {
+      refreshBilling();
+      toast({ title: data?.message || "Plan updated" });
+    },
+    onError: (error: unknown) => {
+      toast({ title: apiErrorMessage(error, "Failed to change plan"), variant: "destructive" });
     },
   });
 
   const cancelSubscriptionMutation = useMutation({
     mutationFn: async (reason: string) => {
       const response = await apiRequest('POST', '/api/subscription/cancel', { reason });
-      if (!response.ok) throw new Error("Failed to cancel subscription");
-      return response.json();
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body?.message || "Failed to cancel subscription");
+      return body;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
+    onSuccess: (data: any) => {
+      refreshBilling();
       setShowCancelDialog(false);
       setCancellationReason('');
-      toast({ title: "Subscription cancellation requested. Will be effective in 30 days." });
+      toast({ title: data?.message || "Your subscription will not renew." });
     },
-    onError: () => {
-      toast({ title: "Failed to cancel subscription", variant: "destructive" });
+    onError: (error: unknown) => {
+      toast({ title: apiErrorMessage(error, "Failed to cancel subscription"), variant: "destructive" });
     },
+  });
+
+  const resumeSubscriptionMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/subscription/resume', {});
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body?.message || "Failed to resume subscription");
+      return body;
+    },
+    onSuccess: (data: any) => {
+      refreshBilling();
+      toast({ title: data?.message || "Your subscription will renew as normal." });
+    },
+    onError: (error: unknown) => toast({ title: apiErrorMessage(error, "Failed to resume subscription"), variant: "destructive" }),
+  });
+
+  const inviteMutation = useMutation({
+    mutationFn: async (payload: { email: string; name: string }) => {
+      const response = await apiRequest('POST', '/api/team/invite', payload);
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body?.message || "Failed to send invite");
+      return body;
+    },
+    onSuccess: () => {
+      refreshBilling();
+      setInviteEmail('');
+      setInviteName('');
+      toast({ title: "Invite sent" });
+    },
+    onError: (error: unknown) => {
+      toast({ title: apiErrorMessage(error, "Failed to send invite"), variant: "destructive" });
+    },
+  });
+
+  const memberStatusMutation = useMutation({
+    mutationFn: async (payload: { userId: number; status: 'active' | 'disabled' }) => {
+      const response = await apiRequest('PUT', `/api/team/${payload.userId}/status`, { status: payload.status });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body?.message || "Failed to update login");
+      return body;
+    },
+    onSuccess: (_data, variables) => {
+      refreshBilling();
+      toast({ title: variables.status === "active" ? "Login enabled" : "Login disabled" });
+    },
+    onError: (error: unknown) => toast({ title: apiErrorMessage(error, "Failed to update login"), variant: "destructive" }),
+  });
+
+  const removeMemberMutation = useMutation({
+    mutationFn: async (userId: number) => {
+      const response = await apiRequest('DELETE', `/api/team/${userId}`, undefined);
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body?.message || "Failed to remove login");
+      return body;
+    },
+    onSuccess: () => {
+      refreshBilling();
+      toast({ title: "Login removed" });
+    },
+    onError: (error: unknown) => toast({ title: apiErrorMessage(error, "Failed to remove login"), variant: "destructive" }),
+  });
+
+  const resendInviteMutation = useMutation({
+    mutationFn: async (userId: number) => {
+      const response = await apiRequest("POST", `/api/team/${userId}/resend`, {});
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body?.message || "Failed to resend invite");
+      return body;
+    },
+    onSuccess: () => {
+      refreshBilling();
+      toast({ title: "Invite resent" });
+    },
+    onError: (error: unknown) => toast({ title: apiErrorMessage(error, "Failed to resend invite"), variant: "destructive" }),
+  });
+
+  const revokeInviteMutation = useMutation({
+    mutationFn: async (userId: number) => {
+      const response = await apiRequest("DELETE", `/api/team/${userId}/invite`, undefined);
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body?.message || "Failed to revoke invite");
+      return body;
+    },
+    onSuccess: () => {
+      refreshBilling();
+      toast({ title: "Invite revoked" });
+    },
+    onError: (error: unknown) => toast({ title: apiErrorMessage(error, "Failed to revoke invite"), variant: "destructive" }),
   });
 
   const handleBusinessChange = (field: keyof MerchantDetails, value: string) => {
@@ -634,11 +628,6 @@ export default function Settings() {
     }
   };
 
-  const handleBillingFrequencyChange = (frequency: string) => {
-    setBillingFrequency(frequency);
-    updateBillingFrequencyMutation.mutate(frequency);
-  };
-
   const handleCancelSubscription = () => {
     if (!cancellationReason.trim()) {
       toast({ title: "Please provide a reason for cancellation", variant: "destructive" });
@@ -647,56 +636,24 @@ export default function Settings() {
     cancelSubscriptionMutation.mutate(cancellationReason);
   };
 
-  const formatCardNumber = (value: string) => {
-    const digits = value.replace(/\D/g, '').slice(0, 19);
-    return digits.replace(/(.{4})/g, '$1 ').trim();
-  };
-
-  const formatExpiry = (value: string) => {
-    const digits = value.replace(/\D/g, '').slice(0, 4);
-    if (digits.length >= 3) return digits.slice(0, 2) + '/' + digits.slice(2);
-    return digits;
-  };
-
-  const handleSaveCard = async () => {
-    const rawNumber = cardNumber.replace(/\s/g, '');
-    if (rawNumber.length < 13 || rawNumber.length > 19) {
-      toast({ title: "Please enter a valid card number", variant: "destructive" });
-      return;
-    }
-    if (!/^\d{2}\/\d{2}$/.test(cardExpiry)) {
-      toast({ title: "Please enter expiry in MM/YY format", variant: "destructive" });
-      return;
-    }
-    if (cardCvc.length < 3) {
-      toast({ title: "Please enter a valid CVC", variant: "destructive" });
-      return;
-    }
+  /**
+   * Opens Windcave's hosted card page in this tab. We come back to
+   * /settings?section=billing&card=… where the shared return handler confirms
+   * the browser-held session, so the PAN is never handled by our JavaScript.
+   */
+  const handleStartCardSetup = async () => {
     setCardSaving(true);
     try {
-      const authToken = localStorage.getItem("authToken");
-      const resp = await fetch('/api/billing/card', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-        body: JSON.stringify({ cardNumber: rawNumber, expiry: cardExpiry, cvc: cardCvc }),
-      });
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        throw new Error((err as { message?: string }).message || 'Failed to save card');
+      const resp = await apiRequest('POST', '/api/billing/card/session', {});
+      const body = await resp.json().catch(() => ({}));
+      if (!resp.ok || !body?.redirectUrl) {
+        throw new Error(body?.message || 'Could not start card setup');
       }
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['/api/billing/card'] }),
-        queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] }),
-      ]);
-      setShowCardForm(false);
-      setCardNumber('');
-      setCardExpiry('');
-      setCardCvc('');
-      toast({ title: "Card saved successfully" });
+      sessionStorage.setItem(BILLING_CARD_SESSION_KEY, body.sessionId);
+      window.location.href = body.redirectUrl;
     } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : "Failed to save card";
+      const msg = apiErrorMessage(error, "Could not start card setup");
       toast({ title: msg, variant: "destructive" });
-    } finally {
       setCardSaving(false);
     }
   };
@@ -709,23 +666,36 @@ export default function Settings() {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${authToken}` },
       });
-      if (!resp.ok) throw new Error('Failed to remove card');
+      const body = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(body?.message || 'Failed to remove card');
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['/api/billing/card'] }),
         queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] }),
       ]);
       toast({ title: "Card removed" });
-    } catch {
-      toast({ title: "Failed to remove card", variant: "destructive" });
+    } catch (error: unknown) {
+      toast({
+        title: error instanceof Error ? error.message : "Failed to remove card",
+        variant: "destructive",
+      });
     } finally {
       setCardRemoving(false);
     }
   };
 
-  const subscription = subscriptionData?.subscription;
-  const transactionProgress = subscription ? Math.min((subscription.currentMonthTransactions / 100) * 100, 100) : 0;
-  const isFreeTier = subscription?.tier === 'free';
-  const isCancelled = subscription?.status === 'cancelled';
+  const seatLimit = subscription?.seatLimit ?? currentPlan.seats;
+  const seatsInUse = teamData?.seatsInUse ?? subscription?.seatsInUse ?? 0;
+  const cancellationState = subscriptionCancellationState(subscription);
+  const isCancelling = cancellationState === 'scheduled';
+  const isCancelled = cancellationState === 'cancelled';
+  const hasPaidCurrentPeriod = hasPaidCurrentSubscriptionPeriod(subscription);
+  const cardBillingDisclosure = cardSetupBillingDisclosure(
+    subscription,
+    formatPlanPrice(subscription?.priceCents ?? currentPlan.priceCents),
+  );
+  const planBillingDisclosure = planChangeBillingDisclosure(subscription);
+  const isPastDue = subscription?.status === 'past_due';
+  const isSuspended = subscription?.status === 'suspended';
 
   if (isLoading) {
     return (
@@ -788,6 +758,11 @@ export default function Settings() {
 
         {/* Business Details Section */}
         <SettingsSection anchor="set-business" title="Business Details" delay={140} isOpen={openSections.has('business')} onToggle={() => toggle('business')}>
+          {!isOwner && (
+            <div className="mb-4 p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-800">
+              Business details are managed by the account owner.
+            </div>
+          )}
           <div className="space-y-4 mt-1">
             <div>
               <Label htmlFor="businessName" className="!text-[#040D6D] font-semibold text-base mb-2 block">Company Name</Label>
@@ -795,6 +770,7 @@ export default function Settings() {
                 id="businessName"
                 value={businessDetails.businessName}
                 onChange={(e) => handleBusinessChange('businessName', e.target.value)}
+                disabled={!isOwner}
                 className="!border !border-gray-200 focus:!border-[#040D6D] focus:!ring-[#040D6D]"
                 data-testid="input-business-name"
               />
@@ -806,6 +782,7 @@ export default function Settings() {
                 id="director"
                 value={businessDetails.director}
                 onChange={(e) => handleBusinessChange('director', e.target.value)}
+                disabled={!isOwner}
                 className="!border !border-gray-200 focus:!border-[#040D6D] focus:!ring-[#040D6D]"
                 data-testid="input-director"
               />
@@ -817,6 +794,7 @@ export default function Settings() {
                 id="address"
                 value={businessDetails.address}
                 onChange={(e) => handleBusinessChange('address', e.target.value)}
+                disabled={!isOwner}
                 className="!border !border-gray-200 focus:!border-[#040D6D] focus:!ring-[#040D6D]"
                 data-testid="input-address"
               />
@@ -828,6 +806,7 @@ export default function Settings() {
                 id="nzbn"
                 value={businessDetails.nzbn}
                 onChange={(e) => handleBusinessChange('nzbn', e.target.value)}
+                disabled={!isOwner}
                 className="!border !border-gray-200 focus:!border-[#040D6D] focus:!ring-[#040D6D]"
                 data-testid="input-nzbn"
               />
@@ -840,6 +819,7 @@ export default function Settings() {
                 type="tel"
                 value={businessDetails.phone}
                 onChange={(e) => handleBusinessChange('phone', e.target.value)}
+                disabled={!isOwner}
                 className="!border !border-gray-200 focus:!border-[#040D6D] focus:!ring-[#040D6D]"
                 data-testid="input-phone"
               />
@@ -852,6 +832,7 @@ export default function Settings() {
                 type="email"
                 value={businessDetails.email}
                 onChange={(e) => handleBusinessChange('email', e.target.value)}
+                disabled={!isOwner}
                 className="!border !border-gray-200 focus:!border-[#040D6D] focus:!ring-[#040D6D]"
                 data-testid="input-email"
               />
@@ -863,6 +844,7 @@ export default function Settings() {
                 id="gstNumber"
                 value={businessDetails.gstNumber}
                 onChange={(e) => handleBusinessChange('gstNumber', e.target.value)}
+                disabled={!isOwner}
                 className="!border !border-gray-200 focus:!border-[#040D6D] focus:!ring-[#040D6D]"
                 data-testid="input-gst-number"
               />
@@ -877,6 +859,7 @@ export default function Settings() {
                 <Switch
                   checked={gstRegistered}
                   onCheckedChange={(value) => saveGst({ gstRegistered: value })}
+                  disabled={!isOwner}
                   data-testid="switch-gst-registered"
                 />
               </div>
@@ -889,6 +872,7 @@ export default function Settings() {
                         key={mode}
                         type="button"
                         onClick={() => saveGst({ tradeGstMode: mode })}
+                        disabled={!isOwner}
                         className="rounded-xl py-2 text-sm font-semibold transition-colors"
                         style={{ background: tradeGstMode === mode ? TRADES_THEME.INK : "#F3F4F6", color: tradeGstMode === mode ? TRADES_THEME.OFFW : "#4B5563" }}
                         data-testid={`button-gst-mode-${mode}`}
@@ -902,16 +886,18 @@ export default function Settings() {
             </div>
           </div>
 
-          <WireframeLiquidButton
-            onClick={handleSaveDetails}
-            busy={updateMerchantMutation.isPending}
-            accent="#040D6D"
-            filledTextColor="#58ABFF"
-            style={{ width: '100%', marginTop: 20, padding: '12px 27px', fontSize: 14 }}
-            data-testid="button-save"
-          >
-            {updateMerchantMutation.isPending ? "Saving..." : "Save Business Details"}
-          </WireframeLiquidButton>
+          {isOwner && (
+            <WireframeLiquidButton
+              onClick={handleSaveDetails}
+              busy={updateMerchantMutation.isPending}
+              accent="#040D6D"
+              filledTextColor="#58ABFF"
+              style={{ width: '100%', marginTop: 20, padding: '12px 27px', fontSize: 14 }}
+              data-testid="button-save"
+            >
+              {updateMerchantMutation.isPending ? "Saving..." : "Save Business Details"}
+            </WireframeLiquidButton>
+          )}
         </SettingsSection>
 
         {/* Dashboard Preferences Section */}
@@ -932,20 +918,23 @@ export default function Settings() {
                   min="0"
                   value={dailyGoal}
                   onChange={(e) => setDailyGoal(e.target.value)}
+                  disabled={!isOwner}
                   className="flex-1"
                   placeholder="500.00"
                   data-testid="input-daily-goal"
                 />
-                <WireframeLiquidButton
-                  onClick={() => updateDailyGoalMutation.mutate(dailyGoal)}
-                  busy={updateDailyGoalMutation.isPending}
-                  accent="#040D6D"
-                  filledTextColor="#58ABFF"
-                  style={{ padding: '10px 20px', fontSize: 13 }}
-                  data-testid="button-save-daily-goal"
-                >
-                  {updateDailyGoalMutation.isPending ? "Saving..." : "Save"}
-                </WireframeLiquidButton>
+                {isOwner && (
+                  <WireframeLiquidButton
+                    onClick={() => updateDailyGoalMutation.mutate(dailyGoal)}
+                    busy={updateDailyGoalMutation.isPending}
+                    accent="#040D6D"
+                    filledTextColor="#58ABFF"
+                    style={{ padding: '10px 20px', fontSize: 13 }}
+                    data-testid="button-save-daily-goal"
+                  >
+                    {updateDailyGoalMutation.isPending ? "Saving..." : "Save"}
+                  </WireframeLiquidButton>
+                )}
               </div>
             </div>
           </div>
@@ -958,15 +947,17 @@ export default function Settings() {
               <h2 style={{ fontWeight: 600, fontSize: 17, color: '#040D6D', letterSpacing: '-0.01em' }} className="mb-4">Subscription &amp; Billing</h2>
               <div className="p-5 rounded-xl text-center space-y-3" style={{ background: 'rgba(4,13,109,0.05)' }}>
                 <p className="text-gray-700 text-sm leading-relaxed">
-                  To add or update your payment method, visit
+                  {isOwner
+                    ? "To manage your plan or payment method, visit"
+                    : "The account owner manages the plan, team logins and payment method."}
                 </p>
-                <a
+                {isOwner && <a
                   href="https://taptpay.co.nz/settings"
                   className="font-semibold text-base underline block"
                   style={{ color: '#040D6D' }}
                 >
                   taptpay.co.nz
-                </a>
+                </a>}
               </div>
             </div>
           </div>
@@ -974,110 +965,242 @@ export default function Settings() {
         <div data-settings-section="billing">
         <SettingsSection title="Subscription & Billing" delay={230} isOpen={openSections.has('billing')} onToggle={() => toggle('billing')}>
           <div className="space-y-5 mt-1">
-            {/* Current Tier */}
-            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-[#040D6D]/10 to-[#58ABFF]/12 rounded-xl">
+            {/* Current plan */}
+            <div className="flex items-start justify-between p-4 bg-gradient-to-r from-[#040D6D]/10 to-[#58ABFF]/12 rounded-xl">
               <div>
-                <p className="text-gray-700 font-medium">Current Plan</p>
+                <p className="text-gray-700 font-medium">Current plan</p>
                 <p className="text-2xl font-bold text-[#040D6D] mt-1">
-                  {isFreeTier ? 'Free Tier' : 'Paid ($19.99/month)'}
+                  {currentPlan.name} · {formatPlanPrice(subscription?.priceCents ?? currentPlan.priceCents)}/mo
+                </p>
+                <p className="text-xs text-gray-600 mt-1">
+                  {seatsInUse} of {seatLimit} {seatLimit === 1 ? 'login' : 'logins'} in use
+                  {subscription?.nextBillingDate && cancellationState === 'active'
+                    ? ` · renews ${new Date(subscription.nextBillingDate).toLocaleDateString('en-NZ')}`
+                    : ''}
                 </p>
               </div>
-              {isCancelled && (
-                <AlertCircle className="text-orange-500" size={24} />
+              {(isCancelling || isCancelled || isPastDue || isSuspended) && (
+                <AlertCircle className="text-orange-500 shrink-0" size={24} />
               )}
             </div>
 
-            {/* Transaction Counter */}
-            <div className="p-4 bg-gray-50 rounded-xl">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-gray-700 font-medium">Monthly Transaction Usage</p>
-                <p className="text-sm font-medium text-gray-600">
-                  {subscription?.currentMonthTransactions || 0} / 100
+            {isPastDue && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-xs text-red-700 font-medium">
+                  Your last subscription payment failed. Update your card below — we'll retry automatically.
                 </p>
               </div>
-              <Progress value={transactionProgress} className="h-3 mb-2" />
-              <p className="text-xs text-gray-500">
-                {isFreeTier 
-                  ? 'Free tier includes up to 100 transactions per month. Additional charges of $0.10 per transaction apply after that.'
-                  : 'You will be charged 10 cents per transaction at your selected billing frequency.'}
-              </p>
-              {isFreeTier && subscription && subscription.currentMonthTransactions >= 100 && (
-                <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-xs text-red-600 font-medium">
-                    ⚠️ You've reached your free tier limit. Your card will be charged $0.10 per additional transaction.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Billing Frequency */}
-            <div>
-              <Label className="text-gray-700 text-sm mb-2 block">
-                Transaction Fee Billing Frequency
-              </Label>
-              <p className="text-xs text-gray-500 mb-3">
-                Choose how often you want to be charged for transaction fees (10 cents per transaction)
-              </p>
-              <Select value={billingFrequency} onValueChange={handleBillingFrequencyChange}>
-                <SelectTrigger className="border-gray-200 focus:border-[#040D6D]" data-testid="select-billing-frequency">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="weekly">Weekly</SelectItem>
-                  <SelectItem value="bi_weekly">Bi-Weekly</SelectItem>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Unbilled Transactions */}
-            {subscription && subscription.unbilledTransactionCount > 0 && (
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
-                <p className="text-sm font-medium text-blue-900 mb-1">
-                  Unbilled Transactions
+            )}
+            {isSuspended && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-xs text-red-700 font-medium">
+                  Your subscription is suspended and payment requests are blocked. Add a working card to reactivate.
                 </p>
-                <p className="text-xs text-blue-700">
-                  {subscription.unbilledTransactionCount} transactions totaling ${Number(subscription.unbilledAmount).toFixed(2)} will be charged on your next billing date
+              </div>
+            )}
+            {subscription?.pendingPlanName && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-xs text-blue-800">
+                  Changing to <strong>{subscription.pendingPlanName}</strong> on{' '}
+                  {subscription.pendingPlanEffectiveAt
+                    ? new Date(subscription.pendingPlanEffectiveAt).toLocaleDateString('en-NZ')
+                    : 'your next billing date'}.
                 </p>
               </div>
             )}
 
-            {/* Billing Card */}
+            {!isOwner ? (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-xs text-blue-800">
+                  The account owner manages plans, team logins, payment methods and billing history.
+                </p>
+              </div>
+            ) : (
+            <>
+            {/* Change plan */}
             <div>
-              <Label className="text-gray-700 text-sm mb-2 block">Payment Card</Label>
+              <Label className="text-gray-700 text-sm mb-2 block">Change plan</Label>
+              <p className="text-xs text-gray-600 mb-3" data-testid="plan-change-billing-disclosure">
+                {planBillingDisclosure}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {PLAN_LIST.map(plan => {
+                  const active = plan.id === currentPlan.id;
+                  return (
+                    <button
+                      key={plan.id}
+                      type="button"
+                      disabled={active || changePlanMutation.isPending}
+                      onClick={() => changePlanMutation.mutate(plan.id)}
+                      data-testid={`settings-plan-${plan.id}`}
+                      className={`text-left p-3 rounded-xl border transition-colors ${
+                        active
+                          ? 'border-[#040D6D] bg-[#040D6D]/5 cursor-default'
+                          : 'border-gray-200 hover:border-[#58ABFF] hover:bg-[#58ABFF]/5'
+                      }`}
+                    >
+                      <span className="block text-sm font-semibold text-[#040D6D]">{plan.name}</span>
+                      <span className="block text-lg font-bold text-gray-900">
+                        {formatPlanPrice(plan.priceCents)}
+                        <span className="text-xs font-normal text-gray-500">/mo</span>
+                      </span>
+                      <span className="block text-xs text-gray-500 mt-0.5">{plan.blurb}</span>
+                      {active && <span className="block text-[10px] font-semibold text-[#040D6D] mt-1">CURRENT</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Need more than 10 logins? <a href="/#tp-contact" className="underline">Talk to us about Enterprise.</a>
+              </p>
+            </div>
+
+            {/* Team logins are intentionally absent on Solo, which has one owner seat. */}
+            {currentPlan.id !== "solo" && (
+            <div>
+              <Label className="text-gray-700 text-sm mb-2 block">
+                Team logins ({seatsInUse} of {seatLimit})
+              </Label>
+              {teamLoading && (
+                <p className="text-xs text-gray-500 mb-2">Loading team logins…</p>
+              )}
+              {teamError && (
+                <p className="text-xs text-red-600 mb-2">
+                  {apiErrorMessage(teamError, "Failed to load team logins")}
+                </p>
+              )}
+              <div className="space-y-2">
+                {(teamData?.members ?? []).map(member => (
+                  <div key={member.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">{member.name || member.email}</p>
+                      <p className="text-xs text-gray-500 truncate">
+                        {member.email} · {member.role === 'owner' ? 'Owner' : member.status === 'invited' ? 'Invite sent' : member.status === 'disabled' ? 'Disabled' : 'Member'}
+                      </p>
+                    </div>
+                    {member.role !== 'owner' && member.status === 'invited' && (
+                      <div className="flex gap-2 shrink-0">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs"
+                          disabled={resendInviteMutation.isPending}
+                          onClick={() => resendInviteMutation.mutate(member.id)}
+                        >
+                          Resend
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs border-red-300 text-red-600 hover:bg-red-50"
+                          disabled={revokeInviteMutation.isPending}
+                          onClick={() => revokeInviteMutation.mutate(member.id)}
+                        >
+                          Revoke
+                        </Button>
+                      </div>
+                    )}
+                    {member.role !== 'owner' && member.status !== 'invited' && (
+                      <div className="flex gap-2 shrink-0">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs"
+                          disabled={memberStatusMutation.isPending}
+                          onClick={() => memberStatusMutation.mutate({
+                            userId: member.id,
+                            status: member.status === 'disabled' ? 'active' : 'disabled',
+                          })}
+                        >
+                          {member.status === 'disabled' ? 'Enable' : 'Disable'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs border-red-300 text-red-600 hover:bg-red-50"
+                          disabled={removeMemberMutation.isPending}
+                          onClick={() => removeMemberMutation.mutate(member.id)}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {seatsInUse < seatLimit ? (
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2">
+                  <Input
+                    placeholder="Name (optional)"
+                    value={inviteName}
+                    onChange={(e) => setInviteName(e.target.value)}
+                    className="border-gray-200 focus:border-[#040D6D]"
+                  />
+                  <Input
+                    type="email"
+                    placeholder="teammate@business.co.nz"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    className="border-gray-200 focus:border-[#040D6D]"
+                    data-testid="input-invite-email"
+                  />
+                  <Button
+                    onClick={() => inviteMutation.mutate({ email: inviteEmail.trim(), name: inviteName.trim() })}
+                    disabled={inviteMutation.isPending || !inviteEmail.trim()}
+                    className="bg-[#040D6D] hover:bg-[#0a1580] text-[#58ABFF]"
+                    data-testid="button-invite-member"
+                  >
+                    {inviteMutation.isPending ? 'Sending…' : 'Invite'}
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500 mt-3">
+                  All of your plan's logins are in use. Upgrade to add more.
+                </p>
+              )}
+            </div>
+            )}
+
+            {/* Payment method — Windcave card-on-file */}
+            <div>
+              <Label className="text-gray-700 text-sm mb-2 block">Payment method</Label>
               <div className="p-3 mb-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <p className="text-xs text-amber-800 font-medium">
-                  A valid credit or debit card is required before you can send any payment request. Only masked card details are retained.
+                <p className="text-xs text-amber-900 font-semibold" data-testid="billing-card-charge-disclosure">
+                  {cardBillingDisclosure}
+                </p>
+                <p className="text-xs text-amber-800 mt-1">
+                  Your card is entered on Windcave's secure page. TaptPay only stores the last
+                  four digits, and a payment method is required before you can send payment requests.
                 </p>
               </div>
               {billingCardStatus?.card && !billingCardStatus.ready && (
                 <div className="p-3 mb-3 bg-red-50 border border-red-200 rounded-lg">
                   <p className="text-xs text-red-700 font-medium">
-                    This card is expired or no longer valid for payment requests. Please replace it.
+                    This card can no longer be charged. Please replace it.
                   </p>
                 </div>
               )}
-              {billingCardStatus?.card && !showCardForm ? (
-                <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-7 bg-white border border-gray-300 rounded flex items-center justify-center">
-                      <span className="text-[9px] font-bold text-gray-600">{billingCardStatus.card.brand.toUpperCase()}</span>
+              {billingCardStatus?.card ? (
+                <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-7 bg-white border border-gray-300 rounded flex items-center justify-center shrink-0">
+                      <span className="text-[9px] font-bold text-gray-600">
+                        {(billingCardStatus.card.brand || 'CARD').toUpperCase()}
+                      </span>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-800">
-                        {billingCardStatus.card.brand} ending in {billingCardStatus.card.last4}
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">
+                        {billingCardStatus.card.brand || "Card"} ending in {billingCardStatus.card.last4}
                       </p>
-                      <p className="text-xs text-gray-500">Expires {billingCardStatus.card.expiry}</p>
+                      {billingCardStatus.card.expiry && (
+                        <p className="text-xs text-gray-500">Expires {billingCardStatus.card.expiry}</p>
+                      )}
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setShowCardForm(true)}
-                      className="text-xs"
-                    >
-                      Replace
+                  <div className="flex gap-2 shrink-0">
+                    <Button size="sm" variant="outline" onClick={handleStartCardSetup} disabled={cardSaving || confirmingCard} className="text-xs">
+                      {confirmingCard ? "Confirming…" : cardSaving ? "Opening…" : isCancelled ? "Restart" : "Replace"}
                     </Button>
                     <Button
                       size="sm"
@@ -1090,129 +1213,160 @@ export default function Settings() {
                     </Button>
                   </div>
                 </div>
-              ) : showCardForm || !billingCardStatus?.card ? (
-                <div className="space-y-3">
-                  <div>
-                    <Label className="text-xs text-gray-600 mb-1 block">Card Number</Label>
-                    <Input
-                      type="text"
-                      inputMode="numeric"
-                      placeholder="1234 5678 9012 3456"
-                      value={cardNumber}
-                      onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
-                      className="border-gray-200 focus:border-[#040D6D] font-mono"
-                      maxLength={23}
-                      data-testid="input-card-number"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label className="text-xs text-gray-600 mb-1 block">Expiry (MM/YY)</Label>
-                      <Input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="MM/YY"
-                        value={cardExpiry}
-                        onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
-                        className="border-gray-200 focus:border-[#040D6D] font-mono"
-                        maxLength={5}
-                        data-testid="input-card-expiry"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs text-gray-600 mb-1 block">CVC</Label>
-                      <Input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="123"
-                        value={cardCvc}
-                        onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                        className="border-gray-200 focus:border-[#040D6D] font-mono"
-                        maxLength={4}
-                        data-testid="input-card-cvc"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    {showCardForm && (
-                      <Button
-                        variant="outline"
-                        onClick={() => { setShowCardForm(false); setCardNumber(''); setCardExpiry(''); setCardCvc(''); }}
-                        className="flex-1"
-                      >
-                        Cancel
-                      </Button>
-                    )}
-                    <Button
-                      onClick={handleSaveCard}
-                      disabled={cardSaving}
-                      className="flex-1 bg-[#040D6D] hover:bg-[#0a1580] text-[#58ABFF]"
-                      data-testid="button-save-card"
-                    >
-                      {cardSaving ? "Saving..." : "Save Card"}
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
+              ) : (
+                <Button
+                  onClick={handleStartCardSetup}
+                  disabled={cardSaving || confirmingCard}
+                  className="w-full bg-[#040D6D] hover:bg-[#0a1580] text-[#58ABFF]"
+                  data-testid="button-add-card"
+                >
+                  {confirmingCard ? "Confirming payment method…" : cardSaving ? "Opening secure page…" : "Add payment method"}
+                </Button>
+              )}
             </div>
 
-            {/* Cancellation Section */}
-            {!isCancelled ? (
-              !showCancelDialog ? (
+            {/* Billing history */}
+            <div>
+              <Label className="text-gray-700 text-sm mb-2 block">Billing history</Label>
+              {billingHistoryLoading ? (
+                <p className="text-xs text-gray-500 p-3 bg-gray-50 rounded-xl">
+                  Loading billing history…
+                </p>
+              ) : billingHistoryError ? (
+                <p className="text-xs text-red-600 p-3 bg-red-50 rounded-xl">
+                  {apiErrorMessage(billingHistoryError, "Failed to load billing history")}
+                </p>
+              ) : (billingHistoryData?.history ?? []).length === 0 ? (
+                <p className="text-xs text-gray-500 p-3 bg-gray-50 rounded-xl">
+                  No subscription invoices yet.
+                </p>
+              ) : (
+                <div className="space-y-2" data-testid="billing-history">
+                  {(billingHistoryData?.history ?? []).map((entry) => (
+                    <div key={entry.id} className="flex items-start justify-between gap-3 p-3 bg-gray-50 rounded-xl">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-800">
+                          {entry.description || billingTypeLabel(entry.billingType)}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {billingDate(entry.paidAt || entry.createdAt)} · {billingTypeLabel(entry.billingType)}
+                        </p>
+                        {entry.failureReason && (
+                          <p className="text-xs text-red-600 mt-1">{entry.failureReason}</p>
+                        )}
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-semibold text-gray-900">{billingMoney(entry.amount)}</p>
+                        <p className={`text-[10px] font-semibold uppercase mt-0.5 ${entry.status === "succeeded" ? "text-green-600" : entry.status === "failed" ? "text-red-600" : "text-gray-500"}`}>
+                          {entry.status}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Cancellation */}
+            {isCancelled ? (
+              <div className="p-4 bg-orange-50 border border-orange-200 rounded-xl space-y-3">
+                <div>
+                  <p className="text-sm font-medium text-orange-900 mb-1">Subscription ended</p>
+                  <p className="text-xs text-orange-700">
+                    This subscription is no longer active. Restart securely with your payment method
+                    to restore access.
+                  </p>
+                </div>
+                <p className="text-xs font-semibold text-orange-900" data-testid="restart-billing-disclosure">
+                  {cardBillingDisclosure}
+                </p>
+                <Button
+                  className="w-full bg-[#040D6D] hover:bg-[#0a1580] text-[#58ABFF]"
+                  disabled={cardSaving || confirmingCard}
+                  onClick={handleStartCardSetup}
+                  data-testid="button-restart-subscription"
+                >
+                  {confirmingCard ? "Confirming payment method…" : cardSaving ? "Opening secure page…" : "Restart subscription"}
+                </Button>
+              </div>
+            ) : isCancelling ? (
+              <div className="p-4 bg-orange-50 border border-orange-200 rounded-xl space-y-3">
+                <div>
+                  <p className="text-sm font-medium text-orange-900 mb-1">Subscription ending</p>
+                  <p className="text-xs text-orange-700">
+                    Your access continues until{' '}
+                    {subscription?.cancellationEffectiveDate
+                      ? new Date(subscription.cancellationEffectiveDate).toLocaleDateString('en-NZ')
+                      : 'the end of your current period'}
+                    . You won't be charged again.
+                  </p>
+                </div>
                 <Button
                   variant="outline"
-                  className="w-full border-red-500 text-red-500 hover:bg-red-50"
-                  onClick={() => setShowCancelDialog(true)}
-                  data-testid="button-cancel-subscription"
+                  className="w-full"
+                  disabled={resumeSubscriptionMutation.isPending}
+                  onClick={() => resumeSubscriptionMutation.mutate()}
+                  data-testid="button-resume-subscription"
                 >
-                  Cancel Subscription
+                  {resumeSubscriptionMutation.isPending ? "Resuming…" : "Keep my subscription"}
                 </Button>
-              ) : (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-xl space-y-3">
-                  <p className="text-sm font-medium text-red-900">
-                    Cancel Subscription (30-day notice required)
-                  </p>
-                  <p className="text-xs text-red-700">
-                    Your subscription will remain active for 30 days after cancellation request. Please provide a reason:
-                  </p>
-                  <Textarea
-                    value={cancellationReason}
-                    onChange={(e) => setCancellationReason(e.target.value)}
-                    placeholder="Please tell us why you're cancelling..."
-                    className="border-red-300 focus:border-red-500"
-                    data-testid="textarea-cancel-reason"
-                  />
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setShowCancelDialog(false);
-                        setCancellationReason('');
-                      }}
-                      className="flex-1"
-                    >
-                      Keep Subscription
-                    </Button>
-                    <Button
-                      onClick={handleCancelSubscription}
-                      disabled={cancelSubscriptionMutation.isPending || !cancellationReason.trim()}
-                      className="flex-1 bg-red-500 hover:bg-red-600 text-white"
-                      data-testid="button-confirm-cancel"
-                    >
-                      {cancelSubscriptionMutation.isPending ? "Processing..." : "Confirm Cancellation"}
-                    </Button>
-                  </div>
-                </div>
-              )
-            ) : (
-              <div className="p-4 bg-orange-50 border border-orange-200 rounded-xl">
-                <p className="text-sm font-medium text-orange-900 mb-1">
-                  Subscription Cancelled
-                </p>
-                <p className="text-xs text-orange-700">
-                  Your subscription will end on {subscription?.cancellationEffectiveDate ? new Date(subscription.cancellationEffectiveDate).toLocaleDateString() : 'N/A'}
-                </p>
               </div>
+            ) : !showCancelDialog ? (
+              <Button
+                variant="outline"
+                className="w-full border-red-500 text-red-500 hover:bg-red-50"
+                onClick={() => setShowCancelDialog(true)}
+                data-testid="button-cancel-subscription"
+              >
+                Cancel subscription
+              </Button>
+            ) : (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-xl space-y-3">
+                <p className="text-sm font-medium text-red-900">Cancel subscription</p>
+                <p className="text-xs text-red-700">
+                  {hasPaidCurrentPeriod ? (
+                    <>
+                      You'll keep full access until{' '}
+                      {subscription?.currentPeriodEnd
+                        ? new Date(subscription.currentPeriodEnd).toLocaleDateString('en-NZ')
+                        : 'the end of your current period'}
+                      , and you won't be charged again. You can undo this any time before then.
+                    </>
+                  ) : (
+                    <>Your subscription will end immediately, and you won't be charged again.</>
+                  )}{' '}
+                  Please tell us why you're leaving:
+                </p>
+                <Textarea
+                  value={cancellationReason}
+                  onChange={(e) => setCancellationReason(e.target.value)}
+                  placeholder="Please tell us why you're cancelling..."
+                  className="border-red-300 focus:border-red-500"
+                  data-testid="textarea-cancel-reason"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowCancelDialog(false);
+                      setCancellationReason('');
+                    }}
+                    className="flex-1"
+                  >
+                    Keep subscription
+                  </Button>
+                  <Button
+                    onClick={handleCancelSubscription}
+                    disabled={cancelSubscriptionMutation.isPending || !cancellationReason.trim()}
+                    className="flex-1 bg-red-500 hover:bg-red-600 text-white"
+                    data-testid="button-confirm-cancel"
+                  >
+                    {cancelSubscriptionMutation.isPending ? "Processing..." : "Confirm cancellation"}
+                  </Button>
+                </div>
+              </div>
+            )}
+            </>
             )}
           </div>
         </SettingsSection>

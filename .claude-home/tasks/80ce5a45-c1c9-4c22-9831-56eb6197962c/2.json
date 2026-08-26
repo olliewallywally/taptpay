@@ -1,0 +1,9 @@
+{
+  "id": "2",
+  "subject": "Fix overlapping buttons and padding on the landing page",
+  "description": "PAUSED, not started. scripts/audit-landing-overlaps.mjs now works (judges only on-screen controls); currently reports two 5px Industries tab gaps. Check the magic-numbered .tp-phone-live at landing-page.tsx:472.",
+  "activeForm": "Fixing overlaps and padding",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}
