@@ -773,7 +773,7 @@ function BoardsModal({ onClose, toast, stones, selectedStoneId, onStoneSelect, o
                     onChange={e => setEditName(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') saveEdit(item); if (e.key === 'Escape') cancelEdit(); }}
                     placeholder="stone name"
-                    style={{ background: 'rgba(4,13,109,0.4)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', borderRadius: 10, padding: '9px 12px', fontSize: 14, fontWeight: 500, outline: 'none', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' }}
+                    style={{ background: 'rgba(4,13,109,0.4)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', borderRadius: 10, padding: '9px 12px', fontSize: 'max(14px, var(--field-floor, 0px))', fontWeight: 500, outline: 'none', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' }}
                   />
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button onClick={() => saveEdit(item)} disabled={busyId === item.id}
@@ -1402,7 +1402,7 @@ export default function RetailTerminalViewCore({
                       value={txRefundAmount}
                       onChange={e => setTxRefundAmount(e.target.value)}
                       placeholder={fmt(selectedStackTx.amount).replace('$', '')}
-                      style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #FECACA', fontSize: 13, boxSizing: 'border-box', outline: 'none' }}
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #FECACA', fontSize: 'max(13px, var(--field-floor, 0px))', boxSizing: 'border-box', outline: 'none' }}
                     />
                   </div>
                   <div>
@@ -1412,7 +1412,7 @@ export default function RetailTerminalViewCore({
                       onChange={e => setTxRefundReason(e.target.value)}
                       placeholder="e.g. Customer requested refund"
                       rows={2}
-                      style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #FECACA', fontSize: 13, resize: 'none', boxSizing: 'border-box', outline: 'none' }}
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #FECACA', fontSize: 'max(13px, var(--field-floor, 0px))', resize: 'none', boxSizing: 'border-box', outline: 'none' }}
                     />
                   </div>
                   <button

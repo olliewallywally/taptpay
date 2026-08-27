@@ -25,3 +25,10 @@ uri = "file://attached_assets/taptpay-phone-3d-model.html"
 type = "text"
 title = "TaptPay phone 3D model"
 description = "Standalone self-contained HTML phone model extracted from the landing page style. Drag to rotate."
+
+[[outputs]]
+id = "a4oo6AhQzG_5petQ9uh5J"
+uri = "file://docs/plans/RXA%20plan.txt"
+type = "text"
+title = "RXA plan"
+description = "Saved copy of the attached TaptPay to Xero integration plan."

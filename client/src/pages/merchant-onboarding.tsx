@@ -12,11 +12,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { CheckCircle, Building2, User, FileText, Globe } from "lucide-react";
 
+/* `text-base md:text-sm` rather than `text-sm`, matching components/ui/input.tsx
+   these were copied from: a field under 16px makes iOS zoom the page on focus,
+   and index.css no longer forces every field to 16px on phones (A1 §4.4). */
 const INPUT_CLASS =
-  "mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
+  "mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 
 const TEXTAREA_CLASS =
-  "mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[80px] resize-none";
+  "mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[80px] resize-none";
 
 export default function MerchantOnboarding() {
   const { toast } = useToast();

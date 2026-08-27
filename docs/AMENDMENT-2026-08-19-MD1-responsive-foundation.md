@@ -533,6 +533,57 @@ with one new phase and two adjustments:
 
 MD1 still blocks nothing before phase 6, so phases 1–5 and K can begin immediately.
 
+**Phase K outcome, 2026-08-27 — complete and green.** Gate:
+`npm run verify:mobile-keyboard` (`scripts/verify-mobile-keyboard.mjs`), five clauses.
+
+| Clause | Result |
+|---|---|
+| §K1 field floor | 23 fields across 12 routes at 390×844; smallest editable field **16px** (floor 16px) |
+| §K2 horizontal overflow | **0px** on all 12 routes |
+| §K3 keyboard raised | 6 field screens × 2 sizes; every focused field inside `visualViewport` |
+| §K5 loaded faces | 582 text elements in Inter / Larken / Outfit — **0 on a synthesised weight** |
+
+Three things landed to get there, each mutation-checked (the clause was reverted and the
+gate confirmed to fail before the fix was restored):
+
+1. **§4.3's font-weight fix.** `client/src/index.css:10` and `client/index.html:219` now
+   request the variable range `wght@100..900` instead of stopping at 700. `.tp-amount` is
+   authored at 900 in retail and 800 elsewhere, so every one of those was a browser-synthesised
+   face. **This unblocks phase 3** — MD6's hard component is satisfied; goldens captured now
+   are captured against real faces.
+2. **§K2's last offender — `/settings`.** The Retail·Property·Trades mode switcher
+   (`client/src/pages/settings.tsx:1484`) needs 373.8px of min-content in a 354px row, so it
+   has always overflowed the viewport by ~2px at 390. `* { max-width: 100vw }` used to clip it;
+   removing that blanket rule exposed it. See the deviation note below.
+3. **A false-failure in the companion's §9.B1 token clause** — see below. Not phase K, but it
+   was masking the token layer's true state.
+
+**§9.B1 was reporting eight false failures.** `scripts/verify-terminal-dock.mjs` derived its
+expectation as `n * tokens["--u"]`, but Chromium quantises *each* container-query length to
+1/64px independently. `--u` therefore arrives already rounded, and multiplying it by `n`
+multiplies that rounding too — 0.29px at `n = 19`, six times the flat 0.05 tolerance it was
+compared against. Every one of the eight reported deltas (five distinct tokens across three viewports) sat inside `n / 64`; all four verticals
+of the token layer were correct all along. The tolerance is now `max(0.05, (n + 1) / 64)`: one
+quantum for the unit, `n` for the derived length. Mutation-checked at
+`--kp-max: calc(19.1 * var(--u))` — a 0.4px deviation — which still fails, so the clause keeps
+the resolution it needs to catch the defects it exists for (a token at 0px, one pinned to its
+cap, the keypad's historical 65.1px against a 76px design size).
+
+With those cleared, `verify:terminal-dock` stands at **3** findings, not 17 — all three are
+§4.2 clause 2 dock-band overlaps on `retail/share`, which are the companion plan's Phase B
+(`min-height: 0`) and were never phase K's. Its §9.F frame-budget clauses are timing-flaky in
+this environment (worst frame measured 18 / 35 / 40 / 63ms across four runs of identical code)
+and should not be read as a signal until they are made load-independent.
+
+> **Deviation for Oliver's list — `/settings` mode switcher.** Fitting the three cards inside
+> 390px meant trimming their chrome: button padding `14px 10px` → `14px 6px`, inner gap
+> `8` → `6`, row gap `8` → `6`, icon `34×34 r11` → `30×30 r10`, plus `minWidth: 0` on each
+> button. The cards now size equally (112.7 → 114px each) instead of raggedly, and all three
+> captions still render unclipped with ~3.4px to spare. `minWidth: 0` is the part that matters
+> structurally: it guarantees the page can never scroll horizontally again even if the copy
+> grows — the caption ellipsises instead. The specific numbers are a design call and are
+> flagged here rather than treated as settled.
+
 ---
 
 ## 6. Gates

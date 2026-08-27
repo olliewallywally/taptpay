@@ -58,8 +58,10 @@
      breathing room, replacing the six hand-tuned literals in plan §1.2. */
   --panel-top: calc(9.5 * var(--u));    /* 38 @390 — the keypad's authored value */
 
-  /* JS-written. The only one, and the read at §4.1 carries its own fallback:
-     --dock-h  documentElement, published by TerminalDockView (Phase A, shipped). init 0px */
+  /* JS-written. Both read with their own fallback:
+     --dock-h  documentElement, published by TerminalDockView (Phase A, shipped). init 0px
+     --kb-h    documentElement, published by use-keyboard-inset.ts (Phase K). init 0px,
+               declared on :root in index.css so it always resolves. */
 
   height: 100vh;      /* fallback order matters */
   height: 100svh;
@@ -125,6 +127,50 @@
   grid-template-rows:
     minmax(var(--hero-min-compact), var(--hero-pref-compact))
     minmax(var(--panel-min), 1fr);
+}
+
+/* ── A1 §4.1: the keyboard is up. ───────────────────────────────────────────
+   Two edits, and both are needed for the same reason — the panel is where
+   every one of the 25 fields lives, so the keyboard's height is demand on the
+   panel, not merely padding inside it.
+
+   1. the hero is capped at its legibility floor and may yield below it: while
+      someone is typing, the fields outrank the amount above them;
+   2. the panel's MINIMUM grows by what the keyboard covers. Without this,
+      `1fr` hands the panel only what the hero leaves, and at 320x568 the
+      scrollport inside it comes out 43px tall — legal, and unusable.
+
+   On Chromium `interactive-widget=resizes-content` shrinks the layout viewport
+   instead, so --kb-h is 0 and the grid is simply solving for a shorter screen;
+   the same two rules are correct there.
+
+   `overflow: hidden auto` is the floor under both: x stays clipped exactly as
+   before, y scrolls if even a collapsed hero cannot buy enough room. */
+:root[data-kb-open] .tp-viewport .tp-screen.tp-feature {
+  grid-template-rows:
+    minmax(0, var(--hero-min))
+    minmax(calc(var(--panel-min) + var(--kb-h, 0px)), 1fr);
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+}
+
+:root[data-kb-open] .tp-viewport .tp-screen.tp-feature[data-hero="compact"] {
+  grid-template-rows:
+    minmax(0, var(--hero-min-compact))
+    minmax(calc(var(--panel-min) + var(--kb-h, 0px)), 1fr);
+}
+
+/* Some field screens nest their own scroll region inside the panel body, with
+   a send footer under it. `flex: 1` hands that region whatever the footer
+   leaves — which, on a panel the keyboard has just shortened, is a sliver:
+   measured 16px around a 65px field on property's charge screen at 320x568,
+   with the field reporting itself comfortably above the keyboard the whole
+   time. A floor of one field plus its label keeps the region legible and
+   pushes the remainder onto the panel body, which already scrolls (DK1).
+   Absolute, like --hero-min and --panel-min's 44px term: it is a legibility
+   floor, and A1 §3.5 exempts those from the unit. */
+:root[data-kb-open] .tp-viewport .tp-panel-body .tp-thin-scroll {
+  min-height: calc(2 * 44px + 8px);
 }
 
 /* Three regions, home screens only: content hero, measured floating chrome,
@@ -195,7 +241,10 @@
   display: flex;
   flex-direction: column;
   padding-top: var(--panel-top);
-  padding-bottom: calc(var(--dock-h, 0px) + var(--safe-bottom) + var(--sp-3));
+  /* --kb-h is what the keyboard covers on WebKit, where the layout viewport
+     never shrinks. It ends the panel's scrollport above the keyboard instead
+     of behind it (A1 §4.1). 0px whenever no keyboard is up. */
+  padding-bottom: calc(var(--dock-h, 0px) + var(--safe-bottom) + var(--sp-3) + var(--kb-h, 0px));
   /* The INLINE padding lives on .tp-panel-body, not here, and that is
      load-bearing rather than tidy. --u is `1.0256cqi` of the terminal
      viewport, and cq units re-resolve at every use site: written inside a

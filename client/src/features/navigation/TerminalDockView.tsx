@@ -86,6 +86,20 @@ const initialNavWidth = () => typeof window === "undefined" ? 320 : Math.min(320
 const rubber = (p: number) => (p <= 1 ? Math.max(0, p) : 1 + (1 - Math.exp(-(p - 1) * 0.55)) * 0.32);
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
 
+/* Release velocity over a trailing window rather than the whole gesture.
+   `(total travel) / (press-to-release)` reads a flick that was preceded by any
+   hesitation as slow — press, pause, then flick 20px and the average is under
+   the threshold although the flick plainly was not. It also put §9.E clause 3's
+   20px flick at ~0.44px/ms against a 0.4 threshold, i.e. inside the timing
+   noise. Measuring from the oldest sample still within VELOCITY_WINDOW of the
+   release describes the motion the finger was actually making when it left. */
+const VELOCITY_WINDOW = 80; // ms
+const releaseVelocity = (samples: { y: number; t: number }[], endY: number, endT: number, sign: 1 | -1) => {
+  const base = samples.find((s) => endT - s.t <= VELOCITY_WINDOW) ?? samples[samples.length - 1];
+  if (!base) return 0;
+  return (sign * (base.y - endY)) / Math.max(1, endT - base.t);
+};
+
 const SWIPE_TRAVEL = 56; // px of drag that maps to progress 1.0
 const EXPAND_THRESHOLD = 0.45;
 const FLICK_VELOCITY = 0.4; // px/ms
@@ -116,7 +130,12 @@ export function TerminalDockView({ mode, activeId, onPick, placement = "fixed", 
 
   /* Gesture state. Refs for the per-frame math (no re-render needed until the
      visual progress actually changes); dragT is the one piece read by render. */
-  const gesture = useRef<{ kind: "expand" | "collapse"; x0: number; y0: number; t0: number; crossedSlop: boolean } | null>(null);
+  const gesture = useRef<
+    { kind: "expand" | "collapse"; x0: number; y0: number; t0: number; crossedSlop: boolean; samples: { y: number; t: number }[] } | null
+  >(null);
+  const stopHandleTracking = useRef<(() => void) | null>(null);
+  const stopBodyTracking = useRef<(() => void) | null>(null);
+  const suppressBodyClick = useRef(false);
   const [dragT, setDragT] = useState<number | null>(null); // null = not dragging
 
   useEffect(() => {
@@ -259,6 +278,8 @@ export function TerminalDockView({ mode, activeId, onPick, placement = "fixed", 
   useEffect(() => () => {
     if (idleTimer.current) clearTimeout(idleTimer.current);
     if (morphTimer.current) clearTimeout(morphTimer.current);
+    stopHandleTracking.current?.();
+    stopBodyTracking.current?.();
   }, []);
 
   /* ── Phase E: the swipe. Track the gesture, don't detect it — pointer
@@ -276,28 +297,51 @@ export function TerminalDockView({ mode, activeId, onPick, placement = "fixed", 
 
   const onHandlePointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
     if (!collapsed) return;
-    handleRef.current?.setPointerCapture(event.pointerId);
-    gesture.current = { kind: "expand", x0: event.clientX, y0: event.clientY, t0: event.timeStamp, crossedSlop: true };
+    event.preventDefault();
+    const pointerId = event.pointerId;
+    const t0 = performance.now();
+    gesture.current = { kind: "expand", x0: event.clientX, y0: event.clientY, t0, crossedSlop: true, samples: [{ y: event.clientY, t: t0 }] };
     setDragT(0);
+
+    const stop = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", cancel);
+      if (stopHandleTracking.current === stop) stopHandleTracking.current = null;
+    };
+    const move = (next: PointerEvent) => {
+      if (next.pointerId !== pointerId) return;
+      const g = gesture.current;
+      if (!g || g.kind !== "expand") return;
+      const dy = g.y0 - next.clientY;
+      const dx = next.clientX - g.x0;
+      if (Math.abs(dx) > Math.abs(dy) + 8) { stop(); endGesture(null); return; }
+      next.preventDefault();
+      g.samples.push({ y: next.clientY, t: performance.now() });
+      if (g.samples.length > 8) g.samples.shift();
+      setDragT(rubber(dy / SWIPE_TRAVEL));
+    };
+    const up = (next: PointerEvent) => {
+      if (next.pointerId !== pointerId) return;
+      const g = gesture.current;
+      stop();
+      if (!g || g.kind !== "expand") return;
+      const dy = g.y0 - next.clientY;
+      const progress = rubber(dy / SWIPE_TRAVEL);
+      const velocity = releaseVelocity(g.samples, next.clientY, performance.now(), 1);
+      endGesture(progress > EXPAND_THRESHOLD || velocity > FLICK_VELOCITY);
+    };
+    const cancel = (next: PointerEvent) => {
+      if (next.pointerId !== pointerId) return;
+      stop();
+      endGesture(null);
+    };
+    stopHandleTracking.current?.();
+    stopHandleTracking.current = stop;
+    window.addEventListener("pointermove", move, { passive: false });
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", cancel);
   };
-  const onHandlePointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
-    const g = gesture.current;
-    if (!g || g.kind !== "expand") return;
-    const dy = g.y0 - event.clientY;
-    const dx = event.clientX - g.x0;
-    if (Math.abs(dx) > Math.abs(dy) + 8) { endGesture(null); return; } // sideways — not this gesture
-    setDragT(rubber(dy / SWIPE_TRAVEL));
-  };
-  const onHandlePointerUp = (event: React.PointerEvent<HTMLButtonElement>) => {
-    const g = gesture.current;
-    if (!g || g.kind !== "expand") return;
-    const dy = g.y0 - event.clientY;
-    const elapsed = Math.max(1, event.timeStamp - g.t0);
-    const velocity = dy / elapsed;
-    const progress = rubber(dy / SWIPE_TRAVEL);
-    endGesture(progress > EXPAND_THRESHOLD || velocity > FLICK_VELOCITY);
-  };
-  const onHandlePointerCancel = () => endGesture(null);
 
   /* A keyboard activation dispatches a click with detail === 0; a pointer tap
      is detail >= 1. The tap path is owned entirely by the drag lifecycle
@@ -314,43 +358,100 @@ export function TerminalDockView({ mode, activeId, onPick, placement = "fixed", 
      under the finger completely untouched. */
   const onBodyPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (collapsed) return;
-    gesture.current = { kind: "collapse", x0: event.clientX, y0: event.clientY, t0: event.timeStamp, crossedSlop: false };
+    const pointerId = event.pointerId;
+    const t0 = performance.now();
+    gesture.current = { kind: "collapse", x0: event.clientX, y0: event.clientY, t0, crossedSlop: false, samples: [{ y: event.clientY, t: t0 }] };
+    suppressBodyClick.current = false;
+
+    const stop = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", cancel);
+      if (stopBodyTracking.current === stop) stopBodyTracking.current = null;
+    };
+    const move = (next: PointerEvent) => {
+      if (next.pointerId !== pointerId) return;
+      const g = gesture.current;
+      if (!g || g.kind !== "collapse") return;
+      const dy = next.clientY - g.y0;
+      const dx = next.clientX - g.x0;
+      if (!g.crossedSlop) {
+        if (Math.hypot(dx, dy) < TAP_SLOP) return;
+        if (Math.abs(dx) > Math.abs(dy)) { stop(); gesture.current = null; return; }
+        g.crossedSlop = true;
+        suppressBodyClick.current = true;
+      }
+      next.preventDefault();
+      g.samples.push({ y: next.clientY, t: performance.now() });
+      if (g.samples.length > 8) g.samples.shift();
+      setDragT(rubber(dy / SWIPE_TRAVEL));
+    };
+    const up = (next: PointerEvent) => {
+      if (next.pointerId !== pointerId) return;
+      const g = gesture.current;
+      stop();
+      if (!g || g.kind !== "collapse") { gesture.current = null; return; }
+      if (!g.crossedSlop) { gesture.current = null; return; }
+      const dy = next.clientY - g.y0;
+      const progress = rubber(dy / SWIPE_TRAVEL);
+      const velocity = releaseVelocity(g.samples, next.clientY, performance.now(), -1);
+      endGesture(!(progress > EXPAND_THRESHOLD || velocity > FLICK_VELOCITY));
+    };
+    const cancel = (next: PointerEvent) => {
+      if (next.pointerId !== pointerId) return;
+      stop();
+      endGesture(null);
+    };
+    stopBodyTracking.current?.();
+    stopBodyTracking.current = stop;
+    window.addEventListener("pointermove", move, { passive: false });
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", cancel);
   };
-  const onBodyPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    const g = gesture.current;
-    if (!g || g.kind !== "collapse") return;
-    const dy = event.clientY - g.y0;
-    const dx = event.clientX - g.x0;
-    if (!g.crossedSlop) {
-      if (Math.hypot(dx, dy) < TAP_SLOP) return; // still might be a tap — do nothing yet
-      if (Math.abs(dx) > Math.abs(dy)) { gesture.current = null; return; } // sideways — let it be whatever it is
-      g.crossedSlop = true;
-      dockRef.current?.setPointerCapture(event.pointerId);
-    }
+  /* Chromium starts a native HTML5 drag from the icon <svg> as soon as the
+     pointer moves with the button down, and that drag fires `pointercancel`
+     on the very first move — so the collapse gesture aborted and settled back
+     open before it had travelled a pixel. The handle never hit this because
+     its pointerdown calls preventDefault(); this one deliberately does not, so
+     that a plain tap's click still reaches the button underneath untouched
+     (§7.5). Refusing the drag itself is the narrow fix: it removes the only
+     thing that was cancelling the pointer and leaves the tap path alone.
+     Nothing in a nav dock is ever meant to be draggable. */
+  const onBodyDragStart = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
-    setDragT(rubber(dy / SWIPE_TRAVEL));
   };
-  const onBodyPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
-    const g = gesture.current;
-    if (!g || g.kind !== "collapse") { gesture.current = null; return; }
-    if (!g.crossedSlop) { gesture.current = null; return; } // a tap — let the button's own onClick handle it
-    const dy = event.clientY - g.y0;
-    const elapsed = Math.max(1, event.timeStamp - g.t0);
-    const velocity = dy / elapsed;
-    const progress = rubber(dy / SWIPE_TRAVEL);
-    endGesture(!(progress > EXPAND_THRESHOLD || velocity > FLICK_VELOCITY));
-  };
-  const onBodyPointerCancel = () => { gesture.current = null; endGesture(null); };
+
   /* A drag that crossed the slop must not also fire the icon button's click
      underneath it — capture-phase so it runs before the button's own onClick. */
   const onBodyClickCapture = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (gesture.current?.kind === "collapse" && gesture.current.crossedSlop) event.stopPropagation();
+    if (!suppressBodyClick.current) return;
+    suppressBodyClick.current = false;
+    event.preventDefault();
+    event.stopPropagation();
   };
 
   const dragging = dragT !== null;
   const restT = collapsed ? 1 : 0;
   const visualT = dragging ? clamp01(gesture.current?.kind === "expand" ? 1 - (dragT as number) : (dragT as number)) : restT;
   const dragCurve = dragging ? "none" : undefined;
+
+  /* Phase F §9.F clause 4. Skipping the goo layer and the filter is only half
+     of honouring prefers-reduced-motion — the dock's own height was still
+     travelling on the full 0.5s curve, which measured 302ms of motion against
+     the ~150ms the clause allows. Under the preference the three transitions
+     collapse to one short linear cross-fade; `--m-ease-out`'s shaped easing is
+     itself part of the choreography being opted out of, so it goes too. */
+  const motion = reducedMotion
+    ? {
+        wrap: "height 0.15s linear",
+        handle: "width 0.15s linear, opacity 0.15s linear",
+        body: "opacity 0.15s linear, transform 0.15s linear",
+      }
+    : {
+        wrap: "height 0.5s var(--m-ease-out)",
+        handle: "width 0.45s var(--m-ease-out), opacity 0.3s ease",
+        body: "opacity 0.3s ease, transform 0.45s var(--m-ease-out)",
+      };
 
   const palette = mode === "trades"
     ? { dock: TRADES_DOCK, active: TRADES_ACTIVE, dim: TRADES_DIM }
@@ -363,18 +464,14 @@ export function TerminalDockView({ mode, activeId, onPick, placement = "fixed", 
      named in §1.8/§8.4; --m-ease-out replaces it, durations unchanged. */
   return (
     <nav ref={navRef} aria-label="Merchant navigation" data-demo-id="terminal-dock" data-terminal-dock-mode={mode} style={{ position: placement, bottom: 0, left: 0, right: 0, display: "flex", justifyContent: "center", paddingBottom: "max(20px, env(safe-area-inset-bottom, 20px))", zIndex: 60, pointerEvents: "none" }}>
-      <div style={{ position: "relative", width: navWidth, height: 58 - 14 * visualT, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "auto", transition: dragCurve ?? "height 0.5s var(--m-ease-out)", overflow: "visible" }}>
+      <div style={{ position: "relative", width: navWidth, height: 58 - 14 * visualT, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "auto", transition: dragCurve ?? motion.wrap, overflow: "visible" }}>
         <button
-          className="tap-target"
           ref={handleRef}
           type="button"
           aria-expanded={!collapsed}
           aria-label="show navigation"
           data-demo-id="dock-handle"
           onPointerDown={onHandlePointerDown}
-          onPointerMove={onHandlePointerMove}
-          onPointerUp={onHandlePointerUp}
-          onPointerCancel={onHandlePointerCancel}
           onClick={onHandleClick}
           style={{
             position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)",
@@ -385,16 +482,27 @@ export function TerminalDockView({ mode, activeId, onPick, placement = "fixed", 
             WebkitTapHighlightColor: "transparent",
           }}
         >
-          <span aria-hidden="true" style={{ width: 56 * visualT, height: Math.max(4, 4 * visualT), background: palette.dock, borderRadius: 999, opacity: visualT, transition: dragCurve ?? "width 0.45s var(--m-ease-out), opacity 0.3s ease", pointerEvents: "none" }} />
+          <span aria-hidden="true" style={{ width: 56 * visualT, height: Math.max(4, 4 * visualT), background: palette.dock, borderRadius: 999, opacity: visualT, transition: dragCurve ?? motion.handle, pointerEvents: "none" }} />
         </button>
         <div
           ref={dockRef}
+          data-demo-id="dock-terminal"
           onPointerDown={onBodyPointerDown}
-          onPointerMove={onBodyPointerMove}
-          onPointerUp={onBodyPointerUp}
-          onPointerCancel={onBodyPointerCancel}
           onClickCapture={onBodyClickCapture}
-          style={{ position: "relative", width: 280, height: 48, background: palette.dock, borderRadius: 24, display: "flex", alignItems: "center", justifyContent: "space-around", padding: "0 16px", overflow: "visible", opacity: 1 - visualT, transform: `scale(${1 - 0.15 * visualT})`, transition: dragCurve ?? "opacity 0.3s ease, transform 0.45s var(--m-ease-out)", pointerEvents: visualT < 0.5 ? "auto" : "none" }}
+          onDragStart={onBodyDragStart}
+          style={{ position: "relative", width: 280, height: 48, background: palette.dock, borderRadius: 24, display: "flex", alignItems: "center", justifyContent: "space-around", padding: "0 16px", overflow: "visible", opacity: 1 - visualT, transform: `scale(${1 - 0.15 * visualT})`, transition: dragCurve ?? motion.body, pointerEvents: visualT < 0.5 ? "auto" : "none",
+            /* §7.5's collapse swipe is a vertical drag, so this box has to own
+               the vertical axis for touch or the compositor claims it as a
+               page scroll. `none` is the usual choice and §9.E clause 6
+               reserves it for the handle, so a scroll flick in the bottom band
+               is never eaten; pan-x takes only the axis the dock actually
+               uses. Scoped to the open state — collapsed, this box is already
+               pointerEvents:none and claims nothing. NOTE: this is a
+               safeguard for real touch input, not the fix for the observed
+               pointercancel (that was `dragstart`, below) — clause 6's own
+               comment records that headless Chromium cannot drive compositor
+               scrolling, so the touch path here is unverified. */
+            touchAction: collapsed ? "auto" : "pan-x" }}
         >
           <div aria-hidden="true" style={{ position: "absolute", left: indLeft, top: -5, width: 65, height: 58, background: palette.dock, borderRadius: 29, boxShadow: "0 4px 20px rgba(0,0,0,0.45)", pointerEvents: "none", willChange: "left", transition: animating ? "left 0.45s cubic-bezier(0.34,1.56,0.64,1)" : "none", zIndex: 0 }} />
           {items.map(({ id, path, Icon }, index) => {

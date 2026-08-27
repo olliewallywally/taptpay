@@ -710,7 +710,7 @@ export default function BoardBuilder() {
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-7 h-7 rounded-full border border-gray-200 flex-shrink-0" style={{ backgroundColor: primaryColor }} />
-                    <Input value={hexInput} onChange={(e) => handleHexInput(e.target.value)} placeholder="#00f1d7" className="font-mono text-xs border-gray-200 focus:border-[#0055FF]" maxLength={7} />
+                    <Input value={hexInput} onChange={(e) => handleHexInput(e.target.value)} placeholder="#00f1d7" className="font-mono text-base md:text-xs border-gray-200 focus:border-[#0055FF]" maxLength={7} />
                   </div>
                 </div>
 
@@ -738,7 +738,7 @@ export default function BoardBuilder() {
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="w-7 h-7 rounded-full border border-gray-200 flex-shrink-0" style={{ backgroundColor: backgroundColor || "transparent" }} />
-                      <Input value={bgHexInput} onChange={(e) => { setBgHexInput(e.target.value); if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value) || e.target.value === "") setBackgroundColor(e.target.value); }} placeholder="None" className="font-mono text-xs border-gray-200 focus:border-[#0055FF]" maxLength={7} />
+                      <Input value={bgHexInput} onChange={(e) => { setBgHexInput(e.target.value); if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value) || e.target.value === "") setBackgroundColor(e.target.value); }} placeholder="None" className="font-mono text-base md:text-xs border-gray-200 focus:border-[#0055FF]" maxLength={7} />
                     </div>
                   </div>
 
@@ -786,7 +786,7 @@ export default function BoardBuilder() {
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-7 h-7 rounded-full border border-gray-200 flex-shrink-0" style={{ backgroundColor: textColor }} />
-                    <Input value={textHexInput} onChange={(e) => { setTextHexInput(e.target.value); if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) setTextColor(e.target.value); }} placeholder="#888888" className="font-mono text-xs border-gray-200 focus:border-[#0055FF]" maxLength={7} />
+                    <Input value={textHexInput} onChange={(e) => { setTextHexInput(e.target.value); if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) setTextColor(e.target.value); }} placeholder="#888888" className="font-mono text-base md:text-xs border-gray-200 focus:border-[#0055FF]" maxLength={7} />
                   </div>
                 </div>
 
@@ -813,7 +813,7 @@ export default function BoardBuilder() {
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-7 h-7 rounded-full border border-gray-200 flex-shrink-0" style={{ backgroundColor: iconColor || primaryColor }} />
-                    <Input value={iconHexInput} onChange={(e) => { setIconHexInput(e.target.value); if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) setIconColor(e.target.value); }} placeholder="Same as Accent" className="font-mono text-xs border-gray-200 focus:border-[#0055FF]" maxLength={7} />
+                    <Input value={iconHexInput} onChange={(e) => { setIconHexInput(e.target.value); if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) setIconColor(e.target.value); }} placeholder="Same as Accent" className="font-mono text-base md:text-xs border-gray-200 focus:border-[#0055FF]" maxLength={7} />
                   </div>
                   <p className="text-[10px] text-gray-400 mt-1">Tints the QR code and Paywave/NFC icon images</p>
                 </div>
@@ -855,7 +855,7 @@ export default function BoardBuilder() {
                     onChange={(e) => setInstructions(e.target.value)}
                     placeholder="simply tap or scan to pay"
                     rows={3}
-                    className="border-gray-200 focus:border-[#0055FF] resize-none text-sm"
+                    className="border-gray-200 focus:border-[#0055FF] resize-none text-base md:text-sm"
                   />
                   <p className="text-[10px] text-gray-400 mt-1">Press Enter to add a new line — text will be centred</p>
                 </div>

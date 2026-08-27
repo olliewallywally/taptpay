@@ -342,7 +342,7 @@ function ChooseTenant({ tenants, invoices, go, onSelect, splitMode, onToggleSpli
           <input
             value={q} onChange={e => setQ(e.target.value)}
             placeholder="search tenants or address"
-            style={{ flex: 1, border: 'none', background: 'transparent', color: BLUE, fontFamily: 'Outfit, system-ui', fontWeight: 500, fontSize: 14, outline: 'none' }}
+            style={{ flex: 1, border: 'none', background: 'transparent', color: BLUE, fontFamily: 'Outfit, system-ui', fontWeight: 500, fontSize: 'max(14px, var(--field-floor, 0px))', outline: 'none' }}
           />
         </div>
         {/* list */}

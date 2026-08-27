@@ -24,6 +24,7 @@ import {
 import { CHUNK_LOAD_TIMEOUT_MS, lazyWithRetry } from "@/lib/lazy-with-retry";
 import { TutorialPageBoundary, TutorialProvider } from "@/features/tutorial/tutorial";
 import { useDeviceClass, type DeviceClass } from "@/hooks/use-device-class";
+import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
 import { desktopChromeForLocation } from "@/lib/desktop-chrome-route";
 import type { TutorialPageKey } from "@shared/tutorial";
 import { redactCustomerPaymentAddress } from "@/lib/payment-addressing";
@@ -1007,6 +1008,9 @@ function AppRoutes() {
 }
 
 function App() {
+  /* Publishes --kb-h / data-kb-open for the whole app. Mounted here rather
+     than in AppRoutes so the listeners survive every navigation. */
+  useKeyboardInset();
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

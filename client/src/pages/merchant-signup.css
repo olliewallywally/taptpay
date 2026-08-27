@@ -146,7 +146,9 @@
   background: #10193b !important;
   color: #fff !important;
   padding: 0.8rem 1rem;
-  font-size: 0.9rem;
+  /* Floors at 1rem under a finger — iOS zooms a focused field below that and
+     index.css no longer forces 16px on every field (A1 §4.4). */
+  font-size: max(0.9rem, var(--field-floor, 0px));
   font-weight: 400;
   letter-spacing: -0.01em;
   transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;

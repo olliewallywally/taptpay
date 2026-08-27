@@ -792,7 +792,7 @@ export default function Transactions() {
                       <Textarea
                         value={refundReason}
                         onChange={(e) => setRefundReason(e.target.value)}
-                        className="border-red-200 focus:border-red-400 text-sm"
+                        className="border-red-200 focus:border-red-400 text-base md:text-sm"
                         placeholder="e.g. Customer requested refund, item out of stock..."
                         rows={2}
                       />

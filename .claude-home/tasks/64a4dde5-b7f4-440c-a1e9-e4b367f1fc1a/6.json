@@ -1,9 +1,0 @@
-{
-  "id": "6",
-  "subject": "Task 6: status filter chips + remind buttons",
-  "description": "Extend RequestsHome with filter chips and inline remind buttons, pass props at render site. Typecheck, full jest, commit.",
-  "activeForm": "Adding filter chips + remind buttons",
-  "status": "in_progress",
-  "blocks": [],
-  "blockedBy": []
-}

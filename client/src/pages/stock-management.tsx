@@ -134,7 +134,7 @@ function VariationsBuilder({
               value={group.name}
               onChange={(e) => updateGroup(gi, { name: e.target.value })}
               placeholder="e.g. Size, Colour"
-              className="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#0055FF] bg-white"
+              className="flex-1 text-base md:text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#0055FF] bg-white"
             />
             <button
               type="button"
@@ -152,7 +152,7 @@ function VariationsBuilder({
                   value={opt.label}
                   onChange={(e) => updateOption(gi, oi, { label: e.target.value })}
                   placeholder="e.g. Large, Red"
-                  className="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#0055FF] bg-white"
+                  className="flex-1 text-base md:text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#0055FF] bg-white"
                 />
                 <div className="relative flex items-center">
                   <span className="absolute left-2.5 text-gray-400 text-xs">+$</span>
@@ -165,7 +165,7 @@ function VariationsBuilder({
                       updateOption(gi, oi, { priceModifier: parseFloat(e.target.value) || 0 })
                     }
                     placeholder="0.00"
-                    className="w-20 pl-7 text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#0055FF] bg-white"
+                    className="w-20 pl-7 text-base md:text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#0055FF] bg-white"
                   />
                 </div>
                 <button
@@ -551,12 +551,14 @@ export default function StockManagement() {
         {/* Search row with + button */}
         <div className="relative flex items-center gap-3 mb-4">
           <div className="relative flex-1">
+            {/* text-base under md — a field below 16px zooms iOS on focus, and
+                index.css no longer forces one on every field (A1 §4.4). */}
             <input
               type="text"
               placeholder="Search products…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-full px-5 py-3 pl-11 text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#040D6D] text-sm"
+              className="w-full bg-gray-50 border border-gray-200 rounded-full px-5 py-3 pl-11 text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#040D6D] text-base md:text-sm"
               data-testid="input-search"
             />
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />

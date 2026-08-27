@@ -42,7 +42,7 @@ function Field({ label, value, onChange, placeholder, required, type = 'text' }:
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        style={{ width: '100%', padding: '14px 16px', borderRadius: 14, background: C.gray, border: 'none', outline: 'none', color: C.navy, fontSize: 15, fontWeight: 500, boxSizing: 'border-box', fontFamily: 'inherit' }}
+        style={{ width: '100%', padding: '14px 16px', borderRadius: 14, background: C.gray, border: 'none', outline: 'none', color: C.navy, fontSize: "max(15px, var(--field-floor, 0px))", fontWeight: 500, boxSizing: 'border-box', fontFamily: 'inherit' }}
       />
     </div>
   );

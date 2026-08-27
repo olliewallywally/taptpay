@@ -69,5 +69,6 @@ describe("TerminalDockView extraction boundary", () => {
       "data-terminal-dock-mode",
       "trades",
     );
+    expect(document.querySelector('[data-demo-id="dock-terminal"]')).not.toBeNull();
   });
 });

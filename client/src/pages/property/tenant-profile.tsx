@@ -377,7 +377,7 @@ export default function TenantProfile() {
                   type={type}
                   value={editForm[k] ?? ''}
                   onChange={e => setEditForm((f: any) => ({ ...f, [k]: e.target.value }))}
-                  style={{ width: '100%', padding: '14px 16px', borderRadius: 14, background: C.gray, border: 'none', outline: 'none', color: C.navy, fontSize: 15, fontWeight: 500, boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '14px 16px', borderRadius: 14, background: C.gray, border: 'none', outline: 'none', color: C.navy, fontSize: "max(15px, var(--field-floor, 0px))", fontWeight: 500, boxSizing: 'border-box' }}
                 />
               </div>
             ))}

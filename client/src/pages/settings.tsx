@@ -1481,12 +1481,12 @@ export default function Settings() {
         </div>
 
         {/* Mode switcher: Retail · Property · Trades */}
-        <div className="pt-bounce mb-5 flex" style={{ '--pt-d': '405ms', gap: 8 } as any}>
+        <div className="pt-bounce mb-5 flex" style={{ '--pt-d': '405ms', gap: 6 } as any}>
           <button
             onClick={() => setLocation('/dashboard')}
-            style={{ flex: 1, background: '#0055FF', borderRadius: 16, padding: '14px 10px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
+            style={{ flex: 1, minWidth: 0, background: '#0055FF', borderRadius: 16, padding: '14px 6px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
           >
-            <div style={{ width: 34, height: 34, borderRadius: 11, background: 'rgba(0,229,204,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <div style={{ width: 30, height: 30, borderRadius: 10, background: 'rgba(0,229,204,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#00E5CC" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M4 12h10M4 17h7"/><rect x="14" y="13" width="7" height="7" rx="1.5"/></svg>
             </div>
             <div style={{ textAlign: 'left', minWidth: 0 }}>
@@ -1496,9 +1496,9 @@ export default function Settings() {
           </button>
           <button
             onClick={() => setLocation('/property')}
-            style={{ flex: 1, background: '#040D6D', borderRadius: 16, padding: '14px 10px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
+            style={{ flex: 1, minWidth: 0, background: '#040D6D', borderRadius: 16, padding: '14px 6px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
           >
-            <div style={{ width: 34, height: 34, borderRadius: 11, background: 'rgba(88,171,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <div style={{ width: 30, height: 30, borderRadius: 10, background: 'rgba(88,171,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#58ABFF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1.5 1.5 0 01-1.5 1.5h-15A1.5 1.5 0 013 20V9.5z"/><path d="M9 21.5V14h6v7.5"/></svg>
             </div>
             <div style={{ textAlign: 'left', minWidth: 0 }}>
@@ -1508,9 +1508,9 @@ export default function Settings() {
           </button>
           <button
             onClick={() => setLocation('/trades')}
-            style={{ flex: 1, background: TRADES_THEME.INK, borderRadius: 16, padding: '14px 10px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
+            style={{ flex: 1, minWidth: 0, background: TRADES_THEME.INK, borderRadius: 16, padding: '14px 6px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
           >
-            <div style={{ width: 34, height: 34, borderRadius: 11, background: 'rgba(244,244,244,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <div style={{ width: 30, height: 30, borderRadius: 10, background: 'rgba(244,244,244,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={TRADES_THEME.OFFW} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a4 4 0 00-5.4 5.4l-6 6a1.5 1.5 0 002.1 2.1l6-6a4 4 0 005.4-5.4l-2.3 2.3-2.1-2.1z"/></svg>
             </div>
             <div style={{ textAlign: 'left', minWidth: 0 }}>

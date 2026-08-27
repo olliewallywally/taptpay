@@ -205,8 +205,8 @@ export function ReportModal({ onClose, title = "Reports", options, clients, onGe
                 </div>
                 {preset === "custom" && (
                   <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                    <input type="date" value={cStart} onChange={(e) => setCStart(e.target.value)} style={{ flex: 1, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(0,0,0,0.12)", background: M.white, color: M.ink, fontSize: 13, fontFamily: "inherit" }} />
-                    <input type="date" value={cEnd} onChange={(e) => setCEnd(e.target.value)} style={{ flex: 1, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(0,0,0,0.12)", background: M.white, color: M.ink, fontSize: 13, fontFamily: "inherit" }} />
+                    <input type="date" value={cStart} onChange={(e) => setCStart(e.target.value)} style={{ flex: 1, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(0,0,0,0.12)", background: M.white, color: M.ink, fontSize: "max(13px, var(--field-floor, 0px))", fontFamily: "inherit" }} />
+                    <input type="date" value={cEnd} onChange={(e) => setCEnd(e.target.value)} style={{ flex: 1, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(0,0,0,0.12)", background: M.white, color: M.ink, fontSize: "max(13px, var(--field-floor, 0px))", fontFamily: "inherit" }} />
                   </div>
                 )}
               </>

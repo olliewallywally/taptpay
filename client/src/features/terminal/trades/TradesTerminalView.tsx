@@ -220,7 +220,7 @@ function ChooseClient({ clients, invoices, go, onSelect, onQuickInvoice }: any) 
           <input
             value={q} onChange={e => setQ(e.target.value)}
             placeholder="search clients or site"
-            style={{ flex: 1, border: 'none', background: 'transparent', color: OFFW, fontFamily: 'Outfit, system-ui', fontWeight: 500, fontSize: 14, outline: 'none' }}
+            style={{ flex: 1, border: 'none', background: 'transparent', color: OFFW, fontFamily: 'Outfit, system-ui', fontWeight: 500, fontSize: 'max(14px, var(--field-floor, 0px))', outline: 'none' }}
           />
         </div>
         <div className="tp-thin-scroll" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 130 }}>
@@ -634,7 +634,9 @@ function JobActionSheet({ invoice, onClose, onMarkReceived, onSendBalance, onCom
    Solid navy box (80%, scrollable): client, line items, deposit, notes, total, CTA. */
 export type QuoteDraftLine = { id: number; description: string; qty: string; unitPrice: string };
 const Q_LABEL = { fontWeight: 600, fontSize: 11, color: 'rgba(88,171,255,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase' as const, marginBottom: 10 };
-const Q_FIELD = { width: '100%', boxSizing: 'border-box' as const, padding: '13px 15px', borderRadius: 14, background: OFFW, border: 'none', color: NAVY, fontFamily: 'Outfit, system-ui', fontWeight: 500, fontSize: 15, outline: 'none' };
+/* fontSize floors at 1rem under a finger: iOS zooms a focused field below that,
+   and index.css no longer forces 16px on every field (A1 §4.4). */
+const Q_FIELD = { width: '100%', boxSizing: 'border-box' as const, padding: '13px 15px', borderRadius: 14, background: OFFW, border: 'none', color: NAVY, fontFamily: 'Outfit, system-ui', fontWeight: 500, fontSize: 'max(15px, var(--field-floor, 0px))', outline: 'none' };
 const Q_TOTROW = { display: 'flex', justifyContent: 'space-between', gap: 16, padding: '5px 0' };
 
 export type TradesQuoteTotals = {

@@ -93,6 +93,8 @@ const PHONES = [
    reports no safe-area inset, so the 20px floor is what applies here. */
 const DOCK_EXPANDED = 78;
 const DOCK_COLLAPSED = 64;
+/* Mirrors FLICK_VELOCITY in TerminalDockView — §9.E clause 3's threshold. */
+const FLICK_THRESHOLD = 0.4;
 const COLLAPSE_AFTER_MS = 4_000;
 
 /* §9.C's table, re-measured 2026-08-23 against the shipped grid with the dock
@@ -508,7 +510,17 @@ async function checkTokenLayer(page, label, phone) {
   };
   for (const [name, n] of Object.entries(MULTIPLES)) {
     const expected = n * tokens["--u"];
-    if (tokens[name] === null || Math.abs(tokens[name] - expected) > 0.05) {
+    /* Chromium quantises each container-query length to 1/64px independently,
+       so `--u` arrives already rounded and `n * tokens["--u"]` multiplies that
+       rounding by n — 0.29px at n=19, six times a flat 0.05 tolerance. The
+       engine truncates, so the bound is (n + 1) / 64: one quantum for the unit
+       and n for the derived length. Floored at the original 0.05 so nothing
+       with a small multiplier is tightened. This absorbs only sub-quantum
+       drift — the defects this clause exists for (a token at 0px, one pinned
+       to its cap, the keypad's 65.1px against a 76px design size) are whole
+       pixels out and still fail. */
+    const tol = Math.max(0.05, (n + 1) / 64);
+    if (tokens[name] === null || Math.abs(tokens[name] - expected) > tol) {
       fail(
         `${label}: ${name} is ${tokens[name]}px, expected ${Math.round(expected * 1000) / 1000}px (${n} × --u) (§9.B1)`,
       );
@@ -1126,11 +1138,52 @@ async function checkGesture(browser) {
       fail("gesture: a slow 20px drag expanded the dock — below the 0.45 threshold it must settle closed (§9.E clause 2)");
     }
 
-    /* Clause 3 — a flick faster than 0.4px/ms expands regardless of distance. */
+    /* Clause 3 — a flick faster than 0.4px/ms expands regardless of distance.
+       Driven from inside the page rather than through page.mouse. A CDP mouse
+       round-trip costs 14-23ms in this environment, so the fastest 20px that
+       `drag()` can actually deliver is ~0.31px/ms — below the very threshold
+       this clause asserts it exceeds. It was therefore a test that could not
+       pass on its own terms, and it only ever looked green because the clause
+       above it left the dock already expanded. Real hit-testing with a real
+       mouse is clause 1's job; what is under test here is purely the velocity
+       threshold, and in-page dispatch is the only way to control release
+       velocity. The achieved figure is asserted too, so the fixture cannot
+       quietly stop being a flick again. */
     await ensureCollapsed(page);
-    await drag(page, { x: boxes.handle.cx, y: boxes.handle.cy }, 20, { ms: 16, steps: 2 });
-    if (!(await dockState(page)).expanded) {
-      fail("gesture: a 20px flick faster than 0.4px/ms did not expand the dock (§9.E clause 3)");
+    const flick = await page.evaluate(async ({ x, y }) => {
+      const handle = document.querySelector('[data-demo-id="dock-handle"]');
+      if (!handle) return null;
+      const pointerId = 41;
+      const send = (type, clientY, target) =>
+        target.dispatchEvent(
+          new PointerEvent(type, {
+            pointerId, pointerType: "touch", isPrimary: true,
+            bubbles: true, cancelable: true, clientX: x, clientY,
+          }),
+        );
+      const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+      const t0 = performance.now();
+      send("pointerdown", y, handle);
+      await wait(8);
+      send("pointermove", y - 10, window);
+      await wait(8);
+      send("pointermove", y - 20, window);
+      const elapsed = performance.now() - t0;
+      send("pointerup", y - 20, window);
+      return { elapsed, velocity: 20 / Math.max(1, elapsed) };
+    }, { x: boxes.handle.cx, y: boxes.handle.cy });
+    await page.waitForTimeout(700);
+    out.flick = flick && { ms: Math.round(flick.elapsed), pxPerMs: Math.round(flick.velocity * 100) / 100 };
+    if (!flick) {
+      fail("gesture: no handle to flick (§9.E clause 3)");
+    } else if (flick.velocity <= FLICK_THRESHOLD) {
+      fail(
+        `gesture: the harness only achieved ${flick.velocity.toFixed(2)}px/ms — clause 3 asserts a flick above ${FLICK_THRESHOLD}px/ms, so it tested nothing (§9.E clause 3)`,
+      );
+    } else if (!(await dockState(page)).expanded) {
+      fail(
+        `gesture: a 20px flick at ${flick.velocity.toFixed(2)}px/ms did not expand the dock (§9.E clause 3)`,
+      );
     }
 
     /* Clause 4 — a downward drag on the expanded body collapses it, and a tap

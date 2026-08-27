@@ -2,7 +2,13 @@
 <html lang="en-NZ">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <!-- `maximum-scale`/`user-scalable=no` were here to stop iOS zooming a
+         focused field; the 1rem field floor in index.css does that without
+         disabling pinch, which was a WCAG 1.4.4 failure (A1 §4.5).
+         `interactive-widget=resizes-content` lets Chromium shrink the layout
+         viewport for the keyboard; WebKit ignores it and is served by --kb-h
+         (use-keyboard-inset.ts). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     
     <!-- PWA -->
     <link rel="manifest" href="/manifest.json" />
@@ -208,7 +214,9 @@
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- The variable range, matching the @import in index.css. Stopping at 700
+         left every 800/900 declaration on a synthesised face — see A1 §4.3. -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap" rel="stylesheet">
 
     <!-- Google Analytics (GA4) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-0MBNS0C2L5"></script>

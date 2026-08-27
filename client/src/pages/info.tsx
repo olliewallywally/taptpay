@@ -131,7 +131,7 @@ export default function InfoPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 disabled={submitting}
-                className="w-full bg-white/10 text-white placeholder-white/35 rounded-xl pl-10 pr-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#00f1d7]/60 disabled:opacity-50"
+                className="w-full bg-white/10 text-white placeholder-white/35 rounded-xl pl-10 pr-4 py-3 text-base md:text-sm outline-none focus:ring-2 focus:ring-[#00f1d7]/60 disabled:opacity-50"
                 style={{ border: "1px solid rgba(255,255,255,0.15)" }}
               />
             </div>
@@ -145,7 +145,7 @@ export default function InfoPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={submitting}
-                className="w-full bg-white/10 text-white placeholder-white/35 rounded-xl pl-10 pr-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#00f1d7]/60 disabled:opacity-50"
+                className="w-full bg-white/10 text-white placeholder-white/35 rounded-xl pl-10 pr-4 py-3 text-base md:text-sm outline-none focus:ring-2 focus:ring-[#00f1d7]/60 disabled:opacity-50"
                 style={{ border: "1px solid rgba(255,255,255,0.15)" }}
               />
             </div>

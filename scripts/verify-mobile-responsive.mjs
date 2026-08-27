@@ -76,6 +76,13 @@ const TOKENS = [
   "--amount-max", "--chrome-gutter", "--dock-h", "--kb-h",
 ];
 
+/* Insets, not geometry: zero is what they MEAN when the thing they measure is
+   absent, and no headless run raises a keyboard, so `--kb-h: 0px` is the only
+   correct reading here. For these the defect inverts — a missing declaration
+   is the failure, because every layout that reads one falls back silently and
+   the phase K rules stop applying (A1 §4.1). Scored below. */
+const ZERO_IS_MEANINGFUL = new Set(["--kb-h"]);
+
 /* Deliberately clipped by design — §7.2 clause 2 asks for an explicit
    allowlist rather than a blanket tolerance. */
 const EDGE_ALLOWLIST = ["tp-send-slot", "tp-pulse", "tp-overlay", "tp-toast", "tp-top-banner"];
@@ -509,6 +516,12 @@ function compare(current, baseline) {
     /* Tokens: appearing or changing is recorded, never scored — but a token
        that computes to 0px is the v1 defect and is always a failure. */
     for (const [name, value] of Object.entries(now.tokens ?? {})) {
+      if (ZERO_IS_MEANINGFUL.has(name)) {
+        if (value == null) {
+          regressions.push(`${cell}  token ${name} does not resolve — every reader falls back silently`);
+        }
+        continue;
+      }
       if (value != null && /^0(px)?$/.test(value)) {
         regressions.push(`${cell}  token ${name} computes to ${value} — the v1 defect`);
       }
