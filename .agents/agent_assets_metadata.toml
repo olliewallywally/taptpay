@@ -32,3 +32,10 @@ uri = "file://docs/plans/RXA%20plan.txt"
 type = "text"
 title = "RXA plan"
 description = "Saved copy of the attached TaptPay to Xero integration plan."
+
+[[outputs]]
+id = "Bg4vxDQ5TjjOhJvpy5xpY"
+uri = "file://attached_assets/full_intergration_plan_-_taptpay_1787816180424.txt"
+type = "text"
+title = "Full RXA plan"
+description = "The newly attached full TaptPay implementation plan, uploaded unchanged."
