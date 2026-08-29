@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { inertWhen } from "../inert-when";
 import { setDockCollapse } from "@/features/navigation/dock-collapse-store";
 import { SegmentedBar } from "../SegmentedBar";
 import { useMeasuredChromeGutter } from "../useMeasuredChromeGutter";
@@ -1216,7 +1217,7 @@ export default function RetailTerminalViewCore({
           style={isFeatureScreen ? { transform: `translate(-50%, calc(${boundaryDelta}px - 100% - 20px))` } : undefined}
         >
           <SubBar activeIdx={subbarActiveIdx} onPick={i => go(SUBBAR_ROUTE[i])} compact={sendVisible} />
-          <div className={`tp-send-slot${sendVisible ? ' show' : ''}`}>
+          <div className={`tp-send-slot${sendVisible ? ' show' : ''}`} {...inertWhen(!sendVisible)}>
             <SendBtn onClick={handleSend} />
           </div>
         </div>

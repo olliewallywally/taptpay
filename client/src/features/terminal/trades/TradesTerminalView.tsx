@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { inertWhen } from "../inert-when";
 import { formatNzd } from "@/lib/trades-money";
 import { TRADES_THEME } from "@/lib/trades-theme";
 import { setDockCollapse } from "@/features/navigation/dock-collapse-store";
@@ -1090,7 +1091,7 @@ export function TradesTerminalView(props: TradesTerminalViewProps) {
           <div className="tp-subbar-center">
             <SubBar activeIdx={subbarActiveIdx} onPick={props.onSubbarPick} compact={sendVisible} hideLabel={false} />
           </div>
-          <div className={`tp-send-slot${sendVisible ? ' show' : ''}`}>
+          <div className={`tp-send-slot${sendVisible ? ' show' : ''}`} {...inertWhen(!sendVisible)}>
             <SendBtn onClick={props.onSendShortcut} />
           </div>
         </div>

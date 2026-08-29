@@ -311,10 +311,19 @@
 .retail-terminal-view .tp-psubbar.hide { opacity: 0; transform: translate(-50%, 67px) scale(0.92); pointer-events: none; }
 .retail-terminal-view .tp-psubbar.show { opacity: 1; }
 .retail-terminal-view .tp-psubbar.feature { transform: translate(-50%, calc(-100% - 20px)); }
+/* Collapsed, the slot is `max-width: 0` and fully transparent — but the send
+   button inside keeps its full natural layout box and only the slot's
+   `overflow: hidden` stops it painting. That box (and the `.tap-target` hit
+   area centred on it) sits ~68px to the right of the action row, over whatever
+   the home screen has there, so the slot must not claim taps while collapsed:
+   §7.2 clause 7's tapCentreMiss. Taps are re-enabled only when the row is
+   `.show` AND the slot itself has expanded. */
 .retail-terminal-view .tp-send-slot {
   display: flex; align-items: center; overflow: hidden; max-width: 0; opacity: 0;
+  pointer-events: none;
 }
 .retail-terminal-view .tp-send-slot.show { max-width: 143px; opacity: 1; }
+.retail-terminal-view .tp-psubbar.show .tp-send-slot.show { pointer-events: auto; }
 .retail-terminal-view .tp-pdock {
   position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: center;
   transition: opacity 280ms cubic-bezier(0,0,0.2,1), transform 360ms cubic-bezier(0.34,1.56,0.64,1);

@@ -86,7 +86,12 @@
 .trades-terminal-view .tp-pfab.hide { opacity: 0; transform: translate(-50%, -50%) translateY(8px) scale(0.7); pointer-events: none; }
 .trades-terminal-view .tp-pfab.show { opacity: 1; }
 .trades-terminal-view .tp-psubbar { position: absolute; top: 50%; left: 0; right: 0; padding: 0 22px; box-sizing: border-box; transform: translateY(67px); display: flex; align-items: center; gap: 8px; transition: opacity 220ms cubic-bezier(0,0,0.2,1), transform 300ms cubic-bezier(0.4,0,0.2,1); will-change: opacity, transform; pointer-events: none; }
-.trades-terminal-view .tp-psubbar.show .tp-subbar, .trades-terminal-view .tp-psubbar.show .tp-send-slot { pointer-events: auto; }
+/* `.tp-send-slot.show`, not `.tp-send-slot`: a collapsed slot is `max-width: 0`
+   but its button keeps a full natural layout box that only `overflow: hidden`
+   stops painting, so re-enabling taps on it hands a phantom 44px hit area to
+   whatever the screen has under it (§7.2 clause 7 — same defect this rule's
+   retail and property twins carried). */
+.trades-terminal-view .tp-psubbar.show .tp-subbar, .trades-terminal-view .tp-psubbar.show .tp-send-slot.show { pointer-events: auto; }
 .trades-terminal-view .tp-psubbar.hide { opacity: 0; transform: translateY(67px) scale(0.92); pointer-events: none; }
 .trades-terminal-view .tp-psubbar.show { opacity: 1; }
 .trades-terminal-view .tp-psubbar.feature { transform: translateY(calc(-100% - 20px)); }

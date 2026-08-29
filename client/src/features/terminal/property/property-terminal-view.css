@@ -106,8 +106,13 @@
 .property-terminal-view .tp-psubbar { position: absolute; top: 50%; left: 0; right: 0; padding: 0 22px; box-sizing: border-box; transform: translateY(67px); display: flex; align-items: center; gap: 8px; transition: opacity 220ms cubic-bezier(0,0,0.2,1), transform 300ms cubic-bezier(0.4,0,0.2,1), top var(--dur-bar) var(--ease-bar); will-change: opacity, transform; pointer-events: none; }
 .property-terminal-view .tp-psubbar.raised { top: 40%; }
 /* Only the visible pills capture taps — the bar's empty full-width area passes
-   taps through to the screen beneath (e.g. the "send bill" CTA). */
-.property-terminal-view .tp-psubbar.show .tp-subbar, .property-terminal-view .tp-psubbar.show .tp-split-slot, .property-terminal-view .tp-psubbar.show .tp-send-slot { pointer-events: auto; }
+   taps through to the screen beneath (e.g. the "send bill" CTA).
+   The slot selectors carry `.show` because a COLLAPSED slot is `max-width: 0`
+   yet its button keeps a full natural layout box (only `overflow: hidden` stops
+   it painting). Without `.show` this rule handed that phantom box — and the
+   44px `.tap-target` hit area centred on it — live pointer-events on top of the
+   action bar's own buttons: §7.2 clause 7's tapCentreMiss. */
+.property-terminal-view .tp-psubbar.show .tp-subbar, .property-terminal-view .tp-psubbar.show .tp-split-slot.show, .property-terminal-view .tp-psubbar.show .tp-send-slot.show { pointer-events: auto; }
 .property-terminal-view .tp-psubbar.hide { opacity: 0; transform: translateY(67px) scale(0.92); pointer-events: none; }
 .property-terminal-view .tp-psubbar.show { opacity: 1; }
 .property-terminal-view .tp-psubbar.feature { transform: translateY(calc(-100% - 20px)); }

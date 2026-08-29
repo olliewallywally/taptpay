@@ -33,7 +33,7 @@
       },
       "activeLabel": null,
       "send": {
-        "w": 69.2,
+        "w": 68.2,
         "h": 32.2,
         "x": 301.4,
         "y": 227.1
@@ -100,7 +100,7 @@
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
       "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
-      "--kb-h": null
+      "--kb-h": "0px"
     },
     "tapUnder44": 15,
     "tapInflated": 0,
@@ -115,7 +115,7 @@
       "resizedAlignment": null,
       "restoredAlignment": null
     },
-    "pageErrors": 4
+    "pageErrors": 2
   },
   "retail@360x640": {
     "docOverflow": 0,
@@ -151,7 +151,7 @@
       },
       "activeLabel": null,
       "send": {
-        "w": 69.2,
+        "w": 68.2,
         "h": 36,
         "x": 332.9,
         "y": 251.4
@@ -218,7 +218,7 @@
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
       "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
-      "--kb-h": null
+      "--kb-h": "0px"
     },
     "tapUnder44": 15,
     "tapInflated": 0,
@@ -233,7 +233,7 @@
       "resizedAlignment": null,
       "restoredAlignment": null
     },
-    "pageErrors": 4
+    "pageErrors": 2
   },
   "retail@375x667": {
     "docOverflow": 0,
@@ -269,7 +269,7 @@
       },
       "activeLabel": null,
       "send": {
-        "w": 69.2,
+        "w": 68.2,
         "h": 37.5,
         "x": 344.9,
         "y": 260.4
@@ -336,7 +336,7 @@
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
       "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
-      "--kb-h": null
+      "--kb-h": "0px"
     },
     "tapUnder44": 15,
     "tapInflated": 0,
@@ -351,7 +351,7 @@
       "resizedAlignment": null,
       "restoredAlignment": null
     },
-    "pageErrors": 4
+    "pageErrors": 2
   },
   "retail@390x844": {
     "docOverflow": 0,
@@ -387,7 +387,7 @@
       },
       "activeLabel": null,
       "send": {
-        "w": 69.2,
+        "w": 68.2,
         "h": 39,
         "x": 356.9,
         "y": 351
@@ -454,7 +454,7 @@
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
       "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
-      "--kb-h": null
+      "--kb-h": "0px"
     },
     "tapUnder44": 15,
     "tapInflated": 0,
@@ -469,7 +469,7 @@
       "resizedAlignment": null,
       "restoredAlignment": null
     },
-    "pageErrors": 4
+    "pageErrors": 2
   },
   "retail@412x915": {
     "docOverflow": 0,
@@ -505,7 +505,7 @@
       },
       "activeLabel": null,
       "send": {
-        "w": 69.2,
+        "w": 68.2,
         "h": 39,
         "x": 368,
         "y": 374.9
@@ -572,17 +572,12 @@
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
       "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
-      "--kb-h": null
+      "--kb-h": "0px"
     },
     "tapUnder44": 15,
     "tapInflated": 0,
-    "tapCentreMiss": 1,
-    "tapCentreMissSamples": [
-      {
-        "control": "send",
-        "hit": "tp-screen.tp-home"
-      }
-    ],
+    "tapCentreMiss": 0,
+    "tapCentreMissSamples": [],
     "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
@@ -592,7 +587,7 @@
       "resizedAlignment": null,
       "restoredAlignment": null
     },
-    "pageErrors": 4
+    "pageErrors": 2
   },
   "retail@430x932": {
     "docOverflow": 0,
@@ -628,7 +623,7 @@
       },
       "activeLabel": null,
       "send": {
-        "w": 69.2,
+        "w": 68.2,
         "h": 39,
         "x": 377,
         "y": 380.6
@@ -695,17 +690,12 @@
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
       "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
-      "--kb-h": null
+      "--kb-h": "0px"
     },
     "tapUnder44": 15,
     "tapInflated": 0,
-    "tapCentreMiss": 1,
-    "tapCentreMissSamples": [
-      {
-        "control": "send",
-        "hit": "tp-screen.tp-home"
-      }
-    ],
+    "tapCentreMiss": 0,
+    "tapCentreMissSamples": [],
     "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
@@ -751,7 +741,7 @@
       },
       "activeLabel": null,
       "send": {
-        "w": 69.2,
+        "w": 68.2,
         "h": 39,
         "x": 356.9,
         "y": 351
@@ -818,7 +808,7 @@
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
       "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
-      "--kb-h": null
+      "--kb-h": "0px"
     },
     "tapUnder44": 15,
     "tapInflated": 0,
@@ -833,7 +823,7 @@
       "resizedAlignment": null,
       "restoredAlignment": null
     },
-    "pageErrors": 5
+    "pageErrors": 3
   },
   "property@320x568": {
     "docOverflow": 0,
@@ -936,17 +926,12 @@
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
       "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
-      "--kb-h": null
+      "--kb-h": "0px"
     },
     "tapUnder44": 13,
     "tapInflated": 0,
-    "tapCentreMiss": 1,
-    "tapCentreMissSamples": [
-      {
-        "control": "tap-target",
-        "hit": "tenants"
-      }
-    ],
+    "tapCentreMiss": 0,
+    "tapCentreMissSamples": [],
     "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
@@ -956,7 +941,7 @@
       "resizedAlignment": null,
       "restoredAlignment": null
     },
-    "pageErrors": 4
+    "pageErrors": 2
   },
   "property@360x640": {
     "docOverflow": 0,
@@ -1059,17 +1044,12 @@
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
       "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
-      "--kb-h": null
+      "--kb-h": "0px"
     },
     "tapUnder44": 13,
     "tapInflated": 0,
-    "tapCentreMiss": 1,
-    "tapCentreMissSamples": [
-      {
-        "control": "tap-target",
-        "hit": "tenants"
-      }
-    ],
+    "tapCentreMiss": 0,
+    "tapCentreMissSamples": [],
     "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
@@ -1182,17 +1162,12 @@
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
       "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
-      "--kb-h": null
+      "--kb-h": "0px"
     },
     "tapUnder44": 13,
     "tapInflated": 0,
-    "tapCentreMiss": 1,
-    "tapCentreMissSamples": [
-      {
-        "control": "tap-target",
-        "hit": "tenants"
-      }
-    ],
+    "tapCentreMiss": 0,
+    "tapCentreMissSamples": [],
     "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
@@ -1202,7 +1177,7 @@
       "resizedAlignment": null,
       "restoredAlignment": null
     },
-    "pageErrors": 4
+    "pageErrors": 2
   },
   "property@390x844": {
     "docOverflow": 0,
@@ -1305,17 +1280,12 @@
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
       "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
-      "--kb-h": null
+      "--kb-h": "0px"
     },
     "tapUnder44": 18,
     "tapInflated": 0,
-    "tapCentreMiss": 1,
-    "tapCentreMissSamples": [
-      {
-        "control": "tap-target",
-        "hit": "tenants"
-      }
-    ],
+    "tapCentreMiss": 0,
+    "tapCentreMissSamples": [],
     "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
@@ -1375,13 +1345,13 @@
       },
       "amount": {
         "w": 356,
-        "h": 73.4,
+        "h": 68.6,
         "x": 28,
         "y": 86
       },
       "amountParent": {
         "w": 356,
-        "h": 185.7,
+        "h": 180.9,
         "x": 28,
         "y": 86
       },
@@ -1428,17 +1398,12 @@
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
       "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
-      "--kb-h": null
+      "--kb-h": "0px"
     },
     "tapUnder44": 18,
     "tapInflated": 0,
-    "tapCentreMiss": 1,
-    "tapCentreMissSamples": [
-      {
-        "control": "tap-target",
-        "hit": "tp-subbar.tp-bar"
-      }
-    ],
+    "tapCentreMiss": 0,
+    "tapCentreMissSamples": [],
     "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
@@ -1551,17 +1516,12 @@
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
       "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
-      "--kb-h": null
+      "--kb-h": "0px"
     },
     "tapUnder44": 18,
     "tapInflated": 0,
-    "tapCentreMiss": 1,
-    "tapCentreMissSamples": [
-      {
-        "control": "tap-target",
-        "hit": "tp-screen.tp-home"
-      }
-    ],
+    "tapCentreMiss": 0,
+    "tapCentreMissSamples": [],
     "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
@@ -1674,17 +1634,12 @@
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
       "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
-      "--kb-h": null
+      "--kb-h": "0px"
     },
     "tapUnder44": 18,
     "tapInflated": 0,
-    "tapCentreMiss": 1,
-    "tapCentreMissSamples": [
-      {
-        "control": "tap-target",
-        "hit": "tenants"
-      }
-    ],
+    "tapCentreMiss": 0,
+    "tapCentreMissSamples": [],
     "inflatedSamples": [],
     "tpUnscopedRules": 0,
     "tpDuplicateKeyframes": 0,
@@ -1730,7 +1685,7 @@
       },
       "activeLabel": null,
       "send": {
-        "w": 69.2,
+        "w": 68.2,
         "h": 32.2,
         "x": 298,
         "y": 227.1
@@ -1797,7 +1752,7 @@
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
       "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
-      "--kb-h": null
+      "--kb-h": "0px"
     },
     "tapUnder44": 11,
     "tapInflated": 0,
@@ -1812,7 +1767,7 @@
       "resizedAlignment": null,
       "restoredAlignment": null
     },
-    "pageErrors": 4
+    "pageErrors": 2
   },
   "trades@360x640": {
     "docOverflow": 0,
@@ -1848,7 +1803,7 @@
       },
       "activeLabel": null,
       "send": {
-        "w": 69.2,
+        "w": 68.2,
         "h": 36,
         "x": 338,
         "y": 251.4
@@ -1915,7 +1870,7 @@
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
       "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
-      "--kb-h": null
+      "--kb-h": "0px"
     },
     "tapUnder44": 11,
     "tapInflated": 0,
@@ -1930,7 +1885,7 @@
       "resizedAlignment": null,
       "restoredAlignment": null
     },
-    "pageErrors": 4
+    "pageErrors": 2
   },
   "trades@375x667": {
     "docOverflow": 0,
@@ -1966,7 +1921,7 @@
       },
       "activeLabel": null,
       "send": {
-        "w": 69.2,
+        "w": 68.2,
         "h": 37.5,
         "x": 353,
         "y": 260.4
@@ -2033,7 +1988,7 @@
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
       "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
-      "--kb-h": null
+      "--kb-h": "0px"
     },
     "tapUnder44": 11,
     "tapInflated": 0,
@@ -2084,7 +2039,7 @@
       },
       "activeLabel": null,
       "send": {
-        "w": 69.2,
+        "w": 68.2,
         "h": 39,
         "x": 368,
         "y": 351
@@ -2151,7 +2106,7 @@
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
       "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
-      "--kb-h": null
+      "--kb-h": "0px"
     },
     "tapUnder44": 11,
     "tapInflated": 0,
@@ -2166,7 +2121,7 @@
       "resizedAlignment": null,
       "restoredAlignment": null
     },
-    "pageErrors": 4
+    "pageErrors": 2
   },
   "trades@412x915": {
     "docOverflow": 0,
@@ -2202,7 +2157,7 @@
       },
       "activeLabel": null,
       "send": {
-        "w": 69.2,
+        "w": 68.2,
         "h": 39,
         "x": 390,
         "y": 374.9
@@ -2269,7 +2224,7 @@
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
       "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
-      "--kb-h": null
+      "--kb-h": "0px"
     },
     "tapUnder44": 11,
     "tapInflated": 0,
@@ -2284,7 +2239,7 @@
       "resizedAlignment": null,
       "restoredAlignment": null
     },
-    "pageErrors": 4
+    "pageErrors": 2
   },
   "trades@430x932": {
     "docOverflow": 0,
@@ -2320,7 +2275,7 @@
       },
       "activeLabel": null,
       "send": {
-        "w": 69.2,
+        "w": 68.2,
         "h": 39,
         "x": 408,
         "y": 380.6
@@ -2387,7 +2342,7 @@
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
       "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
-      "--kb-h": null
+      "--kb-h": "0px"
     },
     "tapUnder44": 11,
     "tapInflated": 0,
@@ -2402,7 +2357,7 @@
       "resizedAlignment": null,
       "restoredAlignment": null
     },
-    "pageErrors": 4
+    "pageErrors": 2
   },
   "trades@390x844+safearea": {
     "docOverflow": 0,
@@ -2438,7 +2393,7 @@
       },
       "activeLabel": null,
       "send": {
-        "w": 69.2,
+        "w": 68.2,
         "h": 39,
         "x": 368,
         "y": 351
@@ -2505,7 +2460,7 @@
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
       "--chrome-gutter": "clamp(70px, 27.2cqi, 117px)",
       "--dock-h": "78px",
-      "--kb-h": null
+      "--kb-h": "0px"
     },
     "tapUnder44": 11,
     "tapInflated": 0,
@@ -2520,6 +2475,6 @@
       "resizedAlignment": null,
       "restoredAlignment": null
     },
-    "pageErrors": 5
+    "pageErrors": 3
   }
 }

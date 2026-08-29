@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { inertWhen } from "../inert-when";
 import { WireframeLiquidButton } from "@/components/wireframe-liquid-button";
 import { setDockCollapse } from "@/features/navigation/dock-collapse-store";
 import { SegmentedBar } from "../SegmentedBar";
@@ -1328,13 +1329,13 @@ export function PropertyTerminalView(props: PropertyTerminalViewProps) {
           className={`tp-psubbar${subbarVisible ? ' show' : ' hide'}${isFeatureScreen ? ' feature' : ''}${props.screen === 'home' ? ' home' : ''}`}
           style={isFeatureScreen ? { transform: `translateY(calc(${boundaryDelta}px - 100% - 20px))` } : undefined}
         >
-          <div className={`tp-split-slot${props.screen === 'tenants' ? ' show' : ''}`}>
+          <div className={`tp-split-slot${props.screen === 'tenants' ? ' show' : ''}`} {...inertWhen(props.screen !== 'tenants')}>
             <SplitPill on={props.splitMode} onToggle={props.onToggleSplit} />
           </div>
           <div className="tp-subbar-center">
             <SubBar activeIdx={subbarActiveIdx} onPick={props.onSubbarPick} compact={sendVisible} hideLabel={false} />
           </div>
-          <div className={`tp-send-slot${sendVisible ? ' show' : ''}`}>
+          <div className={`tp-send-slot${sendVisible ? ' show' : ''}`} {...inertWhen(!sendVisible)}>
             <SendBtn onClick={props.onSendRent} />
           </div>
         </div>
