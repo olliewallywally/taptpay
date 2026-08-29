@@ -1082,7 +1082,7 @@ read this column, then confirm by running the gates.
 | 7 | **done** `e1bbade` | `SegmentedBar` + grid indicator + observers (§6.3) | the six invariants |
 | 8 | **done** `a6dd00d` | Home-only grid + measured gutters (§6.4) | `visibleStackRows >= 3` on all six portrait sizes |
 | 9 | **done** `233058d` | Amount fitting (§6.5) | amount inside its parent at the MD4 maximum, all six sizes |
-| 10 | **OPEN** | Extend to non-terminal merchant routes | goldens per route |
+| 10 | **OPEN** — diagnosis done 2026-08-29, `docs/REVIEW-2026-08-29-phase-10-non-terminal-routes.md` (RC-8..RC-11, 13-item punch list); no fix code yet | Extend to non-terminal merchant routes | goldens per route |
 
 Companion (`docs/PLAN-2026-08-17-terminal-panels-and-dock.md` §8): **A–F all done**;
 `verify:terminal-dock` passes.
