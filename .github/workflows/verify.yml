@@ -1,0 +1,147 @@
+# The gates that docs/PLAN-2026-08-17-mobile-responsive-ui.md §7.5 asks for.
+#
+# WHY THIS EXISTS. Every defect that plan is about lives below `max-width: 640px`,
+# and every probe the repo had before it ran at >=1194px — so the entire class was
+# invisible to CI. It was invisible to CI twice over, in fact, because there was no
+# CI: `verify:mobile`, `verify:mobile-keyboard` and `verify:terminal-dock` were
+# commands a human had to remember to type.
+#
+# WHY IT IS SPLIT IN TWO. §7.6: "Do not ship a permanently failing command." The
+# `static` job needs nothing but the repo and is green from the first run. The
+# browser gates need a live database — the app talks Neon over `@neondatabase/serverless`
+# (server/db.ts:1), so a stock `postgres:` service container cannot stand in for it
+# without a websocket proxy. Rather than fail red on every fork and every repo that
+# has no DATABASE_URL, `preflight` reports whether the secret exists and the gates
+# SKIP when it does not. A skipped job is honest; a red one teaches people to ignore CI.
+
+name: verify
+
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    name: typecheck + client unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: tsc
+        run: npm run check
+      # test:client, not test — the server project needs a database, so it runs
+      # in browser-gates below where one exists.
+      - name: jest (client)
+        run: npm run test:client
+
+  preflight:
+    name: can the browser gates run here?
+    runs-on: ubuntu-latest
+    outputs:
+      has_db: ${{ steps.probe.outputs.has_db }}
+    steps:
+      - id: probe
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -n "$DATABASE_URL" ]; then
+            echo "has_db=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_db=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Browser gates skipped::DATABASE_URL is not configured for this repository, so the mobile gates and goldens cannot boot the app. This is a skip, not a failure — see docs/PLAN-2026-08-17-mobile-responsive-ui.md §7.6."
+          fi
+
+  browser-gates:
+    name: mobile gates + goldens
+    needs: [static, preflight]
+    if: needs.preflight.outputs.has_db == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      # The probes normally launch the nix-store Chromium, because the bundled one
+      # is broken on the dev host (missing libnspr4). Off that host there is no nix
+      # store, so PLAYWRIGHT_CHROMIUM_PATH points them at the downloaded browser.
+      - name: install chromium
+        run: npx playwright install --with-deps chromium
+      - name: resolve the chromium binary
+        run: |
+          echo "PLAYWRIGHT_CHROMIUM_PATH=$(node -e "import('playwright').then(p => console.log(p.chromium.executablePath()))")" >> "$GITHUB_ENV"
+
+      - name: apply migrations
+        run: npm run db:migrate
+
+      - name: start the dev server
+        run: |
+          npm run dev > /tmp/dev.log 2>&1 &
+          for i in $(seq 1 120); do
+            if curl -fsS -o /dev/null http://127.0.0.1:5000/; then
+              echo "dev server up after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "dev server never answered on :5000"; cat /tmp/dev.log; exit 1
+
+      # Vite transforms the module graph on the first browser load; a cold first
+      # goto can exceed the probes' own 30s navigation timeout and fail as if the
+      # app were broken. Pay that cost once, here, where it reads as a warm-up.
+      - name: warm the module graph
+        run: |
+          curl -fsS -o /dev/null http://127.0.0.1:5000/terminal
+          curl -fsS -o /dev/null http://127.0.0.1:5000/property/terminal
+          curl -fsS -o /dev/null http://127.0.0.1:5000/trades/terminal
+
+      - name: jest (server)
+        run: npm run test:server
+
+      - name: geometry gate (§7.2)
+        run: npm run verify:mobile
+
+      - name: keyboard gate (§K)
+        run: npm run verify:mobile-keyboard
+
+      - name: goldens (§7.1)
+        run: npm run test:golden
+
+      # §9.F's frame-budget clauses measure worst-frame time, which on a shared
+      # runner reports 18/35/40/63ms across four runs of identical code. Every
+      # other clause in this gate is geometry and is deterministic, so the gate
+      # still earns its place — but it advises, it does not block, until those
+      # clauses are made load-independent.
+      - name: dock gate (§9, advisory — see comment)
+        continue-on-error: true
+        run: npm run verify:terminal-dock
+
+      - name: desktop P0 regression boundary
+        run: node scripts/verify-desktop-p0.mjs
+
+      - name: collect failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-evidence
+          path: |
+            /tmp/dev.log
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7

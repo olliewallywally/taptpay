@@ -1,0 +1,25 @@
+/* Applied by `toHaveScreenshot({ stylePath })` for the duration of a capture
+ * only — Playwright injects it, screenshots, then removes it.
+ *
+ * §7.1 determinism checklist, row 5: "force overlay scrollbars or hide them in
+ * the capture stylesheet". Headless Chromium draws classic 15px scrollbars, and
+ * whether one appears depends on a sub-pixel content height — which makes it
+ * the single most likely source of a two-run diff. */
+*::-webkit-scrollbar,
+*::-webkit-scrollbar-thumb,
+*::-webkit-scrollbar-track {
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+  display: none !important;
+}
+
+* {
+  scrollbar-width: none !important;
+}
+
+/* The text caret is hidden by `caret: "hide"`, but a focused field's selection
+ * highlight is not, and a couple of screens autofocus. */
+::selection {
+  background: transparent !important;
+}

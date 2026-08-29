@@ -1,8 +1,17 @@
 import { chromium } from "playwright";
+import { existsSync } from "node:fs";
 
 export const BASE_URL = process.env.DESKTOP_SHOT_BASE_URL ?? "http://127.0.0.1:5000";
-export const CHROMIUM_PATH =
+/* The bundled Playwright Chromium is broken on this host (missing libnspr4), so
+   every probe launches the nix-store build instead. That store path exists only
+   on this machine: CI sets PLAYWRIGHT_CHROMIUM_PATH, and when neither is present
+   we hand Playwright `undefined` so it falls back to its own downloaded browser
+   rather than failing on a path that cannot resolve. */
+const NIX_CHROMIUM =
   "/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium";
+export const CHROMIUM_PATH =
+  process.env.PLAYWRIGHT_CHROMIUM_PATH ??
+  (existsSync(NIX_CHROMIUM) ? NIX_CHROMIUM : undefined);
 export const MERCHANT_ID = 999999;
 
 const now = Date.now();

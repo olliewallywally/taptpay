@@ -1,12 +1,20 @@
 import assert from "node:assert/strict";
 import { access, mkdir } from "node:fs/promises";
-import { constants } from "node:fs";
+import { constants, existsSync } from "node:fs";
 import { join } from "node:path";
 import { chromium } from "playwright";
 
 const BASE_URL = process.env.P0_BASE_URL ?? "http://127.0.0.1:5000";
-const CHROMIUM_PATH =
+/* The bundled Playwright Chromium is broken on this host (missing libnspr4), so
+   every probe launches the nix-store build instead. That store path exists only
+   on this machine: CI sets PLAYWRIGHT_CHROMIUM_PATH, and when neither is present
+   we hand Playwright `undefined` so it falls back to its own downloaded browser
+   rather than failing on a path that cannot resolve. */
+const NIX_CHROMIUM =
   "/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium";
+const CHROMIUM_PATH =
+  process.env.PLAYWRIGHT_CHROMIUM_PATH ??
+  (existsSync(NIX_CHROMIUM) ? NIX_CHROMIUM : undefined);
 const SCREENSHOT_DIR = "/tmp/taptpay-desktop-p0";
 const MERCHANT_ID = 999999;
 const PIXEL_TOLERANCE = 1.25;

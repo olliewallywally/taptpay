@@ -67,9 +67,15 @@ const SCHEDULES = [
 ];
 
 const TRADES_CLIENTS = [
-  { id: "c1", name: "Karen Vaile", email: "karen@example.com", phone: "0212223333", address: "18 Rimu Street" },
-  { id: "c2", name: "Hemi Ngata", email: "hemi@example.com", phone: "0213334444", address: "402 Beach Road" },
-  { id: "c3", name: "Dot Fairweather", email: "dot@example.com", phone: "0214445555", address: "7 Miro Lane" },
+  /* Shape matched to `clientProfiles` (shared/schema.ts:1215) — firstName,
+     lastName and siteAddress, all three of which the trades client picker reads
+     directly (`TradesTerminalView.tsx:39,711,761`). An earlier `{ name, address }`
+     shape rendered every client as "Undefined Undefined" with a blank address, in
+     every gate run and in the phase 3 goldens, without failing anything: no clause
+     asserts on copy. Found 2026-08-29 by eye, in a golden diff. */
+  { id: "c1", firstName: "Karen", lastName: "Vaile", email: "karen@example.com", phone: "0212223333", siteAddress: "18 Rimu Street", status: "active" },
+  { id: "c2", firstName: "Hemi", lastName: "Ngata", email: "hemi@example.com", phone: "0213334444", siteAddress: "402 Beach Road", status: "active" },
+  { id: "c3", firstName: "Dot", lastName: "Fairweather", email: "dot@example.com", phone: "0214445555", siteAddress: "7 Miro Lane", status: "active" },
 ];
 
 const TRADES_INVOICES = [
