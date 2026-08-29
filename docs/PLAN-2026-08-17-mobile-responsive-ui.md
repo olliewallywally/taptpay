@@ -1,8 +1,10 @@
 # Plan — mobile responsive UI (v2.1)
 
 Date: 2026-08-17 · **v2 revised after external review; v2.1 completed 2026-08-18**
-Status: **execution-ready.** Every token is defined and calibrated, every terminal screen is
-inventoried, and the companion boundary is settled. No code changed yet.
+Status: **in execution — 11 of 13 phases done as of 2026-08-29.** Only phase 3 (goldens) and
+phase 10 (non-terminal merchant routes) remain; see §9 for the per-phase status column, the
+commits, and the items that were ratcheted rather than closed. The original "no code changed
+yet" line is kept in git history, not here.
 Scope: the phone merchant app. Tablet/desktop (`client/src/desktop/**`) is a strict
 no-regression boundary — the primary root cause cannot reach it.
 
@@ -73,6 +75,30 @@ not exist, and both plans numbered their decisions `D1…`, so "D2" meant two di
 The plan assumes the recommended answer throughout and is written so a different answer
 changes only the section named.
 
+> **Settled 2026-08-29 — §2.1, MD2, MD5, and the golden-set weight.** With MD1 (2026-08-19)
+> and MD7 (settled from the code), **every decision in this section now has a real answer.**
+>
+> - **§2.1 references — AUTHORITATIVE.** The three PNGs are the gate for human fidelity
+>   approval. **The missing dock is deliberate, not an omission:** Oliver left it out of the
+>   Photoshop files because the dock had already been designed separately. So the dock's
+>   absence is *not* evidence against the design and **does not reopen DK2** — §2.1's third
+>   bullet ("there is no dock in the design at all") was the plan drawing the wrong inference
+>   from a deliberate choice. Goldens are approved against the drawing above the dock band;
+>   the dock itself is governed by the companion plan.
+> - **MD2 — 320×568 confirmed.** The assumption the whole build was made against holds. No
+>   clamp relaxes, and the 320 layout tier of goldens is real coverage, not waste.
+> - **MD5 — the native shell is locked to portrait.** Landed 2026-08-29 in
+>   `ios/App/App/Info.plist`: `UISupportedInterfaceOrientations` is now Portrait only, matching
+>   `client/public/manifest.json`. `UISupportedInterfaceOrientations~ipad` is deliberately
+>   untouched — the tablet/desktop app is a separate contract.
+> - **Golden set — capture the full set as specced** (§7.1's ~65 files / 8–10MB), DPR-2
+>   fidelity tier included. The fallback of dropping that tier is not taken.
+>
+> Still open and NOT decided here: **MD4** (money grouping — the fitter is width-invariant, so
+> it stays a one-line `fmt()` change whenever it is answered) and **MD6's second half** (OS
+> text scaling / `user-scalable=no`, explicitly out of scope for this plan). MD6's first half —
+> the font weights — was resolved by phase K.
+
 **MD1 — Adaptation strategy.** **Fluid / intrinsic layout** *(recommended)* — length-valued
 tokens, container queries, measured chrome gutters. Everything reflows and type stays a
 readable physical size on every device. The alternative is the uniform scaled canvas the
@@ -142,11 +168,22 @@ is the real work:
 
 **"Retire it" was never available** — it is the live phone route with a test guarding it. And
 "bring it under the contract" overstated the cost: the extraction is already ~90% done. The
-work is to **finish it** — move `QuoteScreen` into `features/terminal/trades/`, verify
-`TP_TERM_CSS` against the already-scoped `trades-terminal-view.css` and delete it, and repoint
-`quote-builder.tsx` at the feature module. *(Changes §5.1 and §3 RC-6; no change to §6.6.1's
-count or the §7.1 golden set.)* **It is a scoped refactor inside phase 2, not a decision that
-resizes the job.**
+work is to **finish it** — verify `TP_TERM_CSS` against the already-scoped
+`trades-terminal-view.css` and delete it, and repoint `quote-builder.tsx` at the feature
+module. *(Changes §5.1 and §3 RC-6; no change to §6.6.1's count or the §7.1 golden set.)*
+**It is a scoped refactor inside phase 2, not a decision that resizes the job.**
+
+> **Correction, 2026-08-20 — ~~move `QuoteScreen` into `features/terminal/trades/`~~.**
+> Withdrawn. `QuoteScreen` is a *controller*, not a stray screen: it uses
+> `useQuery`/`useMutation`, `queryClient`, `fetch(`, `navigator.clipboard`,
+> `document.createElement` and `window.location`, every one of which
+> `__tests__/trades-terminal-view-boundary.test.tsx:16-28` forbids inside
+> `features/terminal/trades/**`. The move fails that boundary test on five rules and
+> inverts the controller/view split the test exists to enforce. The screen it renders —
+> `QuoteView`, the part carrying the `.tp-screen` markup — is **already** in the feature
+> module, so the extraction is finished and nothing is left to move. This is the same
+> misreading as MD7 itself: a controller read as a stray screen.
+> *(Phase 2 outcome, `docs/NOTE-2026-08-20-phase-2-scoping-outcome.md` §3.1.)*
 
 ---
 
@@ -419,6 +456,22 @@ assertions in the same commit (RC-6).
 Then extract the shared primitives — bar, amount, stack row, pill, field, CTA, dot — into one
 `terminal-primitives.css` driven by §6.1's tokens, so the next fix lands once instead of four
 times.
+
+> **Deferred out of phase 2, and still open as of 2026-08-29.** *(deviation)* A three-way diff
+> at the time said 67 rules were identical in all three sheets, 8 in two, 24 divergent and 59
+> vertical-specific — and every divergence was either palette or a number phase 6 was about to
+> tokenise. Extracting then meant inventing an ad-hoc variable layer that phase 6 would
+> immediately rewrite, and touching all three sheets twice. What *was* extracted is the part
+> phase 6 could not express and scoping could not fix: the keyframes, which are global by
+> definition (`terminal-keyframes.css`), and later the action bar (`segmented-bar.css`,
+> phase 7).
+>
+> **Phases 6–9 absorbed roughly ten of them and no more.** Re-measured 2026-08-29: **57 rules
+> are still byte-identical across all three vertical sheets and 21 diverge** (retail 127 rules,
+> property 94, trades 82). The extraction §5.1 asks for has therefore not happened — it is an
+> open plan item, not a closed one, and it is a refactor rather than a defect: no gate fails
+> because of it.
+> *(`docs/NOTE-2026-08-20-phase-2-scoping-outcome.md` §3.3.)*
 
 > The handoff (`HANDOFF-2026-07-28` §6) records that Oliver **accepted** duplication of the
 > desktop *home-screen furniture*. That ruling was about desktop home screens; it does not
@@ -818,8 +871,10 @@ Three classes, three topologies, one owner each:
    implementation mounted at `/trades/quote`. Both claims were wrong — see §1 MD7.)* It is
    mounted at `/trades/terminal` and renders `<TradesTerminalView>`, whose screens are already
    in the §6.6.1 inventory, so it receives this work through the view. Two items do belong to
-   this phase: **`QuoteScreen`** (`:34-154`), the one screen still living in the page, which
-   moves into `features/terminal/trades/` and is then classified with the rest; and
+   this phase: ~~**`QuoteScreen`** (`:34-154`), which moves into
+   `features/terminal/trades/` and is then classified with the rest~~ — **withdrawn
+   2026-08-20, it is a controller and the move fails the boundary test on five rules; see
+   §1 MD7's correction** — and
    **`TP_TERM_CSS`** (`:520+`), which is deleted in favour of the scoped
    `trades-terminal-view.css` with `quote-builder.tsx` repointed at the feature module (§3
    RC-6). Neither changes the count in §6.6.1.
@@ -901,6 +956,17 @@ For each viewport in §4.1, each mobile route, both orientations:
 Model it on `scripts/desktop-shots/probe-terminal-geometry.mjs`, which already proves the
 "measure, don't look" pattern. Reuse `retail-fixtures.mjs`. **Exit non-zero on failure** —
 several existing scripts collect errors and still exit 0.
+
+> **Correction, 2026-08-20 — the RC-6 counter measured the wrong thing.** Phase 1 counted
+> `<style>` tags whose text matched `/\.tp-subbar\s*\{/`. That proxy fails twice over:
+> `.retail-terminal-view .tp-subbar {` *contains* `.tp-subbar {`, so scoping — the fix — pushed
+> the number **up**, 1 → 3; and reading `<style>` text cannot see an imported sheet or a
+> keyframe collision at all, which is how two more stylesheets survived RC-6's inventory
+> (both row action sheets inline `@keyframes` and declare no `.tp-` selector, so a
+> selector-shaped guard is blind to them — there were **six**, not four). Replaced with two
+> CSSOM counters, `tpUnscopedRules` and `tpDuplicateKeyframes`, both baselined at **0**: a hard
+> ratchet, so no unscoped `.tp-` rule can return unnoticed.
+> *(`docs/NOTE-2026-08-20-phase-2-scoping-outcome.md` §3.2.)*
 
 ### 7.3 State and environment gates
 
@@ -995,20 +1061,36 @@ forms compute 15.03px (length-valued base unit), 15.99px (per-token clamp) and 1
 
 ## 9. Execution order
 
-| Phase | Content | Gate before commit |
-|---|---|---|
-| 0 | Confirm the §2.1 references are authoritative; settle MD1, MD2, MD5 (**MD7 settled from the code 2026-08-19 — see §1**) | Oliver signs off |
-| 1 | Land §7.2 with a recorded baseline JSON; add `verify:mobile` + a workflow | command exists and runs; baseline committed |
-| 2 | Scope all four stylesheets (§5.1); land the tutorial-anchor assertions with them | §7.4 clean; anchors resolve on all three verticals |
-| **2b** | **Apply the screen-class contract (§6.6.1) — one of three classes on all 31 `.tp-screen` elements, plus the §7.4 count guard.** Additive only, no behaviour change | 10 / 12 / 9 per file; no bare-`.tp-screen` layout rule; both plans' grids inert until their own phase |
-| 3 | Add `@playwright/test`, pin the fonts, capture and approve the golden set (§7.1) | Oliver approves every golden against the design |
-| 4 | Inventory every control the 44px rule inflates, app-wide (§5.2) | inventory reviewed; public-route smoke recorded |
-| 5 | Remove RC-1, add `.tap-target`, audit all seven media blocks (§5.3) | §7.2 + goldens + tap-area assertions + public-route smoke |
-| 6 | Token layer, `svh`/`dvh`, four-sided safe areas, keyboard ownership (§6.1–6.2) | token computed-style assertions; §7.2 clauses 1–3 |
-| 7 | `SegmentedBar` + grid indicator + observers (§6.3) | the six invariants |
-| 8 | Home-only grid + measured gutters (§6.4) | `visibleStackRows >= 3` on all six portrait sizes |
-| 9 | Amount fitting (§6.5) | amount inside its parent at the MD4 maximum, all six sizes |
-| 10 | Extend to non-terminal merchant routes | goldens per route |
+**Status as of 2026-08-29.** Eleven of the thirteen phases are done and committed; phase K
+(added by the amendment, §5.5) sits between 5 and 6. All three gates were green on that date —
+`verify:mobile`, `verify:mobile-keyboard`, `verify:terminal-dock` (the last reporting phases
+A–F of the companion). Note that several phases landed inside commits titled *"Update agent
+metadata"* / *"system maintenance cleanup"*, so `git log --oneline` under-reports progress:
+read this column, then confirm by running the gates.
+
+| Phase | Status | Content | Gate before commit |
+|---|---|---|---|
+| 0 | **done** — MD1 signed off 2026-08-19, MD7 settled from the code; **MD2/MD5 answered only by assumption, §2.1 references still unconfirmed** | Confirm the §2.1 references are authoritative; settle MD1, MD2, MD5 (**MD7 settled from the code 2026-08-19 — see §1**) | Oliver signs off |
+| 1 | **done** `88a56fa` | Land §7.2 with a recorded baseline JSON; add `verify:mobile` + a workflow | command exists and runs; baseline committed |
+| 2 | **done** — outcome in `docs/NOTE-2026-08-20-phase-2-scoping-outcome.md`; **§5.1's `terminal-primitives.css` extraction deferred and still open** | Scope all four stylesheets (§5.1); land the tutorial-anchor assertions with them | §7.4 clean; anchors resolve on all three verticals |
+| **2b** | **done** `e25c5e0` | **Apply the screen-class contract (§6.6.1) — one of three classes on all 31 `.tp-screen` elements, plus the §7.4 count guard.** Additive only, no behaviour change | 10 / 12 / 9 per file; no bare-`.tp-screen` layout rule; both plans' grids inert until their own phase |
+| 3 | **OPEN** — skipped out of order because MD6 blocked it; unblocked 2026-08-27 by phase K's font-weight fix | Add `@playwright/test`, pin the fonts, capture and approve the golden set (§7.1) | Oliver approves every golden against the design |
+| 4 | **done** `9a51bd8` + `709626d` (`docs/REVIEW-2026-08-24-mobile-44px-control-inventory.md`) | Inventory every control the 44px rule inflates, app-wide (§5.2) | inventory reviewed; public-route smoke recorded |
+| 5 | **done** `1030d37` — **but 9 `tapCentreMiss` defects were ratcheted into the baseline rather than fixed** (retail `send` at 412/430, property `.tap-target` at every size) | Remove RC-1, add `.tap-target`, audit all seven media blocks (§5.3) | §7.2 + goldens + tap-area assertions + public-route smoke |
+| K | **done** 2026-08-27, green — see amendment §5.5 | Keyboard fix (A1 §4.1), viewport meta (§4.5), the two `!important` overrides (§4.4) | `verify:mobile-keyboard`, five clauses |
+| 6 | **done** `fe128fb` | Token layer, `svh`/`dvh`, four-sided safe areas, keyboard ownership (§6.1–6.2) | token computed-style assertions; §7.2 clauses 1–3 |
+| 7 | **done** `e1bbade` | `SegmentedBar` + grid indicator + observers (§6.3) | the six invariants |
+| 8 | **done** `a6dd00d` | Home-only grid + measured gutters (§6.4) | `visibleStackRows >= 3` on all six portrait sizes |
+| 9 | **done** `233058d` | Amount fitting (§6.5) | amount inside its parent at the MD4 maximum, all six sizes |
+| 10 | **OPEN** | Extend to non-terminal merchant routes | goldens per route |
+
+Companion (`docs/PLAN-2026-08-17-terminal-panels-and-dock.md` §8): **A–F all done**;
+`verify:terminal-dock` passes.
+
+Infrastructure §7.5 asked for and its state: `verify:mobile` ✅, `verify:mobile-keyboard` ✅
+(added by K), `verify:terminal-dock` ✅, `test:golden` — with phase 3,
+`.github/workflows/verify.yml` ✅ (2026-08-29; typecheck and client unit tests always run, the
+browser gates skip rather than fail where no `DATABASE_URL` is configured, per §7.6).
 
 **Stop conditions.** 5 cannot start before 4 (removing the rule without the inventory ships
 broken tap targets on the customer payment page). 7 cannot start before 5 (the invariants

@@ -63,6 +63,10 @@ MD6 answered first.**
 
 ## 3. Corrections the plan needs
 
+> **Folded into `docs/PLAN-2026-08-17-mobile-responsive-ui.md` on 2026-08-29** — §3.1 into §1
+> MD7 and §6.6.1 trap 4, §3.2 into §7.2, §3.3 into §5.1 (where it is re-measured and remains
+> open). Kept here as the record of why.
+
 **3.1 §6.6.1 trap 4 and §1 MD7 — do not move `QuoteScreen`.**
 Both say `QuoteScreen` (`pages/trades/trades-terminal.tsx:34`) should move into
 `features/terminal/trades/`. It must not. `QuoteScreen` is a *controller*: it
