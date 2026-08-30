@@ -515,7 +515,7 @@ export default function StockManagement() {
 
   return (
     <div style={{ background: '#FFFFFF', minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
-    <div className="min-h-screen pb-32 w-full" style={{ maxWidth: 430, background: '#F4F4F4', fontFamily: "'Outfit', system-ui, sans-serif" }}>
+    <div className="min-h-screen pb-32 w-full" style={{ maxWidth: 'var(--phone-shell-max)', background: '#F4F4F4', fontFamily: "'Outfit', system-ui, sans-serif" }}>
       {/* Safe-area spacer */}
       <div style={{ height: 54 }} />
 

@@ -28,6 +28,7 @@ import {
   type PropertyStackFilter,
 } from "../data/property-terminal-model";
 import { filterByProperty } from "@/lib/property-dashboard-data";
+import { AnimatedListRow, AnimatedScrollList } from "@/components/AnimatedScrollList";
 
 /* ── palette ── */
 const ACCENT = "#5E9EFF";
@@ -188,6 +189,10 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
   const rowsRef = useRef<HTMLDivElement | null>(null);
   const stackRef = useRef<HTMLDivElement | null>(null);
   const rowMenuRef = useRef<HTMLDivElement | null>(null);
+  /* AnimatedScrollList's own position:relative wrapper sits between
+     `.pt-stack` and the row buttons, so it — not `.pt-stack` — is now their
+     offsetParent. See `toggleRowMenu` for the compensation this needs. */
+  const stackRowsWrapRef = useRef<HTMLDivElement | null>(null);
 
   const tenantsQuery = usePropertyTenants();
   const invoicesQuery = usePropertyInvoices();
@@ -462,12 +467,21 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
   };
 
   /* `.pt-rows` scrolls, so the popover cannot live inside it. It renders as a
-     child of `.pt-stack` — the row's offsetParent once that is relative — and
-     `offsetTop` is pre-scale, so it needs no division by the canvas scale. */
+     child of `.pt-stack`. The row's offsetParent is AnimatedScrollList's own
+     wrapper now, not `.pt-stack` directly, which excludes the stack head +
+     chips above it — added back via `stackRowsWrapRef.offsetTop`, itself
+     relative to `.pt-stack`. `offsetTop` throughout is pre-scale, so none of
+     this needs dividing by the canvas scale. */
   const toggleRowMenu = (id: string, el: HTMLElement) => {
     if (rowMenu?.id === id) return closeRowMenu();
     setConfirmVoid(false);
-    setRowMenu({ id, top: el.offsetTop - (rowsRef.current?.scrollTop ?? 0) });
+    setRowMenu({
+      id,
+      top:
+        el.offsetTop -
+        (rowsRef.current?.scrollTop ?? 0) +
+        (stackRowsWrapRef.current?.offsetTop ?? 0),
+    });
   };
 
   /* The two-step cancel makes the popover taller after it has opened, so its
@@ -1007,7 +1021,11 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
               ))}
             </div>
 
-            <div className="pt-rows" ref={rowsRef}>
+            <AnimatedScrollList
+              className="pt-rows"
+              scrollRef={rowsRef}
+              wrapperRef={stackRowsWrapRef}
+            >
               {invoicesQuery.isLoading ? (
                 <div className="pt-empty">loading…</div>
               ) : stackRows.length === 0 ? (
@@ -1015,9 +1033,10 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
               ) : (
                 stackRows.map((r) => (
                   <div key={r.id} className="pt-row-wrap">
-                  <button
+                  <AnimatedListRow
                     type="button"
                     className="pt-row"
+                    data-scroll-nav-item
                     aria-haspopup="menu"
                     aria-expanded={rowMenu?.id === r.id}
                     aria-label={`actions for ${r.name}, ${r.label}`}
@@ -1048,7 +1067,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                         <span className="pt-row-cap">left of {fmtNZD(r.fullAmountCents)}</span>
                       )}
                     </span>
-                  </button>
+                  </AnimatedListRow>
                   {showRemind && r.bucket === "overdue" && (
                     <button
                       type="button"
@@ -1063,7 +1082,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                   </div>
                 ))
               )}
-            </div>
+            </AnimatedScrollList>
 
             {rowMenu && menuRow && (
               <div
@@ -1289,7 +1308,7 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                   aria-label="search tenants"
                 />
               </div>
-              <div className="pt-tenant-cards">
+              <AnimatedScrollList className="pt-tenant-cards">
                 {tenantsQuery.isLoading ? (
                   <div className="pt-empty">loading tenants…</div>
                 ) : tenantCards.length === 0 ? (
@@ -1298,10 +1317,11 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                   tenantCards.map((t: any) => {
                     const next = nextUnpaidFor(t.id);
                     return (
-                      <button
+                      <AnimatedListRow
                         key={t.id}
                         type="button"
                         className="pt-tenant-card"
+                        data-scroll-nav-item
                         aria-pressed={t.id === tenantId}
                         style={
                           t.id === tenantId
@@ -1323,11 +1343,11 @@ export default function DesktopPropertyTerminal(props: DesktopRoutePageProps) {
                           <span className="pt-tc-amt">{next ? fmtNZD(next.amountCents ?? 0) : "—"}</span>
                           <span className="pt-tc-cap">{next ? "due" : "nothing due"}</span>
                         </span>
-                      </button>
+                      </AnimatedListRow>
                     );
                   })
                 )}
-              </div>
+              </AnimatedScrollList>
             </div>
           )}
 

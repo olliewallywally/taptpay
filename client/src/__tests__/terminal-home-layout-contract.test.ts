@@ -33,8 +33,23 @@ describe("terminal home layout phase-8 contract", () => {
     const homeRule = css.match(/\.tp-viewport\s+\.tp-screen\.tp-home\s*\{([^}]*)\}/)?.[1] ?? "";
 
     expect(homeRule).toMatch(/display:\s*grid/);
-    expect(homeRule).toMatch(/grid-template-rows:[^;]*var\(--hero-min\)[^;]*var\(--hero-pref\)[^;]*var\(--chrome-gutter\)[^;]*var\(--stack-min\)/s);
-    expect(homeRule).toMatch(/padding-bottom:\s*calc\([^;]*var\(--dock-h[^;]*var\(--safe-bottom\)[^;]*var\(--sp-3\)/s);
+    expect(homeRule).toMatch(/grid-template-rows:[^;]*var\(--hero-min\)[^;]*var\(--home-hero-pref\)[^;]*var\(--chrome-gutter\)[^;]*var\(--stack-min\)/s);
+    /* The dock clearance is padding on the STACK, not on the screen — putting
+       it on the screen left the reserved band painting in the viewport's navy
+       instead of the stack's off-white. Row 3's minimum carries the same token
+       so §4.3's vertical budget is unchanged. */
+    expect(homeRule).not.toMatch(/padding-bottom/);
+    expect(homeRule).toMatch(/minmax\(\s*calc\(\s*var\(--stack-min\)\s*\+\s*var\(--dock-clear\)\s*\+\s*var\(--stack-gap\)\s*\)\s*,\s*1fr\)/s);
+    /* --dock-h-max, not --dock-h: the morph republishes the live height per
+       frame, and a grid track minimum that tracks it re-solves the home grid
+       every frame (§9.F clause 7's 32ms budget, measured at 34-36ms). */
+    expect(css).toMatch(/--dock-clear:\s*calc\([^;]*var\(--dock-h-max[^;]*var\(--safe-bottom\)[^;]*var\(--sp-3\)/s);
+    const stackRule = css.match(/\.tp-viewport\s+\.tp-home-stack\s*\{([^}]*)\}/)?.[1] ?? "";
+    expect(stackRule).toMatch(/padding-bottom:\s*var\(--dock-clear\)/);
+    /* The gap between the floating bar and the stack's header is reserved the
+       same way: padding inside the off-white, and added to row 3's minimum so
+       it does not come out of the three rows. */
+    expect(stackRule).toMatch(/padding-top:\s*var\(--stack-gap\)/);
     expect(css).toMatch(/--stack-min:\s*calc\(\s*3\s*\*\s*var\(--row-h\)\s*\+\s*var\(--stack-hdr-h\)\s*\+\s*2px\s*\)/);
 
     for (const match of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
@@ -55,7 +70,15 @@ describe("terminal home layout phase-8 contract", () => {
     expect(hook).toMatch(/\.style\.setProperty\s*\(\s*["']--chrome-gutter["']/);
     expect(hook).toMatch(/viewportRef\.current/);
     expect(hook).toMatch(/\.tp-(?:pfab|psubbar)\.show/);
-    expect(hook).toMatch(/getBoundingClientRect\(\)\.height/);
+    expect(hook).toMatch(/getBoundingClientRect\(\)/);
+    /* The gutter is derived from each overlay's own height and transform, never
+       from the hero's live rect. `chromeBottom - heroBottom` reads a position
+       that resolves against the --home-hero-h this hook published on an earlier
+       frame, so it lags the hero it is compared against and the gutter it
+       yields changes the grid that sizes the hero — a loop that converged on a
+       128px and then a 70px gutter against a 106px bar on property @390x844. */
+    expect(hook).toMatch(/DOMMatrixReadOnly/);
+    expect(hook).not.toMatch(/\.bottom\s*-\s*heroRect\.bottom/);
     expect(hook).toMatch(/\.observe\s*\(/);
     expect(hook).toMatch(/\.disconnect\s*\(\s*\)/);
   });

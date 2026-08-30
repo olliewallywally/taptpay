@@ -85,6 +85,27 @@
   padding-inline: calc(2.75 * var(--u, 4px));
 }
 
+/* `.crowded` — a sibling pill is taking room the bar would otherwise centre
+   into (currently: property's split-bill pill next to the tenants-tab bar,
+   PropertyTerminalView.tsx). The bar's own grid columns are `max-content`, so
+   nothing shrinks it by default: at 390 wide it measured 352.5px against a
+   259.8px-wide centred slot, a 38px overlap into the pill on the left (and an
+   equal, merely invisible one into empty space on the right). `--u`-scaled
+   padding (as `.compact` uses) can't close this everywhere at once — the
+   pill+padding+gap the bar is squeezed against costs a near-fixed ~100px,
+   which is a much bigger fraction of a 320px screen than a 430px one, while
+   `--u` itself only spans 3.3-4.4px across that range. This is a `cqi`-driven
+   linear fit instead, solved from two measured points (padding that yields a
+   ~5px gap at 320 and at 430) rather than derived from `--u`:
+   padding = 11.36cqi - 32.85px. Verified in Chromium at every viewport in the
+   support matrix, 320-480: gap stays 3.8-7.8px, no overlap, no label clipping
+   (only the active button's label renders — see `.tp-bar-label-track`).
+   Floored so it never goes negative; ceilinged at the pre-crowding value so
+   it only ever narrows the bar, never widens it. */
+.tp-viewport .tp-subbar.tp-bar.crowded .tp-bar-btn {
+  padding-inline: clamp(2px, calc(11.36cqi - 32.85px), 22px);
+}
+
 .tp-bar-label-track {
   display: grid;
   grid-template-columns: 0fr;

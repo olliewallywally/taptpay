@@ -22,6 +22,12 @@ interface SegmentedBarProps {
   onPick?: (index: number) => void;
   compact?: boolean;
   hideLabel?: boolean;
+  /* A sibling pill (currently: property's split-bill pill, .tp-split-slot)
+     is occupying room the bar would otherwise centre into. Unlike `compact`
+     — which is about the send button appearing on the SAME side as the bar
+     shrinks — this is calibrated to the property tenants-tab geometry
+     specifically (§ SegmentedBar crowded rule, segmented-bar.css). */
+  crowded?: boolean;
   activeColor: string;
   inactiveColor: string;
   demoIdPrefix: string;
@@ -34,6 +40,7 @@ export function SegmentedBar({
   onPick,
   compact = false,
   hideLabel = false,
+  crowded = false,
   activeColor,
   inactiveColor,
   demoIdPrefix,
@@ -102,7 +109,7 @@ export function SegmentedBar({
   return (
     <div className="tp-subbar-wrap">
       <div
-        className={`tp-subbar tp-bar${compact ? " compact" : ""}`}
+        className={`tp-subbar tp-bar${compact ? " compact" : ""}${crowded ? " crowded" : ""}`}
         ref={trackRef}
         style={{ "--active-col": activeColumn } as React.CSSProperties}
       >

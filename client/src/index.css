@@ -63,6 +63,24 @@
   --bronze: hsl(30, 50%, 60%);
   --bronze-light: hsl(30, 40%, 70%);
 
+  /* ── Phone shell width ────────────────────────────────────────────────
+     Every phone-facing screen (terminal, dashboards, settings, directories,
+     analytics, transactions, profiles) centers its content in a column
+     capped at this width, then leaves the rest of a wider viewport as an
+     empty gutter. It was hardcoded to 430px per-file in ~20 places, sized to
+     "the largest phone made" per docs/PLAN-2026-08-17-mobile-responsive-ui.md
+     §4.1 — which was already wrong by the time it was written (the iPhone 16
+     Pro Max ships at 440) and is now visibly wrong on the iPhone 17 Pro Max
+     (440) and the Galaxy S25 Ultra/S25+ (480), both of which showed a raw
+     gap down both sides. Raised to clear all of those with the column
+     filling the screen edge-to-edge again, and centralized to one token so
+     the next device that exceeds it is a one-line change, not a 20-file grep.
+     The terminal's own `cqi`-based tokens (terminal-tokens.css §6.1) already
+     clamp to a fixed px ceiling reached at ~430px of container width, so
+     widening this does not grow type or spacing further — it only removes
+     the gutter. */
+  --phone-shell-max: 480px;
+
   /* ── Keyboard inset ────────────────────────────────────────────────────
      What the software keyboard covers, written by use-keyboard-inset.ts as an
      inline style on this element. Declared here so it always resolves, and so
@@ -1163,4 +1181,46 @@
   border-radius: 18px;
   cursor: pointer;
   margin-bottom: 10px;
+}
+
+/* ── Animated scroll list — gradient scroll cues ──────────────────────
+ * `components/AnimatedScrollList.tsx`'s container. Global rather than in
+ * desktop.css because that file is code-split into the desktop chunk and
+ * never loads on a mobile route, and the mobile property lists use the same
+ * component.
+ *
+ * The per-row scale/opacity pop is Motion-driven (inline styles), not CSS —
+ * this block only covers the gradient edges and the wrapper they position
+ * against. `--list-fade-color` must be set to whatever the rows actually sit
+ * on; it differs per surface, so there is no sane global default.
+ */
+.dt-scroll-wrap {
+  position: relative;
+}
+
+.dt-scroll-gradient {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 40px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.dt-scroll-gradient-top {
+  top: 0;
+  background: linear-gradient(
+    to bottom,
+    var(--list-fade-color, transparent),
+    transparent
+  );
+}
+
+.dt-scroll-gradient-bottom {
+  bottom: 0;
+  background: linear-gradient(
+    to top,
+    var(--list-fade-color, transparent),
+    transparent
+  );
 }

@@ -312,8 +312,8 @@ function MainTerminal({ state, go, paywaveOn, togglePaywave, onItemClick, showPa
         </div>
         <div style={{ marginTop: 33, color: BLUE, fontWeight: 500, fontSize: 18 }}>{line || 'no items yet'}</div>
       </div>
-      <div className="tp-home-chrome" aria-hidden="true" />
-      <div className="stagger tp-home-stack" style={{ background: OFFW, padding: '0 22px' }}>
+      <div className="tp-home-chrome" aria-hidden="true" style={{ background: OFFW }} />
+      <div className="stagger tp-home-stack" style={{ background: OFFW, paddingInline: 22 }}>
         <StackHeader onExpand={onExpand} />
         <div className="tp-stack-scroll" style={{ flex: 1, overflow: 'auto', paddingRight: 2 }}>
           <ActiveStack items={state.sent || []} status="sent" onItemClick={onItemClick} onRowClick={onRowClick} />
@@ -348,8 +348,8 @@ function PendingTerminal({ state, go, paywaveOn, togglePaywave, onItemClick, sho
           <div style={{ marginTop: 6, color: '#fff', fontWeight: 600, fontSize: 14 }}>tap send to share payment</div>
         </div>
       </div>
-      <div className="tp-home-chrome" aria-hidden="true" />
-      <div className="stagger tp-home-stack" style={{ background: OFFW, padding: '0 22px' }}>
+      <div className="tp-home-chrome" aria-hidden="true" style={{ background: OFFW }} />
+      <div className="stagger tp-home-stack" style={{ background: OFFW, paddingInline: 22 }}>
         <StackHeader onExpand={onExpand} />
         <div className="tp-stack-scroll" style={{ flex: 1, overflow: 'auto', paddingRight: 2 }}>
           <ActiveStack items={state.sent || []} status="sent" onItemClick={onItemClick} onRowClick={onRowClick} />

@@ -485,7 +485,7 @@ export function RetailDashboardView({
         ref={columnRef}
         style={{
           width: "100%",
-          maxWidth: 430,
+          maxWidth: "var(--phone-shell-max)",
           minHeight: "100svh",
           background: SHEET,
           paddingBottom: 130,

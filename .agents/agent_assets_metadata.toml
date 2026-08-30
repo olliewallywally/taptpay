@@ -38,4 +38,18 @@ id = "Bg4vxDQ5TjjOhJvpy5xpY"
 uri = "file://attached_assets/full_intergration_plan_-_taptpay_1787816180424.txt"
 type = "text"
 title = "Full RXA plan"
-description = "The newly attached full TaptPay implementation plan, uploaded unchanged."
+description = "Authoritative corrected senior-review revision of the full TaptPay implementation plan."
+
+[[outputs]]
+id = "rxa-plan-corrected-pdf-20260829"
+uri = "file://attached_assets/full_intergration_plan_-_taptpay_1787816180424.pdf"
+type = "unspecified"
+title = "Full RXA plan — corrected PDF"
+description = "Generated convenience rendering of the authoritative corrected text revision."
+
+[[outputs]]
+id = "fY8muXXKNi3l_spulv-7O"
+uri = "file://docs/designs/settings-page-design.png"
+type = "image"
+title = "Settings page design"
+description = "Saved settings-page reference image for future use."

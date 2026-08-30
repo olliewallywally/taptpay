@@ -16,58 +16,58 @@
         "w": 274.9,
         "h": 32.2,
         "x": 18.6,
-        "y": 227.1
+        "y": 244
       },
       "subbarBtn": {
         "w": 61.2,
         "h": 23.6,
         "x": 28.6,
-        "y": 231.4
+        "y": 248.3
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 61.2,
         "h": 23.6,
         "x": 28.6,
-        "y": 231.4
+        "y": 248.3
       },
       "activeLabel": null,
       "send": {
         "w": 68.2,
         "h": 32.2,
         "x": 301.4,
-        "y": 227.1
+        "y": 244
       },
       "splitPill": null,
       "actionRow": {
         "w": 282.9,
         "h": 32.2,
         "x": 18.6,
-        "y": 227.1
+        "y": 244
       },
       "amount": {
         "w": 264,
         "h": 54,
         "x": 28,
-        "y": 69.1
+        "y": 46.3
       },
       "amountParent": {
         "w": 320,
-        "h": 191.1,
+        "h": 208,
         "x": 0,
         "y": 0
       },
       "stackScroll": {
         "w": 276,
-        "h": 192.9,
+        "h": 176,
         "x": 22,
-        "y": 297.1
+        "y": 314
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 125,
-        "y": 156.1
+        "y": 173
       },
       "screens": 1,
       "visibleStackRows": 3,
@@ -93,8 +93,8 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--row-h": "max(58px, calc(17.25 * clamp(3.3px, 1.0256cqi, 4px)))",
+      "--stack-hdr-h": "36px",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
@@ -134,58 +134,58 @@
         "w": 297.8,
         "h": 36,
         "x": 27.1,
-        "y": 251.4
+        "y": 297
       },
       "subbarBtn": {
         "w": 66.1,
         "h": 26.6,
         "x": 38.2,
-        "y": 256
+        "y": 301.7
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 66.1,
         "h": 26.6,
         "x": 38.2,
-        "y": 256
+        "y": 301.7
       },
       "activeLabel": null,
       "send": {
         "w": 68.2,
         "h": 36,
         "x": 332.9,
-        "y": 251.4
+        "y": 297
       },
       "splitPill": null,
       "actionRow": {
         "w": 305.8,
         "h": 36,
         "x": 27.1,
-        "y": 251.4
+        "y": 297
       },
       "amount": {
         "w": 304,
         "h": 60.8,
         "x": 28,
-        "y": 77.8
+        "y": 52.2
       },
       "amountParent": {
         "w": 360,
-        "h": 215.4,
+        "h": 261,
         "x": 0,
         "y": 0
       },
       "stackScroll": {
         "w": 316,
-        "h": 238.7,
+        "h": 193.1,
         "x": 22,
-        "y": 323.3
+        "y": 368.9
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 145,
-        "y": 180.4
+        "y": 226
       },
       "screens": 1,
       "visibleStackRows": 3,
@@ -211,8 +211,8 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--row-h": "max(58px, calc(17.25 * clamp(3.3px, 1.0256cqi, 4px)))",
+      "--stack-hdr-h": "36px",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
@@ -252,58 +252,58 @@
         "w": 306.8,
         "h": 37.5,
         "x": 30.1,
-        "y": 260.4
+        "y": 314.5
       },
       "subbarBtn": {
         "w": 68,
         "h": 27.8,
         "x": 41.6,
-        "y": 265.3
+        "y": 319.4
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 68,
         "h": 27.8,
         "x": 41.6,
-        "y": 265.3
+        "y": 319.4
       },
       "activeLabel": null,
       "send": {
         "w": 68.2,
         "h": 37.5,
         "x": 344.9,
-        "y": 260.4
+        "y": 314.5
       },
       "splitPill": null,
       "actionRow": {
         "w": 314.8,
         "h": 37.5,
         "x": 30.1,
-        "y": 260.4
+        "y": 314.5
       },
       "amount": {
         "w": 319,
         "h": 60.8,
         "x": 28,
-        "y": 81
+        "y": 54.4
       },
       "amountParent": {
         "w": 375,
-        "h": 224.4,
+        "h": 278.5,
         "x": 0,
         "y": 0
       },
       "stackScroll": {
         "w": 331,
-        "h": 255.1,
+        "h": 201,
         "x": 22,
-        "y": 333.9
+        "y": 388
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 152.5,
-        "y": 189.4
+        "y": 243.5
       },
       "screens": 1,
       "visibleStackRows": 3,
@@ -329,8 +329,8 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--row-h": "max(58px, calc(17.25 * clamp(3.3px, 1.0256cqi, 4px)))",
+      "--stack-hdr-h": "36px",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
@@ -370,34 +370,34 @@
         "w": 315.7,
         "h": 39,
         "x": 33.1,
-        "y": 351
+        "y": 446.8
       },
       "subbarBtn": {
         "w": 70,
         "h": 29,
         "x": 45.1,
-        "y": 356
+        "y": 451.8
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 70,
         "h": 29,
         "x": 45.1,
-        "y": 356
+        "y": 451.8
       },
       "activeLabel": null,
       "send": {
         "w": 68.2,
         "h": 39,
         "x": 356.9,
-        "y": 351
+        "y": 446.8
       },
       "splitPill": null,
       "actionRow": {
         "w": 323.7,
         "h": 39,
         "x": 33.1,
-        "y": 351
+        "y": 446.8
       },
       "amount": {
         "w": 334,
@@ -407,24 +407,24 @@
       },
       "amountParent": {
         "w": 390,
-        "h": 284,
+        "h": 379.8,
         "x": 0,
         "y": 0
       },
       "stackScroll": {
         "w": 346,
-        "h": 328,
+        "h": 216.3,
         "x": 22,
-        "y": 426
+        "y": 537.8
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 160,
-        "y": 249
+        "y": 344.8
       },
       "screens": 1,
-      "visibleStackRows": 4,
+      "visibleStackRows": 3,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -447,8 +447,8 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--row-h": "max(58px, calc(17.25 * clamp(3.3px, 1.0256cqi, 4px)))",
+      "--stack-hdr-h": "36px",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
@@ -488,34 +488,34 @@
         "w": 316,
         "h": 39,
         "x": 44,
-        "y": 374.9
+        "y": 478.8
       },
       "subbarBtn": {
         "w": 70,
         "h": 29,
         "x": 56,
-        "y": 379.9
+        "y": 483.8
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 70,
         "h": 29,
         "x": 56,
-        "y": 379.9
+        "y": 483.8
       },
       "activeLabel": null,
       "send": {
         "w": 68.2,
         "h": 39,
         "x": 368,
-        "y": 374.9
+        "y": 478.8
       },
       "splitPill": null,
       "actionRow": {
         "w": 324,
         "h": 39,
         "x": 44,
-        "y": 374.9
+        "y": 478.8
       },
       "amount": {
         "w": 356,
@@ -525,24 +525,24 @@
       },
       "amountParent": {
         "w": 412,
-        "h": 307.9,
+        "h": 411.8,
         "x": 0,
         "y": 0
       },
       "stackScroll": {
         "w": 368,
-        "h": 375.1,
+        "h": 255.3,
         "x": 22,
-        "y": 449.9
+        "y": 569.8
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 171,
-        "y": 272.9
+        "y": 376.8
       },
       "screens": 1,
-      "visibleStackRows": 5,
+      "visibleStackRows": 3,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -565,8 +565,8 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--row-h": "max(58px, calc(17.25 * clamp(3.3px, 1.0256cqi, 4px)))",
+      "--stack-hdr-h": "36px",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
@@ -606,34 +606,34 @@
         "w": 316,
         "h": 39,
         "x": 53,
-        "y": 380.6
+        "y": 486.4
       },
       "subbarBtn": {
         "w": 70,
         "h": 29,
         "x": 65,
-        "y": 385.6
+        "y": 491.4
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 70,
         "h": 29,
         "x": 65,
-        "y": 385.6
+        "y": 491.4
       },
       "activeLabel": null,
       "send": {
         "w": 68.2,
         "h": 39,
         "x": 377,
-        "y": 380.6
+        "y": 486.4
       },
       "splitPill": null,
       "actionRow": {
         "w": 324,
         "h": 39,
         "x": 53,
-        "y": 380.6
+        "y": 486.4
       },
       "amount": {
         "w": 374,
@@ -643,24 +643,24 @@
       },
       "amountParent": {
         "w": 430,
-        "h": 313.6,
+        "h": 419.4,
         "x": 0,
         "y": 0
       },
       "stackScroll": {
         "w": 386,
-        "h": 386.4,
+        "h": 264.6,
         "x": 22,
-        "y": 455.6
+        "y": 577.4
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 180,
-        "y": 278.6
+        "y": 384.4
       },
       "screens": 1,
-      "visibleStackRows": 5,
+      "visibleStackRows": 3,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -683,8 +683,8 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--row-h": "max(58px, calc(17.25 * clamp(3.3px, 1.0256cqi, 4px)))",
+      "--stack-hdr-h": "36px",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
@@ -724,34 +724,34 @@
         "w": 315.7,
         "h": 39,
         "x": 33.1,
-        "y": 351
+        "y": 446.8
       },
       "subbarBtn": {
         "w": 70,
         "h": 29,
         "x": 45.1,
-        "y": 356
+        "y": 451.8
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 70,
         "h": 29,
         "x": 45.1,
-        "y": 356
+        "y": 451.8
       },
       "activeLabel": null,
       "send": {
         "w": 68.2,
         "h": 39,
         "x": 356.9,
-        "y": 351
+        "y": 446.8
       },
       "splitPill": null,
       "actionRow": {
         "w": 323.7,
         "h": 39,
         "x": 33.1,
-        "y": 351
+        "y": 446.8
       },
       "amount": {
         "w": 334,
@@ -761,24 +761,24 @@
       },
       "amountParent": {
         "w": 390,
-        "h": 284,
+        "h": 379.8,
         "x": 0,
         "y": 0
       },
       "stackScroll": {
         "w": 346,
-        "h": 328,
+        "h": 216.3,
         "x": 22,
-        "y": 426
+        "y": 537.8
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 160,
-        "y": 249
+        "y": 344.8
       },
       "screens": 1,
-      "visibleStackRows": 4,
+      "visibleStackRows": 3,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -801,8 +801,8 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--row-h": "max(58px, calc(17.25 * clamp(3.3px, 1.0256cqi, 4px)))",
+      "--stack-hdr-h": "36px",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
@@ -842,58 +842,58 @@
         "w": 266.9,
         "h": 32.2,
         "x": 26.6,
-        "y": 227.1
+        "y": 254
       },
       "subbarBtn": {
         "w": 59.2,
         "h": 23.6,
         "x": 36.6,
-        "y": 231.4
+        "y": 258.3
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 59.2,
         "h": 23.6,
         "x": 36.6,
-        "y": 231.4
+        "y": 258.3
       },
       "activeLabel": null,
       "send": {
         "w": 69.2,
         "h": 32.2,
         "x": 298,
-        "y": 227.1
+        "y": 254
       },
       "splitPill": null,
       "actionRow": {
         "w": 320,
         "h": 32.2,
         "x": 0,
-        "y": 227.1
+        "y": 254
       },
       "amount": {
         "w": 264,
-        "h": 57,
+        "h": 48.6,
         "x": 28,
-        "y": 54
+        "y": 25.5
       },
       "amountParent": {
         "w": 264,
-        "h": 169.3,
+        "h": 137.3,
         "x": 28,
-        "y": 54
+        "y": 25.5
       },
       "stackScroll": {
         "w": 276,
-        "h": 203.2,
+        "h": 176.3,
         "x": 22,
-        "y": 286.8
+        "y": 313.7
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 125,
-        "y": 156.1
+        "y": 183
       },
       "screens": 1,
       "visibleStackRows": 3,
@@ -919,8 +919,8 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--row-h": "max(58px, calc(17.25 * clamp(3.3px, 1.0256cqi, 4px)))",
+      "--stack-hdr-h": "26px",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
@@ -960,58 +960,58 @@
         "w": 289.8,
         "h": 36,
         "x": 35.1,
-        "y": 251.4
+        "y": 307
       },
       "subbarBtn": {
         "w": 64.1,
         "h": 26.6,
         "x": 46.2,
-        "y": 256
+        "y": 311.7
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 64.1,
         "h": 26.6,
         "x": 46.2,
-        "y": 256
+        "y": 311.7
       },
       "activeLabel": null,
       "send": {
         "w": 69.2,
         "h": 36,
         "x": 338,
-        "y": 251.4
+        "y": 307
       },
       "splitPill": null,
       "actionRow": {
         "w": 360,
         "h": 36,
         "x": 0,
-        "y": 251.4
+        "y": 307
       },
       "amount": {
         "w": 304,
-        "h": 64.1,
+        "h": 54.7,
         "x": 28,
-        "y": 60.8
+        "y": 28.8
       },
       "amountParent": {
         "w": 304,
-        "h": 176.4,
+        "h": 148.7,
         "x": 28,
-        "y": 60.8
+        "y": 28.8
       },
       "stackScroll": {
         "w": 316,
-        "h": 248.6,
+        "h": 193,
         "x": 22,
-        "y": 313.4
+        "y": 369
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 145,
-        "y": 180.4
+        "y": 236
       },
       "screens": 1,
       "visibleStackRows": 3,
@@ -1037,8 +1037,8 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--row-h": "max(58px, calc(17.25 * clamp(3.3px, 1.0256cqi, 4px)))",
+      "--stack-hdr-h": "26px",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
@@ -1078,58 +1078,58 @@
         "w": 298.8,
         "h": 37.5,
         "x": 38.1,
-        "y": 260.4
+        "y": 324.5
       },
       "subbarBtn": {
         "w": 66,
         "h": 27.8,
         "x": 49.6,
-        "y": 265.3
+        "y": 329.4
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 66,
         "h": 27.8,
         "x": 49.6,
-        "y": 265.3
+        "y": 329.4
       },
       "activeLabel": null,
       "send": {
         "w": 69.2,
         "h": 37.5,
         "x": 353,
-        "y": 260.4
+        "y": 324.5
       },
       "splitPill": null,
       "actionRow": {
         "w": 375,
         "h": 37.5,
         "x": 0,
-        "y": 260.4
+        "y": 324.5
       },
       "amount": {
         "w": 319,
-        "h": 66.8,
+        "h": 57,
         "x": 28,
-        "y": 63.4
+        "y": 30
       },
       "amountParent": {
         "w": 319,
-        "h": 179.1,
+        "h": 153,
         "x": 28,
-        "y": 63.4
+        "y": 30
       },
       "stackScroll": {
         "w": 331,
-        "h": 264.8,
+        "h": 200.8,
         "x": 22,
-        "y": 324.2
+        "y": 388.2
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 152.5,
-        "y": 189.4
+        "y": 253.5
       },
       "screens": 1,
       "visibleStackRows": 3,
@@ -1155,8 +1155,8 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--row-h": "max(58px, calc(17.25 * clamp(3.3px, 1.0256cqi, 4px)))",
+      "--stack-hdr-h": "26px",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
@@ -1196,34 +1196,34 @@
         "w": 307.7,
         "h": 39,
         "x": 41.1,
-        "y": 351
+        "y": 418
       },
       "subbarBtn": {
         "w": 68,
         "h": 29,
         "x": 53.1,
-        "y": 356
+        "y": 423
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 68,
         "h": 29,
         "x": 53.1,
-        "y": 356
+        "y": 423
       },
       "activeLabel": null,
       "send": {
         "w": 69.2,
         "h": 39,
         "x": 368,
-        "y": 351
+        "y": 418
       },
       "splitPill": null,
       "actionRow": {
         "w": 390,
         "h": 39,
         "x": 0,
-        "y": 351
+        "y": 418
       },
       "amount": {
         "w": 334,
@@ -1239,18 +1239,18 @@
       },
       "stackScroll": {
         "w": 346,
-        "h": 292,
+        "h": 209,
         "x": 22,
-        "y": 462
+        "y": 545
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 160,
-        "y": 249
+        "y": 316
       },
       "screens": 1,
-      "visibleStackRows": 4,
+      "visibleStackRows": 3,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -1273,8 +1273,8 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--row-h": "max(58px, calc(17.25 * clamp(3.3px, 1.0256cqi, 4px)))",
+      "--stack-hdr-h": "72px",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
@@ -1314,61 +1314,61 @@
         "w": 308,
         "h": 39,
         "x": 52,
-        "y": 374.9
+        "y": 478.8
       },
       "subbarBtn": {
         "w": 68,
         "h": 29,
         "x": 64,
-        "y": 379.9
+        "y": 483.8
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 68,
         "h": 29,
         "x": 64,
-        "y": 379.9
+        "y": 483.8
       },
       "activeLabel": null,
       "send": {
         "w": 69.2,
         "h": 39,
         "x": 390,
-        "y": 374.9
+        "y": 478.8
       },
       "splitPill": null,
       "actionRow": {
         "w": 412,
         "h": 39,
         "x": 0,
-        "y": 374.9
+        "y": 478.8
       },
       "amount": {
         "w": 356,
-        "h": 68.6,
+        "h": 73.4,
         "x": 28,
         "y": 86
       },
       "amountParent": {
         "w": 356,
-        "h": 180.9,
+        "h": 185.7,
         "x": 28,
         "y": 86
       },
       "stackScroll": {
         "w": 368,
-        "h": 339.1,
+        "h": 219.3,
         "x": 22,
-        "y": 485.9
+        "y": 605.7
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 171,
-        "y": 272.9
+        "y": 376.8
       },
       "screens": 1,
-      "visibleStackRows": 4,
+      "visibleStackRows": 3,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -1391,8 +1391,8 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--row-h": "max(58px, calc(17.25 * clamp(3.3px, 1.0256cqi, 4px)))",
+      "--stack-hdr-h": "72px",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
@@ -1432,34 +1432,34 @@
         "w": 308,
         "h": 39,
         "x": 61,
-        "y": 380.6
+        "y": 486.4
       },
       "subbarBtn": {
         "w": 68,
         "h": 29,
         "x": 73,
-        "y": 385.6
+        "y": 491.4
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 68,
         "h": 29,
         "x": 73,
-        "y": 385.6
+        "y": 491.4
       },
       "activeLabel": null,
       "send": {
         "w": 69.2,
         "h": 39,
         "x": 408,
-        "y": 380.6
+        "y": 486.4
       },
       "splitPill": null,
       "actionRow": {
         "w": 430,
         "h": 39,
         "x": 0,
-        "y": 380.6
+        "y": 486.4
       },
       "amount": {
         "w": 374,
@@ -1475,18 +1475,18 @@
       },
       "stackScroll": {
         "w": 386,
-        "h": 350.4,
+        "h": 228.6,
         "x": 22,
-        "y": 491.6
+        "y": 613.4
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 180,
-        "y": 278.6
+        "y": 384.4
       },
       "screens": 1,
-      "visibleStackRows": 5,
+      "visibleStackRows": 3,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -1509,8 +1509,8 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--row-h": "max(58px, calc(17.25 * clamp(3.3px, 1.0256cqi, 4px)))",
+      "--stack-hdr-h": "72px",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
@@ -1550,34 +1550,34 @@
         "w": 307.7,
         "h": 39,
         "x": 41.1,
-        "y": 351
+        "y": 418
       },
       "subbarBtn": {
         "w": 68,
         "h": 29,
         "x": 53.1,
-        "y": 356
+        "y": 423
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 68,
         "h": 29,
         "x": 53.1,
-        "y": 356
+        "y": 423
       },
       "activeLabel": null,
       "send": {
         "w": 69.2,
         "h": 39,
         "x": 368,
-        "y": 351
+        "y": 418
       },
       "splitPill": null,
       "actionRow": {
         "w": 390,
         "h": 39,
         "x": 0,
-        "y": 351
+        "y": 418
       },
       "amount": {
         "w": 334,
@@ -1593,18 +1593,18 @@
       },
       "stackScroll": {
         "w": 346,
-        "h": 292,
+        "h": 209,
         "x": 22,
-        "y": 462
+        "y": 545
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 160,
-        "y": 249
+        "y": 316
       },
       "screens": 1,
-      "visibleStackRows": 4,
+      "visibleStackRows": 3,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -1627,8 +1627,8 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--row-h": "max(58px, calc(17.25 * clamp(3.3px, 1.0256cqi, 4px)))",
+      "--stack-hdr-h": "72px",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
@@ -1668,58 +1668,58 @@
         "w": 266.9,
         "h": 32.2,
         "x": 22.5,
-        "y": 227.1
+        "y": 244
       },
       "subbarBtn": {
         "w": 59.2,
         "h": 23.6,
         "x": 32.6,
-        "y": 231.4
+        "y": 248.3
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 59.2,
         "h": 23.6,
         "x": 32.6,
-        "y": 231.4
+        "y": 248.3
       },
       "activeLabel": null,
       "send": {
         "w": 68.2,
         "h": 32.2,
         "x": 298,
-        "y": 227.1
+        "y": 244
       },
       "splitPill": null,
       "actionRow": {
         "w": 320,
         "h": 32.2,
         "x": 0,
-        "y": 227.1
+        "y": 244
       },
       "amount": {
         "w": 264,
         "h": 54,
         "x": 28,
-        "y": 62.5
+        "y": 39.8
       },
       "amountParent": {
         "w": 320,
-        "h": 191.1,
+        "h": 208,
         "x": 0,
         "y": 0
       },
       "stackScroll": {
         "w": 276,
-        "h": 194.5,
+        "h": 177.6,
         "x": 22,
-        "y": 295.5
+        "y": 312.4
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 125,
-        "y": 156.1
+        "y": 173
       },
       "screens": 1,
       "visibleStackRows": 3,
@@ -1745,8 +1745,8 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--row-h": "max(58px, calc(17.25 * clamp(3.3px, 1.0256cqi, 4px)))",
+      "--stack-hdr-h": "36px",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
@@ -1786,58 +1786,58 @@
         "w": 289.8,
         "h": 36,
         "x": 31.1,
-        "y": 251.4
+        "y": 297
       },
       "subbarBtn": {
         "w": 64.1,
         "h": 26.6,
         "x": 42.2,
-        "y": 256
+        "y": 301.7
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 64.1,
         "h": 26.6,
         "x": 42.2,
-        "y": 256
+        "y": 301.7
       },
       "activeLabel": null,
       "send": {
         "w": 68.2,
         "h": 36,
         "x": 338,
-        "y": 251.4
+        "y": 297
       },
       "splitPill": null,
       "actionRow": {
         "w": 360,
         "h": 36,
         "x": 0,
-        "y": 251.4
+        "y": 297
       },
       "amount": {
         "w": 304,
         "h": 60.8,
         "x": 28,
-        "y": 70.4
+        "y": 44.8
       },
       "amountParent": {
         "w": 360,
-        "h": 215.4,
+        "h": 261,
         "x": 0,
         "y": 0
       },
       "stackScroll": {
         "w": 316,
-        "h": 240.3,
+        "h": 194.7,
         "x": 22,
-        "y": 321.7
+        "y": 367.3
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 145,
-        "y": 180.4
+        "y": 226
       },
       "screens": 1,
       "visibleStackRows": 3,
@@ -1863,8 +1863,8 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--row-h": "max(58px, calc(17.25 * clamp(3.3px, 1.0256cqi, 4px)))",
+      "--stack-hdr-h": "36px",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
@@ -1904,58 +1904,58 @@
         "w": 298.8,
         "h": 37.5,
         "x": 34.1,
-        "y": 260.4
+        "y": 314.5
       },
       "subbarBtn": {
         "w": 66,
         "h": 27.8,
         "x": 45.6,
-        "y": 265.3
+        "y": 319.4
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 66,
         "h": 27.8,
         "x": 45.6,
-        "y": 265.3
+        "y": 319.4
       },
       "activeLabel": null,
       "send": {
         "w": 68.2,
         "h": 37.5,
         "x": 353,
-        "y": 260.4
+        "y": 314.5
       },
       "splitPill": null,
       "actionRow": {
         "w": 375,
         "h": 37.5,
         "x": 0,
-        "y": 260.4
+        "y": 314.5
       },
       "amount": {
         "w": 319,
         "h": 60.8,
         "x": 28,
-        "y": 73.4
+        "y": 46.7
       },
       "amountParent": {
         "w": 375,
-        "h": 224.4,
+        "h": 278.5,
         "x": 0,
         "y": 0
       },
       "stackScroll": {
         "w": 331,
-        "h": 256.7,
+        "h": 202.6,
         "x": 22,
-        "y": 332.3
+        "y": 386.4
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 152.5,
-        "y": 189.4
+        "y": 243.5
       },
       "screens": 1,
       "visibleStackRows": 3,
@@ -1981,8 +1981,8 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--row-h": "max(58px, calc(17.25 * clamp(3.3px, 1.0256cqi, 4px)))",
+      "--stack-hdr-h": "36px",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
@@ -2022,61 +2022,61 @@
         "w": 307.7,
         "h": 39,
         "x": 37.1,
-        "y": 351
+        "y": 446.8
       },
       "subbarBtn": {
         "w": 68,
         "h": 29,
         "x": 49.1,
-        "y": 356
+        "y": 451.8
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 68,
         "h": 29,
         "x": 49.1,
-        "y": 356
+        "y": 451.8
       },
       "activeLabel": null,
       "send": {
         "w": 68.2,
         "h": 39,
         "x": 368,
-        "y": 351
+        "y": 446.8
       },
       "splitPill": null,
       "actionRow": {
         "w": 390,
         "h": 39,
         "x": 0,
-        "y": 351
+        "y": 446.8
       },
       "amount": {
-        "w": 334,
+        "w": 334.1,
         "h": 61.8,
         "x": 28,
-        "y": 92.8
+        "y": 92.7
       },
       "amountParent": {
         "w": 390,
-        "h": 284,
+        "h": 379.8,
         "x": 0,
         "y": 0
       },
       "stackScroll": {
-        "w": 346,
-        "h": 329.6,
-        "x": 22,
-        "y": 424.4
+        "w": 342.7,
+        "h": 215.8,
+        "x": 23.6,
+        "y": 541
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 160,
-        "y": 249
+        "y": 344.8
       },
       "screens": 1,
-      "visibleStackRows": 4,
+      "visibleStackRows": 2,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -2087,7 +2087,7 @@
       "indicatorWidthViolation": 0,
       "indicatorLabelContainmentViolation": 0,
       "rowViewportFitViolation": 0,
-      "amountOverflow": -56
+      "amountOverflow": -55.9
     },
     "tokens": {
       "--u": "clamp(3.3px, 1.0256cqi, 4px)",
@@ -2099,8 +2099,8 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--row-h": "max(58px, calc(17.25 * clamp(3.3px, 1.0256cqi, 4px)))",
+      "--stack-hdr-h": "36px",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
@@ -2121,7 +2121,7 @@
       "resizedAlignment": null,
       "restoredAlignment": null
     },
-    "pageErrors": 2
+    "pageErrors": 4
   },
   "trades@412x915": {
     "docOverflow": 0,
@@ -2140,34 +2140,34 @@
         "w": 308,
         "h": 39,
         "x": 48,
-        "y": 374.9
+        "y": 478.8
       },
       "subbarBtn": {
         "w": 68,
         "h": 29,
         "x": 60,
-        "y": 379.9
+        "y": 483.8
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 68,
         "h": 29,
         "x": 60,
-        "y": 379.9
+        "y": 483.8
       },
       "activeLabel": null,
       "send": {
         "w": 68.2,
         "h": 39,
         "x": 390,
-        "y": 374.9
+        "y": 478.8
       },
       "splitPill": null,
       "actionRow": {
         "w": 412,
         "h": 39,
         "x": 0,
-        "y": 374.9
+        "y": 478.8
       },
       "amount": {
         "w": 356,
@@ -2177,24 +2177,24 @@
       },
       "amountParent": {
         "w": 412,
-        "h": 307.9,
+        "h": 411.8,
         "x": 0,
         "y": 0
       },
       "stackScroll": {
         "w": 368,
-        "h": 376.7,
+        "h": 256.9,
         "x": 22,
-        "y": 448.3
+        "y": 568.1
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 171,
-        "y": 272.9
+        "y": 376.8
       },
       "screens": 1,
-      "visibleStackRows": 5,
+      "visibleStackRows": 3,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -2217,8 +2217,8 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--row-h": "max(58px, calc(17.25 * clamp(3.3px, 1.0256cqi, 4px)))",
+      "--stack-hdr-h": "36px",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
@@ -2258,34 +2258,34 @@
         "w": 308,
         "h": 39,
         "x": 57,
-        "y": 380.6
+        "y": 486.4
       },
       "subbarBtn": {
         "w": 68,
         "h": 29,
         "x": 69,
-        "y": 385.6
+        "y": 491.4
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 68,
         "h": 29,
         "x": 69,
-        "y": 385.6
+        "y": 491.4
       },
       "activeLabel": null,
       "send": {
         "w": 68.2,
         "h": 39,
         "x": 408,
-        "y": 380.6
+        "y": 486.4
       },
       "splitPill": null,
       "actionRow": {
         "w": 430,
         "h": 39,
         "x": 0,
-        "y": 380.6
+        "y": 486.4
       },
       "amount": {
         "w": 374,
@@ -2295,24 +2295,24 @@
       },
       "amountParent": {
         "w": 430,
-        "h": 313.6,
+        "h": 419.4,
         "x": 0,
         "y": 0
       },
       "stackScroll": {
         "w": 386,
-        "h": 388,
+        "h": 266.2,
         "x": 22,
-        "y": 454
+        "y": 575.8
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 180,
-        "y": 278.6
+        "y": 384.4
       },
       "screens": 1,
-      "visibleStackRows": 5,
+      "visibleStackRows": 3,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -2335,8 +2335,8 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--row-h": "max(58px, calc(17.25 * clamp(3.3px, 1.0256cqi, 4px)))",
+      "--stack-hdr-h": "36px",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",
@@ -2376,34 +2376,34 @@
         "w": 307.7,
         "h": 39,
         "x": 37.1,
-        "y": 351
+        "y": 446.8
       },
       "subbarBtn": {
         "w": 68,
         "h": 29,
         "x": 49.1,
-        "y": 356
+        "y": 451.8
       },
       "activeSubbarBtn": null,
       "subbarInd": {
         "w": 68,
         "h": 29,
         "x": 49.1,
-        "y": 356
+        "y": 451.8
       },
       "activeLabel": null,
       "send": {
         "w": 68.2,
         "h": 39,
         "x": 368,
-        "y": 351
+        "y": 446.8
       },
       "splitPill": null,
       "actionRow": {
         "w": 390,
         "h": 39,
         "x": 0,
-        "y": 351
+        "y": 446.8
       },
       "amount": {
         "w": 334,
@@ -2413,24 +2413,24 @@
       },
       "amountParent": {
         "w": 390,
-        "h": 284,
+        "h": 379.8,
         "x": 0,
         "y": 0
       },
       "stackScroll": {
         "w": 346,
-        "h": 329.6,
+        "h": 217.9,
         "x": 22,
-        "y": 424.4
+        "y": 536.1
       },
       "fab": {
         "w": 70,
         "h": 70,
         "x": 160,
-        "y": 249
+        "y": 344.8
       },
       "screens": 1,
-      "visibleStackRows": 4,
+      "visibleStackRows": 3,
       "sendVsBarDelta": 0,
       "indVsBtnDelta": null,
       "barScrollOverflow": 0,
@@ -2453,8 +2453,8 @@
       "--sp-7": "calc(7 * clamp(3.3px, 1.0256cqi, 4px))",
       "--bar-h": "calc(9.75 * clamp(3.3px, 1.0256cqi, 4px))",
       "--btn-h": null,
-      "--row-h": "calc(17.25 * clamp(3.3px, 1.0256cqi, 4px))",
-      "--stack-hdr-h": "calc(6 * clamp(3.3px, 1.0256cqi, 4px))",
+      "--row-h": "max(58px, calc(17.25 * clamp(3.3px, 1.0256cqi, 4px)))",
+      "--stack-hdr-h": "36px",
       "--kp-size": null,
       "--fab-size": "calc(17.5 * clamp(3.3px, 1.0256cqi, 4px))",
       "--amount-max": "clamp(36px, 22.56cqi, 88px)",

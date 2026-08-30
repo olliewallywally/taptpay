@@ -56,7 +56,10 @@ describe("PropertyDashboardView extraction boundary", () => {
     const onNavigate = jest.fn();
     render(<PropertyDashboardView {...baseProps({ onNavigate })} />);
 
-    expect(screen.getByText("1")).toBeInTheDocument();
+    // The tenant-count hero rolls in character-by-character (RollingText),
+    // so "1" appears in several duplicated/hidden flip spans — the sr-only
+    // span is the one canonical text node to assert against.
+    expect(screen.getByText("1", { selector: ".sr-only" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "set up rent payment" }));
     expect(onNavigate).toHaveBeenCalledWith("/property/terminal?screen=tenants");
   });

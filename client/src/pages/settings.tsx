@@ -700,7 +700,7 @@ export default function Settings() {
   if (isLoading) {
     return (
       <div style={{ background: '#FFFFFF', minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
-        <div className="flex items-center justify-center" style={{ width: '100%', maxWidth: 430, minHeight: '100svh', background: '#F4F4F4' }}>
+        <div className="flex items-center justify-center" style={{ width: '100%', maxWidth: 'var(--phone-shell-max)', minHeight: '100svh', background: '#F4F4F4' }}>
           <div className="w-8 h-8 border-2 border-[#040D6D] border-t-transparent rounded-full animate-spin"></div>
         </div>
       </div>
@@ -713,7 +713,7 @@ export default function Settings() {
 
   return (
     <div style={{ background: '#FFFFFF', minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
-    <div className="pb-32" style={{ width: '100%', maxWidth: 430, minHeight: '100svh', background: '#F4F4F4', fontFamily: "'Outfit', system-ui, sans-serif" }}>
+    <div className="pb-32" style={{ width: '100%', maxWidth: 'var(--phone-shell-max)', minHeight: '100svh', background: '#F4F4F4', fontFamily: "'Outfit', system-ui, sans-serif" }}>
 
       {/* Navy hero — full-bleed with the app's rounded-bottom sheet edge */}
       <div style={{ background: '#040D6D', borderRadius: '0 0 28px 28px', padding: '64px 22px 28px' }}>

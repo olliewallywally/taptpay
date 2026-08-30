@@ -148,9 +148,9 @@ function JobsHome({ invoices, outstanding, go, onRowTap }: any) {
         <div className="tp-amount" style={amountStyle(outstandingText, 82, { color: OFFW })}>{outstandingText}</div>
         <div style={{ marginTop: 10, color: OFFW, fontWeight: 500, fontSize: 16 }}>outstanding</div>
       </div>
-      <div className="tp-home-chrome" aria-hidden="true" />
+      <div className="tp-home-chrome" aria-hidden="true" style={{ background: OFFW }} />
       {/* Bottom — OFFW */}
-      <div className="stagger tp-home-stack" style={{ background: OFFW, padding: '0 22px' }}>
+      <div className="stagger tp-home-stack" style={{ background: OFFW, paddingInline: 22 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <div className="tp-stack-title">jobs</div>
         </div>
@@ -587,7 +587,7 @@ function JobActionSheet({ invoice, onClose, onMarkReceived, onSendBalance, onCom
 
   return (
     <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 80, background: 'rgba(4,13,109,0.45)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', animation: 'tp-fade 0.2s ease both' }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 430, background: OFFW, borderRadius: '26px 26px 0 0', padding: '12px 22px 28px', animation: 'tp-sheetup 0.32s cubic-bezier(0.16,1,0.3,1) both' }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 'var(--phone-shell-max)', background: OFFW, borderRadius: '26px 26px 0 0', padding: '12px 22px 28px', animation: 'tp-sheetup 0.32s cubic-bezier(0.16,1,0.3,1) both' }}>
         <div style={{ display: 'flex', justifyContent: 'center', padding: '0 0 14px' }}>
           <div style={{ width: 38, height: 4, borderRadius: 2, background: 'rgba(4,13,109,0.12)' }} />
         </div>

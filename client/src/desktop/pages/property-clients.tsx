@@ -7,7 +7,7 @@ import {
   DesktopPageScaffold,
   type DesktopRoutePageProps,
 } from "../DesktopPageScaffold";
-import { entranceProps, useListEntrance } from "../list-entrance";
+import { AnimatedListRow, AnimatedScrollList } from "@/components/AnimatedScrollList";
 import { DesktopDirectoryProfile } from "../DesktopDirectoryProfile";
 
 /* ── palette ── */
@@ -117,13 +117,6 @@ export default function DesktopPropertyClients(props: DesktopRoutePageProps) {
       fullNameOf(t).toLowerCase().includes(term) ||
       String(t.propertyAddress ?? "").toLowerCase().includes(term),
   );
-  /* Row entrance: seeded from the whole tenant dataset, so searching or
-     changing the property scope never replays a row the user has already seen. */
-  const entrance = useListEntrance(
-    useMemo(() => tenants.map((t: any) => String(t.id)), [tenants]),
-    useMemo(() => rows.map((t: any) => String(t.id)), [rows]),
-  );
-
   const selectedTenant = tenants.find((tenant: any) => tenant.id === selectedTenantId) ?? null;
   const selectTenant = (id: string) => {
     setSelectedTenantId(id);
@@ -249,9 +242,11 @@ export default function DesktopPropertyClients(props: DesktopRoutePageProps) {
           </button>
         </div>
 
-        {/* No dt-rise here: the rows own the entrance, and stacking a wrapper
-            rise on top of it would run two entrances against each other. */}
-        <div className="pc-list">
+        {/* No dt-rise here: AnimatedScrollList's rows own the entrance (pop
+            in/out as they cross the scroll viewport — see
+            AnimatedScrollList.tsx), and stacking a wrapper rise on top of it
+            would run two entrances against each other. */}
+        <AnimatedScrollList className="pc-list">
           {tenantsQuery.isLoading ? (
             <div className="pc-empty">loading tenants…</div>
           ) : rows.length === 0 ? (
@@ -268,10 +263,11 @@ export default function DesktopPropertyClients(props: DesktopRoutePageProps) {
                   : `next payment · ${fmtDue(invoice)}`
                 : "no invoice yet";
               return (
-                <button
+                <AnimatedListRow
                   key={t.id}
                   type="button"
-                  {...entranceProps(entrance, String(t.id), "pc-row")}
+                  className="pc-row"
+                  data-scroll-nav-item
                   aria-current={t.id === selectedTenantId ? "true" : undefined}
                   onClick={() => selectTenant(t.id)}
                 >
@@ -288,11 +284,11 @@ export default function DesktopPropertyClients(props: DesktopRoutePageProps) {
                   </span>
                   <span className="pc-row-address">{t.propertyAddress}</span>
                   <span className="pc-row-amt">{invoice ? fmtNZD(invoice.amountCents ?? 0) : "—"}</span>
-                </button>
+                </AnimatedListRow>
               );
             })
           )}
-        </div>
+        </AnimatedScrollList>
         {selectedTenant && <DesktopDirectoryProfile vertical="property" profile={selectedTenant} />}
       </div>
 

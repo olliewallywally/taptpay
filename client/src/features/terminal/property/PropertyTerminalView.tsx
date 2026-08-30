@@ -5,6 +5,7 @@ import { setDockCollapse } from "@/features/navigation/dock-collapse-store";
 import { SegmentedBar } from "../SegmentedBar";
 import { useMeasuredChromeGutter } from "../useMeasuredChromeGutter";
 import { useFitTerminalAmounts } from "../useFitTerminalAmounts";
+import { AnimatedListRow, AnimatedScrollList } from "@/components/AnimatedScrollList";
 
 import "../terminal-keyframes.css";
 import "../terminal-tokens.css";
@@ -17,6 +18,16 @@ const OFFW = '#F4F4F4';
 const GREEN = '#1BBF85';
 const RED   = '#FF3B4E';
 const AMBER = '#FFB02E';
+
+/* Oliver asked for 20% more off-white hero on the tenants, amount (keypad)
+   and send screens, and for the amount/send pair to land on the same bottom
+   navy panel height. One constant, applied to all three screens' own root
+   --hero-pref, keeps them identical instead of three independently-typed
+   literals drifting apart. Scoped per-screen (not the shared --hero-pref
+   token) so retail/trades and property's own bill/external screens are
+   untouched, and so verify-terminal-dock.mjs §9.B1 (which only checks
+   retail's keypad) never sees it. 20% of clamp(184px, 33.65svh, 316px). */
+const HERO_PREF_XL = 'clamp(220.8px, 40.38svh, 379.2px)';
 
 const fmt = (c: number) => `$${(c / 100).toFixed(2)}`;
 
@@ -120,9 +131,9 @@ function fmtDate(d: any): string {
   return new Date(d).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-function SubBar({ activeIdx = -1, onPick, compact = false, hideLabel = false }: any) {
+function SubBar({ activeIdx = -1, onPick, compact = false, hideLabel = false, crowded = false }: any) {
   return <SegmentedBar items={SUBBAR_ITEMS} activeIdx={activeIdx} onPick={onPick}
-    compact={compact} hideLabel={hideLabel} activeColor={BLUE}
+    compact={compact} hideLabel={hideLabel} crowded={crowded} activeColor={BLUE}
     inactiveColor="rgba(4,13,109,0.55)" demoIdPrefix="property-mode" />;
 }
 
@@ -195,9 +206,9 @@ function RequestsHome({ invoices, tenants, outstanding, outstandingExpenses = 0,
           <div style={{ marginTop: 4, color: 'rgba(88,171,255,0.55)', fontWeight: 400, fontSize: 13 }}>outstanding expenses</div>
         </div>
       </div>
-      <div className="tp-home-chrome" aria-hidden="true" />
+      <div className="tp-home-chrome" aria-hidden="true" style={{ background: OFFW }} />
       {/* Bottom — OFFW. Rises to the top of the page as the hero leaves. */}
-      <div className="stagger tp-feed-body tp-home-stack" style={{ background: OFFW, padding: feedOpen ? '12px 22px 0' : '0 22px' }}>
+      <div className="stagger tp-feed-body tp-home-stack" style={{ background: OFFW, paddingInline: 22, ...(feedOpen ? { paddingTop: 12 } : null) }}>
         <div className="tp-home-stack-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 9 }}>
           <button className="tap-target" type="button" onClick={() => onToggleFeed?.()} aria-expanded={feedOpen}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'Outfit, system-ui', WebkitTapHighlightColor: 'transparent' }}>
@@ -217,15 +228,19 @@ function RequestsHome({ invoices, tenants, outstanding, outstandingExpenses = 0,
             </button>
           ))}
         </div>
-        <div className="tp-stack-scroll" style={{ flex: 1, overflow: 'auto', paddingRight: 2 }}>
+        <AnimatedScrollList
+          className="tp-stack-scroll"
+          style={{ flex: 1, overflow: 'auto', paddingRight: 2 }}
+          fadeColor="#fff"
+        >
           <div className="tp-stack-card">
             {recent.length === 0 ? (
               <div className="tp-stack-empty">{filter === 'all' ? 'tap + to send a rent request' : `no ${filter} requests`}</div>
-            ) : recent.map((inv: any, i: number) => {
+            ) : recent.map((inv: any) => {
               const st = invoiceStatusFor(inv);
               const dotCls = st === 'paid' ? 'paid' : (st === 'overdue' || st === 'failed') ? 'declined' : st === 'sent' ? 'payment-sent' : 'awaiting';
               return (
-                <div key={inv.id} className="tp-stack-row" style={{ cursor: 'pointer', animationDelay: `${Math.min(i, 12) * 45}ms` }} onClick={() => onRowTap?.(inv)}>
+                <AnimatedListRow as="div" key={inv.id} className="tp-stack-row" style={{ cursor: 'pointer' }} onClick={() => onRowTap?.(inv)}>
                   <div style={{ width: 34, height: 34, borderRadius: 999, background: NAVY, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 11, fontWeight: 800, color: BLUE, letterSpacing: '0.02em', marginRight: 12 }}>
                     {(inv.tenantName || '??').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()}
                   </div>
@@ -267,11 +282,11 @@ function RequestsHome({ invoices, tenants, outstanding, outstandingExpenses = 0,
                       </>
                     );
                   })()}
-                </div>
+                </AnimatedListRow>
               );
             })}
           </div>
-        </div>
+        </AnimatedScrollList>
       </div>
     </div>
   );
@@ -324,7 +339,13 @@ function ChooseTenant({ tenants, invoices, go, onSelect, splitMode, onToggleSpli
       .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
 
   return (
-    <div className="tp-screen tp-feature" style={{ background: NAVY }}>
+    <div
+      className="tp-screen tp-feature"
+      style={{
+        background: NAVY,
+        '--hero-pref': HERO_PREF_XL,
+      } as any}
+    >
       {/* Top — OFFW */}
       <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={() => go('home', 'down')} onCommit={() => go('home', 'down')} />
@@ -347,7 +368,11 @@ function ChooseTenant({ tenants, invoices, go, onSelect, splitMode, onToggleSpli
           />
         </div>
         {/* list */}
-        <div className="tp-thin-scroll" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 130 }}>
+        <AnimatedScrollList
+          className="tp-thin-scroll"
+          style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 130 }}
+          fadeColor={NAVY}
+        >
           {filtered.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '32px 0', color: 'rgba(88,171,255,0.4)', fontSize: 13 }}>no tenants found</div>
           ) : filtered.map((t: any) => {
@@ -356,7 +381,8 @@ function ChooseTenant({ tenants, invoices, go, onSelect, splitMode, onToggleSpli
             const st = inv ? invoiceStatusFor(inv) : null;
             const dotCls = st === 'paid' ? 'paid' : (st === 'overdue' || st === 'failed') ? 'declined' : 'awaiting';
             return (
-              <button key={t.id} onClick={() => onSelect(t, amount)} data-demo-id={`property-tenant-${t.id}`}
+              <AnimatedListRow key={t.id} onClick={() => onSelect(t, amount)} data-demo-id={`property-tenant-${t.id}`}
+                data-scroll-nav-item
                 style={{ textAlign: 'left', background: 'transparent', border: '1.5px solid rgba(88,171,255,0.28)', borderRadius: 18, padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 13 }}>
                 <div style={{ width: 38, height: 38, borderRadius: 999, background: BLUE, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, fontWeight: 800, color: NAVY }}>
                   {tenantInitials(t)}
@@ -369,10 +395,10 @@ function ChooseTenant({ tenants, invoices, go, onSelect, splitMode, onToggleSpli
                   <div style={{ fontWeight: 700, fontSize: 14, color: BLUE, fontVariantNumeric: 'tabular-nums' }}>{amount ? fmt(amount) : '—'}</div>
                   {st && <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end', marginTop: 3 }}><span className={`tp-dot ${dotCls}`} /><span style={{ fontSize: 10, color: 'rgba(88,171,255,0.5)' }}>{st}</span></div>}
                 </div>
-              </button>
+              </AnimatedListRow>
             );
           })}
-        </div>
+        </AnimatedScrollList>
         </div>
       </div>
     </div>
@@ -388,7 +414,13 @@ function RentAmount({ go, selectedTenant, onCommit, backTo = 'send' }: any) {
   const commit = () => { if (cents === 0) return; onCommit(cents); };
 
   return (
-    <div className="tp-screen tp-feature" style={{ background: NAVY }}>
+    <div
+      className="tp-screen tp-feature"
+      style={{
+        background: NAVY,
+        '--hero-pref': HERO_PREF_XL,
+      } as any}
+    >
       <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={() => go(backTo, 'down')} onCommit={commit} demoCommitId="property-amount-confirm" />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
@@ -403,7 +435,7 @@ function RentAmount({ go, selectedTenant, onCommit, backTo = 'send' }: any) {
       </div>
       <div className="stagger tp-panel" style={{ background: NAVY }}>
         <div className="tp-panel-body" style={{ display: 'flex', flexDirection: 'column' }}>
-        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 'var(--sp-3)', alignItems: 'center', justifyItems: 'center', alignContent: 'center' }}>
+        <div className="stagger" style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', rowGap: 'var(--sp-4)', columnGap: 'var(--sp-3)', alignItems: 'center', justifyItems: 'center', alignContent: 'center' }}>
           {['1','2','3','4','5','6','7','8','9'].map(d => (
             <button key={d} className="tp-kp" data-demo-id={`property-key-${d}`} onClick={() => press(d)}>{d}</button>
           ))}
@@ -424,7 +456,7 @@ function SendRentLink({ go, selectedTenant, amount, onSend, sending, frequency, 
   // No tenant selected yet — prompt the user to choose one first
   if (!selectedTenant) {
     return (
-      <div className="tp-screen tp-feature" style={{ background: NAVY }}>
+      <div className="tp-screen tp-feature" style={{ background: NAVY, '--hero-pref': HERO_PREF_XL } as any}>
         <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
           <SubHead onCancel={() => go('home', 'down')} onCommit={() => go('tenants')} />
           <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -447,7 +479,7 @@ function SendRentLink({ go, selectedTenant, amount, onSend, sending, frequency, 
   const firstAuto = recurring ? addInterval(new Date(), frequency) : null;
 
   return (
-    <div className="tp-screen tp-feature" style={{ background: NAVY }}>
+    <div className="tp-screen tp-feature" style={{ background: NAVY, '--hero-pref': HERO_PREF_XL } as any}>
       <div className="stagger tp-hero" style={{ background: OFFW, color: NAVY, display: 'flex', flexDirection: 'column' }}>
         <SubHead onCancel={() => go('home', 'down')} onCommit={onSend} />
         <div style={{ flex: 1, padding: '12px 28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -1093,7 +1125,7 @@ function InvoiceActionSheet({ invoice, onClose, onEditResend, onResend, onMarkRe
 
   return (
     <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 80, background: 'rgba(4,13,109,0.45)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', animation: 'tp-fade 0.2s ease both' }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 430, background: OFFW, borderRadius: '26px 26px 0 0', padding: '12px 22px 28px', animation: 'tp-sheetup 0.32s cubic-bezier(0.16,1,0.3,1) both' }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 'var(--phone-shell-max)', background: OFFW, borderRadius: '26px 26px 0 0', padding: '12px 22px 28px', animation: 'tp-sheetup 0.32s cubic-bezier(0.16,1,0.3,1) both' }}>
         <div style={{ display: 'flex', justifyContent: 'center', padding: '0 0 14px' }}>
           <div style={{ width: 38, height: 4, borderRadius: 2, background: 'rgba(4,13,109,0.12)' }} />
         </div>
@@ -1333,7 +1365,7 @@ export function PropertyTerminalView(props: PropertyTerminalViewProps) {
             <SplitPill on={props.splitMode} onToggle={props.onToggleSplit} />
           </div>
           <div className="tp-subbar-center">
-            <SubBar activeIdx={subbarActiveIdx} onPick={props.onSubbarPick} compact={sendVisible} hideLabel={false} />
+            <SubBar activeIdx={subbarActiveIdx} onPick={props.onSubbarPick} compact={sendVisible} hideLabel={false} crowded={props.screen === 'tenants'} />
           </div>
           <div className={`tp-send-slot${sendVisible ? ' show' : ''}`} {...inertWhen(!sendVisible)}>
             <SendBtn onClick={props.onSendRent} />

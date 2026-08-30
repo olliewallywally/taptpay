@@ -433,7 +433,7 @@ export default function Transactions() {
 
   return (
     <div style={{ background: '#FFFFFF', minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
-    <div style={{ width: '100%', maxWidth: 430, height: '100svh', fontFamily: "'Outfit', system-ui, sans-serif", background: C.navy, position: 'relative', overflow: 'hidden' }}>
+    <div style={{ width: '100%', maxWidth: 'var(--phone-shell-max)', height: '100svh', fontFamily: "'Outfit', system-ui, sans-serif", background: C.navy, position: 'relative', overflow: 'hidden' }}>
 
       {/* ── Dark top ── */}
       <div ref={topRef} style={{ padding: '52px 24px 0' }}>

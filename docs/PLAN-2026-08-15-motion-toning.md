@@ -354,3 +354,17 @@ Step 6 (Trades, Retail, Settings on mobile).
 5. **Shared-file spillover accepted.** Step 0 and the tablet pass are shared CSS, so
    Trades and Retail changed alongside Property. Flagged and accepted rather than
    worked around.
+
+## 9. Exception — 2026-08-30
+
+Oliver asked for a pasted "AnimatedList" reference's literal scale(0.7→1)/opacity
+pop-in-and-out to be ported onto three Property desktop lists: the tenant directory
+(`property-clients.tsx`) and the active-stack rows + tenant-picker cards in
+`property-terminal.tsx`. Shown the conflict with §4/P3's "this is a live feed; rows must
+not pop" and the spent 2-accent budget (§8.1), he chose to match the reference exactly
+rather than tone it to the fade/rise tiers above.
+
+**This is a deliberate, informed re-opening of the ruling for those three lists only.**
+It does not revise the tiers, the budget, or any other screen. Implementation:
+`client/src/desktop/AnimatedScrollList.tsx`. See memory
+`property-lists-scale-pop-override` before "fixing" this back to fade/rise.

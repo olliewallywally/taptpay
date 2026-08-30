@@ -265,7 +265,7 @@ export default function TradesAnalytics() {
 
   return (
     <div style={{ background: C.white, minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
-    <div style={{ width: '100%', maxWidth: 430, height: '100svh', fontFamily: "'Outfit', system-ui, sans-serif", background: C.base, position: 'relative', overflow: 'hidden' }}>
+    <div style={{ width: '100%', maxWidth: 'var(--phone-shell-max)', height: '100svh', fontFamily: "'Outfit', system-ui, sans-serif", background: C.base, position: 'relative', overflow: 'hidden' }}>
 
       {/* ── Dark top ── */}
       <div ref={topRef} style={{ padding: '52px 24px 0' }}>

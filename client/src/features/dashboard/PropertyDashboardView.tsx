@@ -3,6 +3,7 @@ import {
   type Timeframe, buildBuckets, periodWindow, collectedCents,
   growthPct, collectionRate, filterByProperty, fmtCompact,
 } from "@/lib/property-dashboard-data";
+import { RollingHeroNumber } from "@/components/rolling-hero-number";
 
 /* ── Design tokens ── */
 const NAVY = '#040D6D';
@@ -15,6 +16,7 @@ const SHEET = '#F4F4F4';
 const TIMEFRAMES: Timeframe[] = ['day', 'week', 'month', 'year'];
 
 const fmtWhole = (c: number) => '$' + Math.round(c / 100).toLocaleString('en-NZ');
+const fmtCount = (n: number) => String(Math.round(n));
 
 export type PropertyDashboardViewProps = {
   tenants: any[];
@@ -254,7 +256,7 @@ export function PropertyDashboardView({
 
   return (
     <div data-demo-id="property-dashboard" style={{ background: '#FFFFFF', minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
-      <div ref={colRef} style={{ width: '100%', maxWidth: 430, minHeight: '100svh', background: SHEET, paddingBottom: 130, fontFamily: "'Outfit', system-ui, sans-serif" }}>
+      <div ref={colRef} style={{ width: '100%', maxWidth: 'var(--phone-shell-max)', minHeight: '100svh', background: SHEET, paddingBottom: 130, fontFamily: "'Outfit', system-ui, sans-serif" }}>
         <style>{PD_CSS}</style>
 
         {/* ── Navy hero ── */}
@@ -279,7 +281,7 @@ export function PropertyDashboardView({
               <div className="pd-skel" style={{ width: 190, height: 54, borderRadius: 14, background: 'rgba(88,171,255,0.22)' }} />
             ) : (
               <div style={{ fontWeight: 800, fontSize: 54, color: SKY, letterSpacing: '-0.04em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
-                {fmtWhole(collected)}
+                <RollingHeroNumber value={collected} format={fmtWhole} />
               </div>
             )}
             {!invLoading && growth !== null && (
@@ -323,7 +325,7 @@ export function PropertyDashboardView({
             {invLoading ? (
               <div className="pd-skel" style={{ marginTop: 10, width: 54, height: 42, borderRadius: 10, background: 'rgba(2,9,61,0.10)' }} />
             ) : (
-              <div style={{ marginTop: 10, fontWeight: 800, fontSize: 42, color: NAVY, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{activeTenants}</div>
+              <div style={{ marginTop: 10, fontWeight: 800, fontSize: 42, color: NAVY, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}><RollingHeroNumber value={activeTenants} format={fmtCount} /></div>
             )}
           </button>
           <button type="button" className="pd-card pd-tap" data-demo-id="property-dashboard-outstanding" onPointerDown={pulse} onClick={() => onNavigate('/property/terminal?stack=overdue')}
@@ -335,7 +337,7 @@ export function PropertyDashboardView({
             {invLoading ? (
               <div className="pd-skel" style={{ marginTop: 10, width: 54, height: 42, borderRadius: 10, background: 'rgba(88,171,255,0.22)' }} />
             ) : (
-              <div style={{ marginTop: 10, fontWeight: 800, fontSize: 42, color: SKY, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{overdueCount}</div>
+              <div style={{ marginTop: 10, fontWeight: 800, fontSize: 42, color: SKY, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}><RollingHeroNumber value={overdueCount} format={fmtCount} /></div>
             )}
           </button>
         </div>

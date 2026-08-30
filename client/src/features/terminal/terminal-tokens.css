@@ -13,7 +13,7 @@
  */
 
 .tp-viewport {
-  container-type: inline-size;          /* size off our own 430-capped box, not the window */
+  container-type: inline-size;          /* size off our own --phone-shell-max-capped box, not the window */
   --u: clamp(3.3px, 1.0256cqi, 4px);    /* exactly 4.000px at the 390 reference */
 
   --sp-1: calc(1 * var(--u));
@@ -30,8 +30,18 @@
   --amount-max: clamp(36px, 22.56cqi, 88px);
   --amount-k: 1.5;
   --chrome-gutter: clamp(70px, 27.2cqi, 117px);
-  --row-h: calc(17.25 * var(--u));
-  --stack-hdr-h: calc(6 * var(--u));
+  /* Both terms are what a row and the header ACTUALLY measure, not what the
+     unit says they should. `calc(17.25 * var(--u))` is exact at the 390
+     reference and optimistic below it: a row's content is text at fixed sizes,
+     so it stops scaling with --u and bottoms out at 57.5-58.5px while the token
+     kept reporting 56.9. The header is worse — 6 * --u reads 19.8px at 320
+     against a real 24px + 12px margin, fixed at every width. Three rows and a
+     header therefore under-counted by ~15px, which was invisible while row 3
+     had slack and became a lost row the moment the 40/60 split put row 3 on its
+     minimum. Absolute floors under a scaling term, exactly like --hero-min and
+     --panel-min's 44px (A1 §3.5 exempts legibility floors from the unit). */
+  --row-h: max(58px, calc(17.25 * var(--u)));
+  --stack-hdr-h: 36px;                 /* .tp-stack-hdr 24 + its 12px margin */
   --stack-min: calc(3 * var(--row-h) + var(--stack-hdr-h) + 2px);
 
   --kp-max:   calc(19 * var(--u));      /* 76 @390 — the keypad key's DESIGN size (§5) */
@@ -49,7 +59,34 @@
   --hero-min-compact:  96px;
   --hero-pref-compact: clamp(96px, 17svh, 160px);
 
+  /* Home screens split navy/off-white 45/55 (Oliver, 2026-08-30). Separate
+     from --hero-pref on purpose: on a FEATURE screen the hero is the off-white
+     region and 33.65svh is gated by verify-terminal-dock.mjs §9.B1, whereas on
+     a home screen row 1 IS the navy field and its height is the split. No
+     ceiling — 40% is a proportion, not a size — and the --hero-min floor keeps
+     the §4.3 contraction order: where the stack's three-row floor cannot fit
+     underneath, grid falls back toward 184px and the hero yields first. */
+  --home-hero-pref: max(var(--hero-min), 45svh);
+
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  /* What the floating dock covers at the bottom of a home screen. Held as one
+     token because two rules must agree on it exactly: the stack region reserves
+     it as PADDING (so the off-white paints under the dock), and row 3's minimum
+     adds it on top of --stack-min (so the three-row floor is three rows of
+     *content*, not three rows the dock is sitting on). See the note on
+     .tp-screen.tp-home. */
+  --dock-clear: calc(var(--dock-h-max, var(--dock-h, 0px)) + var(--safe-bottom) + var(--sp-3));
+
+  /* Air between the floating action bar and the stack's own header. The gutter
+     is MEASURED as the chrome's extent, so by construction it ends exactly at
+     the bar's bottom edge and the header started flush against it — measured
+     barToHdr 0.0px at 390x844 and 430x932, against clear separation in both
+     references. Reserved like --dock-clear: padding inside the off-white, and
+     added to row 3's minimum so it is not taken out of the three rows. Zeroed
+     below 700px of height, where the budget has no room for it and the bar
+     already clears the header by 1.8px. */
+  --stack-gap: var(--sp-4);
 
   /* SPEC-2026-08-20 §4.3: not measured. The plan's §3.1 rule 2 has this read
      from the floating action bar, but on a feature screen that bar sits
@@ -67,6 +104,15 @@
   height: 100svh;
   height: 100dvh;
 }
+
+/* Property is the one vertical with TWO chrome rows above its list — a header
+   AND a status-filter row (all / overdue / sent / paid / failed) — so the
+   shared 36px band under-counts it by 36px and the three-row floor came out as
+   two at 390x844 the moment the 45/55 split put row 3 on its minimum. Measured:
+   header 22.4 + 9, filters 31.6 + 9. Below 700px of height the filters are
+   display:none and the margins drop to --sp-1, so the band is the header alone
+   and the value returns to ~26px (in the short-screen block). */
+.property-terminal-view.tp-viewport { --stack-hdr-h: 72px; }
 
 /* Amounts keep their authored size as a ceiling, then fit deterministically
    from the displayed character count. The observer fallback writes --fit only
@@ -175,26 +221,50 @@
 
 /* Three regions, home screens only: content hero, measured floating chrome,
    then a pinned-header stack with room for at least three rows. */
+/* The dock clearance is NOT padding on this element. §6.4 wrote it here, and
+   that reserved the space correctly but also stopped the stack region painting
+   into it: .tp-screen has no background of its own, so the reserved band came
+   out in the navy behind the whole viewport, as a dead strip between the
+   bottom of the off-white and the bottom of the phone. Pre-phase-8 the same
+   90px lived as padding INSIDE the off-white block (RetailTerminalViewCore.jsx
+   `padding: '154px 22px 90px'`), which is what both design references show: one
+   off-white field running to the bottom edge, with the dock floating over it.
+   The clearance therefore belongs to .tp-home-stack, and row 3's minimum grows
+   by the same token so the vertical budget in §4.3 is unchanged. */
 .tp-viewport .tp-screen.tp-home {
   display: grid;
   grid-template-rows:
-    minmax(var(--hero-min), var(--hero-pref))
+    minmax(var(--hero-min), var(--home-hero-pref))
     var(--chrome-gutter)
-    minmax(var(--stack-min), 1fr);
+    minmax(calc(var(--stack-min) + var(--dock-clear) + var(--stack-gap)), 1fr);
   min-height: 0;
   box-sizing: border-box;
-  padding-bottom: calc(var(--dock-h, 0px) + var(--safe-bottom) + var(--sp-3));
   overflow: hidden;
 }
 
 .tp-viewport .tp-home-hero { grid-row: 1; min-height: 0; overflow: hidden; }
+
+/* Row 2 is the band the FAB and the action bar float over. Both references put
+   it on the OFF-WHITE side of the seam — the FAB straddles the colour change
+   and the action bar sits below it, on off-white. The band carries the stack's
+   background (written inline per vertical, beside .tp-home-stack's, because
+   trades themes it differently), so the seam lands on the hero's bottom edge
+   where the FAB is centred, instead of a gutter-height lower. */
 .tp-viewport .tp-home-chrome { grid-row: 2; pointer-events: none; }
+
 .tp-viewport .tp-home-stack {
   grid-row: 3;
   min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  /* Inside the off-white, so the background reaches the bottom edge and the
+     scrollport still stops above the dock — which is what keeps
+     `visibleStackRows` honest: a row under the dock must not count as visible.
+     Authored here rather than inline so the two verticals that set
+     `paddingInline` cannot silently drop it. */
+  padding-bottom: var(--dock-clear);
+  padding-top: var(--stack-gap);
 }
 .tp-viewport .tp-home-stack .tp-stack-scroll { min-height: 0; overflow-y: auto; }
 .tp-viewport .tp-home-stack .tp-stack-row {
@@ -206,23 +276,60 @@
 /* Overlay chrome is a sibling of the routed screen, so the shared hook
    publishes the realised home-hero boundary on the viewport. */
 .tp-viewport .tp-pfab.home,
-.tp-viewport .tp-psubbar.home { top: var(--home-hero-h, var(--hero-pref)); }
+.tp-viewport .tp-psubbar.home { top: var(--home-hero-h, var(--home-hero-pref)); }
 
 .tp-viewport .tp-screen.tp-home[data-feed-open="true"] {
-  grid-template-rows: 0 var(--chrome-gutter) minmax(var(--stack-min), 1fr);
+  grid-template-rows: 0 var(--chrome-gutter) minmax(calc(var(--stack-min) + var(--dock-clear) + var(--stack-gap)), 1fr);
 }
 
 @media (max-height: 700px) {
   .tp-viewport .tp-screen.tp-home {
-    padding-bottom: calc(var(--dock-h, 0px) + var(--safe-bottom));
+    --dock-clear: calc(var(--dock-h-max, var(--dock-h, 0px)) + var(--safe-bottom));
+    --stack-gap: 0px;
   }
   .tp-viewport .tp-home-stack-header,
   .tp-viewport .tp-home-stack-filters { margin-bottom: var(--sp-1) !important; }
   .tp-viewport .tp-home-stack-filters button { padding-block: 0 !important; }
   .property-terminal-view .tp-home-stack-filters { display: none !important; }
+  .property-terminal-view.tp-viewport { --stack-hdr-h: 26px; }   /* header 22.4 + --sp-1 */
   .retail-terminal-view .tp-home-hero .tp-amount,
   .trades-terminal-view .tp-home-hero .tp-amount { font-size: clamp(52px, 10svh, 64px) !important; }
   .retail-terminal-view .tp-home-hero > div { margin-top: var(--sp-2) !important; }
+
+  /* The FAB is centred ON the hero/stack seam, so its top half — half of
+     --fab-size, 35px — is always inside the hero, and both design references
+     put it in empty navy. Above 700px of height the hero has 13-134px of slack
+     there and nothing is needed. At 320x568 it does not: measured with the
+     40/60 split, retail's item line ran 18px and property's expenses label
+     11.4px UNDER the FAB. The top padding is the term to spend, not the type —
+     it is the largest single value in both heroes and the only one that costs
+     no legibility. */
+  .retail-terminal-view .tp-home-hero,
+  .trades-terminal-view .tp-home-hero { padding-top: clamp(34px, 7svh, 100px) !important; }
+
+  /* Property stacks FOUR things in the hero where retail and trades stack
+     three — outstanding rent over outstanding expenses, each with its own
+     label — so it is the one vertical whose hero content overruns its row at
+     the 320x568 floor. Measured 31.2px past the row with the 40/60 split
+     (47px before it), clipped silently by the row's overflow:hidden, which took
+     the whole expenses line with it. Retail's and trades' amount rule above
+     does not reach it: property authors the secondary figure at 42px through
+     the same .tp-amount class, so both need a size here, and the padding is the
+     largest single term. Only below 700px of height; at 360x640 the content
+     already fits with 2.8px to spare and nothing here applies. */
+  .property-terminal-view .tp-home-hero {
+    padding-top: clamp(24px, 4.5svh, 86px) !important;
+  }
+  .property-terminal-view .tp-feed-hero-inner > div:not(.tp-amount) {
+    margin-top: var(--sp-1) !important;
+  }
+  .property-terminal-view .tp-feed-hero-inner > .tp-amount:first-child {
+    font-size: clamp(46px, 9svh, 64px) !important;
+  }
+  .property-terminal-view .tp-feed-hero-inner > .tp-amount ~ .tp-amount {
+    font-size: clamp(26px, 5.4svh, 42px) !important;
+    margin-top: var(--sp-2) !important;
+  }
   .retail-terminal-view .tp-psubbar.home { transform: translate(-50%, 36px); }
   .property-terminal-view .tp-psubbar.home,
   .trades-terminal-view .tp-psubbar.home { transform: translateY(36px); }

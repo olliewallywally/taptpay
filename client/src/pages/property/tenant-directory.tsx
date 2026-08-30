@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { startPropertyNavigation, startPropertyBack, signalPropertyReady } from "@/lib/property-transition";
 import { propFetch } from "@/lib/property-api";
 import { usePropertyTenants, usePropertyInvoices } from "@/lib/property-data";
+import { AnimatedListRow } from "@/components/AnimatedScrollList";
 
 /* ── Design tokens ── */
 const C = {
@@ -125,7 +126,7 @@ function AddTenantSheet({ onClose, onSave, saving, saveError }: {
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', justifyContent: 'center' }}>
       {/* Sheet — slides up from bottom */}
       <div style={{
-        width: '100%', maxWidth: 430,
+        width: '100%', maxWidth: 'var(--phone-shell-max)',
         background: '#F4F4F4',
         borderRadius: '28px 28px 0 0',
         maxHeight: '92vh',
@@ -262,7 +263,7 @@ function TenantRow({ tenant, nextInvoice, onClick }: { tenant: any; nextInvoice:
   const overdue = nextInvoice?.status === 'overdue';
 
   return (
-    <button type="button" className="tdir-row" onClick={onClick}>
+    <AnimatedListRow type="button" className="tdir-row" onClick={onClick}>
       <span className="tdir-avatar">{initials(tenant)}</span>
       <span className="tdir-copy">
         <span className="tdir-name">{fullName}</span>
@@ -276,7 +277,7 @@ function TenantRow({ tenant, nextInvoice, onClick }: { tenant: any; nextInvoice:
           <small>no invoice</small>
         )}
       </span>
-    </button>
+    </AnimatedListRow>
   );
 }
 
@@ -360,7 +361,7 @@ export default function TenantDirectory() {
 
   return (
     <div style={{ background: C.white, minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
-    <div style={{ width: '100%', maxWidth: 430, minHeight: '100svh', background: C.sheet, paddingBottom: 128, fontFamily: "'Outfit', system-ui, sans-serif", overflow: 'hidden' }}>
+    <div style={{ width: '100%', maxWidth: 'var(--phone-shell-max)', minHeight: '100svh', background: C.sheet, paddingBottom: 128, fontFamily: "'Outfit', system-ui, sans-serif", overflow: 'hidden' }}>
       <style>{DIRECTORY_CSS}</style>
 
       {/* Hero — carries view-transition-name so it morphs into the profile hero */}
@@ -405,9 +406,12 @@ export default function TenantDirectory() {
               {search ? `no tenants match "${search}"` : 'no tenants yet - tap + to add your first'}
             </div>
           ) : (
-            filtered.map((t: any, i: number) => (
-              <div key={t.id} className="pt-bounce" style={{ '--pt-d': `${190 + Math.min(i, 12) * 45}ms` } as any}>
+            /* No .pt-bounce wrapper: the row owns its entrance now (it pops
+               in/out as it crosses the viewport — see AnimatedScrollList.tsx),
+               and a wrapper entrance on top would run two against each other. */
+            filtered.map((t: any) => (
               <TenantRow
+                key={t.id}
                 tenant={t}
                 nextInvoice={invoiceByTenant(t.id)}
                 onClick={() => {
@@ -425,7 +429,6 @@ export default function TenantDirectory() {
                   );
                 }}
               />
-              </div>
             ))
           )}
         </div>

@@ -352,6 +352,7 @@ async function measure(page, allowlist) {
       ".tp-viewport .tp-psubbar .tp-split-slot",
       ".tp-viewport .tp-psubbar .tp-send",
       ".tp-viewport .tp-subbar.tp-bar.compact .tp-bar-btn",
+      ".tp-viewport .tp-subbar.tp-bar.crowded .tp-bar-btn",
       ".tp-bar-label-track",
       ".tp-bar-label-track.show",
       ".tp-bar-label-track > .tp-subbar-label",

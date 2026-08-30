@@ -673,6 +673,15 @@
   animation-delay: calc(var(--dt-li, 0) * var(--m-stagger-list));
 }
 
+/* The animated scroll list's own gradient cues live in `index.css`, not here:
+   this file is code-split into the desktop chunk (imported by DesktopFrame /
+   ScaledCanvas), so rules placed here never load on a mobile route, and the
+   mobile property lists use the same component. Desktop only needs to set the
+   colour those cues fade from. */
+.tapt-desktop-canvas {
+  --list-fade-color: #000f3f;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tapt-desktop-viewport *,
   .tapt-desktop-viewport *::before,

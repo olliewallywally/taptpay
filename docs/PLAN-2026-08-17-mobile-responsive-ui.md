@@ -93,6 +93,31 @@ changes only the section named.
 >   untouched — the tablet/desktop app is a separate contract.
 > - **Golden set — capture the full set as specced** (§7.1's ~65 files / 8–10MB), DPR-2
 >   fidelity tier included. The fallback of dropping that tier is not taken.
+
+> **MD8 — the home screen's navy/off-white split is 45/55, all three verticals (Oliver,
+> 2026-08-30).** Navy is the hero row and nothing else. Held in its own token,
+> `--home-hero-pref: max(var(--hero-min), 45svh)`, *not* in `--hero-pref`: on a FEATURE screen
+> the hero is the off-white region and its 33.65svh is gated by `verify-terminal-dock.mjs`
+> §9.B1, so the two must not share a value.
+>
+> **45% is reached at 390×844, 412×915 and 430×932. It is not reachable on the three shortest
+> phones**, and §4.3's ordering rule — the stack floor is non-negotiable, the hero contracts
+> first — is what decides that, not an implementation limit. Measured:
+>
+> | | 320×568 | 360×640 | 375×667 | 390×844 | 412×915 | 430×932 |
+> |---|---|---|---|---|---|---|
+> | retail / trades | 36.6% | 40.8% | 41.8% | **45%** | **45%** | **45%** |
+> | property | 38.4% | 42.3% | 43.3% | 41.6% | **45%** | **45%** |
+>
+> At 320×568 a 45% hero leaves 242px where three rows plus the dock need 288 — 45.6px short.
+> Nothing in the adaptable list (§2.3) closes that: the gutter is already at its 70px floor
+> because the FAB is 70px, and rows are at their content height. **Reaching 45% there means
+> two stack rows instead of three, which is Oliver's call, not a developer's.** Property is
+> 41.6% at the 390 reference for a different reason — it is the one vertical with a filter row
+> as well as a header above its list, a 72px band against the shared 36px.
+>
+> Costs one visible stack row at 412 and 430 (4→3); the floor of 3 holds at every cell and the
+> baseline was re-recorded to match.
 >
 > Still open and NOT decided here: **MD4** (money grouping — the fitter is width-invariant, so
 > it stays a one-line `fmt()` change whenever it is answered) and **MD6's second half** (OS
@@ -1080,9 +1105,85 @@ read this column, then confirm by running the gates.
 | K | **done** 2026-08-27, green — see amendment §5.5 | Keyboard fix (A1 §4.1), viewport meta (§4.5), the two `!important` overrides (§4.4) | `verify:mobile-keyboard`, five clauses |
 | 6 | **done** `fe128fb` | Token layer, `svh`/`dvh`, four-sided safe areas, keyboard ownership (§6.1–6.2) | token computed-style assertions; §7.2 clauses 1–3 |
 | 7 | **done** `e1bbade` | `SegmentedBar` + grid indicator + observers (§6.3) | the six invariants |
-| 8 | **done** `a6dd00d` | Home-only grid + measured gutters (§6.4) | `visibleStackRows >= 3` on all six portrait sizes |
+| 8 | **done** `a6dd00d`; **amended 2026-08-30** — see below | Home-only grid + measured gutters (§6.4) | `visibleStackRows >= 3` on all six portrait sizes |
 | 9 | **done** `233058d` | Amount fitting (§6.5) | amount inside its parent at the MD4 maximum, all six sizes |
 | 10 | **OPEN** — diagnosis done 2026-08-29, `docs/REVIEW-2026-08-29-phase-10-non-terminal-routes.md` (RC-8..RC-11, 13-item punch list); no fix code yet | Extend to non-terminal merchant routes | goldens per route |
+
+**Phase 8 amendment, 2026-08-30 — three regressions the geometry gate could not see.**
+Reported by Oliver as "the terminal UI is completely fucked… a space down the bottom where
+the dock is and the whole layout pushed up and overlaying". All three were shipped in
+`a6dd00d` and all three passed `verify:mobile` green, which is §7's own point: geometry gates
+cannot prove design fidelity, and phase 3's goldens — the check that would have caught these
+— is still OPEN.
+
+1. **The dock clearance was `padding-bottom` on `.tp-screen.tp-home`**, exactly as §6.4
+   wrote it. That reserves the space correctly but also stops the stack region *painting*
+   into it: `.tp-screen` has no background, so the reserved band came out in the viewport's
+   navy as a dead strip between the bottom of the off-white and the bottom of the phone.
+   Pre-phase-8 the same clearance lived as padding *inside* the off-white block. Fixed by
+   moving it to `.tp-home-stack` as `--dock-clear`, with row 3's minimum growing by the same
+   token so §4.3's budget is unchanged, and the scrollport still ending above the dock so
+   `visibleStackRows` stays honest.
+2. **The chrome gutter (row 2) painted navy.** Both references put it on the off-white side:
+   the FAB straddles the colour change and the action bar sits below it. The band now carries
+   the stack's background, so the seam lands on the hero's bottom edge where the FAB is
+   already centred, instead of a gutter-height lower.
+3. **Hero content ran under the FAB at 320×568** — retail's item line by 18px, property's
+   expenses label by 11.4px, both silently clipped by row 1's `overflow: hidden`; property's
+   whole expenses line was invisible. The FAB's top half (35px) is always inside the hero, so
+   the short-screen block now spends top padding to buy it back. Positive clearance at every
+   cell on all three verticals.
+
+Two defects were introduced while fixing those and closed before landing, both invisible to
+the same gate:
+
+- `useMeasuredChromeGutter` writes `--chrome-gutter`, which *is* grid row 2, so it resized
+  the hero it observes. Harmless while row 3 had slack; once the 40/60 split put row 3 on its
+  minimum it became a ResizeObserver feedback loop, and the Replit runtime-error plugin
+  rendered the resulting error as a full-screen overlay that took every tap target with it
+  (`tapCentreMiss` 0 → 13). Fixed with the same rAF coalescing `use-keyboard-inset.ts` uses.
+- `--dock-h` is republished per frame during the dock morph *by design*. Feeding it into a
+  grid **track minimum** re-solved the whole home grid every frame: 34–36ms against §9.F
+  clause 7's 32ms budget, reproduced twice, green on a stashed tree. `TerminalDockView` now
+  also publishes `--dock-h-max` (the expanded footprint) and only the track minimum reads it;
+  padding consumers still track the live height.
+
+Four more defects were found and closed in the same pass, none of them measured by any gate:
+
+- **`--stack-min` under-counted its own terms.** `calc(17.25 * var(--u))` is exact at the 390
+  reference and optimistic below it — a row's content is text at fixed sizes, so it bottoms
+  out at 57.5–58.5px while the token still reported 56.9 — and `--stack-hdr-h` read 19.8px at
+  320 against a real 24px header plus a 12px margin. Three rows and a header therefore
+  under-counted by ~15px, invisible while row 3 had slack and a lost row the moment the split
+  put row 3 on its minimum. Both are now absolute floors under the scaling term (A1 §3.5).
+- **Property's stack has two chrome rows, not one** — a header *and* a status-filter row,
+  72px against the shared 36px. Its three-row floor came out as two at 390×844. Overridden on
+  `.property-terminal-view`, and back to ~26px below 700px of height where the filters are
+  `display: none`.
+- **The stack header sat flush against the floating action bar** — measured `barToHdr` 0.0px
+  at 390×844 and 430×932, against clear separation in both references. The gutter is measured
+  as the chrome's extent, so by construction it ends exactly at the bar's bottom edge. Now
+  reserved as `--stack-gap`, padding inside the off-white and added to row 3's minimum, zeroed
+  below 700px of height where the budget has no room for it.
+- **The gutter measurement itself could converge on a wrong answer.** It read
+  `chromeBottom - heroBottom`, but the chrome is positioned `top: var(--home-hero-h)` — a
+  value the hook published on an earlier frame — so it lagged the hero it was compared
+  against, and the gutter it produced resized that hero. Property at 390×844 settled first on
+  a 128px gutter and then on 70px against a 106px bar, which puts the action bar over the
+  stack header. Replaced with each overlay's own height plus its transform offset, which is
+  identical once settled (verified on all three verticals at 320, 390 and 430) and cannot
+  drift, because the hero is not in it.
+
+**The green glow at the top of every terminal screen is gone.** `.tp-top-banner` rests at
+`translateY(-100%)`, off the top of the viewport — but a transform does not move a box-shadow's
+paint, so its `0 8px 40px rgba(27,191,133,0.3)` kept washing the top ~45px of every terminal
+screen in all three verticals. Measured as the green channel running 47 at y=0 against the
+navy's own 13; now a clean 4,13,109 from y=0. The glow moved to `.tp-top-banner.show` and is
+transitioned with the slide, so the shown banner still has it.
+
+Gates after the amendment: `verify:mobile`, `verify:mobile-keyboard`, `verify:terminal-dock`
+all green, 483 client tests pass, `tsc` clean. **Still open:** the split on the three shortest
+phones (MD8's table above) — a decision, not a defect.
 
 Companion (`docs/PLAN-2026-08-17-terminal-panels-and-dock.md` §8): **A–F all done**;
 `verify:terminal-dock` passes.

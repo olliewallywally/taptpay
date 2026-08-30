@@ -31,20 +31,80 @@ export function useMeasuredChromeGutter(
       return;
     }
 
+    /* Both writes resize what is being observed: --chrome-gutter IS grid row 2,
+       so changing it re-solves rows 1 and 3, and row 1 is the hero this hook
+       observes. While row 3 had slack the hero absorbed nothing and the loop
+       never showed; once the 40/60 split put row 3 on its minimum, every gutter
+       write moved the hero and Chromium started reporting "ResizeObserver loop
+       completed with undelivered notifications" on the three smallest cells —
+       which the Replit runtime-error plugin renders as a full-screen overlay,
+       taking every tap target on the page with it.
+
+       Same coalescing as use-keyboard-inset.ts: one write per frame, out of the
+       observation cycle, and no write at all when the value has not moved, so
+       the loop settles instead of ping-ponging. Sub-pixel changes are skipped —
+       the tokens they feed are compared at 0.5px by the gates. */
+    /* How far one overlay reaches PAST the seam, measured without reading the
+       hero. Each overlay is positioned `top: var(--home-hero-h)`, so its
+       untransformed top edge is the hero's bottom edge and its reach is its own
+       height plus whatever its transform pushes it down by.
+
+       The obvious formula — `chromeBottom - heroBottom` — looks equivalent and
+       is not: the chrome's `top` resolves against the --home-hero-h this hook
+       published on an EARLIER frame, so it lags the hero it is being compared
+       against, and the gutter it produces changes the grid, which changes the
+       hero again. Coalescing the writes stopped that reporting an error but not
+       converging on the wrong answer: property at 390x844 settled on a 128px
+       gutter against a 106px bar, then on 70px — 36px too short, which puts the
+       action bar over the stack header. Both terms agree exactly once settled
+       (verified on all three verticals at 320, 390 and 430); only this one
+       cannot drift, because the hero is not in it. */
+    const reachPastSeam = (element: HTMLElement): number => {
+      const { height } = element.getBoundingClientRect();
+      const transform = getComputedStyle(element).transform;
+      if (!transform || transform === "none") return height;
+      let translateY = 0;
+      try {
+        translateY = new DOMMatrixReadOnly(transform).f;
+      } catch {
+        return height;
+      }
+      return height + Math.max(0, translateY);
+    };
+
+    let lastGutter = "";
+    let lastHeroH = "";
+    let frame = 0;
+    let pending = false;
     const publish = () => {
+      pending = false;
       const heroRect = hero.getBoundingClientRect();
-      const height = Math.max(
-        0,
-        ...chrome.map(element => element.getBoundingClientRect().bottom - heroRect.bottom),
-        ...chrome.map(element => element.getBoundingClientRect().height),
-      );
-      if (height > 0) homeScreen.style.setProperty("--chrome-gutter", `${height}px`);
+      const height = Math.max(0, ...chrome.map(reachPastSeam));
+      if (height > 0) {
+        const next = `${Math.round(height * 100) / 100}px`;
+        if (next !== lastGutter) {
+          lastGutter = next;
+          homeScreen.style.setProperty("--chrome-gutter", next);
+        }
+      }
       const heroHeight = heroRect.height;
-      if (heroHeight > 0) viewport.style.setProperty("--home-hero-h", `${heroHeight}px`);
+      if (heroHeight > 0) {
+        const next = `${Math.round(heroHeight * 100) / 100}px`;
+        if (next !== lastHeroH) {
+          lastHeroH = next;
+          viewport.style.setProperty("--home-hero-h", next);
+        }
+      }
+    };
+
+    const schedule = () => {
+      if (pending) return;
+      pending = true;
+      frame = requestAnimationFrame(publish);
     };
 
     publish();
-    const observer = new ResizeObserver(publish);
+    const observer = new ResizeObserver(schedule);
     chrome.forEach(element => observer.observe(element));
     observer.observe(hero);
 
@@ -57,13 +117,14 @@ export function useMeasuredChromeGutter(
        past the viewport bottom, where the screen's overflow:hidden amputated it
        and left the stack's expand control unreachable under the dock (§4.2
        clause 2). Re-measuring when the movement ends is what was missing. */
-    const settle = () => publish();
+    const settle = () => schedule();
     for (const element of [...chrome, hero]) {
       element.addEventListener("transitionend", settle);
       element.addEventListener("animationend", settle);
     }
 
     return () => {
+      if (frame) cancelAnimationFrame(frame);
       observer.disconnect();
       for (const element of [...chrome, hero]) {
         element.removeEventListener("transitionend", settle);

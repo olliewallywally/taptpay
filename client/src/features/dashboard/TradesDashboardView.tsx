@@ -261,7 +261,7 @@ export function TradesDashboardView({
 
   return (
     <div data-demo-id="trades-dashboard" style={{ background: '#FFFFFF', minHeight: '100svh', display: 'flex', justifyContent: 'center' }}>
-      <div ref={colRef} style={{ width: '100%', maxWidth: 430, minHeight: '100svh', background: SHEET, paddingBottom: 130, fontFamily: "'Outfit', system-ui, sans-serif" }}>
+      <div ref={colRef} style={{ width: '100%', maxWidth: 'var(--phone-shell-max)', minHeight: '100svh', background: SHEET, paddingBottom: 130, fontFamily: "'Outfit', system-ui, sans-serif" }}>
         <style>{TD_CSS}</style>
 
         {/* ── Ink hero ── */}

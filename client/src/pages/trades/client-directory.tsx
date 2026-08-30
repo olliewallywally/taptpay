@@ -150,7 +150,7 @@ function AddClientSheet({ onClose, onSave, saving, saveError }: {
       />
 
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, display: "flex", justifyContent: "center" }}>
-        <div style={{ width: "100%", maxWidth: 430, background: C.sheet, borderRadius: "28px 28px 0 0", maxHeight: "92vh", overflowY: "auto", animation: closing ? animOut : animIn }}>
+        <div style={{ width: "100%", maxWidth: "var(--phone-shell-max)", background: C.sheet, borderRadius: "28px 28px 0 0", maxHeight: "92vh", overflowY: "auto", animation: closing ? animOut : animIn }}>
           <div style={{ display: "flex", justifyContent: "center", padding: "14px 0 2px" }}>
             <div style={{ width: 36, height: 4, borderRadius: 2, background: "rgba(0,0,0,0.1)" }} />
           </div>
@@ -356,7 +356,7 @@ export default function ClientDirectory() {
 
   return (
     <div style={{ background: C.white, minHeight: "100svh", display: "flex", justifyContent: "center" }}>
-    <div style={{ width: "100%", maxWidth: 430, minHeight: "100svh", background: C.sheet, paddingBottom: 128, fontFamily: "'Outfit', system-ui, sans-serif", overflow: "hidden" }}>
+    <div style={{ width: "100%", maxWidth: "var(--phone-shell-max)", minHeight: "100svh", background: C.sheet, paddingBottom: 128, fontFamily: "'Outfit', system-ui, sans-serif", overflow: "hidden" }}>
       <style>{DIRECTORY_CSS}</style>
 
       {/* Hero — big count over ink, same metrics as the tenant directory hero */}

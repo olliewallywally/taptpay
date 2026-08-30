@@ -200,9 +200,27 @@ export function TerminalDockView({ mode, activeId, onPick, placement = "fixed", 
     if (!nav || typeof document === "undefined") return;
     const root = document.documentElement;
 
+    /* Two tokens, because they answer two different questions.
+
+       --dock-h is the dock's height RIGHT NOW. Padding consumers want that:
+       they track the collapse so the screen reclaims the space as it shrinks.
+
+       --dock-h-max is the expanded footprint, and it is what a grid TRACK
+       MINIMUM has to use. The morph republishes per frame by design, and a
+       track minimum that moves per frame re-solves the whole home grid every
+       frame — including row 1, whose resize then re-triggers the chrome-gutter
+       observer. Measured at 34-36ms per frame against §9.F clause 7's 32ms
+       budget. The maximum is also the safe direction for a floor: the three-row
+       guarantee has to hold against an EXPANDED dock, which is the state the
+       dock returns to as soon as it is touched. */
+    let maxHeight = 0;
     const publish = () => {
       const { height } = nav.getBoundingClientRect();
       root.style.setProperty("--dock-h", `${Math.round(height * 100) / 100}px`);
+      if (height > maxHeight) {
+        maxHeight = height;
+        root.style.setProperty("--dock-h-max", `${Math.round(height * 100) / 100}px`);
+      }
     };
     publish();
 
@@ -217,6 +235,7 @@ export function TerminalDockView({ mode, activeId, onPick, placement = "fixed", 
       /* Cleared, not left stale: a screen rendered with no dock must not go on
          reserving space for one. */
       root.style.removeProperty("--dock-h");
+      root.style.removeProperty("--dock-h-max");
     };
   }, [placement]);
 
