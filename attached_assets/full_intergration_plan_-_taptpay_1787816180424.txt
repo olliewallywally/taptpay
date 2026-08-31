@@ -1,5 +1,5 @@
 ﻿Single source of truth · supersedes all earlier plans
-TaptPay implementation plan · corrected senior review revision 2026-08-29
+TaptPay implementation plan · owner-decisions revision 2026-08-31
 Security remediation, App Store submission and Xero integration in one ordered sequence. The review snapshot is feat/tablet-desktop-app @ c758786, but that SHA is evidence only: the execution SHA is deliberately unresolved until R0-T0 records the repo owner's approved base. Counts below describe the review snapshot and must be regenerated on the approved execution base. Written to be executed by someone who cannot infer this codebase's unwritten conventions.
 Artifact status: this text file is the authoritative execution document. The matching sibling PDF and .agents/outputs/rxa-plan-preview/ are generated convenience renderings of this corrected revision; the earlier 1787816108070 PDF is retained only as superseded source input. If a rendering disagrees with this text, this text controls.
 Review snapshot c758786 · Execution base required · At least 220 route registrations · Potential credential exposure — incident triage required
@@ -52,6 +52,19 @@ Review finding
 	Desktop acceptance table confused logical canvas with rendered frame size
 	At 1440×900, verify the centred ~1000×746 rendered frame containing the scaled 1180×880 logical canvas
 	R1-T10
+2026-08-31 owner decision lock — authoritative over earlier proposed or unresolved product wording
+The product owner selected the following directions. Implementation tasks must implement these choices and must not re-open them as product questions. Legal, accounting, provider, security and exact-SHA evidence gates still apply where named; a product choice does not replace external approval or technical proof.
+   * Execution base policy: use the newest complete repository version. R0-T0 must convert that policy into one exact owner-approved 40-character SHA after preserving and reviewing the current dirty worktree and included/excluded branch tips. The current checkout is not approval by itself.
+   * Security: rotate every exposed or derived secret, investigate access, review history after rotation, and classify uploads/backups before retention or removal. R0-H1…H5 remain mandatory.
+   * Device gate: a fine-pointer 1440×650 viewport is desktop/tablet UI, never the phone UI.
+   * Native subscription: companion v1. Existing entitled users may sign in; native iOS contains no purchase, upgrade, plan-change, payment-method or external billing CTA/link.
+   * Wallet scope: Apple Pay may appear only on supported iPhones/iPads after its real provider-authoritative implementation and device UAT pass. Google Pay may appear only on supported non-Apple devices/browsers after its equivalent real flow and UAT pass. Unsupported devices show neither. This does not authorise NFC/Tap to Pay.
+   * App Review: use a genuine isolated Windcave test account/environment with synthetic data and test money through normal application flows; never fake success or seed production directly.
+   * Deletion/retention direction: a member may delete their login without deleting required business records; an owner must transfer ownership or close the business; statutory records follow the NZ professional-approved period (expected seven years), legal hold and backup-expiry matrix.
+   * Xero v1: Trades only. TaptPay is the invoice system of record and sends the full accounts-receivable lifecycle to Xero: contacts, authorised invoices before payment, partial/full confirmed payments, credit notes/refunds and corrections. Property and Retail remain out of v1.
+   * Xero accounting pattern: immutable line/GST snapshots; merchant-selected validated sales/GST/clearing/fee/refund accounts; Windcave captures paid into a clearing account; processor fees recorded separately; net deposits reconciled against clearing; manual reconciliation when reliable settlement evidence is unavailable; final mappings require a NZ accountant and representative Windcave evidence.
+   * Xero merchant price: the Xero integration is free to TaptPay merchants and uses standard OAuth, not Custom Connections. TaptPay does not add a merchant integration charge. Xero's own OAuth overview, current pricing and API-limit pages conflict on the uncertified/free connection threshold; X-H1 must obtain a dated written answer and certification/approval path before the live cap is approached. No hard-coded 5- or 25-connection promise appears in code or product copy until then.
+   * Pilot: one consenting Trades merchant first, cents-level reconciliation and review, then gradual expansion.
 Contents
 * P0How to use this document
 * P1The map and sequence
@@ -639,9 +652,9 @@ R1-H1You
 Accept the device baseline commit before R1 client changes
 Depends on: R0 complete · Blocks: T4, T8 and T10
 "Mobile unchanged" is meaningless without a reference. Before the first R1 change to auth, routing or merchant UI, accept an exact post-R0 commit as the visual baseline. From that point "unchanged" means unchanged from it, while intentional R1 differences such as Sign in with Apple are reviewed explicitly rather than absorbed into a later baseline.
-Also decide D10: is a fine-pointer 1440×650 viewport a phone or a desktop? The current shortest-side algorithm classifies it as mobile. Do not let anyone silently change device gating without this decision.
+Implement locked D10: a fine-pointer 1440×650 viewport is desktop/tablet UI. The current shortest-side algorithm classifies it as mobile, so preserve a failing regression first and then correct the gate without changing genuine phone behaviour.
 Check
-Baseline commit SHA and the pre-change phone/tablet/desktop/auth captures are recorded. D10 is decided and written as an ADR before T4 or T8 starts.
+Baseline commit SHA and the pre-change phone/tablet/desktop/auth captures are recorded. D10's locked desktop classification is written as an ADR before T4 or T8 starts.
 R1.B
 Auth and input correctness
 R1-T4AgentHighest security value
@@ -954,19 +967,16 @@ Item
 	Submission
 	Blocked until signed R8 release candidate and all Apple checks
 	A-H4
-Guideline 3.1.3(e) applies to a customer buying physical goods or real-world services from a merchant; it does not automatically exempt TaptPay's own digital subscription that unlocks app functionality. Guideline 3.1.3(f)'s companion-app model is viable only when the native app contains no purchase flow or call to action to buy/change a plan elsewhere. Until A-H1 chooses and legal approves a model, the fail-closed native behaviour is the free companion model: existing entitled users can sign in, but native UI contains no upgrade, purchase, change-plan, payment-method or external billing link.
+Guideline 3.1.3(e) applies to a customer buying physical goods or real-world services from a merchant; it does not automatically exempt TaptPay's own digital subscription that unlocks app functionality. The owner selected Guideline 3.1.3(f)'s companion-app model: existing entitled users can sign in, but native UI contains no upgrade, purchase, change-plan, payment-method or external billing link. A-H1 now records the legal/accounting approval and exact permitted copy rather than choosing between models.
 Submission waits for R8, not R3. R3 fixes payment truth; R7 removes the production live-reload WebView boundary; R8 proves the signed build, metadata and release process. No schedule assumes a 24–48 hour review.
 A.1
 Human decisions — start immediately
 A-H1YouBlocking
-Choose the native subscription model
+Formalise the locked companion-v1 subscription model
 Depends on: nothing · Blocks A-T7 and submission
-Choose and record one model with product/legal/accounting approval:
-   1. Companion v1 — no StoreKit and no native CTA/link/deep link for purchasing, upgrading, changing plan or payment method. Existing web-purchased subscribers receive companion access; native entitlement errors explain access state without directing purchase.
-   2. StoreKit — a separately sized workstream covering products/offers, purchase and restore, App Store Server API/notifications, server-side transaction verification, entitlement convergence with web billing, refunds/revocations, family/sharing policy, price/region changes, sandbox and production reconciliation. It is not a Settings-link tweak.
-Do not cite physical-payment exemption as the answer to TaptPay subscription billing. Record storefront/legal analysis and the exact native copy/screens permitted.
+The product decision is locked to Companion v1: no StoreKit and no native CTA/link/deep link for purchasing, upgrading, changing plan or payment method. Existing web-purchased subscribers receive companion access; native entitlement errors explain access state without directing purchase. Product/legal/accounting owners record the storefront analysis and exact permitted native copy/screens. Any future StoreKit proposal is a separately approved and sized workstream, not part of this integration plan.
 Check
-ADR names the model, owner, permitted/forbidden UI and entitlement source of truth. If undecided, companion fail-closed behaviour remains mandatory and submission stays blocked.
+ADR records the locked companion model, owners, permitted/forbidden UI and entitlement source of truth. Submission stays blocked until the required legal/accounting approval and archive evidence pass.
 A-H2YouBlocking
 Confirm legal entity, capabilities, wallet scope and truthful reviewer environment
 Depends on: nothing
@@ -1046,14 +1056,14 @@ Xero — accounting integration
 Seventeen tasks: fourteen agent tasks and three human gates. Vendor/accounting discovery starts immediately. The provider-neutral accounting source in X-T1 may begin after R4 and X-H2; connection/token work waits for R5 encryption, remote worker work waits for the relevant R6 distributed-worker primitives, and an opt-in merchant pilot waits for R8.
 X.0
 Current commercial and capacity baseline — verify again before purchase or launch
-Xero's official pricing and API-limit pages, effective from 2 March 2026 and checked on 29 August 2026, supersede the older 25-free-connection OAuth wording. The Starter tier is currently capped at 5 connections and 1,000 calls per connected organisation per day; Core and higher tiers increase connections and generally allow 5,000 calls/day. Per-organisation burst/concurrency and app-wide limits also apply. Pricing, currency, egress allowances, App Certification, Security Assessment and limits are vendor-controlled facts: X-H1 records the selected tier and current official URLs/dated response, while code consumes configured budgets and response headers rather than embedding marketing numbers. A Web app Code flow remains the appropriate multi-merchant model; Custom Connections are not the v1 design.
-No connection-capacity promise appears in product copy until the paid tier, certification path and operational budget are approved. At 5 connections, Demo Company, staging and internal test organisations consume scarce capacity; reserve and record them.
+Xero's official documentation is internally inconsistent as checked on 31 August 2026. The OAuth overview describes standard Code/PKCE flows as free with 25 connections and unlimited after certification, while the newer pricing and API-limit pages describe a no-charge Starter tier capped at 5 connections and paid higher tiers. Do not silently declare either threshold controlling for TaptPay. X-H1 obtains a dated written Xero answer covering TaptPay's app registration, migration/legacy status, free threshold, certification path, API/egress limits and any developer-platform charge. Code consumes configured budgets and response headers rather than embedding marketing numbers. TaptPay's product decision remains that merchants are not charged for the integration. A Web app Code flow remains the multi-merchant model; Custom Connections are excluded.
+No connection-capacity or Xero-cost promise appears in product copy beyond “included at no extra charge to the TaptPay merchant” until X-H1's written answer is recorded. Demo Company, staging and internal test organisations consume connection capacity under whichever answer applies; reserve and record them.
 Decision
 	Safe v1 position
 	Gate / rationale
 	When to push an invoice
-	Proposed: Trades paid-sales export after confirmed payment
-	Not locked until X-H2. It creates an AUTHORISED invoice plus its real confirmed payment(s) and does not provide Xero receivables/aging before payment. UI/docs must call it paid-sales export. If merchants need debtor tracking, invoice-on-send is a separately designed state-sync phase
+	Locked: TaptPay-owned Trades accounts-receivable sync
+	Create/update the AUTHORISED Xero invoice from TaptPay's immutable invoice before payment, then apply each real confirmed partial/full payment and approved credit/refund operation. TaptPay is the invoice system of record; v1 is not bidirectional editing and Xero changes do not silently overwrite TaptPay
 	Which vertical first
 	Trades
 	Only after immutable line/tax/payment snapshots exist. Property and Retail are explicitly separate later gates, not reuse-by-default
@@ -1089,7 +1099,7 @@ X-H2YouAccounting blocker
 Approve accounting, GST, payment-provenance and settlement semantics
 Depends on: R3/R4 design available for final approval; discovery starts now · Blocks X-T1
 With a NZ accountant and the Windcave/settlement owner, approve:
-   * whether v1 is paid-sales export or true accounts-receivable sync; document date, due date, revenue recognition and edit/void/correction semantics;
+   * implement the locked TaptPay-owned true accounts-receivable sync; approve document date, due date, revenue recognition and edit/void/correction semantics, including how a Xero-side edit is detected and surfaced without overwriting TaptPay;
    * immutable line-level description, quantity, unit amount, discount, GST treatment/rate/amount and invoice totals; inclusive/exclusive/zero/exempt mappings and rounding;
    * Trades scope first. Long-term residential rent is generally GST-exempt, while property charges/commercial supplies can differ, so Property remains out until each invoice kind/line has an approved tax classification and immutable snapshot. Retail remains separate;
    * which confirmed local capture/share/payment event becomes each Xero payment; cash, bank transfer, externally marked paid and TaptPay/Windcave payments use distinct provenance/account mappings;
@@ -1174,7 +1184,7 @@ Missing/shared/changed email, private relay, same name, reconnect and concurrent
 X-T11Agent
 Trades invoice export from immutable snapshots
 Depends on: X-T10
-For X-H2's approved paid-sales model, enqueue the frozen accounting document only after the required confirmed-payment state. Use a deterministic unique InvoiceNumber/reference and one persisted local operation identity; provider Idempotency-Keys follow X-T7's persisted epoch rules. Build Xero lines solely from immutable line cents/tax classifications; convert cents to decimal strings without binary floating point, set approved LineAmountTypes/TaxTypes and preserve source dates. Never recompute from current merchant tradeGstMode or mutable quote/client data. On response, verify Xero tenant/type/contact/currency/subtotal/tax/total and line semantics exactly before linking success. Xero errors never alter the provider payment, local invoice or receipt/email state.
+For the locked TaptPay-owned accounts-receivable model, enqueue the frozen invoice when TaptPay authorises/issues it, before payment, and enqueue later payment/refund/correction operations separately from their immutable local events. Use a deterministic unique InvoiceNumber/reference and one persisted local operation identity; provider Idempotency-Keys follow X-T7's persisted epoch rules. Build Xero lines solely from immutable line cents/tax classifications; convert cents to decimal strings without binary floating point, set approved LineAmountTypes/TaxTypes and preserve source dates. Never recompute from current merchant tradeGstMode or mutable quote/client data. On response, verify Xero tenant/type/contact/currency/subtotal/tax/total and line semantics exactly before linking success. Xero errors never alter the provider payment, local invoice or receipt/email state.
 Check
 Inclusive, exclusive, zero/exempt, discount, multi-line, one-cent rounding, changed-merchant-settings and closed-period fixtures match the local snapshot and Demo Company to the cent. Replays, timeout-after-create and retries beyond six minutes still yield one invoice. A mismatched returned total dead-letters with no payment allocation.
 X-T12Agent
@@ -1274,7 +1284,7 @@ Risk
 	Native
 	Release archive has bundled shell, exact API/navigation policy, signed entitlement/privacy reports and real supported-device UAT; otherwise the feature stays off
 	Apple commerce/review
-	Approved companion or StoreKit ADR, no forbidden billing CTA, truthful reviewer path, deletion workflow and metadata-to-binary check
+	Approved locked companion-v1 ADR, no forbidden billing CTA, truthful reviewer path, deletion workflow and metadata-to-binary check
 	Xero durability
 	Transactional outbox, stable local operation identity, persisted provider-key epochs with no expired-key reuse, ambiguous-response adoption, two-instance leases/token refresh/rate limits and reconnect-generation tests
 	Accounting correctness
@@ -1664,7 +1674,7 @@ Product, native and compliance
    * Every visible merchant control is backed by a real enabled API or truthfully disabled; no mock business data.
    * Tap to Pay remains off, or real SDK, entitlement, build and device-UAT evidence is approved.
    * iOS Release archive launches bundled assets with no server.url/broad navigation, contains only supported entitlements, has an evidence-matched privacy manifest/label and passes offline/deep-link/device tests.
-   * Native subscription UI implements the approved companion or StoreKit ADR; the companion build contains no external purchase/change-plan/payment-method CTA.
+   * Native subscription UI implements the locked companion-v1 ADR and contains no external purchase/change-plan/payment-method CTA.
    * Owner account deletion passes recent-reauth, immediate quiescing, external revocation, statutory retention/legal-hold, retry and audit tests.
    * Security, deployment, product, iOS, wallet and WooCommerce documentation matches reality.
    * PCI, AML/KYB, sanctions, chargeback, privacy and retention, merchant-of-record and settlement reviews completed by qualified owners.
@@ -1699,8 +1709,8 @@ ID
 	Locked
 	Synthetic beta merchants on Windcave UAT first
 	D7
-	Required · first gate
-	Repo owner names the exact current execution SHA and included/excluded branch tips at R0-T0. c758786 is the review snapshot only; 9a51bd8 is rejected as an automatic base because material mobile commits follow it
+	Required · first gate · direction locked
+	Use the newest complete version. R0-T0 must preserve/review the dirty worktree and convert that direction into one exact owner-approved 40-character SHA plus included/excluded branch tips. c758786 is evidence only; the current checkout is not automatic approval
 	D8
 	Provisional
 	Encrypt and retain four legacy bank fields; no new collection; legal owns retention
@@ -1708,8 +1718,8 @@ ID
 	Required
 	Entitlement semantics for migration-granted merchants — needed before R6
 	D10
-	Required
-	Is a fine-pointer 1440×650 viewport a phone or a desktop? Needed at R1-H1
+	Locked · owner 2026-08-31
+	A fine-pointer 1440×650 viewport uses the desktop/tablet UI, never the phone UI
 	D11
 	Locked
 	Only owners and authorised admins initiate refunds
@@ -1726,20 +1736,20 @@ ID
 	Locked
 	One crypto utility — R5's key-ID envelope serves bank fields and Xero tokens
 	D16
-	Required · proposed default
-	Xero v1 is labelled Trades paid-sales export after confirmed payment unless X-H2 approves true receivables sync; immutable snapshot/payment semantics required either way
+	Locked · owner 2026-08-31 · accountant gate remains
+	Xero v1 is Trades-only TaptPay-owned accounts-receivable sync: issue the immutable invoice to Xero before payment, then sync confirmed partial/full payments, credit notes/refunds and corrections. No bidirectional editing in v1
 	D17
-	Required
-	Selected Xero tier, the current five-connection Starter constraint, API/egress budgets and certification requirements confirmed and dated with Xero support (X-H1); recheck before launch
+	Required vendor confirmation · product price locked
+	Free to TaptPay merchants using standard OAuth; no Custom Connections and no merchant integration surcharge. X-H1 obtains Xero's written ruling on the conflicting 25-free OAuth versus 5-connection Starter documentation, certification/approval, API/egress budgets and any developer-platform cost; recheck before launch
 	D18
-	Required
-	App Review merchant created/reset through normal signup/admin operations, never DB/startup seeding; provider/Apple-approved truthful payment test path required (A-H2)
+	Locked direction · provider/Apple evidence remains
+	App Review merchant created/reset through normal signup/admin operations and uses a genuine isolated Windcave test account/environment with synthetic data/test money; never DB/startup seeding or fake success (A-H2)
 	D19
-	Required
-	Account-deletion, legal-hold and backup-expiry matrix — what is erased/pseudonymised/retained, why and for how long (A-H3)
+	Locked direction · professional approval remains
+	Members may delete their login without deleting required business records; owners transfer ownership or close the business; statutory financial records follow the NZ professional-approved period expected to be seven years. A-H3 completes the legal-hold, pseudonymisation and backup-expiry matrix
 	D20
-	Required
-	Native subscription model: companion with no purchase CTA, or separately scoped StoreKit implementation (A-H1). Physical customer payments do not decide TaptPay SaaS billing
+	Locked · owner 2026-08-31
+	Native subscription model is companion v1 with no native purchase, upgrade, plan-change, payment-method or external billing CTA/link. StoreKit is outside this plan
 	D21
 	Locked
 	Production iOS ships bundled assets with an exact API/deep-link boundary; no Release server.url, broad allowNavigation or Replit wildcard
@@ -1747,14 +1757,14 @@ ID
 	Locked
 	Xero uses connection-generation-scoped typed link tables with concrete FKs, transactional outbox, stable operation keys, leased workers and ambiguous-response recovery; never direct IDs, unchecked polymorphic links or a process-local sync log
 	D23
-	Required
+	Locked · owner 2026-08-31
 	Property and Retail Xero integrations remain out of v1 until their own immutable source/refund models and accountant-approved tax mappings pass review
 	D24
-	Required
-	Clearing, processor fees, net settlement and bank-feed workflow approved from representative Windcave evidence before claiming Xero reconciliation (X-H2)
+	Locked pattern · accountant/provider evidence remains
+	Windcave payments use a clearing account; fees are separate expenses; net deposits reconcile against clearing; refunds use credit notes and refund payments; merchant mappings are validated; fall back to a documented manual workflow when reliable settlement evidence is unavailable (X-H2)
 	D25
-	Locked
-	Apple Pay, Google Pay, NFC and Tap controls/metadata stay absent until each has a real durable provider-authoritative implementation, entitlement where applicable and physical-device UAT
+	Locked · owner 2026-08-31
+	Apple Pay targets supported iPhones/iPads; Google Pay targets supported non-Apple devices/browsers. Each remains absent where unsupported and until its real durable provider-authoritative flow and device/browser UAT pass. NFC/Tap to Pay remains off under D13
 	P10
 Verification record
 What was checked and how, so confidence is visible rather than implied.
@@ -1786,11 +1796,11 @@ Claim
 	Confirmed
 	jest projects config; 23 existing tests in server/__tests__/
 	Xero: 25 free Code-flow connections
-	Obsolete / rejected
-	Current official pricing and limits supersede the older OAuth overview wording
+	Official-document conflict · vendor answer required
+	OAuth overview says free/25 and unlimited after certification; current pricing/limits pages say no-charge Starter/5 and paid higher tiers. X-H1 obtains TaptPay-specific written confirmation
 	Xero: Starter five connections and 1,000 calls/day; higher tiers differ
-	Confirmed as of 2026-08-29; recheck required
-	Official Xero pricing, pricing FAQ and API limits pages effective from 2026-03-02; X-H1 records selected tier/support answer
+	Published on pricing/limits pages but not assumed controlling
+	Official Xero pages checked 2026-08-31 conflict; X-H1 records TaptPay's app-registration-specific support answer before the cap is approached
 	Xero: App Certification and Security Assessment are the same prerequisite
 	Rejected
 	Official pricing distinguishes them: Plus lists App Certification; Advanced/Enterprise list App Certification plus an initial and annual Security Assessment. Separate security standards and premium APIs can trigger assessment/use-case gates by connection count, API or risk. X-H1 obtains written confirmation for the selected tier and use case

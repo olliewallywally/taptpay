@@ -476,7 +476,7 @@ def add_page_chrome(document: pymupdf.Document) -> None:
     navy = (0.027, 0.071, 0.196)
     muted = (0.35, 0.42, 0.55)
     line = (0.70, 0.79, 0.91)
-    header = "TAPTPAY  /  FULL IMPLEMENTATION PLAN  /  CORRECTED 2026-08-29"
+    header = "TAPTPAY  /  FULL IMPLEMENTATION PLAN  /  OWNER DECISIONS 2026-08-31"
     source = "Authoritative source: full_intergration_plan_-_taptpay_1787816180424.txt"
     for index, page in enumerate(document):
         width = page.rect.width
@@ -566,14 +566,14 @@ def build_pdf(source_text: str) -> tuple[int, int]:
         add_page_chrome(document)
         document.set_metadata(
             {
-                "title": "TaptPay implementation plan — corrected senior review revision",
+                "title": "TaptPay implementation plan — owner-decisions revision",
                 "author": "TaptPay",
                 "subject": "Security remediation, App Store submission and Xero integration",
                 "keywords": "TaptPay, remediation, App Store, Xero, implementation plan",
                 "creator": "Chromium and PyMuPDF via .agents/scripts/render_rxa_plan.py",
                 "producer": "PyMuPDF",
-                "creationDate": "D:20260829000000Z",
-                "modDate": "D:20260829000000Z",
+                "creationDate": "D:20260831000000Z",
+                "modDate": "D:20260831000000Z",
             }
         )
         document.embfile_add(
@@ -657,7 +657,7 @@ def verify_artifacts(source_text: str, expected_pages: int) -> None:
             raise RuntimeError("embedded authoritative source does not match the text file")
         all_text = "\n".join(page.get_text("text") for page in document)
         required = (
-            "corrected senior review revision",
+            "owner-decisions revision",
             "R0 — Emergency containment",
             "Apple — App Store readiness",
             "Xero — accounting integration",
@@ -675,7 +675,7 @@ def verify_artifacts(source_text: str, expected_pages: int) -> None:
                 f"hyperlinks unexpectedly confined to pages: {linked_pages}"
             )
         chrome_text = {
-            "TAPTPAY  /  FULL IMPLEMENTATION PLAN  /  CORRECTED 2026-08-29",
+            "TAPTPAY  /  FULL IMPLEMENTATION PLAN  /  OWNER DECISIONS 2026-08-31",
             "Authoritative source: full_intergration_plan_-_taptpay_1787816180424.txt",
         }
         out_of_bounds: list[str] = []
