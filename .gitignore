@@ -9,3 +9,7 @@ db-backups/
 # @playwright/test run artefacts (tests/golden/** is the committed baseline)
 test-results
 playwright-report
+
+# local Claude Code state — credentials, session transcripts, local permission overrides
+.claude-home/
+.claude/settings.local.json
