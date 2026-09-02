@@ -2,6 +2,7 @@ import { users, type User, type UserStatus, merchants, merchantTutorialProgress,
 import { DEFAULT_PLAN_ID, isUpgrade, planFor, planForOrDefault, type PlanId } from "@shared/plans";
 import { decideBilling, failedPaymentUpdates, immediatePlanUpdates, MAX_PAYMENT_ATTEMPTS, nextBillingPeriodStart, nextPeriodUpdates, proratedUpgradeCents, queuedPlanUpdates, renewalPlan } from "./subscription-billing";
 import { getDb, isDatabaseConnected } from "./database";
+import { config } from "./config";
 import { eq, ne, desc, asc, and, inArray, notInArray, gte, lte, lt, or, ilike, sql, isNull, isNotNull } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import type {
@@ -7704,7 +7705,7 @@ export class DatabaseStorage implements IStorage {
 // or the Neon client could not be initialised, fail fast so the deployment logs
 // surface a clear error instead of silently running on in-memory storage where
 // every restart would permanently lose all merchant and transaction data.
-const _isProduction = process.env.NODE_ENV === 'production';
+const _isProduction = config.isProduction;
 if (_isProduction && !isDatabaseConnected()) {
   console.error('');
   console.error('╔══════════════════════════════════════════════════════════╗');
@@ -7729,7 +7730,7 @@ export const storage: IStorage & { clearAllMerchants?: () => void } = isDatabase
 // Log the active storage backend so every deployment log makes it obvious
 // which backend is in use and confirms data will (or will not) persist.
 if (isDatabaseConnected()) {
-  const rawUrl = process.env.DATABASE_URL || '';
+  const rawUrl = config.databaseUrl;
   // Extract just the host portion — never log credentials.
   const dbHost = rawUrl.replace(/^[^@]*@/, '').split('/')[0] || 'unknown host';
   console.log(`✅ Storage: DatabaseStorage (Neon PostgreSQL @ ${dbHost})`);

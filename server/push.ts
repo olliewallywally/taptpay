@@ -7,12 +7,13 @@ import {
   type PushSubscription,
 } from "@shared/schema";
 import { storage } from "./storage";
+import { config } from "./config";
 
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || "";
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || "";
+const VAPID_PUBLIC_KEY = config.push.vapidPublicKey ?? "";
+const VAPID_PRIVATE_KEY = config.push.vapidPrivateKey ?? "";
 const VAPID_SUBJECT = "mailto:support@taptpay.co.nz";
 
-const APNS_BUNDLE_ID = process.env.APNS_BUNDLE_ID || "nz.taptpay.app";
+const APNS_BUNDLE_ID = config.push.apnsBundleId;
 const APNS_HOST = "api.push.apple.com";
 
 let pushInitialized = false;
@@ -130,9 +131,9 @@ let apnsJwtToken: string | null = null;
 let apnsJwtIssuedAt = 0;
 
 function getApnsJwt(): string | null {
-  const APNS_KEY_P8 = process.env.APNS_KEY_P8;
-  const APNS_KEY_ID = process.env.APNS_KEY_ID;
-  const APNS_TEAM_ID = process.env.APNS_TEAM_ID;
+  const APNS_KEY_P8 = config.push.apnsKey;
+  const APNS_KEY_ID = config.push.apnsKeyId;
+  const APNS_TEAM_ID = config.push.apnsTeamId;
 
   if (!APNS_KEY_P8 || !APNS_KEY_ID || !APNS_TEAM_ID) return null;
 
@@ -229,9 +230,9 @@ async function sendNativePushToMerchant(
   payload: PushPayload
 ): Promise<Pick<PushDeliveryResult, "attempted" | "delivered" | "failed">> {
   const hasCredentials = !!(
-    process.env.APNS_KEY_P8 &&
-    process.env.APNS_KEY_ID &&
-    process.env.APNS_TEAM_ID
+    config.push.apnsKey &&
+    config.push.apnsKeyId &&
+    config.push.apnsTeamId
   );
 
   if (!hasCredentials) {

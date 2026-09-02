@@ -11,12 +11,13 @@
  */
 
 import { normalizeNzPhone } from "./whatsapp-service";
+import { config } from "./config";
 
 export function isSmsConfigured(): boolean {
   return !!(
-    process.env.TWILIO_ACCOUNT_SID &&
-    process.env.TWILIO_AUTH_TOKEN &&
-    (process.env.TWILIO_FROM_NUMBER || process.env.TWILIO_MESSAGING_SERVICE_SID)
+    config.sms.accountSid &&
+    config.sms.authToken &&
+    (config.sms.fromNumber || config.sms.messagingServiceSid)
   );
 }
 
@@ -37,22 +38,22 @@ export async function sendSms(opts: { toPhone: string; text: string }): Promise<
     return { ok: false };
   }
   const to = `+${digits}`;
-  const sid = process.env.TWILIO_ACCOUNT_SID as string;
+  const sid = config.sms.accountSid as string;
   const url = `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(sid)}/Messages.json`;
 
   const form = new URLSearchParams();
   form.set("To", to);
   form.set("Body", opts.text);
-  if (process.env.TWILIO_MESSAGING_SERVICE_SID) {
-    form.set("MessagingServiceSid", process.env.TWILIO_MESSAGING_SERVICE_SID);
+  if (config.sms.messagingServiceSid) {
+    form.set("MessagingServiceSid", config.sms.messagingServiceSid);
   } else {
-    form.set("From", process.env.TWILIO_FROM_NUMBER as string);
+    form.set("From", config.sms.fromNumber as string);
   }
 
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15_000);
-    const auth = Buffer.from(`${sid}:${process.env.TWILIO_AUTH_TOKEN}`).toString("base64");
+    const auth = Buffer.from(`${sid}:${config.sms.authToken}`).toString("base64");
     const res = await fetch(url, {
       method: "POST",
       headers: {

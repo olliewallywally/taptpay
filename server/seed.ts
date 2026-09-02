@@ -1,6 +1,7 @@
 import { getDb } from './database';
 import { merchants, transactions } from '@shared/schema';
 import { createUser } from './auth';
+import { config } from './config';
 
 export async function seedDatabase() {
   const db = getDb();
@@ -32,7 +33,9 @@ export async function seedDatabase() {
       // status (createUser below sets the passwordHash).
       status: "active",
       qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=https://tapt.co.nz/pay/1",
-      paymentUrl: `https://${process.env.REPLIT_DOMAINS?.split(',')[0] || 'localhost:5000'}/pay/1`,
+      paymentUrl: `${config.publicOrigin || (config.legacyDomains.replitDomains
+        ? `https://${config.legacyDomains.replitDomains.split(',')[0]}`
+        : "http://localhost:5000")}/pay/1`,
       currentProviderRate: "2.9000", // 2.9%
       ourRate: "0.2000", // 0.2%
     }).returning();

@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import express from "express";
+import { config } from "./config";
 import { createServer, type Server } from "http";
 import { installAsyncRouteGuard } from "./async-route-guard";
 import {
@@ -16,7 +17,7 @@ import { eq } from "drizzle-orm";
 import { TUTORIAL_PAGE_KEYS, isTutorialPageKey } from "@shared/tutorial";
 import { inviteTeamMemberSchema, acceptInviteSchema, retailTransactionCreateRequestSchema, updateMerchantDetailsSchema, updateThemeSchema, updateDailyGoalSchema, forgotPasswordSchema, resetPasswordSchema, createMerchantSchema, changePasswordSchema, createRefundSchema, insertRefundSchema, createStockItemSchema, updateStockItemSchema, publicSignupSchema, businessDetailsSchema, pushNotificationPreferencesSchema, createTenantProfileSchema, updateTenantProfileSchema, createActiveScheduleSchema, updateActiveScheduleSchema, createAdHocInvoiceSchema, markInvoicePaidExternalSchema, updateRentReminderSettingsSchema, createClientProfileSchema, updateClientProfileSchema, createQuoteSchema, acceptQuoteSchema, createJobInvoiceSchema, markJobPaidExternalSchema, createJobScheduleSchema, updateJobScheduleSchema, updateTradeReminderSettingsSchema, updateTradeGstSettingsSchema } from "@shared/schema";
 import { windcaveService, isWindcaveConfigured, createWindcaveSession, queryWindcaveSession, createWindcaveRefund, simulateCreateSession, simulateQuerySession, simulateRentSession, getWindcaveEnv, submitGooglePayToken, createAttendedSession, submitTapToPayToken, simulateAttendedTapToPay, createCardStorageSession, queryStoredCardSession, chargeStoredCard } from "./windcave";
-import { authenticateUser, generateToken, authenticateToken, createUser, isAccountOwner, requestPasswordReset, resetPassword, validateResetToken, JWT_SECRET, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
+import { authenticateUser, generateToken, authenticateToken, createUser, isAccountOwner, requestPasswordReset, resetPassword, validateResetToken, type AuthenticatedRequest, isAccountLocked, isIPRateLimited, recordFailedLogin, clearFailedAttempts, logSecurityEvent, syncVerifiedMerchants } from "./auth";
 import { generateReceiptPdf } from "./pdf-generator";
 import { generateQuotePdf } from "./trades-quote-pdf";
 import { generateBusinessReportPdf } from "./report-generator";
@@ -90,7 +91,7 @@ let lastCronRun: {
 } | null = null;
 
 function authorizeCronRequest(req: express.Request, res: express.Response): boolean {
-  const cronSecret = process.env.CRON_SECRET;
+  const cronSecret = config.cronSecret;
   if (!cronSecret) {
     res.status(503).json({ message: "Cron not configured" });
     return false;
@@ -433,7 +434,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     });
     if (!authenticated) return;
 
-    const adminEmail = process.env.ADMIN_EMAIL;
+    const adminEmail = config.admin.email;
     if (
       req.user?.role !== "admin" ||
       req.user.merchantId !== 0 ||
@@ -460,7 +461,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
   // Google OAuth routes
   app.get("/api/auth/google", (req, res) => {
-    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientId = config.oauth.googleClientId;
     if (!clientId) {
       return res.redirect('/login?error=Google+sign+in+is+not+configured');
     }
@@ -484,8 +485,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
 
     try {
-      const clientId = process.env.GOOGLE_CLIENT_ID!;
-      const clientSecret = process.env.GOOGLE_CLIENT_SECRET!;
+      const clientId = config.oauth.googleClientId;
+      const clientSecret = config.oauth.googleClientSecret;
+      if (!clientId || !clientSecret) {
+        return res.redirect('/login?error=Google+sign+in+is+not+configured');
+      }
       const redirectUri = `${getBaseUrl(req)}/api/auth/google/callback`;
 
       // Exchange code for tokens
@@ -754,8 +758,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
       
       // Check for admin credentials
-      const adminEmail = process.env.ADMIN_EMAIL;
-      const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
+      const adminEmail = config.admin.email;
+      const adminPasswordHash = config.admin.passwordHash;
 
       if (adminEmail && email === adminEmail) {
         let passwordValid = false;
@@ -985,7 +989,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
       // Send notification email to TaptPay admin
       // All user-supplied values are HTML-escaped via escHtml() to prevent injection.
-      const adminEmail = process.env.ADMIN_EMAIL || process.env.ADMIN_NOTIFY_EMAIL;
+      const adminEmail = config.admin.email || config.admin.notifyEmail;
       if (adminEmail) {
         const emailHtml = `
           <h2>New Merchant KYC Submission</h2>
@@ -1573,9 +1577,15 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       });
       tokenAttemptSessionCreation.set(claim.attempt.id, creationLatch);
       try {
+      if (!config.paymentReturnStateSecret) {
+        return res.status(503).json({
+          code: "PAYMENT_RETURN_STATE_UNAVAILABLE",
+          message: "Payment initiation is temporarily unavailable",
+        });
+      }
       const returnState = createPaymentReturnState(
         claim.attempt.id,
-        process.env.PAYMENT_RETURN_STATE_SECRET || JWT_SECRET,
+        config.paymentReturnStateSecret,
       ).rawToken;
       const baseUrl = getBaseUrl(req);
       const xId = claim.attempt.id.replace(/-/g, "").slice(0, 16);
@@ -2083,7 +2093,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       }
       if (!(await requireBillingCard(validation.data.merchantId, res))) return;
 
-      if (validation.data.linkMode === "per_payment" && process.env.ENABLE_PER_PAYMENT_LINKS !== "true") {
+      if (validation.data.linkMode === "per_payment" && !config.features.newRetailPayments) {
         return res.status(503).json({ message: "Per-payment links are not enabled yet" });
       }
 
@@ -2946,12 +2956,11 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     // googlePayEnv is independent of Windcave's env — it requires domain registration
     // at console.googlepay.com before switching to "PRODUCTION".
     // Set GOOGLE_PAY_ENV=PRODUCTION once the domain is registered.
-    const googlePayEnv: "TEST" | "PRODUCTION" =
-      process.env.GOOGLE_PAY_ENV === "PRODUCTION" ? "PRODUCTION" : "TEST";
+    const googlePayEnv = config.wallets.googlePayEnvironment;
     res.json({
       env: getWindcaveEnv(),
-      applePayMerchantId: process.env.WINDCAVE_APPLE_PAY_MERCHANT_ID || "",
-      googlePayMerchantId: process.env.WINDCAVE_GOOGLE_PAY_MERCHANT_ID || "",
+      applePayMerchantId: config.windcave.applePayMerchantId || "",
+      googlePayMerchantId: config.windcave.googlePayMerchantId || "",
       googlePayEnv,
     });
   });
@@ -4195,7 +4204,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       message: configured
         ? "Windcave API is configured and ready (UAT)"
         : "Running in simulation mode. Configure WINDCAVE_USERNAME and WINDCAVE_API_KEY to enable live payments.",
-      endpoint: process.env.WINDCAVE_ENDPOINT || "https://uat.windcave.com/api/v1",
+      endpoint: config.windcave.endpoint || "",
     });
   });
 
@@ -4347,8 +4356,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
   // GA4 detailed metrics — chart + countries (range: 7d | 14d | 30d | all)
   app.get("/api/admin/ga4-detailed", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
-    const propertyId = process.env.GOOGLE_ANALYTICS_PROPERTY_ID;
-    const serviceAccountRaw = process.env.GOOGLE_ANALYTICS_SERVICE_ACCOUNT;
+    const propertyId = config.analytics.propertyId;
+    const serviceAccountRaw = config.analytics.serviceAccount;
     if (!propertyId || !serviceAccountRaw) return res.json({ configured: false });
 
     const range = (req.query.range as string) || '7d';
@@ -4412,8 +4421,8 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
   // GA4 metrics for admin portal
   app.get("/api/admin/ga4-metrics", authenticateAdmin, async (req: AuthenticatedRequest, res) => {
-    const propertyId = process.env.GOOGLE_ANALYTICS_PROPERTY_ID;
-    const serviceAccountRaw = process.env.GOOGLE_ANALYTICS_SERVICE_ACCOUNT;
+    const propertyId = config.analytics.propertyId;
+    const serviceAccountRaw = config.analytics.serviceAccount;
 
     if (!propertyId || !serviceAccountRaw) {
       return res.json({ configured: false });
@@ -4705,7 +4714,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     try {
       const testEmail = await sendEmail({
         to: req.user?.email || 'test@example.com',
-        from: process.env.RESEND_FROM_EMAIL || 'noreply@taptpay.co.nz',
+        from: config.email.fromEmail,
         subject: 'TaptPay Email Test',
         text: 'This is a test email to verify the Resend email configuration.',
         html: '<h2>TaptPay Email Test</h2><p>This is a test email to verify the Resend email configuration.</p>'
@@ -4730,9 +4739,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const status = getEmailServiceStatus();
       res.json({
         ...status,
-        nodeEnv: process.env.NODE_ENV || 'development',
-        fromAddress: process.env.RESEND_FROM_EMAIL || 'noreply@taptpay.co.nz',
-        adminNotifyConfigured: !!(process.env.ADMIN_EMAIL || process.env.ADMIN_NOTIFY_EMAIL),
+        nodeEnv: config.appEnv,
+        fromAddress: config.email.fromEmail,
+        adminNotifyConfigured: !!(config.admin.email || config.admin.notifyEmail),
         // In production with no real provider, emails are NOT delivered (and no
         // longer silently "simulated" as success).
         willDeliver: status.availableProviders.length > 0,
@@ -4856,7 +4865,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
           .join(" ");
         const notificationSent = await sendEmail({
           to: "oliver@taptpay.co.nz",
-          from: process.env.RESEND_FROM_EMAIL || "noreply@taptpay.co.nz",
+          from: config.email.fromEmail,
           subject: `Verified TaptPay signup — ${(merchant.businessName || merchant.name || "").replace(/[\r\n]/g, "")}`,
           html: `
             <div style="font-family:Arial,sans-serif;max-width:680px;margin:0 auto;color:#06102f">
@@ -4969,7 +4978,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const safeEmail = email.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
       // Fire-and-forget notification — do not block the response
-      const leadNotifyEmail = process.env.ADMIN_EMAIL;
+      const leadNotifyEmail = config.admin.email;
       if (leadNotifyEmail) sendEmail({
         to: leadNotifyEmail,
         from: 'noreply@taptpay.co.nz',
@@ -5301,13 +5310,13 @@ else{window.location.href=${JSON.stringify(payUrl)};}
 
   // Push capabilities — reports which delivery paths are ready on this server
   app.get("/api/push/capabilities", (_req, res) => {
-    const vapidPublic = process.env.VAPID_PUBLIC_KEY || "";
-    const vapidPrivate = process.env.VAPID_PRIVATE_KEY || "";
+    const vapidPublic = config.push.vapidPublicKey || "";
+    const vapidPrivate = config.push.vapidPrivateKey || "";
     const webPushReady = !!(vapidPublic && vapidPrivate);
 
-    const apnsKey = process.env.APNS_KEY_P8 || "";
-    const apnsKeyId = process.env.APNS_KEY_ID || "";
-    const apnsTeamId = process.env.APNS_TEAM_ID || "";
+    const apnsKey = config.push.apnsKey || "";
+    const apnsKeyId = config.push.apnsKeyId || "";
+    const apnsTeamId = config.push.apnsTeamId || "";
     const nativePushReady = !!(apnsKey && apnsKeyId && apnsTeamId);
 
     res.json({
@@ -5318,15 +5327,15 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       nativePush: {
         available: nativePushReady,
         reason: nativePushReady ? undefined : "APNs credentials not configured",
-        bundleId: process.env.APNS_BUNDLE_ID || "nz.taptpay.app",
+        bundleId: config.push.apnsBundleId,
       },
     });
   });
 
   // Get VAPID public key for push notification subscription
   app.get("/api/push/vapid-key", (req, res) => {
-    const vapidKey = process.env.VAPID_PUBLIC_KEY || "";
-    const vapidPrivate = process.env.VAPID_PRIVATE_KEY || "";
+    const vapidKey = config.push.vapidPublicKey || "";
+    const vapidPrivate = config.push.vapidPrivateKey || "";
     if (!vapidKey || !vapidPrivate) {
       return res.status(503).json({ message: "Push notifications not configured" });
     }
@@ -5336,7 +5345,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   // Subscribe to push notifications
   app.post("/api/push/subscribe", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
-      if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+      if (!config.push.vapidPublicKey || !config.push.vapidPrivateKey) {
         return res.status(503).json({ message: "Push notifications not configured on server" });
       }
 
@@ -6004,7 +6013,7 @@ else{window.location.href=${JSON.stringify(payUrl)};}
         return res.status(403).json({ error: 'Insufficient permissions' });
       }
       if (!(await requireBillingCard(req.apiKey.merchantId, res))) return;
-      if (process.env.ENABLE_PER_PAYMENT_LINKS !== "true") {
+      if (!config.features.newRetailPayments) {
         return res.status(503).json({ error: "Per-payment links are not enabled yet" });
       }
 
@@ -6333,23 +6342,23 @@ else{window.location.href=${JSON.stringify(payUrl)};}
       const isAndroid = /Android/.test(userAgent);
       const isChrome = /Chrome/.test(userAgent) && /Google Inc/.test(req.headers['user-agent'] || '');
 
-      const config = {
+      const walletConfig = {
         applePaySupported: isIOS,
         googlePaySupported: isAndroid && isChrome,
         paymentRequestSupported: !!globalThis.PaymentRequest,
         environment: windcaveService.isConfigured() ? "production" : "test",
-        merchantId: process.env.APPLE_PAY_MERCHANT_ID || "merchant.com.tapt.payment",
+        merchantId: config.wallets.applePayMerchantId,
         merchantName: "Tapt Payment",
         supportedNetworks: ["visa", "mastercard", "amex", "eftpos"],
         countryCode: "NZ",
         currencyCode: "NZD",
         googlePayGateway: {
           gateway: "windcave",
-          gatewayMerchantId: process.env.WINDCAVE_MERCHANT_ID || "test-merchant"
+          gatewayMerchantId: config.windcave.merchantId || "test-merchant"
         }
       };
 
-      res.json(config);
+      res.json(walletConfig);
     } catch (error) {
       console.error("Digital wallet config error:", error);
       res.status(500).json({ error: "Failed to get digital wallet configuration" });
@@ -7946,9 +7955,9 @@ else{window.location.href=${JSON.stringify(payUrl)};}
   app.post("/api/webhooks/whatsapp", express.json(), async (req, res) => {
     res.status(200).send("OK"); // respond immediately so Evolution doesn't retry
     try {
-      if (process.env.EVOLUTION_API_KEY) {
+      if (config.whatsapp.apiKey) {
         const incoming = req.headers["apikey"] as string | undefined;
-        if (incoming !== process.env.EVOLUTION_API_KEY) {
+        if (incoming !== config.whatsapp.apiKey) {
           console.warn("[WA_WEBHOOK] rejected — bad apikey");
           return;
         }

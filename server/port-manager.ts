@@ -1,6 +1,7 @@
 import { exec } from "child_process";
 import { promisify } from "util";
 import type { Server } from "http";
+import { config } from "./config";
 
 const execAsync = promisify(exec);
 
@@ -167,7 +168,7 @@ export function setupGracefulShutdown(server: Server, port: number): void {
   // (autoscale) replaces crashed instances, so exit fast on unknown state.
   process.on('uncaughtException', (error) => {
     console.error('❌ Uncaught exception (server kept alive in dev):', error);
-    if (process.env.NODE_ENV === 'production') {
+    if (config.isProduction) {
       gracefulShutdown('UNCAUGHT_EXCEPTION');
     }
   });

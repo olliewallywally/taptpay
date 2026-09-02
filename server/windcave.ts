@@ -1,15 +1,16 @@
 // Windcave RESTful API Integration
 import crypto from "crypto";
 import { redactSensitive } from "./request-log";
+import { config } from "./config";
 
-const WINDCAVE_ENDPOINT = process.env.WINDCAVE_ENDPOINT || "https://uat.windcave.com/api/v1";
+const WINDCAVE_ENDPOINT = config.windcave.endpoint || "";
 const SESSION_URL = `${WINDCAVE_ENDPOINT}/sessions`;
 const TRANSACTION_URL = `${WINDCAVE_ENDPOINT}/transactions`;
 const REQUEST_TIMEOUT = 15000;
 const RETRY_LIMIT = 5;
 
 export function getWindcaveEnv(): "uat" | "sec" {
-  const endpoint = process.env.WINDCAVE_ENDPOINT || "";
+  const endpoint = config.windcave.endpoint || "";
   return endpoint.includes("sec.windcave.com") ? "sec" : "uat";
 }
 
@@ -30,8 +31,8 @@ function logAudit(action: string, details: Record<string, any>) {
 }
 
 function buildAuthHeader(): string {
-  const username = process.env.WINDCAVE_USERNAME || "";
-  const apiKey = process.env.WINDCAVE_API_KEY || "";
+  const username = config.windcave.username || "";
+  const apiKey = config.windcave.apiKey || "";
   return `Basic ${Buffer.from(`${username}:${apiKey}`).toString("base64")}`;
 }
 
@@ -778,7 +779,12 @@ export async function createWindcaveRefund(
 }
 
 export function isWindcaveConfigured(): boolean {
-  return !!(process.env.WINDCAVE_USERNAME && process.env.WINDCAVE_API_KEY);
+  return !!(
+    (config.paymentMode === "uat" || config.paymentMode === "production") &&
+    config.windcave.endpoint &&
+    config.windcave.username &&
+    config.windcave.apiKey
+  );
 }
 
 function delay(ms: number): Promise<void> {

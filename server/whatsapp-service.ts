@@ -9,9 +9,10 @@
  *   EVOLUTION_API_KEY   the instance/global apikey
  *   EVOLUTION_INSTANCE  default instance name (per-merchant override possible)
  */
+import { config } from "./config";
 
 export function isWhatsAppConfigured(): boolean {
-  return !!(process.env.EVOLUTION_API_URL && process.env.EVOLUTION_API_KEY);
+  return !!(config.whatsapp.apiUrl && config.whatsapp.apiKey);
 }
 
 /**
@@ -44,8 +45,8 @@ export async function sendWhatsApp(opts: { toPhone: string; text: string; instan
     console.warn(`[WHATSAPP] unparseable number: ${opts.toPhone}`);
     return { ok: false };
   }
-  const base = (process.env.EVOLUTION_API_URL || "").replace(/\/+$/, "");
-  const instance = opts.instance || process.env.EVOLUTION_INSTANCE || "default";
+  const base = (config.whatsapp.apiUrl || "").replace(/\/+$/, "");
+  const instance = opts.instance || config.whatsapp.instance;
   const url = `${base}/message/sendText/${encodeURIComponent(instance)}`;
 
   try {
@@ -53,7 +54,7 @@ export async function sendWhatsApp(opts: { toPhone: string; text: string; instan
     const timer = setTimeout(() => controller.abort(), 15_000);
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json", apikey: process.env.EVOLUTION_API_KEY as string },
+      headers: { "Content-Type": "application/json", apikey: config.whatsapp.apiKey as string },
       body: JSON.stringify({ number, text: opts.text }),
       signal: controller.signal,
     });

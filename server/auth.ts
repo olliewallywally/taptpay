@@ -1,4 +1,5 @@
 import bcrypt from 'bcrypt';
+import { config } from './config';
 import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
@@ -238,12 +239,7 @@ export async function syncVerifiedMerchants(): Promise<void> {
   // no-op — authentication reads live from the users table
 }
 
-export const JWT_SECRET = process.env.JWT_SECRET ?? (() => {
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('JWT_SECRET environment variable must be set in production');
-  }
-  return 'dev-only-jwt-secret-not-for-production';
-})();
+export const JWT_SECRET = config.jwtSecret;
 
 function userRowToUser(row: {
   id: number;
@@ -321,7 +317,7 @@ export function generateToken(user: User): string {
   }
 
   if (user.role === 'admin') {
-    const adminEmail = process.env.ADMIN_EMAIL;
+    const adminEmail = config.admin.email;
     if (!adminEmail || user.email.toLowerCase() !== adminEmail.toLowerCase() || user.merchantId !== 0) {
       throw new Error('Cannot issue an admin token for an unconfigured principal');
     }
@@ -412,7 +408,7 @@ export async function authenticateToken(req: AuthenticatedRequest, res: Response
   // A role string alone is not admin authority. Require the dedicated principal,
   // the configured email, and a zero merchant scope.
   if (decoded.role === 'admin') {
-    const adminEmail = process.env.ADMIN_EMAIL;
+    const adminEmail = config.admin.email;
     if (
       decoded.principal !== ADMIN_TOKEN_PRINCIPAL ||
       !adminEmail ||

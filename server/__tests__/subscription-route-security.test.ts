@@ -145,7 +145,7 @@ describe("admin and SSE token provenance", () => {
     expect(guard).toContain("await authenticateToken(req, res");
     expect(guard).toContain('req.user?.role !== "admin"');
     expect(guard).toContain("req.user.merchantId !== 0");
-    expect(guard).toContain("ADMIN_EMAIL");
+    expect(guard).toContain("config.admin.email");
     expect(handler("get", "/api/admin/auth/me")).toContain("authenticateAdmin");
   });
 

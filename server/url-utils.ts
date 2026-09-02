@@ -1,16 +1,20 @@
 /**
  * Utility functions for generating proper URLs based on the current environment
  */
+import { config } from "./config";
 
 export function getBaseUrl(req?: any): string {
   // In production, use the configured production domain for stable callback URLs
-  if (process.env.PRODUCTION_DOMAIN) {
-    return `https://${process.env.PRODUCTION_DOMAIN}`;
+  if (config.publicOrigin) {
+    return config.publicOrigin;
+  }
+  if (config.legacyDomains.productionDomain) {
+    return `https://${config.legacyDomains.productionDomain}`;
   }
 
   // In production (Replit), use the REPLIT_DOMAINS environment variable
-  if (process.env.REPLIT_DOMAINS) {
-    const domain = process.env.REPLIT_DOMAINS.split(',')[0];
+  if (config.legacyDomains.replitDomains) {
+    const domain = config.legacyDomains.replitDomains.split(',')[0];
     return `https://${domain}`;
   }
   

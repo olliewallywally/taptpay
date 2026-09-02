@@ -1,4 +1,5 @@
 import express from "express";
+import { config } from "./config";
 import fs from "fs";
 import path from "path";
 import helmet from "helmet";
@@ -22,7 +23,7 @@ const app = express();
 // ============================================
 // SECURITY HEADERS - Payment Processor Grade
 // ============================================
-const isProduction = process.env.NODE_ENV === 'production';
+const isProduction = config.isProduction;
 
 // Security headers - CSP enabled in production, disabled in dev for Replit webview compatibility
 app.use(helmet({
@@ -92,21 +93,8 @@ app.use(express.urlencoded({ extended: false }));
 app.use(createRequestLogger(log));
 
 (async () => {
-  // ── JWT_SECRET validation ────────────────────────────────────────────────
-  if (!process.env.JWT_SECRET) {
-    if (isProduction) {
-      console.error('');
-      console.error('[FATAL] JWT_SECRET is NOT set in production.');
-      console.error('  Set JWT_SECRET in your deployment secrets to a strong random value.');
-      console.error('  Refusing to start — running without JWT_SECRET in production is insecure.');
-      console.error('');
-      process.exit(1);
-    } else {
-      console.warn('⚠️  JWT_SECRET not set — using development fallback (acceptable in dev only).');
-      process.env.JWT_SECRET = 'dev-secret-key-change-in-production';
-    }
-  } else {
-    console.log('✅ JWT_SECRET: configured');
+  for (const diagnostic of config.diagnostics) {
+    console.warn(`[CONFIG] ${diagnostic.group}: ${diagnostic.key}`);
   }
 
   // ── Database connectivity verification ───────────────────────────────────
@@ -155,11 +143,11 @@ app.use(createRequestLogger(log));
   // a non-zero exit code instead of silently destroying live data. If you need
   // to apply schema changes, run `npm run db:push` manually after reviewing
   // exactly what will be changed, or start with RUN_SCHEMA_PUSH=true.
-  if (process.env.RUN_MIGRATIONS === 'true') {
+  if (config.retiredRunMigrations) {
     console.error('[FATAL] RUN_MIGRATIONS is retired; run `npm run db:migrate` as a deliberate deploy step.');
     process.exit(1);
   }
-  const runSchemaPush = process.env.RUN_SCHEMA_PUSH === 'true';
+  const runSchemaPush = config.runSchemaPush;
   if (isDatabaseConnected() && runSchemaPush) {
     log('Running schema push to sync database...');
     try {
@@ -173,7 +161,6 @@ app.use(createRequestLogger(log));
             stdio: 'pipe',
             encoding: 'utf8',
             timeout: 30_000,
-            env: { ...process.env },
           }
         );
         if (push.status === 0) {
@@ -217,7 +204,7 @@ app.use(createRequestLogger(log));
   // production Neon) on every boot and then daily, via pg_dump into db-backups/.
   // Runs in the workspace only — the deployed container has no pg_dump and its
   // filesystem is ephemeral, so backups there would be pointless.
-  if (process.env.NODE_ENV !== 'production') {
+  if (!config.isProduction) {
     const backupScript = path.resolve(process.cwd(), 'scripts', 'db-backup.sh');
     if (fs.existsSync(backupScript)) {
       const runBackup = () => {
@@ -297,7 +284,7 @@ app.use(createRequestLogger(log));
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
+  if (config.appEnv === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
@@ -324,16 +311,14 @@ app.use(createRequestLogger(log));
   log(`✅ Server successfully running on ${host}:${port}`);
 
   // Keep Neon database endpoint alive — ping every 4 minutes to prevent auto-suspension
-  if (process.env.DATABASE_URL) {
-    const { neon } = await import("@neondatabase/serverless");
-    const keepAliveSql = neon(process.env.DATABASE_URL);
-    setInterval(async () => {
-      try {
-        await keepAliveSql`SELECT 1`;
-      } catch {
-        // Silently ignore — server continues regardless
-      }
-    }, 4 * 60 * 1000);
-    log("✅ Database keep-alive ping started (every 4 minutes)");
-  }
+  const { neon } = await import("@neondatabase/serverless");
+  const keepAliveSql = neon(config.databaseUrl);
+  setInterval(async () => {
+    try {
+      await keepAliveSql`SELECT 1`;
+    } catch {
+      // Silently ignore — server continues regardless
+    }
+  }, 4 * 60 * 1000);
+  log("✅ Database keep-alive ping started (every 4 minutes)");
 })();

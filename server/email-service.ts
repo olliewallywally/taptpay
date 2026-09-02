@@ -1,6 +1,7 @@
 import { Resend } from 'resend';
+import { config } from './config';
 
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+const resend = config.email.resendApiKey ? new Resend(config.email.resendApiKey) : null;
 
 if (!resend) {
   console.warn("RESEND_API_KEY not set. Email functionality will be simulated.");
@@ -25,7 +26,7 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
     // In production, never pretend a simulated email was delivered — that masks
     // a missing RESEND_API_KEY and makes "email sent" lies propagate to callers,
     // logs, and the admin test endpoint. Report the real failure instead.
-    if (process.env.NODE_ENV === 'production') {
+    if (config.isProduction) {
       console.error(`❌ RESEND_API_KEY not set — cannot send email "${params.subject}" to ${params.to}`);
       return false;
     }

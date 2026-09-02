@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
 import nodemailer from 'nodemailer';
+import { config } from './config';
 
 interface EmailParams {
   to: string;
@@ -10,27 +11,27 @@ interface EmailParams {
 }
 
 const EMAIL_CONFIG = {
-  provider: process.env.EMAIL_PROVIDER || 'resend',
+  provider: config.email.provider,
   resend: {
-    apiKey: process.env.RESEND_API_KEY,
-    fromEmail: process.env.RESEND_FROM_EMAIL || 'noreply@taptpay.co.nz',
+    apiKey: config.email.resendApiKey,
+    fromEmail: config.email.fromEmail,
   },
   smtp: {
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true',
+    host: config.email.smtpHost,
+    port: config.email.smtpPort,
+    secure: config.email.smtpSecure,
     auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
+      user: config.email.smtpUser,
+      pass: config.email.smtpPass,
     },
   },
   gmail: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_APP_PASSWORD,
+    user: config.email.gmailUser,
+    pass: config.email.gmailAppPassword,
   },
   outlook: {
-    user: process.env.OUTLOOK_USER,
-    pass: process.env.OUTLOOK_PASS,
+    user: config.email.outlookUser,
+    pass: config.email.outlookPass,
   },
 };
 
@@ -125,7 +126,7 @@ export async function sendEmailMulti(params: EmailParams): Promise<boolean> {
     // Only simulate (and report success) outside production, or when the operator
     // explicitly opted into simulation. In production a genuine delivery failure
     // must surface as a failure, not be masked by a fake "sent" result.
-    if (process.env.NODE_ENV === 'production' && EMAIL_CONFIG.provider !== 'simulation') {
+    if (config.isProduction && EMAIL_CONFIG.provider !== 'simulation') {
       console.error(`❌ Email delivery failed (provider="${EMAIL_CONFIG.provider}", resendConfigured=${!!resendClient}) — "${params.subject}" to ${params.to}`);
       return false;
     }
@@ -142,8 +143,8 @@ export async function sendMerchantVerificationEmail(
   merchantName: string,
   baseUrl?: string
 ): Promise<boolean> {
-  const properBaseUrl = baseUrl || (process.env.REPLIT_DOMAINS
-    ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+  const properBaseUrl = baseUrl || config.publicOrigin || (config.legacyDomains.replitDomains
+    ? `https://${config.legacyDomains.replitDomains.split(',')[0]}`
     : 'http://localhost:5000');
   const confirmUrl = `${properBaseUrl}/confirm-email?token=${token}`;
 
