@@ -62,7 +62,7 @@ export interface AppConfig {
   readonly publicOrigin?: string;
   readonly publicApiOrigin?: string;
   readonly databaseTarget: DatabaseTarget;
-  readonly databaseUrl: string;
+  readonly databaseUrl?: string;
   readonly jwtSecret: string;
   readonly paymentReturnStateSecret?: string;
   readonly cronSecret?: string;
@@ -249,7 +249,9 @@ export function loadConfig(env: EnvironmentSource): Readonly<AppConfig> {
   }
 
   const databaseUrl = nonempty(env, "DATABASE_URL");
-  if (!databaseUrl) throw new ConfigValidationError("DATABASE_URL", "database");
+  if (!databaseUrl && (appEnv === "staging" || appEnv === "production")) {
+    throw new ConfigValidationError("DATABASE_URL", "database");
+  }
 
   const jwtSecret = nonempty(env, "JWT_SECRET");
   if (!jwtSecret && (appEnv === "staging" || appEnv === "production")) {
@@ -264,6 +266,13 @@ export function loadConfig(env: EnvironmentSource): Readonly<AppConfig> {
   ) as Record<BooleanEnvironmentKey, boolean>;
   if (rawBooleans.FEATURE_CRYPTO) {
     throw new ConfigValidationError("FEATURE_CRYPTO", "capability", "must remain false");
+  }
+  if (rawBooleans.SEED_DEMO_DATA && appEnv !== "development" && appEnv !== "test") {
+    throw new ConfigValidationError(
+      "SEED_DEMO_DATA",
+      "database",
+      "cannot be true in staging or production",
+    );
   }
 
   const paymentMode = enumValue(

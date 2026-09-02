@@ -182,13 +182,10 @@ app.use(createRequestLogger(log));
 
   const server = await registerRoutes(app);
 
-  // Initialize database with seed data if connected
-  if (isDatabaseConnected()) {
-    try {
-      await seedDatabase();
-    } catch (error) {
-      log(`⚠️ Database seeding failed: ${error}`);
-    }
+  // Demo data is an explicit development/test action. A requested seed failure
+  // is fatal instead of being hidden behind a warning.
+  if (config.seedDemoData) {
+    await seedDatabase();
   }
 
   // Sync verified merchants to recreate auth users
@@ -311,14 +308,16 @@ app.use(createRequestLogger(log));
   log(`✅ Server successfully running on ${host}:${port}`);
 
   // Keep Neon database endpoint alive — ping every 4 minutes to prevent auto-suspension
-  const { neon } = await import("@neondatabase/serverless");
-  const keepAliveSql = neon(config.databaseUrl);
-  setInterval(async () => {
-    try {
-      await keepAliveSql`SELECT 1`;
-    } catch {
-      // Silently ignore — server continues regardless
-    }
-  }, 4 * 60 * 1000);
-  log("✅ Database keep-alive ping started (every 4 minutes)");
+  if (config.databaseUrl) {
+    const { neon } = await import("@neondatabase/serverless");
+    const keepAliveSql = neon(config.databaseUrl);
+    setInterval(async () => {
+      try {
+        await keepAliveSql`SELECT 1`;
+      } catch {
+        // Silently ignore — server continues regardless
+      }
+    }, 4 * 60 * 1000);
+    log("✅ Database keep-alive ping started (every 4 minutes)");
+  }
 })();

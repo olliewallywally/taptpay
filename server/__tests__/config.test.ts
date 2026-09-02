@@ -146,6 +146,32 @@ describe("fail-closed runtime configuration", () => {
     })).toThrow("CRON_SECRET");
   });
 
+  test("allows the development MemStorage path but requires a database in production", () => {
+    expect(() => loadConfig({
+      ...BASE_ENV,
+      APP_ENV: "development",
+      DATABASE_TARGET: "local",
+      DATABASE_URL: undefined,
+    })).not.toThrow();
+    expect(() => loadConfig({
+      ...BASE_ENV,
+      APP_ENV: "production",
+      DATABASE_TARGET: "production",
+      DATABASE_URL: undefined,
+    })).toThrow("DATABASE_URL");
+  });
+
+  test("rejects demo seeding in staging and production", () => {
+    for (const appEnv of ["staging", "production"] as const) {
+      expect(() => loadConfig({
+        ...BASE_ENV,
+        APP_ENV: appEnv,
+        DATABASE_TARGET: appEnv,
+        SEED_DEMO_DATA: "true",
+      })).toThrow("SEED_DEMO_DATA");
+    }
+  });
+
   test("audit may warn for an inventoried optional email group; enforce stops", () => {
     const audit = loadConfig({
       ...BASE_ENV,

@@ -624,9 +624,6 @@ export interface IStorage extends PaymentAttemptRepository {
     transactionsByStatus: { [key: string]: number };
   }>;
   
-  // Clear operations
-  clearTransactions(merchantId: number): Promise<boolean>;
-
   // API Key operations
   createApiKey(data: any): Promise<any>;
   getApiKey(id: number): Promise<any>;
@@ -2244,20 +2241,6 @@ export class MemStorage implements IStorage {
 
     // Remove merchant
     this.merchants.delete(id);
-    return true;
-  }
-
-  async clearTransactions(merchantId: number): Promise<boolean> {
-    // Clear all transactions for a specific merchant
-    const transactionsToDelete = Array.from(this.transactions.values()).filter(
-      t => t.merchantId === merchantId
-    );
-    
-    transactionsToDelete.forEach(transaction => {
-      this.transactions.delete(transaction.id);
-    });
-    
-    console.log(`Cleared ${transactionsToDelete.length} transactions for merchant ${merchantId}`);
     return true;
   }
 
@@ -4936,20 +4919,6 @@ export class DatabaseStorage implements IStorage {
       averageTransactionValue: completedTransactions.length > 0 ? totalRevenue / completedTransactions.length : 0,
       transactionsByStatus,
     };
-  }
-
-  async clearTransactions(merchantId: number): Promise<boolean> {
-    if (!this.db) throw new Error('Database not available');
-    
-    try {
-      // Delete all transactions for the merchant
-      await this.db.delete(transactions).where(eq(transactions.merchantId, merchantId));
-      console.log(`Cleared transactions for merchant ${merchantId} from database`);
-      return true;
-    } catch (error) {
-      console.error('Error clearing transactions:', error);
-      return false;
-    }
   }
 
   async getRevenueOverTime(merchantId: number, days: number = 30): Promise<Array<{
@@ -7730,7 +7699,7 @@ export const storage: IStorage & { clearAllMerchants?: () => void } = isDatabase
 // Log the active storage backend so every deployment log makes it obvious
 // which backend is in use and confirms data will (or will not) persist.
 if (isDatabaseConnected()) {
-  const rawUrl = config.databaseUrl;
+  const rawUrl = config.databaseUrl ?? '';
   // Extract just the host portion — never log credentials.
   const dbHost = rawUrl.replace(/^[^@]*@/, '').split('/')[0] || 'unknown host';
   console.log(`✅ Storage: DatabaseStorage (Neon PostgreSQL @ ${dbHost})`);

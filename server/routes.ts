@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import express from "express";
 import { config } from "./config";
+import { strictPositiveIntegerParam } from "./http-params";
 import { createServer, type Server } from "http";
 import { installAsyncRouteGuard } from "./async-route-guard";
 import {
@@ -5522,21 +5523,23 @@ else{window.location.href=${JSON.stringify(payUrl)};}
     }
   });
 
-  // Clear transactions for a merchant
+  // Compatibility tombstone. Financial records are never bulk-deleted; future
+  // corrections use typed state transitions and append-only events.
   app.post("/api/merchants/:id/clear-transactions", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    try {
-      const merchantId = parseInt(req.params.id);
-      const success = await storage.clearTransactions(merchantId);
-      
-      if (success) {
-        res.json({ message: "Transactions cleared successfully" });
-      } else {
-        res.status(500).json({ message: "Failed to clear transactions" });
-      }
-    } catch (error) {
-      console.error("Error clearing transactions:", error);
-      res.status(500).json({ message: "Failed to clear transactions" });
+    const merchantId = strictPositiveIntegerParam(req.params.id);
+    if (merchantId === null) {
+      return res.status(400).json({
+        code: "INVALID_MERCHANT_ID",
+        message: "Merchant ID must be a positive integer",
+      });
     }
+    if (req.user?.role === "admin" || !checkAccountOwnership(req, merchantId)) {
+      return res.status(403).json({ code: "FORBIDDEN", message: "Access denied" });
+    }
+    return res.status(410).json({
+      code: "TRANSACTION_CLEARING_RETIRED",
+      message: "Transaction clearing has been retired",
+    });
   });
 
   // ===== REFUND MANAGEMENT ROUTES =====

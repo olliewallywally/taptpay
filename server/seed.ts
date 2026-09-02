@@ -1,13 +1,24 @@
 import { getDb } from './database';
 import { merchants, transactions } from '@shared/schema';
 import { createUser } from './auth';
-import { config } from './config';
+import { config, type AppConfig } from './config';
 
-export async function seedDatabase() {
+type DemoSeedConfig = Pick<AppConfig, 'seedDemoData' | 'appEnv'>;
+
+export function assertDemoSeedAllowed(runtimeConfig: DemoSeedConfig): void {
+  if (!runtimeConfig.seedDemoData) {
+    throw new Error('SEED_DEMO_DATA must be true before demo data can be created');
+  }
+  if (runtimeConfig.appEnv !== 'development' && runtimeConfig.appEnv !== 'test') {
+    throw new Error('Demo seeding is restricted to development and test');
+  }
+}
+
+export async function seedDatabase(runtimeConfig: DemoSeedConfig = config) {
+  assertDemoSeedAllowed(runtimeConfig);
   const db = getDb();
   if (!db) {
-    console.log('Database not available for seeding');
-    return;
+    throw new Error('Database not available for requested demo seed');
   }
 
   try {
@@ -53,9 +64,4 @@ export async function seedDatabase() {
     console.error('Database seeding failed:', error);
     throw error;
   }
-}
-
-// Auto-seed if this file is run directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  seedDatabase().catch(console.error);
 }

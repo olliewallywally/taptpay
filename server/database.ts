@@ -7,10 +7,10 @@
 // single consistent connection, this module now re-exports the same
 // Pool-backed Drizzle instance used everywhere else instead of maintaining
 // a second, independent connection.
-import { db as sharedDb } from './db';
+import { databaseClient } from './db';
 
 export function getDb() {
-  return sharedDb;
+  return databaseClient;
 }
 
 export function isDatabaseConnected(): boolean {

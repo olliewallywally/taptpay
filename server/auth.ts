@@ -1,5 +1,6 @@
 import bcrypt from 'bcrypt';
 import { config } from './config';
+import { isDemoAccountLoginBlocked } from './demo-safety';
 import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
@@ -280,6 +281,7 @@ function userRowToUser(row: {
  * fails the first gate even though their password is still correct.
  */
 export async function authenticateUser(email: string, password: string): Promise<User | null> {
+  if (isDemoAccountLoginBlocked(config.appEnv, email)) return null;
   const { storage } = await import('./storage');
 
   const userRow = await storage.getUserByEmail(email);
