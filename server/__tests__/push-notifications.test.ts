@@ -19,6 +19,7 @@ jest.mock("web-push", () => ({
 }));
 
 import { buildPushPayload, sendPushToMerchant } from "../push";
+import webpush from "web-push";
 
 function subscription(id: number, failedPaymentAlerts: boolean) {
   return {
@@ -39,6 +40,12 @@ function subscription(id: number, failedPaymentAlerts: boolean) {
 }
 
 describe("push notification preference filtering", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env.VAPID_PUBLIC_KEY = "test-public-key";
+    process.env.VAPID_PRIVATE_KEY = "test-private-key";
+  });
+
   test("filters each subscription against the explicit event type", async () => {
     getPushSubscriptionsByMerchant.mockResolvedValue([
       subscription(1, false),
@@ -81,5 +88,19 @@ describe("push notification preference filtering", () => {
     expect(serialized).not.toContain("endpoint");
     expect(serialized).not.toContain("p256dh");
     expect(serialized).not.toContain("auth-secret");
+  });
+
+  test.each([404, 410])("deactivates a web subscription after push status %s", async (statusCode) => {
+    getPushSubscriptionsByMerchant.mockResolvedValue([subscription(3, true)]);
+    (webpush.sendNotification as jest.Mock).mockRejectedValue({ statusCode });
+
+    await expect(sendPushToMerchant(42, {
+      type: "payment_received",
+      itemName: "Safe sale",
+      amount: "14.50",
+      transactionId: 99,
+    })).resolves.toMatchObject({ attempted: 1, failed: 1 });
+
+    expect(deactivatePushSubscription).toHaveBeenCalledWith(3);
   });
 });

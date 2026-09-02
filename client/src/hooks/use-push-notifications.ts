@@ -44,6 +44,16 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return output;
 }
 
+function applicationServerKeysMatch(
+  current: ArrayBuffer | null,
+  expected: Uint8Array,
+): boolean {
+  if (!current) return false;
+  const actual = new Uint8Array(current);
+  if (actual.length !== expected.length) return false;
+  return actual.every((value, index) => value === expected[index]);
+}
+
 const authHeaders = (json = false) => {
   const token = localStorage.getItem("authToken");
   return {
@@ -51,6 +61,53 @@ const authHeaders = (json = false) => {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 };
+
+/**
+ * Keep an already-opted-in browser subscribed after a VAPID key rotation.
+ * A missing subscription remains opted out; only a subscription carrying a
+ * different application-server key is replaced automatically.
+ */
+export async function reconcileExistingWebPushSubscription(
+  registration: ServiceWorkerRegistration,
+  publicKey: string,
+  request: typeof fetch = fetch,
+): Promise<boolean> {
+  const existing = await registration.pushManager.getSubscription();
+  if (!existing) return false;
+
+  const applicationServerKey = urlBase64ToUint8Array(publicKey);
+  if (applicationServerKeysMatch(existing.options.applicationServerKey, applicationServerKey)) {
+    return true;
+  }
+
+  const staleEndpoint = existing.endpoint;
+  await existing.unsubscribe();
+  try {
+    await request("/api/push/unsubscribe", {
+      method: "POST",
+      headers: authHeaders(true),
+      body: JSON.stringify({ endpoint: staleEndpoint }),
+    });
+  } catch {
+    // Local unsubscribe is authoritative for the browser. The server also prunes
+    // a stale 404/410 endpoint during delivery, so recovery must not stop here.
+  }
+
+  const replacement = await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey,
+  });
+  const response = await request("/api/push/subscribe", {
+    method: "POST",
+    headers: authHeaders(true),
+    body: JSON.stringify({ subscription: replacement.toJSON() }),
+  });
+  if (!response.ok) {
+    await replacement.unsubscribe();
+    throw new Error("Server rejected replacement push subscription");
+  }
+  return true;
+}
 
 export interface PushNotifications {
   /** The browser/platform can receive push at all. */
@@ -98,7 +155,23 @@ export function usePushNotifications(): PushNotifications {
     try {
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.getSubscription();
-      setEnabled(!!subscription);
+      if (!subscription) {
+        setEnabled(false);
+        return;
+      }
+      const keyResponse = await fetch("/api/push/vapid-key");
+      if (!keyResponse.ok) {
+        setAvailable(false);
+        setEnabled(false);
+        return;
+      }
+      const { publicKey } = await keyResponse.json();
+      if (typeof publicKey !== "string" || !publicKey) {
+        setAvailable(false);
+        setEnabled(false);
+        return;
+      }
+      setEnabled(await reconcileExistingWebPushSubscription(registration, publicKey));
     } catch {
       setEnabled(false);
     }
